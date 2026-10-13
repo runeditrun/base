@@ -32,6 +32,15 @@ schema at construction. Apply the bookkeeping migration first. Policy fields:
 | `extraPayloads` | Named `{produce,consume}` pairs. Producers return bytes or a byte stream. Consumers receive a verified byte stream and descriptor before D1 commit. |
 | `partBytes` | Maximum part size, default 16 MiB, configurable from 1 KiB to 16 MiB. |
 
+Archives always skip Base's own tables: SQLite and Cloudflare internals, the
+migration ledgers (`d1_migrations`, `_rer_deploy_migrations`,
+`_rer_portability_migrations`), portability bookkeeping, development outboxes,
+operator identity and dependency secrets. `excludedTables` lists them (exact
+names, or prefixes ending in `%`), and `excludedTable(name, policy)` says whether
+an archive under that policy skips a table. A seed's own table inventory, which
+refuses tables it does not know, uses the same predicate, so it does not refuse a
+table Base created and never archives.
+
 For native local CLI transfers, declare executable policy through
 `localPortability({database, buckets, policyModule})`. `policyModule` is a
 seed-root-relative path or a `file:` URL (including `new URL('./archive-policy.mjs',
