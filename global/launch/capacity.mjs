@@ -13,7 +13,7 @@ import { LaunchFailure } from './failure.mjs';
 export const personDefaults = { limit: 10, idleSeconds: 43200 };
 const unboundedLoad = '1000000';
 // The verbs that start a server or enter the job queue on every pin.
-export const personVerbs = new Set(['dev', 'preview', 'install', 'setup', 'build', 'verify', 'deploy', 'export', 'import']);
+export const personVerbs = new Set(['dev', 'demo', 'preview', 'install', 'setup', 'build', 'verify', 'deploy', 'export', 'import']);
 
 // How the pinned dispatcher counts servers, and which person defaults it lacks.
 // describe's `defaults` (from rer-cli-2) is authoritative: the launcher supplies

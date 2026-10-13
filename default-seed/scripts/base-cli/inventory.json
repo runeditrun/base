@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "ee0623e6dbea953e6d7192124b9cc93ca89c28564f415bd3074f8af57c0dfa89"
+      "sha256": "0fe459d90ee52cad127b26eea580c9eac61a79bcdf90d909d81117a6dc587cde"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -137,7 +137,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "2a4e2c1f5c66b6b72d20fee9dc5f36f39e39a7e1c626e4ddc0d1ab43bc85662f"
+      "sha256": "507f5b853841148fd9c12587d3d9176b1ace69dce9d7c803e98e66d10be70750"
     },
     "operator-prerequisites.mjs": {
       "source": "onboarding/operator-prerequisites.mjs",
@@ -359,7 +359,11 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "a1ae39f6fc8548c0fbbaf81b91ca2dc7c9bfd9994554cc8a672c4cdc53d196c0"
+      "sha256": "8c696b526b11af63fd539fc148d4386a6c73bc3859a0d85e96d815cf721a2ff1"
+    },
+    "cli/demo.mjs": {
+      "source": "cli/demo.mjs",
+      "sha256": "dbe10f718f7fbc876816954a1a35e2f108c050ee9e1f4af42ad3af09e5cb3562"
     },
     "cli/dependencies.mjs": {
       "source": "cli/dependencies.mjs",
@@ -395,7 +399,7 @@
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
-      "sha256": "837316ee7acea14a21df88eecccc19bfabb01dc6fe348292937629b60c6ee866"
+      "sha256": "f4e4cd81e9499565693ea1b664be7d9642d6533ae3b98d86eee7154017eadd83"
     },
     "cli/dev-identity.mjs": {
       "source": "cli/dev-identity.mjs",
@@ -471,11 +475,11 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "880ba42f61a0f4e2b60d8071b11256cc9295e63552151647e79c74c372886ff7"
+      "sha256": "3c704dcf40dc707e2b6cd47285b0335635225ff959d9699715ee354718e3bf2a"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "a0b1129189d693c41f34be3724030132542cbc03bd301f649390e3f00d0957ed"
+      "sha256": "c11352f8d32686442be49aae6635d7f947cf674d18b2606e346520f01a63c72d"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -507,7 +511,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "acd98eb82fddd1a8c1463fd11265370f1bf54d6ef06e42caf15b17112539ee46"
+      "sha256": "9db6b3b8387a82653201200133ba91f60b83fc5f75ff9882296d43511f84fd2f"
     },
     "cli/pnpm-probe.mjs": {
       "source": "cli/pnpm-probe.mjs",
@@ -967,7 +971,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "9e3708d5e7c3b4db5a609bc78be19cf49193f05115185216feda84a883b03017"
+      "sha256": "eaf8612eec1eb7fa992012e07e5cffb6fc1fc4a535f6db9d5c8ccc36498d3721"
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",
@@ -1605,6 +1609,10 @@
       "source": "modules/operator-auth/crypto.mjs",
       "sha256": "c9a843518d9223ec91698060bacd5a44cd0c4361adaa6b09c05be69f11a828b8"
     },
+    "modules/operator-auth/csp.mjs": {
+      "source": "modules/operator-auth/csp.mjs",
+      "sha256": "9bf6c5c5b2adcfc6f6c82a657af38346b8ec4e2344aea20b4d972a2564cffaed"
+    },
     "modules/operator-auth/dev-admission.d.mts": {
       "source": "modules/operator-auth/dev-admission.d.mts",
       "sha256": "4fa20898bba75ecf5a09005fd4ea3ae520f8a43b4b2cca5ecb5069443cd72d1d"
@@ -1619,7 +1627,7 @@
     },
     "modules/operator-auth/dev/badge.mjs": {
       "source": "modules/operator-auth/dev/badge.mjs",
-      "sha256": "4c020304e411be6d87fcf12e6c84b27385e357ff9b84f45a1ed3a50fdf7dd933"
+      "sha256": "497be14c6f3e42fd42b2734f887f2566e6f8d9f1465d2f8d717d5f9e10b50f5c"
     },
     "modules/operator-auth/dev/index.d.mts": {
       "source": "modules/operator-auth/dev/index.d.mts",

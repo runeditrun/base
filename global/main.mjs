@@ -30,7 +30,7 @@ pins (installed first by rer install, rer setup or rer dev), else its vendored s
                        Run COMMAND once this computer's job queue admits it (heavy package scripts
                        of a checkout that pins the rer package use it).
 
-Checkout verbs: install, setup, dev, preview, build, verify, reset, deploy, export, import,
+Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy, export, import,
 outbox, doctor, describe, check, release. Run rer VERB --help in a checkout for its flags.
 `;
 

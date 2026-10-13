@@ -12,7 +12,7 @@ export async function exportReference(base, target) {
  await cp(resolve(base, 'onboarding'), resolve(target, 'scripts/base-onboarding'), runtime(resolve(base, 'onboarding')));
  await cp(resolve(base, 'modules/mail'), resolve(target, 'src/modules/mail'), runtime(resolve(base, 'modules/mail')));
  await cp(resolve(base, 'modules/ai'), resolve(target, 'src/modules/ai'), runtime(resolve(base, 'modules/ai')));
- for(const name of ['dependencies','owner-claim'])await cp(resolve(base,'modules/'+name),resolve(target,'src/modules/'+name),runtime(resolve(base,'modules/'+name)));
+ for(const name of ['dependencies','owner-claim','demo'])await cp(resolve(base,'modules/'+name),resolve(target,'src/modules/'+name),runtime(resolve(base,'modules/'+name)));
  await cp(resolve(base, 'modules/operator-auth'), resolve(target, 'src/modules/operator-auth'), runtime(resolve(base, 'modules/operator-auth')));
  // The Worker's erasure route runs these at runtime; `vite dev` serves only src.
  for (const name of ['portability', 'erasure']) await cp(resolve(base, 'modules', name), resolve(target, 'src/modules', name), runtime(resolve(base, 'modules', name)));
@@ -20,12 +20,12 @@ export async function exportReference(base, target) {
  for (const part of ['src', 'schema']) await cp(resolve(base, 'modules/import-kit', part), resolve(target, 'src/modules/import-kit', part), runtime(resolve(base, 'modules/import-kit', part)));
  await cp(resolve(base, 'foundation/runtime'), resolve(target, 'src/base'), { recursive: true });
  await exportCLI(base, target);
- for (const name of ['RUN-LOCALLY.md','SEED-COMMAND-CONTRACT.md','HOMEPAGE-VARIANTS.md','VERIFY-WORKFLOW.md']) await cp(resolve(base,'export',name), resolve(target,name));
+ for (const name of ['RUN-LOCALLY.md','SEED-COMMAND-CONTRACT.md','HOMEPAGE-VARIANTS.md','VERIFY-WORKFLOW.md','DEMO.md']) await cp(resolve(base,'export',name), resolve(target,name));
  await mkdir(resolve(target, '.github/workflows'), { recursive: true });
  await cp(resolve(base, 'export/verify.yml'), resolve(target, '.github/workflows/verify.yml'));
  await cp(resolve(base,'LICENSE'), resolve(target,'LICENSE'));
  const idp = 'modules/operator-auth/identity/oidc/tests/idp.mjs', idpTarget = 'tests/operator-auth/idp.mjs';
- const maps = { [resolve(base, 'modules/dependencies')]: resolve(target, 'src/modules/dependencies'), [resolve(base, 'modules/owner-claim')]: resolve(target, 'src/modules/owner-claim'), [resolve(base, idp)]: resolve(target, idpTarget), [resolve(base, 'onboarding')]: resolve(target, 'scripts/base-onboarding'), [resolve(base, 'modules/mail')]: resolve(target, 'src/modules/mail'), [resolve(base, 'modules/ai')]: resolve(target, 'src/modules/ai'), [resolve(base, 'modules/operator-auth')]: resolve(target, 'src/modules/operator-auth'), [resolve(base, 'foundation/runtime')]: resolve(target, 'src/base'), [resolve(base, 'modules/portability')]: resolve(target, 'src/modules/portability'), [resolve(base, 'modules/erasure')]: resolve(target, 'src/modules/erasure'), [resolve(base, 'modules/import-kit')]: resolve(target, 'src/modules/import-kit') };
+ const maps = { [resolve(base, 'modules/dependencies')]: resolve(target, 'src/modules/dependencies'), [resolve(base, 'modules/owner-claim')]: resolve(target, 'src/modules/owner-claim'), [resolve(base, 'modules/demo')]: resolve(target, 'src/modules/demo'), [resolve(base, idp)]: resolve(target, idpTarget), [resolve(base, 'onboarding')]: resolve(target, 'scripts/base-onboarding'), [resolve(base, 'modules/mail')]: resolve(target, 'src/modules/mail'), [resolve(base, 'modules/ai')]: resolve(target, 'src/modules/ai'), [resolve(base, 'modules/operator-auth')]: resolve(target, 'src/modules/operator-auth'), [resolve(base, 'foundation/runtime')]: resolve(target, 'src/base'), [resolve(base, 'modules/portability')]: resolve(target, 'src/modules/portability'), [resolve(base, 'modules/erasure')]: resolve(target, 'src/modules/erasure'), [resolve(base, 'modules/import-kit')]: resolve(target, 'src/modules/import-kit') };
  const sources = {};
  function relocate(bytes, original, file) {
   return bytes.replace(/(['"])(\.\.[^'"\n]+)\1/g, (literal, quote, specifier) => {

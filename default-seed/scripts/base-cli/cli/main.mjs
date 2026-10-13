@@ -27,7 +27,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (project.profile === 'independent' && !['describe', 'check', 'doctor'].includes(options.verb)) options = parse(argv, process.cwd(), { independent: true });
   else if (options.forwarded.length) throw invalid('First-party commands accept only the documented flags, without forwarded arguments.');
   out = output(options);
-  if (project.profile === 'first-party' && options.detach && ['dev','preview'].includes(options.verb)) return (await import('./detached-server.mjs')).detachedServer(options, argv, out);
+  if (project.profile === 'first-party' && options.detach && ['dev','preview'].includes(options.verb)) return await (await import('./detached-server.mjs')).detachedServer(options, argv, out);
   if (options.verb === 'describe') { const result = await describe(project); out.human(options.json ? JSON.stringify(result) : JSON.stringify(result, null, 2)); return 0; }
   if (options.verb === 'check') {
    const result = await check(project, options.profile);

@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { commonFlags, serverDefaults, verbs } from './contract.mjs';
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
-const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--open', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove']);
+const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--open', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo']);
 export const mailbox = value => typeof value === 'string' && value.length <= 254 && /^[a-zA-Z0-9.!+_%\-]+@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+$/.test(value);
 // A loopback host: the shared predicate (including `*.localhost` door names),
 // plus `::1` as --host and a bracket-stripped hostname spell it.
@@ -17,6 +17,8 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if (!verb || verb === '--help') return { help: true };
  if (verb === 'release') return { verb, releaseArgs: args };
  if (verb === 'archive') return { verb, archiveArgs: args };
+ // rer demo is rer dev --demo.
+ if (verb === 'demo' && !independent) return parse(['dev', '--demo', ...args], cwd, { independent, deferTail });
  // Independent projects own verb names; only the common wrapper flags apply
  // to unknown names. Profile resolution rejects undeclared commands later.
  if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run rer --help.');
@@ -53,8 +55,10 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if(options.models!==undefined && !['fake','live'].includes(options.models))throw invalid('--models takes fake or live.');
  if(options.modelsService!==undefined && options.models!=='live')throw invalid('--models-service requires --models live.');
  if(options.as!==undefined && (options.login || !/^[a-z][a-z0-9-]{0,39}$/.test(options.as)))throw invalid(options.login?'--as and --login cannot be combined.':'--as takes a persona name such as owner, signed-out or admin.');
+ if(options.demo&&['--door','--direct','--as','--login','--models','--models-service'].some(flag=>options.supplied.has(flag)))throw invalid('A demo opens signed in as the owner on its own data: --demo takes only --port, --host, --idle-timeout, --stop, --detach and --foreground.');
  if(['dev','preview'].includes(verb) && !options.stop){
-  const value=options.idleTimeout??process.env.RER_SERVER_IDLE_SECONDS??String(serverDefaults.idleSeconds);
+  // A demo ends one hour after it starts unless --idle-timeout says otherwise.
+  const value=options.idleTimeout??(options.demo?'3600':process.env.RER_SERVER_IDLE_SECONDS??String(serverDefaults.idleSeconds));
   if(!/^[1-9][0-9]*$/.test(value)||!Number.isSafeInteger(Number(value)))throw invalid('Idle timeout must be positive integer seconds.');
   options.idleTimeout=Number(value);
  }

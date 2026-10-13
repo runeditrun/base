@@ -66,9 +66,12 @@ export function localInstaller(hooks = {}) {
   if (['dev','preview'].includes(verb) && hooks.secrets?.originKey) context.vars[hooks.secrets.originKey] = context.origin;
   store.addSecrets?.(Object.entries(context.vars).filter(([key]) => /secret|token|password/i.test(key)).map(([, value]) => value));
   if (['installer', 'setup', 'build'].includes(verb) && hooks.build) await build(context, hooks);
-  if (['installer', 'setup'].includes(verb) && hooks.migrate) await phase(context, hooks, 'migrate', hooks.migrate);
+  // A demo (dev with options.demo) starts on fresh state in options.demo.state:
+  // migrate it, then claim the saved owner there exactly as setup does.
+  const demo = verb === 'dev' && Boolean(options.demo);
+  if ((['installer', 'setup'].includes(verb) || demo) && hooks.migrate) await phase(context, hooks, 'migrate', hooks.migrate);
   if (['installer', 'setup', 'dev', 'preview'].includes(verb) && hooks.start) await start(context, verb === 'preview' ? {...hooks,start:options.preview} : verb === 'dev' && options.dev ? { ...hooks, start: options.dev } : hooks);
-  if (['installer', 'setup'].includes(verb) && hooks.owner) {
+  if ((['installer', 'setup'].includes(verb) || demo) && hooks.owner) {
    if (typeof hooks.owner === 'function' || Array.isArray(hooks.owner)) await phase(context, hooks, 'owner', hooks.owner);
    else await owner(context, hooks.owner);
   }

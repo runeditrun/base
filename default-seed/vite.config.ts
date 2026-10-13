@@ -8,7 +8,7 @@ import { archiveOutputGuard } from './scripts/base-onboarding/archive-output.mjs
 // Only `vite dev` loads the local-only entry and the checkout's dev key; a build
 // keeps src/server.ts and never sees either (rer build checks its output).
 const local = (name: string) => process.env[name] ? { [name]: process.env[name] } : {}
-const serve = { main: './src/server.dev.ts', vars: { ...local('RER_DEV_ORIGIN'), ...local('RER_DEV_KEY'), ...local('RER_DEV_IDENTITY'), ...local('RER_MODELS_SERVICE'), ...local('RER_MODELS_KEY') } }
+const serve = { main: './src/server.dev.ts', vars: { ...local('RER_DEV_ORIGIN'), ...local('RER_DEV_KEY'), ...local('RER_DEV_IDENTITY'), ...local('RER_MODELS_SERVICE'), ...local('RER_MODELS_KEY'), ...local('RER_DEMO'), ...local('RER_DEMO_EXPIRES') } }
 // A build routes requests the way rer deploy hosts it: the Worker runs before built
 // files and hands them out through env.ASSETS. `rer preview` serves this output, so
 // a prerendered page reaches the browser as the Worker's document (no-store,
@@ -26,7 +26,7 @@ export default defineConfig(({ command, isPreview }) => ({
   // key, installer state), export archives, settings or local data.
   server: { fs: { allow: ['src', 'public', 'node_modules', 'deploy-site.json'], deny: ['**/.rer/**', '**/.seed/**', '**/exports/**', '**/*.rer'] } },
   plugins: [
-    cloudflare({ inspectorPort: false, viteEnvironment: { name: 'ssr' }, persistState: { path: '.wrangler/state' },
+    cloudflare({ inspectorPort: false, viteEnvironment: { name: 'ssr' }, persistState: { path: process.env.RER_STATE_DIR ?? '.wrangler/state' },
       config: command === 'serve' && !isPreview ? serve : built,
     }),
     tanstackStart({

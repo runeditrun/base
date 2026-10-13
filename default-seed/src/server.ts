@@ -1,3 +1,4 @@
+import { withDemo } from '../../modules/demo/index.mjs'
 import { dependenciesResponse } from './core/platform/auth/dependencies.server'
 import { firstRunResponse } from '../../foundation/runtime/setup'
 import { operatorAuth } from './core/platform/auth/session.server'
@@ -15,11 +16,12 @@ import { setupStateResponse } from '../../foundation/runtime/setup-state'
 
 import { dispatch } from '../../foundation/runtime/dispatch'
 import { staticAssetResponse } from '../../foundation/runtime/static-assets'
+import { seedDemo } from './demo'
 
 const api = createApi()
 const queueMessage = z.union([z.object({ id: z.string().length(26) }).strict(), z.object({ erasure: z.string().regex(/^[0-9a-f]{32}$/) }).strict()])
 
-export default {
+export default withDemo({
   async fetch(request, bindings: Bindings, execution): Promise<Response> {
     const asset = await staticAssetResponse(request, bindings)
     if (asset) return asset
@@ -69,4 +71,4 @@ export default {
     await recordScheduledRun(checked, controller.cron)
     await (await import('./core/features/people/routes')).resumePendingErasures(checked)
   },
-} satisfies ExportedHandler<Bindings>
+} satisfies ExportedHandler<Bindings>, { seed: seedDemo })

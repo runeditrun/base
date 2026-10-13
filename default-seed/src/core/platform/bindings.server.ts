@@ -21,6 +21,9 @@ export interface Bindings {
   RER_MODELS_KEY?: string
   RER_DEV_KEY?: string
   RER_DEV_IDENTITY?: string
+  /** Demo runtimes only (`rer demo`): modules/demo's switch and the demo's end. Deploy refuses RER_DEMO. */
+  RER_DEMO?: string
+  RER_DEMO_EXPIRES?: string
   RER_INSTALLATION_ID?: string
   RER_MANAGEMENT_ORIGIN?: string
   AUTH_ALLOW_LIST?: string

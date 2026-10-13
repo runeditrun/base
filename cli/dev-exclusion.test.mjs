@@ -24,7 +24,7 @@ test('rer build refuses a build that bundles the dev layer, naming the file; the
  await writeFile(config, original);
  // AI alone is also refused, without the identity wrapper's marker.
  const entry = join(seed.root, 'src/server.ts'), production = await readFile(entry, 'utf8');
- await writeFile(entry, `import { withDevAi } from './modules/ai/dev/index.mjs';\n` + production.replace('export default {', 'const production = {') + '\nexport default withDevAi(production);\n');
+ await writeFile(entry, `import { withDevAi } from './modules/ai/dev/index.mjs';\n` + production.replace('export default withDemo({', 'const production = withDemo({') + '\nexport default withDevAi(production);\n');
  const aiRefused = await seed.run(['build'], 4);
  assert.match(error(aiRefused).message, /local-only dev layer/);
  await writeFile(entry, production);
@@ -37,13 +37,14 @@ test('rer build refuses a build that bundles the dev layer, naming the file; the
  assert.deepEqual(check.clauses.filter(clause => !clause.ok).map(clause => clause.id), ['SC-05.dev-identity.email-link-test']);
 });
 
-test('rer deploy and its dry run refuse RER_DEV_KEY and declared local-only keys before building', { timeout: 5 * 60_000 }, async t => {
+test('rer deploy and its dry run refuse RER_DEV_KEY, RER_DEMO and declared local-only keys before building', { timeout: 5 * 60_000 }, async t => {
  const seed = await portabilityFixture(t, { generated: false }), path = join(seed.root, 'deploy.json');
  const declaration = JSON.parse(await readFile(path, 'utf8'));
  for (const [change, key] of [
   [d => ({ ...d, secrets: [...d.secrets, { binding: 'RER_DEV_KEY', environment: 'RER_DEV_KEY' }] }), 'RER_DEV_KEY'],
   [d => ({ ...d, vars: { ...d.vars, RER_DEV_KEY: 'copied-from-local' } }), 'RER_DEV_KEY'],
   [d => ({ ...d, vars: { ...d.vars, RER_DEV_IDENTITY: 'on' } }), 'RER_DEV_IDENTITY'],
+  [d => ({ ...d, vars: { ...d.vars, RER_DEMO: '1' } }), 'RER_DEMO'],
   [d => ({ ...d, vars: { ...d.vars, RER_MODELS_KEY: 'synthetic-live-dev-key' } }), 'RER_MODELS_KEY'],
   [d => ({ ...d, secrets: [...d.secrets, { binding: 'MODELS_KEY', environment: '.rer/local/models.json' }] }), '.rer/local/models.json'],
  ]) {
