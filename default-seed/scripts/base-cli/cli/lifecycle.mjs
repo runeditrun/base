@@ -114,8 +114,10 @@ export async function runCommand(project, options, out) {
   if (['setup', 'build'].includes(options.verb)) await refuseDevLayerOutput(project.root, adapter.devIdentity);
   const url = selected?.url, signInUrl = url ? url + '/__dev/outbox' : undefined;
   if (options.verb === 'setup') {
-   await linkDependencies({project,input,origin:url,store,signal});
-   if(project.setupManifest?.dependencies?.length) {
+   // Only a connected provider leaves first setup open; a native claim with
+   // every optional dependency unanswered has already closed it.
+   const connected=await linkDependencies({project,input,origin:url,store,signal});
+   if(connected.length) {
     const proof=await localCliSessionProof(project);
     store.addSecrets?.([proof]);
     const completed=await appFetch(url+'/auth/setup-complete',{method:'POST',headers:{Origin:url,'Content-Type':'application/json','x-rer-local-cli':proof},body:'{}',signal});

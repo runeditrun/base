@@ -5,12 +5,14 @@ import { providerMetadata } from '../modules/dependencies/protocol.mjs';
 import { readJson } from '../modules/operator-auth/identity/oidc/network.mjs';
 
 // Only an owner-only, untracked token file is accepted. The token never enters
-// setup answers, generated runtime configuration, logs or an archive.
+// setup answers, generated runtime configuration, logs or an archive. Returns
+// the dependencies this setup connected; an unanswered optional one is skipped.
 export async function linkDependencies({project,input,origin,store,signal,appSetupToken,fetch:fetcher=globalThis.fetch,clock=Date.now}) {
- const links=[];
+ const links=[],connected=[];
  for(const dependency of project.setupManifest?.dependencies??[]) {
   const issuer=input?.[dependency.address];
   if(!issuer) {if(!dependency.optional)throw missing('A required dependency address is missing.');continue;}
+  connected.push(dependency);
   const tokenPath=approvalPath(project,dependency.interface);
   if(!tokenPath) {
    const current=await readJson(fetcher,origin+'/auth/dependencies/status',{timeoutMs:5000}).catch(()=>null);
@@ -42,4 +44,5 @@ export async function linkDependencies({project,input,origin,store,signal,appSet
   await unlink(path);
   store.report('Dependency linked; its one-time approval token was deleted.');
  }
+ return connected;
 }

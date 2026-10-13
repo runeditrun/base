@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer setup` finishes provider-free when a seed declares an optional dependency that you leave unconnected.
+
 ## 0.2.2
 
 - `rer deploy` claims the hosted owner, exits cleanly when it finishes, changes and removes secrets safely, and removes the resources it created when you ask it to.
