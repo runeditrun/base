@@ -1,7 +1,7 @@
 import {linkApproval,approvalPath} from './dependency-approval.mjs';
 import { unlink } from 'node:fs/promises';
 import { missing } from './errors.mjs';
-import { providerMetadata } from '../modules/dependencies/protocol.mjs';
+import { INTERFACE, providerMetadata } from '../modules/dependencies/protocol.mjs';
 import { readJson } from '../modules/operator-auth/identity/oidc/network.mjs';
 
 // Only an owner-only, untracked token file is accepted. The token never enters
@@ -10,9 +10,17 @@ export async function linkDependencies({project,input,origin,store,signal,appSet
  const links=[];
  const ownerDependency = project.setupManifest?.steps?.find(step => step.type === 'owner-claim' && step.mode === 'idp')?.dependency;
  let ownerClaimed = false;
+ let ownerIssuer;
+ const ownerState = async () => {
+  if (ownerDependency !== INTERFACE || !ownerIssuer) return undefined;
+  const document = await readJson(fetcher, origin+'/.well-known/rer-dependencies', {timeoutMs:5000});
+  // claim:false also describes apps without owner-capable dependencies.
+  if (document.origin === origin && document.dependencies?.some(item => item.interface === INTERFACE) && typeof document.claim === 'boolean') return document.claim;
+ };
  for(const dependency of project.setupManifest?.dependencies??[]) {
   const issuer=input?.[dependency.address];
   if(!issuer) {if(!dependency.optional)throw missing('A required dependency address is missing.');continue;}
+  if(dependency.interface===ownerDependency)ownerIssuer=issuer;
   const tokenPath=approvalPath(project,dependency.interface);
   if(!tokenPath) {
    const current=await readJson(fetcher,origin+'/auth/dependencies/status',{timeoutMs:5000}).catch(()=>null);
@@ -22,6 +30,9 @@ export async function linkDependencies({project,input,origin,store,signal,appSet
   const {path,value}=await linkApproval({project,dependency,issuer,origin,store,clock});
   links.push({dependency,issuer,path,value});
  }
+ // Validate every approval first, then distinguish an existing native owner
+ // from one this link is about to claim, without relying on local deploy history.
+ const unclaimedBefore = await ownerState();
  // Open every initial app approval before the first provider can claim its owner.
  // Hosted runtimes accept their private setup token; no local CLI HMAC is sent.
  if(links.length && appSetupToken) {
@@ -46,8 +57,8 @@ export async function linkDependencies({project,input,origin,store,signal,appSet
   store.report('Dependency linked; its one-time approval token was deleted.');
  }
  if (ownerClaimed) {
-  const document = await readJson(fetcher, origin+'/.well-known/rer-dependencies', {timeoutMs:5000});
-  ownerClaimed = document.origin === origin && document.claim === false;
+  const status = await readJson(fetcher, origin+'/auth/dependencies/status', {timeoutMs:5000});
+  ownerClaimed = unclaimedBefore !== undefined && await ownerState() === false && status.links?.some(link => link.interface === ownerDependency && link.issuer === ownerIssuer && link.linked === true) === true;
  }
- return {ownerClaimed};
+ return {ownerClaimed, ...(ownerClaimed ? {ownerOutcome: unclaimedBefore ? 'claimed' : 'kept'} : {})};
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.g0d4e4923",
+  "cliVersion": "0.2.2-dev.g0210383c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -367,7 +367,7 @@
     },
     "cli/dependencies.mjs": {
       "source": "cli/dependencies.mjs",
-      "sha256": "98030b505a66d226e1d65b5d5e730287e69b336370687d472044ddd85999facd"
+      "sha256": "4d2520fad80f5561584e7d49769fb50bb2714b16c4bbe62a92760511423f593c"
     },
     "cli/dependency-approval.mjs": {
       "source": "cli/dependency-approval.mjs",
@@ -399,7 +399,7 @@
     },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
-      "sha256": "dc1d2cb3b9d861071dc7f97997cabb32cce80ee363e1961b8b9e1518eb106f34"
+      "sha256": "8820e6e4e77466d33eca8a1289c98f9d08570311a95a91a0525822f684ba3308"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",

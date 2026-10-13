@@ -37,8 +37,8 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  }
  const linked = await beforeClaim?.(token);
  if (claim?.mode === 'idp') {
-  if (!linked?.ownerClaimed) throw ownerFailure('the identity provider has not confirmed the designated owner link');
-  return retire('claimed');
+  if (!linked?.ownerClaimed || !['claimed', 'kept'].includes(linked.ownerOutcome)) throw ownerFailure('the identity provider has not confirmed the designated owner link');
+  return retire(linked.ownerOutcome);
  }
  if (typeof hook === 'function') {
   const context = { origin: deployed.origin, vars: { ...env, [tokenKey]: token }, input: {}, store, signal, ownerClaim: claim, fail: () => ownerFailure('the seed owner hook failed') };
