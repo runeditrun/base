@@ -14,7 +14,7 @@ async function fixture() {
   return [manifest,...parts,{kind:'closing',partCount:2,contentHash:verifier.digest(),archiveHash:integrity.digest()}];
 }
 test('bounded reader rejects an over-long line',async()=>{await assert.rejects(collect(archiveLines(bytesStream('12345\n'),4)),/exceeds/);});
-test('bounded reader rejects invalid UTF-8',async()=>{await assert.rejects(collect(archiveLines(new Response(Uint8Array.of(255,10)).body,10)),/encoded data/);});
+test('bounded reader rejects invalid UTF-8 as malformed archive text',async()=>{await assert.rejects(collect(archiveLines(new Response(Uint8Array.of(255,10)).body,10)),/^Error: archive_json$/);});
 test('bounded reader accepts fragmented UTF-8, CRLF and final unterminated lines',async()=>{
   const bytes=new TextEncoder().encode('🙂\r\nlast'),source=new ReadableStream({start(c){for(const b of bytes)c.enqueue(Uint8Array.of(b));c.close();}});
   assert.deepEqual(await collect(archiveLines(source,16)),['🙂','last']);

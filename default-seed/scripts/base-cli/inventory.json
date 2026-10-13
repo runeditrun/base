@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.ge48ad1e8",
+  "cliVersion": "0.2.2-dev.g462fd4c2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1919,7 +1919,7 @@
     },
     "modules/portability/lines.mjs": {
       "source": "modules/portability/lines.mjs",
-      "sha256": "dda9e5466d17ddcfa78a6a227d5b0e05ddef7462516662c97bf9cb01dc57ea49"
+      "sha256": "15a164e56d56dce539ec704427d7bb4567e9ad25580e3d1cd3db81dbf841f5f4"
     },
     "modules/portability/migration-history.mjs": {
       "source": "modules/portability/migration-history.mjs",

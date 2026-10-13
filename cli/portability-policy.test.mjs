@@ -28,13 +28,15 @@ export default { ...portabilityPolicy, validateStaged: async ({ read }) =>
  (await read('computed_entries')).every(row => permittedDomains.has(row.label)) };
 `);
  await declare("policyModule: 'scripts/installer/archive-policy.mjs'");
- // Both malformed primary and later-journal inputs have one constant diagnostic;
+ // Malformed primary and later-journal inputs, and bytes that are not UTF-8, have one constant diagnostic;
  // neither the private input nor V8's parser wording is exposed.
  await writeFile(join(target.root, 'exports/malformed.rer'), '{"private-domain-sentinel":\n', { mode: 0o600 });
+ await writeFile(join(target.root, 'exports/not-utf8.rer'), Buffer.from([0x7b, 0xff, 0xfe, 0x7d, 0x0a]), { mode: 0o600 });
  const diagnosticEnv = await isolatedQueue(t, { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_NODE_AUTO: '0' });
  for (const args of [
   ['import', '--input', 'exports/malformed.rer', '--yes'],
   [...input, '--journal', 'exports/malformed.rer'],
+  ['import', '--input', 'exports/not-utf8.rer', '--yes'],
  ]) {
   let failure;
   try { await promisify(execFile)(process.execPath, ['scripts/rer.mjs', ...args, '--json'], { cwd: target.root, env: diagnosticEnv, signal: t.signal }); }
@@ -46,7 +48,7 @@ export default { ...portabilityPolicy, validateStaged: async ({ read }) =>
   assert.match(errors[0].message, /archive_json/);
   const diagnostic = failure.stdout + failure.stderr;
   assert.equal(diagnostic.match(/archive_json/g)?.length, 1);
-  assert.doesNotMatch(diagnostic, /private-domain-sentinel|SyntaxError|Unexpected|JSON at position/);
+  assert.doesNotMatch(diagnostic, /private-domain-sentinel|SyntaxError|Unexpected|JSON at position|not valid for encoding/);
   await noData();
  }
  // Invalid declarations fail closed before any data migration, including a
