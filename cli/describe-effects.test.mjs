@@ -65,3 +65,11 @@ export const commandAdapter = {
  assert.equal(changed.verbs.deploy.effects, descriptor.commands.deploy.effects);
  await assert.rejects(access(join(root, 'hook-ran')), { code: 'ENOENT' });
 });
+
+// A person reading the default seed's describe learns every release subcommand.
+test('the default seed describes its release subcommands', () => {
+ const result = spawnSync(process.execPath, [cli, 'describe', '--json', '--cwd', fileURLToPath(new URL('../default-seed', import.meta.url))], { encoding: 'utf8', timeout: 10000, env: { PATH: process.env.PATH, HOME: process.env.HOME } });
+ assert.equal(result.status, 0, result.stderr);
+ const { effects } = JSON.parse(result.stdout.trim().split('\n').at(-1)).verbs.release;
+ for (const subcommand of ['keygen', 'sign', 'receipt']) assert.match(effects, new RegExp(`\\b${subcommand}\\b`), effects);
+});

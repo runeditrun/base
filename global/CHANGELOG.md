@@ -6,6 +6,7 @@
 - A seed adapter can declare `resetPreflight`; `rer reset` runs it before listing or deleting anything, and `--yes` cannot skip it.
 - A first `rer dev` whose chosen port is taken by another program before setup can use it moves to the next free port and says which.
 - `rer deploy` says it is deploying to your Cloudflare account and names the live address, instead of saying the application is running locally; `rer build` ends with "Your application is built".
+- `rer describe` in the default seed and new foundations names the release keygen, sign and receipt subcommands again.
 
 ## 0.2.2
 
