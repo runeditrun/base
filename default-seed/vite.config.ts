@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { excludeLocalVariables } from './vite/exclude-local-variables.ts'
 import { archiveOutputGuard } from './scripts/base-onboarding/archive-output.mjs'
+import { demoSockets } from '../modules/demo/vite.mjs'
 
 // Only `vite dev` loads the local-only entry and the checkout's dev key; a build
 // keeps src/server.ts and never sees either (rer build checks its output).
@@ -26,6 +27,7 @@ export default defineConfig(({ command, isPreview }) => ({
   // key, installer state), export archives, settings or local data.
   server: { fs: { allow: ['src', 'public', 'node_modules', 'deploy-site.json'], deny: ['**/.rer/**', '**/.seed/**', '**/exports/**', '**/*.rer'] } },
   plugins: [
+    demoSockets(),
     cloudflare({ inspectorPort: false, viteEnvironment: { name: 'ssr' }, persistState: { path: process.env.RER_STATE_DIR ?? '.wrangler/state' },
       config: command === 'serve' && !isPreview ? serve : built,
     }),

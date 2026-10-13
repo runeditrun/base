@@ -11,8 +11,15 @@ With `RER_DEMO=1`:
 - **Nothing leaves.** When the module is evaluated it replaces global `fetch`
   for the whole isolate (routes, cron, queue consumers, Durable Objects). A
   loopback host is allowed; anything else throws `TypeError: fetch failed`, the
-  error a failed delivery already raises. Each refused call is recorded, method
-  and host only, in `rer_demo_outbound`.
+  error a failed delivery already raises. A loopback request goes out with
+  `redirect: 'manual'`; when the caller follows redirects, each `Location`
+  comes back through the same check (at most 20 hops). `WebSocket` and
+  `node:net`'s `Socket#connect` (`net.connect`, `createConnection`, `tls`) are
+  wrapped the same way, and `vite.mjs`'s `demoSockets()` plugin resolves the
+  Worker's `cloudflare:sockets` imports to `sockets.mjs`, whose `connect` is
+  guarded too (a module namespace cannot be patched at runtime). Each refused
+  call is recorded, method (`CONNECT` and `WEBSOCKET` for sockets) and host
+  only, in `rer_demo_outbound`.
 - **Demo data once.** After the owner exists, `seed(env, { ownerEmail, now })`
   runs once (marked in `rer_demo`). It must be idempotent.
 - **A visible bar.** Every HTML page opens with "Demo · nothing is sent · ends

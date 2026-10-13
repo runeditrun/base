@@ -105,7 +105,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   if(!selected.vars[keys.email])throw missing('Private owner settings are missing. Run rer setup first.');
   if(devIdentity&&!devKey)devKey=await requireDevKey(project.root);
   if(devIdentity&&options.verb==='dev'&&!options.login)refuseManagedInstallation(selected.vars,process.env);
-  if(project.adapter.localPrerequisites&&!await project.adapter.localPrerequisites({root:project.root,vars:selected.vars,email:selected.vars[keys.email]}))throw missing('Local migrations, owner or local authentication/mail settings are missing. Run rer setup first.');
+  if(project.adapter.localPrerequisites&&!await project.adapter.localPrerequisites({root:project.root,vars:selected.vars,email:selected.vars[keys.email],demo:Boolean(options.demo)}))throw missing('Local migrations, owner or local authentication/mail settings are missing. Run rer setup first.');
   await registry.update({url:selected.url,host:selected.host,port:selected.port,login:Boolean(options.login),models:options.models??'fake'});
   const {privateDirectory}=await shared('private-files.mjs');
   if(options.demo){await demoAdopted(project.root);demo=await demoState(project.root,options.idleTimeout);}

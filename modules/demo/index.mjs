@@ -1,10 +1,11 @@
 // Demo mode: one guard a seed imports first in its Worker entry. It does nothing
 // unless the runtime has RER_DEMO=1 (`rer demo`, or a hosted demo container).
-// With it, nothing leaves the machine: global fetch answers loopback only for the
-// whole isolate (routes, cron, queue consumers, Durable Objects), and every
-// refused call is recorded by method and host. The seed's seedDemo hook runs once
-// after the owner exists, and every HTML page carries a "Demo" bar listing the
-// captured mail and the blocked sends.
+// With it, nothing leaves the machine: global fetch, WebSocket and node:net
+// connect, and cloudflare:sockets connect (through vite.mjs), answer loopback
+// only for the whole isolate (routes, cron, queue consumers, Durable Objects),
+// and every refused call is recorded by method and host. The seed's seedDemo
+// hook runs once after the owner exists, and every HTML page carries a "Demo"
+// bar listing the captured mail and the blocked sends.
 import { env } from 'cloudflare:workers';
 import { escapeHtml, isLoopbackHost } from '../operator-auth/http.mjs';
 import { allow, sha256 } from '../operator-auth/csp.mjs';
@@ -13,21 +14,99 @@ const on = env?.RER_DEMO === '1';
 let database = 'DB';
 const db = () => env[database];
 
+// Refusals are written in the background; withDemo awaits them before a
+// handler returns, so a synchronous refusal (a socket) is recorded too.
+const writes = new Set();
+function record(method, host) {
+  const write = (async () => {
+    await ready();
+    await db().prepare('INSERT INTO rer_demo_outbound(at, method, host) VALUES (?, ?, ?)').bind(Date.now(), method, host).run();
+  })().catch(() => { /* The refusal stands even when it cannot be recorded. */ }).finally(() => writes.delete(write));
+  writes.add(write);
+  return write;
+}
+const recorded = () => Promise.all(writes);
+
+/** The host:port a socket names, as URL spells it (so `::1` is `[::1]`). */
+function socketHost(hostname, port) {
+  const name = String(hostname ?? 'localhost');
+  return new URL(`http://${name.includes(':') && !name.startsWith('[') ? `[${name}]` : name}:${port}`);
+}
+/** cloudflare:sockets connect's address: "host:port" or { hostname, port }. */
+function connectAddress(address) {
+  return typeof address === 'string' ? new URL(`http://${address}`) : socketHost(address?.hostname, address?.port);
+}
+/** Throws (after starting the record) unless the socket's host is loopback. */
+export function guardConnect(address) {
+  const url = connectAddress(address);
+  if (on && !isLoopbackHost(url.hostname)) {
+    void record('CONNECT', url.host);
+    throw new TypeError(`connect failed: demo mode sends nothing (CONNECT ${url.host} refused)`);
+  }
+}
+
 // Evaluated before the rest of the entry's imports, so no module can keep the
 // real fetch. A refused call throws the network error fetch itself throws, which
 // seeds already treat as a failed delivery.
 if (on) {
   const send = globalThis.fetch;
-  globalThis.fetch = async function demoFetch(input, init) {
-    const url = new URL(input instanceof Request ? input.url : String(input));
-    if (isLoopbackHost(url.hostname)) return send(input, init);
-    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
-    try {
-      await ready();
-      await db().prepare('INSERT INTO rer_demo_outbound(at, method, host) VALUES (?, ?, ?)').bind(Date.now(), method, url.host).run();
-    } catch { /* The refusal stands even when it cannot be recorded. */ }
+  const refuse = async (method, url) => {
+    await record(method, url.host);
     throw new TypeError(`fetch failed: demo mode sends nothing (${method} ${url.host} refused)`);
   };
+  // Loopback requests go out with redirect 'manual'. When the caller follows
+  // redirects, each Location comes back here (at most 20 hops, as fetch does),
+  // so a loopback responder cannot send the request on to another host.
+  globalThis.fetch = async function demoFetch(input, init) {
+    let request = new Request(input, init);
+    const follow = request.redirect === 'follow';
+    for (let hops = 0; ; hops++) {
+      const url = new URL(request.url);
+      if (!isLoopbackHost(url.hostname)) await refuse(request.method, url);
+      if (!follow) return send(request);
+      const response = await send(request.clone(), { redirect: 'manual' });
+      const location = response.headers.get('location');
+      if (![301, 302, 303, 307, 308].includes(response.status) || location === null) return response;
+      if (hops === 20) throw new TypeError('fetch failed: too many redirects');
+      await response.body?.cancel();
+      const next = new URL(location, url);
+      // Fetch's redirect rules: 303 (and 301/302 after POST) becomes a bodiless
+      // GET, and credentials never cross to another origin.
+      const get = response.status === 303 && !['GET', 'HEAD'].includes(request.method) || [301, 302].includes(response.status) && request.method === 'POST';
+      const headers = new Headers(request.headers);
+      if (get) for (const name of ['content-type', 'content-length', 'content-encoding', 'content-language', 'content-location']) headers.delete(name);
+      if (next.origin !== url.origin) headers.delete('authorization');
+      request = new Request(next, { method: get ? 'GET' : request.method, headers, body: get ? null : request.body, redirect: 'manual', signal: request.signal });
+    }
+  };
+  // A WebSocket opens with a request the fetch guard never sees.
+  if (globalThis.WebSocket) globalThis.WebSocket = new Proxy(globalThis.WebSocket, {
+    construct(target, args, newTarget) {
+      const url = new URL(String(args[0]));
+      if (!isLoopbackHost(url.hostname)) {
+        void record('WEBSOCKET', url.host);
+        throw new TypeError(`WebSocket failed: demo mode sends nothing (WEBSOCKET ${url.host} refused)`);
+      }
+      return Reflect.construct(target, args, newTarget);
+    },
+  });
+  // node:net (nodejs_compat) connects every socket through Socket#connect:
+  // net.connect, net.createConnection and new net.Socket().connect. A refused
+  // one fails the way an unreachable host does, with an 'error' event.
+  const net = globalThis.process?.getBuiltinModule?.('node:net');
+  if (net?.Socket) {
+    const open = net.Socket.prototype.connect;
+    net.Socket.prototype.connect = function connect(...args) {
+      const [first, second] = Array.isArray(args[0]) ? args[0] : args;
+      const options = first !== null && typeof first === 'object' ? first : { port: first, host: typeof second === 'string' ? second : undefined };
+      if (options.path !== undefined && options.port === undefined) return open.apply(this, args);
+      const url = socketHost(options.host, options.port);
+      if (isLoopbackHost(url.hostname)) return open.apply(this, args);
+      void record('CONNECT', url.host);
+      queueMicrotask(() => this.destroy(new Error(`connect ECONNREFUSED: demo mode sends nothing (CONNECT ${url.host} refused)`)));
+      return this;
+    };
+  }
 }
 
 let tables;
@@ -103,9 +182,11 @@ export function withDemo(worker, { seed, binding = 'DB', owner = operatorOwner }
     ...worker,
     async fetch(request, bindings, execution) {
       await prepared(bindings);
-      return decorate(await worker.fetch(request, bindings, execution));
+      const response = await worker.fetch(request, bindings, execution);
+      await recorded();
+      return decorate(response);
     },
-    ...(worker.scheduled ? { async scheduled(controller, bindings, execution) { await prepared(bindings); return worker.scheduled(controller, bindings, execution); } } : {}),
-    ...(worker.queue ? { async queue(batch, bindings, execution) { await prepared(bindings); return worker.queue(batch, bindings, execution); } } : {}),
+    ...(worker.scheduled ? { async scheduled(controller, bindings, execution) { await prepared(bindings); try { return await worker.scheduled(controller, bindings, execution); } finally { await recorded(); } } } : {}),
+    ...(worker.queue ? { async queue(batch, bindings, execution) { await prepared(bindings); try { return await worker.queue(batch, bindings, execution); } finally { await recorded(); } } } : {}),
   };
 }

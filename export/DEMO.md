@@ -23,8 +23,11 @@ Base's `modules/demo` (`withDemo`) does nothing unless the runtime has
 `RER_DEMO=1`. With it, global `fetch` answers loopback hosts only, for the whole
 isolate (routes, cron, queue consumers, Durable Objects); any other request
 throws `TypeError: fetch failed`, the error a failed delivery already raises,
-and is listed in the bar by method and host. Mail stays in the development
-outbox and is listed too. `rer deploy` refuses a deploy declaration or
+and is listed in the bar by method and host. A loopback answer's redirects are
+followed through the same check, hop by hop. `new WebSocket`, `node:net` (and
+so `node:tls`) and `cloudflare:sockets` `connect` answer loopback only too, and
+their refusals are listed the same way. Mail stays in the development outbox
+and is listed too. `rer deploy` refuses a deploy declaration or
 `--env-file` that carries `RER_DEMO`.
 
 ## Adopting it in a seed
@@ -48,12 +51,16 @@ outbox and is listed too. `rer deploy` refuses a deploy declaration or
    Options: `binding` names the D1 binding when it is not `DB`; `owner(env)`
    returns the owner's email when the seed's accounts are not Base
    operator-auth's.
-3. **Two `vite.config` lines.** The dev persistence path reads `RER_STATE_DIR`,
-   and the demo switches reach the dev entry's vars:
+3. **Three `vite.config` changes.** The dev persistence path reads
+   `RER_STATE_DIR`, the demo switches reach the dev entry's vars, and
+   `demoSockets()` (first in `plugins`) hands the Worker's `cloudflare:sockets`
+   imports the guarded `connect` under `rer demo`:
 
    ```ts
+   import { demoSockets } from './src/modules/demo/vite.mjs'
    persistState: { path: process.env.RER_STATE_DIR ?? '.wrangler/state' },
    const serve = { main: './src/server.dev.ts', vars: { /* ... */ ...local('RER_DEMO'), ...local('RER_DEMO_EXPIRES') } }
+   plugins: [demoSockets(), cloudflare({ /* ... */ }), /* ... */],
    ```
 
 Add `.rer/demo/` to `.gitignore`. Then run `rer setup` (once), `rer demo`, open

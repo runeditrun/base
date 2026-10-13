@@ -26,7 +26,9 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
   owner: { existingOwnerViaSignIn: true, displayName: input => input.displayName || 'Owner' },
   signIn: { emailKey: 'OWNER_EMAIL', returnTo: '/setup' },
  });
- return {...lifecycle,localPrerequisites:async({root,vars,email})=>vars.AUTH_LOCAL==='true'&&vars.MAIL_PROVIDER==='development'&&Boolean(vars.SESSION_SECRET)&&await operatorPrerequisites(root,email),install:(root,input,store,onApp,signal)=>installOperator(root,input,store,onApp,signal,lifecycle.hooks)};
+  // A demo migrates and claims the owner in its own state, so it never opens the
+ // checkout's database: even read-only, SQLite rewrites its -shm index.
+ return {...lifecycle,localPrerequisites:async({root,vars,email,demo})=>vars.AUTH_LOCAL==='true'&&vars.MAIL_PROVIDER==='development'&&Boolean(vars.SESSION_SECRET)&&(demo||await operatorPrerequisites(root,email)),install:(root,input,store,onApp,signal)=>installOperator(root,input,store,onApp,signal,lifecycle.hooks)};
 }
 
 // Only local runtimes receive the dev key; vite.config.ts passes it to `vite dev` alone.

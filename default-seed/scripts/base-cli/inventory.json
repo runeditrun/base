@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.gdb063ebf",
+  "cliVersion": "0.2.2-dev.g0d4e4923",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -137,7 +137,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "507f5b853841148fd9c12587d3d9176b1ace69dce9d7c803e98e66d10be70750"
+      "sha256": "4185807ada36a8349ba576e8a7f4f58cc661394772ae664d961d81523e6b22d3"
     },
     "operator-prerequisites.mjs": {
       "source": "onboarding/operator-prerequisites.mjs",
@@ -363,7 +363,7 @@
     },
     "cli/demo.mjs": {
       "source": "cli/demo.mjs",
-      "sha256": "dbe10f718f7fbc876816954a1a35e2f108c050ee9e1f4af42ad3af09e5cb3562"
+      "sha256": "b9d652ab69ffac46f37020c95796cd01b0c1a112cbe6b2bbb452514507b346a4"
     },
     "cli/dependencies.mjs": {
       "source": "cli/dependencies.mjs",
@@ -479,7 +479,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "c11352f8d32686442be49aae6635d7f947cf674d18b2606e346520f01a63c72d"
+      "sha256": "85117310a297b2a096ca267f5dc1bae72e7f43a395bd0a8fb64abc4447820de4"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",

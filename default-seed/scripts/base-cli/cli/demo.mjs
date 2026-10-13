@@ -5,17 +5,18 @@ import { refuse } from './errors.mjs';
 import { shared } from './shared.mjs';
 
 // `rer demo` (dev --demo) state and its two adoption checks (export/DEMO.md).
-const adopt = 'See DEMO.md: a seed adopts demo mode with src/demo.ts, withDemo as the first import of its Worker entry, and two vite.config lines.';
+const adopt = 'See DEMO.md: a seed adopts demo mode with src/demo.ts, withDemo as the first import of its Worker entry, and three vite.config changes.';
 
 // Before anything starts: the seed's Vite persists where rer says, so the
-// checkout's own .wrangler/state is never opened by a demo.
+// checkout's own .wrangler/state is never opened by a demo, and hands the
+// Worker's cloudflare:sockets imports demo mode's guarded connect.
 export async function demoAdopted(root) {
+ let text = '';
  for (const name of ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs']) {
-  let text; try { text = await readFile(join(root, name), 'utf8'); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-  if (text.includes('RER_STATE_DIR')) return;
-  break;
+  try { text = await readFile(join(root, name), 'utf8'); break; } catch (error) { if (error.code !== 'ENOENT') throw error; }
  }
- throw refuse(`This seed's vite.config does not persist to RER_STATE_DIR, so a demo would run on this checkout's own data. ${adopt}`);
+ if (!text.includes('RER_STATE_DIR')) throw refuse(`This seed's vite.config does not persist to RER_STATE_DIR, so a demo would run on this checkout's own data. ${adopt}`);
+ if (!text.includes('demoSockets(')) throw refuse(`This seed's vite.config does not list demoSockets(), so a demo's cloudflare:sockets connections could leave this computer. ${adopt}`);
 }
 
 // A demo's data lives in .rer/demo/START. Only one server runs per checkout, so
