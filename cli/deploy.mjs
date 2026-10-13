@@ -6,7 +6,7 @@ import { missing, invalid, refuse, RerError } from './errors.mjs';
 import { ownerPlan, ownerWorkerName, localOnlyBinding } from '../modules/deploy-kit/owner.mjs';
 import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
-import { deployEnvironment } from './deploy-inputs.mjs';
+import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
@@ -18,7 +18,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const local = localOnlyBinding(declaration, localOnlyKeys);
   if (local) throw refuse(`${declarationPath} names the local-only key ${local} as a deploy binding or secret. Remove it; local dev keys never reach a deployment.`);
   const environment = options.environment ?? 'production';
-  const again = `rer deploy --environment ${environment}`;
+  const again = deployAgain(options);
   const change = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret'].filter(Boolean);
   // The command that finishes what this run started: the same verb, never a plain deploy in its place.
   const retry = options.remove ? `${again} --remove --yes` : options.setSecret ? `${again} --set-secret ${options.setSecret}` : options.unsetSecret ? `${again} --unset-secret ${options.unsetSecret}` : again;
@@ -37,9 +37,9 @@ export function ownerDeploy(declarationPath, lifecycle) {
    store.report('deploy: dry run complete; no deployment occurred and no provider request was made.');
    return { dryRun: true, deployed: false };
   }
-  const names = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
-  if (names.some(name => !process.env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required. See the deploy-kit owner-account instructions.');
   const { env, supplied } = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
+  const names = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
+  if (names.some(name => !env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required. See the deploy-kit owner-account instructions.');
   const { main } = await import('../modules/deploy-kit/owner-cli.mjs');
   const { createRedaction, credentialValues } = await shared('redaction.mjs');
   const redaction = createRedaction();
@@ -71,21 +71,21 @@ export function ownerDeploy(declarationPath, lifecycle) {
    await owner('health');
    step = 'claim owner';
    const linked = token => linkDependencies?.(deployed.origin, token);
-   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed, env, supplied, addSecret: value => redaction.addSecrets([value]),
-    secret: (extra, values) => owner('secret', extra, values), beforeClaim: linked });
+   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed, env, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },
+    secret: (extra, values) => owner('secret', extra, values), beforeClaim: linked, recordClaim: outcome => owner('record-owner', ['--outcome', outcome]), inspect: () => owner('inspect'), store, signal });
    // A seed that claims its owner its own way links with the token it was given.
    if (claimed === undefined) await linked(env[declared(claim?.tokenField ?? 'SETUP_TOKEN')?.environment]);
    // The app claims the OWNER_EMAIL the Worker holds: the local one only when this run uploaded it.
    const email = declared(claim?.emailField);
    const named = !email ? '' : deployed.sentSecrets.includes(email.binding) && env[email.environment] ? ` (${env[email.environment]})` : ` (the ${email.binding} already set on the Worker)`;
-   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${named}; the one-time setup token was used and removed. Sign in by email at ${deployed.origin}.`);
+   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${named}; the one-time setup token was removed. Sign in by email at ${deployed.origin}.`);
    return { deployed: true, origin: deployed.origin, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   } catch (error) {
    if (error instanceof RerError) throw error;
    const { commandFailure } = await shared('failures.mjs');
    throw commandFailure(failureText({ error, step, created, again, retry, secretChange: Boolean(change.length && !options.remove), deployed, redact: redaction.redact }));
   }
- }, { declaration: declarationPath });
+ }, { declaration: declarationPath, managesHostedOwner: true });
 }
 
 // The failing step, its redacted cause, what this run created and the command that continues.
@@ -97,7 +97,8 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  if (input) return `Deploy needs ${input}, which the deploy declaration lists as a secret and the Worker does not hold it. Set ${input} in the environment or in an --env-file file (an owned 0600 file of KEY=VALUE lines), then run the same command again. Nothing was uploaded.${created.length ? ` Resources created this attempt: ${created.join(', ')}.` : ''}`;
  if (code === 'remove-incomplete') return `Removal stopped with ${error.remaining.join(', ')} still present${error.failed.length ? ` (${error.failed.map(item => `${item.resource}: ${item.code}`).join('; ')})` : ''}. Removed: ${error.removed.join(', ') || 'nothing'}. An R2 bucket must be empty before it can be deleted. Run ${again} --remove --yes again to finish.`;
  if (code === 'nothing-to-remove') return `This checkout has no rer deployment record for this environment, so --remove deletes nothing. Run it from the checkout that deployed it.`;
- if (code === 'owner-claim-failed') return `The application is deployed at ${deployed?.origin}, but claiming its owner failed: ${redact(String(error.cause))}. The setup token is still on the Worker; run ${again} again to retry the claim.`;
+ if (code === 'owner-token-retirement-failed') return `The application is deployed at ${deployed?.origin}; owner ${error.owner}; setup token retirement failed (${redact(String(error.cause))}). Run ${again} --unset-secret ${error.tokenKey ?? 'SETUP_TOKEN'} using the same environment credentials, or run ${again} again to finish.`;
+ if (code === 'owner-claim-failed') return `The application is deployed at ${deployed?.origin}, but claiming its owner failed: ${redact(String(error.cause))}. Owner claim and setup token retirement are not confirmed; run ${again} again using the same environment credentials to finish.`;
  const resource = diagnostic?.resource ?? (error.resource ? redact(String(error.resource)) : undefined);
  const lines = [`Deploy failed at ${at}: ${code}${resource ? ` (${resource})` : ''}${diagnostic?.providerCodes?.length ? ` (provider ${diagnostic.providerCodes.join(', ')})` : ''}.`];
  if (diagnostic?.output && diagnostic.output !== '(no provider output)') lines.push(`First redacted output lines:\n${diagnostic.output}`);

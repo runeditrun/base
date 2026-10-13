@@ -87,7 +87,7 @@ export async function setupInput(project, options, vars, signal, { origin } = {}
  if(savedEmail&&!mailbox(savedEmail))throw refuse('Saved owner is malformed. Restore private settings or run rer reset --yes.');
  if(savedEmail&&savedEmail.toLowerCase()!==answers[names.email]){
   if(owners.length)throw refuse(`Private setting ${names.email} differs from the retained database owner. Restore ${names.email} in ${project.adapter.hooks?.secrets?.file??'.dev.vars'} to ${answers[names.email]}, then run rer setup --owner-email ${answers[names.email]}; or back up data and run rer reset --yes. Private bytes were kept.`);
-  throw refuse(`Owner conflicts with the saved installation (${savedEmail}). Run rer setup --owner-email ${savedEmail}, or back up data and run rer reset --yes.`);
+  throw refuse(`Owner conflicts with the saved installation (${savedEmail}). Run rer setup --owner-email ${savedEmail}, or back up data, run rer dev --stop, then rer reset --yes followed by rer setup --owner-email ${answers[names.email]}. Reset deletes local data.`);
  }
 
  try{return seed.model.validateInput(answers,known);}catch{throw missing('Installer answers are incomplete. Supply the active manifest fields using rer setup --answers answers.json --non-interactive.');}

@@ -31,3 +31,25 @@ export async function deployEnvironment({ root, options, declaration, setupManif
  }
  return { env, supplied };
 }
+
+// Hooks and their child builds read process.env. Install the private file for
+// this command only, and restore even keys changed by a failing hook.
+export async function withDeployEnvironment(root, options, run) {
+ const saved = { ...process.env };
+ const { env } = await deployEnvironment({ root, options, declaration: {} });
+ const { createRedaction, credentialValues } = await shared('redaction.mjs');
+ const redaction = createRedaction();
+ redaction.addSecrets([...credentialValues(env), ...Object.entries(env).filter(([key, value]) => saved[key] !== value).map(([, value]) => value)]);
+ Object.assign(process.env, env);
+ try { return await run(redaction); }
+ catch (error) { if (typeof error?.message === 'string') error.message = redaction.redact(error.message); throw error; }
+ finally {
+  for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
+  Object.assign(process.env, saved);
+ }
+}
+
+export function deployAgain(options) {
+ const quote = value => /^[a-zA-Z0-9_./-]+$/.test(value) ? value : `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+ return `rer deploy --environment ${quote(options.environment ?? 'production')}${options.envFile ? ` --env-file ${quote(options.envFile)}` : ''}${options.cwd ? ` --cwd ${quote(options.cwd)}` : ''}`;
+}

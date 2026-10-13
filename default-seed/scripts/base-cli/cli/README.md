@@ -268,3 +268,24 @@ reproducible and `.github/workflows/rer-release.yml` publishes it; see
 to end on the package-mode reference (served from a local registry, see
 `scripts/rer-package/registry.mjs`), and drives `install.sh` and `rer update`
 against that registry.
+
+
+Owner-account application deploy completion is shared across standard and custom
+hooks. An adapter can declare `deployDeclaration` (or `deploy.declaration`);
+legacy hooks with one root owner deployment declaration are supported too. A
+custom hook may return only `{ deployed: true, origin }`: rer verifies the
+recorded Worker, runs the adapter's actual owner bootstrap, records successful
+ownership separately from retired secrets, and removes the setup token before
+returning success. An owner already claimed by the hook is kept without another
+bootstrap. An existing owner is explicitly reported as kept. Function owner
+hooks run their complete bootstrap flow; setup manifest paths do not replace it.
+A missing or ambiguous declaration or deployment receipt refuses completion.
+
+`--env-file` values are available in the command's preflight, custom hook and
+child build environment and are redacted; the caller environment is restored
+on success and failure. `--remove`, `--set-secret` and `--unset-secret` always go
+through the owner-account controller, without invoking the application's build
+or deploy hook. Failure reports distinguish deployment, owner claim and token
+retirement and preserve the environment, checkout and env-file in recovery
+commands. Retirement can be finished with `rer deploy --unset-secret SETUP_TOKEN`
+plus the same `--environment`, `--env-file` and `--cwd` arguments.
