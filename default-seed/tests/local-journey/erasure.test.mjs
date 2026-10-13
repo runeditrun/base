@@ -76,7 +76,7 @@ const sql = (root, query) => {
 }
 const refused = (run) => assert.rejects(run, /failed \(4\)/)
 
-test('BASE-DATA-003 a native person with 300 notes erases through bounded steps while related imports still resume and undo', { timeout: 30 * 60_000 }, async (t) => {
+test('BASE-DATA-003 a person with 300 notes and 300 reactions across 30 imports erases through bounded, continued steps while related imports still resume and undo', { timeout: 30 * 60_000 }, async (t) => {
   const runtime = await freshLocalProject('large-erasure-owner@example.test')
   try {
     const owner = api(runtime.origin, await session(runtime.origin, runtime.vars.RER_DEV_KEY, 'owner'))
@@ -94,21 +94,34 @@ test('BASE-DATA-003 a native person with 300 notes erases through bounded steps 
     assert.equal(imported.status, 201)
     const job = imported.json.job.id
     assert.equal((await owner('POST', `/api/people/imports/${job}/resume`, { batches: 1 })).json.job.state, 'applying')
+    // 300 more imported people reacted to by the subject, in 30 separate imports:
+    // more imports than one request rewrites, so erasure continues across requests.
+    for (let upload = 0; upload < 30; upload++) {
+      const peers = await owner('POST', '/api/people/imports', { label: `reactions-${upload}.json`, people: Array.from({ length: 10 }, (_, index) => ({
+        ref: `reacted-${upload}-${index}`, name: `Reacted ${upload}-${index}`, email: `reacted-${upload}-${index}@example.test`, details: { reactions } })) })
+      assert.equal(peers.status, 201)
+      assert.equal((await owner('POST', `/api/people/imports/${peers.json.job.id}/resume`, {})).json.job.state, 'completed')
+    }
     for (let index = 0; index < 300; index++) {
       assert.equal((await owner('POST', `/api/people/${person}/notes`, { body: `Large subject note ${index}` })).status, 201)
     }
     assert.equal((await owner('GET', `/api/people/${person}/export`)).json.notes.length, 300)
     const erased = await owner('POST', `/api/people/${person}/erasure`, { confirmation: `erase ${person}` })
-    assert.equal(erased.status, 200)
-    const { receipt, journal } = erased.json
+    assert.equal(erased.status, 202, 'the first request commits one bounded redaction step and queues the next')
+    assert.ok(erased.json.redaction.jobsRedacted > 0 && erased.json.redaction.jobsPending > 0)
+    for (const deadline = Date.now() + 5 * 60_000; (await owner('GET', `/api/people/${person}/export`)).status !== 404;) {
+      assert.ok(Date.now() < deadline, 'the queued steps finish the erasure')
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+    const [operation] = await sql(runtime.root, 'SELECT id FROM rer_erasure_operations')
+    const { receipt } = (await owner('GET', `/api/erasures/${operation.id}`)).json
     assert.equal(receipt.phase, 'complete')
     assert.deepEqual(receipt.deleted, { people: 1, person_notes: 300 })
-    assert.deepEqual(journal.fieldMatches, [{ path: ['details', 'reactions', '*', 'users', '*'], matches: 10 }], 'both exact identifiers are counted in two source/effect pairs and one applied native peer')
-    assert.equal((await owner('GET', `/api/people/${person}/export`)).status, 404)
+    assert.ok((await owner('GET', '/api/erasures/journal')).json.journal.length >= 2, 'each committed step leaves a journal row')
     assert.equal((await owner('POST', `/api/people/${person}/erasure`, { confirmation: `erase ${person}` })).status, 404)
-    assert.deepEqual((await owner('POST', `/api/erasures/${receipt.id}/resume`, {})).json.receipt, receipt, 'completed bounded erasure safely resumes')
     const clean = [{ ...reactions[0], users: ['U-KEPT'] }]
     assert.deepEqual((await owner('GET', '/api/people/large-applied-peer/export')).json.person.details.reactions, clean)
+    assert.deepEqual((await owner('GET', '/api/people/reacted-29-9/export')).json.person.details.reactions, clean)
     assert.equal((await owner('POST', `/api/people/imports/${job}/resume`, {})).json.job.state, 'completed')
     assert.deepEqual((await owner('GET', '/api/people/large-pending-peer/export')).json.person.details.reactions, clean)
     assert.equal((await owner('POST', `/api/people/imports/${job}/undo`, {})).json.job.state, 'undone')
@@ -117,7 +130,10 @@ test('BASE-DATA-003 a native person with 300 notes erases through bounded steps 
     assert.deepEqual((await owner('GET', `/api/people/${peer}/export`)).json, beforePeer)
     await runtime.stop()
     assert.deepEqual(await sql(runtime.root, 'SELECT id FROM person_notes'), [], 'all 300 native notes are gone from D1')
-    t.diagnostic('300 native notes: erasure 200 complete; people=1, person_notes=300; export=404; exact field matches=10; resume/undo and unrelated peer preserved')
+    assert.deepEqual(await leftovers(runtime.root, [actor.toLowerCase()]), [], 'no table, original, trace or object still holds the source user id')
+    assert.equal((await sql(runtime.root, `SELECT count(*) AS n FROM people WHERE instr(details,'${person}')>0`))[0].n, 0, 'no peer still names the person')
+    assert.equal((await sql(runtime.root, "SELECT count(*) AS n FROM people WHERE details LIKE '%U-KEPT%'"))[0].n, 300, 'all 300 reacted peers keep their other reactions')
+    t.diagnostic('300 notes + 300 reactions over 30 imports: 202 then queued steps; people=1, person_notes=300; no identifier left; resume/undo and unrelated peer preserved')
   } finally { await runtime.close() }
 })
 

@@ -1,4 +1,5 @@
 import { canonicalJson, sha256 } from '../../../../../modules/import-kit/src/d1/index.ts'
+import { personRedaction } from './person-redaction.server.ts'
 import type { D1Database as KitDatabase, D1ImportContext, D1Sql, D1TargetAdapter, ImportMapping, Json, SourceBundle, TargetRow } from '../../../../../modules/import-kit/src/d1/index.ts'
 
 /** People arrive through Base import-kit: each source row becomes one `people`
@@ -29,6 +30,7 @@ export const personTargets: D1TargetAdapter = {
       row.targetId, name, email, canonicalJson(details), row.revision)]
   },
   remove(_destination, _kind, id) { return [sql('DELETE FROM people WHERE id=?', id)] },
+  redaction: (db, _destination, fields) => personRedaction(db, fields),
   async list(db) {
     const { results } = await db.prepare('SELECT id FROM people WHERE import_revision IS NOT NULL ORDER BY id').all<{ id: string }>()
     return Promise.all(results.map(async ({ id }) => (await this.read(db, 'people', PERSON, id))!))

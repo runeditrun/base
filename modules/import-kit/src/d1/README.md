@@ -455,6 +455,11 @@ nothing back: the native rows are fenced by the erasure module's
 unbounded (one batch), so `maxBatchBytes` is refused with
 `IMPORT_RETIREMENT_UNBOUNDED_ONLY`.
 
+`person.related.fields` can stand without a `target` (a person who appears only
+inside other people's records), and `{ resumable: true }` spreads a redaction
+across requests in bounded steps; see the kit README, "Erasing fields in
+retained shared records".
+
 
 ## Normalized paged imports
 
