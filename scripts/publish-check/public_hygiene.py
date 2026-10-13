@@ -9,7 +9,7 @@ from hygiene_config import EMAIL, LOCAL_PATH, public_email
 from font_licence import without_required_notices
 from trust_bundle import anchor_values
 from png_text import text_chunks
-from media import binary_media
+from media import sample_spans
 URI_AUTHORITY = re.compile(r'''(?i)(?a:(?P<scheme>[a-z][a-z0-9+.-]*:))?//(?P<authority>[^/?#\s<>"']+)''')
 # Match raw, complete commit trailer lines; decoded or embedded prose cannot
 # acquire trailer privileges. Only the address span is omitted from email checks.
@@ -94,25 +94,34 @@ def certificate_metadata(data, bundle, emails, config):
     return not Counter(emails) - inside
 
 
+def without_spans(data, spans):
+    # Each span becomes one space: text on either side stays apart, and no
+    # long blank run is left for the line-anchored patterns to rescan.
+    kept, offset = [], 0
+    for start, end in sorted(spans):
+        kept.append(data[offset:start])
+        offset = max(offset, end)
+    kept.append(data[offset:])
+    return b' '.join(kept)
+
+
 def inspect(data, path, config, resolver, *, commit_message=False):
     chunks = list(text_chunks(data))
-    remaining = bytearray(data) if chunks else data
+    # Image and video samples are not text: they can spell an address or a
+    # path by chance. Comments, XMP, tags and other metadata remain text.
+    spans = sample_spans(data) or []
     rules, provenance = set(), False
     for start, end, fields in chunks:
-        remaining[start:end] = b' ' * (end - start)
+        spans.append((start, end))
         for field in fields:
             # A metadata value is text, not a standalone source manifest or
             # trust bundle, even when the containing image has a JSON name.
             field_rules, field_provenance = inspect_text(field, '@png-text', config, resolver, binary_content=False)
             rules.update(field_rules)
             provenance |= field_provenance
-    # Image and video bytes are not text: compressed pixels can spell an
-    # address or a path by chance. Framed PNG text fields above remain text.
-    if binary_media(data):
-        return rules, provenance
     # Keep the original binary classification for content outside text chunks.
     # CRC-adjacent bytes must not also create a synthetic raw mailbox match.
-    raw_rules, raw_provenance = inspect_text(bytes(remaining), path, config, resolver,
+    raw_rules, raw_provenance = inspect_text(without_spans(data, spans), path, config, resolver,
                                             commit_message=commit_message, binary_content=binary(data))
     rules.update(raw_rules)
     provenance |= raw_provenance

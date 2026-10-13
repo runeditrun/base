@@ -422,14 +422,20 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             self.assertNotIn(value, json.dumps(report))
 
 
-    def test_media_bytes_are_not_text_and_public_base_copies_are_pre_existing(self):
+    def test_media_samples_are_not_text_and_public_base_copies_are_pre_existing(self):
         def gif(*blocks):
             # 1x1 GIF with a two-colour table; each block is (introducer, payload).
             body = b'GIF89a' + struct.pack('<HHBBB', 1, 1, 0x80, 0, 0) + b'\0\0\0\xff\xff\xff'
             for introducer, payload in blocks:
                 body += introducer + bytes([len(payload)]) + payload + b'\0'
             return body + b';'
-        pixels = (b'\x2c' + struct.pack('<HHHHB', 0, 0, 1, 1, 0) + b'\x02', b'\x07k' + b'@' + b'x9.io\x0f\x84\x51')
+
+        def jpeg(xmp, scan):
+            # An APP1 XMP segment, then one scan of entropy-coded bytes.
+            def segment(marker, data):
+                return b'\xff' + marker + struct.pack('>H', len(data) + 2) + data
+            return b'\xff\xd8' + segment(b'\xe1', xmp) + segment(b'\xda', b'\x01\x01\0\0\x3f\0') + scan + b'\xff\xd9'
+        pixels =(b'\x2c' + struct.pack('<HHHHB', 0, 0, 1, 1, 0) + b'\x02', b'\x07k' + b'@' + b'x9.io\x0f\x84\x51')
         self.write('.github/assets/media/preview.gif', gif(pixels))
         self.write('CONTRIBUTORS.txt', f'{secrets.token_hex(8)}@{secrets.token_hex(8)}.com\n')
         self.commit()
@@ -466,6 +472,18 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             self.assertEqual(report['status'], 'FAIL')
             self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, {('secret.env-match', 'docs/demo.gif')})
             self.assertNotIn(value, json.dumps(report))
+            # Metadata around the samples is still text: a GIF comment and JPEG XMP.
+            self.git('reset', '-q', '--hard', 'HEAD~1')
+            self.write('docs/demo.gif', gif(pixels, (b'\x21\xfe', b'Made by ' + mailbox.encode())))
+            self.commit()
+            report = door()
+            self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, {('hygiene.email', 'docs/demo.gif')})
+            self.git('reset', '-q', '--hard', 'HEAD~1')
+            xmp = '<rdf:Description stRef:filePath="/' + f'Users/{secrets.token_hex(4)}/Desktop/master.psd"/>'
+            self.write('docs/photo.jpg', jpeg(b'http://ns.adobe.com/xap/1.0/\0' + xmp.encode(), pixels[1]))
+            self.commit()
+            report = door()
+            self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, {('hygiene.local-path', 'docs/photo.jpg')})
 
     def test_controller_manifest_digests_preserve_real_credential_findings(self):
         value = secrets.token_hex(32)
