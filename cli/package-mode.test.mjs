@@ -139,6 +139,9 @@ test('--to-package moves delivery operations, the scripts they run and CI workfl
   'HOMEPAGE-VARIANTS.md': await readFile(join(base, 'export/HOMEPAGE-VARIANTS.md'), 'utf8'),
   'AGENTS.md': await readFile(join(base, 'export/AGENTS.md'), 'utf8'),
   'src/base/hydration/README.md': await readFile(join(base, 'foundation/runtime/hydration/README.md'), 'utf8'),
+  'README.md': await readFile(join(base, 'default-seed/README.md'), 'utf8'),
+  'OPERATIONS.md': await readFile(join(base, 'default-seed/OPERATIONS.md'), 'utf8'),
+  'src/modules/erasure/README.md': await readFile(join(base, 'modules/erasure/README.md'), 'utf8'),
  };
  const seed = {
   ...publicDocs,
@@ -172,8 +175,9 @@ test('--to-package moves delivery operations, the scripts they run and CI workfl
  assert.equal(contract.code,0,contract.stdout+contract.stderr);
  const read = async path => readFile(join(root, path), 'utf8');
  for (const path of Object.keys(seed).filter(path => path !== 'OPERATIONS.json')) assert.doesNotMatch(await read(path), /scripts\/(?:rer\.mjs|base-cli\/|base-onboarding\/)/, `${path} no longer calls the removed copy`);
- const packageDocs = ['RUN-LOCALLY.md', 'SEED-COMMAND-CONTRACT.md', 'HOMEPAGE-VARIANTS.md', 'AGENTS.md', 'src/base/hydration/README.md'];
+ const packageDocs = Object.keys(publicDocs);
  for (const path of packageDocs) assert.doesNotMatch(await read(path), /node scripts\/(?:rer\.mjs|export-cli\.mjs)|scripts\/(?:rer\.mjs|base-cli|base-onboarding)|rer queue status|global\/rer\.mjs/, `${path} gives package-mode instructions only`);
+ assert.doesNotMatch(await read('README.md'), /From the runnable project\s+Package mode/, 'a rewritten sentence that wraps across lines is replaced whole');
  const selected = JSON.parse(await read('edition.json')).components;
  assert.ok(selected.some(component => component.source.paths.includes('app.mjs')), 'conversion retains selected app source');
  for (const component of selected) for (const path of component.source.paths) await access(join(root,path));

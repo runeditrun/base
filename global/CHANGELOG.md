@@ -8,6 +8,7 @@
 - `rer deploy` says it is deploying to your Cloudflare account and names the live address, instead of saying the application is running locally; `rer build` ends with "Your application is built".
 - `rer describe` in the default seed and new foundations names the release keygen, sign and receipt subcommands again.
 - Importing an archive whose bytes are not valid UTF-8 is refused with the same `archive_json` diagnostic (exit 2) as invalid JSON.
+- Converting a seed to package mode no longer leaves a broken queue sentence in its README or `scripts/base-cli` paths in its operations guide and erasure README.
 
 ## 0.2.2
 

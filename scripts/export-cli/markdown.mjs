@@ -35,7 +35,7 @@ export function rewritePackageMarkdown(path, source) {
   '`rer verify` includes the hosted-output check.');
  text = text.replace(/(?:In vendored mode(?: only)?, )?`node scripts\/base-cli\/cli\/hydration\/check\.mjs[\s\S]*?counted in `--details`\./g,
   '`rer verify` includes the hydration check.');
- text = text.replace(/(?:From the runnable project root|root), inspect the live queue with\n`node scripts\/base-cli\/modules\/job-queue\/cli\.mjs status`\./g,
+ text = text.replace(/(?:From the runnable project\s+root|root), inspect the live queue with\s+`node scripts\/base-cli\/modules\/job-queue\/cli\.mjs status`\./g,
   'Package mode has no queue status command; a waiting command reports its live position.');
 
  if (path === 'RUN-LOCALLY.md') {
@@ -100,5 +100,7 @@ export function rewritePackageMarkdown(path, source) {
    'Package mode has no queue status command; a waiting command reports its live position.');
  }
 
+ // A module path that is left names its copy inside the installed package.
+ text = text.replace(/`scripts\/base-cli\/(modules\/[A-Za-z0-9_./-]+)`/g, '`node_modules/@runeditrun/rer/$1`');
  return text;
 }

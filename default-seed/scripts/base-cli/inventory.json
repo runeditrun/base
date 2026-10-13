@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.g462fd4c2",
+  "cliVersion": "0.2.2-dev.g88e14f40",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1035,7 +1035,7 @@
     },
     "modules/erasure/README.md": {
       "source": "modules/erasure/README.md",
-      "sha256": "525506c392d339c8619b7929c1091c25b480356065d9659785b4656d4e642a1b"
+      "sha256": "e0bf55f99d02a79a07ea3d3a089053419f8217a8dca7678861cea05a4181318b"
     },
     "modules/erasure/audit.mjs": {
       "source": "modules/erasure/audit.mjs",
