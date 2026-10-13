@@ -1,0 +1,943 @@
+{
+  "schema": 1,
+  "base": {
+    "schema": 1,
+    "title": "Setup",
+    "groups": [],
+    "fields": [
+      {
+        "name": "PROVIDER_URL",
+        "label": "Provider URL",
+        "kind": "url"
+      },
+      {
+        "name": "OWNER_EMAIL",
+        "label": "Owner",
+        "kind": "email",
+        "prefill": "account-email",
+        "required": true
+      },
+      {
+        "name": "API_KEY",
+        "label": "API key",
+        "kind": "secret",
+        "required": false,
+        "ownerVisible": false
+      }
+    ],
+    "steps": [
+      {
+        "type": "owner-claim",
+        "mode": "setup-token",
+        "emailField": "OWNER_EMAIL"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "rejects entered hidden secret",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects entered hidden secret"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "input"
+          ],
+          "value": "entered"
+        }
+      ]
+    },
+    {
+      "name": "rejects entered generated secret",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects entered generated secret"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "input"
+          ],
+          "value": "entered"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "ownerVisible"
+          ],
+          "value": true
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "generate"
+          ],
+          "value": "hex"
+        }
+      ]
+    },
+    {
+      "name": "rejects managed visible secret",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects managed visible secret"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "input"
+          ],
+          "value": "managed"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "ownerVisible"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "rejects unmarked visible secret",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects unmarked visible secret"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "ownerVisible"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "rejects unknown input secret",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects unknown input secret"
+      },
+      "validation": "schema",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "input"
+          ],
+          "value": "other"
+        }
+      ]
+    },
+    {
+      "name": "public fields cannot declare secret input mode",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "public fields cannot declare secret input mode"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "input"
+          ],
+          "value": "entered"
+        }
+      ]
+    },
+    {
+      "name": "rejects secret runtimeEditable true",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects secret runtimeEditable true"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "runtimeEditable"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "rejects secret runtimeEditable false",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects secret runtimeEditable false"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "runtimeEditable"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "rejects unknown runtime exclusion",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects unknown runtime exclusion"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "runtime"
+          ],
+          "value": {
+            "additionalFields": true,
+            "exclude": [
+              "UNKNOWN"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid colour default red",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid colour default red"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "colour"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "red"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid timezone default Nowhere/Bad",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid timezone default Nowhere/Bad"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "timezone"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "Nowhere/Bad"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid url default notaurl",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid url default notaurl"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "url"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "notaurl"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid url default ftp://example.org",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid url default ftp://example.org"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "url"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "ftp://example.org"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid url default https://user:password@exa",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid url default https://user:password@exa"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "url"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "https://user:password@example.org"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid email default nope",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid email default nope"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "email"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "nope"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid email default xxxxxxxxxxxxxxxxxxxxxxxxx",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid email default xxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "email"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@ex.test"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid text default xxxxxxxxxxxxxxxxxxxxxxxxx",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid text default xxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "text"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid select default missing",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid select default missing"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "select"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "missing"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "options"
+          ],
+          "value": [
+            {
+              "value": "ok",
+              "label": "OK"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rejects empty select default without a declared empty option",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects empty select default without a declared empty option"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "select"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": ""
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "options"
+          ],
+          "value": [
+            {
+              "value": "ok",
+              "label": "OK"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid extension ID ",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid extension ID "
+      },
+      "validation": "schema",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps"
+          ],
+          "value": [
+            {
+              "type": "owner-claim",
+              "mode": "setup-token",
+              "emailField": "OWNER_EMAIL"
+            },
+            {
+              "type": "extension",
+              "id": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid extension ID Uppercase",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid extension ID Uppercase"
+      },
+      "validation": "schema",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps"
+          ],
+          "value": [
+            {
+              "type": "owner-claim",
+              "mode": "setup-token",
+              "emailField": "OWNER_EMAIL"
+            },
+            {
+              "type": "extension",
+              "id": "Uppercase"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid extension ID bad_id",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid extension ID bad_id"
+      },
+      "validation": "schema",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps"
+          ],
+          "value": [
+            {
+              "type": "owner-claim",
+              "mode": "setup-token",
+              "emailField": "OWNER_EMAIL"
+            },
+            {
+              "type": "extension",
+              "id": "bad_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rejects invalid extension ID xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects invalid extension ID xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "validation": "schema",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps"
+          ],
+          "value": [
+            {
+              "type": "owner-claim",
+              "mode": "setup-token",
+              "emailField": "OWNER_EMAIL"
+            },
+            {
+              "type": "extension",
+              "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rejects condition both operators",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects condition both operators"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "when"
+          ],
+          "value": {
+            "field": "PROVIDER_URL",
+            "equals": "x",
+            "nonEmpty": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejects condition neither operator",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects condition neither operator"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "when"
+          ],
+          "value": {
+            "field": "PROVIDER_URL"
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejects condition false nonempty",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects condition false nonempty"
+      },
+      "validation": "schema",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "when"
+          ],
+          "value": {
+            "field": "PROVIDER_URL",
+            "nonEmpty": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejects condition undeclared",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects condition undeclared"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "when"
+          ],
+          "value": {
+            "field": "MISSING",
+            "nonEmpty": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejects condition secret dependency",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects condition secret dependency"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "when"
+          ],
+          "value": {
+            "field": "API_KEY",
+            "nonEmpty": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejects later nonempty dependency",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects later nonempty dependency"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "when"
+          ],
+          "value": {
+            "field": "OWNER_EMAIL",
+            "nonEmpty": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejects presentation overlap",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects presentation overlap"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "text"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "presentations"
+          ],
+          "value": [
+            {
+              "when": {
+                "field": "PROVIDER_URL",
+                "nonEmpty": true
+              }
+            },
+            {
+              "when": {
+                "field": "PROVIDER_URL",
+                "equals": "yes"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rejects presentation duplicate nonempty",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "rejects presentation duplicate nonempty"
+      },
+      "validation": "semantic",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "text"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "presentations"
+          ],
+          "value": [
+            {
+              "when": {
+                "field": "PROVIDER_URL",
+                "nonEmpty": true
+              }
+            },
+            {
+              "when": {
+                "field": "PROVIDER_URL",
+                "nonEmpty": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "duplicate equality presentations retain the established diagnostic",
+      "origin": "review",
+      "source": {
+        "file": "SETUP.review.test.mjs",
+        "test": "duplicate equality presentations retain the established diagnostic"
+      },
+      "validation": "semantic",
+      "errorIncludes": "presentation condition values must be unique",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "kind"
+          ],
+          "value": "text"
+        },
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "presentations"
+          ],
+          "value": [
+            {
+              "when": {
+                "field": "PROVIDER_URL",
+                "equals": "same"
+              }
+            },
+            {
+              "when": {
+                "field": "PROVIDER_URL",
+                "equals": "same"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

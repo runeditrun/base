@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "rules": {
+    "R2": {
+      "mounts": {
+        "src/core/app/mount.server.ts": [
+          "src/ext/index.server.ts"
+        ],
+        "src/core/app/public-mount.ts": [
+          "src/ext/public-config.ts"
+        ]
+      }
+    },
+    "R3": {
+      "exceptions": [
+        "src/core/features/delivery/mail/index.ts"
+      ]
+    },
+    "R4": {
+      "specifiers": [],
+      "specifierPrefixes": [
+        "drizzle-orm"
+      ],
+      "clientModules": [
+        "src/core/platform/db/client"
+      ],
+      "allowedFiles": [
+        "**/repository.ts"
+      ],
+      "allowedDirectories": [
+        "src/core/platform/db"
+      ]
+    },
+    "R5": {
+      "importScopes": [],
+      "environmentScopes": [
+        "**"
+      ]
+    },
+    "R6": false
+  }
+}

@@ -1,0 +1,157 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      clean_bootstrap:
+        description: Run without restoring dependency or browser caches
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Main needs evidence for every pushed SHA, including repeated runs of a SHA.
+# A distinct run key also avoids GitHub replacing a pending main run.
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.stages.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.20.0'
+      - id: stages
+        name: Assign every full-verify stage exactly once
+        run: |
+          matrix=$(node scripts/ci/verify.mjs --matrix)
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify (${{ matrix.group }}${{ matrix.shard && format(' {0}/3', matrix.shard) || '' }})
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      # Docker's official ubuntu:24.04, mirrored by mirror-ubuntu-image.yml to GHCR: hosted runners pull it with GITHUB_TOKEN, free of the anonymous Docker Hub and ECR Public limits that failed jobs before they started.
+      image: ghcr.io/runeditrun/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --init
+      volumes:
+        - /usr/local/lib/android:/runner-preinstalled/android
+    timeout-minutes: 25
+    env:
+      TZ: UTC
+      RER_VERIFY_WORKERS: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Require an init process to reap cancelled command descendants
+        run: |
+          set -euo pipefail
+          # The Actions container entrypoint is `tail -f /dev/null`. Without
+          # `options: --init` it is PID 1, so orphaned zombies are never reaped and
+          # the strict process-cleanup tests fail with an unrelated-looking message.
+          pid1_comm=$(cat /proc/1/comm)
+          if [ "$pid1_comm" = tail ]; then
+            printf 'Container PID 1 is %s, not an init process; keep container options: --init so cancelled child processes are reaped.\n' "$pid1_comm" >&2
+            exit 1
+          fi
+      - name: Reclaim unused hosted Android tools for native consumer verification
+        run: |
+          set -euo pipefail
+          df -Pk "$GITHUB_WORKSPACE"
+          du -sk /runner-preinstalled/android
+          # Delete only the explicitly mounted host SDK, retaining the mount
+          # point and all runner Actions runtimes, tool caches and Docker images.
+          find /runner-preinstalled/android -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          df -Pk "$GITHUB_WORKSPACE"
+      - name: Install checkout prerequisites
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Record clean Linux preconditions before cache restore
+        run: |
+          test "$(uname -s)" = Linux
+          if command -v node || command -v pnpm; then
+            printf 'Expected a container without Node or pnpm\n' >&2
+            exit 1
+          fi
+          test ! -d node_modules
+          test ! -d default-seed/node_modules
+          test ! -d "$HOME/.cache/ms-playwright"
+          printf 'Clean Linux: no Node, pnpm, dependencies or browser cache before restore\n'
+      - name: Cache shared pnpm store and Playwright browsers
+        if: ${{ !inputs.clean_bootstrap }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ~/.local/share/pnpm/store
+            ~/.cache/ms-playwright
+          key: base-ubuntu24-${{ runner.arch }}-${{ hashFiles('scripts/agent-bootstrap.sh', 'scripts/install-gitleaks.sh', 'pnpm-lock.yaml', 'modules/mail/pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'default-seed/package.json', 'foundation/template/package.json', 'foundation/template/pnpm-lock.yaml') }}
+      - name: Bootstrap pinned Linux toolchain
+        run: |
+          # Checkout configures a temporary HOME; the root container's test
+          # shell needs this exact reviewed workspace trusted in its own HOME.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+          bash scripts/agent-bootstrap.sh
+          # Measure the actual consumer filesystem after dependency/browser
+          # installation. The editor's own 15 GiB guard remains authoritative.
+          df -Pk "$GITHUB_WORKSPACE"
+          available_kib=$(df --output=avail -k "$GITHUB_WORKSPACE" | tail -n 1)
+          if (( available_kib < 15 * 1024 * 1024 )); then
+            printf 'Verification requires at least 15 GiB free after bootstrap; available: %s KiB\n' "$available_kib" >&2
+            exit 1
+          fi
+      - name: Run full-verify stages assigned to this job
+        env:
+          VERIFY_GROUP: ${{ matrix.group }}
+          CLI_SHARD: ${{ matrix.shard }}
+        run: node scripts/ci/verify.mjs "$VERIFY_GROUP"
+      - name: Fetch pinned active HappyToHelp source without credentials
+        if: ${{ !cancelled() && matrix.group == 'launcher' }}
+        env:
+          GIT_CONFIG_NOSYSTEM: '1'
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_TERMINAL_PROMPT: '0'
+          GIT_ASKPASS: /bin/false
+        run: |
+          git -c credential.helper= init "$RUNNER_TEMP/public-happytohelp"
+          git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" fetch --depth=1 https://github.com/just-every/happytohelp.git 60e9a84688ea41575d56a8f692bbb8173366c7c5
+          git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" checkout --detach FETCH_HEAD
+      - name: Select the active edition's pinned runtime after Base stages finish
+        if: ${{ !cancelled() && matrix.group == 'launcher' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '26.8.1'
+      - name: Packed launcher acquisition, browser onboarding and offline resume for active HappyToHelp
+        if: ${{ !cancelled() && matrix.group == 'launcher' }}
+        run: node scripts/ci/launcher-acceptance.mjs
+      - name: Remove active-edition acceptance checkouts
+        if: ${{ always() && matrix.group == 'launcher' }}
+        run: |
+          rm -rf -- "$RUNNER_TEMP/public-happytohelp" "$RUNNER_TEMP/base-launcher-evidence"
+          rm -f -- "$RUNNER_TEMP/launcher-release-manifest.json"

@@ -1,0 +1,172 @@
+name: live-proof
+on:
+  workflow_dispatch:
+    inputs:
+      proof:
+        description: Registered proof name
+        required: true
+        type: choice
+        options: [secrets-present, t016-r2-off, t016-r2-on, t016-upgrade-rollback]
+      sha:
+        description: Exact lowercase 40-character commit SHA on main or an allowed v* release tag
+        required: true
+        type: string
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      # Before checkout, and with no Environment attached. Never interpolate inputs
+      # into shell source. workflow_sha identifies this main-dispatched controller.
+      - name: Validate dispatch envelope
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          CONTROL_SHA: ${{ github.workflow_sha }}
+        shell: bash
+        run: |
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+          [[ "$GITHUB_REPOSITORY" == runeditrun/base ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$INPUT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CONTROL_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.16.0'
+      - name: Validate immutable source against fresh allowed refs
+        id: source
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          INPUT_PROOF: ${{ inputs.proof }}
+          CONTROL_SHA: ${{ github.workflow_sha }}
+          MODE: proof
+          GH_READ_TOKEN: ${{ github.token }}
+        run: node live-proofs/validate-source.mjs
+
+  isolation:
+    needs: validate
+    if: ${{ startsWith(inputs.proof, 't016-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      attestation: ${{ steps.isolation.outputs.attestation }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26.8.1'
+      - name: Prove process and filesystem isolation without provider credentials
+        id: isolation
+        env:
+          CONTROL_SHA: ${{ github.workflow_sha }}
+          T016_CONTROLLER_IMAGE: ${{ vars.T016_CONTROLLER_IMAGE }}
+          T016_BUILD_IMAGE: ${{ vars.T016_BUILD_IMAGE }}
+          T016_BROWSER_IMAGE: ${{ vars.T016_BROWSER_IMAGE }}
+        run: node live-proofs/tests/isolation-linux.mjs
+      - name: Stop any containers left by an interrupted isolation probe
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          mapfile -t ids < <(docker ps --all --quiet --filter "label=t016.run=t016-isolation-${GITHUB_RUN_ID}")
+          if (("${#ids[@]}")); then docker rm --force "${ids[@]}"; fi
+
+  execute:
+    needs: [validate, isolation]
+    if: ${{ always() && needs.validate.result == 'success' && (needs.isolation.result == 'success' || needs.isolation.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: live-proof
+    outputs:
+      result: ${{ steps.execute.outputs.result }}
+      executed_sha: ${{ steps.execute.outputs.executed_sha }}
+      started: ${{ steps.execute.outputs.started }}
+      finished: ${{ steps.execute.outputs.finished }}
+      qualification: ${{ steps.execute.outputs.qualification }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.16.0'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: ${{ startsWith(inputs.proof, 't016-') }}
+        with:
+          node-version: '26.8.1'
+      - name: Execute registered operation with provider credentials only
+        id: execute
+        env:
+          SOURCE_DIRECTORY: ${{ github.workspace }}/source
+          VALIDATED_SHA: ${{ needs.validate.outputs.sha }}
+          INPUT_PROOF: ${{ inputs.proof }}
+          MODE: proof
+          CONTROL_SHA: ${{ github.workflow_sha }}
+          T016_ISOLATION_ATTESTATION: ${{ needs.isolation.outputs.attestation }}
+          T016_CONTROLLER_IMAGE: ${{ vars.T016_CONTROLLER_IMAGE }}
+          T016_BUILD_IMAGE: ${{ vars.T016_BUILD_IMAGE }}
+          T016_BROWSER_IMAGE: ${{ vars.T016_BROWSER_IMAGE }}
+          CF_THROWAWAY_API_TOKEN: ${{ secrets.CF_THROWAWAY_API_TOKEN }}
+          CF_THROWAWAY_ACCOUNT_ID: ${{ secrets.CF_THROWAWAY_ACCOUNT_ID }}
+          T016_SENDGRID_API_KEY: ${{ (inputs.proof == 't016-r2-on' || inputs.proof == 't016-upgrade-rollback') && secrets.SENDGRID_API_KEY || '' }}
+          T016_SENDGRID_FROM: ${{ (inputs.proof == 't016-r2-on' || inputs.proof == 't016-upgrade-rollback') && secrets.T016_SENDGRID_FROM || '' }}
+          T016_TEST_MAILBOX: ${{ (inputs.proof == 't016-r2-on' || inputs.proof == 't016-upgrade-rollback') && secrets.T016_TEST_MAILBOX || '' }}
+          T016_MAILBOX_ADAPTER: ${{ vars.T016_MAILBOX_ADAPTER }}
+          T016_GMAIL_ACCESS_TOKEN: ${{ (inputs.proof == 't016-r2-on' || inputs.proof == 't016-upgrade-rollback') && vars.T016_MAILBOX_ADAPTER == 'gmail' && secrets.T016_GMAIL_ACCESS_TOKEN || '' }}
+        run: node control/live-proofs/run.mjs
+      - name: Stop any containers left by an interrupted T016 operation
+        if: ${{ always() && startsWith(inputs.proof, 't016-') }}
+        shell: bash
+        run: |
+          mapfile -t ids < <(docker ps --all --quiet --filter "label=t016.run=t016-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}")
+          if (("${#ids[@]}")); then docker rm --force "${ids[@]}"; fi
+
+  receipt:
+    # Separate clean runner: proof code cannot leave a hook, process or changed
+    # writer behind to steal the evidence credential. Failure still reaches here.
+    if: ${{ always() && needs.validate.result == 'success' }}
+    needs: [validate, execute]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: live-proof
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.16.0'
+      - name: Persist fixed-schema receipt to private evidence store
+        env:
+          EVIDENCE_WRITE_TOKEN: ${{ secrets.EVIDENCE_WRITE_TOKEN }}
+          EVIDENCE_REPOSITORY: ${{ secrets.EVIDENCE_REPOSITORY }}
+          VALIDATED_SHA: ${{ needs.validate.outputs.sha }}
+          CONTROL_SHA: ${{ github.workflow_sha }}
+          INPUT_PROOF: ${{ inputs.proof }}
+          MODE: proof
+          JOB_RESULT: ${{ needs.execute.result }}
+          EXECUTION_RESULT: ${{ needs.execute.outputs.result }}
+          EXECUTED_SHA: ${{ needs.execute.outputs.executed_sha }}
+          STARTED: ${{ needs.execute.outputs.started }}
+          FINISHED: ${{ needs.execute.outputs.finished }}
+          QUALIFICATION: ${{ needs.execute.outputs.qualification }}
+        run: node live-proofs/persist.mjs

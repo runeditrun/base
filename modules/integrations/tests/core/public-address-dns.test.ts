@@ -1,0 +1,62 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import dns from 'node:dns/promises';
+import https from 'node:https';
+import { syncBuiltinESMExports } from 'node:module';
+import { NodePinnedTransport } from '../../core/node-transport.ts';
+import { deniedAddresses, publicAddresses } from './public-address-cases.ts';
+
+test('production transport checks every DNS answer before any HTTPS connection', async t => {
+  const originalLookup = dns.lookup, originalRequest = https.request;
+  let answers: { address: string; family: number }[] = [], connects = 0, lookups = 0;
+  const reachedConnection = new Error('Test connection boundary reached');
+  const host = 'receiver.example.com';
+  dns.lookup = (async (hostname: string, options: unknown) => {
+    lookups++;
+    assert.equal(hostname, host);
+    assert.deepEqual(options, { all: true, verbatim: true });
+    return answers;
+  }) as typeof dns.lookup;
+  https.request = ((url: URL, options: https.RequestOptions) => {
+    connects++;
+    assert.equal(url.hostname, host);
+    assert.equal(options.rejectUnauthorized, true);
+    assert.equal(options.agent, false);
+    options.lookup!(host, { family: 0, hints: 0, all: false }, (error, address, family) => {
+      assert.equal(error, null); assert.equal(address, answers[0]!.address); assert.equal(family, answers[0]!.family);
+    });
+    options.lookup!(host, { family: 0, hints: 0, all: true }, (error, addresses) => {
+      assert.equal(error, null); assert.deepEqual(addresses, [answers[0]]);
+    });
+    // A test-only boundary prevents real network I/O even when the unfixed guard permits an address.
+    throw reachedConnection;
+  }) as typeof https.request;
+  syncBuiltinESMExports();
+  const answer = (address: string) => ({ address, family: address.includes(':') ? 6 : 4 });
+  const send = () => new NodePinnedTransport().send({ url: `https://${host}/events`, headers: {}, body: '{}' });
+  try {
+    for (const address of deniedAddresses) await t.test(`DNS rejects ${address} alone and in either mixed order`, async () => {
+      for (const values of [[address], ['8.8.8.8', address], [address, '2606:4700:4700::1111']]) {
+        answers = values.map(answer); const before = connects;
+        await assert.rejects(send(), /Destination DNS is not public/);
+        assert.equal(connects, before);
+      }
+    });
+    await t.test('empty and malformed answers reject', async () => {
+      for (const values of [[], ['bad-address'], ['2606:::1'], ['8.8.8.256']]) {
+        answers = values.map(answer); const before = connects;
+        await assert.rejects(send(), /Destination DNS is not public/);
+        assert.equal(connects, before);
+      }
+    });
+    await t.test('public answers pin the first address with the original TLS hostname and no second resolution', async () => {
+      for (const address of publicAddresses) {
+        answers = [answer(address), answer('8.8.4.4')]; const before = lookups;
+        await assert.rejects(send(), error => error === reachedConnection);
+        assert.equal(lookups, before + 1);
+      }
+    });
+  } finally {
+    dns.lookup = originalLookup; https.request = originalRequest; syncBuiltinESMExports();
+  }
+});

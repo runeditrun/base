@@ -1,0 +1,60 @@
+{
+  "name": "seeds-base",
+  "private": true,
+  "type": "module",
+  "description": "Seed foundations: the governing documents and the schemas every seed is validated against.",
+  "scripts": {
+    "verify:schema": "node onboarding/queued-entry.mjs verify:schema -- sh -c 'node schema/validate.mjs && node schema/validate.mjs --schema SEED && node schema/validate.mjs --schema SETUP && node schema/validate.mjs --schema SETUP --expect-invalid schema/SETUP.invalid.example.json && node --test --test-concurrency=2 schema/*.test.mjs'",
+    "verify:reference": "node onboarding/queued-entry.mjs verify:reference -- sh -c \"pnpm --dir default-seed verify\"",
+    "verify": "node onboarding/queued-entry.mjs verify -- node scripts/verify.mjs",
+    "edition": "node composition/cli.mjs",
+    "verify:composition": "node onboarding/queued-entry.mjs verify:composition -- sh -c 'node schema/validate.mjs --schema FAMILY && node schema/validate.mjs --schema COMPOSITION && node --test --test-concurrency=2 composition/*.test.mjs'",
+    "verify:modules": "node onboarding/queued-entry.mjs verify:modules -- sh -c 'node --max-old-space-size=4096 --test --test-concurrency=2 modules/*/tests/*.test.ts'",
+    "verify:authoring": "node onboarding/queued-entry.mjs verify:authoring -- sh -c 'node --test --test-concurrency=2 authoring/*.test.mjs'",
+    "verify:deployment": "node onboarding/queued-entry.mjs verify:deployment -- sh -c 'node --test --test-concurrency=2 deployment/*.test.mjs modules/deploy-kit/tests/*.test.mjs'",
+    "foundation": "node foundation/cli.mjs",
+    "verify:foundation": "node onboarding/queued-entry.mjs verify:foundation -- sh -c \"node --test --test-concurrency=2 foundation/*.test.mjs && node foundation/verify-export.mjs\"",
+    "verify:operations": "node onboarding/queued-entry.mjs verify:operations -- sh -c 'node --test --test-concurrency=2 operations/*.test.mjs'",
+    "verify:mail-relay": "node onboarding/queued-entry.mjs verify:mail-relay -- sh -c 'node --test --test-concurrency=2 infrastructure/sendgrid-event-relay/*.test.ts'",
+    "verify:edition-authoring": "node onboarding/queued-entry.mjs verify:edition-authoring -- sh -c 'node --test --test-concurrency=2 edition-authoring/*.test.mjs'",
+    "verify:onboarding": "node onboarding/queued-entry.mjs verify:onboarding -- sh -c 'node --test --test-concurrency=2 onboarding/*.test.mjs onboarding/local/*.test.mjs onboarding/ui/*.test.mjs'",
+    "verify:onboarding-browser": "node onboarding/queued-entry.mjs verify:onboarding-browser -- sh -c \"node onboarding/ui/browser-check.mjs && node onboarding/tests/installer-journey.mjs\"",
+    "verify:launcher": "node onboarding/queued-entry.mjs verify:launcher -- sh -c 'node --test --test-concurrency=2 launcher/tests/*.test.mjs'",
+    "verify:launcher-acceptance": "node onboarding/queued-entry.mjs verify:launcher-acceptance -- sh -c \"node launcher/tests/acceptance.mjs\"",
+    "verify:operator-auth": "node onboarding/queued-entry.mjs verify:operator-auth -- sh -c 'node --test --test-concurrency=2 modules/operator-auth/tests/*.test.mjs modules/operator-auth/identity/oidc/tests/*.test.mjs modules/operator-auth/signin/tests/*.test.mjs modules/dependencies/tests/*.test.mjs'",
+    "publish-check": "node scripts/publish-check.mjs",
+    "verify:publish-check": "node onboarding/queued-entry.mjs verify:publish-check -- sh -c 'python3 -B scripts/publish-check/tests.py && python3 -B scripts/publish-check/coverage_tests.py'",
+    "rer": "node bin/rer.mjs",
+    "verify:release": "node onboarding/queued-entry.mjs verify:release -- sh -c 'node --test --test-concurrency=2 modules/release/*.test.mjs'",
+    "delivery:package": "node modules/delivery-producer/cli.mjs package",
+    "verify:delivery-producer": "node onboarding/queued-entry.mjs verify:delivery-producer -- sh -c 'node --test --test-concurrency=2 modules/delivery-producer/tests/*.test.mjs'",
+    "verify:editor": "node onboarding/queued-entry.mjs verify:editor -- sh -c 'node modules/editor/tests/verify.mjs'",
+    "verify:job-queue": "node onboarding/queued-entry.mjs verify:job-queue -- sh -c 'node --test --test-concurrency=1 modules/job-queue/tests/*.test.mjs'",
+    "verify:owner-claim": "node onboarding/queued-entry.mjs verify:owner-claim -- sh -c 'node --test --test-concurrency=1 modules/owner-claim/tests/*.test.mjs && ./default-seed/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2022 --lib ES2022,DOM default-seed/node_modules/@cloudflare/workers-types/index.d.ts modules/owner-claim/tests/types.check.mts'",
+    "verify:scale": "node onboarding/queued-entry.mjs verify:scale -- sh -c 'IMPORT_KIT_SCALE=1 node --max-old-space-size=4096 --test --test-concurrency=1 modules/import-kit/tests/d1/scale.test.ts modules/import-kit/tests/d1/custody-capacity.test.ts modules/import-kit/tests/d1/preserved-native-provider-scale.test.ts modules/import-kit/tests/d1/guard-depth.test.ts modules/import-kit/tests/d1/preserved-report-provider-scale.test.ts modules/import-kit/tests/d1/create-budget.test.ts modules/import-kit/tests/scale/create-boundary.test.ts modules/import-kit/tests/d1/preserved-guard-budget.test.ts modules/import-kit/tests/d1/creation-remaining-budget.test.ts modules/import-kit/tests/d1/erasure.test.ts && PORTABILITY_SCALE=1 node --test --test-concurrency=1 modules/portability/tests/capacity.test.mjs'",
+    "verify:boundary-checker": "node onboarding/queued-entry.mjs verify:boundary-checker -- sh -c 'node --test --test-concurrency=2 modules/boundary-checker/tests/*.test.mjs && ./default-seed/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2022 modules/boundary-checker/tests/types.check.mts'",
+    "verify:portability": "node onboarding/queued-entry.mjs verify:portability -- sh -c 'node --test --test-concurrency=1 modules/portability/tests/*.test.mjs && ./default-seed/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2022 --lib ES2022,DOM default-seed/node_modules/@cloudflare/workers-types/index.d.ts modules/portability/tests/types.check.mts'",
+    "verify:cli": "node onboarding/queued-entry.mjs verify:cli -- sh -c 'node --test --test-concurrency=2 cli/*.test.mjs'",
+    "verify:rer": "node onboarding/queued-entry.mjs verify:rer -- sh -c 'node --test --test-concurrency=1 global/tests/*.test.mjs'",
+    "verify:review-harness": "node onboarding/queued-entry.mjs verify:review-harness -- sh -c 'node --test --test-concurrency=1 modules/review-harness/tests/*.test.mjs && ./default-seed/node_modules/.bin/tsc --project modules/review-harness/tests/tsconfig.json'",
+    "verify:container": "node onboarding/queued-entry.mjs verify:container -- sh -c 'node --test --test-concurrency=2 modules/container/tests/*.test.mjs'"
+  },
+  "bin": {
+    "rer": "bin/rer.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.18.0",
+    "ajv-formats": "3.0.1",
+    "miniflare": "5.20260907.0-alpha"
+  },
+  "pnpm": {
+    "overrides": {
+      "@esbuild-kit/core-utils>esbuild": "0.25.12",
+      "sharp": "0.35.5",
+      "undici": "7.29.1"
+    },
+    "patchedDependencies": {
+      "miniflare@5.20260907.0-alpha": "patches/miniflare@5.20260907.0-alpha.patch"
+    }
+  }
+}

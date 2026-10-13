@@ -1,0 +1,18 @@
+diff --git a/dist/src/index.js b/dist/src/index.js
+index 432e2bae751f20e225804831d0830203f3ba055e..cd45d8c24922781d28b9151de0c032bfbd70096c 100644
+--- a/dist/src/index.js
++++ b/dist/src/index.js
+@@ -67499,9 +67499,10 @@ var SynchronousFetcher = class {
+       /* value */
+       0
+     );
+-    const message = (0, import_node_worker_threads.receiveMessageOnPort)(
+-      this.#channel.port1
+-    )?.message;
++    let message;
++    while ((message = (0, import_node_worker_threads.receiveMessageOnPort)(this.#channel.port1)?.message) === void 0) {
++      Atomics.wait(this.#notifyHandle, 0, 0);
++    }
+     (0, import_node_assert13.default)(message?.id === id);
+     if ("response" in message) {
+       const { status: status2, headers: rawHeaders, body } = message.response;

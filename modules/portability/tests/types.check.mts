@@ -1,0 +1,10 @@
+import { createPortability, createPortabilityHandler, readArchive, type ArchivePolicy, type Row } from '../index.mjs';
+declare const db: D1Database;
+declare const bucket: R2Bucket;
+const policy:ArchivePolicy={product:'fixture',buckets:{FILES:{}},exportRow:(_table,row):Row=>row,validateStaged:async staged=>(await staged.read('notes')).length>0};
+const service=await createPortability({db,buckets:{FILES:bucket},policy});
+const id:string=await service.exports.create();
+const statements:D1PreparedStatement[]=await service.erasureStatements('notes',{id:'one'});
+const handler:(request:Request)=>Promise<Response|null>=await createPortabilityHandler({db,buckets:{FILES:bucket},policy,appOrigin:'https://example.test',authorize:async()=> 'owner'});
+for await(const record of readArchive(await service.exports.download(id)))if(record.kind==='part')await service.imports.uploadPart('target',record.index,record);
+void [statements,handler];

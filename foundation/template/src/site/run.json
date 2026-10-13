@@ -1,0 +1,10 @@
+{
+  "name": "Foundation",
+  "repository": "https://github.com/runeditrun/base",
+  "clone": "git clone https://github.com/runeditrun/base.git",
+  "folder": "foundation",
+  "requirements": "Needs Node 22 or later and pnpm 10.12.4, on macOS, Linux or Windows with WSL2.",
+  "licence": "MIT",
+  "docs": false,
+  "hosted": []
+}

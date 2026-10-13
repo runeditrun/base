@@ -1,0 +1,604 @@
+{
+  "schema": 1,
+  "base": "SETUP.example.json",
+  "cases": [
+    {
+      "name": "unsupported version",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "schema"
+          ],
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "unknown root property",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "future"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "unknown field property",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            1,
+            "future"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "duplicate field name",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            1,
+            "name"
+          ],
+          "value": "EMAIL_PROVIDER"
+        }
+      ]
+    },
+    {
+      "name": "duplicate group ID",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "groups",
+            1,
+            "id"
+          ],
+          "value": "account"
+        }
+      ]
+    },
+    {
+      "name": "unknown group reference",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            1,
+            "group"
+          ],
+          "value": "missing"
+        }
+      ]
+    },
+    {
+      "name": "unsupported public kind",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            1,
+            "kind"
+          ],
+          "value": "color"
+        }
+      ]
+    },
+    {
+      "name": "duplicate select value",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "options",
+            1,
+            "value"
+          ],
+          "value": ""
+        }
+      ]
+    },
+    {
+      "name": "select default without an option",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "default"
+          ],
+          "value": "unlisted"
+        }
+      ]
+    },
+    {
+      "name": "options on non-select field",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            1,
+            "options"
+          ],
+          "value": [
+            {
+              "value": "x",
+              "label": "X"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "condition references a missing field",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            8,
+            "when",
+            "field"
+          ],
+          "value": "MISSING"
+        }
+      ]
+    },
+    {
+      "name": "condition references a later field",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            0,
+            "when"
+          ],
+          "value": {
+            "field": "APP_NAME",
+            "equals": "Northstar"
+          }
+        }
+      ]
+    },
+    {
+      "name": "condition references a secret field",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            6,
+            "when"
+          ],
+          "value": {
+            "field": "EMAIL_API_KEY",
+            "equals": "key"
+          }
+        }
+      ]
+    },
+    {
+      "name": "condition uses a missing select value",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "presentations",
+            0,
+            "when",
+            "equals"
+          ],
+          "value": "missing"
+        }
+      ]
+    },
+    {
+      "name": "presentation variants can overlap",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "presentations",
+            1,
+            "when",
+            "equals"
+          ],
+          "value": "resend"
+        }
+      ]
+    },
+    {
+      "name": "presentation discriminator differs",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            2,
+            "presentations",
+            1,
+            "when",
+            "field"
+          ],
+          "value": "DEPLOYMENT_MODE"
+        }
+      ]
+    },
+    {
+      "name": "account-email prefill on non-email field",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            5,
+            "prefill"
+          ],
+          "value": "account-email"
+        }
+      ]
+    },
+    {
+      "name": "invalid secret generator",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            11,
+            "generate"
+          ],
+          "value": "random"
+        }
+      ]
+    },
+    {
+      "name": "owner-visible secret without generation",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            13,
+            "ownerVisible"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "missing owner-claim step",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps"
+          ],
+          "value": [
+            {
+              "type": "extension",
+              "id": "email"
+            },
+            {
+              "type": "extension",
+              "id": "ai"
+            },
+            {
+              "type": "extension",
+              "id": "inbound-email"
+            },
+            {
+              "type": "extension",
+              "id": "sender-dns"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "multiple owner-claim steps",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps"
+          ],
+          "value": [
+            {
+              "type": "owner-claim",
+              "mode": "signed",
+              "emailField": "OWNER_EMAIL",
+              "tokenField": "OWNER_CLAIM_TOKEN",
+              "path": "/auth/owner-claim"
+            },
+            {
+              "type": "extension",
+              "id": "email"
+            },
+            {
+              "type": "extension",
+              "id": "ai"
+            },
+            {
+              "type": "extension",
+              "id": "inbound-email"
+            },
+            {
+              "type": "extension",
+              "id": "sender-dns"
+            },
+            {
+              "type": "owner-claim",
+              "mode": "signed",
+              "emailField": "OWNER_EMAIL",
+              "tokenField": "OWNER_CLAIM_TOKEN",
+              "path": "/auth/owner-claim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "claim email does not reference prefilled email",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps",
+            0,
+            "emailField"
+          ],
+          "value": "APP_NAME"
+        }
+      ]
+    },
+    {
+      "name": "signed claim uses visible secret",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            11,
+            "ownerVisible"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "signed claim token is optional",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            11,
+            "required"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "signed claim path is not same-app safe",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps",
+            0,
+            "path"
+          ],
+          "value": "//other.example/claim"
+        }
+      ]
+    },
+    {
+      "name": "legacy claim token is not owner-visible",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps",
+            0,
+            "mode"
+          ],
+          "value": "setup-token"
+        },
+        {
+          "op": "delete",
+          "path": [
+            "steps",
+            0,
+            "path"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "legacy claim token is optional",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            11,
+            "required"
+          ],
+          "value": false
+        },
+        {
+          "op": "set",
+          "path": [
+            "steps",
+            0,
+            "mode"
+          ],
+          "value": "setup-token"
+        },
+        {
+          "op": "delete",
+          "path": [
+            "steps",
+            0,
+            "path"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "legacy claim declares signed path",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps",
+            0,
+            "mode"
+          ],
+          "value": "setup-token"
+        }
+      ]
+    },
+    {
+      "name": "checked negative example",
+      "file": "SETUP.invalid.example.json"
+    },
+    {
+      "name": "duplicate JSON keys",
+      "text": "{\"schema\":1,\"schema\":1}"
+    },
+    {
+      "name": "invalid UTF-8",
+      "hex": "fffe"
+    },
+    {
+      "name": "empty select default without a declared empty option",
+      "origin": "review",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "fields",
+            5,
+            "default"
+          ],
+          "value": ""
+        }
+      ]
+    },
+    {
+      "name": "dependency list must be an array",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "dependencies"
+          ],
+          "value": {}
+        }
+      ]
+    },
+    {
+      "name": "provided interfaces must be unique",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "provides"
+          ],
+          "value": [
+            "error-sink@1",
+            "error-sink@1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dependency address must reference a URL answer",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "dependencies"
+          ],
+          "value": [
+            {
+              "interface": "oidc-provider@1",
+              "optional": true,
+              "cardinality": 1,
+              "address": "MISSING_PROVIDER",
+              "paths": [
+                "/auth/oidc/auth/callback"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dependency registration path must remain on the app origin",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "dependencies"
+          ],
+          "value": [
+            {
+              "interface": "oidc-provider@1",
+              "optional": true,
+              "cardinality": 1,
+              "address": "MISSING_PROVIDER",
+              "paths": [
+                "//other.example/callback"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "idp claim must reference a declared identity dependency",
+      "operations": [
+        {
+          "op": "set",
+          "path": [
+            "steps"
+          ],
+          "value": [
+            {
+              "type": "owner-claim",
+              "mode": "idp",
+              "emailField": "OWNER_EMAIL",
+              "dependency": "oidc-provider@1",
+              "path": "/auth/owner-claim"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

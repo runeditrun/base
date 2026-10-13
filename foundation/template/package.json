@@ -1,0 +1,63 @@
+{
+  "name": "@run-edit-run/foundation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.20.0"
+  },
+  "scripts": {
+    "build": "node scripts/rer.mjs build",
+    "dev": "node scripts/rer.mjs dev",
+    "preview": "node scripts/rer.mjs preview",
+    "typecheck": "tsc --build --incremental",
+    "test:typecheck": "node scripts/base-onboarding/queued-entry.mjs test:typecheck -- sh -c \"node --test tests/incremental-typecheck.test.mjs\"",
+    "verify": "node scripts/rer.mjs verify",
+    "setup": "node scripts/rer.mjs setup",
+    "deploy": "node scripts/rer.mjs deploy",
+    "test:runtime": "node scripts/base-onboarding/queued-entry.mjs test:runtime -- sh -c \"node tests/runtime.mjs\"",
+    "test:email-link": "node scripts/base-onboarding/queued-entry.mjs test:email-link -- sh -c \"node tests/email-link.mjs\"",
+    "onboard": "node scripts/install.mjs",
+    "build:app": "node scripts/base-onboarding/queued-entry.mjs build:app -- sh -c \"vite build\"",
+    "verify:app": "node scripts/base-onboarding/queued-entry.mjs verify:app -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:runtime && pnpm run test:email-link\"",
+    "reset": "node scripts/rer.mjs reset",
+    "export": "node scripts/rer.mjs export",
+    "import": "node scripts/rer.mjs import",
+    "release": "node scripts/rer.mjs release",
+    "outbox": "node scripts/rer.mjs outbox",
+    "doctor": "node scripts/rer.mjs doctor",
+    "describe": "node scripts/rer.mjs describe",
+    "check": "node scripts/rer.mjs check",
+    "deps": "node scripts/rer.mjs install",
+    "rer": "node scripts/rer.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.33",
+    "@tanstack/react-start": "1.168.50",
+    "hono": "4.13.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.54.5",
+    "@cloudflare/workers-types": "5.20260908.1",
+    "@playwright/test": "1.63.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "5.9.3",
+    "vite": "8.2.2",
+    "wrangler": "4.129.1"
+  },
+  "packageManager": "pnpm@10.12.4",
+  "pnpm": {
+    "overrides": {
+      "sharp": "0.35.5",
+      "undici": "7.29.1"
+    },
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
+  }
+}

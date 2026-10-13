@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "base": "base",
+  "family": "support",
+  "edition": "lily",
+  "modules": [
+    "support-email"
+  ],
+  "source": "editions/lily",
+  "copies": [
+    {
+      "component": "support",
+      "source": "core/src",
+      "target": "src/family/support",
+      "repository": "family"
+    },
+    {
+      "component": "support-email",
+      "source": "modules/support-email/src",
+      "target": "src/modules/support-email",
+      "repository": "family"
+    }
+  ]
+}

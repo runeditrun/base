@@ -1,0 +1,12 @@
+node_modules/
+.cache/
+*.tsbuildinfo
+.worktrees/
+default-seed/node_modules/
+default-seed/.output/
+default-seed/dist/
+default-seed/.wrangler/
+default-seed/.dev.vars
+default-seed/playwright-report/
+default-seed/test-results/
+__pycache__/

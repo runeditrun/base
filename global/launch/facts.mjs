@@ -1,0 +1,94 @@
+// What a launch needs to know about a checkout before it changes anything.
+import { execFile } from 'node:child_process';
+import { stat } from 'node:fs/promises';
+import { createServer } from 'node:net';
+import { basename, join } from 'node:path';
+import { promisify } from 'node:util';
+import { listeningPorts } from '../../onboarding/process-diagnostics.mjs';
+import { LaunchFailure } from './failure.mjs';
+
+const run = promisify(execFile);
+async function mtime(path) { try { return (await stat(path)).mtimeMs; } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; } }
+
+// The pinned dispatcher's own read-only description.
+export async function describeCheckout(root, entry, env, signal) {
+ try {
+  const { stdout } = await run(process.execPath, [entry, 'describe', '--json'], { cwd: root, env, maxBuffer: 16 * 1024 * 1024, signal });
+  return JSON.parse(stdout);
+ } catch (error) {
+  if (signal?.aborted) throw signal.reason;
+  throw new LaunchFailure(error.code ?? 1, (error.stderr?.trim() || `rer describe failed in ${root}.`));
+ }
+}
+
+// Install when the last install did not finish or the lockfile changed since.
+// pnpm writes node_modules/.modules.yaml only once dependencies are linked and
+// built, so a stopped install leaves it absent. An install this launcher ran
+// is finished only when its record says so: that also covers the project's
+// own install hooks, which pnpm runs after writing the manifest.
+export async function needsInstall(root, last) {
+ if (last && last.state !== 'done') return true;
+ const manifest = await mtime(join(root, 'node_modules/.modules.yaml'));
+ if (manifest === undefined) return true;
+ const lock = await mtime(join(root, 'pnpm-lock.yaml'));
+ return lock !== undefined && Math.max(manifest, last?.at ?? 0) < lock;
+}
+
+// A checkout is set up when its pin's describe says so (`local.prepared`, from
+// rer-cli-2); for older pins, when its primary private settings file holds
+// anything. The pin's describe names it (`local.settings`, where the pin has it).
+export async function hasSettings(root, described) {
+ if (typeof described?.local?.prepared === 'boolean') return described.local.prepared;
+ const primary = described?.local?.settings?.[0] ?? '.dev.vars';
+ try { return (await stat(join(root, primary))).size > 0; } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+}
+
+// Every pin's setup saves its answers file only once it has finished, so a
+// file newer than this launcher's record of its own attempt (its start for
+// 'running', its end for 'failed') is a setup that finished after it.
+async function finishedSince(root, described, at) {
+ const saved = await mtime(join(root, described?.local?.installerState ?? '.seed/installer', 'setup-answers.json'));
+ return saved !== undefined && typeof at === 'number' && saved > at;
+}
+
+// Setup runs on a checkout with no saved settings ('fresh'). When a setup this
+// launcher started did not finish ('running' after a kill, or 'failed') and no
+// setup has finished since, it runs again ('resume') and keeps what the earlier
+// attempt saved. A checkout set up any other way is never set up again.
+// A checkout that is not prepared but already holds an owner (a setting a newer
+// manifest added is missing) resumes too, so the saved owner and origin are
+// kept; one without a saved owner gets the local owner ('fresh').
+export async function setupNeeded(root, described, last) {
+ if (!await hasSettings(root, described)) return described?.local?.ownerSaved === true ? 'resume' : 'fresh';
+ if (!last || last.state === 'done') return undefined;
+ return await finishedSince(root, described, last.at) ? undefined : 'resume';
+}
+
+export function localOwner(root) {
+ const label = basename(root).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63) || 'checkout';
+ return `owner@${label}.test`;
+}
+
+async function bindable(host, port) {
+ const socket = createServer();
+ try { await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen({ port, host, exclusive: true }, resolve); }); return true; }
+ catch (error) { return host === '::1' && ['EADDRNOTAVAIL', 'EAFNOSUPPORT'].includes(error.code); }
+ finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
+}
+
+// The first port from 8787 (RER_DEV_PORT_FROM moves the start) that no
+// registered server holds, nothing listens on, binds on both 127.0.0.1 and ::1
+// (a browser that tries ::1 first never reaches another server) and that
+// `claim` secures against another launch choosing it at the same time.
+export async function freePort(servers, claim, env = process.env) {
+ const from = Number(env.RER_DEV_PORT_FROM ?? 8787);
+ if (!Number.isInteger(from) || from < 1 || from > 65535) throw new LaunchFailure(2, 'RER_DEV_PORT_FROM must be a port number.');
+ const held = new Set(servers.map(record => record.port).filter(Boolean)), busy = await listeningPorts();
+ for (let port = from; port <= 65535; port++) {
+  if (held.has(port) || busy.has(port)) continue;
+  if (!await bindable('127.0.0.1', port) || !await bindable('::1', port)) continue;
+  const claimed = await claim(port);
+  if (claimed) return { port, ...claimed };
+ }
+ throw new LaunchFailure(4, `No free port from ${from} upward. Pass one with rer dev --port PORT.`);
+}

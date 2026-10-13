@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "rules": {
+    "R1": false,
+    "R2": {
+      "mounts": [
+        "src/core/app/mounts/assistance.ts",
+        "src/core/app/mounts/public-config.ts",
+        "src/core/app/mounts/public-config.server.ts",
+        "src/core/features/records/identity.ts",
+        "src/core/features/records/repository.ts",
+        "src/core/features/settings/repository.ts",
+        "src/core/features/workbench/repository.ts"
+      ]
+    },
+    "R3": false,
+    "R4": {
+      "allowedFiles": [
+        "**/repository.ts",
+        "**/*-repository.ts"
+      ]
+    },
+    "R5": false,
+    "R6": false
+  }
+}

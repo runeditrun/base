@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://runeditrun.example/schemas/slack-section-message-subset.json",
+  "$comment": "Documented subset, transcribed from Slack's live section block and text object field schemas on 2026-10-06. See provenance.md. This is not Slack-published JSON Schema and does not claim full Block Kit coverage.",
+  "type": "object",
+  "required": ["blocks"],
+  "additionalProperties": false,
+  "properties": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 4000 },
+    "channel": { "type": "string", "minLength": 1 },
+    "mrkdwn": { "type": "boolean" },
+    "unfurl_links": { "type": "boolean" },
+    "unfurl_media": { "type": "boolean" },
+    "blocks": {
+      "type": "array", "minItems": 1, "maxItems": 50,
+      "items": { "$ref": "#/definitions/section" }
+    }
+  },
+  "definitions": {
+    "text": {
+      "oneOf": [
+        {
+          "type": "object", "required": ["type", "text"], "additionalProperties": false,
+          "properties": {
+            "type": { "const": "plain_text" },
+            "text": { "type": "string", "minLength": 1, "maxLength": 3000 },
+            "emoji": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object", "required": ["type", "text"], "additionalProperties": false,
+          "properties": {
+            "type": { "const": "mrkdwn" },
+            "text": { "type": "string", "minLength": 1, "maxLength": 3000 },
+            "verbatim": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "section": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "anyOf": [{ "required": ["text"], "properties": { "text": {} } }, { "required": ["fields"], "properties": { "fields": {} } }],
+      "properties": {
+        "type": { "const": "section" },
+        "text": { "$ref": "#/definitions/text" },
+        "block_id": { "type": "string", "maxLength": 255 },
+        "expand": { "type": "boolean" },
+        "fields": {
+          "type": "array", "minItems": 1, "maxItems": 10,
+          "items": {
+            "allOf": [
+              { "$ref": "#/definitions/text" },
+              { "type": "object", "properties": { "text": { "type": "string", "maxLength": 2000 } } }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

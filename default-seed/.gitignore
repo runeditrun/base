@@ -1,0 +1,9 @@
+.dev.vars
+.cache/
+*.tsbuildinfo
+.dev.vars.previous
+.wrangler/
+dist/
+
+.seed/
+.rer/local/

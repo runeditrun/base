@@ -1,0 +1,10 @@
+import { aiConfig, createAiClient, AiError, type AiTransport } from '../index.mjs';
+import { createDevAiClient, withDevAi } from '../dev/index.mjs';
+import { createFakeTransport } from '../fake/index.mjs';
+const config = aiConfig({ AI_ENABLED: 'true', AI_API_KEY: 'test', AI_MODEL: 'model' });
+const transport: AiTransport = createFakeTransport();
+const client = createAiClient(config, { transport });
+const response: Promise<Response> = client.chat({ messages: [], stream: true }, { feature: 'summary', signal: new AbortController().signal });
+void response; void createDevAiClient; void withDevAi;
+const error = new AiError('ai_misconfigured');
+const code: string = error.code; void code;

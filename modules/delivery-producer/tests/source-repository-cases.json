@@ -1,0 +1,77 @@
+{
+  "acceptedUrls": [
+    {
+      "value": "https://{github-host}/Example-owner/Example-repo",
+      "identity": "Example-owner/Example-repo"
+    },
+    {
+      "value": "HTTPS://{GITHUB-HOST}/Example-owner/Example-repo",
+      "identity": "Example-owner/Example-repo"
+    },
+    {
+      "value": "HtTpS://{GitHub-Host}/Example-owner/Example-repo",
+      "identity": "Example-owner/Example-repo"
+    },
+    {
+      "value": "https://{github-host}/Example-owner/Example-repo.git",
+      "identity": "Example-owner/Example-repo"
+    },
+    {
+      "value": "https://{github-host}/Example-owner/Example-repo.GIT",
+      "identity": "Example-owner/Example-repo"
+    },
+    {
+      "value": "https://{github-host}/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.git",
+      "identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "value": "https://{github-host}/Example-owner/Example-repo.git.git",
+      "identity": "Example-owner/Example-repo.git",
+      "canonicalizable": false
+    }
+  ],
+  "rejectedUrls": [
+    "https://gıthub.com/forge/journal",
+    "https://gİthub.com/forge/journal",
+    "httpſ://{github-host}/forge/journal",
+    "https://gіthub.com/forge/journal",
+    "http://{github-host}/Example-owner/Example-repo",
+    "https://www.{github-host}/Example-owner/Example-repo",
+    "https://{github-host}/Example-owner/Example-repo/",
+    "https://{github-host}/Example-owner/Example-repo/extra",
+    "https://user@{github-host}/Example-owner/Example-repo",
+    "https://user:test-password@{github-host}/Example-owner/Example-repo",
+    "https://{github-host}:443/Example-owner/Example-repo",
+    "https://{github-host}/Example-owner/Example-repo?query=1",
+    "https://{github-host}/Example-owner/Example-repo#fragment",
+    "git@{github-host}:Example-owner/Example-repo.git",
+    "https://gitlab.com/Example-owner/Example-repo",
+    "https://{github-host}/Example-owner./Example-repo",
+    "https://{github-host}/Example-owner/Example-repo.",
+    "https://{github-host}/Example-owner/Example-repo..git",
+    "https://{github-host}/-Example-owner/Example-repo",
+    "https://{github-host}/Example-owner/.Example-repo",
+    "https://{github-host}/Example-owner",
+    "https://{github-host}/Example-owner//Example-repo",
+    "https://{github-host}/Example-owner/Example-r%65po",
+    " https://{github-host}/Example-owner/Example-repo",
+    "https://{github-host}/Example-owner/Example-repo\n",
+    "https://{github-host}/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/Example-repo",
+    "https://{github-host}/Example-owner/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ],
+  "acceptedBare": [
+    "Example-owner/Example-repo"
+  ],
+  "rejectedBare": [
+    "Example-owner./Example-repo",
+    "Example-owner/Example-repo.",
+    "Example-owner",
+    "Example-owner/Example-repo/extra",
+    " Example-owner/Example-repo",
+    "Example-owner/Example-repo\n",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/Example-repo"
+  ],
+  "unrepresentableBare": [
+    "Example-owner/Example-repo.git"
+  ]
+}

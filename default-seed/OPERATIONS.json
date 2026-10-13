@@ -1,0 +1,221 @@
+{
+  "version": 2,
+  "project": "runeditrun/default-seed-reference",
+  "runtime": {
+    "requirements": [
+      {
+        "name": "node",
+        "version": "22.20.0"
+      },
+      {
+        "name": "pnpm",
+        "version": "10.12.4"
+      }
+    ]
+  },
+  "requiredEnvironment": [
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_TOKEN"
+  ],
+  "seedContract": {
+    "version": 1,
+    "profile": "first-party",
+    "adapter": "scripts/installer/local.mjs"
+  },
+  "documentation": {
+    "document": "RUN-LOCALLY.md"
+  },
+  "commands": {
+    "setup": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "setup"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for setup effects."
+    },
+    "dev": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "dev"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for dev effects."
+    },
+    "build": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "build"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for build effects."
+    },
+    "verify": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "verify"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for verify effects."
+    },
+    "reset": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "reset"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for reset effects."
+    },
+    "deploy": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "deploy"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for deploy effects."
+    },
+    "export": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "export"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for export effects."
+    },
+    "import": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "import"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for import effects."
+    },
+    "release": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "release"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for release effects."
+    },
+    "outbox": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "outbox"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for outbox effects."
+    },
+    "doctor": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "doctor"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for doctor effects."
+    },
+    "describe": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "describe"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for describe effects."
+    },
+    "check": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "check"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for check effects."
+    },
+    "install": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "install"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "See SEED-COMMAND-CONTRACT.md for install effects."
+    },
+    "preview": {
+      "argv": [
+        "node",
+        "scripts/rer.mjs",
+        "preview"
+      ],
+      "inputs": [
+        "scripts/rer.mjs",
+        "scripts/installer/local.mjs"
+      ],
+      "effects": "Serve fixed production output, preserve local owner and durable state, stop after idle timeout or explicit stop."
+    }
+  },
+  "health": {
+    "path": "/health",
+    "meaning": "The actual local Worker is serving."
+  },
+  "acceptance": {
+    "document": "ACCEPTANCE.md"
+  },
+  "environmentSources": {
+    "CLOUDFLARE_ACCOUNT_ID": "Owner-account deployment instructions in OPERATIONS.md",
+    "CLOUDFLARE_API_TOKEN": "Owner-account deployment instructions in OPERATIONS.md"
+  }
+}

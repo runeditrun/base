@@ -1,0 +1,15 @@
+{
+  "name": "@runeditrun/seed-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fetch an owned seed checkout and open its standalone onboarding",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "bin": { "rer-setup": "bin/rer-setup.mjs" },
+  "files": ["bin", "lib", "README.md"],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:acceptance": "node tests/acceptance.mjs"
+  }
+}

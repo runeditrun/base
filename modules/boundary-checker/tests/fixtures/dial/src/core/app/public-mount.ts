@@ -1,0 +1,1 @@
+import '../../ext/public-config'

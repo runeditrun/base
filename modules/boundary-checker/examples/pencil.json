@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "tsconfig": "tsconfig.app.json",
+  "rules": {
+    "R2": {
+      "mounts": [
+        "src/core/app/mountExtensions.client.ts",
+        "src/core/app/mountExtensions.server.ts"
+      ]
+    },
+    "R4": false,
+    "R5": {
+      "allowedDirectories": [
+        "src/core/platform"
+      ]
+    },
+    "R7": {
+      "files": [
+        "src/ext/index.client.*"
+      ]
+    },
+    "R8": {
+      "enabled": true,
+      "files": [
+        "src/ext/config.ts",
+        "src/ext/local/**"
+      ]
+    }
+  }
+}

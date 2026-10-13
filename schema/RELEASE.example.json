@@ -1,0 +1,50 @@
+{
+  "version": "0.2.0",
+  "previousVersion": "0.1.0",
+  "date": "2026-09-07",
+  "contractChanges": {},
+  "proseChanges": [
+    {
+      "document": "AGENTS.md",
+      "section": "Ownership",
+      "change": "changed",
+      "date": "2026-09-06",
+      "summary": "The owner's paths became files upstream never overwrites rather than files an update never touches, and the owner's agent may adapt them while landing one.",
+      "was": "`src/ext/`, `.seed/`, `migrations/ext/`, and `tests/local/` were the owner's, and updates never touched them.",
+      "now": "`src/ext/`, `.seed/`, `migrations/ext/`, and `tests/local/` are the owner's; upstream releases never overwrite them, and the owner's agent may adapt them during an update.",
+      "ownerAction": "Your agent may change your own files as part of landing a release — adapting an extension to a changed core API rather than working around it. Upstream still never commits to those paths."
+    },
+    {
+      "document": "AGENTS.md",
+      "section": "Verify",
+      "change": "changed",
+      "date": "2026-09-06",
+      "summary": "`pnpm verify` runs the owner's override replacement tests and local intent tests as part of the run, rather than reporting them separately from the contract.",
+      "was": "`pnpm verify` reported the contract as satisfied, overridden, or broken, and reported your intent tests separately.",
+      "now": "`pnpm verify` reports the contract as satisfied, overridden, or broken and runs each declared override replacement test and each local intent test in the same run.",
+      "ownerAction": "A `replacementTest` named in `src/ext/contract-overrides.json` and every test under `tests/local/` must pass for `pnpm verify` to be green; a replacement test that has stopped running is now a failure rather than a separate report."
+    },
+    {
+      "document": "AGENTS.md",
+      "section": "Update",
+      "change": "changed",
+      "date": "2026-09-06",
+      "summary": "The update candidate became a starting point rather than a result to accept or reject: how the change lands is the owner's call.",
+      "was": "`rer update` fetched the latest verified tag, rebased the owner's commits, ran migrations and `pnpm verify`, then offered the candidate; on failure it reported the conflicting files, the affected clauses from `RELEASE.json`, and the relevant `.seed/intent.md` lines. Resolution meant working that candidate until `pnpm verify` passed, and nothing named intent as the thing an update had to preserve.",
+      "now": "`rer update` prepares a candidate with the owner's commits on top, runs migrations and `pnpm verify`, then offers it as a starting point; how the update lands is the owner's call. On a conflict it stops and reports the conflicting files, the affected clauses from `RELEASE.json`, and the relevant `.seed/intent.md` lines. Whatever route the agent takes, every requirement in `.seed/intent.md` is preserved unless the owner changes it, and `pnpm verify` — including declared override replacements and local intent tests — passes before adopting.",
+      "ownerAction": "Your agent chooses how an upstream release comes in: take the candidate, re-derive it, or land the change another way. The verified outcome is what counts, and a conflict is your agent's work rather than a reason to defer the update."
+    },
+    {
+      "document": "LICENSE",
+      "change": "added",
+      "date": "2026-09-06",
+      "summary": "The seed now states its licence in the repository instead of leaving it to the marketplace listing.",
+      "now": "MIT, in `LICENSE` at the root of the installation, covering the code the owner receives and everything they build on it.",
+      "ownerAction": "Nothing to do. Keep the file when you fork or rename the installation."
+    }
+  ],
+  "extensionPointChanges": [],
+  "migrations": [],
+  "breaking": false,
+  "agentUpdateInstructions": "No clause changed meaning in this release, so `contractChanges` is empty and adopting it moves no guarantee: what changed is what the owner-facing documents promise. Three of those positions are now yours to rely on. Files under `src/ext/`, `.seed/`, `migrations/ext/`, and `tests/local/` are still never overwritten by upstream, and you may adapt them while landing an update instead of working around them. `pnpm verify` runs each declared override replacement test and each local intent test, so a green run covers them and a replacement test that no longer runs is a failure. Preserve every requirement in `.seed/intent.md` unless the owner changes it, and treat the update candidate as a starting point rather than a result to accept or reject."
+}

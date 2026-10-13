@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "support",
+  "repository": "just-every/run-happytohelp",
+  "base": {
+    "repository": "runeditrun/base",
+    "commit": "0123456789abcdef0123456789abcdef01234567"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "title": "Invalid optional signed claim secret",
+  "groups": [],
+  "fields": [
+    { "name": "OWNER_EMAIL", "label": "First owner email", "kind": "email", "prefill": "account-email" },
+    { "name": "OWNER_CLAIM_TOKEN", "label": "Owner claim token", "kind": "secret", "required": false, "generate": "hex", "ownerVisible": false }
+  ],
+  "steps": [
+    { "type": "owner-claim", "mode": "signed", "emailField": "OWNER_EMAIL", "tokenField": "OWNER_CLAIM_TOKEN", "path": "/auth/owner-claim" }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "schema": 1,
+  "title": "Workspace setup",
+  "groups": [
+    { "id": "account", "label": "Workspace account", "help": "Choose the workspace identity and first owner." },
+    { "id": "appearance", "label": "Appearance" },
+    { "id": "access", "label": "Access" },
+    {
+      "id": "email",
+      "label": "Email delivery",
+      "help": "Choose a sender provider or leave email disabled for now.",
+      "presentations": [
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "" }, "help": "Email can be configured later." },
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "resend" }, "help": "Verify your sending domain in Resend first." },
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "cloudflare" }, "help": "Needs the Workers Paid plan and a sending domain onboarded in Cloudflare Email Sending, with its DNS on Cloudflare." },
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "sendgrid" }, "help": "Verify your sending domain in SendGrid first." }
+      ]
+    }
+  ],
+  "fields": [
+    {
+      "name": "EMAIL_PROVIDER",
+      "label": "Email provider",
+      "kind": "select",
+      "order": 0,
+      "default": "",
+      "runtimeEditable": true,
+      "options": [
+        { "value": "", "label": "Set up email later" },
+        { "value": "resend", "label": "Resend" },
+        { "value": "cloudflare", "label": "Cloudflare Email Sending" },
+        { "value": "sendgrid", "label": "SendGrid" }
+      ],
+      "group": "email"
+    },
+    {
+      "name": "EMAIL_ACCOUNT_ID",
+      "label": "Cloudflare account ID",
+      "kind": "text",
+      "help": "The 32-character ID of the Cloudflare account that owns the sending domain.",
+      "group": "email",
+      "runtimeEditable": true,
+      "presentations": [
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "cloudflare" }, "label": "Cloudflare account ID", "help": "The 32-character ID of the Cloudflare account that owns the sending domain.", "placeholder": "32 hexadecimal characters", "required": true, "order": 0 }
+      ]
+    },
+    {
+      "name": "EMAIL_FROM",
+      "label": "Sender address",
+      "kind": "secret",
+      "required": false,
+      "placeholder": "sender@example.com",
+      "ownerVisible": false,
+      "group": "email",
+      "help": "The address customers see mail from. Use an address on a domain you have verified with this provider.",
+      "presentations": [
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "resend" }, "label": "Sender address", "help": "The address customers see mail from. Use an address on a domain you have verified with this provider.", "placeholder": "sender@example.com", "required": true, "order": 0 },
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "cloudflare" }, "label": "Sender address", "help": "The address customers see mail from. Use an address on a domain you have verified with this provider.", "placeholder": "sender@example.com", "required": true, "order": 1 },
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "sendgrid" }, "label": "Sender address", "help": "The address customers see mail from. Use an address on a domain you have verified with this provider.", "placeholder": "sender@example.com", "required": true, "order": 0 }
+      ]
+    },
+    {
+      "name": "EMAIL_API_KEY",
+      "label": "Resend API key",
+      "kind": "secret",
+      "required": false,
+      "ownerVisible": false,
+      "group": "email",
+      "presentations": [
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "resend" }, "label": "Resend API key", "help": "Create a sending API key in Resend.", "required": true, "order": 1 },
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "cloudflare" }, "label": "Email Sending API token", "help": "A dedicated Cloudflare API token with Email Sending: Edit permission. Do not reuse a deployment token.", "required": true, "order": 2 },
+        { "when": { "field": "EMAIL_PROVIDER", "equals": "sendgrid" }, "label": "SendGrid API key", "help": "A SendGrid API key with Mail Send permission.", "required": true, "order": 1 }
+      ]
+    },
+    {
+      "name": "INBOUND_EMAIL_TOKEN",
+      "label": "Inbound email token",
+      "kind": "secret",
+      "required": false,
+      "generate": "hex",
+      "ownerVisible": false,
+      "help": "Optional — supply when enabling this provider or integration.",
+      "group": "email"
+    },
+    {
+      "name": "DEPLOYMENT_MODE",
+      "label": "Address mode",
+      "kind": "select",
+      "required": true,
+      "default": "managed",
+      "options": [
+        { "value": "managed", "label": "Managed address" },
+        { "value": "custom", "label": "Custom domain" }
+      ],
+      "group": "account",
+      "runtimeEditable": false
+    },
+    {
+      "name": "APP_NAME",
+      "label": "Workspace name",
+      "kind": "text",
+      "help": "The name shown to workspace members.",
+      "placeholder": "Northstar",
+      "default": "My workspace",
+      "group": "account",
+      "runtimeEditable": true
+    },
+    {
+      "name": "OWNER_EMAIL",
+      "label": "First owner email",
+      "kind": "email",
+      "required": true,
+      "prefill": "account-email",
+      "group": "account",
+      "runtimeEditable": true
+    },
+    {
+      "name": "CUSTOM_DOMAIN",
+      "label": "Custom domain",
+      "kind": "url",
+      "placeholder": "https://workspace.example",
+      "group": "account",
+      "when": { "field": "DEPLOYMENT_MODE", "equals": "custom" },
+      "runtimeEditable": true
+    },
+    { "name": "ACCENT_COLOR", "label": "Accent colour", "kind": "colour", "default": "#163c60", "group": "appearance" },
+    { "name": "TIMEZONE", "label": "Timezone", "kind": "timezone", "default": "Australia/Brisbane", "group": "appearance" },
+    {
+      "name": "OWNER_CLAIM_TOKEN",
+      "label": "Owner claim token",
+      "kind": "secret",
+      "required": true,
+      "generate": "base64",
+      "ownerVisible": false,
+      "group": "access"
+    },
+    {
+      "name": "SESSION_SECRET",
+      "label": "Session secret",
+      "kind": "secret",
+      "required": true,
+      "generate": "hex",
+      "ownerVisible": false,
+      "group": "access"
+    },
+    {
+      "name": "OPTIONAL_PROVIDER_KEY",
+      "label": "Optional provider key",
+      "kind": "secret",
+      "required": false,
+      "ownerVisible": false,
+      "group": "access"
+    },
+    { "name": "APP_ORIGIN", "label": "Application address", "kind": "url", "runtimeEditable": false },
+    { "name": "RER_MANAGEMENT_ORIGIN", "label": "Management address", "kind": "url", "runtimeEditable": false }
+  ],
+  "runtime": { "additionalFields": true, "exclude": ["APP_ORIGIN", "EMAIL_PROVIDER", "EMAIL_ACCOUNT_ID", "RER_MANAGEMENT_ORIGIN"] },
+  "steps": [
+    { "type": "owner-claim", "mode": "signed", "emailField": "OWNER_EMAIL", "tokenField": "OWNER_CLAIM_TOKEN", "path": "/auth/owner-claim" },
+    { "type": "extension", "id": "email" },
+    { "type": "extension", "id": "ai" },
+    { "type": "extension", "id": "inbound-email" },
+    { "type": "extension", "id": "sender-dns" }
+  ]
+}

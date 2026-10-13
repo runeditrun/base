@@ -1,0 +1,114 @@
+name: deploy-stage
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact lowercase 40-character commit SHA on main or an allowed v* release tag
+        required: true
+        type: string
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      # Before checkout, and with no Environment attached. Never interpolate inputs
+      # into shell source. workflow_sha identifies this main-dispatched controller.
+      - name: Validate dispatch envelope
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          CONTROL_SHA: ${{ github.workflow_sha }}
+        shell: bash
+        run: |
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+          [[ "$GITHUB_REPOSITORY" == runeditrun/base ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$INPUT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CONTROL_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.16.0'
+      - name: Validate immutable source against fresh allowed refs
+        id: source
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          INPUT_PROOF: ''
+          CONTROL_SHA: ${{ github.workflow_sha }}
+          MODE: stage
+          GH_READ_TOKEN: ${{ github.token }}
+        run: node live-proofs/validate-source.mjs
+
+  execute:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: stage
+    outputs:
+      result: ${{ steps.execute.outputs.result }}
+      executed_sha: ${{ steps.execute.outputs.executed_sha }}
+      started: ${{ steps.execute.outputs.started }}
+      finished: ${{ steps.execute.outputs.finished }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.16.0'
+      - name: Execute registered operation with provider credentials only
+        id: execute
+        env:
+          SOURCE_DIRECTORY: ${{ github.workspace }}/source
+          VALIDATED_SHA: ${{ needs.validate.outputs.sha }}
+          INPUT_PROOF: ''
+          MODE: stage
+          CF_THROWAWAY_API_TOKEN: ${{ secrets.CF_THROWAWAY_API_TOKEN }}
+          CF_THROWAWAY_ACCOUNT_ID: ${{ secrets.CF_THROWAWAY_ACCOUNT_ID }}
+        run: node control/live-proofs/run.mjs
+
+  receipt:
+    # Separate clean runner: proof code cannot leave a hook, process or changed
+    # writer behind to steal the evidence credential. Failure still reaches here.
+    if: ${{ always() && needs.validate.result == 'success' }}
+    needs: [validate, execute]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: stage
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.16.0'
+      - name: Persist fixed-schema receipt to private evidence store
+        env:
+          EVIDENCE_WRITE_TOKEN: ${{ secrets.EVIDENCE_WRITE_TOKEN }}
+          EVIDENCE_REPOSITORY: ${{ secrets.EVIDENCE_REPOSITORY }}
+          VALIDATED_SHA: ${{ needs.validate.outputs.sha }}
+          CONTROL_SHA: ${{ github.workflow_sha }}
+          INPUT_PROOF: ''
+          MODE: stage
+          JOB_RESULT: ${{ needs.execute.result }}
+          EXECUTION_RESULT: ${{ needs.execute.outputs.result }}
+          EXECUTED_SHA: ${{ needs.execute.outputs.executed_sha }}
+          STARTED: ${{ needs.execute.outputs.started }}
+          FINISHED: ${{ needs.execute.outputs.finished }}
+        run: node live-proofs/persist.mjs

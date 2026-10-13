@@ -1,0 +1,29 @@
+name: Mirror Ubuntu image
+
+# Copies Docker's official ubuntu:24.04 (every platform, unchanged digests) to
+# ghcr.io/runeditrun/ubuntu:24.04, which Verify pulls with its GITHUB_TOKEN.
+# Run it again to take a newer Ubuntu point release, then update Verify's digest.
+# Dispatch only, and only from main: the job is skipped on any other ref, so no
+# branch can move the tag Verify's pinned digest is taken from.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  mirror:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Copy ubuntu:24.04 to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker buildx imagetools create --tag ghcr.io/runeditrun/ubuntu:24.04 docker.io/library/ubuntu:24.04
+          docker buildx imagetools inspect docker.io/library/ubuntu:24.04 | head -n 3
+          docker buildx imagetools inspect ghcr.io/runeditrun/ubuntu:24.04

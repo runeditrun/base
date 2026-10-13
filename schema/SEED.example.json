@@ -1,0 +1,183 @@
+{
+  "id": "slate",
+  "name": "Slate",
+  "version": "0.1.0",
+  "maturity": "foundation-checkpoint",
+  "category": "knowledge",
+  "spine": {
+    "id": "knowledge",
+    "record": "a page in a tree in a container"
+  },
+  "replaces": [
+    { "name": "Notion", "edition": null },
+    { "name": "Confluence", "edition": null }
+  ],
+  "description": "A self-hosted product-planning workspace that turns evidence-backed briefs into reviewed execution plans.",
+  "scope": "One business, one shared workspace, equal invited operators.",
+  "capabilities": [
+    {
+      "id": "public-landing",
+      "description": "A buyer-configured owner identity plate at the public root with a sign-in action and an optional static credit.",
+      "clauses": ["HOME-001"]
+    },
+    {
+      "id": "workspace",
+      "description": "One configurable workspace with equal operators, authenticated links, a state-derived overview, and visible sign-in and invitation mail delivery.",
+      "clauses": ["WORK-001", "WORK-002", "WORK-003", "WORK-004", "WORK-005", "WORK-006", "WORK-007", "MAIL-001", "MAIL-002"]
+    },
+    {
+      "id": "editing-and-saving",
+      "description": "Durable save status, visible failures, revision conflicts, idempotent mutations, honest offline state, and a defined text format.",
+      "clauses": ["SAVE-001", "SAVE-002", "SAVE-003", "SAVE-004", "SAVE-005", "SAVE-006", "SAVE-007"]
+    },
+    {
+      "id": "revision-history",
+      "description": "A revision identifier on every planning record, readable history with differences, and restore.",
+      "clauses": ["REV-001", "REV-002", "REV-003"]
+    },
+    {
+      "id": "briefs",
+      "description": "Structured brief capture, shaping, readiness, plan creation, drift review, and archive lifecycle.",
+      "clauses": ["BRIEF-001", "BRIEF-002", "BRIEF-003", "BRIEF-004", "BRIEF-005", "BRIEF-006", "BRIEF-007", "BRIEF-008"]
+    },
+    {
+      "id": "search-and-links",
+      "description": "Fast, fresh global retrieval across every planning record, with links that survive rename, move, and archive.",
+      "clauses": ["SEARCH-001", "SEARCH-002", "SEARCH-003", "SEARCH-004", "LINK-001", "LINK-002"]
+    },
+    {
+      "id": "reviewed-ai",
+      "description": "Budgeted, source-aware AI proposals with review-before-mutation, provenance, and visible failure.",
+      "clauses": ["AI-001", "AI-002", "AI-003", "AI-004", "AI-005", "AI-006"]
+    },
+    {
+      "id": "importers",
+      "description": "One importer per incumbent this seed replaces, each tested against an export that product itself produced, with a report of what did not map.",
+      "clauses": ["IMP-001", "IMP-002", "IMP-003", "IMP-004", "IMP-005"]
+    },
+    {
+      "id": "portability",
+      "description": "Complete export, referential restore, visible jobs, and rebuilt search.",
+      "clauses": ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006"]
+    }
+  ],
+  "nonGoals": [
+    "Multiple workspaces, multi-tenancy, roles, permission levels, private records, guests, or public share links.",
+    "User-defined databases, formulas, rollups, sites, forms, embeds, or a generic file drive.",
+    "Slack, Jira, Asana, GitHub, calendar, CRM, or other external application sync.",
+    "Native mobile apps, real-time co-editing, shared cursors, presence, CRDT merge, or offline browsing and editing.",
+    "Autonomous AI mutations or uncited AI statements presented as facts."
+  ],
+  "externals": [
+    {
+      "id": "cloudflare-platform",
+      "required": true,
+      "why": "The supported deployment target supplies Worker compute, D1 records and search, R2 files, and Queues jobs; there is no owned primitive underneath it to fall back to.",
+      "data": [
+        "every record the workspace holds",
+        "every uploaded evidence file",
+        "every queued job"
+      ],
+      "adapters": []
+    },
+    {
+      "id": "transactional-email-provider",
+      "required": true,
+      "why": "Magic-link sign-in and operator invitations require outbound email, which Cloudflare's owned primitives do not send.",
+      "data": [
+        "operator email address",
+        "workspace name",
+        "single-use sign-in or invitation URL"
+      ],
+      "adapters": ["mail.sender.v1"]
+    },
+    {
+      "id": "ai-inference-provider",
+      "required": false,
+      "requiredWhen": "AI_ENABLED=true",
+      "why": "Optional research, synthesis, and plan proposals require model inference and optional provider web search, which no Cloudflare primitive in this deployment provides.",
+      "data": [
+        "the operator prompt",
+        "explicitly selected brief fields and evidence excerpts",
+        "the record identifiers needed for the run"
+      ],
+      "adapters": ["ai.provider.v1"]
+    }
+  ],
+  "env": [
+    { "name": "APP_URL", "secret": false, "required": true, "why": "Canonical deployment URL used in sign-in links." },
+    { "name": "SETUP_OWNER_EMAIL", "secret": false, "required": true, "why": "Allow-listed owner created by setup." },
+    { "name": "SESSION_SECRET", "secret": true, "required": true, "why": "Signs and revokes authenticated sessions." },
+    { "name": "MAIL_FROM", "secret": false, "required": true, "why": "Verified sender for sign-in and invitations." },
+    { "name": "MAIL_API_KEY", "secret": true, "required": true, "why": "Authenticates the configured mail adapter." },
+    { "name": "AI_ENABLED", "secret": false, "required": false, "default": "false", "why": "Makes intentional AI disablement distinct from missing configuration." },
+    { "name": "AI_API_KEY", "secret": true, "required": false, "requiredWhen": "AI_ENABLED=true", "why": "Authenticates the configured AI adapter." },
+    { "name": "AI_MODEL", "secret": false, "required": false, "requiredWhen": "AI_ENABLED=true", "why": "Pins the model used and recorded by AI runs." }
+  ],
+  "deploy": {
+    "healthPath": "/health",
+    "operatorPath": "/app",
+    "publicPaths": ["/", "/signin", "/health", "/api/auth/", "/assets/"],
+    "notes": "The root is a public owner identity plate and /signin begins authentication. `/` is matched exactly and opens nothing beneath it, so a matcher compares it for equality rather than with `pathname.startsWith('/')`, which would admit every route. `/api/auth/` and `/assets/` end in a slash and are true prefixes covering the declared auth flow and the static assets; `/signin` and `/health` are exact. All workspace data endpoints and /app require a session."
+  },
+  "customFields": ["brief", "evidence", "decision", "plan", "task", "risk"],
+  "extensionPoints": {
+    "contributions": [
+      "workspace.additional-page.v1",
+      "settings.additional-section.v1",
+      "workspace.scheduled-job.v1"
+    ],
+    "policies": [
+      "operator.management.v1",
+      "overview.next-action.v1",
+      "brief.readiness.v1",
+      "brief.plan-creation.v1",
+      "ai.usage-budget.v1"
+    ],
+    "events": [
+      "brief.created.v1",
+      "brief.state-changed.v1",
+      "evidence.added.v1",
+      "decision.resolved.v1",
+      "comment.created.v1",
+      "ai.run-reviewed.v1"
+    ],
+    "slots": [
+      "workspace.navigation.after.v1",
+      "overview.summary.after.v1",
+      "brief.header.actions.v1",
+      "brief.detail.after.v1",
+      "activity.filters.after.v1",
+      "settings.sections.after.v1"
+    ],
+    "adapters": ["mail.sender.v1", "ai.provider.v1"]
+  },
+  "limits": {
+    "status": "estimated-unverified-until-load-test",
+    "note": "Every value here is a bootstrap estimate. The load test replaces them and rewrites this status; contract times are p95 at these values.",
+    "operatorsPerDeployment": 25,
+    "briefsPerDeployment": 2000,
+    "plansPerDeployment": 500,
+    "revisionsPerRecord": 500,
+    "commentsPerRecord": 1000,
+    "attachmentStorageBytesPerDeployment": 4294967296,
+    "uploadBytesPerFile": 26214400,
+    "uploadTypes": ["application/pdf", "text/plain", "text/markdown", "text/csv", "image/png", "image/jpeg", "image/webp"],
+    "concurrentAiRuns": 5,
+    "operatorApiRequestsPerMinute": 300,
+    "publicRequestsPerIpPerMinute": 60
+  },
+  "accessibility": {
+    "level": "WCAG 2.2 AA",
+    "status": "target until the automated and manual audit runs against the ported app",
+    "includes": ["operator app", "sign-in flow"]
+  },
+  "operatingCost": {
+    "status": "estimated on 2026-08-31, not measured against a running deployment",
+    "currency": "USD",
+    "assumptions": "Up to 10 active operators, 2000 briefs, 4 GB of evidence, and moderate search and queue use.",
+    "cloudflarePerMonth": "0 while the deployment stays inside the Workers Free entitlements; Workers Paid is not the default for this seed.",
+    "workersPaidRequiredAt": "Any of 100000 Worker requests/day, 10 ms CPU in an invocation, 5000000 D1 rows read/day, 100000 D1 rows written/day, 5 GB D1 storage, 10000 Queue operations/day, or a sixth Cron trigger.",
+    "excluded": ["mail provider", "AI provider usage"]
+  }
+}

@@ -1,0 +1,112 @@
+name: T016 credential-free Linux qualification
+on:
+  pull_request:
+    paths:
+      - 'live-proofs/**'
+      - 'scripts/qualification/**'
+      - '.github/workflows/t016-linux-qualification.yml'
+permissions:
+  contents: read
+concurrency:
+  group: t016-linux-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  qualification:
+    if: >-
+      github.repository == 'runeditrun/base' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Validate private same-repository PR envelope
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          e = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+          assert os.environ['GITHUB_EVENT_NAME'] == 'pull_request'
+          assert os.environ['GITHUB_REPOSITORY'] == 'runeditrun/base'
+          assert e['repository']['full_name'] == 'runeditrun/base' and e['repository']['private'] is True
+          for side in ['head', 'base']:
+              assert e['pull_request'][side]['repo']['full_name'] == 'runeditrun/base'
+              assert e['pull_request'][side]['repo']['private'] is True
+          PY
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        timeout-minutes: 5
+        with:
+          node-version: '26.8.1'
+      - name: Remove checkout authority
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          r = subprocess.run(['git', 'config', '--local', '--name-only', '--get-regexp', '(extraheader|credential|sshcommand)'], capture_output=True, text=True)
+          assert r.returncode in [0, 1]
+          for key in r.stdout.splitlines():
+              subprocess.run(['git', 'config', '--local', '--unset-all', key], check=True, capture_output=True)
+          r = subprocess.run(['git', 'config', '--local', '--name-only', '--get-regexp', '(extraheader|credential|sshcommand)'], capture_output=True)
+          assert r.returncode == 1 and not r.stdout
+          PY
+      - name: Run real credential-free qualification
+        timeout-minutes: 48
+        shell: bash
+        run: |
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP" RUNNER_TEMP="$RUNNER_TEMP" \
+            GITHUB_ACTIONS=true GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" GITHUB_EVENT_PATH="$GITHUB_EVENT_PATH" \
+            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+            GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_JOB="$GITHUB_JOB" \
+            GITHUB_WORKFLOW_SHA="$GITHUB_WORKFLOW_SHA" GITHUB_SHA="$GITHUB_SHA" GITHUB_SERVER_URL="$GITHUB_SERVER_URL" \
+            node live-proofs/tests/linux-ci/run.mjs --output "$RUNNER_TEMP/t016-linux-results"
+      - name: Always remove run-scoped containers and networks
+        if: always()
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP" RUNNER_TEMP="$RUNNER_TEMP" \
+            GITHUB_ACTIONS=true GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" GITHUB_EVENT_PATH="$GITHUB_EVENT_PATH" \
+            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+            GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_JOB="$GITHUB_JOB" \
+            GITHUB_WORKFLOW_SHA="$GITHUB_WORKFLOW_SHA" GITHUB_SHA="$GITHUB_SHA" GITHUB_SERVER_URL="$GITHUB_SERVER_URL" \
+            node live-proofs/tests/linux-ci/run.mjs --cleanup --output "$RUNNER_TEMP/t016-linux-results"
+      - name: Retain bounded private proof reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        timeout-minutes: 3
+        with:
+          name: t016-linux-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/t016-linux-results/receipt.json
+            ${{ runner.temp }}/t016-linux-results/receipt.sha256
+            ${{ runner.temp }}/t016-linux-results/proofs/*
+            ${{ runner.temp }}/t016-linux-results/raw/*
+            ${{ runner.temp }}/t016-linux-results/runtime/**
+            ${{ runner.temp }}/t016-linux-results/generic/*
+            ${{ runner.temp }}/t016-linux-results/adversaries/*
+            ${{ runner.temp }}/t016-linux-results/sources/*
+            ${{ runner.temp }}/t016-linux-results/builds/*
+            ${{ runner.temp }}/t016-linux-results/networks/*
+            ${{ runner.temp }}/t016-linux-results/browser/*
+            ${{ runner.temp }}/t016-linux-results/cleanup/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Retain exact images separately for independent gate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        timeout-minutes: 8
+        with:
+          name: t016-linux-images-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/t016-linux-results-images/manifest.json
+            ${{ runner.temp }}/t016-linux-results-images/images.tar.part-*
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error

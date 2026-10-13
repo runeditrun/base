@@ -1,0 +1,62 @@
+{
+  "id": "foundation",
+  "name": "Foundation",
+  "version": "0.1.0",
+  "maturity": "technical-foundation-not-product",
+  "category": "status",
+  "spine": {
+    "id": "foundation",
+    "record": "No domain record selected"
+  },
+  "description": "TanStack Start and Hono Worker with real owner authentication, D1 and local development mail.",
+  "capabilities": [
+    {
+      "id": "http-dispatch",
+      "clauses": [
+        "HTTP-001"
+      ]
+    }
+  ],
+  "nonGoals": [
+    "Finished product functionality",
+    "Speculative domain data"
+  ],
+  "externals": [
+    {
+      "id": "cloudflare",
+      "required": true,
+      "why": "Worker hosting",
+      "data": [
+        "HTTP requests"
+      ],
+      "adapters": []
+    }
+  ],
+  "env": [],
+  "deploy": {
+    "healthPath": "/health",
+    "publicPaths": [
+      "/",
+      "/health",
+      "/signin"
+    ],
+    "notes": "Native owner sessions guard /app; unknown paths return real 404s; the development outbox is local-only."
+  },
+  "extensionPoints": {
+    "contributions": [],
+    "policies": [],
+    "events": [],
+    "slots": [],
+    "adapters": []
+  },
+  "limits": {
+    "status": "unmeasured"
+  },
+  "accessibility": {
+    "level": "WCAG 2.2 AA",
+    "status": "target; unaudited"
+  },
+  "operatingCost": {
+    "status": "unmeasured"
+  }
+}
