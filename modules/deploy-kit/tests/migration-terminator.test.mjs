@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate } from '../migrations.mjs';
+import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { migrate, readMigrationRewrites, withRewrites } from '../migrations.mjs';
 import { cloudflare } from '../provider.mjs';
 import { hash } from '../validation.mjs';
 import { providerFixture } from './provider-fixture.mjs';
@@ -89,4 +92,39 @@ test('a lost ingestion response leaves the claim uncertain and blocks automatic 
   const writes = fixture.state.writes.length;
   await assert.rejects(migrate(cloudflare(fixture), id, [migration]), /uncertain-migration-history/);
   assert.equal(fixture.state.writes.length, writes);
+});
+
+test('a seed-declared reviewed rewrite lets upgrades past a released migration proceed; undeclared changes stay refused', async t => {
+  const { fixture, api, id, db } = await setup(t);
+  const product = await mkdtemp(join(await realpath(tmpdir()), 'rewrite-proof-'));
+  t.after(() => rm(product, { recursive: true, force: true }));
+  const named = (name, sql) => ({ name, sql, sha256: hash(sql) });
+  const released = [named('0001_schema.sql', schema), named('0002_custody.sql', 'CREATE TABLE custody(id TEXT);')];
+  await migrate(api, id, released);
+  const rewritten = named('0002_custody.sql', 'CREATE TABLE IF NOT EXISTS custody(id TEXT);');
+  const current = [released[0], rewritten, named('0003_converge.sql', 'CREATE INDEX custody_id ON custody(id);')];
+  const ledger = () => db.prepare('SELECT name,sha256,state FROM d1_migrations ORDER BY id').all().map(row => ({ ...row }));
+  const before = ledger(), writes = fixture.state.writes.length;
+  const declare = rewrites => writeFile(join(product, 'migrations/rewrites.json'), JSON.stringify({ version: 1, rewrites }));
+  const declared = { migration: '0002_custody.sql', from: released[1].sha256, to: rewritten.sha256, reason: 'Fresh D1 could not parse the released statement.', reviewed: true };
+  await mkdir(join(product, 'migrations'), { recursive: true });
+  assert.deepEqual(await readMigrationRewrites(product), []);
+  await assert.rejects(migrate(api, id, current), /changed-or-uncertain-migration-history/);
+  for (const [rewrites, refusal] of [
+    [[{ ...declared, reviewed: false }], /unreviewed-migration-rewrite/],
+    [[{ ...declared, to: hash('other bytes') }], /migration-rewrite-mismatch/],
+    [[{ ...declared, migration: '0009_absent.sql' }], /unknown-migration-rewrite/],
+  ]) {
+    await declare(rewrites);
+    await assert.rejects(async () => migrate(api, id, withRewrites(current, await readMigrationRewrites(product))), refusal);
+  }
+  await declare([declared]);
+  const upgrade = withRewrites(current, await readMigrationRewrites(product));
+  const changedFirst = withRewrites([named('0001_schema.sql', `${schema}\n-- edited`), ...current.slice(1)], await readMigrationRewrites(product));
+  await assert.rejects(migrate(api, id, changedFirst), /changed-or-uncertain-migration-history/, 'an undeclared change is still refused');
+  assert.deepEqual(ledger(), before);
+  assert.equal(fixture.state.writes.length, writes, 'refusals write nothing');
+  assert.deepEqual((await migrate(api, id, upgrade)).applied, ['0003_converge.sql']);
+  assert.deepEqual(ledger(), [...before, { name: '0003_converge.sql', sha256: current[2].sha256, state: 'applied' }], 'the ledger keeps the released digest it applied');
+  assert.deepEqual((await migrate(api, id, upgrade)).applied, []);
 });

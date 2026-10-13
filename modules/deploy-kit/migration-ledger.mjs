@@ -4,7 +4,10 @@ export const ledger = 'd1_migrations';
 const legacy = '_rer_deploy_migrations';
 export const literal = value => `'${value.replaceAll("'","''")}'`;
 export const createLedger = `CREATE TABLE ${ledger} (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, sha256 TEXT, state TEXT CHECK(state IN ('applying','applied')))`;
-const validPrefix = (rows, migrations) => rows.every((row, index) => row.name === migrations[index]?.name && row.sha256 === migrations[index]?.sha256 && row.state === 'applied');
+/** An applied row records this migration: its current bytes, or bytes a seed's
+ * reviewed rewrite record says this migration replaced. */
+export const recorded = (row, migration) => row.name === migration?.name && (row.sha256 === migration.sha256 || (migration.rewrites ?? []).some(rewrite => rewrite.from === row.sha256));
+const validPrefix = (rows, migrations) => rows.every((row, index) => recorded(row, migrations[index]) && row.state === 'applied');
 const same = (a, b) => a.length === b.length && a.every((row, index) => row.name === b[index].name && row.sha256 === b[index].sha256 && row.state === b[index].state);
 
 export async function readLedger(api, id, migrations, query) {

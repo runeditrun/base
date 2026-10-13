@@ -193,6 +193,17 @@ No Single Redirect (dynamic redirect ruleset) permission is needed. Base's refer
 
 SQL files have ordered unique names and SHA-256 identities. `d1_migrations` holds controller history with ordered IDs, names, timestamps, SHA-256 hashes and states. Native archives already exclude this installation table. Standard Wrangler name-only inserts remain possible, but their missing hashes/states block subsequent Base deployment pending reviewed adoption. Applied entries must be an unchanged prefix of the desired set. A new migration gets an `applying` claim before its SQL and completion marker are submitted together through the [Cloudflare D1 SQL import API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/import/), using the same whole-file protocol as Wrangler to preserve compound trigger bodies and atomic SQL/completion. Uploads use bounded HTTPS R2 destinations, without account credentials; polling is bounded and signed URLs and import response text are never diagnostic output. Any interrupted, failed or uncertain outcome remains blocked and must be inspected explicitly; the kit never automatically retries, rolls back user data, or marks an unknown outcome successful. Readback checks every final identity.
 
+A seed that had to rewrite a migration it already released declares the rewrite
+in `migrations/rewrites.json`: `{ "version": 1, "rewrites": [{ "migration":
+"0019_import_custody.sql", "from": "<released SHA-256>", "to": "<current SHA-256>",
+"reason": "...", "reviewed": true }] }`. An applied row holding `from` then counts
+as that migration, so an upgrade past it proceeds; the ledger keeps the released
+digest it applied. A later migration must converge databases that applied the
+released bytes. The record is refused unless `reviewed` is `true`, it names a
+migration in the set, and `to` is that migration's current bytes; every other
+change to applied history is still refused. Keep the record for as long as any
+installation may hold the released digest.
+
 Completion preserves the original SQL bytes and always starts on a new line.
 Comment-only migrations are rejected before any provider request or ledger claim.
 The controller adds a separator only when the final non-comment token is not a
