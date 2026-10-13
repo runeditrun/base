@@ -8,9 +8,10 @@ import { operatorMail } from '../../platform/auth/mail.server.mjs'
 import { newUlid } from '../../platform/identifiers.server'
 import { custodyCheckpoint, peopleErasure } from './erasure'
 import { importRoutes } from './import-routes'
-import { readD1ImportFieldMatches, retireD1ImportCustody } from '../../../../../modules/import-kit/src/d1/index.ts'
+import { retireD1ImportCustody } from '../../../../../modules/import-kit/src/d1/index.ts'
 import type { D1CustodyRetirement, D1ImportContext } from '../../../../../modules/import-kit/src/d1/index.ts'
 import { peopleImportContext, PERSON } from './imports.server'
+import { personRedaction } from './person-redaction.server'
 import { addNote, attachFile, createPerson, erasureRequestedStatement, exportPerson, personExists } from './repository.server'
 
 type Environment = { Bindings: Bindings; Variables: { session: Session; files: R2Bucket } }
@@ -69,7 +70,44 @@ function retiringPeopleContext(context: D1ImportContext, subject: string): D1Imp
       const rows = await targets.list(db, destination)
       return await isRetired(db) ? rows.filter(row => row.targetKind !== PERSON || row.targetId !== subject) : rows
     },
+    redaction: (db, _destination, fields) => personRedaction(db, fields, { sql: `NOT(id=? AND ${retired})`, params: [subject, subject] }),
   } } }
+}
+
+/** Erase a person. Import custody goes first, by exact identifiers only: their
+ * records become tombstones, an import labelled with exactly their email is
+ * retired whole, and their ids leave other people's reactions. A name is not an
+ * identifier, so an import labelled "Alice" is not touched. When the reactions
+ * span more imports than one request can rewrite, each request commits one
+ * bounded step and queues the next with its continuation. Then native deletion
+ * runs in bounded, resumable steps. */
+export async function erasePerson(bindings: Bindings, operator: { id: string; role: string }, id: string, continuation?: string) {
+  if (!bindings.FILES) throw new Error('Missing Worker binding: FILES')
+  const db = bindings.DB, files = bindings.FILES
+  const person = (await db.prepare('SELECT email,details FROM people WHERE id=?').bind(id).first<{ email: string; details: string }>())!
+  const sourceUserId = JSON.parse(person.details).sourceUserId
+  const references = [...new Set([id, ...(typeof sourceUserId === 'string' && sourceUserId.length ? [sourceUserId] : [])])]
+  const imports = retiringPeopleContext(peopleImportContext(db, operator), id)
+  // Optional: a person need not appear in anyone's reactions.
+  const fields = references.map(value => ({ path: ['details', 'reactions', '*', 'users', '*'], value, optional: true }))
+  // Native-created people can also be named in imported peers. Retirement,
+  // reference redaction, custody and the restore checkpoint commit together.
+  const result = await retireD1ImportCustody({ target: { kind: PERSON, id }, values: [person.email], related: { fields } },
+    [toD1Sql(erasureRequestedStatement(db, operator.id, id))], imports, await custodyCheckpoint(db, files, true), { resumable: true, continuation })
+  if (result.phase === 'redacting') {
+    await bindings.JOBS.send({ redact: id, operator: operator.id, continuation: result.continuation })
+    return { redaction: { jobsRedacted: result.jobsRedacted, jobsPending: result.jobsPending } }
+  }
+  const opened = await (await peopleErasure(db, files)).start('person', { id })
+  return { receipt: await continueErasure(bindings, opened.id), journal: journalEntry(result) }
+}
+
+/** The queued next step of a person's import redaction, under the operator who
+ * asked for it; their role is checked again inside every step's batch. */
+export async function continueRedaction(bindings: Bindings, id: string, operatorId: string, continuation: string) {
+  const operator = await bindings.DB.prepare('SELECT id,role FROM oa_operators WHERE id=?').bind(operatorId).first<{ id: string; role: string }>()
+  if (!operator || !await personExists(bindings.DB, id)) return
+  await erasePerson(bindings, operator, id, continuation)
 }
 
 export async function continueErasure(bindings: Bindings, id: string) {
@@ -140,27 +178,8 @@ export function peopleRoutes() {
     if (!await personExists(context.env.DB, id)) return context.json({ error: 'not found' }, 404)
     const parsed = erasureInput.safeParse(await context.req.json().catch(() => null))
     if (!parsed.success || parsed.data.confirmation !== `erase ${id}`) return context.json({ error: 'confirmation_mismatch', expected: 'erase <id>' }, 400)
-    const db = context.env.DB, files = context.get('files'), operatorId = context.get('session').operatorId
-    const erasure = await peopleErasure(db, files)
-    const person = (await db.prepare('SELECT email,details FROM people WHERE id=?').bind(id).first<{ email: string; details: string }>())!
-    // Import custody, by exact identifiers only: their records become tombstones,
-    // and an import labelled with exactly their email is retired whole. A name is
-    // not an identifier, so an import labelled "Alice" is not touched.
-    const sourceUserId = JSON.parse(person.details).sourceUserId
-    const references = [...new Set([id, ...(typeof sourceUserId === 'string' && sourceUserId.length ? [sourceUserId] : [])])]
-    const imports = retiringPeopleContext(peopleImportContext(db, context.get('session').operator), id)
-    const fields = references.map(value => ({ path: ['details', 'reactions', '*', 'users', '*'], value }))
-    const selection = await readD1ImportFieldMatches(fields, imports)
-    const custody = { target: { kind: PERSON, id }, values: [person.email],
-      related: { fields: selection.fieldMatches.some(field => field.matches > 0) ? fields : [], snapshot: selection.snapshot } }
-    // Native-created people can also be named in imported peers. Retirement,
-    // reference redaction, custody and the restore checkpoint commit together;
-    // native deletion then runs in bounded, resumable steps.
-    const journal = journalEntry(await retireD1ImportCustody(custody,
-      [toD1Sql(erasureRequestedStatement(db, operatorId, id))], imports, await custodyCheckpoint(db, files, true)))
-    const opened = await erasure.start('person', { id })
-    const receipt = await continueErasure(context.env, opened.id)
-    return context.json({ receipt, journal }, receipt.phase === 'complete' ? 200 : 202)
+    const result = await erasePerson(context.env, context.get('session').operator, id)
+    return context.json(result, 'receipt' in result && result.receipt?.phase === 'complete' ? 200 : 202)
   })
   app.get('/api/erasures/:id', async (context) => {
     const erasure = await peopleErasure(context.env.DB, context.get('files'))

@@ -7,12 +7,18 @@ import { withdrawArtifacts } from './erased-artifacts.ts';
 /** Snapshot the caller's selectors before any awaited reads. Never retain the
  * selected private values in the plan or journal. */
 export function fieldRedactions(fields: readonly D1FieldRedaction[] = []): D1FieldRedaction[] {
-  return fields.map(({ path, value }) => {
+  return fields.map(({ path, value, optional }) => {
     requireText(value, 'redaction value');
     if (!Array.isArray(path) || !path.length || path.length > 256 || path.some(segment =>
       typeof segment !== 'string' && !(Number.isSafeInteger(segment) && segment >= 0))) throw new Error('IMPORT_INVALID_REDACTION_PATH');
-    return { path: [...path], value };
+    if (optional !== undefined && typeof optional !== 'boolean') throw new Error('IMPORT_INVALID_REDACTION_PATH');
+    return { path: [...path], value, ...optional ? { optional } : {} };
   });
+}
+
+/** A path matched nowhere is a typo unless every selector on it is optional. */
+export function unmatchedPath(fields: readonly D1FieldRedaction[], counts: readonly D1FieldMatch[]): boolean {
+  return counts.some(count => count.matches === 0 && fields.some(field => !field.optional && canonicalJson(field.path) === canonicalJson(count.path)));
 }
 
 export function fieldMatches(fields: readonly D1FieldRedaction[]): D1FieldMatch[] {
