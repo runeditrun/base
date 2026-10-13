@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { parseJsonc } from '../../cli/jsonc.mjs';
 import { portabilityPlan } from './portability-schema.mjs';
 import { checkBoundary } from './boundary.mjs';
+import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 const hash = source => createHash('sha256').update(source).digest('hex');
 export async function buildContainer(root, options={}) {
  const previous=process.cwd();process.chdir(root);
@@ -36,12 +37,13 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  if (engine === 'workerd') workerConfig = JSON.parse(await readFile(join(root,'dist/server/wrangler.json'),'utf8'));
  else workerConfig = parseJsonc(await readFile(join(root,'wrangler.jsonc'),'utf8'));
  const { unstable_splitSqlQuery:split } = require('wrangler');
- const migrations = {};
+ const migrations = {}, rewrites = await readMigrationRewrites(root);
  for (const db of workerConfig.d1_databases ?? []) {
   let directory = resolve(root,db.migrations_dir ?? 'migrations');
   try { await readdir(directory); } catch { directory = resolve(root,'dist/server',db.migrations_dir); }
   migrations[db.binding] = [];
   for (const name of (await readdir(directory)).filter(name => name.endsWith('.sql')).sort()) { const sql = await readFile(join(directory,name),'utf8'); migrations[db.binding].push({ name,sql,sha256:hash(sql),statements:split(sql) }); }
+  migrations[db.binding] = withRewrites(migrations[db.binding], rewrites, { partial:true });
  }
  const entry = engine === 'workerd' ? 'dist/server/'+workerConfig.main : 'dist/server/index.mjs';
  await readFile(join(root,entry));
