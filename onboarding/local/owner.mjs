@@ -27,7 +27,7 @@ export async function assertLocalOwner(root,email,failure=message=>Error(message
  if(!Array.isArray(owners)||owners.some(owner=>typeof owner!=='string'))throw failure('The localOwner hook must return existing owner email addresses without changing state.');
  if(owners.length&&!owners.some(owner=>owner.toLowerCase()===email.toLowerCase())){
   const address=safeOwner(owners[0]);
-  throw failure(`Local database already belongs to ${address}. Restore ${setting} to ${address}, then run rer setup --owner-email ${address}; or back up data and run rer reset --yes. Existing data and private settings were kept.`);
+  throw failure(`Local database already belongs to ${address}. Restore ${setting} to ${address}, then run rer setup --owner-email ${address}; or back up data, run rer dev --stop, then rer reset --yes followed by rer setup --owner-email ${safeOwner(email)}. Reset deletes local data. Existing data and private settings were kept.`);
  }
  return owners;
 }
