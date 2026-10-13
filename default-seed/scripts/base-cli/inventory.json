@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.g4a783393",
+  "cliVersion": "0.2.2-dev.g4bb4168f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -113,7 +113,7 @@
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
-      "sha256": "d2eef0ae7a594af51fc733d27ca5f66e538f472f7271caaa0f2e2a8739cb188b"
+      "sha256": "8cfe77eab8b2ad763d2801fe3aee8259182aae13fcd3fc9065bc65e350af3756"
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
@@ -225,7 +225,7 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "5807c2d5b2bc454d5bd9ad61fc39508e7d84a3b5deef05323b53d29cc7face6c"
+      "sha256": "43fce6331fa9697651d9d69e68da49ace8dc7dfeab28c4283779faff986c0aa5"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
@@ -315,7 +315,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "845a8a70e887c7be0bd3937bb5acd33a8ff5fb6562545dd93a499d20d2c6e1bb"
+      "sha256": "3c89a8aafe1670d00483c88d1ea1330820dbc7a53ce55018960b268b75179918"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -367,7 +367,7 @@
     },
     "cli/dependencies.mjs": {
       "source": "cli/dependencies.mjs",
-      "sha256": "f63d0dfeb23984792fc53ca3cc6554eea7154415090b5a1e636a8d4ca14ee350"
+      "sha256": "98030b505a66d226e1d65b5d5e730287e69b336370687d472044ddd85999facd"
     },
     "cli/dependency-approval.mjs": {
       "source": "cli/dependency-approval.mjs",
@@ -381,21 +381,29 @@
       "source": "cli/dependency-input.mjs",
       "sha256": "b686a1c685ad3b842a1815de96424faaa6cf457eb0e4a97d4a71f5a9ea7060fd"
     },
+    "cli/deploy-command.mjs": {
+      "source": "cli/deploy-command.mjs",
+      "sha256": "7005ae9decd7769e7965adf34f6c0e55c1ab077324c1191c3e391d8c68dac3bc"
+    },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
       "sha256": "d9bddc99e9efdffa92ba7e213a07f3a70891fd288d0767e6ca071d59078d171d"
     },
     "cli/deploy-inputs.mjs": {
       "source": "cli/deploy-inputs.mjs",
-      "sha256": "b9d8c8d3b0adfda73165b9939b58a3279324fd7517e0055db17993cd59ca6337"
+      "sha256": "ef579d668ba0ff43b5f1ab907ebf64c09d00a9cbdf0da8e9e000c6a076786f89"
+    },
+    "cli/deploy-observation.mjs": {
+      "source": "cli/deploy-observation.mjs",
+      "sha256": "1478619f885dc73e00f35b4170eacb7150e85c5578f86fdf3592260fa4533333"
     },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
-      "sha256": "46f6944a750bd0f88ee86e6a16d062f3b800a00b1ba913ea358b12394839c56b"
+      "sha256": "dc1d2cb3b9d861071dc7f97997cabb32cce80ee363e1961b8b9e1518eb106f34"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "ebd5c66b2754fd0b7fffd0fa8dff2311784ff89756dc13f6113caa5d0c5671cd"
+      "sha256": "a8869ab928b4ec711efca2356b0ff6e6370b0b5d6c44f7db3f91ed5b105f56da"
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
@@ -467,7 +475,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "993a0ec2ea3e06ed4f5e50c11624e22f9ec63b2b85c45dcefa499e9872e43887"
+      "sha256": "de5dbd1602ac1e90b8e5922aabd649ffbfa32cef8796440d308bb57581918ef9"
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
@@ -587,7 +595,7 @@
     },
     "cli/setup-input.mjs": {
       "source": "cli/setup-input.mjs",
-      "sha256": "e84ec8d920283d5e77a45f72286c6d784c66baa8780237ac6e8dd13786375d45"
+      "sha256": "7d16b37e91a01390d89d3f533193b4a30a3a8f2b482b7ca4494b767d6fb61988"
     },
     "cli/shared.mjs": {
       "source": "cli/shared.mjs",
@@ -959,7 +967,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "e3c15b15c7f2fd198039ea076a46763d551eec91bbf1624ed2443aefecec525d"
+      "sha256": "098de17e7c5114e2014eb22d811f2b73c1372765d1cb21dc7aeb10ba2aff0a88"
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
@@ -971,7 +979,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "eaf8612eec1eb7fa992012e07e5cffb6fc1fc4a535f6db9d5c8ccc36498d3721"
+      "sha256": "af7c2c15a058d1fcbaefeea7fd2292518fffd7402f7dc6309235cf46da8f58f2"
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",
