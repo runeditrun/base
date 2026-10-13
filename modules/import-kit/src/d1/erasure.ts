@@ -125,7 +125,7 @@ export async function targetErasure(target: { kind: string; id: string } | undef
   const reports = await eraseReversalEvidence(context, changedPlans);
   before.push(...reports.before);
   after.push(...releaseCopies, ...erasureWrites(changedJobs, decisions, redactions), ...reports.after, ...privateErasure.after);
-  if (fields.length || related?.snapshot !== undefined) for (const table of ['ik_d1_staging', 'ik_d1_native_staging']) {
+  if (fields.length || related?.snapshot !== undefined) for (const table of ['ik_d1_staging', 'ik_d1_native_staging', 'ik_d1_preparation_steps']) {
     after.push(sql(`DELETE FROM ${table} WHERE destination=?`, context.destination), guard(sql(`NOT EXISTS(SELECT 1 FROM ${table} WHERE destination=?)`, context.destination)));
   }
   for (const [id, next] of changedPlans) after.push(...custodyGuards(next, id));

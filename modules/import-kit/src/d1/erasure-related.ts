@@ -58,7 +58,7 @@ export async function relatedSelection(context: D1ImportContext, related: D1Rela
     }
     // Incomplete private plans cannot be safely field-rewritten. Cancel every
     // private preparation in this destination atomically, including other actors.
-    for (const table of ['ik_d1_staging', 'ik_d1_native_staging']) {
+    for (const table of ['ik_d1_staging', 'ik_d1_native_staging', 'ik_d1_preparation_steps']) {
       const { results } = await db.prepare(`SELECT id FROM ${table} WHERE destination=? ORDER BY id`).bind(context.destination).all();
       guards.push(...exactRows(table, ['id'], results, sql('destination=?', context.destination)));
     }

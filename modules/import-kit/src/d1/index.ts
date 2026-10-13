@@ -9,6 +9,8 @@ export type * from '../types.ts';
 export { d1ErasureSchema } from './erasure-schema.ts';
 export { d1StagingSchema, d1LegacyStreamReceiptUpgrade } from './staging-schema.ts';
 export { d1PreparationSchema } from './preparation-schema.ts';
+export { d1PreparationStepsSchema } from './preparation-steps-schema.ts';
+export { prepareD1ImportSteps, type ImportPreparationStep } from './preparation-steps.ts';
 export { prepareD1ImportStream, publishD1ImportPreparation, readD1ImportPreparation, type ImportPreparation } from './preparations.ts';
 export { cancelD1ImportStaging } from './staging-lifecycle.ts';
 export { requestContext as d1RequestContext } from './budget.ts';

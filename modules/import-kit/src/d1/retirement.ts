@@ -43,7 +43,7 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
   await readAtomic(context, [], undefined, 'erase');
   const db = context.storage.database, destination = context.destination;
   const scope = await retirementScope(db, destination, values), retiring = new Set(scope.jobs);
-  const fenced = Boolean(person.target) || fields.length > 0 || scope.jobs.length + scope.streams.length + scope.stages.length + scope.anchors.length > 0;
+  const fenced = Boolean(person.target) || fields.length > 0 || scope.jobs.length + scope.streams.length + scope.stages.length + scope.anchors.length + scope.preparations.length > 0;
   if (fenced && !checkpoint.length) throw new Error('IMPORT_RETIREMENT_CHECKPOINT_REQUIRED');
   const fence = fenced ? checkpoint : [];
   // Only the checkpoint fences rows the tally does not count (another import's jobs, a seed's tables): unfenced caller SQL is refused.
