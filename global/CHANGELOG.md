@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `rer setup` finishes provider-free when a seed declares an optional dependency that you leave unconnected.
+- A seed adapter can declare `resetPreflight`; `rer reset` runs it before listing or deleting anything, and `--yes` cannot skip it.
 
 ## 0.2.2
 

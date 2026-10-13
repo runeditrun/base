@@ -73,6 +73,13 @@ export async function reset(project, options, out) {
  await refuseLegacyProcess(project,{reset:true});
  const { strandedOriginals } = await shared('local/recovery.mjs');
  if ((await strandedOriginals(project.root)).length) throw refuse('An interrupted build holds private settings. Run rer build to recover them before reviewing reset.');
+ // The seed's own safety check (legacy data it still has to recover, for
+ // example) runs before the inventory and confirmation; --yes cannot skip it.
+ const preflight = project.adapter.resetPreflight;
+ if (preflight !== undefined) {
+  if (typeof preflight !== 'function') throw refuse('The seed adapter declares a reset preflight that is not a function.');
+  try { await preflight({ root: project.root }); } catch (error) { throw refuse(`Reset refused by the seed's preflight: ${error?.message || 'no reason given'}`); }
+ }
  const declared = project.adapter.settings ?? [];
  for (const path of declared) if (!/^\.dev\.vars(?:\.previous)?$|^data\/[a-zA-Z0-9_-]+\.json$/.test(path)) throw refuse('Generated settings inventory is unsafe; declare specific private settings files.');
  const paths = [...new Set(['.wrangler/state', '.rer/local', '.seed/installer', ...declared])];
