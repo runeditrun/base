@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPortability,readArchive } from '../index.mjs';
+import { createPortability,readArchive,excludedTable } from '../index.mjs';
+import { migrate } from '../../container/migrations.mjs';
 import { runtime,seed,archive,collect,rows } from './helpers.mjs';
 import { fixturePolicy } from './fixture-policy.mjs';
 test('snapshot stays consistent while writes land between create and advance',async t=>{
@@ -60,4 +61,13 @@ test('Base auth, module bookkeeping and development outbox are excluded by defau
   const a=await archive(await f.connect());assert.ok(a.manifest.excludedTables.includes('oa_sessions'));assert.ok(a.manifest.excludedTables.includes('oc_claims'));assert.ok(a.manifest.excludedTables.includes('rer_mail_development_outbox'));assert.ok(a.manifest.excludedTables.includes('rer_ai_development_outbox'));assert.ok(!a.manifest.tables.some(t=>t.name==='rer_ai_development_outbox'));
   assert.ok(!a.manifest.tables.some(t=>t.name.startsWith('rer_portability_')));
   const included=await createPortability({db:f.db,buckets:{FILES:f.bucket},policy:{...fixturePolicy,includeTables:['oa_sessions']}});const b=await archive(included);assert.equal(rows(b).find(x=>x.table==='oa_sessions').row.id,'excluded-session');
+  // A seed's own table inventory skips exactly what archives skip, including the
+  // deploy controller's migration ledger.
+  await migrate(f.db,[]);
+  for(const policy of [fixturePolicy,{...fixturePolicy,includeTables:['oa_sessions']}]){
+    const c=await archive(await createPortability({db:f.db,buckets:{FILES:f.bucket},policy}));
+    assert.ok(c.manifest.excludedTables.includes('_rer_deploy_migrations'));
+    assert.ok(c.manifest.excludedTables.every(name=>excludedTable(name,policy)));
+    assert.ok(c.manifest.tables.every(({name})=>!excludedTable(name,policy)));
+  }
 });
