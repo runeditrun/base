@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.g1f2f2565",
+  "cliVersion": "0.2.2-dev.g0681b1e1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -21,7 +21,7 @@
     },
     "adapter-labels.mjs": {
       "source": "onboarding/adapter-labels.mjs",
-      "sha256": "d87140e8efcd1566a3c5a57f93e1ba15e716856d4e9dac83f73930ede95045eb"
+      "sha256": "98e334c0d69817dbeda1a542b0da0d908034c8a5145243ac7d7cc6f5c7dcb2a0"
     },
     "adapter-settings.mjs": {
       "source": "onboarding/adapter-settings.mjs",
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "0fe459d90ee52cad127b26eea580c9eac61a79bcdf90d909d81117a6dc587cde"
+      "sha256": "240eaf534e4e61ed82a75d37cf56f81308dbe6a61f72b6f107d48c93597b881f"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -395,7 +395,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "ebd5c66b2754fd0b7fffd0fa8dff2311784ff89756dc13f6113caa5d0c5671cd"
+      "sha256": "cddb3f896fab0a46508e454ae6326cd8c192d07da8baaf75d3d07d718223887a"
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",

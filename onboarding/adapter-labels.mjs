@@ -9,5 +9,6 @@ export const labels = Object.freeze({
  signIn: 'Opening sign-in through the development outbox',
  hosting: 'Deploying to your Cloudflare account',
  complete: 'Your application is running locally',
+ built: 'Your application is built',
 });
 
