@@ -4,7 +4,7 @@
 // They are static HTML strings for `rer build --site`; the seed's site entry
 // renders them with its own RunData and edition identity, and a seed with an
 // approved homepage renders that page instead of siteHomeHtml.
-// Visual authority: the 12ui Run page picks (evidence/homepage-variants/run-page).
+// Visual authority: the 12ui Run page picks.
 // This file is copied unchanged to src/base by both maintained exporters.
 import { checkIdentity, type EditionIdentity } from './identity'
 import { ink } from './theme-frame'
