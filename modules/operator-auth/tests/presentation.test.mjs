@@ -6,6 +6,7 @@ import { createOperatorAuth } from '../index.mjs';
 import { confirmationResponse } from '../identity/email-link/confirmation.mjs';
 import { securityHeaders } from '../http.mjs';
 import { linkMessage } from '../identity/email-link/message.mjs';
+import { runtime, presets } from '../identity/oidc/tests/fake-runtime.mjs';
 
 const base = { origin: 'https://auth.test', OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'test-only-session-secret-at-least-32-characters' };
 const branding = { productName: '<A & "B">', accentColor: '#fffFFF', signInPath: '/signin?next=%2Fapp&from=auth' };
@@ -184,4 +185,19 @@ test('a declared seed theme links its served stylesheet and the CSP admits only 
   const style = html.match(/<style>([\s\S]*?)<\/style>/)[1];
   const hash = createHash('sha256').update(style).digest('base64');
   assert.equal(response.headers.get('Content-Security-Policy'), `${securityHeaders()['Content-Security-Policy']}; style-src 'self' 'sha256-${hash}'; font-src 'self'; img-src 'self'`);
+});
+
+test('the owner sign-in settings page wears the declared seed theme, as sign-in does', async t => {
+  const setup = presets();
+  setup.core = { ...setup.core, branding: { productName: 'Fixture', theme: '/rer-theme.css' } };
+  const r = await runtime(t, setup);
+  const owner = await r.bootstrap();
+  const page = await r.call('/auth/settings/identity', { cookie: owner, headers: { Accept: 'text/html' } });
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /<html lang="en" class="rer-themed">/);
+  assert.match(html, /<link rel="stylesheet" href="\/rer-theme.css">/);
+  assert.match(html, /<form action="\/auth\/settings\/identity" method="post">/);
+  const style = html.match(/<style>([\s\S]*?)<\/style>/)[1];
+  assert.match(page.headers.get('Content-Security-Policy'), new RegExp(`style-src 'self' 'sha256-${createHash('sha256').update(style).digest('base64').replace(/[+/]/g, '\\$&')}'`));
 });

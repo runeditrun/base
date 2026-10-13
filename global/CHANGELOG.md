@@ -9,6 +9,7 @@
 - `rer describe` in the default seed and new foundations names the release keygen, sign and receipt subcommands again.
 - Importing an archive whose bytes are not valid UTF-8 is refused with the same `archive_json` diagnostic (exit 2) as invalid JSON.
 - Converting a seed to package mode no longer leaves a broken queue sentence in its README or `scripts/base-cli` paths in its operations guide and erasure README.
+- The owner's sign-in settings page (`/auth/settings/identity`) wears the seed's declared theme, like sign-in and setup.
 
 ## 0.2.2
 

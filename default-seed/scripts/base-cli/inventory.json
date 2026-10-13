@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.g0ae20219",
+  "cliVersion": "0.2.2-dev.gc5f5e45c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1575,7 +1575,7 @@
     },
     "modules/operator-auth/accounts/settings-page.mjs": {
       "source": "modules/operator-auth/accounts/settings-page.mjs",
-      "sha256": "3036524d91e838e63654748b6fe0c8671c8590bc6632eb9990fc2b518e1bbcc7"
+      "sha256": "1f7bfcbceb4c7fbc95a42b23fb62f869aaf02e0b5590ce75419c14235b48af8d"
     },
     "modules/operator-auth/accounts/store.mjs": {
       "source": "modules/operator-auth/accounts/store.mjs",
@@ -1779,7 +1779,7 @@
     },
     "modules/operator-auth/page.mjs": {
       "source": "modules/operator-auth/page.mjs",
-      "sha256": "d6bb3bcce21c060cc1f5936f445c7dd4205b62494295896e4b23374c44a961c1"
+      "sha256": "553b04f210e94f7f5622a5988445da82ffc94ca436be272d8ccfe993918ca7a0"
     },
     "modules/operator-auth/policy.mjs": {
       "source": "modules/operator-auth/policy.mjs",
@@ -1787,7 +1787,7 @@
     },
     "modules/operator-auth/routes.mjs": {
       "source": "modules/operator-auth/routes.mjs",
-      "sha256": "1daf7f60b6905c24009e090779d852285a60997d8b0d012af2b1476983095ebe"
+      "sha256": "5337330fca02e8862e42750232967ef084f0d7b5bf0c01cb3f3a6e844c4f6cf3"
     },
     "modules/operator-auth/service.mjs": {
       "source": "modules/operator-auth/service.mjs",
