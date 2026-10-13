@@ -4,6 +4,7 @@
 
 - `rer setup` finishes provider-free when a seed declares an optional dependency that you leave unconnected.
 - A seed adapter can declare `resetPreflight`; `rer reset` runs it before listing or deleting anything, and `--yes` cannot skip it.
+- A first `rer dev` whose chosen port is taken by another program before setup can use it moves to the next free port and says which.
 
 ## 0.2.2
 

@@ -10,7 +10,7 @@ import { liveServers } from '../registry.mjs';
 import { checkCapacity, personEnvironment, pinPolicy } from './capacity.mjs';
 import { bringBackDoor, doorPlan } from './door.mjs';
 import { LaunchFailure } from './failure.mjs';
-import { describeCheckout, freePort, localOwner, needsInstall, setupNeeded } from './facts.mjs';
+import { describeCheckout, freePort, localOwner, needsInstall, portTaken, setupNeeded } from './facts.mjs';
 import { claimPort, installState, setupState } from './state.mjs';
 import { runVerb } from './steps.mjs';
 import { localDefaults } from './local-defaults.mjs';
@@ -74,13 +74,24 @@ export async function prepare({ root, args, env, report, directory, log, childre
   return { entry, added };
  } else if (setup === 'fresh') {
   // An interrupted setup resumes on the port it chose while that port is free.
+  // A port another process takes between choosing it and setup refusing it is
+  // passed over for the next free one; a port the person passed is kept.
   const owner = localOwner(checkout), explicit = flagValue(args, '--port');
-  const { port, release } = explicit ? { port: Number(explicit) } : await freePort(await liveServers(childEnv), port => claimPort(port, childEnv), last?.port ? { ...childEnv, RER_DEV_PORT_FROM: String(last.port) } : childEnv);
-  report({ phase: 'setup', message: `setting up a local owner (${owner}) on port ${port}` });
-  try { await step(setupState, ['setup', '--owner-email', owner, '--port', String(port), ...hostArgs], { port, owner }, setupEnv); }
-  catch (failure) { await release?.(); throw failure; }
-  // The claim lasts until the server registers the port: the caller releases it.
-  return { entry, added, release };
+  let from = last?.port;
+  for (let attempt = 1; ; attempt++) {
+   const { port, release } = explicit ? { port: Number(explicit) } : await freePort(await liveServers(childEnv), port => claimPort(port, childEnv), from ? { ...childEnv, RER_DEV_PORT_FROM: String(from) } : childEnv);
+   report({ phase: 'setup', message: `setting up a local owner (${owner}) on port ${port}` });
+   try { await step(setupState, ['setup', '--owner-email', owner, '--port', String(port), ...hostArgs], { port, owner }, setupEnv); }
+   catch (failure) {
+    await release?.();
+    if (explicit || attempt === 3 || failure.exitCode !== 4 || !await portTaken(port)) throw failure;
+    report({ phase: 'note', message: `port ${port} was taken by another process; choosing another free port` });
+    from = port + 1;
+    continue;
+   }
+   // The claim lasts until the server registers the port: the caller releases it.
+   return { entry, added, release };
+  }
  }
  await bringBackDoor(plan, env, report);
  return { entry, added };

@@ -76,6 +76,11 @@ async function bindable(host, port) {
  finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
 }
 
+// Whether something now listens on a port or keeps it from binding.
+export async function portTaken(port) {
+ return (await listeningPorts()).has(port) || !await bindable('127.0.0.1', port) || !await bindable('::1', port);
+}
+
 // The first port from 8787 (RER_DEV_PORT_FROM moves the start) that no
 // registered server holds, nothing listens on, binds on both 127.0.0.1 and ::1
 // (a browser that tries ::1 first never reaches another server) and that
