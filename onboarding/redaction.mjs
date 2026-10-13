@@ -35,7 +35,9 @@ const DOUBLE_QUOTED = /"(?:\\[^\r\n]|[^"\\\r\n])*(?:\\(?=[\r\n]|$))?/.source;
 const SINGLE_QUOTED = /'(?:\\[^\r\n]|[^'\\\r\n])*(?:\\(?=[\r\n]|$))?/.source;
 const PRIVATE_VALUE = `(?:${DOUBLE_QUOTED}(?:"|(?=[\\r\\n]|$))|${SINGLE_QUOTED}(?:'|(?=[\\r\\n]|$))|[^\\s"'<>;&]+)`;
 const FIELD_VALUE = '["\']?\\s*[=:]\\s*' + NOT_FLAG + PRIVATE_VALUE;
-const CLI_PREFIX = '(?<![A-Za-z0-9_-])--(?:[A-Za-z0-9]+[_-])*';
+// These deploy flags take a binding name, never the secret value. Explicitly
+// registered private bytes remain redacted by the exact-value pass.
+const CLI_PREFIX = '(?<![A-Za-z0-9_-])--(?!(?:set|unset)-secret(?:\\s|$))(?:[A-Za-z0-9]+[_-])*';
 const CLI_ARGUMENT = CLI_PREFIX + '(' + FIELD_NAME + ')\\s+' + NOT_FLAG + '(' + PRIVATE_VALUE + ')';
 // A bare Bearer/Basic value must look like a credential, not the next word of
 // prose such as "Basic checks passed"; after Authorization any value is private.

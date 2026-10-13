@@ -111,3 +111,14 @@ test('unterminated OSC and DCS recover on newline, at 4 KiB, and after end reset
   assert.equal(reset,'RESET_MARKER\n');
  }
 });
+
+
+test('deploy secret binding recovery commands remain usable while values remain private', () => {
+ const input = 'rer deploy --unset-secret SETUP_TOKEN; rer deploy --set-secret SESSION_SECRET; --api-key synthetic-private-value';
+ for (const unit of [1, 7, 4096]) {
+  const result = captured(input, ['synthetic-private-value'], unit);
+  assert.match(result, /--unset-secret SETUP_TOKEN/);
+  assert.match(result, /--set-secret SESSION_SECRET/);
+  absent(result, ['synthetic-private-value']);
+ }
+});

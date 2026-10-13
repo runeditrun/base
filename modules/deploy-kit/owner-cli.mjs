@@ -7,13 +7,14 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
-import { ownerTarget, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState } from './owner.mjs';
+import { ownerTarget, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState } from './owner.mjs';
+import { activeWorker } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
 import { refuseLocalModels } from './local-only.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
-const usage = 'usage: owner-cli.mjs deploy|health|remove --declaration <file> --environment <name> [--product <dir>] [--state <file>] | secret ... --set NAME|--unset NAME';
+const usage = 'usage: owner-cli.mjs deploy|health|remove|inspect|record-owner --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME|--unset NAME';
 
 /** The owner's committed source and existing local build. Run the seed's build first. */
 async function ownerArtifact(root, product) {
@@ -26,11 +27,12 @@ async function ownerArtifact(root, product) {
 /** Inputs: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, plus the secrets the declaration names on first deploy. */
 export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
   let parsed;
-  try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string'},unset:{type:'string'}}}); }
+  try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string'},unset:{type:'string'},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
   const {positionals:[command,...rest],values} = parsed;
-  if (!['deploy','health','secret','remove'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (!['deploy','health','secret','remove','inspect','record-owner'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
+  if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
   await refuseLocalModels(resolve(cwd));
   const missing = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_API_TOKEN'].filter(key => typeof env[key] !== 'string' || !env[key].trim());
   if (missing.length) { const error = new Error('missing-input'); error.inputs = missing; throw error; }
@@ -51,7 +53,26 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return {ok:true,...await ownerSecret({api,target,statePath,binding,value}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
-  const {retiredSecrets = []} = await settleOwnerState({api,target,statePath});
+  const state = await settleOwnerState({api,target,statePath});
+  const {retiredSecrets = []} = state;
+  if (command === 'record-owner') return withStateLock(statePath, async () => {
+    const current = await readOwnerState(statePath, target);
+    assert(current.receipt && !current.pendingUpload && !current.pendingSecret, 'missing-owner-receipt');
+    const live = await activeWorker(api, target.worker);
+    assert(live && sameDeployment(live, current.receipt.provider), 'owned-resource-replaced');
+    current.ownerClaim = { outcome: values.outcome };
+    await writeOwnerState(statePath, current);
+    return {ok:true, owner:values.outcome};
+  });
+  if (command === 'inspect') {
+    assert(!localOnlyBinding(declaration, localOnlyKeys), 'local-only-binding');
+    assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
+    const live = await activeWorker(api, target.worker);
+    assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');
+    const rows = await api.request(`/workers/scripts/${target.worker}/secrets`);
+    assert(Array.isArray(rows), 'invalid-secret-list');
+    return {ok:true, origin:target.origin, versionId:live.versionId, retiredSecrets, ownerClaim:state.ownerClaim, liveSecrets:rows.map(row => row.name)};
+  }
   const current = retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
   const artifact = await ownerArtifact(root,values.product);
   const plan = ownerPlan(target,current,artifact,{localOnlyKeys});
@@ -65,7 +86,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });
-  return {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,retiredSecrets,state:statePath};
+  return {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,retiredSecrets,...(state.ownerClaim ? {ownerClaim:state.ownerClaim} : {}),state:statePath};
 }
 
 /** Prints refusal codes and resource names only; never inputs, tokens or provider bodies. */
