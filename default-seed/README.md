@@ -258,16 +258,19 @@ holds any of them. On a fresh destination, pass the latest archive as
 journal cannot be recognised.
 
 Erasing a person also erases them from import custody (migrations
-`0018_import_kit.sql`, `0019_people_imports.sql` and
-`0020_import_erasure_append_only.sql`). For an imported person the whole D1
-erasure commits in one batch with import-kit's `retireD1ImportCustody`: their
+`0018_import_kit.sql`, `0019_people_imports.sql`,
+`0020_import_erasure_append_only.sql` and `0021_import_preparation_steps.sql`).
+For an imported person the D1 erasure commits with import-kit's
+`retireD1ImportCustody`: their
 records become tombstones, so other people's imports still resume and undo, and
 an import labelled with exactly their email is retired whole (its rows stay, its
 undo and resume end). Matching is exact; a name is never used. Each erasure
 appends one journal row, which nothing can rewrite. That batch also writes
 portability's redaction checkpoint, so with `--journal` any archive made before
 the erasure is refused whole, including one from while the person was still
-pending in an import.
+pending in an import. Their ids also leave other people's imported reactions;
+when those span more imports than one request rewrites, the erasure answers 202
+and queues the next bounded step with its continuation until it completes.
 
 ## Verification
 
