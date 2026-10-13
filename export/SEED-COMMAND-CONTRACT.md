@@ -189,6 +189,70 @@ repository at that gate. The template pins the Actions, installs the seed's
 frozen rer pin, and checks the Run page and www redirect after deployment.
 Copying the template alone does not enable deployment.
 
+## Adopting Base's import, erasure, migration and dependency fixes
+
+Each needs a Base refresh (vendored copies) or the rer pin that contains it.
+Base's own `default-seed` shows every one in use.
+
+### Erasing a person named in many imported records
+
+`retireD1ImportCustody` costs a few statements per job, not per affected row,
+when the people adapter implements the optional `redaction(db, destination,
+fields)` scope (default-seed's `person-redaction.server.ts` is the reference):
+300 reactions take one request, 3,000 too. Mark alternate identifiers
+`optional: true` instead of dropping fields after `readD1ImportFieldMatches`.
+When a person's values span more than about 150 imports, pass `{ resumable:
+true, continuation }` as the fifth argument and, while the result's `phase` is
+`redacting`, queue the next call with its `continuation` (default-seed's
+`erasePerson` and its `redact` queue message); start native erasure only after
+`complete`.
+
+### Erasing a person who appears only inside someone else's record
+
+Call `retireD1ImportCustody({ values, related: { fields } }, [], context,
+checkpoint)` without a `target` for a person with no native record of their own,
+such as a cancelled invitee on another invitee's booking: their fields leave
+every source, effect, before-image and native row, originals holding them are
+withdrawn, and the shared record keeps its resume and undo. Replace a seed's
+`erasure_import_shared_source` refusal with this call.
+
+### Importing files too large for one request
+
+Replace the review/prepare pair with `prepareD1ImportSteps(source, mapping,
+context)` called once per request until `reviewable`, then
+`publishD1ImportPreparation(id, { ...context, reviewedFingerprint })` and
+`resumeD1ImportStream` as before. Apply import-kit's
+`d1PreparationStepsSchema` as a new numbered migration (default-seed's
+`0021_import_preparation_steps.sql`) before refreshing, since erasure and
+cancellation read its table. See the D1 README, "Preparation across requests".
+
+### Shipping a reviewed rewrite of a released migration
+
+Declare it in `migrations/rewrites.json`: `{ "version": 1, "rewrites": [{
+"migration": "0019_import_custody.sql", "from": "<released SHA-256>", "to":
+"<current SHA-256>", "reason": "...", "reviewed": true }] }`, and add a later
+migration that converges databases that applied the released bytes. Deploy and
+local runs then upgrade past it; anything else that changed in applied history
+is still refused. Keep the record for as long as an installation may hold the
+released digest.
+
+### Seed table inventories and Base's tables
+
+A seed inventory that refuses unknown tables skips the ones archives never
+carry with portability's `excludedTable(name, policy)` (or the
+`excludedTables` list), which includes `_rer_deploy_migrations` and the other
+migration ledgers. Do not delete or rename those tables.
+
+### Shared dependency fixes
+
+Base's lockfiles resolve sharp 0.35.5, undici 7.29.1, source-map-js 1.2.2,
+esbuild 0.25.12 and later, and playwright 1.63.0, and `pnpm audit` finds no
+known advisory in them. Copy Base's `pnpm.overrides` for `sharp`, `undici` and
+`@esbuild-kit/core-utils>esbuild` into the seed's root `package.json` (and any
+vendored `mail` package), run `pnpm install`, and run the seed's suites. Base's
+own suites showed no behaviour change from undici 7.29.1; Mango's one red
+move-in journey on it did not reproduce.
+
 ## Hydration units
 
 A mismatch between the server HTML and what React hydrates (an extension linking an address, a translator, a proxy rewrite) makes React client-render the nearest Suspense boundary; under TanStack Router that is everything under the root route, and the root route's own chrome is in no boundary at all. Seeds wrap every page section and the root chrome in `HydrationUnit`, mark one-time entrance animations with `data-intro` under the root's intro guard, hydrate through a `src/client.tsx` that passes `createRecoverableErrorHandler()`, keep addresses as lone text and send `no-transform` on documents. The convention and the adoption steps are in Base's `foundation/runtime/hydration/README.md` (in an edition, `src/base/hydration/README.md`).
