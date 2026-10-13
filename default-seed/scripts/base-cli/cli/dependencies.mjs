@@ -8,13 +8,15 @@ import { readJson } from '../modules/operator-auth/identity/oidc/network.mjs';
 // setup answers, generated runtime configuration, logs or an archive.
 export async function linkDependencies({project,input,origin,store,signal,appSetupToken,fetch:fetcher=globalThis.fetch,clock=Date.now}) {
  const links=[];
+ const ownerDependency = project.setupManifest?.steps?.find(step => step.type === 'owner-claim' && step.mode === 'idp')?.dependency;
+ let ownerClaimed = false;
  for(const dependency of project.setupManifest?.dependencies??[]) {
   const issuer=input?.[dependency.address];
   if(!issuer) {if(!dependency.optional)throw missing('A required dependency address is missing.');continue;}
   const tokenPath=approvalPath(project,dependency.interface);
   if(!tokenPath) {
    const current=await readJson(fetcher,origin+'/auth/dependencies/status',{timeoutMs:5000}).catch(()=>null);
-   if(current?.links?.some(link=>link.interface===dependency.interface && link.issuer===issuer && link.linked===true))continue;
+   if(current?.links?.some(link=>link.interface===dependency.interface && link.issuer===issuer && link.linked===true)){ if(dependency.interface===ownerDependency)ownerClaimed=true;continue; }
   }
   if(!tokenPath)throw missing('Provider approval is required. Set RER_LINK_TOKEN_FILE to an owner-only, untracked link-token JSON file for this exact origin and callback set.');
   const {path,value}=await linkApproval({project,dependency,issuer,origin,store,clock});
@@ -39,7 +41,13 @@ export async function linkDependencies({project,input,origin,store,signal,appSet
   if(result.linked!==true)throw missing('Provider approval did not complete linking.');
   const status=await readJson(fetcher,origin+'/auth/dependencies/status',{timeoutMs:5000});
   if(!status.links?.some(link=>link.interface===dependency.interface && link.issuer===issuer && link.linked===true))throw missing('The application has not accepted the provider link.');
+  if(dependency.interface===ownerDependency)ownerClaimed=true;
   await unlink(path);
   store.report('Dependency linked; its one-time approval token was deleted.');
  }
+ if (ownerClaimed) {
+  const document = await readJson(fetcher, origin+'/.well-known/rer-dependencies', {timeoutMs:5000});
+  ownerClaimed = document.origin === origin && document.claim === false;
+ }
+ return {ownerClaimed};
 }

@@ -17,6 +17,16 @@ import { ensureDevKey, readDevKey, refuseDevLayerOutput, openUrl, DEV_KEY_HEADER
 import { announceDoorRoute, routeRunning, verifyDoorFor } from './door-mode.mjs';
 
 export async function runCommand(project, options, out) {
+ if (options.verb === 'deploy' && !options.site) {
+  const { validateDeployOptions } = await import('./deploy-command.mjs');
+  validateDeployOptions(options);
+  const { withDeployEnvironment } = await import('./deploy-inputs.mjs');
+  return withDeployEnvironment(project.root, options, redaction => runLifecycle(project, options, out, redaction));
+ }
+ return runLifecycle(project, options, out);
+}
+
+async function runLifecycle(project, options, out, deployRedaction) {
  if(project.profile==='first-party'&&['dev','preview'].includes(options.verb))return (await import('./managed-server.mjs')).managedServer(project,options,out);
  const cancellation = new AbortController(), signal = cancellation.signal;
  let termination, operation, store, temporary, proxy, failed = false;
@@ -59,6 +69,7 @@ export async function runCommand(project, options, out) {
   const state = { logs: [] };
   store = await createCommands(directory, state, { terminal: text => out.progress(text), onWaiting: options.json ? details => out.event('waiting', details) : undefined, queue: ['install','setup','build','verify','deploy','export','import'].includes(options.verb)?{verb:options.verb,originalCI:process.env.CI==='true'}:undefined });
   store.state = state;
+  if (deployRedaction) store.addSecrets?.(Object.values(process.env).filter(value => value && deployRedaction.redact(value) !== value));
   store.setupManifest = project.setupManifest;
   store.step = async label => { state.step = store.redact(label); store.report(label); };
   store.phase = async phase => { state.phase = phase; };
@@ -86,10 +97,7 @@ export async function runCommand(project, options, out) {
   if (options.verb === 'deploy') {
    if (typeof adapter.deploy !== 'function') throw refuse('Owner-account deploy declaration is missing.');
    const link = async (origin, appSetupToken) => linkDependencies({project,input:project.setupSeed?await savedSetupAnswers(project,project.setupSeed.model):undefined,origin,store,signal,appSetupToken});
-   const deployed = await adapter.deploy({ root: project.root, options, store, signal, operationToken: operation.token, localOnlyKeys: adapter.localOnlyKeys ?? [], checkBuild: () => refuseDevLayerOutput(project.root, adapter.devIdentity), setupManifest: project.setupManifest, linkDependencies: link });
-   // Base's owner-account deploy links while its setup token is live; another deploy hook is linked here.
-   if(deployed.deployed && !options.dryRun && !deployed.dependenciesLinked) await link(deployed.origin,process.env[project.setupManifest?.steps.find(step=>step.type==='owner-claim')?.tokenField??'SETUP_TOKEN']);
-   return deployed;
+   return await (await import('./deploy-command.mjs')).deployCommand({ adapter, root: project.root, options, store, signal, operationToken: operation.token, localOnlyKeys: adapter.localOnlyKeys ?? [], checkBuild: () => refuseDevLayerOutput(project.root, adapter.devIdentity), setupManifest: project.setupManifest, linkDependencies: link });
   }
   // Setup writes the checkout's dev key; its temporary app and the CLI's own
   // outbox reads present it. Captured logs redact it.

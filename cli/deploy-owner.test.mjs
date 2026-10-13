@@ -78,7 +78,7 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  assert.equal(provider.state.secrets.find(item => item.name === 'SESSION_SECRET').value, 'rotated-session-secret');
  await writeFile(join(root, 'NOTES.md'), 'newer source\n'); git('add', '.'); git('commit', '-qm', 'second');
  const second = await run();
- assert.equal(second.deployed, true); assert.equal(second.owner, undefined);
+ assert.equal(second.deployed, true); assert.equal(second.owner, 'kept');
  assert.equal(claims.length, 1, 'an owner is claimed once');
  assert.deepEqual(secretNames(provider), ['MAIL_API_KEY', 'OWNER_EMAIL', 'SESSION_SECRET'], 'the retired token is not uploaded again');
  // Replacement by someone else still refuses, untouched.

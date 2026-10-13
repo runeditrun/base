@@ -154,6 +154,7 @@ export async function readOwnerState(path, target) {
   assert(state.pendingUpload === undefined || typeof state.pendingUpload?.fingerprint === 'string' && typeof state.pendingUpload?.build === 'string', 'invalid-owner-state');
   // Declared secrets rer removed on purpose (the spent setup token): later plans omit them.
   assert(state.pendingSecret === undefined || identifier(state.pendingSecret?.binding) && typeof state.pendingSecret?.present === 'boolean', 'invalid-owner-state');
+  assert(state.ownerClaim === undefined || ['claimed','kept'].includes(state.ownerClaim?.outcome), 'invalid-owner-state');
   assert(state.retiredSecrets === undefined || Array.isArray(state.retiredSecrets) && state.retiredSecrets.every(identifier), 'invalid-owner-state');
   assert(state.accountId === target.accountId && state.project === target.project && state.environment === target.environment && state.worker === target.worker, 'owner-state-target-mismatch');
   return state;
