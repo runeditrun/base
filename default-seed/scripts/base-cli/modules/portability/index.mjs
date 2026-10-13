@@ -4,6 +4,7 @@ import { createExport, advanceExport, exportStatus, downloadExport, abortExport 
 import { createImport, uploadPart, finalizeImport, importStatus, abortImport } from './import.mjs';
 import { erasureStatements, redactionStatements, invalidateTransfersStatements } from './journal.mjs';
 export { archiveLines } from './lines.mjs';
+export { excludedTables, excludedTable } from './catalogue.mjs';
 export { readArchive, makePart, MAX_LINE_BYTES, MAX_PART_BYTES } from './format.mjs';
 export { canonicalJson, sha256 } from './hash.mjs';
 export { PortabilityError } from './storage.mjs';

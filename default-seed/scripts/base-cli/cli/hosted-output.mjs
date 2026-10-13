@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { RUN_WORKER_FIRST } from '../modules/deploy-kit/render.mjs';
 import { publicAssetPaths } from '../modules/deploy-kit/artifact.mjs';
 import { migrate } from '../modules/container/migrations.mjs';
+import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migrations.mjs';
 import { RerError } from './errors.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
@@ -76,7 +77,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
     const sql = await readFile(join(directory, name), 'utf8');
     plan.push({ name, sql, sha256: createHash('sha256').update(sql).digest('hex'), statements: split(sql) });
    }
-   await migrate(await mf.getD1Database(item.binding, 'app'), plan);
+   await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
  return { client, identity, origin: ORIGIN, close: () => mf.dispose(),

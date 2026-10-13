@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.g4a783393",
+  "cliVersion": "0.2.2-dev.g9c616dc9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -423,7 +423,7 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "a84d318885db21c4de4fce1cab377476a878f1cee448f8fa993dce477744ac46"
+      "sha256": "85c0c9df812993ce55e6fbd2f00ac9f3ce076719f2ac1d1a7b84a18e57b08e56"
     },
     "cli/hydration/browser.mjs": {
       "source": "cli/hydration/browser.mjs",
@@ -767,7 +767,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "c5b4858452fe25b1639cefd76573060b11b8cab1e13fa215425ff52027b10ded"
+      "sha256": "3893d566dc64d718a3871d855e4c9cb02b5ee72004619f611d9274131fe19128"
     },
     "modules/container/deploy-input.mjs": {
       "source": "modules/container/deploy-input.mjs",
@@ -791,7 +791,7 @@
     },
     "modules/container/migrations.mjs": {
       "source": "modules/container/migrations.mjs",
-      "sha256": "6eeefa2ef40674e32ef653150f24d532ea5c72b88456ae2551c161399260bf0a"
+      "sha256": "42883652d59ca5b4162eff5a4de3648d72640f7b7cfa19c10bdb51cced2b2354"
     },
     "modules/container/node-engine.mjs": {
       "source": "modules/container/node-engine.mjs",
@@ -887,7 +887,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "bf9d9eb9e1c429433d3601f432c1550ea35d9e96907b619e7ee43f551e2445c2"
+      "sha256": "9c1e735dd32985a05b3d760db4361d8d17123c02b1e01b78ceacdbf0fba13286"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -947,11 +947,11 @@
     },
     "modules/deploy-kit/migration-ledger.mjs": {
       "source": "modules/deploy-kit/migration-ledger.mjs",
-      "sha256": "5dff6143e4f62b4940dbf812977c44b64aaff5fa98ce397e7277f6ce92c403c7"
+      "sha256": "55a554e089a59287d8fbdd1871fe04d9987ed1900a1cafa5bdc74a25d7311296"
     },
     "modules/deploy-kit/migrations.mjs": {
       "source": "modules/deploy-kit/migrations.mjs",
-      "sha256": "8a99843619b0b8c8e2201ed4a3cb5ac840fd6974934f0e4a6f2013f805ee2bb8"
+      "sha256": "f2ab5bca39935dfd74753d6a6fbfb5032535b567f8e4b3b69881e5a9431f0fad"
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
@@ -971,7 +971,7 @@
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",
-      "sha256": "281027298074f2bd4c775fe708c244f651f8b1b30f00b7f21145c29309e7be3e"
+      "sha256": "b8fa8b17c8de2e552bda4cde6e04d412c77833320c426b9eb83d3c7828330c67"
     },
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",
@@ -1831,7 +1831,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "ee7eacd55f423a8f4a28e37d67b96d97925846feb0a0b192b7349c831d3462d5"
+      "sha256": "80151c12d7b78d8c7870d1b073517aa5071994ff7c8fc169e75cd017328d2c15"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
@@ -1839,7 +1839,7 @@
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
-      "sha256": "c48a578eba77653cb463eb233c822e66d81c2aed7744b3c7c36221feabe6f5ab"
+      "sha256": "cc6f7e4ad01b8fd6e7a01f15509835f57ac0e6eaea6050866d5224d1a7ef4391"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
@@ -1891,11 +1891,11 @@
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
-      "sha256": "3b01334a1d73afb056581fef3e908585c9d399de29615dad03cd13009b4f87f4"
+      "sha256": "1d3f04b62b0840694054ffa0dfa93acc4faece948f8f971bae72fffb9e06d3a8"
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
-      "sha256": "7f35b0d8d22aff78236d1353a9e6d28bfc1d9e2729e2322f427375a89fce6679"
+      "sha256": "0587037ce7f4dad7bfb933303bea40baee7fa07bbf4d4e24cb51f69b82a89d7a"
     },
     "modules/portability/journal.mjs": {
       "source": "modules/portability/journal.mjs",
