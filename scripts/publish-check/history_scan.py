@@ -38,6 +38,9 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         recorded = registry() + exceptions(history.selected(EXCEPTIONS))
         resolver = GitHubResolver()
         public_blobs = {e['oid'] for c in history.public_commits for e in history.entries(c)}
+        # A file byte-identical to the same path on the public base is already public.
+        public_paths = {e['path']: e['oid'] for e in history.entries(history.public_commit)
+                        if e['kind'] == 'blob'} if history.public_commit else {}
         report['history']['preExistingCommits'] = sorted(history.public_commits)
         report['history']['newlyPublicCommits'] = [c for c in history.commits if c not in history.public_commits]
         seen_trees, seen_blobs, inspected = set(), set(), {}
@@ -73,7 +76,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                 if key not in inspected:
                     inspected[key] = text_rules(history.blob(oid), path, config_tree, resolver, hashes)
                 rules, provenance = inspected[key]
-                entry_scope = 'pre-existing' if scope != 'release-tree' and oid in public_blobs else scope
+                entry_scope = 'pre-existing' if (scope != 'release-tree' and oid in public_blobs) or public_paths.get(path) == oid else scope
                 for rule in rules:
                     add(rule, path, commit, oid, entry_scope)
                 if provenance:
@@ -92,8 +95,10 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             entry = entries_by_commit[history.commit].get(path)
             oid = entry['oid'] if entry and entry['kind'] == 'blob' and history.blob(entry['oid']) == data else None
             rules, _ = text_rules(data, path, selected_context, resolver, hashes)
+            public_oid = public_paths.get(path)
+            scope = 'pre-existing' if public_oid and (public_oid == oid or history.blob(public_oid) == data) else 'working-tree'
             for rule in rules:
-                add(rule, path, history.commit, oid, 'working-tree')
+                add(rule, path, history.commit, oid, scope)
             if path == 'LICENSE':
                 for rule in license_rules(data, recorded):
                     add(rule, path, history.commit, oid, 'working-tree')
@@ -109,7 +114,12 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                     path = Path(path).resolve().relative_to(Path(history.repo).resolve()).as_posix()
                 entry = entries_by_commit.get(commit, {}).get(path)
                 oid = entry['oid'] if entry and entry['kind'] == 'blob' else None
-                scope = 'working-tree' if mode == 'dir' else 'release-tree' if commit == history.commit else 'pre-existing' if oid in public_blobs else 'newly-public'
+                if mode == 'dir':
+                    public_oid = public_paths.get(path)
+                    held = working_regular(Path(history.repo), path) if public_oid else None
+                    scope = 'pre-existing' if held and history.blob(public_oid) == held[0] else 'working-tree'
+                else:
+                    scope = 'pre-existing' if (oid and public_paths.get(path) == oid) or (commit != history.commit and oid in public_blobs) else 'release-tree' if commit == history.commit else 'newly-public'
                 if hit['RuleID'] in ('generic-api-key', 'hex-api-key'):
                     identity_scope = 'working-tree' if mode == 'dir' else commit
                     scoped_entries = entries_by_commit.get(commit, {})

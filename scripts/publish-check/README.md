@@ -27,7 +27,9 @@ cannot extend a mailbox, and these explicit text fields do not use the binary
 mixed-case host heuristic. Raw-byte hygiene inspection retains the original
 binary classification outside those chunks; checksums do not suppress text
 inspection. Gitleaks still receives the original bytes. Compressed metadata is
-not decoded.
+not decoded. `media.py` recognises image and video files by walking their
+container structure; their raw bytes skip text hygiene but not environment or
+Gitleaks inspection.
 
 Other binary metadata decoding, Git protocol/object/ref modelling, frozen comparison,
 resumable inspection and their tests have been removed. Tests live in `tests.py`

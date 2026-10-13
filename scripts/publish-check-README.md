@@ -84,7 +84,12 @@ invalid UTF-8), a mailbox whose host name has mixed-case letters within a label
 (`iM.jDe`) is not one; stored host names are lower case, upper case or
 capitalised. PNG `tEXt` and uncompressed `iTXt` fields are inspected separately
 as text, without surrounding chunk framing or CRC bytes. Their mailboxes retain
-mixed-case domains. Other binary content keeps the shape rule above.
+mixed-case domains. GIF, PNG, JPEG, WebP, ICO, MP4/AVIF and WebM files get no
+other text hygiene: compressed pixels can spell an address or path by chance.
+A file is media only when its bytes walk as one complete container to the end
+of the file (NUL padding aside), so text renamed `.gif` or an image with text
+appended is still inspected. Known environment values and Gitleaks still see
+media bytes. Other binary content keeps the shape rule above.
 A bare `word/word` in prose (`commit/tree`, `rer-delegation/1`,
 `` font resource version tokens ``) with no GitHub context nearby (a URL, a repository field, a
 label or command, `repository`, `clone`, `fork`, `upstream`, a repository route)
@@ -125,8 +130,9 @@ parity are not covered.
 An explicit `--public-base` is fetched with system Git into
 `refs/publish-check/public/base`; it scopes the history scan to the selected
 release and public ancestry. Historical already-public findings move to
-`preExisting`; the selected tree, working tree and known environment matches
-still block. A newly public historical missing licence is a warning only when
+`preExisting`, and so does a selected-tree or working-tree file byte-identical
+to the same path at the public base's tip; other selected-tree and working-tree
+findings and every known environment match still block. A newly public historical missing licence is a warning only when
 the selected licence passes. No checkout, history rewrite, visibility change or
 push occurs. The command scans local available history; it does not inventory
 unreachable objects or reflogs.

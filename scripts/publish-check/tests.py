@@ -422,6 +422,51 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             self.assertNotIn(value, json.dumps(report))
 
 
+    def test_media_bytes_are_not_text_and_public_base_copies_are_pre_existing(self):
+        def gif(*blocks):
+            # 1x1 GIF with a two-colour table; each block is (introducer, payload).
+            body = b'GIF89a' + struct.pack('<HHBBB', 1, 1, 0x80, 0, 0) + b'\0\0\0\xff\xff\xff'
+            for introducer, payload in blocks:
+                body += introducer + bytes([len(payload)]) + payload + b'\0'
+            return body + b';'
+        pixels = (b'\x2c' + struct.pack('<HHHHB', 0, 0, 1, 1, 0) + b'\x02', b'\x07k' + b'@' + b'x9.io\x0f\x84\x51')
+        self.write('.github/assets/media/preview.gif', gif(pixels))
+        self.write('CONTRIBUTORS.txt', f'{secrets.token_hex(8)}@{secrets.token_hex(8)}.com\n')
+        self.commit()
+        with tempfile.TemporaryDirectory() as directory:
+            public = os.path.join(directory, 'public.git')
+            subprocess.check_call(['git', 'clone', '-q', '--bare', str(self.repo), public])
+            # 60 bytes: the comment block's length byte cannot join the value.
+            value = 'synthetic-environment-value-' + secrets.token_hex(16)
+            environment = os.path.join(directory, 'synthetic.env')
+            with open(environment, 'w') as file:
+                file.write('TOKEN=' + value)
+
+            def door(*extra):
+                result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo),
+                                         '--public-base', public + '#main', '--env-file', environment, *extra],
+                                        capture_output=True, text=True)
+                return json.loads(result.stdout)
+
+            self.write('README.md', 'A clean fixture, now with a preview.')
+            self.commit()
+            report = door()
+            self.assertEqual(report['status'], 'PASS', report['findings'])
+            self.assertIn(('hygiene.email', 'CONTRIBUTORS.txt'), {(f['rule'], f['path']) for f in report['preExisting']})
+            mailbox = f'{secrets.token_hex(8)}@{secrets.token_hex(8)}.com'
+            self.write('docs/preview.gif', 'Contact: ' + mailbox + '\n')
+            self.commit()
+            report = door()
+            self.assertEqual(report['status'], 'FAIL')
+            self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, {('hygiene.email', 'docs/preview.gif')})
+            self.git('reset', '-q', '--hard', 'HEAD~1')
+            self.write('docs/demo.gif', gif(pixels, (b'\x21\xfe', value.encode())))
+            self.commit()
+            report = door()
+            self.assertEqual(report['status'], 'FAIL')
+            self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, {('secret.env-match', 'docs/demo.gif')})
+            self.assertNotIn(value, json.dumps(report))
+
     def test_controller_manifest_digests_preserve_real_credential_findings(self):
         value = secrets.token_hex(32)
         manifest = {'sourceSha': secrets.token_hex(20), 'descriptorSha256': secrets.token_hex(32),

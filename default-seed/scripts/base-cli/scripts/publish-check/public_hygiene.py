@@ -9,6 +9,7 @@ from hygiene_config import EMAIL, LOCAL_PATH, public_email
 from font_licence import without_required_notices
 from trust_bundle import anchor_values
 from png_text import text_chunks
+from media import binary_media
 URI_AUTHORITY = re.compile(r'''(?i)(?a:(?P<scheme>[a-z][a-z0-9+.-]*:))?//(?P<authority>[^/?#\s<>"']+)''')
 # Match raw, complete commit trailer lines; decoded or embedded prose cannot
 # acquire trailer privileges. Only the address span is omitted from email checks.
@@ -105,6 +106,10 @@ def inspect(data, path, config, resolver, *, commit_message=False):
             field_rules, field_provenance = inspect_text(field, '@png-text', config, resolver, binary_content=False)
             rules.update(field_rules)
             provenance |= field_provenance
+    # Image and video bytes are not text: compressed pixels can spell an
+    # address or a path by chance. Framed PNG text fields above remain text.
+    if binary_media(data):
+        return rules, provenance
     # Keep the original binary classification for content outside text chunks.
     # CRC-adjacent bytes must not also create a synthetic raw mailbox match.
     raw_rules, raw_provenance = inspect_text(bytes(remaining), path, config, resolver,
