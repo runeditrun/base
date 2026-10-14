@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm, realpath, access } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, realpath, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { ownerDeploy } from './deploy.mjs';
+import { claimHostedOwner } from './deploy-owner.mjs';
 import { localInstaller } from '../onboarding/adapter.mjs';
 import { ownerProvider } from '../modules/deploy-kit/tests/owner-provider.mjs';
+import { main as ownerKit } from '../modules/deploy-kit/owner-cli.mjs';
 
 // rer deploy through its public adapter door, against the fake Cloudflare account
 // (the only fake: the provider and the hosted app's owner step at the network edge).
@@ -30,7 +32,7 @@ async function checkout(t, declaration) {
  return { root, git };
 }
 
-function account(t, { claimed = false } = {}) {
+function account(t) {
  const provider = ownerProvider(), claims = [];
  const saved = Object.fromEntries(['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'MAIL_API_KEY', 'SESSION_SECRET', 'SETUP_TOKEN', 'OWNER_EMAIL'].map(name => [name, process.env[name]]));
  for (const name of Object.keys(saved)) delete process.env[name];
@@ -42,8 +44,11 @@ function account(t, { claimed = false } = {}) {
    const body = JSON.parse(init.body), live = provider.state.secrets.find(item => item.name === 'SETUP_TOKEN')?.value;
    claims.push({ origin: init.headers.Origin, matches: body.token === live });
    if (body.token !== live) return Response.json({ error: 'invalid_token' }, { status: 403 });
-   if (claimed) return Response.json({ error: 'already_initialized' }, { status: 409 });
-   claimed = true; return new Response(null, { status: 303, headers: { Location: '/' } });
+   const binding = provider.state.settings.bindings.find(item => item.name === 'DB');
+   const { db } = provider.state.databases.find(row => row.uuid === binding.id);
+   if (db.prepare('SELECT id FROM owner').get()) return Response.json({ error: 'already_initialized' }, { status: 409 });
+   db.prepare('INSERT INTO owner(id) VALUES (?)').run('owner@example.test');
+   return new Response(null, { status: 303, headers: { Location: '/' } });
   }
   return provider.fetch(input, init);
  });
@@ -53,6 +58,28 @@ function account(t, { claimed = false } = {}) {
 const lifecycle = { run: async () => {}, settings: {}, hooks: { owner: { existingOwnerViaSignIn: true, displayName: input => input.displayName || 'Owner' } } };
 const store = () => { const lines = []; return { lines, state: {}, report: line => lines.push(line), step: async line => lines.push(line), phase: async () => {} }; };
 const secretNames = provider => provider.state.secrets.map(item => item.name).sort();
+
+test('direct owner callers retire once without a recorder, skip legacy retirement, and claim after modern inspection', async t => {
+ const { root } = await checkout(t, { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] });
+ const { provider, claims } = account(t);
+ const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
+ const env = { ...process.env, SETUP_TOKEN: 'test-only-setup-token' };
+ const command = (verb, extra = [], values = env) => ownerKit([verb, '--declaration', 'deploy.json', '--environment', 'production', ...extra], values, { cwd: root });
+ const claim = (deployed, extra = {}) => claimHostedOwner({ hook: lifecycle.hooks.owner, setupManifest: manifest, declaration, deployed, env,
+  secret: (args, values) => command('secret', args, values), addSecret: () => {}, ...extra });
+ const unsets = () => provider.state.calls.filter(call => call.method === 'DELETE' && call.path.endsWith('/secrets/SETUP_TOKEN')).length;
+ assert.equal(await claim(await command('deploy')), 'claimed');
+ assert.equal(claims.length, 1); assert.equal(unsets(), 1);
+ assert.deepEqual(secretNames(provider), []);
+ assert.equal(await claim(await command('deploy')), undefined);
+ assert.equal(claims.length, 1); assert.equal(unsets(), 1);
+ // A modern inspection with an empty live-secret list must still bootstrap.
+ const inspected = await command('inspect');
+ assert.deepEqual(inspected.liveSecrets, []);
+ assert.equal(await claim(inspected), 'kept');
+ assert.equal(claims.length, 2); assert.equal(unsets(), 2);
+ assert.deepEqual(secretNames(provider), []);
+});
 
 test('rer deploy claims the setup owner on the hosted app, retires the setup token, and later updates the same Worker', async t => {
  const secrets = ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name }));
@@ -94,9 +121,9 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
 });
 
 test('rer deploy --remove deletes only what this environment created, reads back that it is gone, and leaves the rest', async t => {
- const { root } = await checkout(t, { r2: [{ binding: 'FILES' }], kv: [{ binding: 'CACHE' }], queues: [{ binding: 'JOBS' }], secrets: [{ binding: 'SESSION_SECRET', environment: 'SESSION_SECRET' }] });
- const { provider } = account(t);
- const deploy = ownerDeploy('deploy.json', { ...lifecycle, hooks: {} });
+ const { root } = await checkout(t, { r2: [{ binding: 'FILES' }], kv: [{ binding: 'CACHE' }], queues: [{ binding: 'JOBS' }], secrets: ['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ binding: name, environment: name })) });
+ const { provider, claims } = account(t);
+ const deploy = ownerDeploy('deploy.json', lifecycle);
  const run = options => deploy({ root, options: { environment: 'production', ...options }, store: store(), setupManifest: manifest });
  // A create whose answer was lost may exist: removal deletes it only once it is confirmed empty.
  provider.fail('POST', /^\/storage\/kv\/namespaces$/, { afterApply: true });
@@ -107,6 +134,27 @@ test('rer deploy --remove deletes only what this environment created, reads back
  provider.state.kv[0].keys = [];
  assert.deepEqual((await run({ remove: true, yes: true })).removed.sort(), ['d1:fixture-production-db', 'kv:fixture-production-cache', 'r2:fixture-production-files']);
  await run({});
+ const statePath = join(root, '.rer/deploy/production.json');
+ const before = JSON.parse(await readFile(statePath, 'utf8'));
+ provider.fail('DELETE', /^\/workers\/scripts\/fixture-production$/);
+ await assert.rejects(run({ remove: true, yes: true }), /provider-http-500/);
+ assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), before, 'a Worker that remains keeps its resources and ownership proof');
+ const oldDatabase = provider.state.databases[0].uuid, cache = provider.state.kv[0].id;
+ provider.fail('DELETE', /^\/storage\/kv\/namespaces\//);
+ await assert.rejects(run({ remove: true, yes: true }), /still present/);
+ assert.equal(provider.state.settings, null); assert.equal(provider.state.databases.length, 0);
+ const partial = JSON.parse(await readFile(statePath, 'utf8'));
+ assert.equal(partial.receipt, null); assert.equal(partial.owned.worker, null);
+ assert.equal(partial.ownerClaim, undefined); assert.equal(partial.retiredSecrets, undefined);
+ assert.deepEqual(partial.owned.kv, before.owned.kv, 'the surviving KV remains owned for reuse or removal');
+ assert.deepEqual(partial.owned.d1, {});
+ const bootstraps = claims.length;
+ assert.equal((await run({})).owner, 'claimed');
+ assert.equal(claims.length, bootstraps + 1, 'the new database needs its own bootstrap');
+ assert.notEqual(provider.state.databases[0].uuid, oldDatabase);
+ assert.equal(provider.state.databases[0].db.prepare('SELECT id FROM owner').get().id, 'owner@example.test');
+ assert.equal(provider.state.kv[0].id, cache);
+ assert.ok(!secretNames(provider).includes('SETUP_TOKEN'));
  provider.foreign.d1('fixture-staging-db'); provider.foreign.queues('someone-elses-queue');
  await assert.rejects(run({ remove: true }), /Add --yes to confirm/);
  const result = await run({ remove: true, yes: true });

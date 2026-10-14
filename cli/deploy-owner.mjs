@@ -19,7 +19,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  const item = (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(entry => entry?.binding === tokenKey);
  if (!item) { if (claim) throw ownerFailure('the deploy declaration does not name the owner setup token secret'); return undefined; }
  const retire = async outcome => {
-  try { await recordClaim(outcome); await secret(['--unset', tokenKey], env); }
+  try { await recordClaim?.(outcome); await secret(['--unset', tokenKey], env); }
   catch (cause) { const error = new Error('owner-token-retirement-failed'); error.owner = outcome; error.tokenKey = tokenKey; error.cause = cause.message; throw error; }
   return outcome;
  };
@@ -27,6 +27,9 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  // can retire a token while the application is still unclaimed. A legacy hook
  // can re-upload a spent token, so always remove it again after ownership proof.
  if (deployed.owner || deployed.ownerClaim) { await beforeClaim?.(); return retire(deployed.owner ?? 'kept'); }
+ // Older direct callers only recorded token retirement, without an ownership
+ // record or live-secret inspection. Keep their completed deploys idempotent.
+ if (!deployed.liveSecrets && deployed.retiredSecrets?.includes(tokenKey)) return undefined;
  const given = !deployed.liveSecrets && env[item.environment]?.trim() && !supplied.includes(tokenKey);
  let token = deployed.sentSecrets?.includes(tokenKey) || given ? env[item.environment] : undefined;
  if (!token) {

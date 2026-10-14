@@ -94,7 +94,10 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
     if (remaining.length) {
       // Keep the record of what is left, so a later --remove finishes it.
       for (const kind of KINDS) for (const name of Object.keys(state.owned[kind])) if (!remaining.includes(`${kind}:${name}`)) delete state.owned[kind][name];
-      if (!remaining.includes(`worker:${target.worker}`)) { state.owned.worker = null; state.receipt = null; delete state.pendingUpload; }
+      if (!remaining.includes(`worker:${target.worker}`)) {
+        state.owned.worker = null; state.receipt = null; delete state.pendingUpload;
+        delete state.ownerClaim; delete state.retiredSecrets;
+      }
       await writeOwnerState(statePath, state);
       const error = new Error('remove-incomplete'); error.remaining = remaining; error.failed = failed; error.removed = removed;
       throw error;
