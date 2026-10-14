@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.6
+
+- A job-queue client no longer crashes with an unhandled `write EPIPE` when a process probing its identity or policy socket closes before the answer is written (a probe that timed out under load); the prober reports its own timeout or reset. This stopped Orbit's release producer twice.
+- `rer setup --owner-email YOU` (or `--answers`) on a checkout whose local owner is still the `owner@<checkout>.test` that the zero-setup `rer dev` created replaces that owner with you in place: the same account under your address, all local data kept, and one line saying so. A database that holds any other owner is still refused, as before.
+- An untouched repeat `rer deploy` after the hosted owner was claimed writes nothing: retiring the setup token no longer changes the build fingerprint (so the Worker is not uploaded again), and the recorded claim stays `claimed`.
+- The pinned pnpm check settles with a bounded retry: a fresh pnpm's version check is tried up to three times (10, 20 and 30 seconds), and if it still fails, rer says what pnpm did: no answer in time, could not start, its exit code and first error line, or the version it reported. The first `rer import` on a fresh clone no longer stops there when the same command succeeds on retry.
+- A provider call Cloudflare refuses carries the call and Cloudflare's own error codes and messages (account id and token removed, each message cut to 300 characters); `rer deploy` names them when a custom deploy hook fails on one, instead of only `provider-http-400`.
+- `rer deploy --remove --yes` removes what a custom deploy hook deployed under its own kit state file when the hook returned that file as `state`, and reads every resource back gone.
+
+### Upgrade notes
+
+- A custom deploy hook that keeps its own kit state file returns it as `state` in its result (the kit's `deploy` result names it as `state`), so `rer deploy --remove --yes` can find what it deployed.
+- A deployment that an earlier rer redeployed after its owner claim uploads its Worker once more on the next `rer deploy` (the fingerprint again names the retired setup token); repeats after that write nothing.
+
 ## 0.2.5
 
 - `rer deploy` with a seed's own deploy hook claims the hosted owner from what the hook returns, `{ deployed: true, origin }`, once the origin's `/health` names the checkout's commit, and prints the sign-in address. A hook that keeps its own deployment record (Penny's does) no longer ends in `missing-owner-receipt` with a live, unclaimed app; such a hook returns `setupToken` too when its Worker holds a setup token other than the `SETUP_TOKEN` rer passed it. A hook that reports no deployment, or whose app never names the commit, fails saying so and claims nothing.
