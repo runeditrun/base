@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.7
+
+- `rer deploy` after a custom deploy hook that returned its own kit state file as `state` reads that record for every finalization step (inspect, the setup token, the owner record), so it issues a setup token, claims the hosted owner, retires the token and exits 0, instead of failing with `HTTP 403 (invalid_setup_token)` because it looked only at `.rer/deploy/<environment>.json`. `--set-secret` and `--unset-secret` read the same record. An untouched repeat still writes nothing.
+
+### Upgrade notes
+
+- None: a hook that already returns `state` (0.2.6 upgrade note) gets its owner claimed on its next `rer deploy`.
+
 ## 0.2.6
 
 - A job-queue client no longer crashes with an unhandled `write EPIPE` when a process probing its identity or policy socket closes before the answer is written (a probe that timed out under load); the prober reports its own timeout or reset. This stopped Orbit's release producer twice.
