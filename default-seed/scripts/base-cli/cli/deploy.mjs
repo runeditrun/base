@@ -72,8 +72,9 @@ export function ownerDeploy(declarationPath, lifecycle) {
    await owner('health');
    store.report(`Your application is live on your Cloudflare account at ${deployed.origin}.`);
    step = 'claim owner';
+   const { liveSecrets, retiredSecrets, ownerClaim } = await owner('inspect');
    const linked = token => linkDependencies?.(deployed.origin, token);
-   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed, env, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },
+   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed: { ...deployed, liveSecrets, retiredSecrets, ownerClaim }, env, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },
     secret: (extra, values) => owner('secret', extra, values), beforeClaim: linked, recordClaim: outcome => owner('record-owner', ['--outcome', outcome]), inspect: () => owner('inspect'), store, signal });
    // A seed that claims its owner its own way links with the token it was given.
    if (claimed === undefined) await linked(env[declared(claim?.tokenField ?? 'SETUP_TOKEN')?.environment]);

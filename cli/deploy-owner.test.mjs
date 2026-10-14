@@ -34,6 +34,7 @@ async function checkout(t, declaration) {
 
 function account(t) {
  const provider = ownerProvider(), claims = [];
+ let denied = false;
  const saved = Object.fromEntries(['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'MAIL_API_KEY', 'SESSION_SECRET', 'SETUP_TOKEN', 'OWNER_EMAIL'].map(name => [name, process.env[name]]));
  for (const name of Object.keys(saved)) delete process.env[name];
  Object.assign(process.env, { CLOUDFLARE_ACCOUNT_ID: provider.accountId, CLOUDFLARE_API_TOKEN: provider.token });
@@ -43,7 +44,8 @@ function account(t) {
   if (url.hostname.endsWith('.workers.dev') && url.pathname === '/auth/bootstrap') {
    const body = JSON.parse(init.body), live = provider.state.secrets.find(item => item.name === 'SETUP_TOKEN')?.value;
    claims.push({ origin: init.headers.Origin, matches: body.token === live });
-   if (body.token !== live) return Response.json({ error: 'invalid_token' }, { status: 403 });
+   if (!live || body.token !== live) return Response.json({ error: 'invalid_token' }, { status: 403 });
+   if (denied) return Response.json({ error: 'owner_claim_denied' }, { status: 403 });
    const binding = provider.state.settings.bindings.find(item => item.name === 'DB');
    const { db } = provider.state.databases.find(row => row.uuid === binding.id);
    if (db.prepare('SELECT id FROM owner').get()) return Response.json({ error: 'already_initialized' }, { status: 409 });
@@ -52,7 +54,7 @@ function account(t) {
   }
   return provider.fetch(input, init);
  });
- return { provider, claims };
+ return { provider, claims, deny: value => { denied = value; } };
 }
 
 const lifecycle = { run: async () => {}, settings: {}, hooks: { owner: { existingOwnerViaSignIn: true, displayName: input => input.displayName || 'Owner' } } };
@@ -118,6 +120,33 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  const writes = provider.state.writes.length;
  await assert.rejects(run(), /owned-resource-replaced/);
  assert.equal(provider.state.writes.length, writes);
+});
+
+test('rer deploy recovers an unclaimed hosted owner after manual setup-token retirement', async t => {
+ const secrets = ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ binding: name, environment: name }));
+ const { root } = await checkout(t, { secrets });
+ const { provider, claims, deny } = account(t);
+ const deploy = ownerDeploy('deploy.json', localInstaller({ owner: lifecycle.hooks.owner, secrets: { file: '.dev.vars' } }));
+ const run = (options = {}) => deploy({ root, options: { environment: 'production', ...options }, store: store(), setupManifest: manifest });
+ const currentOwner = () => {
+  const binding = provider.state.settings.bindings.find(item => item.name === 'DB');
+  return provider.state.databases.find(row => row.uuid === binding.id).db.prepare('SELECT id FROM owner').get()?.id;
+ };
+ deny(true);
+ await assert.rejects(run(), /owner_claim_denied/);
+ assert.equal(claims.length, 1);
+ assert.equal(currentOwner(), undefined);
+ assert.ok(secretNames(provider).includes('SETUP_TOKEN'));
+ await run({ unsetSecret: 'SETUP_TOKEN' });
+ assert.ok(!secretNames(provider).includes('SETUP_TOKEN'));
+ assert.equal(currentOwner(), undefined, 'manual token retirement does not claim the hosted database');
+ deny(false);
+ const recovered = await run();
+ assert.equal(currentOwner(), 'owner@example.test', 'successful standard redeploy must claim the current database');
+ assert.equal(recovered.owner, 'claimed');
+ assert.equal(claims.length, 2);
+ assert.ok(claims.every(claim => claim.matches), 'both bootstrap attempts use the live setup token');
+ assert.ok(!secretNames(provider).includes('SETUP_TOKEN'), 'recovery retires its new setup token');
 });
 
 test('rer deploy --remove deletes only what this environment created, reads back that it is gone, and leaves the rest', async t => {
