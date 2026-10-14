@@ -21,6 +21,7 @@ export async function readDeployEnvFile(root, envFile, localOnlyKeys = []) {
     if (Object.hasOwn(settings, match[1])) throw new Error('Repeated deploy env key');
     settings[match[1]] = match[2].replace(/^"(.*)"$/, '$1');
   }
-  if ([...LOCAL_ONLY_KEYS, ...localOnlyKeys].some(key => Object.hasOwn(settings, key))) throw new Error('Local-only keys are refused for deploy');
+  const local = [...LOCAL_ONLY_KEYS, ...localOnlyKeys].find(key => Object.hasOwn(settings, key));
+  if (local) throw new Error(`local-only key ${local} is refused for deploy; remove it from the file`);
   return settings;
 }

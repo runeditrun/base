@@ -1,8 +1,8 @@
 // Demo mode: one guard a seed imports first in its Worker entry. It does nothing
 // unless the runtime has RER_DEMO=1 (`rer demo`, or a hosted demo container).
-// With it, nothing leaves the machine: global fetch, WebSocket and node:net
-// connect, and cloudflare:sockets connect (through vite.mjs), answer loopback
-// only for the whole isolate (routes, cron, queue consumers, Durable Objects),
+// With it, nothing leaves the machine: global fetch, WebSocket, navigator.sendBeacon,
+// EventSource, node:net connect and cloudflare:sockets connect (through vite.mjs)
+// answer loopback only for the whole isolate (routes, cron, queue consumers, Durable Objects),
 // and every refused call is recorded by method and host. The seed's seedDemo
 // hook runs once after the owner exists, and every HTML page carries a "Demo"
 // bar listing the captured mail and the blocked sends.
@@ -88,6 +88,34 @@ if (on) {
         throw new TypeError(`WebSocket failed: demo mode sends nothing (WEBSOCKET ${url.host} refused)`);
       }
       return Reflect.construct(target, args, newTarget);
+    },
+  });
+  // navigator.sendBeacon and EventSource send through the runtime's own fetch,
+  // not globalThis.fetch. A beacon goes out through the guarded fetch (false when
+  // refused, as a browser answers a beacon it will not queue); an EventSource
+  // opens only on a loopback host and follows redirects through the guard too.
+  const navigator = globalThis.navigator;
+  if (typeof navigator?.sendBeacon === 'function') navigator.sendBeacon = function sendBeacon(url, data) {
+    const target = new URL(String(url));
+    if (!isLoopbackHost(target.hostname)) {
+      void record('POST', target.host);
+      return false;
+    }
+    globalThis.fetch(target, { method: 'POST', body: data ?? null, keepalive: true }).catch(() => { /* A beacon never reports a failure. */ });
+    return true;
+  };
+  if (globalThis.EventSource?.from) globalThis.EventSource = new Proxy(globalThis.EventSource, {
+    construct(target, args) {
+      const url = new URL(String(args[0]));
+      if (!isLoopbackHost(url.hostname)) {
+        void record('GET', url.host);
+        throw new TypeError(`EventSource failed: demo mode sends nothing (GET ${url.host} refused)`);
+      }
+      // The runtime's own EventSource follows redirects with its internal fetch,
+      // so the stream is read through the guarded fetch instead (no reconnection).
+      const { readable, writable } = new TransformStream();
+      globalThis.fetch(url, { headers: { accept: 'text/event-stream' } }).then(response => response.body.pipeTo(writable), error => writable.abort(error));
+      return target.from(readable);
     },
   });
   // node:net (nodejs_compat) connects every socket through Socket#connect:

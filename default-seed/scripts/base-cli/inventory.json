@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.ge9c7bcfd",
+  "cliVersion": "0.2.2-dev.gf32b067e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -407,7 +407,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "f3b6e16b7450ae92a544c0b0be96e4e7f16d5524c7eb90a284c65b2329214e02"
+      "sha256": "f46d3cd8d1dac5d281aff03d054ecd31cba0409cb0128c1337e7e0819f7fa969"
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
@@ -971,7 +971,7 @@
     },
     "modules/deploy-kit/env-file.mjs": {
       "source": "modules/deploy-kit/env-file.mjs",
-      "sha256": "21c0f70462b871d36902b07087a8f8025bc267b642a612aef711aa69273ba452"
+      "sha256": "5caa93643e4217ef091fdd6edfad47aabe1a4b8715798bca3f9a9edbc2c0ab27"
     },
     "modules/deploy-kit/health-request.mjs": {
       "source": "modules/deploy-kit/health-request.mjs",

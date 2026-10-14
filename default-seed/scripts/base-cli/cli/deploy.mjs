@@ -24,6 +24,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const retry = options.remove ? `${again} --remove --yes` : options.setSecret ? `${again} --set-secret ${options.setSecret}` : options.unsetSecret ? `${again} --unset-secret ${options.unsetSecret}` : again;
   if (change.length > 1 || change.length && options.dryRun) throw invalid(`Use ${change.join(', ')}${options.dryRun ? ' and --dry-run' : ''} on separate runs.`);
   if (options.remove && !options.yes) throw invalid(`${again} --remove deletes this environment's Worker and every D1, R2, KV and queue rer created for it, with their data. Add --yes to confirm.`);
+  // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
+  if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
   if (!change.length) {
    await lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken });
    await checkBuild();

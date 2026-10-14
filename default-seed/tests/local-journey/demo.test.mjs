@@ -35,7 +35,10 @@ test('rer demo opens signed in on throwaway seeded data, sends nothing, and leav
     const server = join(runtime.root, 'src/server.ts'), source = await readFile(server, 'utf8')
     const entry = 'async fetch(request, bindings: Bindings, execution): Promise<Response> {'
     assert.ok(source.includes(entry))
-    await writeFile(server, source.replace(entry, `${entry}\n    if (new URL(request.url).pathname === '/__follow') return fetch(new URL(request.url).searchParams.get('url')!).then((response) => new Response(String(response.status)), (error) => new Response(String(error)))`))
+    const probes = `${entry}
+    if (new URL(request.url).pathname === '/__follow') return fetch(new URL(request.url).searchParams.get('url')!).then((response) => new Response(String(response.status)), (error) => new Response(String(error)))
+    if (new URL(request.url).pathname === '/__beacon') return new Response(String(navigator.sendBeacon(new URL(request.url).searchParams.get('url')!, 'ping')))`
+    await writeFile(server, source.replace(entry, probes))
     const output = await runtime.command(['rer', 'demo', '--detach', '--json'])
     demo = output.split('\n').filter((line) => line.startsWith('{')).map((line) => JSON.parse(line)).find((event) => event.event === 'ready')
     assert.equal(demo.signedInAs, owner, 'the demo opens as the saved owner')
@@ -66,8 +69,20 @@ test('rer demo opens signed in on throwaway seeded data, sends nothing, and leav
     const followed = await (await fetch(`${demo.url}/__follow?url=${encodeURIComponent(`http://127.0.0.1:${redirector.address().port}/start`)}`)).text()
     assert.match(followed, /fetch failed/, 'the redirect to another host is refused')
 
+    // A beacon takes a route that skips fetch: loopback goes out, another host is refused.
+    let pinged
+    const listener = createServer((request, response) => { pinged = request.method; response.end() })
+    await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve))
+    try {
+      assert.equal(await (await fetch(`${demo.url}/__beacon?url=${encodeURIComponent(`http://127.0.0.1:${listener.address().port}/beacon`)}`)).text(), 'true')
+      for (let wait = 0; pinged === undefined && wait < 50; wait++) await new Promise((resolve) => setTimeout(resolve, 100))
+      assert.equal(pinged, 'POST', 'a loopback beacon is delivered')
+    } finally { listener.close() }
+    assert.equal(await (await fetch(`${demo.url}/__beacon?url=${encodeURIComponent('http://beacon.example.com/ping')}`)).text(), 'false', 'a beacon to another host is refused')
+
     const bar = /<aside id="rer-demo-bar"[\s\S]*?<\/aside>/.exec(await app.page('/app'))[0]
     assert.match(bar, /GET auth\.example\.com/, 'the refused send is listed')
+    assert.match(bar, /POST beacon\.example\.com/, 'the refused beacon is listed')
     assert.match(bar, /GET redirected\.example\.com/, 'the refused redirect hop is listed')
     assert.match(bar, /→ demo-owner@example\.test/, 'the step-up mail is listed as captured')
 

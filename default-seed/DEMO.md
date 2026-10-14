@@ -24,7 +24,7 @@ Base's `modules/demo` (`withDemo`) does nothing unless the runtime has
 isolate (routes, cron, queue consumers, Durable Objects); any other request
 throws `TypeError: fetch failed`, the error a failed delivery already raises,
 and is listed in the bar by method and host. A loopback answer's redirects are
-followed through the same check, hop by hop. `new WebSocket`, `node:net` (and
+followed through the same check, hop by hop. `new WebSocket`, `navigator.sendBeacon`, `new EventSource`, `node:net` (and
 so `node:tls`) and `cloudflare:sockets` `connect` answer loopback only too, and
 their refusals are listed the same way. Mail stays in the development outbox
 and is listed too. `rer deploy` refuses a deploy declaration or
