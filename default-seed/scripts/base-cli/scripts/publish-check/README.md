@@ -30,6 +30,9 @@ inspection. Gitleaks still receives the original bytes. Compressed metadata is
 not decoded. `media.py` walks image and video containers to find their
 pixel and sample spans; only those spans skip text hygiene, never
 environment or Gitleaks inspection, and metadata around them is still text.
+`c2pa.py` finds the strictly parsed X.509 certificates inside a PNG's C2PA
+manifest store (`caBX`) and returns their Name and rfc822Name value spans,
+which skip text hygiene the same way.
 
 Other binary metadata decoding, Git protocol/object/ref modelling, frozen comparison,
 resumable inspection and their tests have been removed. Tests live in `tests.py`

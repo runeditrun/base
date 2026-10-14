@@ -485,6 +485,74 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             report = door()
             self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, {('hygiene.local-path', 'docs/photo.jpg')})
 
+    def test_ai_generated_and_phone_images_scan_clean_while_metadata_emails_fail(self):
+        def der(tag, *parts):
+            content = b''.join(parts)
+            size = len(content)
+            length = bytes([size]) if size < 0x80 else bytes([0x80 | ((size.bit_length() + 7) // 8)]) + size.to_bytes((size.bit_length() + 7) // 8, 'big')
+            return bytes([tag]) + length + content
+
+        def name(*attributes):
+            return der(0x30, *(der(0x31, der(0x30, der(0x06, oid), der(tag, value.encode()))) for oid, tag, value in attributes))
+        common, email = bytes.fromhex('550403'), bytes.fromhex('2a864886f70d010901')
+        signer = f'{secrets.token_hex(6)}@{secrets.token_hex(6)}.com'
+        algorithm = der(0x30, der(0x06, bytes.fromhex('2a8648ce3d040302')))
+        # A C2PA signing certificate naming its holder's address in the
+        # subject and the subject alternative name, as image generators sign.
+        subject = name((common, 0x0c, 'Image Generator Signing'), (email, 0x16, signer))
+        tbs = der(0x30, der(0xa0, der(0x02, b'\x02')), der(0x02, hashlib.sha256(b'serial').digest()[:16]), algorithm,
+                  name((common, 0x0c, 'Image Generator Claim Signing CA')),
+                  der(0x30, der(0x17, b'260101000000Z'), der(0x17, b'270101000000Z')), subject,
+                  der(0x30, der(0x30, der(0x06, bytes.fromhex('2a8648ce3d0201')), der(0x06, bytes.fromhex('2a8648ce3d030107'))),
+                      der(0x03, b'\0\x04' + hashlib.sha512(b'key').digest())),
+                  der(0xa3, der(0x30, der(0x30, der(0x06, bytes.fromhex('551d11')), der(0x04, der(0x30, der(0x81, signer.encode())))))))
+        certificate = der(0x30, tbs, algorithm, der(0x03, b'\0' + hashlib.sha512(b'signature').digest()))
+
+        def box(kind, *parts):
+            content = b''.join(parts)
+            return struct.pack('>I', 8 + len(content)) + kind + content
+
+        def superbox(label, *boxes):
+            return box(b'jumb', box(b'jumd', hashlib.sha256(label).digest()[:16], b'\x03', label + b'\0'), *boxes)
+        # COSE_Sign1 carrying the chain as a CBOR byte string under x5chain.
+        signature = b'\xd2\x84\x43\xa1\x01\x26\xa1\x66x5chain\x59' + struct.pack('>H', len(certificate)) + certificate + b'\xf6\x58\x40' + hashlib.sha512(b'cose').digest()
+        manifest = superbox(b'c2pa', superbox(b'urn:c2pa:' + secrets.token_hex(8).encode(), superbox(b'c2pa.signature', box(b'cbor', signature))))
+
+        def png(*chunks):
+            body = b'\x89PNG\r\n\x1a\n'
+            for kind, data in (('IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)), *chunks, ('IEND', b'')):
+                body += struct.pack('>I', len(data)) + kind.encode() + data + struct.pack('>I', zlib.crc32(kind.encode() + data))
+            return body
+
+        def segment(marker, data):
+            return b'\xff' + marker + struct.pack('>H', len(data) + 2) + data
+
+        def jpeg(*segments, scan):
+            return b'\xff\xd8' + b''.join(segments) + segment(b'\xda', b'\x01\x01\0\0\x3f\0') + scan + b'\xff\xd9'
+        # Compressed pixels that happen to spell a mailbox, in the primary
+        # image and in the depth and gain-map images a phone stores after it.
+        pixels = b'\x07k' + b'@' + b'x9.io\x0f\x84\x51'
+        mpf = segment(b'\xe2', b'MPF\0II*\0' + hashlib.sha256(b'index').digest())
+        phone = jpeg(mpf, scan=pixels) + jpeg(scan=pixels) + jpeg(scan=b'\x11q' + b'@' + b'z7.io\x9c')
+        self.write('docs/generated.png', png(('caBX', manifest), ('IDAT', pixels)))
+        self.write('docs/photo.jpg', phone)
+        self.commit()
+        report = self.report()
+        self.assertEqual(report['status'], 'PASS', report['findings'])
+
+        # An address anywhere else is still flagged: in the manifest outside
+        # a certificate, in XMP, or in EXIF of a trailing image.
+        mailbox = f'{secrets.token_hex(8)}@{secrets.token_hex(8)}.com'
+        for path, data in (('docs/generated.png', png(('caBX', manifest + superbox(b'c2pa.assertions', box(b'json', json.dumps({'author': mailbox}).encode()))), ('IDAT', pixels))),
+                           ('docs/photo.jpg', jpeg(segment(b'\xe1', b'http://ns.adobe.com/xap/1.0/\0<x:xmpmeta dc:creator="' + mailbox.encode() + b'"/>'), scan=pixels) + jpeg(scan=pixels)),
+                           ('docs/photo.jpg', phone + jpeg(segment(b'\xe1', b'Exif\0\0MM\0*\0\0\0\x08' + mailbox.encode()), scan=pixels))):
+            with self.subTest(path):
+                self.write(path, data)
+                self.commit()
+                report = self.report()
+                self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, {('hygiene.email', path)})
+                self.git('reset', '-q', '--hard', 'HEAD~1')
+
     def test_controller_manifest_digests_preserve_real_credential_findings(self):
         value = secrets.token_hex(32)
         manifest = {'sourceSha': secrets.token_hex(20), 'descriptorSha256': secrets.token_hex(32),

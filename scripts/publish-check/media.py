@@ -63,9 +63,22 @@ def png(data):
 
 
 def jpeg(data):
-    if not data.startswith(b'\xff\xd8'):
+    # A phone stores more images after the first one's end (MPF depth and
+    # gain maps): each is walked, and their samples are pixels too.
+    walked = jpeg_image(data, 0)
+    if walked is None:
         return None
-    offset = 2
+    end, samples = walked
+    while data.startswith(b'\xff\xd8', end) and (following := jpeg_image(data, end)):
+        end, more = following
+        samples += more
+    return end, samples
+
+
+def jpeg_image(data, offset):
+    if not data.startswith(b'\xff\xd8', offset):
+        return None
+    offset += 2
     samples = []
     while offset + 2 <= len(data):
         if data[offset] != 0xFF:

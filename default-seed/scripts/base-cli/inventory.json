@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.3-dev.g318d2fa8",
+  "cliVersion": "0.2.3-dev.gf3840e00",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2095,7 +2095,11 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "6cba712c156a4df9320b6d5a349f30a6474197a4eaf8aaea89a8760e9f074f3f"
+      "sha256": "47f918b689eba371f98c562c10ed6bf424a54896b61e4a706299a1e7ed0898c8"
+    },
+    "scripts/publish-check/c2pa.py": {
+      "source": "scripts/publish-check/c2pa.py",
+      "sha256": "a043993cea8009927baa9be9036cb3a4b1daf70cc6314ed8e1fe7cd6d76a6c9e"
     },
     "scripts/publish-check/checksum_maps.py": {
       "source": "scripts/publish-check/checksum_maps.py",
@@ -2195,7 +2199,7 @@
     },
     "scripts/publish-check/media.py": {
       "source": "scripts/publish-check/media.py",
-      "sha256": "01321057438d98c73638fb26caa61103931db669b50b61004c211376744f00a0"
+      "sha256": "e954cd52e94c9c055a5c855d09c3d7bbad7a5d14746d49dcb9582649e29ac5e5"
     },
     "scripts/publish-check/png_text.py": {
       "source": "scripts/publish-check/png_text.py",
@@ -2223,7 +2227,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "51ca08f546415036c6765ff4a7a1df8ab10d2eb5ede10d0185ab3cc36e23360e"
+      "sha256": "486d4160151a38d69407a35e8aeec0819a228f1ce86e886817dc4cd1ab72d5d8"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",

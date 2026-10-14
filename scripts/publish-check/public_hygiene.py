@@ -10,6 +10,7 @@ from font_licence import without_required_notices
 from trust_bundle import anchor_values
 from png_text import text_chunks
 from media import sample_spans
+from c2pa import certificate_spans
 URI_AUTHORITY = re.compile(r'''(?i)(?a:(?P<scheme>[a-z][a-z0-9+.-]*:))?//(?P<authority>[^/?#\s<>"']+)''')
 # Match raw, complete commit trailer lines; decoded or embedded prose cannot
 # acquire trailer privileges. Only the address span is omitted from email checks.
@@ -110,6 +111,8 @@ def inspect(data, path, config, resolver, *, commit_message=False):
     # Image and video samples are not text: they can spell an address or a
     # path by chance. Comments, XMP, tags and other metadata remain text.
     spans = sample_spans(data) or []
+    # Names in a C2PA manifest's signing certificates are certificate metadata.
+    spans += certificate_spans(data)
     rules, provenance = set(), False
     for start, end, fields in chunks:
         spans.append((start, end))

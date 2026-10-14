@@ -88,7 +88,11 @@ mixed-case domains. In GIF, PNG, JPEG, WebP, ICO, MP4/AVIF and WebM files the
 pixel and sample data (GIF image data and colour tables, PNG `PLTE`/`IDAT`/`fdAT`,
 JPEG scans, WebP `VP8 `/`VP8L`/`ALPH`/`ANMF`, ISO `mdat`, WebM clusters) gets no
 text hygiene: it can spell an address or path by chance. Every other byte, such as a
-comment, XMP, EXIF or a video tag, is still inspected. A file is media only when
+comment, XMP, EXIF or a video tag, is still inspected. A JPEG whose first image
+is followed by more (a phone's depth and gain-map images) has every image walked.
+In a PNG's C2PA manifest (`caBX`), the issuer and subject names and alternative
+email names of the X.509 certificates it carries are certificate metadata and get
+no text hygiene; the rest of the manifest is inspected. A file is media only when
 its bytes walk as one complete container to the end of the file (NUL padding
 aside); an MP4/AVIF file needs a sized `ftyp` box with a known brand and a
 `moov` or `meta` box. Text renamed `.gif` or an image with text appended is
