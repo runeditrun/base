@@ -43,8 +43,14 @@ const kept = {
  NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1', SSH_AUTH_SOCK: '/synthetic/agent.sock', NODE_OPTIONS: '--max-old-space-size=4096',
  XDG_CONFIG_HOME: '/synthetic/xdg-config', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0', PNPM_FIXTURE_SETTING: 'plain', npm_config_fixture_setting: 'plain', RER_STATE_DIR: '/synthetic/hf_models_cache_state',
 };
-// A proxy reaches the install without its user:password.
-const proxy = { HTTPS_PROXY: 'http://fixture:synthetic-password@proxy.invalid:3128' };
+// A proxy reaches the install without its user:password, whatever the password holds.
+const proxies = [
+ ['HTTPS_PROXY', 'http://fixture:synthetic-password@proxy.invalid:3128', 'http://proxy.invalid:3128'],
+ ['http_proxy', 'http://fixture:synthetic pass word@proxy.invalid:3128', 'http://proxy.invalid:3128'],
+ ['ALL_PROXY', '  socks5://fixture:synthetic@password@proxy.invalid:1080', 'socks5://proxy.invalid:1080'],
+ ['https_proxy', 'fixture:synthetic-password@proxy.invalid:3128', 'proxy.invalid:3128'],
+];
+const proxy = Object.fromEntries(proxies.map(([name, value]) => [name, value]));
 
 let directory, registry, versions;
 before(async () => {
@@ -113,7 +119,7 @@ test('a fresh clone installs dependencies without credentials, and its deploy st
   for (const name of Object.keys({ ...credentials, ...others })) assert.ok(!(name in seen), `${name} never reaches a dependency build script`);
   assert.ok(seen.PATH?.includes(process.env.PATH), 'PATH reaches the dependency build script');
   for (const [name, value] of Object.entries({ HOME: environment().HOME, ...kept })) assert.equal(seen[name], value, `${name} reaches the dependency build script`);
-  assert.equal(seen.HTTPS_PROXY, 'http://proxy.invalid:3128', 'the proxy reaches the install without its user:password');
+  for (const [name, , stripped] of proxies) assert.equal(seen[name], stripped, `${name} reaches the install without its user:password`);
  }
 
  const deployed = await run(process.execPath, [launcher, 'deploy', '--non-interactive'], { cwd: root, env: environment(credentials) });

@@ -18,7 +18,8 @@ const settings = /^(npm_config_|PNPM_|COREPACK_|RER_)/i;
 // PNPM_REGISTRY_PASSWORD, RER_PREVIEW_TOKEN, RER_SIGNING_KEY.
 const credentialPart = /TOKEN|SECRET|PASSW(OR)?D|PASSPHRASE|CREDENTIAL|CREDS|JWT|COOKIE|WEBHOOK|SESSION|AUTH(?!OR)|(API|ACCESS|PRIVATE|SIGNING|ENCRYPTION|MASTER|LICENSE)_?KEY/i;
 
-const withoutUserinfo = value => value.replace(/^([a-z][a-z0-9+.-]*:\/\/)?[^\s/]*@/i, '$1');
+// Up to the last @ of the authority, whatever the password holds (spaces included), after any leading whitespace.
+const withoutUserinfo = value => value.replace(/^\s*([a-z][a-z0-9+.-]*:\/\/)?[^/?#]*@/i, '$1');
 
 export function dependencyEnvironment(env = process.env) {
  const kept = {};

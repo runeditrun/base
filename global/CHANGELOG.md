@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.4
+
+0.2.3 was tagged but not published; its changes are in 0.2.4.
 
 - A first `rer deploy` waits up to two minutes (it was 30 seconds) for Cloudflare's account listing to show a database, bucket, namespace or queue it has just created, whether the listing disagrees with its own page counts or leaves the new resource out; one that never appears stops the deploy before any upload, names the resource, and the same command resumes with it.
 - A first `rer dev` no longer chooses the port another, stopped checkout was set up on, so both checkouts keep working origins.
@@ -10,9 +12,8 @@
 - Two verbs started at the same moment after a pulled pin change share one install of the new pin: the second waits for the first's install, then runs, instead of racing it and failing with "The declared adapter could not be loaded".
 - The publication scan accepts AI-generated PNGs whose C2PA manifest carries the signing certificate's email address (certificate names are metadata) and phone JPEGs that store more images after the first (every image's pixels are skipped as pixels), while an address in the rest of the manifest, XMP or EXIF is still flagged.
 - Dependency installs receive only the environment an install needs, never your credentials: the frozen `pnpm install` that `rer install`, a fresh clone's first verb, `rer dev`, the installer and `rer release` run, the pnpm version check, `rer update`'s npm install and local data migrations get `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`/`TMP`/`TEMP`, `TERM`, `LANG`/`LANGUAGE`/`LC_*`, `TZ`, `CI`, `SSH_AUTH_SOCK` (git+ssh dependencies), `NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `XDG_*`, proxy settings without their user:password, and `npm_config_*`, `PNPM_*`, `COREPACK_*` and `RER_*` settings except credentials (by name, such as `_authToken` or `*_SESSION`, or by value: a URL with a password, a credential query or connection-string parameter, a JWT, a private key, an Authorization header or a provider token). Every other variable stays with you, so dependency build scripts (esbuild, workerd, sharp, oxide) never see vault sessions (`BW_SESSION`, `OP_SESSION_*`), connection strings, keys or tokens under any name. `rer deploy` and the seed's own `verify` still receive everything.
-
-## 0.2.3
-
+- A proxy setting reaches a dependency install without its user:password even when the password contains spaces, an extra `@` or the value starts with whitespace.
+- `rer deploy` setting or removing a secret whose answer was lost settles against the Worker version it recorded, so a later deploy recognises the change instead of refusing it.
 - `rer setup` finishes provider-free when a seed declares an optional dependency that you leave unconnected.
 - A seed adapter can declare `resetPreflight`; `rer reset` runs it before listing or deleting anything, and `--yes` cannot skip it.
 - A first `rer dev` whose chosen port is taken by another program before setup can use it moves to the next free port and says which.
@@ -40,6 +41,8 @@
 - Existing OIDC provider links show **not linked** until the next successful sign-in through each provider, because older stores have no verified token-exchange observation for them.
 - The default seed's erasure queue message is now `{ redact, chain }` instead of `{ redact, operator, continuation }`; a message still queued in the old shape when you deploy is refused, so let the erasure queue drain first. Default-seed migrations 0021 to 0023 add the import-step, stream-source and erasure-progress tables, and its cron trigger sweeps erasures every 10 minutes.
 - A seed adopting `rer demo` adds `src/demo.ts` (exporting an idempotent `seedDemo`), copies Base's `modules/demo/` and wraps its Worker entry's default export in `withDemo` as the entry's first import, and makes three `vite.config` changes: the state path reads `RER_STATE_DIR`, the dev entry's vars pass `RER_DEMO` and `RER_DEMO_EXPIRES`, and `demoSockets()` comes first in `plugins`; add `.rer/demo/` to `.gitignore`. `export/DEMO.md` has the steps.
+- A private registry's auth must be in `~/.npmrc` (or the registry config your package manager reads from `HOME`): dependency installs now get only an allowlisted environment, so a token passed as an environment variable no longer reaches them.
+- A seed with custom recovery code that checks the deploy migration ledger is exactly Wrangler's three columns uses `migrationLedgerShape` instead; the old check refuses ledgers from 0.2.2 on (`MIGRATION_MISMATCH`).
 
 ## 0.2.2
 

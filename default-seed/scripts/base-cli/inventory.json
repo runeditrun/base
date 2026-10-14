@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.3-dev.gf3840e00",
+  "cliVersion": "0.2.4-dev.g30848fa3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -69,7 +69,7 @@
     },
     "dependency-environment.mjs": {
       "source": "onboarding/dependency-environment.mjs",
-      "sha256": "b585b56cd1f46b869867e7db2ae5304b49a4dc05ade970fb78297e4d13fe6b08"
+      "sha256": "428f148b7472ca7a847f7c95ddcb3237c953df80bf770c748e7203592eac4e49"
     },
     "dev-identity.mjs": {
       "source": "onboarding/dev-identity.mjs",
