@@ -10,6 +10,7 @@ export const personErasure = defineErasure({
   edges: [
     { table: 'person_notes', from: 'people', on: { person_id: 'id' } },
     { table: 'person_files', from: 'people', on: { person_id: 'id' }, blob: { bucket: 'FILES', keyColumn: 'storage_key' } },
+    { table: 'person_erasure_redactions', from: 'people', on: { person_id: 'id' } },
   ],
   audit: [
     { table: 'audit_events', column: 'entity_id', of: 'people', where: "entity_type='person'", clear: { details: '{}' } },

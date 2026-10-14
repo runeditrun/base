@@ -79,35 +79,60 @@ function retiringPeopleContext(context: D1ImportContext, subject: string): D1Imp
  * retired whole, and their ids leave other people's reactions. A name is not an
  * identifier, so an import labelled "Alice" is not touched. When the reactions
  * span more imports than one request can rewrite, each request commits one
- * bounded step and queues the next with its continuation. Then native deletion
- * runs in bounded, resumable steps. */
-export async function erasePerson(bindings: Bindings, operator: { id: string; role: string }, id: string, continuation?: string) {
-  if (!bindings.FILES) throw new Error('Missing Worker binding: FILES')
-  const db = bindings.DB, files = bindings.FILES
-  const person = (await db.prepare('SELECT email,details FROM people WHERE id=?').bind(id).first<{ email: string; details: string }>())!
-  const sourceUserId = JSON.parse(person.details).sourceUserId
-  const references = [...new Set([id, ...(typeof sourceUserId === 'string' && sourceUserId.length ? [sourceUserId] : [])])]
-  const imports = retiringPeopleContext(peopleImportContext(db, operator), id)
-  // Optional: a person need not appear in anyone's reactions.
-  const fields = references.map(value => ({ path: ['details', 'reactions', '*', 'users', '*'], value, optional: true }))
-  // Native-created people can also be named in imported peers. Retirement,
-  // reference redaction, custody and the restore checkpoint commit together.
-  const result = await retireD1ImportCustody({ target: { kind: PERSON, id }, values: [person.email], related: { fields } },
-    [toD1Sql(erasureRequestedStatement(db, operator.id, id))], imports, await custodyCheckpoint(db, files, true), { resumable: true, continuation })
-  if (result.phase === 'redacting') {
-    await bindings.JOBS.send({ redact: id, operator: operator.id, continuation: result.continuation })
-    return { redaction: { jobsRedacted: result.jobsRedacted, jobsPending: result.jobsPending } }
-  }
-  const opened = await (await peopleErasure(db, files)).start('person', { id })
-  return { receipt: await continueErasure(bindings, opened.id), journal: journalEntry(result) }
+ * bounded step and queues the next. Then native deletion runs in bounded,
+ * resumable steps.
+ *
+ * The request is recorded before the first step, with where the redaction
+ * stands after each one (job ids and revisions, never a value), so a lost
+ * request or queued step never strands it: the cron sweep takes it over. The
+ * person's native erasure deletes that record. */
+export async function erasePerson(bindings: Bindings, operator: { id: string; role: string }, id: string) {
+  const chain = newUlid()
+  // Repeating the request takes the erasure over from where it stands.
+  const pending = (await bindings.DB.prepare('INSERT INTO person_erasure_redactions(person_id,operator_id,chain,updated_at) VALUES(?,?,?,?) ON CONFLICT(person_id) DO UPDATE SET operator_id=excluded.operator_id,chain=excluded.chain,updated_at=excluded.updated_at RETURNING continuation')
+    .bind(id, operator.id, chain, new Date().toISOString()).first<{ continuation: string | null }>())!
+  return eraseStep(bindings, operator, id, chain, pending.continuation)
 }
 
-/** The queued next step of a person's import redaction, under the operator who
- * asked for it; their role is checked again inside every step's batch. */
-export async function continueRedaction(bindings: Bindings, id: string, operatorId: string, continuation: string) {
-  const operator = await bindings.DB.prepare('SELECT id,role FROM oa_operators WHERE id=?').bind(operatorId).first<{ id: string; role: string }>()
-  if (!operator || !await personExists(bindings.DB, id)) return
-  await erasePerson(bindings, operator, id, continuation)
+/** One step of the erasure under the chain that owns it. */
+async function eraseStep(bindings: Bindings, operator: { id: string; role: string }, id: string, chain: string, continuation: string | null) {
+  if (!bindings.FILES) throw new Error('Missing Worker binding: FILES')
+  const db = bindings.DB, files = bindings.FILES
+  // Retiring import custody committed the request audit: only the native erasure remains.
+  if (!await custodyRetired(db, id)) {
+    const person = (await db.prepare('SELECT email,details FROM people WHERE id=?').bind(id).first<{ email: string; details: string }>())!
+    const sourceUserId = JSON.parse(person.details).sourceUserId
+    const references = [...new Set([id, ...(typeof sourceUserId === 'string' && sourceUserId.length ? [sourceUserId] : [])])]
+    const imports = retiringPeopleContext(peopleImportContext(db, operator), id)
+    // Optional: a person need not appear in anyone's reactions.
+    const fields = references.map(value => ({ path: ['details', 'reactions', '*', 'users', '*'], value, optional: true }))
+    // Native-created people can also be named in imported peers. Retirement,
+    // reference redaction, custody and the restore checkpoint commit together.
+    const result = await retireD1ImportCustody({ target: { kind: PERSON, id }, values: [person.email], related: { fields } },
+      [toD1Sql(erasureRequestedStatement(db, operator.id, id))], imports, await custodyCheckpoint(db, files, true), { resumable: true, continuation: continuation ?? undefined })
+    if (result.phase === 'redacting') {
+      await db.prepare('UPDATE person_erasure_redactions SET continuation=?,updated_at=? WHERE person_id=? AND chain=?').bind(result.continuation, new Date().toISOString(), id, chain).run()
+      await bindings.JOBS.send({ redact: id, chain })
+      return { redaction: { jobsRedacted: result.jobsRedacted, jobsPending: result.jobsPending } }
+    }
+    const opened = await (await peopleErasure(db, files)).start('person', { id })
+    return { receipt: await continueErasure(bindings, opened.id), journal: journalEntry(result) }
+  }
+  const opened = await (await peopleErasure(db, files)).start('person', { id })
+  return { receipt: await continueErasure(bindings, opened.id) }
+}
+
+const custodyRetired = async (db: D1Database, id: string) =>
+  Boolean(await db.prepare("SELECT 1 FROM audit_events WHERE entity_type='person' AND entity_id=? AND action='person.erasure_requested'").bind(id).first())
+
+/** The queued next step of a person's erasure, under the operator who asked for
+ * it (their role is checked again inside every step's batch). A step whose chain
+ * a repeated request or the sweep took over, or whose erasure finished, stops. */
+export async function continueRedaction(bindings: Bindings, id: string, chain: string) {
+  const pending = await bindings.DB.prepare("SELECT r.continuation,o.id,o.role FROM person_erasure_redactions r JOIN oa_operators o ON o.id=r.operator_id AND o.status='active' WHERE r.person_id=? AND r.chain=?")
+    .bind(id, chain).first<{ continuation: string | null; id: string; role: string }>()
+  if (!pending || !await personExists(bindings.DB, id)) return
+  await eraseStep(bindings, { id: pending.id, role: pending.role }, id, chain, pending.continuation)
 }
 
 export async function continueErasure(bindings: Bindings, id: string) {
@@ -118,9 +143,21 @@ export async function continueErasure(bindings: Bindings, id: string) {
   return receipt
 }
 
-/** The cron sweep: an erasure whose queue message was lost still finishes. */
+/** The cron sweep: an erasure whose request or queue message was lost still finishes. */
 export async function resumePendingErasures(bindings: Bindings) {
   if (!bindings.FILES) return
+  // Still redacting import custody: take the erasure over under a new chain, so
+  // a late message of the lost one stops. Custody already retired: make sure the
+  // native erasure is open; the loop below runs it. A person an import's undo
+  // removed meanwhile has nothing left to erase.
+  await bindings.DB.prepare('DELETE FROM person_erasure_redactions WHERE person_id NOT IN (SELECT id FROM people)').run()
+  const requested = (await bindings.DB.prepare('SELECT person_id AS id FROM person_erasure_redactions ORDER BY updated_at LIMIT 5').all<{ id: string }>()).results
+  for (const { id } of requested) {
+    if (await custodyRetired(bindings.DB, id)) { await (await peopleErasure(bindings.DB, bindings.FILES)).start('person', { id }); continue }
+    const chain = newUlid()
+    await bindings.DB.prepare('UPDATE person_erasure_redactions SET chain=?,updated_at=? WHERE person_id=?').bind(chain, new Date().toISOString(), id).run()
+    await continueRedaction(bindings, id, chain)
+  }
   const pending = (await bindings.DB.prepare("SELECT id FROM rer_erasure_operations WHERE phase<>'complete' ORDER BY requested_at LIMIT 5").all<{ id: string }>()).results
   for (const { id } of pending) {
     try { await continueErasure(bindings, id) }

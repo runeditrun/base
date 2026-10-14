@@ -787,9 +787,14 @@ the steps write before the owner acknowledges; that custody is private,
 owner-scoped and removed by `cancelD1ImportStaging(operationKey, context)`,
 destination field erasure, or header retirement of its operation key. A step
 generation erased or changed between steps ends the preparation with
-`IMPORT_PREPARATION_INTERRUPTED`: cancel and prepare again. A different upload
-under the same operation key is refused (`OPERATION_KEY_CONFLICT`), and calling
-again after publication returns `published`. Measured on default-seed's people
+`IMPORT_PREPARATION_INTERRUPTED`: cancel and prepare again. A step whose request
+ended after it staged its slice but before recording it is staged again by the
+next call, and cancellation or retirement removes every generation the steps
+staged, recorded or not. A different upload under the same operation key is
+refused (`OPERATION_KEY_CONFLICT`), before and after publication: the published
+stream keeps the steps' source digest (`ik_d1_stream_sources`), so only the same
+upload returns `published`, and a key an import published in one request is
+refused here. Measured on default-seed's people
 adapter: 100,000 rows in 40 requests, none above 2 s of Node CPU against
 15 s for the one-request review (see the kit test
 `tests/d1/preparation-steps.test.ts`, run at full size in `verify:scale`).

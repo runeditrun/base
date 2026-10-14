@@ -223,8 +223,9 @@ context)` called once per request until `reviewable`, then
 `publishD1ImportPreparation(id, { ...context, reviewedFingerprint })` and
 `resumeD1ImportStream` as before. Apply import-kit's
 `d1PreparationStepsSchema` as a new numbered migration (default-seed's
-`0021_import_preparation_steps.sql`) before refreshing, since erasure and
-cancellation read its table. See the D1 README, "Preparation across requests".
+`0021_import_preparation_steps.sql`, plus `0022_import_stream_sources.sql` for
+its later `ik_d1_stream_sources` table) before refreshing, since erasure,
+cancellation and replay read its tables. See the D1 README, "Preparation across requests".
 
 ### Shipping a reviewed rewrite of a released migration
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createReadStream } from 'node:fs'
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
@@ -76,10 +76,10 @@ const sql = (root, query) => {
 }
 const refused = (run) => assert.rejects(run, /failed \(4\)/)
 
-test('BASE-DATA-003 a person with 300 notes and 300 reactions across 30 imports erases through bounded, continued steps while related imports still resume and undo', { timeout: 30 * 60_000 }, async (t) => {
+test('BASE-DATA-003 a person with 300 notes and 300 reactions across 30 imports erases through bounded, continued steps that survive a server restart, while related imports still resume and undo', { timeout: 30 * 60_000 }, async (t) => {
   const runtime = await freshLocalProject('large-erasure-owner@example.test')
   try {
-    const owner = api(runtime.origin, await session(runtime.origin, runtime.vars.RER_DEV_KEY, 'owner'))
+    let owner = api(runtime.origin, await session(runtime.origin, runtime.vars.RER_DEV_KEY, 'owner'))
     const actor = `U-LARGE-${tag}`
     const created = await owner('POST', '/api/people', { name: 'Large native subject', email: `large-${tag}@example.test`, details: { sourceUserId: actor } })
     assert.equal(created.status, 201)
@@ -109,14 +109,24 @@ test('BASE-DATA-003 a person with 300 notes and 300 reactions across 30 imports 
     const erased = await owner('POST', `/api/people/${person}/erasure`, { confirmation: `erase ${person}` })
     assert.equal(erased.status, 202, 'the first request commits one bounded redaction step and queues the next')
     assert.ok(erased.json.redaction.jobsRedacted > 0 && erased.json.redaction.jobsPending > 0)
-    for (const deadline = Date.now() + 5 * 60_000; (await owner('GET', `/api/people/${person}/export`)).status !== 404;) {
-      assert.ok(Date.now() < deadline, 'the queued steps finish the erasure')
+    // The server stops with the next step queued, and the queue does not outlive it.
+    // Nobody repeats the request: the scheduled sweep (here every minute) takes the
+    // erasure over and its queued steps finish it.
+    await runtime.stop()
+    for (const file of ['wrangler.jsonc', 'deploy.json']) {
+      const path = join(runtime.root, file)
+      await writeFile(path, (await readFile(path, 'utf8')).replace(/("crons"\s*:\s*\[)[^\]]*\]/, '$1"* * * * *"]'))
+    }
+    await runtime.start(runtime.origin)
+    owner = api(runtime.origin, await session(runtime.origin, runtime.vars.RER_DEV_KEY, 'owner'))
+    for (const deadline = Date.now() + 6 * 60_000; (await owner('GET', `/api/people/${person}/export`)).status !== 404;) {
+      assert.ok(Date.now() < deadline, 'the sweep and its queued steps finish the erasure')
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
     const [operation] = await sql(runtime.root, 'SELECT id FROM rer_erasure_operations')
     const { receipt } = (await owner('GET', `/api/erasures/${operation.id}`)).json
     assert.equal(receipt.phase, 'complete')
-    assert.deepEqual(receipt.deleted, { people: 1, person_notes: 300 })
+    assert.deepEqual(receipt.deleted, { people: 1, person_erasure_redactions: 1, person_notes: 300 })
     assert.ok((await owner('GET', '/api/erasures/journal')).json.journal.length >= 2, 'each committed step leaves a journal row')
     assert.equal((await owner('POST', `/api/people/${person}/erasure`, { confirmation: `erase ${person}` })).status, 404)
     const clean = [{ ...reactions[0], users: ['U-KEPT'] }]
@@ -162,7 +172,7 @@ test('BASE-DATA-003 person erasure leaves no planted value anywhere, keeps anony
     const { receipt } = erased.json
     assert.equal(receipt.phase, 'complete')
     assert.ok(receipt.seconds < 300)
-    assert.deepEqual(receipt.deleted, { people: 1, person_files: 1, person_notes: 1 })
+    assert.deepEqual(receipt.deleted, { people: 1, person_erasure_redactions: 1, person_files: 1, person_notes: 1 })
     assert.deepEqual(hits(JSON.stringify(receipt)), [])
     await runtime.stop()
 
@@ -227,7 +237,7 @@ test('BASE-DATA-003 an imported person is erased from import custody; the other 
     assert.equal(erased.status, 200)
     const { receipt, journal } = erased.json
     assert.equal(receipt.phase, 'complete')
-    assert.deepEqual(receipt.deleted, { people: 1, person_notes: 1 })
+    assert.deepEqual(receipt.deleted, { people: 1, person_erasure_redactions: 1, person_notes: 1 })
     assert.equal(journal.recordsErased, 1)
     assert.equal(journal.jobsRetired, 1)
     assert.ok(journal.stores.some((store) => store.store === 'ik_jobs' && store.rows === 2), 'both jobs touched: one rewritten, one retired')

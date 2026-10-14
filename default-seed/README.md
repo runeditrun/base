@@ -259,7 +259,8 @@ journal cannot be recognised.
 
 Erasing a person also erases them from import custody (migrations
 `0018_import_kit.sql`, `0019_people_imports.sql`,
-`0020_import_erasure_append_only.sql` and `0021_import_preparation_steps.sql`).
+`0020_import_erasure_append_only.sql`, `0021_import_preparation_steps.sql` and
+`0022_import_stream_sources.sql`).
 For an imported person the D1 erasure commits with import-kit's
 `retireD1ImportCustody`: their
 records become tombstones, so other people's imports still resume and undo, and
@@ -270,7 +271,13 @@ portability's redaction checkpoint, so with `--journal` any archive made before
 the erasure is refused whole, including one from while the person was still
 pending in an import. Their ids also leave other people's imported reactions;
 when those span more imports than one request rewrites, the erasure answers 202
-and queues the next bounded step with its continuation until it completes.
+and queues the next bounded step until it completes. The request and where its
+redaction stands (job ids and revisions, never a value) are kept in
+`person_erasure_redactions` (migration `0023_person_erasure_redactions.sql`),
+so an erasure whose request or queued step is lost (a restart, a failed send)
+is taken over by the cron sweep and finishes without being requested again;
+repeating the request takes it over at once. The person's erasure deletes that
+row.
 
 ## Verification
 

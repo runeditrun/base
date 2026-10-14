@@ -20,7 +20,7 @@ import { seedDemo } from './demo'
 
 const api = createApi()
 const queueMessage = z.union([z.object({ id: z.string().length(26) }).strict(), z.object({ erasure: z.string().regex(/^[0-9a-f]{32}$/) }).strict(),
-  z.object({ redact: z.string().min(1).max(200), operator: z.string().min(1).max(200), continuation: z.string().min(1).max(120_000) }).strict()])
+  z.object({ redact: z.string().min(1).max(200), chain: z.string().length(26) }).strict()])
 
 export default withDemo({
   async fetch(request, bindings: Bindings, execution): Promise<Response> {
@@ -63,7 +63,7 @@ export default withDemo({
       const parsed = queueMessage.safeParse(message.body)
       if (!parsed.success) throw new Error('Queue message does not match reference.lifecycle.v1 or an erasure continuation')
       if ('erasure' in parsed.data) await (await import('./core/features/people/routes')).continueErasure(checkedBindings, parsed.data.erasure)
-      else if ('redact' in parsed.data) await (await import('./core/features/people/routes')).continueRedaction(checkedBindings, parsed.data.redact, parsed.data.operator, parsed.data.continuation)
+      else if ('redact' in parsed.data) await (await import('./core/features/people/routes')).continueRedaction(checkedBindings, parsed.data.redact, parsed.data.chain)
       else await completeReferenceJob(checkedBindings, parsed.data.id)
       message.ack()
     }
