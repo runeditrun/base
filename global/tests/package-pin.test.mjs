@@ -1,6 +1,7 @@
 // A checkout that pins the rer package, through the installed launcher: a
 // fresh clone's first rer install runs dependency build scripts without the
-// caller's provider credentials while the seed's own deploy still receives them.
+// caller's provider credentials while the seed's own deploy still receives
+// them, and after a pulled pin change rer deploy installs the new pin first.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -88,4 +89,16 @@ test('a fresh clone installs dependencies without provider credentials, and its 
  assert.equal(deployed.code, 0, deployed.stderr);
  const [deploy] = await recorded(records, 'deploy');
  for (const name of Object.keys(credentials)) assert.ok(deploy?.includes(name), `the seed's deploy receives ${name}`);
+});
+
+test('after a pulled pin change, rer deploy installs the new pinned package first', { timeout: 240_000 }, async () => {
+ const { root, records } = await seed('pinned', versions.first);
+ const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment() });
+ assert.equal(installed.code, 0, installed.stderr);
+ assert.equal(await installedVersion(root), versions.first);
+ await pin(root, versions.next);
+ const deployed = await run(process.execPath, [launcher, 'deploy', '--non-interactive'], { cwd: root, env: environment(credentials) });
+ assert.equal(deployed.code, 0, deployed.stderr);
+ assert.equal(await installedVersion(root), versions.next, 'node_modules holds the new pin');
+ assert.equal((await recorded(records, 'deploy')).length, 1, 'the deploy ran');
 });

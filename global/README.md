@@ -182,8 +182,8 @@ as an exact devDependency instead (`"@runeditrun/rer": "0.2.0"`, locked in
 which inside `pnpm run` is the pinned copy in `node_modules/.bin`, so
 `pnpm install --frozen-lockfile && pnpm run build` needs no global `rer`. A global
 `rer` hands every verb to the pinned package, launching included. Until
-`node_modules` holds the pinned version, `rer install` and `rer dev` install it
-first (the frozen `pnpm install`) and every other verb says to run `rer install`.
+`node_modules` holds the pinned version (a fresh clone, or a pulled pin change),
+every verb installs it first (the frozen `pnpm install`), then runs it.
 Every dependency install runs without the caller's credentials: variables whose
 name or value marks one, `CLOUDFLARE_*` account settings and application
 bindings never reach the package manager or a dependency's build script.

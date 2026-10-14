@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- After a pulled change to a checkout's `@runeditrun/rer` pin, every verb (`rer deploy` included) installs the pinned version with the frozen lockfile before it runs, instead of asking you to run `rer install` first.
 - Dependency installs never receive your provider credentials: the frozen `pnpm install` that `rer install`, a fresh clone's first verb, `rer dev` and the installer run, the pnpm version check, `rer update`'s npm install and local data migrations run without variables whose name or value marks a credential, provider account settings (`CLOUDFLARE_*`) or application bindings, so dependency build scripts (esbuild, workerd, sharp, oxide) never see them. Proxy settings still reach the install, and `rer deploy` still receives everything.
 
 ## 0.2.3

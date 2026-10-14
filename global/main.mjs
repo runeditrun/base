@@ -1,3 +1,4 @@
+import { verbs } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
@@ -8,7 +9,7 @@ const help = `Usage: rer VERB [FLAGS]
 
 Inside a project (the nearest OPERATIONS.json at or above this folder, or --cwd DIR),
 every verb runs that checkout's own pinned rer: the @runeditrun/rer version its package.json
-pins (installed first by rer install, rer setup or rer dev), else its vendored scripts/rer.mjs.
+pins (installed first by any verb when node_modules holds another), else its vendored scripts/rer.mjs.
 
   rer dev              Launch a first-party checkout with no setup steps: installs dependencies,
                        sets up a local owner and a free port when needed, starts the app and prints
@@ -34,8 +35,9 @@ Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy
 outbox, doctor, describe, check, release. Run rer VERB --help in a checkout for its flags.
 `;
 
-// The verbs that install an uninstalled pinned package before they run.
-const installsFirst = new Set(['install', 'setup', 'check', 'describe']);
+// The checkout verbs that install the pinned package before they run when
+// node_modules holds another version or none (dev installs it in its launch).
+const installsFirst = new Set([...Object.keys(verbs), 'release'].filter(verb => verb !== 'dev'));
 
 export async function main(argv) {
  handleBrokenPipes();
@@ -86,22 +88,17 @@ export async function main(argv) {
   return (await import('../onboarding/queued-entry.mjs')).queuedCommandLine(argv.slice(1));
  }
  // A checkout that pins its own rer package runs all of it, launching included.
- // Until node_modules holds the pinned version, install, setup, check and describe
- // install it with the frozen lockfile (then run the pinned verb, so a fresh
- // clone checks with the pinned bytes), the zero-setup launch installs it
- // first, and every other verb says to install.
+ // Until node_modules holds the pinned version (a fresh clone, or a pulled pin
+ // change), every checkout verb installs it with the frozen lockfile and then
+ // runs the pinned verb, so a fresh clone checks and a changed pin deploys with
+ // the pinned bytes; the zero-setup launch installs it first.
  const pinned = first && mode !== 'package' ? pinnedPackage(target.root) : undefined;
- if (pinned && !pinned.ready && !argv.includes('--help')) {
-  if (installsFirst.has(verb)) {
-   const { installPinned } = await import('./launch/install-pinned.mjs'), { LaunchFailure } = await import('./launch/failure.mjs');
-   try { await installPinned(target.root); }
-   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
-   return delegate(target, target.args);
-  }
-  if (verb !== 'dev') {
-   process.stderr.write(`${target.root} pins ${pinnedName} ${pinned.declared}, ${pinned.installed ? `but node_modules holds ${pinned.installed}` : 'which is not installed yet'}. Run rer install, then rer ${verb} again.\n`);
-   return 3;
-  }
+ if (pinned && !pinned.ready && !argv.includes('--help') && installsFirst.has(verb)) {
+  const { installPinned } = await import('./launch/install-pinned.mjs'), { LaunchFailure } = await import('./launch/failure.mjs');
+  if (pinned.installed) process.stderr.write(`${target.root} pins ${pinnedName} ${pinned.declared}, but node_modules holds ${pinned.installed}; installing the pinned version first.\n`);
+  try { await installPinned(target.root); }
+  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
+  return delegate(target, target.args);
  }
  if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target);
  // Every other server start or queued job on a vendored pin gets the person
