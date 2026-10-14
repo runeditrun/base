@@ -3,7 +3,6 @@ import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkou
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
 import { handleBrokenPipes } from './output.mjs';
-import { packageName as pinnedName } from './package-info.mjs';
 
 const help = `Usage: rer VERB [FLAGS]
 
@@ -92,14 +91,16 @@ export async function main(argv) {
  // change), every checkout verb installs it with the frozen lockfile and then
  // runs the pinned verb, so a fresh clone checks and a changed pin deploys with
  // the pinned bytes; the zero-setup launch installs it first.
+ // Verbs started at once share one install, and one whose pin already looks
+ // installed waits for an install still running.
  const pinned = first && mode !== 'package' ? pinnedPackage(target.root) : undefined;
  if (pinned && !pinned.ready && !argv.includes('--help') && installsFirst.has(verb)) {
   const { installPinned } = await import('./launch/install-pinned.mjs'), { LaunchFailure } = await import('./launch/failure.mjs');
-  if (pinned.installed) process.stderr.write(`${target.root} pins ${pinnedName} ${pinned.declared}, but node_modules holds ${pinned.installed}; installing the pinned version first.\n`);
   try { await installPinned(target.root); }
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
   return delegate(target, target.args);
  }
+ if (mode === 'package' && installsFirst.has(verb)) await (await import('./launch/install-pinned.mjs')).settledPin(target.root);
  if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target);
  // Every other server start or queued job on a vendored pin gets the person
  // defaults too (a pinned package applies its own).

@@ -1,8 +1,8 @@
 // A checkout that pins the rer package, through the installed launcher: a
 // fresh clone's first rer install runs dependency build scripts with an
 // allowlisted environment, never the caller's credentials, while the seed's
-// own deploy still receives them, and after a pulled pin change rer deploy
-// installs the new pin first.
+// own deploy still receives them; after a pulled pin change, two verbs started
+// at once install the new pin once, first.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -12,7 +12,7 @@ import { join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
 import { tarball } from '../../scripts/rer-package/tarball.mjs';
 import { integrity, localRegistry } from '../../scripts/rer-package/registry.mjs';
-import { pins, verbs } from '../../cli/contract.mjs';
+import { aliases, pins, verbs } from '../../cli/contract.mjs';
 import { readPackage } from '../update/archive.mjs';
 import { run } from './harness.mjs';
 
@@ -73,9 +73,9 @@ async function seed(name, version) {
 import { localInstaller } from '@runeditrun/rer/local-installer';
 import { commandAdapter } from '@runeditrun/rer/adapter';
 const require = createRequire(import.meta.url);
-const never = ['node', ['-e', 'process.exit(9)']];
+const never = ['node', ['-e', 'process.exit(9)']], ok = ['node', ['-e', '']];
 const deploy = Object.assign(async () => { ${record('deploy')}; return { deployed: true, origin: 'https://seed.example.test' }; }, { managesHostedOwner: true });
-const adapter = commandAdapter(localInstaller({ build: never, migrate: never, start: never, owner: {}, signIn: {} }), { preview: never, verify: never, deploy, deployDeclaration: 'deploy.json', portability: { export: () => {}, import: () => {} }, input: { names: { email: 'email', name: 'displayName' }, validate: value => value } });
+const adapter = commandAdapter(localInstaller({ build: ok, migrate: never, start: never, owner: {}, signIn: {} }), { preview: never, verify: never, deploy, deployDeclaration: 'deploy.json', portability: { export: () => {}, import: () => {} }, input: { names: { email: 'email', name: 'displayName' }, validate: value => value } });
 export { adapter as commandAdapter };
 `);
  await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'example/seed', compatibilityDate: '2026-01-01' }));
@@ -87,7 +87,7 @@ export { adapter as commandAdapter };
 
 // What a pulled commit changing the pin brings: package.json and its lockfile.
 async function pin(root, version) {
- await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'seed', private: true, packageManager: `pnpm@${pins.pnpm}`, engines: { node: pins.node }, devDependencies: { '@runeditrun/rer': version, probe: 'file:./probe' }, pnpm: { onlyBuiltDependencies: ['probe'] } }));
+ await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'seed', private: true, packageManager: `pnpm@${pins.pnpm}`, engines: { node: pins.node }, scripts: Object.fromEntries(Object.entries(aliases).map(([alias, verb]) => [alias, verb ? `rer ${verb}` : 'rer'])), devDependencies: { '@runeditrun/rer': version, probe: 'file:./probe' }, pnpm: { onlyBuiltDependencies: ['probe'] } }));
  const locked = await run('pnpm', ['install', '--lockfile-only', '--ignore-scripts'], { cwd: root, env: environment() });
  assert.equal(locked.code, 0, locked.stderr + locked.stdout);
 }
@@ -122,14 +122,17 @@ test('a fresh clone installs dependencies without credentials, and its deploy st
  for (const name of Object.keys(credentials)) assert.ok(deploy && name in deploy, `the seed's deploy receives ${name}`);
 });
 
-test('after a pulled pin change, rer deploy installs the new pinned package first', { timeout: 240_000 }, async () => {
+test('after a pulled pin change, two verbs started at once share one install of the new pinned package', { timeout: 240_000 }, async () => {
  const { root, records } = await seed('pinned', versions.first);
  const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment() });
  assert.equal(installed.code, 0, installed.stderr);
  assert.equal(await installedVersion(root), versions.first);
+ const before = (await recorded(records, 'install')).length;
  await pin(root, versions.next);
- const deployed = await run(process.execPath, [launcher, 'deploy', '--non-interactive'], { cwd: root, env: environment(credentials) });
- assert.equal(deployed.code, 0, deployed.stderr);
+ const builds = await Promise.all([0, 1].map(() => run(process.execPath, [launcher, 'build', '--non-interactive'], { cwd: root, env: environment() })));
+ // Exit 4: the other build held the checkout's local state, as rer reports.
+ for (const { code, stderr } of builds) assert.ok(code === 0 || code === 4, `exit ${code}: ${stderr}`);
+ assert.ok(builds.some(({ code }) => code === 0), 'one build ran');
  assert.equal(await installedVersion(root), versions.next, 'node_modules holds the new pin');
- assert.equal((await recorded(records, 'deploy')).length, 1, 'the deploy ran');
+ assert.equal((await recorded(records, 'install')).length, before + 1, 'the new pin was installed once');
 });

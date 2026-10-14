@@ -8,8 +8,9 @@
 //   server.log    the private log of the server rer started
 //   server.json   that server's PID and start time, and the process rer spawned
 //   stop.json     when rer dev --stop last ran: a launch requested before it stops
+//   pin-install.json  the process installing the checkout's pinned rer package
 import { createHash } from 'node:crypto';
-import { appendFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, link, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { serversDirectory } from '../registry.mjs';
@@ -53,6 +54,43 @@ export async function claimPort(port, env = process.env) {
   await rm(path, { force: true });
  }
  return undefined;
+}
+
+// One pinned-package install per checkout at a time: two verbs started at once
+// after a pin change share it. claimPinInstall resolves to a release function
+// once this process holds the claim; both wait (onWait once) while another
+// live process holds it.
+const pinInstallPath = (checkout, env) => join(launchPath(checkout, env), 'pin-install.json');
+const pause = () => new Promise(resolveWait => setTimeout(resolveWait, 200));
+
+export async function claimPinInstall(checkout, { env = process.env, signal, onWait } = {}) {
+ await launchDirectory(checkout, env);
+ const path = pinInstallPath(checkout, env), { start } = await processInfo(process.pid);
+ for (let waited = false; ; ) {
+  signal?.throwIfAborted();
+  // Linked complete, so a waiter never reads a claim still being written.
+  const written = `${path}.${process.pid}`;
+  await writeFile(written, JSON.stringify({ pid: process.pid, start }), { mode: 0o600 });
+  try {
+   await link(written, path);
+   return async () => { if ((await readJson(path))?.pid === process.pid) await rm(path, { force: true }); };
+  } catch (error) { if (error.code !== 'EEXIST') throw error; }
+  finally { await rm(written, { force: true }); }
+  const holder = await readJson(path);
+  if (!await live(holder)) { await rm(path, { force: true }); continue; }
+  if (!waited) { waited = true; onWait?.(holder.pid); }
+  await pause();
+ }
+}
+
+export async function settledPinInstall(checkout, { env = process.env, signal, onWait } = {}) {
+ for (let waited = false; ; ) {
+  signal?.throwIfAborted();
+  const holder = await readJson(pinInstallPath(checkout, env));
+  if (!await live(holder)) return;
+  if (!waited) { waited = true; onWait?.(holder.pid); }
+  await pause();
+ }
 }
 
 // The worker claims the checkout's launch; a second worker started at the
