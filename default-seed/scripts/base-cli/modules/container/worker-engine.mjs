@@ -19,7 +19,9 @@ export async function workerEngine({ root, data, manifest, settings, edge }) {
  };
  const mf = new Miniflare(convertV4MiniflareOptions({ host:'127.0.0.1',port:0,cf:false,resourcePersistencePath:data,unsafeLocalExplorer:false,
   workers:[{ name:'ingress',modules:true,script:`export default {fetch(request,env){const observed=request.headers.get('x-rer-original-url');if(!observed)return new Response(null,{status:400});const url=new URL(observed),headers=new Headers(request.headers);headers.delete('x-rer-original-url');headers.set('host',url.host);return env.APP.fetch(new Request(url,{method:request.method,headers,redirect:'manual',...(!['GET','HEAD'].includes(request.method)?{body:request.body}:{})}))}}`,serviceBindings:{ APP:'app' } }, app,
-   { name:'egress',modules:true,script:'export default {fetch(request,env){return env.NETWORK.fetch(request)}}',serviceBindings:{ NETWORK:{ network:{ allow:['public'],tlsOptions:{ trustBrowserCas:true,trustedCertificates:[...rootCertificates] } } } } }],
+   // A demo (RER_DEMO=1) sends nothing: its egress worker refuses every request.
+   settings.RER_DEMO === '1' ? { name:'egress',modules:true,script:"export default {fetch(request){throw new TypeError('fetch failed: demo egress is denied ('+new URL(request.url).host+')')}}" }
+    : { name:'egress',modules:true,script:'export default {fetch(request,env){return env.NETWORK.fetch(request)}}',serviceBindings:{ NETWORK:{ network:{ allow:['public'],tlsOptions:{ trustBrowserCas:true,trustedCertificates:[...rootCertificates] } } } } }],
  }));
  await mf.ready; const databases = {}, objects = {};
  for (const [binding, plan] of Object.entries(manifest.migrations)) { const db = await mf.getD1Database(binding, 'app'); databases[binding] = db; await migrate(db, plan); await ensurePortabilitySchema(db, manifest.portabilityMigrations); }

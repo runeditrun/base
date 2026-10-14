@@ -18,7 +18,7 @@ export async function startHost({ root = '/app', data = '/data', settings = proc
   server = createServer(async (req, res) => {
    try {
     lastRequest=Date.now();
-    const request = await incoming(req, { trustedProxy:settings.TRUSTED_PROXY, maxRequestBytes:manifest.maxRequestBytes });
+    const request = await incoming(req, { trustedProxy:settings.TRUSTED_PROXY, origin:settings.RER_INGRESS_ORIGIN, maxRequestBytes:manifest.maxRequestBytes });
     let response = await engine.fetch(request);
     if (new URL(request.url).pathname === '/health' && response.ok) {
      const body = await response.json(); const deadJobs = engine.dead();

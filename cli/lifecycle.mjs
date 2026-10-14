@@ -17,7 +17,7 @@ import { ensureDevKey, readDevKey, refuseDevLayerOutput, openUrl, DEV_KEY_HEADER
 import { announceDoorRoute, routeRunning, verifyDoorFor } from './door-mode.mjs';
 
 export async function runCommand(project, options, out) {
- if (options.verb === 'deploy' && !options.site) {
+ if (options.verb === 'deploy' && !options.site && !options.demo) {
   const { validateDeployOptions } = await import('./deploy-command.mjs');
   validateDeployOptions(options);
   const { withDeployEnvironment } = await import('./deploy-inputs.mjs');
@@ -80,6 +80,8 @@ async function runLifecycle(project, options, out, deployRedaction) {
   const adapter = project.adapter;
   // The run site: static pages built from edition identity, never the app build.
   if (options.site) return await (await import('./site.mjs')).siteCommand(project, options, store, signal, out);
+  // The hosted demo: a front Worker and the seed's container image on demo.<domain>.
+  if (options.verb === 'deploy' && options.demo) return await (await import('./demo-host.mjs')).demoHostCommand(project, options, store, signal, out, operation);
   if (options.verb === 'install') {
    await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...process.env, CI: 'true' } }); return {};
   }

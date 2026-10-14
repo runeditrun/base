@@ -10,6 +10,7 @@
 - Importing an archive whose bytes are not valid UTF-8 is refused with the same `archive_json` diagnostic (exit 2) as invalid JSON.
 - Converting a seed to package mode no longer leaves a broken queue sentence in its README or `scripts/base-cli` paths in its operations guide and erasure README.
 - The owner's sign-in settings page (`/auth/settings/identity`) wears the seed's declared theme, like sign-in and setup.
+- `rer deploy --demo` hosts a seed's demo at `demo.<domain>`: each visitor passes a Turnstile check and gets their own signed-in, throwaway container of the seed that can send nothing, ended after an hour or 15 idle minutes. `export/run-demo.yml` deploys it when `RUN_DEMO_DEPLOY` is on.
 
 ## 0.2.2
 

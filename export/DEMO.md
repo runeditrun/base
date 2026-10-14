@@ -66,3 +66,68 @@ and is listed too. `rer deploy` refuses a deploy declaration or
 Add `.rer/demo/` to `.gitignore`. Then run `rer setup` (once), `rer demo`, open
 `RER_OPEN`, and check the bar, the data, and a send the seed makes (it must
 appear under "Blocked sends").
+
+## Hosting the demo
+
+`rer deploy --demo` puts the demo on the web at `demo.<domain>` (the run site's
+apex), so a visitor gets their own throwaway copy: the start page runs a
+Turnstile check and starts it, and they land signed in as the owner, with the
+seed's demo data and the Demo bar. Each visitor gets their own Cloudflare
+Container running this seed's image (`rer build --platform container`, workerd
+engine) with `RER_DEMO=1` and no internet, behind one front Worker
+(`<project>-<environment>--demo`). The engine's egress worker refuses every
+request too, so a send fails three ways. Only the visitor's random `rer_demo`
+cookie (HttpOnly, Secure, SameSite=Lax, one hour) reaches their container. A
+demo ends after 60 minutes, or 15 minutes with no requests; its container is
+destroyed and its state deleted, and the visitor sees "This demo has ended".
+At most `maxInstances` demos (10 unless set) run at once, and one IP starts at
+most 3 a minute.
+Mail lands in the outbox (and the bar) only where the seed's development
+outbox accepts the demo's https origin; otherwise the seed's mail is simply
+unconfigured. Nothing is sent either way.
+
+The seed needs, beyond the adoption above:
+
+1. **`deploy-demo.json`** beside `deploy-site.json`:
+
+   ```json
+   { "version": 1, "domain": "run-lamp.com", "name": "Lamp" }
+   ```
+
+   Optional: `"maxInstances"`, and `"settings"`, plain demo settings for the
+   container (never secrets, never `RER_*`, the origin, `OWNER_EMAIL`,
+   `SESSION_SECRET` or `SETUP_TOKEN`, which the front sets). `deploy.json`
+   must list `"container"` in `platforms`.
+2. **The signed owner claim.** The front signs the owner in with a
+   five-minute claim to `/auth/owner-claim`, signed by a key pair made for
+   that one container. The seed serves `modules/owner-claim`'s
+   `createOwnerClaimHandler` there when `RER_OWNER_CLAIM_PUBLIC_KEYS` is set,
+   with `RER_OWNER_CLAIM_ISSUER`, `RER_OWNER_CLAIM_INSTALLATION_ID`, its
+   origin and `OWNER_EMAIL` (Base's default seed:
+   `src/core/platform/auth/dependencies.server.ts`).
+3. **The workflow.** Copy Base's `export/run-demo.yml` to
+   `.github/workflows/run-demo.yml`. It deploys on each push to `main` only
+   when the repository variable `RUN_DEMO_DEPLOY` is `true`.
+
+`rer deploy --demo --dry-run` builds everything into `.rer/demo-host/` (add it
+to `.gitignore`) with no provider request. To try it locally with Docker, add
+Cloudflare's always-passing Turnstile test secret to `.rer/demo-host/.dev.vars`
+(`TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA`) and run, in that
+folder, `wrangler dev --local-protocol https --var TURNSTILE_SITE_KEY:1x00000000000000000000AA`.
+Wrangler serves the Worker as it is routed, so the Worker sees
+`https://demo.<domain>`: point that name at `127.0.0.1` (for example in
+`/etc/hosts`) and open `https://demo.<domain>:8787/`.
+
+### Owner steps
+
+1. **Workers Paid** on the Cloudflare account that holds the run site
+   (Containers are included; a visitor-hour on `basic` costs about one cent).
+2. **A Turnstile widget** for `demo.<domain>` (managed mode). In the seed
+   repository's `run-demo` GitHub environment, set the variable
+   `TURNSTILE_SITE_KEY` and the secret `TURNSTILE_SECRET_KEY` from it, plus
+   the variable `CLOUDFLARE_ACCOUNT_ID` and the secret `CLOUDFLARE_API_TOKEN`.
+3. **The deploy token**: the run site's token (Workers Scripts: Edit; Zone:
+   Read and Workers Routes: Edit on the run site zone) plus **Containers:
+   Edit** on the account.
+4. **`RUN_DEMO_DEPLOY=true`** as a repository variable when the demo should go
+   live. Until then nothing deploys.

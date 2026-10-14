@@ -18,6 +18,16 @@ async function run(command,args,options={}) {
  try{await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>code===0?resolve():reject(new Error('Container command failed')));});}
  finally{process.off('SIGTERM',abort);process.off('SIGINT',abort);if(child.exitCode===null&&child.signalCode===null)child.kill('SIGTERM');}
 }
+/** The image's build folder (.rer/container/image unless `output`), built with the checkout's private local settings hidden. */
+export async function imageFolder(project,operation,config,{output,engine}={}) {
+ const {root}=project,{withoutLocalVariables}=await shared('local/build.mjs'),{buildEnvironment}=await shared('local/environment.mjs');
+ const declaration=await readFile(join(root,'seed.json'),'utf8').then(JSON.parse).catch(()=>({}));
+ const declared=Array.isArray(declaration.env)?declaration.env.map(item=>item.name):Object.keys(declaration.env??{});
+ await withoutLocalVariables(root,async()=>{
+  const builder=fileURLToPath(new URL('../modules/container/build.mjs',import.meta.url));
+  await run(process.execPath,[builder,root,JSON.stringify({output,engine})],{cwd:root,env:buildEnvironment([...declared,...(config.secrets??[]).flatMap(item=>[item.binding,item.environment])])});
+ },{nested:operation.token,settings:[...(project.adapter?.settings??[]),...(project.privateInputs??[])]});
+}
 export async function containerCommand(project,options,out) {
  if(options.stop)return runContainer(project,options,out);
  const {localOperation}=await shared('local/operation.mjs'),{recoverInterrupted}=await shared('local/recovery.mjs');
@@ -35,16 +45,7 @@ async function runContainer(project,options,out,operation) {
   if(options.verb==='deploy'){if(!options.host)throw missing('Container deploy requires --host ssh://user@host.');sshTarget(options.host);await deployInputs({root,envFile:options.envFile,localOnlyKeys:project.adapter?.localOnlyKeys});}
   const ingress={...(options.bindAddress?{address:options.bindAddress}:{}),...(options.httpPort?{httpPort:options.httpPort}:{}),...(options.httpsPort?{httpsPort:options.httpsPort}:{})};
   ingressBindings({...config.container?.ingress,...ingress});
-  if(!options.image){
-   const {withoutLocalVariables}=await shared('local/build.mjs'),{buildEnvironment}=await shared('local/environment.mjs');
-   const declaration=await readFile(join(root,'seed.json'),'utf8').then(JSON.parse).catch(()=>({}));
-   const declared=Array.isArray(declaration.env)?declaration.env.map(item=>item.name):Object.keys(declaration.env??{});
-   await withoutLocalVariables(root,async()=>{
-    const builder=fileURLToPath(new URL('../modules/container/build.mjs',import.meta.url));
-    await run(process.execPath,[builder,root],{cwd:root,env:buildEnvironment([...declared,...(config.secrets??[]).flatMap(item=>[item.binding,item.environment])])});
-    await run('docker',['build','--tag',image,join(root,'.rer/container/image')],{cwd:root});
-   },{nested:operation.token,settings:[...(project.adapter?.settings??[]),...(project.privateInputs??[])]});
-  }
+  if(!options.image){await imageFolder(project,operation,config);await run('docker',['build','--tag',image,join(root,'.rer/container/image')],{cwd:root});}
   if(options.verb==='build')return{platform:'container',image};
   if(!options.host)throw missing('Container deploy requires --host ssh://user@host.');
   return deploySSH({root,image:options.image??image,ingress,host:options.host,envFile:options.envFile,environment:options.environment,localOnlyKeys:project.adapter?.localOnlyKeys,dryRun:options.dryRun});

@@ -24,6 +24,10 @@ export interface Bindings {
   /** Demo runtimes only (`rer demo`): modules/demo's switch and the demo's end. Deploy refuses RER_DEMO. */
   RER_DEMO?: string
   RER_DEMO_EXPIRES?: string
+  /** The signed owner claim's issuer, installation and public keys (JSON {kid: JWK}); set by a hosted demo's front or RER Managed. */
+  RER_OWNER_CLAIM_ISSUER?: string
+  RER_OWNER_CLAIM_INSTALLATION_ID?: string
+  RER_OWNER_CLAIM_PUBLIC_KEYS?: string
   RER_INSTALLATION_ID?: string
   RER_MANAGEMENT_ORIGIN?: string
   AUTH_ALLOW_LIST?: string

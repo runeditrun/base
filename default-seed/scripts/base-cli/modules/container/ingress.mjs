@@ -1,12 +1,15 @@
 import { Readable } from 'node:stream';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-export async function incoming(req, { trustedProxy, maxRequestBytes = 25 * 1024 * 1024 } = {}) {
+// `origin` (RER_INGRESS_ORIGIN) fixes the public origin for a container whose only
+// peer is its own front, such as a hosted demo's Durable Object.
+export async function incoming(req, { trustedProxy, origin, maxRequestBytes = 25 * 1024 * 1024 } = {}) {
  const headers = new Headers(); for (const [name, value] of Object.entries(req.headers)) if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(',') : value);
  const peer = req.socket.remoteAddress?.replace('::ffff:', '') ?? '';
  const trusted = trustedProxy && (isIP(trustedProxy) ? peer===trustedProxy : (await lookup(trustedProxy,{all:true})).some(item=>item.address.replace('::ffff:','')===peer));
  let host = req.headers.host, proto = 'http', address = peer;
  if (trusted) { host = req.headers['x-forwarded-host'] ?? host; proto = req.headers['x-forwarded-proto'] ?? proto; address = req.headers['x-forwarded-for']?.split(',').at(-1)?.trim() ?? peer; }
+ if (origin) { const fixed = new URL(origin); host = fixed.host; proto = fixed.protocol.slice(0, -1); }
  for (const name of ['cf-connecting-ip','x-forwarded-host','x-forwarded-proto','x-forwarded-for','forwarded','x-rer-original-url']) headers.delete(name);
  if (!['http', 'https'].includes(proto) || typeof host !== 'string' || !/^(?:[a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\])(?::[0-9]+)?$/.test(host)) throw new Error('Invalid ingress origin');
  headers.set('cf-connecting-ip', address); headers.set('host', host);

@@ -1,5 +1,3 @@
-import { declaredCronSources } from './deploy-config.mjs';
-
 // `rer dev` runs the project's declared Cron Triggers (wrangler `triggers.crons`, from wrangler.jsonc, wrangler.toml or a deploy template)
 // on their schedule by calling the local runtime's scheduled test endpoint (the Vite plugin's under dev, Miniflare's own under preview), so
 // alerts, retries and checks behave on the owner's computer as they do deployed.
@@ -40,6 +38,8 @@ export function cronMatches(cron, date) {
 // triggers.crons must declare the same ones: otherwise `rer dev` would run a
 // schedule the deployed Worker does not have.
 export async function declaredCrons(root, adapter) {
+ // Imported here: the container image runs this file's parseCron and cronMatches without the CLI's project modules.
+ const { declaredCronSources } = await import('./deploy-config.mjs');
  const sources = await declaredCronSources(root, adapter);
  for (const { path, crons } of sources) for (const cron of crons) parseCron(cron);
  const [first, ...others] = sources;

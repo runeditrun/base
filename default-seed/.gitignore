@@ -8,3 +8,4 @@ dist/
 .seed/
 .rer/local/
 .rer/demo/
+.rer/demo-host/
