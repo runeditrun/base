@@ -27,7 +27,7 @@ export function ownerProvider({creationDates = false} = {}) {
     if (failure.afterApply) await handle(input,init);
     if (failure.afterApply && failure.status === undefined) throw new TypeError('test-only lost response');
     if (failure.transport) throw new TypeError('test-only connection reset');
-    return Response.json({success:false,errors:[{code:10000,message:'injected failure'}]},{status:failure.status});
+    return Response.json({success:false,errors:failure.errors ?? [{code:10000,message:'injected failure'}]},{status:failure.status});
   };
   const handle = async (input, init = {}) => {
     const url = new URL(input);

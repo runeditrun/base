@@ -11,6 +11,7 @@ import { hookOrigin, waitForSource } from './deploy-hook.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
+import { providerRefusal } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 
 export function validateDeployOptions(options) {
@@ -103,6 +104,7 @@ export async function deployCommand(context) {
   const redact = value => store.redact?.(redaction.redact(value)) ?? redaction.redact(value);
   const readiness = mutationReadinessFailure(error, { again, redact });
   if (readiness) throw commandFailure(readiness);
-  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
+  const refused = providerRefusal(error);
+  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
  }
 }

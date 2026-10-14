@@ -132,6 +132,19 @@ test('claim and retirement failures fail the command with deployment state and s
  assert.ok(Object.keys(process.env).length === Object.keys(before).length && Object.entries(before).every(([key, value]) => process.env[key] === value), 'caller environment restored after failure');
 });
 
+test('a custom deploy that Cloudflare refuses names the call and Cloudflare\'s own code and message, without credentials', async t => {
+ const f = await fixture(t, { declared: true });
+ const message = `Uncaught ReferenceError in the uploaded script for account ${f.provider.accountId} with token ${f.provider.token}: ${'x'.repeat(2000)}`;
+ f.provider.fail('PUT', /^\/workers\/scripts\/[^/]+$/, { status: 400, errors: [{ code: 10021, message }] });
+ await assert.rejects(f.run(), error => {
+  assert.match(error.message, /PUT \/workers\/scripts\/[a-z0-9-]+/, 'the refused call');
+  assert.match(error.message, /10021 Uncaught ReferenceError in the uploaded script/, 'Cloudflare\'s own code and message');
+  assert.ok(!error.message.includes(f.provider.accountId) && !error.message.includes(f.provider.token), 'no credentials');
+  assert.ok(!error.message.includes('x'.repeat(400)), 'the message is bounded');
+  return true;
+ });
+});
+
 test('missing or ambiguous ownership records refuse success, and denied bootstrap is never retried', async t => {
  const f = await fixture(t);
  f.deny(); await assert.rejects(f.run(), /owner claim is not confirmed/);

@@ -16,6 +16,14 @@ export function deployDiagnostic(error, redact) {
     ...(detail.providerCodes?.length ? {providerCodes:detail.providerCodes} : {}),
     output:(detail.output ? (redact ? clean(detail.output) : '(provider output withheld; rer deploy provides redacted details)') : '(no provider output)').split(/\r?\n/).slice(0,8).map(line=>line.slice(0,500)).join('\n')};
 }
+/** One line naming the provider call that was refused and what Cloudflare said, from
+ * the error's own `providerRefusal` (set by any copy of the kit); undefined otherwise. */
+export function providerRefusal(error, redact = String) {
+  const refusal = error?.providerRefusal;
+  if (typeof refusal?.operation !== 'string' || !Array.isArray(refusal.errors)) return undefined;
+  const said = refusal.errors.map(item => [item?.code, typeof item?.message === 'string' ? redact(item.message).slice(0,300) : undefined].filter(part => part !== undefined && part !== '').join(' ')).filter(Boolean).slice(0,3);
+  return `Cloudflare refused ${redact(refusal.operation).slice(0,200)}${said.length ? `: ${said.join('; ')}` : ''}`;
+}
 function operation(path, options = {}) {
   const write = options.method && options.method !== 'GET';
   if (/\/d1\/database\/[^/]+\/query/.test(path)) return 'migrate D1';

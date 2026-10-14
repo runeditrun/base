@@ -107,6 +107,7 @@ Ownership lives in a state file, by default `.rer/deploy/<environment>.json` und
 - **One run at a time.** A deploy takes an exclusive lock file, `<state file>.lock`, for the whole run and removes it at the end, even after a failure. A second run on the same state file is refused as `owner-state-locked` before any provider request. If a run was killed (power loss, `kill -9`) and no deploy is running, delete the lock file by hand.
 
 The CLI prints JSON: refusal codes and resource names only, never inputs, tokens or provider bodies.
+A refused provider call also carries `providerRefusal` on the thrown error: the call (`PUT /workers/scripts/<name>`) and Cloudflare's own codes and messages, with the account id and token removed and each message cut to 300 characters. `rer deploy` names it when a custom deploy hook fails on one.
 
 ### rer deploy: inputs, the hosted owner, secret changes and removal
 

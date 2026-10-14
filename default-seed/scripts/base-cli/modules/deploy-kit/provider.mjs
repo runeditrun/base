@@ -56,6 +56,13 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     if (!response.ok || payload?.success === false) {
       const error = new Error(response.ok ? 'provider-unsuccessful-or-malformed' : `provider-http-${response.status}`);
       error.status = response.status;
+      // What Cloudflare refused, on the error itself so any caller (a custom hook
+      // with its own copy of the kit too) can say it: the call, and Cloudflare's own
+      // codes and messages, without credentials and bounded.
+      const bounded = text => redactAuth(text).replace(/[\x00-\x1f\x7f-\x9f]+/g,' ').trim().slice(0,300);
+      const said = (Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code) || typeof x?.message === 'string').slice(0,3)
+        .map(x => ({...(Number.isSafeInteger(x.code) ? {code:x.code} : {}),...(typeof x.message === 'string' ? {message:bounded(x.message)} : {})}));
+      error.providerRefusal = {operation:`${method} ${path.split('?')[0]}`,errors:said.length || payload !== undefined || !output.trim() ? said : [{message:bounded(output.trim().split('\n')[0])}]};
       throw recordDeployFailure(error,{providerCodes:(Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code)).map(x=>x.code).slice(0,8),
         output:redactAuth(Array.isArray(payload?.errors) ? payload.errors.filter(x=>typeof x?.message==='string').map(x=>x.message).join('\n') : output)});
     }
