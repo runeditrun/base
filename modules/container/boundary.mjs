@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 export async function checkBoundary(root, { engine='node', cacheContract }={}) {
@@ -10,6 +10,9 @@ export async function checkBoundary(root, { engine='node', cacheContract }={}) {
    const name=relative(root,path),tree=ts.createSourceFile(path,await readFile(path,'utf8'),ts.ScriptTarget.Latest,true);
    const cache=cacheContract==='lamp-retained-v1'&&/(?:^|\/)platform\/blobs\/snapshot-cache\.ts$/.test(name);
    const bindings=/(?:^|\/)platform\/bindings\.server\.ts$/.test(name);
+   // The demo guard an exported seed carries reads RER_DEMO from env: that one
+   // file, and only its unrenamed `env` import.
+   const demo=name.split(sep).join('/')==='src/modules/demo/index.mjs';
    const fail=api=>failures.push({path:name,api}),localNames=new Set();
    function names(node){if((ts.isVariableDeclaration(node)||ts.isFunctionDeclaration(node)||ts.isImportSpecifier(node))&&node.name&&ts.isIdentifier(node.name))localNames.add(node.name.text);ts.forEachChild(node,names);}names(tree);
    function visit(node){
@@ -17,7 +20,7 @@ export async function checkBoundary(root, { engine='node', cacheContract }={}) {
      const module=node.moduleSpecifier.text;
      if(module.startsWith('cloudflare:')){
       const imports=node.importClause?.namedBindings;
-      const allowed=module==='cloudflare:workers'&&imports&&ts.isNamedImports(imports)&&imports.elements.every(element=>(bindings&&(element.propertyName??element.name).text==='env')||(cache&&(element.propertyName??element.name).text==='DurableObject'));
+      const allowed=module==='cloudflare:workers'&&imports&&ts.isNamedImports(imports)&&imports.elements.every(element=>(demo&&!node.importClause.name&&!element.propertyName&&element.name.text==='env')||(bindings&&(element.propertyName??element.name).text==='env')||(cache&&(element.propertyName??element.name).text==='DurableObject'));
       if(!allowed)fail('Cloudflare import outside binding/cache contract');
      }
     }

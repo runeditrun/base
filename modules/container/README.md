@@ -13,7 +13,9 @@ selected through `cacheContract` when the seed implements that contract. This
 is not a general Durable Object adapter. A seed requiring KV or other
 Cloudflare-only APIs cannot use Node.
 The import boundary rejects those APIs and new Cloudflare imports outside the
-platform binding/cache boundary.
+platform binding/cache boundary. The one other file it admits is an exported
+seed's demo guard, `src/modules/demo/index.mjs`, and there only
+`import { env } from 'cloudflare:workers'` (it reads `RER_DEMO`).
 
 The entrypoint holds a Linux kernel `flock` for the lifetime of the host. Each
 installation has one local data volume and one writer. The lock inode retains

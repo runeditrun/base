@@ -19,7 +19,7 @@ export const commandAdapter = {
  state: '.local/state',
  settings: [],
  verbs: {
-  dev: { flags: ['--help', '--cwd', '--non-interactive', '--json', '--port', '--host', '--no-queue'], effects: 'This seed accepts loopback listeners only.' },
+  dev: { flags: ['--help', '--cwd', '--non-interactive', '--json', '--port', '--host', '--no-queue', '--door', '--demo'], effects: 'This seed accepts loopback listeners only.' },
   deploy: { flags: ['--help', '--cwd', '--non-interactive', '--json', '--dry-run', '--no-queue'] },
   preview: { flags: ['--help', '--cwd', '--non-interactive', '--json', '--port', '--host', '--idle-timeout', '--stop', '--no-queue'] },
  },
@@ -57,6 +57,8 @@ export const commandAdapter = {
  assert.ok(!first.verbs.dev.flags.includes('--site'));
  assert.ok(first.verbs.deploy.flags.includes('--dry-run'));
  assert.ok(!first.verbs.deploy.flags.includes('--host'));
+ assert.ok(first.verbs.demo.effects.length > 0, 'rer demo is listed as a verb with its effects');
+ assert.ok(first.verbs.demo.flags.includes('--port') && !first.verbs.demo.flags.includes('--demo') && !first.verbs.demo.flags.includes('--door'), 'the demo verb lists the dev flags a demo takes');
  assert.ok(first.verbs.preview.effects.length > 0, 'the shared effect remains a final fallback when the seed has no declaration');
 
  descriptor.commands.deploy.effects = 'Hosted deployment is held until release approval.';

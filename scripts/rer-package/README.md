@@ -29,8 +29,9 @@ In a clean HOME with an empty npm config: `npx --package=TARBALL rer cli
 install`, `rer --version`, then a zero-setup `rer dev` and `rer dev --stop` on two
 fresh default-seed exports: a vendored one, and one in package mode, converted by
 `scripts/export-cli.mjs --to-package` to pin this tarball's version, which a
-local registry serves (`registry.mjs`; `reference.mjs` builds that reference). It
-needs `pnpm` and `npm` on PATH, as `rer dev` and the conversion do.
+local registry serves (`registry.mjs`; `reference.mjs` builds that reference).
+The package-mode export then runs `rer deploy --demo --dry-run`, which builds the
+hosted demo's container image folder from the exported seed. It needs `pnpm` and `npm` on PATH, as `rer dev` and the conversion do.
 
 ## Package mode without publishing
 

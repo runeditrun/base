@@ -39,6 +39,19 @@ export async function liveWorker(directory) {
  return await live(holder) ? holder : undefined;
 }
 
+// A claim file is written to a private file first and hard-linked into place,
+// so it appears complete or not at all: a process finding it never reads a
+// half-written claim as a dead one and removes it. False when one is there.
+async function linkClaim(path, record) {
+ const written = `${path}.${process.pid}`;
+ await writeFile(written, JSON.stringify(record), { mode: 0o600 });
+ try {
+  await link(written, path);
+  return true;
+ } catch (error) { if (error.code !== 'EEXIST') throw error; return false; }
+ finally { await rm(written, { force: true }); }
+}
+
 // A port chosen for a setup stays claimed while the process that chose it
 // lives, so two launches preparing at once never pick the same port.
 export async function claimPort(port, env = process.env) {
@@ -46,10 +59,7 @@ export async function claimPort(port, env = process.env) {
  await mkdir(directory, { recursive: true, mode: 0o700 });
  const { start } = await processInfo(process.pid);
  for (let attempt = 0; attempt < 2; attempt++) {
-  try {
-   await writeFile(path, JSON.stringify({ pid: process.pid, start }), { flag: 'wx', mode: 0o600 });
-   return { release: async () => { if ((await readJson(path))?.pid === process.pid) await rm(path, { force: true }); } };
-  } catch (error) { if (error.code !== 'EEXIST') throw error; }
+  if (await linkClaim(path, { pid: process.pid, start })) return { release: async () => { if ((await readJson(path))?.pid === process.pid) await rm(path, { force: true }); } };
   if (await live(await readJson(path))) return undefined;
   await rm(path, { force: true });
  }
@@ -68,14 +78,7 @@ export async function claimPinInstall(checkout, { env = process.env, signal, onW
  const path = pinInstallPath(checkout, env), { start } = await processInfo(process.pid);
  for (let waited = false; ; ) {
   signal?.throwIfAborted();
-  // Linked complete, so a waiter never reads a claim still being written.
-  const written = `${path}.${process.pid}`;
-  await writeFile(written, JSON.stringify({ pid: process.pid, start }), { mode: 0o600 });
-  try {
-   await link(written, path);
-   return async () => { if ((await readJson(path))?.pid === process.pid) await rm(path, { force: true }); };
-  } catch (error) { if (error.code !== 'EEXIST') throw error; }
-  finally { await rm(written, { force: true }); }
+  if (await linkClaim(path, { pid: process.pid, start })) return async () => { if ((await readJson(path))?.pid === process.pid) await rm(path, { force: true }); };
   const holder = await readJson(path);
   if (!await live(holder)) { await rm(path, { force: true }); continue; }
   if (!waited) { waited = true; onWait?.(holder.pid); }
@@ -99,15 +102,12 @@ export async function claimLaunch(directory, token) {
  const path = join(directory, 'worker.json');
  for (let attempt = 0; attempt < 3; attempt++) {
   const { start } = await processInfo(process.pid);
-  try {
-   await writeFile(path, JSON.stringify({ token, pid: process.pid, start, startedAt: Date.now(), events: `events-${token}.jsonl` }), { flag: 'wx', mode: 0o600 });
+  if (await linkClaim(path, { token, pid: process.pid, start, startedAt: Date.now(), events: `events-${token}.jsonl` })) {
    for (const entry of await readdir(directory)) if (/^events-.*\.jsonl$/.test(entry) && entry !== `events-${token}.jsonl`) await rm(join(directory, entry), { force: true });
    return true;
-  } catch (error) {
-   if (error.code !== 'EEXIST') throw error;
-   if (await liveWorker(directory)) return false;
-   await rm(path, { force: true });
   }
+  if (await liveWorker(directory)) return false;
+  await rm(path, { force: true });
  }
  return false;
 }

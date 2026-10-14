@@ -5,7 +5,9 @@
 // `rer dev` (ready URL and sign-in line, /health answering) and `rer dev
 // --stop` on two fresh default-seed exports: one vendored, as seeds carry it
 // today, and one in package mode, converted to pin this tarball's version
-// served from a local registry. Exits non-zero on any failure.
+// served from a local registry; that one then runs `rer deploy --demo
+// --dry-run`, the hosted demo every exported seed can build. Exits non-zero on
+// any failure.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -89,6 +91,11 @@ export async function smoke(tarball, { port } = {}) {
   process.stdout.write(reference.transcript);
   assert.equal(JSON.parse(await readFile(join(packaged, 'package.json'), 'utf8')).devDependencies['@runeditrun/rer'], version, 'the package-mode reference pins this tarball');
   await launch(packaged, reference.env, 'package mode');
+  // The exported seed carries the demo module in src/, where the container
+  // import boundary checks it.
+  const demo = await run(rer, ['deploy', '--demo', '--dry-run'], { cwd: packaged, env: reference.env });
+  assert.equal(demo.code, 0, 'rer deploy --demo --dry-run (package mode)');
+  assert.ok(JSON.parse(await readFile(join(packaged, '.rer/demo-host/wrangler.json'), 'utf8')).containers?.length, 'the dry run writes the demo Worker with its container');
   return { version, url };
  } finally {
   for (const [root, launchEnv] of started) await run(rer, ['dev', '--stop'], { cwd: root, env: launchEnv }).catch(() => {});
