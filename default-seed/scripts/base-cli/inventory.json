@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.3",
+  "cliVersion": "0.2.3-dev.g9e3bc091",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1887,7 +1887,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "197d62d245ca822da4aa11d0f3cc324d5f8d7021cd2d7a59fa738b0a46d4c689"
+      "sha256": "f42e8b069f708f6302cf2f7285cb50fca7d01cda6f5a8f82989d8a70a9e2236e"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",

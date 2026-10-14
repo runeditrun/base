@@ -68,4 +68,9 @@ test('an archive made before later additive migrations restores into the upgrade
  await seed.run(['reset', '--yes']);
  assert.equal((await seed.run(['import', '--input', 'exports/current.rer', '--yes'])).at(-1).contentHash, current.contentHash);
  assert.deepEqual((await seed.data(original))[0].results, rows);
+ // An archive from an installation one index ahead has this schema, but names a
+ // migration this installation never applied: it is newer, and refused.
+ await seed.run(['export', '--output', 'exports/newer.rer']);
+ await unlink(migration('1001_index.sql'));
+ await refused('exports/newer.rer', /schema_mismatch/);
 });

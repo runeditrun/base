@@ -54,10 +54,13 @@ async function placement(db,manifest,cat,replay,applied) {
 // migrations that changed only data (a purge or a backfill) or added an index.
 // Those that change restorable data are refused like any other. Without a
 // replayer the statements cannot be read, so an archive whose recorded
-// migrations the destination's ledger has outgrown is refused.
+// migrations the destination's ledger has outgrown is refused. An archive that
+// records a migration the destination never applied is newer than it, even
+// when that migration left the schema as it was (an index, a data change).
 export async function sameSchemaMigrations(db,manifest,cat,migrations) {
   const applied=await appliedMigrations(db);
   if(!applied)return;
+  insist(!manifest.migrations || manifest.migrations.every(name=>applied.includes(name)),'schema_mismatch:migrations');
   if(!migrations){insist(!manifest.migrations || applied.every(name=>manifest.migrations.includes(name)),'schema_mismatch:migrations');return;}
   await placement(db,manifest,cat,await migrations(),applied);
 }
