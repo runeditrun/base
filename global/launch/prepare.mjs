@@ -11,7 +11,7 @@ import { checkCapacity, personEnvironment, pinPolicy } from './capacity.mjs';
 import { bringBackDoor, doorPlan } from './door.mjs';
 import { LaunchFailure } from './failure.mjs';
 import { describeCheckout, freePort, localOwner, needsInstall, portTaken, setupNeeded } from './facts.mjs';
-import { claimPort, installState, setupState } from './state.mjs';
+import { claimPort, installState, savedPorts, setupState } from './state.mjs';
 import { runVerb } from './steps.mjs';
 import { localDefaults } from './local-defaults.mjs';
 import { installPinned } from './install-pinned.mjs';
@@ -79,7 +79,8 @@ export async function prepare({ root, args, env, report, directory, log, childre
   const owner = localOwner(checkout), explicit = flagValue(args, '--port');
   let from = last?.port;
   for (let attempt = 1; ; attempt++) {
-   const { port, release } = explicit ? { port: Number(explicit) } : await freePort(await liveServers(childEnv), port => claimPort(port, childEnv), from ? { ...childEnv, RER_DEV_PORT_FROM: String(from) } : childEnv);
+   const held = explicit ? [] : [...(await liveServers(childEnv)).map(record => record.port), ...await savedPorts(checkout, childEnv)];
+   const { port, release } = explicit ? { port: Number(explicit) } : await freePort(held, port => claimPort(port, childEnv), from ? { ...childEnv, RER_DEV_PORT_FROM: String(from) } : childEnv);
    report({ phase: 'setup', message: `setting up a local owner (${owner}) on port ${port}` });
    try { await step(setupState, ['setup', '--owner-email', owner, '--port', String(port), ...hostArgs], { port, owner }, setupEnv); }
    catch (failure) {

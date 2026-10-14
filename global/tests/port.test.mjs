@@ -1,6 +1,7 @@
-// A zero-setup `rer dev` chooses its own port: when another process takes the
-// port it chose before setup can use it, the launch moves to the next free
-// port, says which, and comes up there. The checkout is a minimal vendored
+// A zero-setup `rer dev` chooses its own port: it skips the port a stopped
+// checkout was set up on, and when another process takes the port it chose
+// before setup can use it, the launch moves to the next free port, says which,
+// and comes up there. The checkout is a minimal vendored
 // first-party seed whose dispatcher is Base's own CLI; on its first setup the
 // dispatcher starts an unrelated listener on the chosen port, as another
 // program on the computer would.
@@ -11,12 +12,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
+import { launchPath } from '../launch/state.mjs';
 import { freePort, run, sweep } from './harness.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 const source = path => JSON.stringify(pathToFileURL(join(base, path)).href);
 
-test('a zero-setup rer dev moves past a port another process takes before setup uses it', { timeout: 5 * 60_000 }, async t => {
+test('a zero-setup rer dev skips a stopped checkout\'s saved port and moves past a port another process takes', { timeout: 5 * 60_000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-port-')), root = join(directory, 'seed');
  const env = await isolatedQueue(t, { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', RER_SERVERS_DIR: join(directory, 'servers'), RER_DEV_PORT_FROM: String(await freePort()), ...Object.fromEntries(['TMPDIR'].filter(name => process.env[name]).map(name => [name, process.env[name]])) });
  const rer = args => run(process.execPath, [join(base, 'global/rer.mjs'), ...args], { cwd: root, env });
@@ -67,10 +69,15 @@ if (args[0] === 'setup' && args.includes('--port') && !existsSync(holderFile)) {
 const { main } = await import(${source('cli/main.mjs')});
 process.exitCode = await main();
 `);
+ // Another checkout, now stopped, was set up by rer dev on the first free port.
+ const saved = Number(env.RER_DEV_PORT_FROM), other = launchPath(join(directory, 'other'), env);
+ await mkdir(other, { recursive: true });
+ await writeFile(join(other, 'setup.json'), JSON.stringify({ state: 'done', port: saved, owner: 'owner@other.test', at: Date.now() }));
  const launched = await rer(['dev']);
  assert.equal(launched.code, 0, launched.stderr + launched.stdout);
  const taken = Number(await readFile(join(directory, 'taken-port'), 'utf8'));
  const ready = new URL(launched.stdout.match(/^RER_READY (\S+)$/m)?.[1] ?? 'http://invalid');
+ assert.ok(taken !== saved && Number(ready.port) !== saved, 'the launch never chooses the stopped checkout\'s port');
  assert.notEqual(Number(ready.port), taken, 'the launch does not stay on the taken port');
  assert.match(launched.stderr, new RegExp(`port ${ready.port}`), 'the launch says which port it chose');
  assert.equal((await fetch(ready.origin + '/health')).status, 200);

@@ -92,6 +92,21 @@ const stepRecord = name => ({
 });
 export const installState = stepRecord('install'), setupState = stepRecord('setup');
 
+// The ports other checkouts were set up on by this launcher. A stopped
+// checkout keeps its saved origin, so a fresh launch must not take its port.
+export async function savedPorts(checkout, env = process.env) {
+ const launches = join(serversDirectory(env), 'launches'), own = launchPath(checkout, env);
+ let entries = [];
+ try { entries = await readdir(launches, { withFileTypes: true }); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+ const ports = [];
+ for (const entry of entries) {
+  if (!entry.isDirectory() || join(launches, entry.name) === own) continue;
+  const port = (await setupState.read(join(launches, entry.name)))?.port;
+  if (Number.isInteger(port)) ports.push(port);
+ }
+ return ports;
+}
+
 // A stop asks every launch started before it to end. A worker reads this right
 // after it claims the launch; a stop that ran before the claim found no worker
 // to signal, so the worker ends itself here instead of starting anything.

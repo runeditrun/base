@@ -81,14 +81,15 @@ export async function portTaken(port) {
  return (await listeningPorts()).has(port) || !await bindable('127.0.0.1', port) || !await bindable('::1', port);
 }
 
-// The first port from 8787 (RER_DEV_PORT_FROM moves the start) that no
-// registered server holds, nothing listens on, binds on both 127.0.0.1 and ::1
-// (a browser that tries ::1 first never reaches another server) and that
-// `claim` secures against another launch choosing it at the same time.
-export async function freePort(servers, claim, env = process.env) {
+// The first port from 8787 (RER_DEV_PORT_FROM moves the start) that is not
+// `held` (by a registered server, or saved by another checkout that is stopped),
+// nothing listens on, binds on both 127.0.0.1 and ::1 (a browser that tries
+// ::1 first never reaches another server) and that `claim` secures against
+// another launch choosing it at the same time.
+export async function freePort(ports, claim, env = process.env) {
  const from = Number(env.RER_DEV_PORT_FROM ?? 8787);
  if (!Number.isInteger(from) || from < 1 || from > 65535) throw new LaunchFailure(2, 'RER_DEV_PORT_FROM must be a port number.');
- const held = new Set(servers.map(record => record.port).filter(Boolean)), busy = await listeningPorts();
+ const held = new Set(ports.filter(Boolean)), busy = await listeningPorts();
  for (let port = from; port <= 65535; port++) {
   if (held.has(port) || busy.has(port)) continue;
   if (!await bindable('127.0.0.1', port) || !await bindable('::1', port)) continue;

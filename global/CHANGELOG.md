@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A first `rer dev` no longer chooses the port another, stopped checkout was set up on, so both checkouts keep working origins.
 - Seed recovery code can check the deploy migration ledger with one call: `migrationLedgerShape(rows)` from `@runeditrun/rer/modules/deploy-kit/migration-ledger`, given the rows of its `ledgerShapeQuery`, accepts all three `d1_migrations` shapes a deployment can hold (Wrangler's own, Wrangler's after a kit deploy adopted it, and the kit's own since 0.2.2) and refuses any other. A seed whose recovery checks that the ledger is exactly Wrangler's three columns refuses ledgers from 0.2.2 on (`MIGRATION_MISMATCH`); replace that check with this call.
 - `rer import` and hosted restores refuse an archive that records a migration this installation has not applied (`schema_mismatch`), even when that migration left the schema unchanged (an index or a data-only change); such an archive is newer than the installation.
 - After a pulled change to a checkout's `@runeditrun/rer` pin, every verb (`rer deploy` included) installs the pinned version with the frozen lockfile before it runs, instead of asking you to run `rer install` first.
