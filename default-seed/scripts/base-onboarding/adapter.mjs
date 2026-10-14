@@ -7,6 +7,7 @@ import { buildEnvironment } from './local/environment.mjs';
 import { localOperation } from './local/operation.mjs';
 import { recoverInterrupted } from './local/recovery.mjs';
 import { credentialValues } from './redaction.mjs';
+import { dependencyEnvironment } from './dependency-environment.mjs';
 import { labels } from './adapter-labels.mjs';
 import { chooseOrigin, prepareSettings, readSettings } from './adapter-settings.mjs';
 import {listenerPorts} from './process-diagnostics.mjs';
@@ -160,7 +161,8 @@ async function commandsFor(context, hook) {
 async function phase(context, hooks, name, hook) {
  await context.store.step(labels[name]);
  for (const [command, args = [], options = {}] of await commandsFor(context, hook)) {
-  await context.run(labels[name], command, args, { step: steps[name], ...options });
+  // Dependency installs run third-party build scripts without credentials.
+  await context.run(labels[name], command, args, { step: steps[name], ...options, ...(name === 'dependencies' ? { env: dependencyEnvironment(options.env ?? process.env) } : {}) });
  }
 }
 

@@ -83,7 +83,8 @@ async function runLifecycle(project, options, out, deployRedaction) {
   // The hosted demo: a front Worker and the seed's container image on demo.<domain>.
   if (options.verb === 'deploy' && options.demo) return await (await import('./demo-host.mjs')).demoHostCommand(project, options, store, signal, out, operation);
   if (options.verb === 'install') {
-   await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...process.env, CI: 'true' } }); return {};
+   const { dependencyEnvironment } = await shared('dependency-environment.mjs');
+   await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...dependencyEnvironment(), CI: 'true' } }); return {};
   }
   if (options.verb === 'verify') {
    const target = adapter.verify;

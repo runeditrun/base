@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.3-dev.g72efe46d",
+  "cliVersion": "0.2.3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "240eaf534e4e61ed82a75d37cf56f81308dbe6a61f72b6f107d48c93597b881f"
+      "sha256": "06c733d6f8840caf7452f0d89c6bed166253e29e33efee16350ecee8636acd85"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -66,6 +66,10 @@
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
       "sha256": "cce2391569d2ba0de916d7f306884f7bb035aede7a2464c80e1206815781061a"
+    },
+    "dependency-environment.mjs": {
+      "source": "onboarding/dependency-environment.mjs",
+      "sha256": "2eec16c0eb2cc349e46c7f9124fa854fe44833ee99ec6998bf8f88618bc50040"
     },
     "dev-identity.mjs": {
       "source": "onboarding/dev-identity.mjs",
@@ -225,7 +229,7 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "43fce6331fa9697651d9d69e68da49ace8dc7dfeab28c4283779faff986c0aa5"
+      "sha256": "68e19e5f853efbc9d4474a2b95357568a956fd8e462ed7725335f2a5f5daf40b"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
@@ -479,7 +483,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "b8f336c58739f47cf94558d86da2e72b4840852acc843833e750f4f54f74b69f"
+      "sha256": "49edb9403994794df9460af467ff87e2750a4f1cf8da2f18f8cbc1d268ed78f3"
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
@@ -527,7 +531,7 @@
     },
     "cli/pnpm-probe.mjs": {
       "source": "cli/pnpm-probe.mjs",
-      "sha256": "cbd8613b0f65de4545ea720ef7c5d4e0e943060701040f0ebc589b3dfcddcab0"
+      "sha256": "0b131fa3d365d2a16d856b2179a7f11145c84eff645ca74281de3a372a39d76f"
     },
     "cli/pnpm-runtime.mjs": {
       "source": "cli/pnpm-runtime.mjs",
@@ -547,7 +551,7 @@
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "13e0eeaeaaaed92d1cbbdcbad50b6b79140cf14a4e6cf1a7142bddbf489b6d10"
+      "sha256": "087834cff51be260c9c496838c12f7ca4332ec888ab35d86fa9d8f3f7af4cc61"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",

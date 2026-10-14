@@ -289,12 +289,16 @@ export function createRedaction({mask = MASK} = {}) {
  return {addSecrets,redact,stream};
 }
 
+// A variable whose name marks a credential, or whose value is a URL carrying one.
+export const credentialName = key => CREDENTIAL_NAME.test(key) || CAMEL_CREDENTIAL_NAME.test(key);
+export const credentialUrl = value => CREDENTIAL_URL.test(value);
+
 export function credentialValues(input, declared = []) {
  if (!input || typeof input !== 'object') return [];
  return Object.entries(input).flatMap(([key,value]) => {
   // An explicit model declaration remains an exact secret contract, including
   // short values. Environment heuristics must not turn boolean flags into masks.
-  if (typeof value === 'string') return declared.includes(key) || (value.length>=8 && (CREDENTIAL_NAME.test(key) || CAMEL_CREDENTIAL_NAME.test(key) || CREDENTIAL_URL.test(value))) ? [value] : [];
+  if (typeof value === 'string') return declared.includes(key) || (value.length>=8 && (credentialName(key) || credentialUrl(value))) ? [value] : [];
   return value && typeof value==='object' ? credentialValues(value,declared) : [];
  });
 }

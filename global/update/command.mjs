@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { dependencyEnvironment } from '../../onboarding/dependency-environment.mjs';
 import { layout } from '../cli/layout.mjs';
 import { channelOf } from '../cli/status.mjs';
 import { ownManifest, ownRoot, packageDigest, packageName } from '../package-info.mjs';
@@ -47,7 +48,7 @@ async function npmGlobal(version) {
  const command = `npm ${args.map(arg => /^[\w@./:=-]+$/.test(arg) ? arg : JSON.stringify(arg)).join(' ')}`;
  process.stdout.write(`Updating the npm global rer: ${command}\n`);
  let code;
- try { code = await run('npm', args); } catch (error) { code = 127; process.stderr.write(`Could not run npm (${error.code ?? error.message}).\n`); }
+ try { code = await run('npm', args, dependencyEnvironment()); } catch (error) { code = 127; process.stderr.write(`Could not run npm (${error.code ?? error.message}).\n`); }
  if (code !== 0) {
   process.stderr.write(`npm could not update rer (exit ${code}); rer is unchanged. Fix the problem npm reports (for example, a prefix you cannot write), then run:\n  ${command}\n`);
   return code || 1;

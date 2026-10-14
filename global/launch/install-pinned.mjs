@@ -1,8 +1,10 @@
 // A checkout that pins the @runeditrun/rer package runs its own rer once
 // node_modules holds the pinned version; until then none of it can run (its
 // adapter imports the package). So its first dependency install is this
-// launcher's: the frozen pnpm install that `rer install` runs.
+// launcher's: the frozen pnpm install that `rer install` runs. Like every
+// dependency install, it runs without the caller's credentials.
 import { spawn } from 'node:child_process';
+import { dependencyEnvironment } from '../../onboarding/dependency-environment.mjs';
 import { pinnedPackage } from '../checkout.mjs';
 import { packageName } from '../package-info.mjs';
 import { ensureProjectPnpm } from '../../cli/project-pnpm.mjs';
@@ -13,7 +15,7 @@ export async function installPinned(root, { env = process.env, output = text => 
  signal?.throwIfAborted();
  try { await ensureProjectPnpm(root, { env, signal, report: text => output(text + '\n') }); }
  catch (error) { if (error instanceof RerError) throw new LaunchFailure(error.exitCode, error.message); throw error; }
- const child = spawn('pnpm', ['install', '--frozen-lockfile'], { cwd: root, env: { ...env, CI: 'true' }, stdio: ['ignore', 'pipe', 'pipe'] });
+ const child = spawn('pnpm', ['install', '--frozen-lockfile'], { cwd: root, env: { ...dependencyEnvironment(env), CI: 'true' }, stdio: ['ignore', 'pipe', 'pipe'] });
  children?.add(child);
  if (signal?.aborted) child.kill('SIGTERM');
  let tail = '';

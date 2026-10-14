@@ -184,6 +184,9 @@ which inside `pnpm run` is the pinned copy in `node_modules/.bin`, so
 `rer` hands every verb to the pinned package, launching included. Until
 `node_modules` holds the pinned version, `rer install` and `rer dev` install it
 first (the frozen `pnpm install`) and every other verb says to run `rer install`.
+Every dependency install runs without the caller's credentials: variables whose
+name or value marks one, `CLOUDFLARE_*` account settings and application
+bindings never reach the package manager or a dependency's build script.
 
 Heavy package scripts wait for this computer's job queue with
 `rer queue NAME -- COMMAND [ARGS]` (in vendored mode,

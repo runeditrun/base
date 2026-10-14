@@ -6,6 +6,7 @@ import { readLegacyArchive } from '../modules/portability/format.mjs';
 import { fileRecords } from '../modules/portability/files.mjs';
 import { RerError, refuse } from './errors.mjs';
 import { policyModuleURL, serializablePolicy } from './portability-policy.mjs';
+import { shared } from './shared.mjs';
 
 // Seeds declare their real bindings and data policy. The shared module owns the
 // archive format and atomic restore; the shared runner owns its native children.
@@ -52,8 +53,10 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   // Do not apply pending product migrations to a populated recovery target.
   // Check real existing bindings first; finalize repeats this under the lock.
   if(legacyRecovery)await nativeWorker(store,'legacy-preflight',input,signal);
+  // Local migrations need no provider account: wrangler runs without credentials.
+  const { dependencyEnvironment } = await shared('dependency-environment.mjs');
   await store.run('Applying local data migrations', 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], {
-   cwd: root, signal, env: { ...process.env, RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false' },
+   cwd: root, signal, env: { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false' },
   });
   const receipt=await nativeWorker(store,direction,input,signal);
   if(legacyRecovery)receipt.output=relative(root,legacyRecovery.output);

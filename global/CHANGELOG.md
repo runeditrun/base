@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Dependency installs never receive your provider credentials: the frozen `pnpm install` that `rer install`, a fresh clone's first verb, `rer dev` and the installer run, the pnpm version check, `rer update`'s npm install and local data migrations run without variables whose name or value marks a credential, provider account settings (`CLOUDFLARE_*`) or application bindings, so dependency build scripts (esbuild, workerd, sharp, oxide) never see them. Proxy settings still reach the install, and `rer deploy` still receives everything.
+
 ## 0.2.3
 
 - `rer setup` finishes provider-free when a seed declares an optional dependency that you leave unconnected.
