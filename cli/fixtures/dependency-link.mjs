@@ -13,7 +13,7 @@ export function setupDiagnostic(child) {
  // Emit fixed classifications only; child messages and private values stay local.
  const events=new Set(['error','result','waiting','setup-ready']);
  const codes=new Set(['invalid_invocation','invalid_setup_manifest','missing_input','safety_refusal','command_failed','cancelled']);
- const reasons=[['setup_fields',/^Missing or invalid active setup fields:/],['provider_document',/^A selected provider dependency document is unavailable\.$/],['approval_scope',/^Link approval must name this exact origin,/],['approval_required',/^Provider approval is required\./],['pnpm_probe',/^The pinned pnpm version probe failed\./]];
+ const reasons=[['setup_fields',/^Missing or invalid active setup fields:/],['provider_document',/^A selected provider dependency document is unavailable\.$/],['approval_scope',/^Link approval must name this exact origin,/],['approval_required',/^Provider approval is required\./],['pnpm_probe',/^The pinned pnpm version probe failed\b/]];
  const rows=[];
  for(const line of child.stdoutText.split('\n')) {
   let row;try{row=JSON.parse(line);}catch{continue;}

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.5-dev.gab6397bc",
+  "cliVersion": "0.2.5-dev.g182bbc78",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -543,7 +543,7 @@
     },
     "cli/pnpm-probe.mjs": {
       "source": "cli/pnpm-probe.mjs",
-      "sha256": "0b131fa3d365d2a16d856b2179a7f11145c84eff645ca74281de3a372a39d76f"
+      "sha256": "e1c7ce9cf10dd6e6fd641bb4243b76d4881d426bcff2bee5485212c5c14deef8"
     },
     "cli/pnpm-runtime.mjs": {
       "source": "cli/pnpm-runtime.mjs",
@@ -571,7 +571,7 @@
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
-      "sha256": "909048efdfcb6f34b45f1301bd088ef387c0430014f640218d55ea88db7d5768"
+      "sha256": "ce38760655b3cda56f592c7e16d43a78e3572232f2eaf31f03122aa3a786fef3"
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",

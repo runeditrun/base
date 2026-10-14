@@ -3,6 +3,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { delimiter, dirname, join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
+import { setTimeout as delay } from 'node:timers/promises';
 import { cachedPnpm, downloadPnpm } from './pnpm-runtime.mjs';
 import { missing, RerError } from './errors.mjs';
 import { shellQuote } from './node-runtime-cache.mjs';
@@ -16,9 +17,9 @@ export async function projectPnpmPin(root) {
  if (!pin) throw missing('This first-party checkout must declare an exact pnpm version in package.json packageManager. Correct that declaration, then rerun rer.');
  return pin;
 }
-async function probe(root, env, signal, store) {
- try { return await probePnpm(root, store, signal, env); }
- catch (error) { if (signal?.aborted) throw error; return undefined; }
+async function probe(root, env, signal, store, timeoutMs) {
+ try { return { version: await probePnpm(root, store, signal, env, timeoutMs) }; }
+ catch (error) { if (signal?.aborted) throw error; return { reason: error.reason ?? error.message }; }
 }
 export async function ensureProjectPnpm(root, options = {}) {
  if (options.store) return ensure(root, options);
@@ -46,7 +47,7 @@ export async function ensureProjectPnpm(root, options = {}) {
 }
 async function ensure(root, { env = process.env, signal, report = () => {}, store }, pin) {
  pin ??= await projectPnpmPin(root);
- if (await probe(root, env, signal, store) === pin) return env;
+ if ((await probe(root, env, signal, store)).version === pin) return env;
  let directory = await cachedPnpm(pin, env);
  if (!directory) {
   report(`Fetching pnpm ${pin} for this project; rer keeps it in its own cache.`);
@@ -61,7 +62,14 @@ async function ensure(root, { env = process.env, signal, report = () => {}, stor
  // this process's Node before the caller's PATH, but cannot be shadowed by a
  // different pnpm installed in that Node's bin directory.
  const supplied = { ...env, PATH: [directory, dirname(process.execPath), env.PATH].filter(Boolean).join(delimiter) };
- if (await probe(root, supplied, signal, store) !== pin) throw missing(`The verified pnpm ${pin} did not report the project version. Run ${shellQuote(join(directory, 'pnpm'))} --version to inspect it, then rerun rer.`);
- Object.assign(env, supplied);
- return env;
+ // A fresh pnpm's first run can stall or fail once (a cold start on a busy
+ // machine): the check settles with a bounded retry, then names what failed.
+ let result;
+ for (const [attempt, timeoutMs] of [10000, 20000, 30000].entries()) {
+  if (attempt) await delay(1000, undefined, { signal });
+  result = await probe(root, supplied, signal, store, timeoutMs);
+  if (result.version === pin) { Object.assign(env, supplied); return env; }
+ }
+ const failed = result.version === undefined ? result.reason : `it reported ${JSON.stringify(result.version.slice(0, 64))}`;
+ throw missing(`The verified pnpm ${pin} did not report the project version after 3 tries (${failed}). Run ${shellQuote(join(directory, 'pnpm'))} --version to inspect it, then rerun rer.`);
 }
