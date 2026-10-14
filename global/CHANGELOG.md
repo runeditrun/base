@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.3
 
 - `rer setup` finishes provider-free when a seed declares an optional dependency that you leave unconnected.
 - A seed adapter can declare `resetPreflight`; `rer reset` runs it before listing or deleting anything, and `--yes` cannot skip it.
@@ -10,7 +10,25 @@
 - Importing an archive whose bytes are not valid UTF-8 is refused with the same `archive_json` diagnostic (exit 2) as invalid JSON.
 - Converting a seed to package mode no longer leaves a broken queue sentence in its README or `scripts/base-cli` paths in its operations guide and erasure README.
 - The owner's sign-in settings page (`/auth/settings/identity`) wears the seed's declared theme, like sign-in and setup.
+- `rer demo` (the same as `rer dev --demo`) runs a seed as a throwaway local demo: signed in as the saved owner, filled with the seed's demo data, marked by a Demo bar, unable to send anything, and deleted on `--stop`, Ctrl-C or after an hour; the checkout's own state is never written.
+- Under `rer demo`, `fetch`, redirects, `WebSocket`, `navigator.sendBeacon`, `EventSource`, `node:net`/`node:tls` and `cloudflare:sockets` reach loopback hosts only, and every refused send is listed in the Demo bar.
+- `rer demo` refuses a seed that has not adopted it (no `withDemo` guard, no `demoSockets()` or a state path that ignores `RER_STATE_DIR`), and `rer deploy`, including `--dry-run`, refuses a deploy declaration or `--env-file` that carries `RER_DEMO` and names the key.
 - `rer deploy --demo` hosts a seed's demo at `demo.<domain>`: each visitor passes a Turnstile check and gets their own signed-in, throwaway container of the seed that can send nothing, ended after an hour or 15 idle minutes. `export/run-demo.yml` deploys it when `RUN_DEMO_DEPLOY` is on.
+- `rer deploy` claims the hosted owner after every deploy, including seeds whose own deploy hooks run, retires the setup token, keeps an existing native identity-provider owner and keeps a live owner token you supply.
+- Container images built by `rer build --platform container` start again; they exited at start.
+- The default seed's sign-in serves the signed owner claim whenever its public keys are configured.
+- A seed can declare a reviewed rewrite of an already released migration in `migrations/rewrites.json`; deploys and local builds accept the released bytes for that migration only and still refuse every undeclared change.
+- Seed table inventories can use the exported portability exclusion list, so native ZIP and remote export no longer refuse the deploy controller's migration ledger table.
+- The publication scan skips only the compressed pixel and sample data of recognised images and videos; their comments, XMP, EXIF and tags are checked, and a text file behind a fake media header is checked whole.
+- With `--public-base`, the publication scan reports a file identical to the public base's copy as pre-existing instead of a finding.
+- Base's default seed and source import kit (outside the rer npm package) prepare and verify 100,000-row imports across requests within the Worker CPU limit and resume after a killed step; a changed re-upload under a published key is refused.
+- Base's default seed and source import kit erase a person named in other people's imported records at seed scale, across requests, and when they never became a native record; an interrupted erasure is finished by a cron sweep within about 10 minutes.
+
+### Upgrade notes
+
+- Existing OIDC provider links show **not linked** until the next successful sign-in through each provider, because older stores have no verified token-exchange observation for them.
+- The default seed's erasure queue message is now `{ redact, chain }` instead of `{ redact, operator, continuation }`; a message still queued in the old shape when you deploy is refused, so let the erasure queue drain first. Default-seed migrations 0021 to 0023 add the import-step, stream-source and erasure-progress tables, and its cron trigger sweeps erasures every 10 minutes.
+- A seed adopting `rer demo` adds `src/demo.ts` (exporting an idempotent `seedDemo`), copies Base's `modules/demo/` and wraps its Worker entry's default export in `withDemo` as the entry's first import, and makes three `vite.config` changes: the state path reads `RER_STATE_DIR`, the dev entry's vars pass `RER_DEMO` and `RER_DEMO_EXPIRES`, and `demoSockets()` comes first in `plugins`; add `.rer/demo/` to `.gitignore`. `export/DEMO.md` has the steps.
 
 ## 0.2.2
 
