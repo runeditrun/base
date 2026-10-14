@@ -20,6 +20,9 @@ const definitions = {
  check: [['--profile'], 'Read-only structural command contract and operations validation.'],
 };
 export const verbs = Object.fromEntries(Object.entries(definitions).map(([name, [flags, effects]]) => [name, { flags: [...commonFlags, ...flags, ...(['build','deploy','dev','preview','export','import'].includes(name)?['--platform']:[]), ...(['install','setup','dev','preview','build','verify','deploy','export','import'].includes(name)?['--no-queue']:[])], effects }]));
+// `rer demo` is `rer dev --demo`; describe lists it as a verb with the dev
+// flags a demo takes whenever the seed's dev takes --demo.
+export const demoVerb = Object.freeze({ flags: [...commonFlags, '--port', '--host', '--idle-timeout', '--stop', '--detach', '--foreground', '--no-queue'], effects: 'A throwaway demo of this seed (rer dev --demo): fresh data in .rer/demo/START (deleted when it stops: --stop, Ctrl-C or its end, one hour by default or --idle-timeout), the saved owner signed in, the seed\'s demo data, a Demo bar, and nothing sent (RER_DEMO=1; the checkout\'s own data is never touched).' });
 export const aliases = Object.fromEntries([...Object.keys(verbs).filter(v => v !== 'install'), 'release', 'deps', 'rer'].map(name => [name, name === 'deps' ? 'install' : name === 'rer' ? null : name]));
 export const releaseFlags = ['--repo', '--project', '--repository', '--output', '--ref', '--dry-run', '--tag', '--clean-history', '--onto', '--env-file', '--no-queue'];
 export const requiredHooks = ['preview', 'dependencies', 'build', 'migrate', 'start', 'health', 'owner', 'signIn', 'verify', 'deploy', 'portability', 'state', 'settings', 'input'];
