@@ -69,13 +69,10 @@ test('an installed rer launches the package-mode default-seed reference with one
 
  const version = (await run(rer, ['--version'], { cwd: root, env })).stdout.trim().split('\n');
  assert.ok(version[1].includes(` ${version[0]} `), `the export pins the version of the package built from the same commit: ${version.join(' / ')}`);
- // Until node_modules holds the pinned package, a verb that runs the checkout
- // says to install; check installs it with the frozen lockfile and checks with
- // the pinned bytes, so a fresh clone checks before any install.
- const uninstalled = await run(rer, ['build'], { cwd: root, env });
- assert.equal(uninstalled.code, 3, uninstalled.stderr);
- assert.match(uninstalled.stderr, /rer install/);
- await assert.rejects(access(join(root, 'node_modules/@runeditrun/rer')), 'nothing was installed');
+ // Until node_modules holds the pinned package, every verb installs it with the
+ // frozen lockfile first: check runs with the pinned bytes, so a fresh clone
+ // checks before any install of its own.
+ await assert.rejects(access(join(root, 'node_modules/@runeditrun/rer')), 'nothing is installed yet');
  const checked = await run(rer, ['check', '--profile', 'first-party', '--json'], { cwd: root, env });
  const report = JSON.parse(checked.stdout.trim().split('\n').at(-1));
  assert.equal(checked.code, 0, 'the converted reference passes check in package mode: ' + JSON.stringify(report.clauses?.filter(clause => !clause.ok)) + checked.stderr.slice(-2000));
