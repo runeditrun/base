@@ -150,6 +150,27 @@ test('rer release CLI invokes the producer and prints the redacted tail of a fai
   assert.equal((result.stdout + result.stderr + readFileSync(resolve(f.options.output, 'release-receipt.json'), 'utf8')).includes(canary), false);
 });
 
+test('rer release installs seed dependencies without the caller credentials; the seed verify keeps them', t => {
+  const record = kind => `require('fs').writeFileSync(require('path').join(process.env.PROBE_RECORDS,'${kind}.json'),JSON.stringify(Object.keys(process.env)))`;
+  const f = fixture(t, `node -e "${record('verify')}" && node --test check.test.mjs`);
+  mkdirSync(resolve(f.repo, 'probe'));
+  writeFileSync(resolve(f.repo, 'probe/package.json'), JSON.stringify({ name: 'probe', version: '1.0.0', scripts: { install: 'node record.cjs' } }));
+  writeFileSync(resolve(f.repo, 'probe/record.cjs'), record('install') + ';\n');
+  const pkg = JSON.parse(readFileSync(resolve(f.repo, 'package.json')));
+  writeFileSync(resolve(f.repo, 'package.json'), JSON.stringify({ ...pkg, devDependencies: { probe: 'file:./probe' }, pnpm: { onlyBuiltDependencies: ['probe'] } }));
+  execFileSync('pnpm', ['install', '--lockfile-only', '--ignore-scripts'], { cwd: f.repo, stdio: ['ignore', 'pipe', 'pipe'] });
+  f.commit();
+  const records = resolve(f.temporary, 'records'); mkdirSync(records);
+  const credentials = { CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token-0001', CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef', GITHUB_TOKEN: 'ghp_' + randomBytes(18).toString('hex'), FOO_SECRET: 'synthetic-secret-0001', PGPASSWORD: 'synthetic-password-0001' };
+  const result = spawnSync(process.execPath, [resolve(root, 'bin/rer.mjs'), 'release', '--repo', f.repo, '--project', 'octocat/Hello-World', '--repository', 'https://github.com/octocat/Hello-World', '--output', f.options.output, '--dry-run'], { encoding: 'utf8', env: { ...process.env, ...credentials, PROBE_RECORDS: records } });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const seen = kind => JSON.parse(readFileSync(resolve(records, `${kind}.json`), 'utf8'));
+  for (const name of Object.keys(credentials)) {
+    assert.ok(!seen('install').includes(name), `${name} never reaches a dependency install script`);
+    assert.ok(seen('verify').includes(name), `the seed's verify receives ${name}`);
+  }
+});
+
 test('bare release runs real gates and writes only a preview, including with an existing version tag', async t => {
   const f = fixture(t);
   git(f.repo, 'tag', 'v1.2.3');

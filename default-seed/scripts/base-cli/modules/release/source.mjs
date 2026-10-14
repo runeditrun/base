@@ -68,12 +68,15 @@ function failureTail(logs) {
   return bytes.subarray(Math.max(0, bytes.length - TAIL_BYTES)).toString('utf8').replace(/^\uFFFD+/, '');
 }
 
-export async function command(command, args, cwd) {
+// A dependency install runs code the seed did not write, so it gets the
+// shared credential-free environment; the seed's own verify keeps the caller's.
+export async function command(command, args, cwd, { dependencies = false } = {}) {
  const {createCommands}=await shared('commands.mjs');
+ const inherited=dependencies?(await shared('dependency-environment.mjs')).dependencyEnvironment():process.env;
  const directory=await mkdtemp(resolve(tmpdir(),'rer-release-'));
  const state={logs:[]};
  const store=await createCommands(directory,state,{terminal:()=>{},queue:{verb:'release'}});
- const summary=testSummary(),env={...process.env,FORCE_COLOR:'0'};delete env.NODE_TEST_CONTEXT;
+ const summary=testSummary(),env={...inherited,FORCE_COLOR:'0'};delete env.NODE_TEST_CONTEXT;
  try {
   await store.run('Release verification',command,args,{cwd,env,onChild:child=>child.stdout.on('data',bytes=>summary.write(bytes))});
   return {status:'PASS',exitCode:0,...summary.finish()};

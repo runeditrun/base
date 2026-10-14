@@ -39,7 +39,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
     git(checkout, 'checkout', '--detach', source.commit);
     // Honour the seed's committed install policy. Base's native-build settings
     // are not interchangeable with pnpm 8's locked onlyBuiltDependencies.
-    const install = await command('pnpm', ['install', '--frozen-lockfile'], checkout);
+    const install = await command('pnpm', ['install', '--frozen-lockfile'], checkout, { dependencies: true });
     const verify = install.status === 'PASS' ? await command('pnpm', ['run', 'verify'], checkout) : { status: 'FAIL', reason: 'frozen-install-failed', tests: 0, passed: 0, failed: 0, output: install.output };
     // Release-only scale and capacity cases stay outside routine CI. The
     // committed seed script is an additional gate in previews and releases.

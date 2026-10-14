@@ -134,8 +134,9 @@ test('trigger migration preserves controller claims, applied hashes and no-op re
 
 // Seed recovery code checks the ledger before reading it. Every ledger a
 // deployment can hold passes the shared check: a fresh kit deploy's, Wrangler's
-// own, and Wrangler's after a kit deploy adopted it. Any other shape is refused.
-test('migrationLedgerShape accepts the kit, Wrangler and adopted ledgers and refuses any other', async t => {
+// own, Wrangler's after a kit deploy adopted it, and a rer 0.2.1 deploy's,
+// alone or beside Wrangler's. Any other shape is refused.
+test('migrationLedgerShape accepts the kit, Wrangler, adopted and 0.2.1 ledgers and refuses any other', async t => {
   const fixture = providerFixture();
   t.after(() => fixture.close());
   const api = cloudflare(fixture);
@@ -156,6 +157,20 @@ test('migrationLedgerShape accepts the kit, Wrangler and adopted ledgers and ref
   assert.deepEqual(wrangler.shape(), { name: 'd1_migrations', columns: ['id', 'name', 'applied_at', 'sha256', 'state'], shape: 'adopted' });
   const other = await deployment('other', wranglerLedger + '; ALTER TABLE d1_migrations ADD COLUMN note TEXT');
   assert.throws(() => other.shape(), /invalid-migration-ledger/);
+  // The statements rer 0.2.1's migrate() ran for one migration on a new database.
+  const [applied] = migrations;
+  const deployed021 = `CREATE TABLE _rer_deploy_migrations (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('applying','applied')));
+    INSERT INTO _rer_deploy_migrations(name,sha256,state) VALUES ('${applied.name}','${applied.sha256}','applying');
+    ${applied.sql}; UPDATE _rer_deploy_migrations SET state='applied' WHERE name='${applied.name}' AND sha256='${applied.sha256}';`;
+  const legacy = { name: '_rer_deploy_migrations', columns: ['name', 'sha256', 'state'], shape: 'legacy' };
+  const old = await deployment('0.2.1', deployed021);
+  assert.deepEqual(old.shape(), legacy);
+  const beside = await deployment('0.2.1-over-wrangler', `${wranglerLedger}; ${deployed021}`);
+  assert.deepEqual(beside.shape(), legacy, 'the kit ledger is the history, not the stale Wrangler table');
+  await migrate(api, old.resource.uuid, migrations);
+  assert.equal(old.shape().shape, 'kit', 'the next deploy moves it into d1_migrations');
+  const widened = await deployment('0.2.1-widened', deployed021 + ' ALTER TABLE _rer_deploy_migrations ADD COLUMN note TEXT;');
+  assert.throws(() => widened.shape(), /invalid-migration-ledger/);
 });
 
 test('conflict and trigger ROLLBACK policies cannot implicitly end the provider transaction', t => {

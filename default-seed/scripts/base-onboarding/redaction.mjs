@@ -59,9 +59,12 @@ const COOKIE_HEADER = '(?<![A-Za-z0-9_-])(?:Set-)?Cookie["\']?\\s*:\\s*(?:[^\\s=
 const SCHEME = '(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://';
 const USERINFO = SCHEME + '([^\\s/?#"<>`]*)@';
 const SLASHED_USERINFO = SCHEME + '([^\\s/?#:@"<>`\\[\\]]*:(?![0-9]*(?:[/?#\\s"<>`]|$))(?=(?<password>[^\\s"<>`@]{0,128}))\\k<password>)@';
+// Provider token formats recognisable by their prefix alone.
+const TOKEN_PREFIX = '(?:gh[pousr]_|github_pat_|sk-(?:proj-)?|sk_live_|sk_test_|rk_live_|rk_test_|pk_live_|whsec_|SG\\.|xox[baprs]-|AKIA|ASIA|AIza|npm_|glpat-|pypi-|hf_|re_)';
+const KNOWN_TOKEN = '(?<![A-Za-z0-9_])' + TOKEN_PREFIX + '[A-Za-z0-9_./+=-]+';
 const PATTERNS = new RegExp('(?:' + [
  AUTH_HEADER, BARE_AUTH,
- '(?<![A-Za-z0-9_])(?:gh[pousr]_|github_pat_|sk-(?:proj-)?|sk_live_|sk_test_|rk_live_|rk_test_|pk_live_|whsec_|SG\\.|xox[baprs]-|AKIA|ASIA|AIza|npm_|glpat-|pypi-|hf_|re_)[A-Za-z0-9_./+=-]+',
+ KNOWN_TOKEN,
  FIELD + FIELD_VALUE, COOKIE_HEADER,
  USERINFO, SLASHED_USERINFO,
 ].join('|') + ')', 'gi');
@@ -292,6 +295,13 @@ export function createRedaction({mask = MASK} = {}) {
 // A variable whose name marks a credential, or whose value is a URL carrying one.
 export const credentialName = key => CREDENTIAL_NAME.test(key) || CAMEL_CREDENTIAL_NAME.test(key);
 export const credentialUrl = value => CREDENTIAL_URL.test(value);
+// A value that carries a credential whatever its variable is called: a known
+// provider token of at least 16 characters, a JWT, or a URL with userinfo or a
+// credential query parameter (libsql://db?authToken=...).
+// A token never continues a path or word (/opt/hf_models_cache is a path).
+const TOKEN_VALUE = new RegExp('(?<![A-Za-z0-9_./-])' + TOKEN_PREFIX + '[A-Za-z0-9_./+=-]{12,}');
+const CREDENTIAL_QUERY = /[?&;](?:auth[_-]?token|access[_-]?token|api[_-]?key|token|key|secret|password|sig|signature)=[^&#\s]/i;
+export const credentialValue = value => TOKEN_VALUE.test(value) || jwtRanges(value).length > 0 || CREDENTIAL_URL.test(value) || CREDENTIAL_QUERY.test(value);
 
 export function credentialValues(input, declared = []) {
  if (!input || typeof input !== 'object') return [];

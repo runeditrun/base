@@ -1,6 +1,6 @@
 // A checkout that pins the rer package, through the installed launcher: a
 // fresh clone's first rer install runs dependency build scripts without the
-// caller's provider credentials while the seed's own deploy still receives
+// caller's credentials while the seed's own deploy still receives
 // them, and after a pulled pin change rer deploy installs the new pin first.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +19,19 @@ const base = resolve(import.meta.dirname, '../..');
 const launcher = join(base, 'global/rer.mjs');
 // Synthetic provider credentials a person has exported in their shell.
 const credentials = { CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token-0001', CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef', SENDGRID_API_KEY: 'SG.synthetic-sendgrid-key-0001' };
+// Other credentials a dependency script never sees: by name, run-together
+// name, or a value that carries a token whatever the variable is called.
+const others = {
+ PGPASSWORD: 'synthetic-password', DBPASSWORD: 'synthetic-password', CLIENTSECRET: 'synthetic-secret', GPG_PASSPHRASE: 'synthetic-passphrase',
+ CI_JOB_JWT: 'synthetic-jwt', DOCKER_CREDS: 'synthetic-creds', GITHUB_PAT: 'synthetic-pat', GOOGLE_APPLICATION_CREDENTIALS: '/synthetic/key.json',
+ SLACK_WEBHOOK_URL: 'https://hooks.slack.example/services/synthetic', AWS_ACCESS_KEY_ID: 'synthetic-aws-id', AWS_REGION: 'us-east-1',
+ cloudflare_account_id: '0123456789abcdef0123456789abcdef', npm_config__auth: Buffer.from('fixture:fixture').toString('base64'), 'npm_config_//registry.example/:_authToken': 'synthetic-npm-token',
+ DATABASE_URL: 'postgres://app:synthetic-password@db.example/app', DB: 'libsql://db.example?authToken=synthetic-libsql-token',
+ GH: 'ghp_' + 'synthetic0'.repeat(4), FINE: 'github_pat_' + 'synthetic0'.repeat(4), OPENAI: 'sk-proj-' + 'synthetic0'.repeat(4),
+ SLACK: 'xoxb-' + 'synthetic0'.repeat(3), AMAZON: 'AKIA' + 'SYNTHETIC0'.repeat(2), SIGNED: [{ alg: 'HS256' }, { sub: 'fixture' }, 'fixture-signature'].map(part => Buffer.from(typeof part === 'string' ? part : JSON.stringify(part)).toString('base64url')).join('.'),
+};
+// What an install still needs, even where a value resembles a token.
+const kept = { LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8', NO_PROXY: 'localhost,127.0.0.1', CI: '1', RER_STATE_DIR: '/synthetic/hf_models_cache_state' };
 
 let directory, registry, versions;
 before(async () => {
@@ -76,14 +89,17 @@ async function recorded(records, kind) {
 
 const installedVersion = async root => JSON.parse(await readFile(join(root, 'node_modules/@runeditrun/rer/package.json'), 'utf8')).version;
 
-test('a fresh clone installs dependencies without provider credentials, and its deploy still receives them', { timeout: 240_000 }, async () => {
+test('a fresh clone installs dependencies without credentials, and its deploy still receives them', { timeout: 240_000 }, async () => {
  const { root, records } = await seed('fresh', versions.first);
  assert.ok(!existsSync(join(root, 'node_modules')), 'nothing is installed yet');
- const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment(credentials) });
+ const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment({ ...credentials, ...others, ...kept }) });
  assert.equal(installed.code, 0, installed.stderr);
  const scripts = await recorded(records, 'install');
  assert.ok(scripts.length >= 1, 'the dependency build script ran');
- for (const names of scripts) for (const name of Object.keys(credentials)) assert.ok(!names.includes(name), `${name} never reaches a dependency build script`);
+ for (const names of scripts) {
+  for (const name of Object.keys({ ...credentials, ...others })) assert.ok(!names.includes(name), `${name} never reaches a dependency build script`);
+  for (const name of ['PATH', 'HOME', ...Object.keys(kept)]) assert.ok(names.includes(name), `${name} reaches the dependency build script`);
+ }
 
  const deployed = await run(process.execPath, [launcher, 'deploy', '--non-interactive'], { cwd: root, env: environment(credentials) });
  assert.equal(deployed.code, 0, deployed.stderr);

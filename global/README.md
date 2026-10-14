@@ -184,8 +184,10 @@ which inside `pnpm run` is the pinned copy in `node_modules/.bin`, so
 `rer` hands every verb to the pinned package, launching included. Until
 `node_modules` holds the pinned version (a fresh clone, or a pulled pin change),
 every verb installs it first (the frozen `pnpm install`), then runs it.
-Every dependency install runs without the caller's credentials: variables whose
-name or value marks one, `CLOUDFLARE_*` account settings and application
+Every dependency install, `rer release`'s included, runs without the caller's
+credentials: variables whose name or value marks one (`PGPASSWORD`, `*_JWT`,
+`npm_config_*auth*`, a URL with a password or `?authToken=`, a `ghp_` or `sk-`
+token under any name), `CLOUDFLARE_*` and `AWS_*` settings and application
 bindings never reach the package manager or a dependency's build script.
 
 Heavy package scripts wait for this computer's job queue with

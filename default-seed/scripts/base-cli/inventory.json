@@ -69,7 +69,7 @@
     },
     "dependency-environment.mjs": {
       "source": "onboarding/dependency-environment.mjs",
-      "sha256": "2eec16c0eb2cc349e46c7f9124fa854fe44833ee99ec6998bf8f88618bc50040"
+      "sha256": "9243c0847c8e88affd4796a614757daabe90f027abb01ac5873c38ef3f77cf20"
     },
     "dev-identity.mjs": {
       "source": "onboarding/dev-identity.mjs",
@@ -229,7 +229,7 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "68e19e5f853efbc9d4474a2b95357568a956fd8e462ed7725335f2a5f5daf40b"
+      "sha256": "948a08da1f92ec8544c37b5ac49ca0833410058d88e16bdb2ffe16ef360b2d49"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
@@ -995,7 +995,7 @@
     },
     "modules/deploy-kit/migration-ledger.mjs": {
       "source": "modules/deploy-kit/migration-ledger.mjs",
-      "sha256": "59aa3688bbc4e6a3ba233112f670e66b804f75b57903d437be87d845b674baf1"
+      "sha256": "2ee5a74195b5bdd87475db3ea28a16b3873da0c97ac47d3170d791d98368de27"
     },
     "modules/deploy-kit/migrations.mjs": {
       "source": "modules/deploy-kit/migrations.mjs",
@@ -2011,7 +2011,7 @@
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "cb681b53707123c331c9ed0aa1d3d75543d4ad959d3114a194607152fc05f8e3"
+      "sha256": "ee8553008cb5add4978a87c4546cb5d58459a7d98d7ee3740e19881e233ab08c"
     },
     "modules/release/public-child-transport-state.cjs": {
       "source": "modules/release/public-child-transport-state.cjs",
@@ -2055,7 +2055,7 @@
     },
     "modules/release/source.mjs": {
       "source": "modules/release/source.mjs",
-      "sha256": "b1a70bc89c4b660d68f36ff3712790b2c2d571531fe280231126445057a8134c"
+      "sha256": "22ed6384e5cdc2c9c38f4864a85920ec8bcb38ab12a45934717aa88f79cb1302"
     },
     "modules/release/statement.mjs": {
       "source": "modules/release/statement.mjs",
