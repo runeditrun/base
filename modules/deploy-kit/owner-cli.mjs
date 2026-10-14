@@ -50,7 +50,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     const binding = values.set ?? values.unset, item = (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(entry => entry?.binding === binding);
     if (!item) { const error = new Error('undeclared-secret'); error.resource = `secret:${binding}`; throw error; }
     const value = values.set === undefined ? undefined : env[item.environment];
-    return {ok:true,...await ownerSecret({api,target,statePath,binding,value}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
+    return {ok:true,...await ownerSecret({api,target,statePath,binding,value,fetch,healthOptions}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
   const state = await settleOwnerState({api,target,statePath});

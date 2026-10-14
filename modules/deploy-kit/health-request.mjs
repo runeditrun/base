@@ -1,4 +1,9 @@
+import { StringDecoder } from 'node:string_decoder';
 import { assert } from './validation.mjs';
+
+// Do not flush an incomplete final character: a replacement would corrupt a
+// truncated credential prefix before the caller can redact it.
+const decodePrefix = bytes => new StringDecoder('utf8').write(bytes.subarray(0,256));
 
 async function bodyPrefix(response) {
   if (!response.body) return '';
@@ -11,7 +16,7 @@ async function bodyPrefix(response) {
     }
   } catch { /* HTTP status remains authoritative if its diagnostic body breaks. */ }
   finally { await reader.cancel().catch(() => {}); }
-  return bytes.toString('utf8');
+  return decodePrefix(bytes);
 }
 
 /** One credential-free, bounded request. Retain only bounded response evidence. */
@@ -41,7 +46,7 @@ export async function healthRequest({origin, receipt, versionId, request, timeou
         const {done,value} = await reader.read();
         if (done) break;
         bytes = Buffer.concat([bytes, value]);
-        attempt.body = bytes.subarray(0,256).toString('utf8');
+        attempt.body = decodePrefix(bytes);
         assert(bytes.length <= 65536,'response-too-large');
       }
     } finally { await reader.cancel().catch(() => {}); }

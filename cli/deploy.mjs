@@ -8,6 +8,7 @@ import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
+import { mutationReadinessFailure } from './deploy-readiness.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -63,7 +64,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
     step = 'secrets';
     const binding = options.setSecret ?? options.unsetSecret;
     await owner('secret', [options.setSecret ? '--set' : '--unset', binding]);
-    store.report(`${options.setSecret ? `Set ${binding}` : `Removed ${binding}`} on this environment's Worker and recorded its new version; the next ${again} updates it.`);
+    store.report(`${options.setSecret ? `Set ${binding}` : `Removed ${binding}`} on this environment's Worker, recorded its new version and verified hosted readiness.`);
     return { binding, present: Boolean(options.setSecret), deployed: false };
    }
    store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
@@ -95,6 +96,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
 
 // The failing step, its redacted cause, what this run created and the command that continues.
 function failureText({ error, step, created, again, retry, secretChange, deployed, redact }) {
+ const readiness = mutationReadinessFailure(error, { again, redact });
+ if (readiness) return readiness;
  const diagnostic = deployDiagnostic(error, redact);
  const code = diagnostic?.code ?? (/^[a-zA-Z0-9_-]{1,120}$/.test(error.message) ? redact(error.message) : 'deploy-failed');
  const at = step === 'deploy' ? diagnostic?.step ?? 'prepare deploy' : step;

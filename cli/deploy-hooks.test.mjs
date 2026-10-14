@@ -158,3 +158,42 @@ test('identity-provider deploy cannot report ownership from an absent link', asy
  const state = JSON.parse(await readFile(join(f.root, '.rer/deploy/production.json'), 'utf8'));
  assert.equal(state.ownerClaim, undefined);
 });
+
+for (const declared of [false, true]) test(`hook finalization (${declared ? 'declared object' : 'legacy function'}) fails after applied token retirement`, async t => {
+ const f = await fixture(t, { declared });
+ let elapsed = 0;
+ t.mock.method(performance, 'now', () => elapsed);
+ f.provider.state.healthOverride = () => {
+  if (!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN')) { elapsed += 90000; return new Response('SETUP_TOKEN required synthetic-mail-value\nsecond line', { status: 503 }); }
+  const vars = Object.fromEntries(f.provider.state.settings.bindings.map(item => [item.name, item.text]));
+  return Response.json({ ok: true, deployment: { sourceSha: vars.RER_DEPLOY_SOURCE, fingerprint: vars.RER_DEPLOY_FINGERPRINT, versionId: f.provider.state.version.id } });
+ };
+ await assert.rejects(f.run(), error => {
+  assert.equal(error.exitCode, 1);
+  assert.match(error.message, /owner claimed/i); assert.match(error.message, /token retirement/i);
+  assert.match(error.message, /HTTP 503/); assert.match(error.message, /configuration.*redeploy/i);
+  assert.doesNotMatch(error.message, /synthetic-mail-value|second line|--set-secret SETUP_TOKEN|retirement is not confirmed/);
+  return true;
+ });
+ const state = JSON.parse(await readFile(join(f.root, '.rer/deploy/production.json'), 'utf8'));
+ assert.equal(state.ownerClaim.outcome, 'claimed'); assert.ok(state.retiredSecrets.includes('SETUP_TOKEN'));
+ assert.equal(state.receipt.provider.versionId, f.provider.state.version.id);
+ assert.ok(!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
+ assert.equal(f.claims.length, 1);
+ assert.ok(!f.progress.some(line => line.includes('Sign in by email')));
+ // Public lifecycle errors carry nonzero exits for explicit mutations too.
+ const builds = f.builds();
+ process.env.SESSION_SECRET = 'test-only-session-rotation';
+ await rm(join(f.root, 'dist'), { recursive: true });
+ await writeFile(join(f.root, '.gitignore'), 'dirty source');
+ for (const options of [{ setSecret: 'SESSION_SECRET' }, { unsetSecret: 'SESSION_SECRET' }]) {
+  await assert.rejects(f.run(options), error => {
+   assert.equal(error.exitCode, 1); assert.match(error.message, /secret change.*applied/i); assert.match(error.message, /HTTP 503/);
+   return true;
+  });
+  const saved = JSON.parse(await readFile(join(f.root, '.rer/deploy/production.json'), 'utf8'));
+  assert.equal(saved.receipt.provider.versionId, f.provider.state.version.id);
+  assert.equal(f.provider.state.secrets.some(item => item.name === 'SESSION_SECRET'), Boolean(options.setSecret));
+ }
+ assert.equal(f.builds(), builds);
+});

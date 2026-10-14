@@ -230,7 +230,7 @@ test('secret writes settle ambiguous answers within their window and clear refus
       return api.request(path,options);
     }};
     fail(present ? 'PUT' : 'DELETE', present ? /\/secrets$/ : /\/secrets\/AUTH_SECRET$/, answer);
-    const change = ownerSecret({api:observed,target,statePath,binding:'AUTH_SECRET',...(present ? {value:'test-only-rotated'} : {}),
+    const change = ownerSecret({api:observed,target,statePath,fetch:args.fetch,binding:'AUTH_SECRET',...(present ? {value:'test-only-rotated'} : {}),
       windowMs:6000,clock:() => elapsed,sleep:async ms => { elapsed += ms; sleeps++; }});
     if (answer.afterApply) await change;
     else await assert.rejects(change, /provider|token-scope-missing/);
@@ -312,7 +312,7 @@ test('secret settlement polls delayed or failed reads and clears unconfirmed suc
       if (writing && scenario === 'wrong-presence' && path.endsWith('/secrets')) return [];
       return api.request(path,options);
     }};
-    const change = ownerSecret({api:observed,target,statePath,binding:'AUTH_SECRET',value:'test-only-rotated',
+    const change = ownerSecret({api:observed,target,statePath,fetch:args.fetch,binding:'AUTH_SECRET',value:'test-only-rotated',
       windowMs:6000,clock:() => elapsed,sleep:async ms => { elapsed += ms; }});
     if (['read-503','read-reset','lag'].includes(scenario)) {
       await change;

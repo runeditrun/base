@@ -4,6 +4,7 @@ import { invalid, refuse, RerError } from './errors.mjs';
 import { ownerDeploy } from './deploy.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
+import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { observeOwner } from './deploy-observation.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
@@ -86,6 +87,8 @@ export async function deployCommand(context) {
   const outcome = error.owner ?? claimed ?? observedClaims.at(-1)?.outcome;
   const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}; setup token retirement is not confirmed.` : 'The custom deploy did not finish; inspect its deployment record before recovery.';
   const redact = value => store.redact?.(redaction.redact(value)) ?? redaction.redact(value);
+  const readiness = mutationReadinessFailure(error, { again, redact });
+  if (readiness) throw commandFailure(readiness);
   throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
  }
 }

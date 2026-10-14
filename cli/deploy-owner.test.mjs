@@ -244,3 +244,72 @@ test('a secret change settles after its response is lost; one the provider refus
  await provider.fetch(origin, { method: 'PUT', headers: { Authorization: `Bearer ${provider.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'SESSION_SECRET', text: 'x', type: 'secret_text' }) });
  await assert.rejects(run({}), /owned-resource-replaced/);
 });
+
+// A failed hosted response exhausts virtual readiness time; normal timers are untouched.
+function virtualReadiness(t) {
+ let elapsed = 0;
+ t.mock.method(performance, 'now', () => elapsed);
+ return () => { elapsed += 90000; };
+}
+
+test('post-retirement 503 fails deploy while preserving owner, retired token and new version', async t => {
+ const { root } = await checkout(t, { secrets: ['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ binding: name, environment: name })) });
+ const { provider, claims } = account(t);
+ const exhaust = virtualReadiness(t);
+ let retiredVersion;
+ provider.state.healthOverride = () => {
+  if (!secretNames(provider).includes('SETUP_TOKEN')) {
+   exhaust(); retiredVersion = provider.state.version.id;
+   return new Response(`SETUP_TOKEN required ${process.env.CLOUDFLARE_API_TOKEN}\nsecond diagnostic must not print`, { status: 503 });
+  }
+  const vars = Object.fromEntries(provider.state.settings.bindings.map(item => [item.name, item.text]));
+  return Response.json({ ok: true, deployment: { sourceSha: vars.RER_DEPLOY_SOURCE, fingerprint: vars.RER_DEPLOY_FINGERPRINT, versionId: provider.state.version.id } });
+ };
+ const out = store();
+ await assert.rejects(ownerDeploy('deploy.json', lifecycle)({ root, options: {}, store: out, setupManifest: manifest }), error => {
+  assert.match(error.message, /owner claimed/i); assert.match(error.message, /token retirement/i);
+  assert.match(error.message, /HTTP 503/); assert.match(error.message, /SETUP_TOKEN required/);
+  assert.match(error.message, /configuration.*redeploy/i);
+  assert.doesNotMatch(error.message, /--set-secret SETUP_TOKEN|second diagnostic/);
+  assert.ok(!error.message.includes(provider.token));
+  return true;
+ });
+ assert.equal(claims.length, 1);
+ assert.equal(provider.state.databases[0].db.prepare('SELECT id FROM owner').get().id, 'owner@example.test');
+ const state = JSON.parse(await readFile(join(root, '.rer/deploy/production.json'), 'utf8'));
+ assert.equal(state.ownerClaim.outcome, 'claimed'); assert.ok(state.retiredSecrets.includes('SETUP_TOKEN'));
+ assert.equal(state.receipt.provider.versionId, retiredVersion);
+ assert.equal(state.receipt.health.ok, false);
+ assert.ok(!JSON.stringify(state).includes(provider.token));
+ assert.ok(!secretNames(provider).includes('SETUP_TOKEN'));
+ assert.ok(!out.lines.some(line => line.includes('Sign in by email')));
+});
+
+for (const options of [{ setSecret: 'SESSION_SECRET' }, { unsetSecret: 'SESSION_SECRET' }]) test(`explicit secret ${options.setSecret ? 'set' : 'unset'} fails after applied unhealthy version without requiring source or build`, async t => {
+ const { root } = await checkout(t, { secrets: [{ binding: 'SESSION_SECRET', environment: 'SESSION_SECRET' }] });
+ const { provider } = account(t);
+ const deploy = ownerDeploy('deploy.json', { ...lifecycle, hooks: {} });
+ const run = options => deploy({ root, options, store: store(), setupManifest: manifest });
+ await run({});
+ await rm(join(root, 'dist'), { recursive: true });
+ await writeFile(join(root, '.gitignore'), 'dirty source');
+ const exhaust = virtualReadiness(t);
+ // The 256-byte diagnostic prefix ends inside é, after a long known-secret prefix.
+ process.env.SESSION_SECRET = 'secret-that-must-be-redacted'.padEnd(237, 'q') + 'é-private-tail'.repeat(20);
+ provider.state.healthOverride = () => { exhaust(); return new Response(`bad configuration ${process.env.SESSION_SECRET} ${'x'.repeat(300)}beyond-bound\nprivate second line`, { status: 503 }); };
+
+ const previous = provider.state.version.id;
+ await assert.rejects(run(options), error => {
+  assert.match(error.message, /secret change.*applied/i);
+  assert.match(error.message, /HTTP 503/); assert.match(error.message, /bad configuration/);
+  assert.doesNotMatch(error.message, /secret-that-must-be-redacted|private second line|beyond-bound|not-committed|build/);
+  return true;
+ });
+ const state = JSON.parse(await readFile(join(root, '.rer/deploy/production.json'), 'utf8'));
+ assert.notEqual(provider.state.version.id, previous);
+ assert.equal(state.receipt.provider.versionId, provider.state.version.id);
+ assert.equal(secretNames(provider).includes('SESSION_SECRET'), Boolean(options.setSecret));
+ assert.equal(state.pendingSecret, undefined);
+ assert.equal(state.receipt.health.ok, false);
+ assert.ok(!JSON.stringify(state).includes('secret-that-must-be-redacted'));
+});
