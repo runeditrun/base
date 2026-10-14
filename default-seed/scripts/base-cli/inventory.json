@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.4-dev.g18423513",
+  "cliVersion": "0.2.4-dev.g8d1e9941",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -319,7 +319,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "1ad967a827d46aaec8154dbd034f804a14c97c798fbf2917d108cd6760bc8c3e"
+      "sha256": "5d3a838f3d2b372152302bb96906ebad8b6f03732dcbfff289d7aa489956a9a8"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -399,7 +399,7 @@
     },
     "cli/deploy-hook.mjs": {
       "source": "cli/deploy-hook.mjs",
-      "sha256": "101934f565500e48682b58bad11f92d3fe14ffa87e71f910c2086f9e82a34cac"
+      "sha256": "fe0bf879a8236ce8c565d2d4720f6832e95fbaaf9520f2b89e8e3173cb978cfa"
     },
     "cli/deploy-inputs.mjs": {
       "source": "cli/deploy-inputs.mjs",

@@ -170,6 +170,11 @@ test('a hook keeping its own record is claimed from its result once /health name
  f.adapter.deploy = async () => ({ deployed: false });
  await assert.rejects(f.run(), error => /without reporting a live deployment/.test(error.message) && !/receipt/.test(error.message));
  assert.equal(f.claims.length, 2);
+ // An http origin off loopback is refused before rer sends it anything.
+ f.adapter.deploy = async () => ({ deployed: true, origin: new URL(first.origin).origin.replace('https:', 'http:'), setupToken: 'hook-token-value' });
+ const sent = f.requests.length;
+ await assert.rejects(f.run(), error => /not https/.test(error.message) && /return its https origin/.test(error.message) && !error.message.includes('hook-token-value'));
+ assert.equal(f.requests.length, sent); assert.equal(f.claims.length, 2);
 });
 
 test('uncommitted tracked source stops the deploy before building and names the files', async t => {

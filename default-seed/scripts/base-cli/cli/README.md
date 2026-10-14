@@ -273,7 +273,8 @@ against that registry.
 Owner-account application deploy completion is shared across standard and custom
 hooks. An adapter can declare `deployDeclaration` (or `deploy.declaration`);
 legacy hooks with one root owner deployment declaration are supported too. A
-custom hook returns `{ deployed: true, origin }` once its upload is live, plus
+custom hook returns `{ deployed: true, origin }` once its upload is live (an
+https origin; http only on a loopback host, or rer sends it nothing), plus
 `setupToken` when its Worker holds a setup token other than the `SETUP_TOKEN`
 rer passed it. rer waits until the origin's `/health` names the checkout's commit,
 then runs the adapter's actual owner bootstrap with that token and prints the

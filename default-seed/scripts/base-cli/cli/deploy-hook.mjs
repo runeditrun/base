@@ -1,11 +1,14 @@
 import { waitHealth } from '../modules/deploy-kit/health-request.mjs';
+import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 
 // A custom deploy hook owns its upload and whatever record it keeps of it. It
 // returns { deployed: true, origin }; rer claims the owner only once that
-// origin's /health names the commit this run deployed.
+// origin's /health names the commit this run deployed. The origin is https
+// (http only on loopback), since the claim sends the one-time setup token there.
 export function hookOrigin(deployed, again) {
- const origin = deployed?.deployed === true && typeof deployed.origin === 'string' && URL.canParse(deployed.origin) ? new URL(deployed.origin).origin : undefined;
- if (origin && origin === deployed.origin) return origin;
+ const url = deployed?.deployed === true && typeof deployed.origin === 'string' && URL.canParse(deployed.origin) ? new URL(deployed.origin) : undefined;
+ if (url?.protocol === 'http:' && !isLoopbackHost(url.hostname)) throw hookFailure(`The deploy hook reported its deployment at ${url.origin}, which is not https, so rer sent it nothing and claimed no owner. Make the hook return its https origin, then run ${again} again.`);
+ if (url && (url.protocol === 'https:' || url.protocol === 'http:') && url.origin === deployed.origin) return url.origin;
  throw hookFailure(`The deploy hook finished without reporting a live deployment, so rer claimed no owner. A deploy hook returns { deployed: true, origin } once its upload is live. Check the hook's output above, fix the hook, then run ${again} again.`);
 }
 
