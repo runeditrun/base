@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.4-dev.ga04e9f70",
+  "cliVersion": "0.2.5-dev.g22821a27",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2247,7 +2247,7 @@
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",
-      "sha256": "d60bb6bb45a768493b5869cca3b5dd0f8d87d2ce28197407522ea224aa304dbb"
+      "sha256": "d5affef88ece3f33d27d1ba5d98c85d9f90cacebdd2f3856dd09659cd9e77225"
     },
     "scripts/publish-check/publication_config.py": {
       "source": "scripts/publish-check/publication_config.py",

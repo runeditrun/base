@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.5
 
 - `rer deploy` with a seed's own deploy hook claims the hosted owner from what the hook returns, `{ deployed: true, origin }`, once the origin's `/health` names the checkout's commit, and prints the sign-in address. A hook that keeps its own deployment record (Penny's does) no longer ends in `missing-owner-receipt` with a live, unclaimed app; such a hook returns `setupToken` too when its Worker holds a setup token other than the `SETUP_TOKEN` rer passed it. A hook that reports no deployment, or whose app never names the commit, fails saying so and claims nothing.
 - `rer deploy` with uncommitted changes to tracked files stops before building, lists the files, says to commit them and that nothing was uploaded (exit 4), instead of building first and failing with `owner-source-not-committed`.
@@ -8,6 +8,14 @@
 - `rer describe` lists `demo` as a verb (`rer dev --demo`), with its effects and the flags a demo takes.
 - Two launches claiming the same port, or two workers claiming the same checkout's launch, get exactly one winner: the claim is written complete and linked into place, so the other never reads it half-written and takes it as abandoned.
 - `node scripts/export-cli.mjs --to-package` on a composed foundation drops the removed `scripts/base-cli` copy's entries from `composition.lock.json` along with its files, so `rer check` no longer fails `SC-05.auth-copy` for files the conversion deleted.
+- `rer deploy` refuses a seed deploy hook's `http://` origin (other than a loopback host such as `localhost`, `127.0.0.1` or `[::1]`) before sending it anything, so the one-time setup token only travels over https; it says to make the hook return its https origin.
+- After a redeploy whose app answers unhealthy, the owner state in `.rer/deploy/` keeps each health check's status and timing but not the response text, so a secret an app echoes is never saved there; the secret command already kept none.
+- A secret change `rer deploy` could not yet confirm stays recorded until the provider's records agree, and blocks another secret change, deploy or removal until then; a secret added or removed outside rer meanwhile is refused instead of adopted.
+
+### Upgrade notes
+
+- A seed's custom deploy hook returns `{ deployed: true, origin }` with an https origin (and may add `setupToken`); `rer deploy` waits for that origin's `/health` to name the checkout's commit, then claims the owner itself.
+- A seed adopting `rer demo` needs rer 0.2.5 for `rer deploy --demo`.
 
 ## 0.2.4
 
