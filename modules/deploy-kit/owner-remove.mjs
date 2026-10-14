@@ -43,7 +43,7 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
   const api = withSettledLists(withScopeHints(provider));
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
-    if (await settlePendingSecret(api, target.worker, state)) await writeOwnerState(statePath, state);
+    if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await writeOwnerState(statePath, state);
     const owned = KINDS.flatMap(kind => Object.entries(state.owned[kind]).map(([name, entry]) => ({kind, name, entry})));
     assert(state.owned.worker || owned.length, 'nothing-to-remove');
     // Preflight, read-only.

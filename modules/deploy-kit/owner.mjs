@@ -169,7 +169,8 @@ export async function readOwnerState(path, target) {
   assert(state.pendingUpload === undefined || typeof state.pendingUpload?.fingerprint === 'string' && typeof state.pendingUpload?.build === 'string', 'invalid-owner-state');
   // Declared secrets rer removed on purpose (the spent setup token): later plans omit them.
   assert(state.pendingSecret === undefined || identifier(state.pendingSecret?.binding) && typeof state.pendingSecret?.present === 'boolean'
-    && (state.pendingSecret.versionId === undefined || uuid(state.pendingSecret.versionId)), 'invalid-owner-state');
+    && (state.pendingSecret.versionId === undefined || uuid(state.pendingSecret.versionId))
+    && (state.pendingSecret.repeatVersionId === undefined || uuid(state.pendingSecret.repeatVersionId)), 'invalid-owner-state');
   assert(state.ownerClaim === undefined || ['claimed','kept'].includes(state.ownerClaim?.outcome), 'invalid-owner-state');
   assert(state.retiredSecrets === undefined || Array.isArray(state.retiredSecrets) && state.retiredSecrets.every(identifier), 'invalid-owner-state');
   assert(state.accountId === target.accountId && state.project === target.project && state.environment === target.environment && state.worker === target.worker, 'owner-state-target-mismatch');
@@ -244,18 +245,40 @@ export function recordSecretChange(state, current, {binding, present}) {
 /** A secret change rer recorded as pending but never confirmed (a lost response, or a run that
  * ended before the change settled). It is that change only when the Worker's versions list shows
  * exactly one version after the recorded starting version and it is the live one, still running the receipt's
- * exact script and build fingerprint: adopt its version. Anything else, such as a later change
- * someone made after rer's, is left to the identity check, which refuses it. */
-export async function settlePendingSecret(api, worker, state) {
-  if (!state.pendingSecret || !state.receipt || state.pendingSecret.versionId !== state.receipt.provider.versionId) return false;
+ * exact script and build fingerprint: adopt its version. A confirming PUT also records its
+ * own starting version before it writes; its immediate successor can be recovered by the
+ * same checks. Anything later is left to the identity check, which refuses it. */
+export async function settlePendingSecret(api, worker, state, {preflight = false, observe, confirm} = {}) {
+  if (!state.pendingSecret || !state.receipt) return false;
   const live = await activeWorker(api, worker);
-  if (!live || sameDeployment(live, state.receipt.provider) || live.etag !== state.receipt.provider.etag || deployedFingerprint(live.settings) !== state.receipt.fingerprint) return false;
+  if (sameDeployment(live, state.receipt.provider)) {
+    // A new command sees that the abandoned write made no live version change.
+    // During the write's own readback this can still be propagation delay.
+    if (!preflight) {
+      // Deployment propagation can lag a secret write's version. Only a
+      // matching newest version corroborates that the write was unapplied.
+      const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
+      observe?.(Array.isArray(versions) && versions[0]?.id === live.versionId ? live : null);
+      return false;
+    }
+    delete state.pendingSecret;
+    return true;
+  }
+  observe?.(live);
+  if (state.pendingSecret.versionId !== state.receipt.provider.versionId || !live || live.etag !== state.receipt.provider.etag || deployedFingerprint(live.settings) !== state.receipt.fingerprint) return false;
   // Newest first, as the provider lists them.
   const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
   const ids = Array.isArray(versions) ? versions.map(item => item?.id) : [];
-  if (ids[0] !== live.versionId || ids.indexOf(state.pendingSecret.versionId) !== 1) return false;
+  const {versionId, repeatVersionId} = state.pendingSecret;
+  const immediate = ids.indexOf(versionId) === 1;
+  const repeated = repeatVersionId && ids[1] === repeatVersionId && ids.indexOf(versionId) === 2;
+  // A rotation's ambiguous first answer requires a second PUT before success.
+  // Its starting version is saved before that PUT, so interruption can recover
+  // either the original immediate successor or the second write's successor.
+  if (ids[0] !== live.versionId || !(repeatVersionId ? repeated || preflight && immediate && live.versionId === repeatVersionId : immediate)) return false;
   const rows = await api.request(`/workers/scripts/${worker}/secrets`);
   if (!Array.isArray(rows) || rows.some(row => row.name === state.pendingSecret.binding) !== state.pendingSecret.present) return false;
+  if (confirm && !repeatVersionId) { await confirm(live); return false; }
   recordSecretChange(state, live, state.pendingSecret);
   return true;
 }
@@ -264,7 +287,7 @@ export async function settleOwnerState({api: provider, target, statePath}) {
   const api = withScopeHints(provider);
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
-    if (await settlePendingSecret(api, target.worker, state)) await writeOwnerState(statePath, state);
+    if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await writeOwnerState(statePath, state);
     return state;
   });
 }
@@ -321,6 +344,7 @@ export async function ownerDeploy({api: provider, target, plan, artifact, stateP
 async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle}) {
   const state = await readOwnerState(statePath, target);
   const save = () => writeOwnerState(statePath, state);
+  if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
   await checkServiceWorkers(api, plan);
   const priorWorker = await checkOwnedWorker(api, plan, artifact, state);
   const exists = priorWorker !== null;

@@ -140,6 +140,41 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  const writes = provider.state.writes.length;
  await assert.rejects(run(), /owned-resource-replaced/);
  assert.equal(provider.state.writes.length, writes);
+ for (const scenario of ['read-outage','lag','active-lag','lost-response','applied-524']) await t.test(`unconfirmed setup-token retirement ${scenario}`, async t => {
+  const { root } = await checkout(t, { secrets: secrets.filter(item => item.binding !== 'MAIL_API_KEY') });
+  const { provider, claims } = account(t);
+  const run = (options = {}) => ownerDeploy('deploy.json', lifecycle)({ root, options: { environment: 'production', ...options }, store: store(), setupManifest: manifest });
+  let unconfirmed = false, elapsed = 0, startingVersion, deployments;
+  const clock = performance.now.bind(performance), inner = globalThis.fetch;
+  // Advance the clock past the readback window while the provider cannot confirm it.
+  t.mock.method(performance, 'now', () => unconfirmed ? (elapsed += 60000) : clock());
+  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+   const url = new URL(input), method = init.method ?? 'GET';
+   if (unconfirmed && scenario === 'active-lag' && method === 'GET' && url.pathname.endsWith('/deployments')) return Response.json({ success: true, result: { deployments } });
+   if (unconfirmed && method === 'GET' && url.pathname.endsWith('/versions')) {
+    if (scenario === 'lag') return Response.json({ success: true, result: { items: [{ id: startingVersion }] } });
+    return Response.json({ success: false, errors: [{ code: 10013, message: 'test-only read outage' }] }, { status: 503 });
+   }
+   if (method === 'DELETE' && url.pathname.endsWith('/secrets/SETUP_TOKEN')) {
+    startingVersion = provider.state.version.id;
+    deployments = structuredClone(provider.state.deployments);
+    try { return await inner(input, init); }
+    finally { unconfirmed = true; }
+   }
+   return inner(input, init);
+  });
+  if (scenario === 'lost-response' || scenario === 'applied-524') provider.fail('DELETE', /\/secrets\/SETUP_TOKEN$/, { afterApply: true, ...(scenario === 'applied-524' ? { status: 524 } : {}) });
+  await assert.rejects(run(), error => /setup token retirement failed/.test(error.message) && /--unset-secret SETUP_TOKEN/.test(error.message));
+  unconfirmed = false;
+  const statePath = join(root, '.rer/deploy/production.json'), saved = JSON.parse(await readFile(statePath, 'utf8'));
+  assert.equal(saved.pendingSecret.versionId, startingVersion);
+  assert.ok(!secretNames(provider).includes('SETUP_TOKEN'));
+  await run({ unsetSecret: 'SETUP_TOKEN' });
+  assert.equal((await run()).owner, 'kept');
+  assert.equal(claims.length, 1, 'recovery keeps the owner already claimed');
+  assert.ok(!secretNames(provider).includes('SETUP_TOKEN'));
+  assert.equal(JSON.parse(await readFile(statePath, 'utf8')).pendingSecret, undefined);
+ });
 });
 
 test('rer deploy recovers an unclaimed hosted owner after manual setup-token retirement', async t => {

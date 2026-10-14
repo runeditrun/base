@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.4-dev.g4e891217",
+  "cliVersion": "0.2.4-dev.gd27cecca",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1011,15 +1011,15 @@
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
-      "sha256": "8601007538f5f5f038fcbd5e0ceac83a301a529d0089b6343f996d89a4ba52e9"
+      "sha256": "021df3a33c7f94b315b92da9fb76d5341659c9ab66bf58d8cc35354093f8cbb4"
     },
     "modules/deploy-kit/owner-secret.mjs": {
       "source": "modules/deploy-kit/owner-secret.mjs",
-      "sha256": "eb160c8e1a28192f32aadbdbdaaf562020bf88d6cf527be390651365e88e25cf"
+      "sha256": "3ebce65a0c48dd13173b84ed9918f94819820b36a9aba72d40d053e8a3506538"
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "2b3a52b1e70709b59a4b05678e9273415160033429d023448e9c7f8f616296cb"
+      "sha256": "797885399d0cbae2b72a334695632faad8668eabf3ab8eb92a09b62910fd723d"
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",
