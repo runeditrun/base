@@ -184,11 +184,12 @@ which inside `pnpm run` is the pinned copy in `node_modules/.bin`, so
 `rer` hands every verb to the pinned package, launching included. Until
 `node_modules` holds the pinned version (a fresh clone, or a pulled pin change),
 every verb installs it first (the frozen `pnpm install`), then runs it.
-Every dependency install, `rer release`'s included, runs without the caller's
-credentials: variables whose name or value marks one (`PGPASSWORD`, `*_JWT`,
-`npm_config_*auth*`, a URL with a password or `?authToken=`, a `ghp_` or `sk-`
-token under any name), `CLOUDFLARE_*` and `AWS_*` settings and application
-bindings never reach the package manager or a dependency's build script.
+Every dependency install, `rer release`'s included, receives an allowlisted
+environment: the shell, locale, terminal and temporary-folder variables, `CI`,
+`TZ`, `SSH_AUTH_SOCK`, `NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `XDG_*`, proxy
+settings without their user:password, and `npm_config_*`, `PNPM_*`,
+`COREPACK_*` and `RER_*` settings that carry no credential by name or value.
+No other variable reaches the package manager or a dependency's build script.
 
 Heavy package scripts wait for this computer's job queue with
 `rer queue NAME -- COMMAND [ARGS]` (in vendored mode,

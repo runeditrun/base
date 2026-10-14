@@ -1,7 +1,8 @@
 // A checkout that pins the rer package, through the installed launcher: a
-// fresh clone's first rer install runs dependency build scripts without the
-// caller's credentials while the seed's own deploy still receives
-// them, and after a pulled pin change rer deploy installs the new pin first.
+// fresh clone's first rer install runs dependency build scripts with an
+// allowlisted environment, never the caller's credentials, while the seed's
+// own deploy still receives them, and after a pulled pin change rer deploy
+// installs the new pin first.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -19,9 +20,15 @@ const base = resolve(import.meta.dirname, '../..');
 const launcher = join(base, 'global/rer.mjs');
 // Synthetic provider credentials a person has exported in their shell.
 const credentials = { CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token-0001', CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef', SENDGRID_API_KEY: 'SG.synthetic-sendgrid-key-0001' };
-// Other credentials a dependency script never sees: by name, run-together
-// name, or a value that carries a token whatever the variable is called.
+// Other credentials a dependency script never sees: vault sessions, a
+// connection string, a private key, an Authorization header, provider tokens,
+// and any variable not on the install's allowlist, whatever it is called.
+const pem = ['-----BEGIN PRIVATE KEY-----', Buffer.from('synthetic-private-key').toString('base64'), '-----END PRIVATE KEY-----'].join('\n');
 const others = {
+ BW_SESSION: Buffer.from('synthetic-bitwarden-session').toString('base64'), OP_SESSION_fixture: 'synthetic-1password-session', FASTLANE_SESSION: 'synthetic-cookie-jar',
+ AZURE_STORAGE_CONNECTION_STRING: `DefaultEndpointsProtocol=https;AccountName=fixture;AccountKey=${Buffer.from('synthetic-account-key').toString('base64')};EndpointSuffix=core.windows.net`,
+ GITHUB_APP_PEM: pem, EXTRA_HEADERS: 'Authorization: Bearer synthetic-bearer-value', FIXTURE_UNKNOWN_SETTING: 'plain',
+ npm_config_fixture_key: pem, RER_FIXTURE_HEADER: 'Authorization: Basic ' + Buffer.from('fixture:synthetic').toString('base64'), PNPM_FIXTURE_SESSION: 'synthetic-session',
  PGPASSWORD: 'synthetic-password', DBPASSWORD: 'synthetic-password', CLIENTSECRET: 'synthetic-secret', GPG_PASSPHRASE: 'synthetic-passphrase',
  CI_JOB_JWT: 'synthetic-jwt', DOCKER_CREDS: 'synthetic-creds', GITHUB_PAT: 'synthetic-pat', GOOGLE_APPLICATION_CREDENTIALS: '/synthetic/key.json',
  SLACK_WEBHOOK_URL: 'https://hooks.slack.example/services/synthetic', AWS_ACCESS_KEY_ID: 'synthetic-aws-id', AWS_REGION: 'us-east-1',
@@ -30,8 +37,14 @@ const others = {
  GH: 'ghp_' + 'synthetic0'.repeat(4), FINE: 'github_pat_' + 'synthetic0'.repeat(4), OPENAI: 'sk-proj-' + 'synthetic0'.repeat(4),
  SLACK: 'xoxb-' + 'synthetic0'.repeat(3), AMAZON: 'AKIA' + 'SYNTHETIC0'.repeat(2), SIGNED: [{ alg: 'HS256' }, { sub: 'fixture' }, 'fixture-signature'].map(part => Buffer.from(typeof part === 'string' ? part : JSON.stringify(part)).toString('base64url')).join('.'),
 };
-// What an install still needs, even where a value resembles a token.
-const kept = { LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8', NO_PROXY: 'localhost,127.0.0.1', CI: '1', RER_STATE_DIR: '/synthetic/hf_models_cache_state' };
+// The install's allowlist, kept even where a value resembles a token.
+const kept = {
+ USER: 'fixture', LOGNAME: 'fixture', SHELL: '/bin/sh', TERM: 'dumb', LANG: 'en_US.UTF-8', LANGUAGE: 'en_US', LC_ALL: 'en_US.UTF-8', TZ: 'UTC', CI: 'true',
+ NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1', SSH_AUTH_SOCK: '/synthetic/agent.sock', NODE_OPTIONS: '--max-old-space-size=4096',
+ XDG_CONFIG_HOME: '/synthetic/xdg-config', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0', PNPM_FIXTURE_SETTING: 'plain', npm_config_fixture_setting: 'plain', RER_STATE_DIR: '/synthetic/hf_models_cache_state',
+};
+// A proxy reaches the install without its user:password.
+const proxy = { HTTPS_PROXY: 'http://fixture:synthetic-password@proxy.invalid:3128' };
 
 let directory, registry, versions;
 before(async () => {
@@ -53,7 +66,7 @@ async function seed(name, version) {
  const root = join(directory, name), records = join(directory, `${name}-records`);
  await mkdir(join(root, 'probe'), { recursive: true });
  await mkdir(records);
- const record = kind => `require('node:fs').writeFileSync(require('node:path').join(${JSON.stringify(records)}, '${kind}-' + process.pid + '.json'), JSON.stringify(Object.keys(process.env)))`;
+ const record = kind => `require('node:fs').writeFileSync(require('node:path').join(${JSON.stringify(records)}, '${kind}-' + process.pid + '.json'), JSON.stringify(process.env))`;
  await writeFile(join(root, 'probe/package.json'), JSON.stringify({ name: 'probe', version: '1.0.0', scripts: { install: 'node record.cjs' } }));
  await writeFile(join(root, 'probe/record.cjs'), record('install') + ';\n');
  await writeFile(join(root, 'adapter.mjs'), `import { createRequire } from 'node:module';
@@ -92,19 +105,21 @@ const installedVersion = async root => JSON.parse(await readFile(join(root, 'nod
 test('a fresh clone installs dependencies without credentials, and its deploy still receives them', { timeout: 240_000 }, async () => {
  const { root, records } = await seed('fresh', versions.first);
  assert.ok(!existsSync(join(root, 'node_modules')), 'nothing is installed yet');
- const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment({ ...credentials, ...others, ...kept }) });
+ const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment({ ...credentials, ...others, ...kept, ...proxy }) });
  assert.equal(installed.code, 0, installed.stderr);
  const scripts = await recorded(records, 'install');
  assert.ok(scripts.length >= 1, 'the dependency build script ran');
- for (const names of scripts) {
-  for (const name of Object.keys({ ...credentials, ...others })) assert.ok(!names.includes(name), `${name} never reaches a dependency build script`);
-  for (const name of ['PATH', 'HOME', ...Object.keys(kept)]) assert.ok(names.includes(name), `${name} reaches the dependency build script`);
+ for (const seen of scripts) {
+  for (const name of Object.keys({ ...credentials, ...others })) assert.ok(!(name in seen), `${name} never reaches a dependency build script`);
+  assert.ok(seen.PATH?.includes(process.env.PATH), 'PATH reaches the dependency build script');
+  for (const [name, value] of Object.entries({ HOME: environment().HOME, TMPDIR: directory, ...kept })) assert.equal(seen[name], value, `${name} reaches the dependency build script`);
+  assert.equal(seen.HTTPS_PROXY, 'http://proxy.invalid:3128', 'the proxy reaches the install without its user:password');
  }
 
  const deployed = await run(process.execPath, [launcher, 'deploy', '--non-interactive'], { cwd: root, env: environment(credentials) });
  assert.equal(deployed.code, 0, deployed.stderr);
  const [deploy] = await recorded(records, 'deploy');
- for (const name of Object.keys(credentials)) assert.ok(deploy?.includes(name), `the seed's deploy receives ${name}`);
+ for (const name of Object.keys(credentials)) assert.ok(deploy && name in deploy, `the seed's deploy receives ${name}`);
 });
 
 test('after a pulled pin change, rer deploy installs the new pinned package first', { timeout: 240_000 }, async () => {

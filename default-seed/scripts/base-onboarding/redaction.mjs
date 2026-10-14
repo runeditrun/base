@@ -297,11 +297,14 @@ export const credentialName = key => CREDENTIAL_NAME.test(key) || CAMEL_CREDENTI
 export const credentialUrl = value => CREDENTIAL_URL.test(value);
 // A value that carries a credential whatever its variable is called: a known
 // provider token of at least 16 characters, a JWT, or a URL with userinfo or a
-// credential query parameter (libsql://db?authToken=...).
+// credential query or connection-string parameter (libsql://db?authToken=...,
+// ...;AccountKey=...), a private key, or an Authorization header value.
 // A token never continues a path or word (/opt/hf_models_cache is a path).
 const TOKEN_VALUE = new RegExp('(?<![A-Za-z0-9_./-])' + TOKEN_PREFIX + '[A-Za-z0-9_./+=-]{12,}');
-const CREDENTIAL_QUERY = /[?&;](?:auth[_-]?token|access[_-]?token|api[_-]?key|token|key|secret|password|sig|signature)=[^&#\s]/i;
-export const credentialValue = value => TOKEN_VALUE.test(value) || jwtRanges(value).length > 0 || CREDENTIAL_URL.test(value) || CREDENTIAL_QUERY.test(value);
+const CREDENTIAL_QUERY = /[?&;](?:auth[_-]?token|access[_-]?token|api[_-]?key|account[_-]?key|shared[_-]?access[_-]?key|token|key|secret|password|sig|signature)=[^&#\s]/i;
+const PRIVATE_KEY_VALUE = /-----BEGIN [A-Z0-9 ]{0,64}PRIVATE KEY/;
+const AUTHORIZATION_VALUE = new RegExp(AUTH_HEADER + '|' + BARE_AUTH, 'i');
+export const credentialValue = value => TOKEN_VALUE.test(value) || jwtRanges(value).length > 0 || CREDENTIAL_URL.test(value) || CREDENTIAL_QUERY.test(value) || PRIVATE_KEY_VALUE.test(value) || AUTHORIZATION_VALUE.test(value);
 
 export function credentialValues(input, declared = []) {
  if (!input || typeof input !== 'object') return [];

@@ -1,22 +1,32 @@
 // A dependency install runs code the seed did not write: the package manager
 // and every build script it allows (esbuild, workerd, sharp, oxide). It gets
-// the caller's environment without provider credentials, application bindings
-// or any variable whose name or value marks a credential. The seed's own
-// commands that need them, such as deploy, still receive them.
+// only the variables an install needs, named below; every other variable,
+// whatever it is called, stays with the caller. The seed's own commands that
+// need credentials, such as deploy, still receive the whole environment.
 import { applicationBindings } from './local/environment.mjs';
 import { credentialName, credentialValue } from './redaction.mjs';
 
-// Provider account settings name the account a credential acts on.
-const provider = /^(CLOUDFLARE_|CF_|AWS_)/i;
-// Credential words inside a name, also run together: PGPASSWORD, CLIENTSECRET,
-// GPG_PASSPHRASE, CI_JOB_JWT, DOCKER_CREDS, SLACK_WEBHOOK_URL, BASICAUTH.
-const credentialPart = /TOKEN|SECRET|PASSW(OR)?D|PASSPHRASE|CREDENTIAL|CREDS|JWT|COOKIE|WEBHOOK|AUTH(?!OR)|(API|ACCESS|PRIVATE|SIGNING|ENCRYPTION|MASTER|LICENSE)_?KEY/i;
-// The install reaches its registry through these, credentials included.
+// The shell, locale, terminal and temporary folders, Node's own settings, and
+// the SSH agent a git+ssh dependency is fetched through. Kept whatever their
+// value looks like: a directory may resemble a token.
+const system = /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TMP|TEMP|TERM|LANG|LANGUAGE|LC_[A-Z]+|TZ|CI|SSH_AUTH_SOCK|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|XDG_[A-Z_]+)$/;
+// The install reaches its registry through these; any user:password is dropped.
 const proxy = /^(https?_proxy|all_proxy|no_proxy)$/i;
-// Kept whatever their value looks like: a directory may resemble a token.
-const ordinary = /^(PATH|HOME|CI|LANG|LANGUAGE|LC_[A-Z]+)$/;
+// Package manager settings and rer's control variables, except credentials.
+const settings = /^(npm_config_|PNPM_|COREPACK_|RER_)/i;
+// Credential words inside a name, also run together: NPM_CONFIG__AUTHTOKEN,
+// PNPM_REGISTRY_PASSWORD, RER_PREVIEW_TOKEN, RER_SIGNING_KEY.
+const credentialPart = /TOKEN|SECRET|PASSW(OR)?D|PASSPHRASE|CREDENTIAL|CREDS|JWT|COOKIE|WEBHOOK|SESSION|AUTH(?!OR)|(API|ACCESS|PRIVATE|SIGNING|ENCRYPTION|MASTER|LICENSE)_?KEY/i;
+
+const withoutUserinfo = value => value.replace(/^([a-z][a-z0-9+.-]*:\/\/)?[^\s/]*@/i, '$1');
 
 export function dependencyEnvironment(env = process.env) {
- return Object.fromEntries(Object.entries(env).filter(([key, value]) => value !== undefined
-  && (proxy.test(key) || ordinary.test(key) || !(credentialName(key) || credentialPart.test(key) || provider.test(key) || applicationBindings.test(key) || credentialValue(value)))));
+ const kept = {};
+ for (const [key, value] of Object.entries(env)) {
+  if (value === undefined) continue;
+  if (system.test(key)) kept[key] = value;
+  else if (proxy.test(key)) kept[key] = withoutUserinfo(value);
+  else if (settings.test(key) && !(credentialName(key) || credentialPart.test(key) || applicationBindings.test(key) || credentialValue(value))) kept[key] = value;
+ }
+ return kept;
 }
