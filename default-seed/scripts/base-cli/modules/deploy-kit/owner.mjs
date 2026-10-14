@@ -1,7 +1,8 @@
 import { ingressBindings } from './container-config.mjs';
 import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { assert, hash, identifier, resourceName, validatePlan } from './validation.mjs';
+import { assert, hash, identifier, resourceName, uuid, validatePlan } from './validation.mjs';
+import { definiteProviderRefusal } from './provider.mjs';
 import { regularBytes } from './artifact.mjs';
 import { resourceKinds, findResource, checkCronOwnership } from './resources.mjs';
 import { secretBindings, activeWorker, deployedFingerprint } from './worker.mjs';
@@ -167,7 +168,8 @@ export async function readOwnerState(path, target) {
     && KINDS.every(kind => state.owned[kind] && typeof state.owned[kind] === 'object' && Object.values(state.owned[kind]).every(entry => ['pending','created'].includes(entry?.status))), 'invalid-owner-state');
   assert(state.pendingUpload === undefined || typeof state.pendingUpload?.fingerprint === 'string' && typeof state.pendingUpload?.build === 'string', 'invalid-owner-state');
   // Declared secrets rer removed on purpose (the spent setup token): later plans omit them.
-  assert(state.pendingSecret === undefined || identifier(state.pendingSecret?.binding) && typeof state.pendingSecret?.present === 'boolean', 'invalid-owner-state');
+  assert(state.pendingSecret === undefined || identifier(state.pendingSecret?.binding) && typeof state.pendingSecret?.present === 'boolean'
+    && (state.pendingSecret.versionId === undefined || uuid(state.pendingSecret.versionId)), 'invalid-owner-state');
   assert(state.ownerClaim === undefined || ['claimed','kept'].includes(state.ownerClaim?.outcome), 'invalid-owner-state');
   assert(state.retiredSecrets === undefined || Array.isArray(state.retiredSecrets) && state.retiredSecrets.every(identifier), 'invalid-owner-state');
   assert(state.accountId === target.accountId && state.project === target.project && state.environment === target.environment && state.worker === target.worker, 'owner-state-target-mismatch');
@@ -241,17 +243,17 @@ export function recordSecretChange(state, current, {binding, present}) {
 }
 /** A secret change rer recorded as pending but never confirmed (a lost response, or a run that
  * ended before the change settled). It is that change only when the Worker's versions list shows
- * exactly one version after the receipt's and it is the live one, still running the receipt's
+ * exactly one version after the recorded starting version and it is the live one, still running the receipt's
  * exact script and build fingerprint: adopt its version. Anything else, such as a later change
  * someone made after rer's, is left to the identity check, which refuses it. */
 export async function settlePendingSecret(api, worker, state) {
-  if (!state.pendingSecret || !state.receipt) return false;
+  if (!state.pendingSecret || !state.receipt || state.pendingSecret.versionId !== state.receipt.provider.versionId) return false;
   const live = await activeWorker(api, worker);
   if (!live || sameDeployment(live, state.receipt.provider) || live.etag !== state.receipt.provider.etag || deployedFingerprint(live.settings) !== state.receipt.fingerprint) return false;
   // Newest first, as the provider lists them.
   const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
   const ids = Array.isArray(versions) ? versions.map(item => item?.id) : [];
-  if (ids[0] !== live.versionId || ids.indexOf(state.receipt.provider.versionId) !== 1) return false;
+  if (ids[0] !== live.versionId || ids.indexOf(state.pendingSecret.versionId) !== 1) return false;
   const rows = await api.request(`/workers/scripts/${worker}/secrets`);
   if (!Array.isArray(rows) || rows.some(row => row.name === state.pendingSecret.binding) !== state.pendingSecret.present) return false;
   recordSecretChange(state, live, state.pendingSecret);
@@ -330,7 +332,12 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   // absent on resume means create again; present means an uncertain outcome to inspect.
   for (const {kind,item} of create) {
     state.owned[kind][item.name] = {status:'pending'}; await save();
-    const row = await resourceKinds[kind].create(api,item);
+    let row;
+    try { row = await resourceKinds[kind].create(api,item); }
+    catch (error) {
+      if (definiteProviderRefusal(error)) { delete state.owned[kind][item.name]; await save(); }
+      throw error;
+    }
     assert(findResource([row],kind,item.name) === row, 'invalid-created-resource');
     state.owned[kind][item.name] = {status:'created',...(resourceId(kind,row) === undefined ? {} : {id:resourceId(kind,row)})}; await save();
     await listedAfterCreate(api,kind,item,settle);
@@ -359,7 +366,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   }};
   const receipt = await deploy({api:observed, plan, artifact, artifactSha256:hash(artifact), previousReceipt:state.receipt ?? undefined,
     createResources:false, uploadWithoutReceipt:true, env, fetch, healthOptions, readiness,
-    onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; await save(); } },
+    onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; delete state.pendingSecret; await save(); } },
     // Keep each first-health attempt beside the identity it belongs to.
     onHealth: async candidate => { if (candidate.changed) { state.receipt = candidate; await save(); } }});
   return {receipt, created:create.map(({kind,item}) => `${kind}:${item.name}`), sentSecrets};

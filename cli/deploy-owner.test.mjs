@@ -111,6 +111,8 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  await assert.rejects(run(), error => /Deploy needs MAIL_API_KEY/.test(error.message) && /--env-file/.test(error.message));
  assert.equal(provider.state.writes.length, 0);
  await writeFile(join(root, 'deploy.env'), 'MAIL_API_KEY="from-the-env-file"\n', { mode: 0o600 });
+ // A gateway answer after retirement must still complete the claim and save its new version.
+ provider.fail('DELETE', /\/secrets\/SETUP_TOKEN$/, { afterApply: true, status: 502 });
  const out = store(), first = await run({ envFile: 'deploy.env' }, out);
  assert.equal(first.deployed, true); assert.equal(first.owner, 'claimed');
  assert.deepEqual(claims, [{ origin: first.origin, matches: true }]);
@@ -125,6 +127,7 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  assert.ok(out.lines.findIndex(line => line.includes(first.origin)) < out.lines.findIndex(line => line.startsWith('Claimed the hosted owner')), 'the deployed origin is named once it is live, before the owner claim');
  // A secret rotated through rer, then newer source: the update is accepted.
  process.env.SESSION_SECRET = 'rotated-session-secret';
+ provider.fail('PUT', /\/secrets$/, { afterApply: true, status: 504 });
  await run({ setSecret: 'SESSION_SECRET' });
  assert.equal(provider.state.secrets.find(item => item.name === 'SESSION_SECRET').value, 'rotated-session-secret');
  await writeFile(join(root, 'NOTES.md'), 'newer source\n'); git('add', '.'); git('commit', '-qm', 'second');
@@ -214,21 +217,21 @@ test('rer deploy --remove deletes only what this environment created, reads back
  await run({});
  process.env.SESSION_SECRET = 'rotated';
  provider.fail('PUT', /\/secrets$/, { afterApply: true });
- await assert.rejects(run({ setSecret: 'SESSION_SECRET' }), /provider-transport-failed/);
+ await run({ setSecret: 'SESSION_SECRET' });
  await provider.fetch(`https://api.cloudflare.com/client/v4/accounts/${provider.accountId}/workers/scripts/fixture-production/secrets`, { method: 'PUT', headers: { Authorization: `Bearer ${provider.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'OTHER', text: 'x', type: 'secret_text' }) });
  const databases = provider.state.databases.length;
  await assert.rejects(run({ remove: true, yes: true }), /owned-resource-replaced/);
  assert.notEqual(provider.state.settings, null); assert.equal(provider.state.databases.length, databases);
 });
 
-test('a secret change rer started is adopted after its response is lost; one the provider refused is not, and one made outside rer is refused', async t => {
+test('a secret change settles after its response is lost; one the provider refused is not adopted, and one made outside rer is refused', async t => {
  const { root } = await checkout(t, { secrets: [{ binding: 'SESSION_SECRET', environment: 'SESSION_SECRET' }] });
  const { provider } = account(t);
  const deploy = ownerDeploy('deploy.json', { ...lifecycle, hooks: {} });
  const run = options => deploy({ root, options: { environment: 'production', ...options }, store: store(), setupManifest: manifest });
  await run({});
  provider.fail('DELETE', /\/secrets\/SESSION_SECRET$/, { afterApply: true });
- await assert.rejects(run({ unsetSecret: 'SESSION_SECRET' }), /provider-transport-failed/);
+ await run({ unsetSecret: 'SESSION_SECRET' });
  assert.deepEqual(secretNames(provider), []);
  assert.equal((await run({})).deployed, true, 'the next deploy recognises the change it started');
  assert.deepEqual(secretNames(provider), [], 'the removed secret stays retired');

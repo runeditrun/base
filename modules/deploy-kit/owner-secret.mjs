@@ -1,14 +1,15 @@
 import { assert, identifier } from './validation.mjs';
-import { activeWorker, deployedFingerprint } from './worker.mjs';
+import { activeWorker } from './worker.mjs';
+import { definiteProviderRefusal } from './provider.mjs';
 import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDeployment, refuse, recordSecretChange, settlePendingSecret } from './owner.mjs';
 
 /** Set (`value` given) or remove one Worker secret of the owner's last deployment, then
  * record the Worker version the change made in the state file, so the next deploy
  * recognises its own Worker. A Worker someone else replaced is refused untouched.
  * The change is recorded as pending first: if the provider applies it but rer never
- * sees it settle, a later run adopts it (see settlePendingSecret). A change the provider
- * answered with an error clears the pending record. The secret listing
- * and active deployment lag a change, so they are read until they show it, up to `windowMs`.
+ * sees it settle, a later run can recognise its immediate successor (see settlePendingSecret).
+ * Both success and ambiguous failure read back for up to `windowMs`. An explicit refusal,
+ * or an outcome not confirmed in that window, clears the pending record.
  * A removed declared secret is retired: later plans omit it until it is set again. */
 export async function ownerSecret({api: provider, target, statePath, binding, value, windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
   const api = withScopeHints(provider);
@@ -24,26 +25,29 @@ export async function ownerSecret({api: provider, target, statePath, binding, va
     const path = `/workers/scripts/${target.worker}/secrets`, present = value !== undefined;
     const names = async () => { const rows = await api.request(path); assert(Array.isArray(rows), 'invalid-secret-list'); return rows.map(row => row.name); };
     const changed = present || (await names()).includes(binding);
-    state.pendingSecret = {binding, present}; await writeOwnerState(statePath, state);
+    state.pendingSecret = {binding, present, versionId:state.receipt.provider.versionId}; await writeOwnerState(statePath, state);
+    let failure;
     try {
       if (present) await api.request(path, {method:'PUT', body:{name:binding, text:value, type:'secret_text'}});
       else if (changed) await api.request(`${path}/${binding}`, {method:'DELETE'});
     } catch (error) {
-      // The provider answered and refused: nothing changed, so nothing is pending. Only a lost
-      // response (no answer at all) may have applied the change.
-      if (error.status !== undefined) { delete state.pendingSecret; await writeOwnerState(statePath, state); }
-      throw error;
+      if (definiteProviderRefusal(error)) { delete state.pendingSecret; await writeOwnerState(statePath, state); throw error; }
+      failure = error;
     }
-    let current;
-    for (const start = clock(); ; await sleep(2000)) {
-      current = await activeWorker(api, target.worker);
-      if (current && (!changed || !sameDeployment(current, live)) && (await names()).includes(binding) === present) break;
-      if (clock() - start + 2000 > windowMs) throw new Error('secret-change-unsettled');
+    try {
+      if (!changed) recordSecretChange(state, live, state.pendingSecret);
+      else for (const start = clock(); ; await sleep(2000)) {
+        try { if (await settlePendingSecret(api, target.worker, state)) break; }
+        catch (error) {
+          if (error.message !== 'provider-transport-failed' && !(error.status >= 500 && error.status < 600)) throw error;
+        }
+        if (clock() - start + 2000 > windowMs) throw failure ?? new Error('secret-change-unsettled');
+      }
+    } catch (error) {
+      delete state.pendingSecret; await writeOwnerState(statePath, state);
+      throw failure ?? error;
     }
-    // A secret change makes a new version of the same code: the script and build fingerprint must not move.
-    assert(current.etag === live.etag && deployedFingerprint(current.settings) === deployedFingerprint(live.settings), 'secret-change-drift');
-    recordSecretChange(state, current, {binding, present});
     await writeOwnerState(statePath, state);
-    return {worker:target.worker, binding, present, versionId:current.versionId};
+    return {worker:target.worker, binding, present, versionId:state.receipt.provider.versionId};
   });
 }

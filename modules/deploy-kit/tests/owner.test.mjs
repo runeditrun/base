@@ -7,6 +7,9 @@ import { cloudflare, ownerWorkerName, ownerResourceName, ownerTarget, ownerPlan,
 import { hash, validatePlan } from '../validation.mjs';
 import { renderConfig } from '../render.mjs';
 import { ownerProvider } from './owner-provider.mjs';
+import { ownerSecret } from '../owner-secret.mjs';
+import { ownerRemove } from '../owner-remove.mjs';
+import { settleOwnerState, writeOwnerState } from '../owner.mjs';
 
 const source = 'export default {scheduled() {},fetch(){return new Response("ok")}}';
 const sql = 'CREATE TABLE notes(id INTEGER PRIMARY KEY, body TEXT NOT NULL);';
@@ -212,4 +215,117 @@ test('KV is validated like other named resources, and plans without KV keep thei
   const resources = {d1:[],r2:[],queues:[]};
   assert.equal(Object.hasOwn(renderConfig(validatePlan(withoutKv),resources,'a'.repeat(32),'1'.repeat(40),'f','index.js'),'kv_namespaces'),false);
   assert.deepEqual(renderConfig(plan,{...resources,kv:[{binding:'CACHE',name:kv[0].name,id:'c'.repeat(32)}]},'a'.repeat(32),'1'.repeat(40),'f','index.js').kv_namespaces,[{binding:'CACHE',id:'c'.repeat(32)}]);
+});
+
+test('secret writes settle ambiguous answers within their window and clear refusals before later dashboard changes', async t => {
+  const answers = [{afterApply:true,status:504}, {afterApply:true,status:524}, {afterApply:true},
+    {status:500}, {transport:true}, {status:403}, {status:200}];
+  for (const present of [true,false]) for (const answer of answers) await t.test(`${present ? 'set' : 'unset'} ${JSON.stringify(answer)}`, async t => {
+    const fixture = await setup(t), {args,api,target,statePath,state,fail} = fixture;
+    await ownerDeploy(args);
+    const before = await readOwnerState(statePath,target);
+    let elapsed = 0, sleeps = 0, intent;
+    const observed = {...api, async request(path, options) {
+      if (options?.method === (present ? 'PUT' : 'DELETE') && path.includes('/secrets')) intent = (await readOwnerState(statePath,target)).pendingSecret;
+      return api.request(path,options);
+    }};
+    fail(present ? 'PUT' : 'DELETE', present ? /\/secrets$/ : /\/secrets\/AUTH_SECRET$/, answer);
+    const change = ownerSecret({api:observed,target,statePath,binding:'AUTH_SECRET',...(present ? {value:'test-only-rotated'} : {}),
+      windowMs:6000,clock:() => elapsed,sleep:async ms => { elapsed += ms; sleeps++; }});
+    if (answer.afterApply) await change;
+    else await assert.rejects(change, /provider|token-scope-missing/);
+    assert.equal(intent.versionId,before.receipt.provider.versionId, 'intent is anchored before the provider write');
+    const saved = await readOwnerState(statePath,target);
+    assert.equal(saved.pendingSecret,undefined);
+    if (answer.afterApply) {
+      assert.equal(saved.receipt.provider.versionId,state.version.id);
+      assert.equal(state.secrets.some(item => item.name === 'AUTH_SECRET'),present);
+      assert.equal((saved.retiredSecrets ?? []).includes('AUTH_SECRET'),!present);
+    } else {
+      assert.deepEqual(saved.receipt,before.receipt);
+      assert.equal(state.secrets.find(item => item.name === 'AUTH_SECRET').value,args.env.AUTH_SECRET);
+      assert.equal(sleeps > 0,answer.status === 500 || !!answer.transport, 'only ambiguous failures wait for readback');
+    }
+    await api.request(`/workers/scripts/${target.worker}/secrets`,{method:'PUT',body:{name:'DASHBOARD_ADDED',text:'test-only-foreign',type:'secret_text'}});
+    const writes = state.writes.length;
+    await assert.rejects(ownerDeploy(args),/owned-resource-replaced/);
+    await assert.rejects(ownerRemove({api,target,statePath}),/owned-resource-replaced/);
+    assert.equal(state.writes.length,writes, 'neither command changes the foreign Worker or its resources');
+  });
+});
+
+test('interrupted secret settlement requires its recorded immediate successor, and a new upload clears old intent', async t => {
+  for (const scenario of ['immediate','later-change','stale-receipt','new-upload']) await t.test(scenario, async t => {
+    const {args,api,target,statePath,state} = await setup(t);
+    await ownerDeploy(args);
+    const saved = await readOwnerState(statePath,target);
+    saved.pendingSecret = {binding:'AUTH_SECRET',present:true,versionId:saved.receipt.provider.versionId};
+    await writeOwnerState(statePath,saved);
+    const path = `/workers/scripts/${target.worker}/secrets`;
+    if (scenario !== 'new-upload') await api.request(path,{method:'PUT',body:{name:'AUTH_SECRET',text:'test-only-rotated',type:'secret_text'}});
+    if (scenario === 'later-change' || scenario === 'stale-receipt') {
+      if (scenario === 'stale-receipt') {
+        saved.receipt.provider = {versionId:state.version.id,deploymentId:state.deployments[0].id,etag:state.version.resources.script.etag};
+        await writeOwnerState(statePath,saved);
+      }
+      await api.request(path,{method:'PUT',body:{name:'DASHBOARD_ADDED',text:'test-only-foreign',type:'secret_text'}});
+      const writes = state.writes.length;
+      await settleOwnerState({api,target,statePath});
+      await assert.rejects(ownerDeploy(args),/owned-resource-replaced/);
+      await assert.rejects(ownerRemove({api,target,statePath}),/owned-resource-replaced/);
+      assert.equal(state.writes.length,writes);
+    } else {
+      if (scenario === 'immediate') {
+        await settleOwnerState({api,target,statePath});
+        const settled = await readOwnerState(statePath,target);
+        assert.equal(settled.receipt.provider.versionId,state.version.id);
+        assert.equal((await ownerDeploy(args)).receipt.changed,false);
+      } else {
+        const changed = {...artifact,source:{...artifact.source,sha:'7'.repeat(40)}};
+        const result = await ownerDeploy({...args,artifact:changed,plan:ownerPlan(target,declaration(),changed)});
+        assert.equal(result.receipt.changed,true);
+      }
+      assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined);
+    }
+  });
+});
+
+test('secret settlement polls delayed or failed reads and clears unconfirmed success without adopting drift', async t => {
+  for (const scenario of ['read-503','read-reset','lag','unsettled','wrong-presence','script-drift','two-versions']) await t.test(scenario, async t => {
+    const {args,api,target,statePath,state,foreign} = await setup(t);
+    await ownerDeploy(args);
+    const before = await readOwnerState(statePath,target);
+    let writing = false, reads = 0, elapsed = 0;
+    const observed = {...api, async request(path, options) {
+      if (options?.method === 'PUT' && path.endsWith('/secrets')) {
+        writing = true;
+        const result = await api.request(path,options);
+        if (scenario === 'script-drift') foreign.replaceWorker();
+        if (scenario === 'two-versions') await api.request(path,{method:'PUT',body:{name:'OTHER',text:'test-only-foreign',type:'secret_text'}});
+        return result;
+      }
+      if (writing && path.endsWith('/versions')) {
+        if (scenario === 'read-503' && reads++ === 0) throw Object.assign(new Error('provider-http-503'),{status:503});
+        if (scenario === 'read-reset' && reads++ === 0) throw new Error('provider-transport-failed');
+        if (scenario === 'unsettled' || scenario === 'lag' && reads++ < 2) return {items:[{id:before.receipt.provider.versionId}]};
+      }
+      if (writing && scenario === 'wrong-presence' && path.endsWith('/secrets')) return [];
+      return api.request(path,options);
+    }};
+    const change = ownerSecret({api:observed,target,statePath,binding:'AUTH_SECRET',value:'test-only-rotated',
+      windowMs:6000,clock:() => elapsed,sleep:async ms => { elapsed += ms; }});
+    if (['read-503','read-reset','lag'].includes(scenario)) {
+      await change;
+      assert.ok(elapsed > 0, 'settlement waited for the provider readback');
+      assert.equal((await readOwnerState(statePath,target)).receipt.provider.versionId,state.version.id);
+    } else {
+      await assert.rejects(change,/secret-change-unsettled/);
+      assert.deepEqual((await readOwnerState(statePath,target)).receipt,before.receipt);
+      const writes = state.writes.length;
+      await assert.rejects(ownerDeploy(args),/owned-resource-replaced/);
+      await assert.rejects(ownerRemove({api,target,statePath}),/owned-resource-replaced/);
+      assert.equal(state.writes.length,writes);
+    }
+    assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined);
+  });
 });

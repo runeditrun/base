@@ -23,8 +23,9 @@ export function ownerProvider({creationDates = false} = {}) {
     if (index < 0) return handle(input, init);
     const [failure] = failures.splice(index,1);
     state.calls.push({method,path,search:url.search,failed:true});
-    // A lost response after the provider already applied the request.
-    if (failure.afterApply) { await handle(input,init); throw new TypeError('test-only lost response'); }
+    // A lost response or gateway error after the provider already applied the request.
+    if (failure.afterApply) await handle(input,init);
+    if (failure.afterApply && failure.status === undefined) throw new TypeError('test-only lost response');
     if (failure.transport) throw new TypeError('test-only connection reset');
     return Response.json({success:false,errors:[{code:10000,message:'injected failure'}]},{status:failure.status});
   };

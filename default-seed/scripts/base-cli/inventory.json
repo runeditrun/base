@@ -1011,11 +1011,11 @@
     },
     "modules/deploy-kit/owner-secret.mjs": {
       "source": "modules/deploy-kit/owner-secret.mjs",
-      "sha256": "989b6dadc04eada34ac9fd8a3d9f38ba3a38d44c087335454d4766dd010a074f"
+      "sha256": "6ca1d39dfe7ffc42d240cc40684deb26301c402189e0a0c8bda8372901561fbb"
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "4426d14b61493239dfae35efbe4cbf10b4d8b741998fdc889af0064e32b537a9"
+      "sha256": "2b3a52b1e70709b59a4b05678e9273415160033429d023448e9c7f8f616296cb"
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",
@@ -1023,7 +1023,7 @@
     },
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",
-      "sha256": "a5de791ad9aef3cb8171404ca767c5bfa6817617de61868b8d29c7e0dd332b4e"
+      "sha256": "fb75a17074d3cc71a970522df8ea3466cc1ffe1401e14805cf23edcad96af00e"
     },
     "modules/deploy-kit/queue-consumer.mjs": {
       "source": "modules/deploy-kit/queue-consumer.mjs",

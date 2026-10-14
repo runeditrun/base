@@ -2,6 +2,9 @@ import { recordDeployFailure } from './diagnostics.mjs';
 import { importD1, importUploadURL } from './d1-import.mjs';
 import { assert, hexId } from './validation.mjs';
 
+// A gateway/server error can arrive after a write. An explicit API refusal cannot.
+export const definiteProviderRefusal = error => error.status === 200 || error.status >= 400 && error.status < 500;
+
 async function boundedText(response, limit = 4 * 1024 * 1024, onReadError) {
   assert(response.body, 'empty-response');
   const reader = response.body.getReader(); const chunks = []; let length = 0;
