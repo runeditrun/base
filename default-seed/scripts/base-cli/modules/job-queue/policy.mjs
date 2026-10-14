@@ -23,7 +23,8 @@ export async function callerPolicy(env=process.env) {
  const lifetime=await identity(),token=randomUUID(),path=`/tmp/rer-policy-${token}.sock`;
  // An invalid inherited claim fails closed even when the child changes CI.
  const ci=!value&&env.CI==='true';
- const server=createServer(socket=>socket.end(JSON.stringify({token,ci})));
+ // As with identity: a prober that closed first reports that itself.
+ const server=createServer(socket=>{socket.on('error',()=>{});socket.end(JSON.stringify({token,ci}));});
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(path,resolve);});await chmod(path,0o600);
  return {ci,environment:{RER_JOB_POLICY:JSON.stringify({path,token,owner:lifetime.info})},async close(){await new Promise(resolve=>server.close(resolve));await unlink(path).catch(error=>{if(error.code!=='ENOENT')throw error;});await lifetime.close();}};
 }

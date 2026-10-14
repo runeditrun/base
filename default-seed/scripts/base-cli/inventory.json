@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.5-dev.g22821a27",
+  "cliVersion": "0.2.5-dev.gd37e3fc9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1259,7 +1259,7 @@
     },
     "modules/job-queue/identity.mjs": {
       "source": "modules/job-queue/identity.mjs",
-      "sha256": "d62f823e55d57aeb90645da6e0f5626c05aa6b3042e4e97c6a95ee92695b69f8"
+      "sha256": "5a860e5a80227c3a552c25d5917e58c7b04a01004e4313f8c09c300c7add1b1e"
     },
     "modules/job-queue/index.mjs": {
       "source": "modules/job-queue/index.mjs",
@@ -1275,7 +1275,7 @@
     },
     "modules/job-queue/policy.mjs": {
       "source": "modules/job-queue/policy.mjs",
-      "sha256": "104c5280362190b1a6c3d7fc9cb7b61adf858afedff4b7dd6d83ee881106efe4"
+      "sha256": "cd1d6391fad62959a41fd0c6523d95af546dd775c674ad6a6da6bbdb429c63f6"
     },
     "modules/job-queue/processes.mjs": {
       "source": "modules/job-queue/processes.mjs",

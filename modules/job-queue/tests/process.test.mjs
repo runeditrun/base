@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { createConnection } from 'node:net';
 import { deliverGroupSignal, processInfo, stopGroup } from '../processes.mjs';
 import { setup, until, client, worker, noLivePids, cli } from './helpers.mjs';
 import { recordedState } from './state.mjs';
@@ -154,4 +155,22 @@ test('a replacement group with the same start stamp but a different supervisor t
   await stopGroup({ ...owner, pgid: child.pid, marker: 'rer-prior-supervisor' }, 30);
   const current = await processInfo(child.pid);
   assert.ok(current && !current.zombie, 'Recycled process-group identity must not authorize a signal');
+});
+
+test('a queued command survives probes that close its identity socket mid-write', async t => {
+  const { directory } = await setup(t);
+  const ledger = recordedState(directory);
+  const release = join(directory, 'release');
+  const job = client(t, directory, ['run', '--kind', 'heavy', '--label', 'peer-close', '--', process.execPath, worker, 'gate', release]);
+  const { running: [lease] } = await ledger.wait(state => state.running.length === 1);
+  for (let i = 0; i < 200; i++) {
+    const peer = createConnection(lease.owner.socket);
+    peer.on('error', () => {});
+    peer.on('connect', () => peer.destroy());
+    await new Promise(resolve => peer.once('close', resolve));
+  }
+  await writeFile(release, '');
+  const result = await job.done;
+  assert.equal(result.code, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /EPIPE|ECONNRESET/);
 });

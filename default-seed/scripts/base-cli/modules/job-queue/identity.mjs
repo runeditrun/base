@@ -11,7 +11,9 @@ export async function identity() {
   const token = randomUUID(), socket = join(tmpdir(), `rer-job-${token}.sock`);
   // Darwin's TMPDIR can be long; use the short system temporary directory then.
   const path = Buffer.byteLength(socket) < 100 ? socket : `/tmp/rer-job-${token}.sock`;
-  const server = createServer(client => { client.end(token); });
+  // A prober that timed out or exited may close before the answer is written;
+  // the prober reports that itself, so the answer's EPIPE or ECONNRESET is dropped.
+  const server = createServer(client => { client.on('error', () => {}); client.end(token); });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(path, resolve); });
   await chmod(path, 0o600);
   const { title, ...processIdentity } = await processInfo(process.pid);
