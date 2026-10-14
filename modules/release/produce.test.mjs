@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -151,7 +152,9 @@ test('rer release CLI invokes the producer and prints the redacted tail of a fai
 });
 
 test('rer release installs seed dependencies without the caller credentials; the seed verify keeps them', t => {
-  const record = kind => `require('fs').writeFileSync(require('path').join(process.env.PROBE_RECORDS,'${kind}.json'),JSON.stringify(Object.keys(process.env)))`;
+  const records = mkdtempSync(resolve(tmpdir(), 'rer-release-records-'));
+  t.after(() => rmSync(records, { recursive: true, force: true }));
+  const record = kind => `require('fs').writeFileSync(require('path').join(${JSON.stringify(records).replaceAll('"', "'")},'${kind}.json'),JSON.stringify(Object.keys(process.env)))`;
   const f = fixture(t, `node -e "${record('verify')}" && node --test check.test.mjs`);
   mkdirSync(resolve(f.repo, 'probe'));
   writeFileSync(resolve(f.repo, 'probe/package.json'), JSON.stringify({ name: 'probe', version: '1.0.0', scripts: { install: 'node record.cjs' } }));
@@ -160,9 +163,8 @@ test('rer release installs seed dependencies without the caller credentials; the
   writeFileSync(resolve(f.repo, 'package.json'), JSON.stringify({ ...pkg, devDependencies: { probe: 'file:./probe' }, pnpm: { onlyBuiltDependencies: ['probe'] } }));
   execFileSync('pnpm', ['install', '--lockfile-only', '--ignore-scripts'], { cwd: f.repo, stdio: ['ignore', 'pipe', 'pipe'] });
   f.commit();
-  const records = resolve(f.temporary, 'records'); mkdirSync(records);
   const credentials = { CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token-0001', CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef', GITHUB_TOKEN: 'ghp_' + randomBytes(18).toString('hex'), FOO_SECRET: 'synthetic-secret-0001', PGPASSWORD: 'synthetic-password-0001' };
-  const result = spawnSync(process.execPath, [resolve(root, 'bin/rer.mjs'), 'release', '--repo', f.repo, '--project', 'octocat/Hello-World', '--repository', 'https://github.com/octocat/Hello-World', '--output', f.options.output, '--dry-run'], { encoding: 'utf8', env: { ...process.env, ...credentials, PROBE_RECORDS: records } });
+  const result = spawnSync(process.execPath, [resolve(root, 'bin/rer.mjs'), 'release', '--repo', f.repo, '--project', 'octocat/Hello-World', '--repository', 'https://github.com/octocat/Hello-World', '--output', f.options.output, '--dry-run'], { encoding: 'utf8', env: { ...process.env, ...credentials } });
   assert.equal(result.status, 0, result.stderr + result.stdout);
   const seen = kind => JSON.parse(readFileSync(resolve(records, `${kind}.json`), 'utf8'));
   for (const name of Object.keys(credentials)) {
