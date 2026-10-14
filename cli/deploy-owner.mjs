@@ -6,8 +6,9 @@ import { randomBytes } from 'node:crypto';
 // (Base operator-auth POST /auth/bootstrap), then removes that token from the
 // Worker and records the new Worker version. A Worker still holding a token rer
 // did not upload this run gets a fresh one first, unless the person supplied the
-// token (environment or --env-file): that value is the deployed token and is used. A seed with its own owner step
-// function runs its own bootstrap; identity-provider linking runs before retirement.
+// token (environment or --env-file) and inspection has not found it absent. A
+// seed with its own owner step function runs its own bootstrap; identity-provider
+// linking runs before retirement.
 // `beforeClaim(token)` runs while the token is live (dependency approvals need it).
 export async function claimHostedOwner({ hook, setupManifest, declaration, deployed, env, supplied = [], secret, addSecret, beforeClaim, recordClaim, inspect, store, signal, fetch = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), boundMs = 90000 }) {
  const claim = setupManifest?.steps?.find(step => step.type === 'owner-claim');
@@ -30,7 +31,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  // Older direct callers only recorded token retirement, without an ownership
  // record or live-secret inspection. Keep their completed deploys idempotent.
  if (!deployed.liveSecrets && deployed.retiredSecrets?.includes(tokenKey)) return undefined;
- const given = !deployed.liveSecrets && env[item.environment]?.trim() && !supplied.includes(tokenKey);
+ const given = (!deployed.liveSecrets || deployed.liveSecrets.includes(tokenKey)) && env[item.environment]?.trim() && !supplied.includes(tokenKey);
  let token = deployed.sentSecrets?.includes(tokenKey) || given ? env[item.environment] : undefined;
  if (!token) {
   token = randomBytes(32).toString('hex'); addSecret(token);

@@ -61,7 +61,7 @@ const lifecycle = { run: async () => {}, settings: {}, hooks: { owner: { existin
 const store = () => { const lines = []; return { lines, state: {}, report: line => lines.push(line), step: async line => lines.push(line), phase: async () => {} }; };
 const secretNames = provider => provider.state.secrets.map(item => item.name).sort();
 
-test('direct owner callers retire once without a recorder, skip legacy retirement, and claim after modern inspection', async t => {
+test('direct owner callers retire once, skip legacy retirement, and select live tokens after modern inspection', async t => {
  const { root } = await checkout(t, { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] });
  const { provider, claims } = account(t);
  const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
@@ -70,16 +70,33 @@ test('direct owner callers retire once without a recorder, skip legacy retiremen
  const claim = (deployed, extra = {}) => claimHostedOwner({ hook: lifecycle.hooks.owner, setupManifest: manifest, declaration, deployed, env,
   secret: (args, values) => command('secret', args, values), addSecret: () => {}, ...extra });
  const unsets = () => provider.state.calls.filter(call => call.method === 'DELETE' && call.path.endsWith('/secrets/SETUP_TOKEN')).length;
+ const sets = () => provider.state.calls.filter(call => call.method === 'PUT' && call.path.endsWith('/secrets')).length;
  assert.equal(await claim(await command('deploy')), 'claimed');
  assert.equal(claims.length, 1); assert.equal(unsets(), 1);
  assert.deepEqual(secretNames(provider), []);
  assert.equal(await claim(await command('deploy')), undefined);
  assert.equal(claims.length, 1); assert.equal(unsets(), 1);
- // A modern inspection with an empty live-secret list must still bootstrap.
+ // An absent token must be replaced, even when the environment has a stale value.
  const inspected = await command('inspect');
  assert.deepEqual(inspected.liveSecrets, []);
- assert.equal(await claim(inspected), 'kept');
+ assert.equal(await claim(inspected, { beforeClaim: token => assert.ok(token !== env.SETUP_TOKEN, 'the retired environment token is not reused') }), 'kept');
  assert.equal(claims.length, 2); assert.equal(unsets(), 2);
+ assert.deepEqual(secretNames(provider), []);
+ // An explicitly supplied live token remains usable without a secret rotation.
+ await command('secret', ['--set', 'SETUP_TOKEN']);
+ const live = await command('inspect'), beforeExplicit = sets();
+ assert.ok(live.liveSecrets.includes('SETUP_TOKEN'));
+ assert.equal(await claim(live, { beforeClaim: token => assert.ok(token === env.SETUP_TOKEN, 'dependency approval uses the supplied live token') }), 'kept');
+ assert.equal(sets(), beforeExplicit, 'the live person-supplied token was not rotated');
+ assert.equal(claims.length, 3); assert.equal(unsets(), 3);
+ // A value generated for this deploy is not the person's existing live token.
+ await command('secret', ['--set', 'SETUP_TOKEN']);
+ const generated = 'test-only-newly-generated-token', beforeGenerated = sets();
+ assert.equal(await claim(await command('inspect'), { env: { ...env, SETUP_TOKEN: generated }, supplied: ['SETUP_TOKEN'],
+  beforeClaim: token => assert.ok(token !== generated && token !== env.SETUP_TOKEN, 'a fresh token replaces the unknown live value') }), 'kept');
+ assert.equal(sets(), beforeGenerated + 1);
+ assert.equal(claims.length, 4); assert.equal(unsets(), 4);
+ assert.ok(claims.every(claim => claim.matches), 'every bootstrap uses the live provider binding');
  assert.deepEqual(secretNames(provider), []);
 });
 

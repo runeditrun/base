@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { ownerProvider } from '../../modules/deploy-kit/tests/owner-provider.mjs';
 import { testProvider } from '../../default-seed/tests/operator-auth/oidc-provider.mjs';
+import { commandDiagnostic } from './command-diagnostic.mjs';
 
 // Preserve the public provider client's body, credentials and redirect policy
 // through the controlled HTTP edge, including binary signed D1 imports.
@@ -163,7 +164,8 @@ export async function linkedDeploy(t, f, localOrigin) {
   assert.equal(events.includes('initiate'), false, 'no initiation before readiness');
   release();
   const successCode=await success.done;
-  if(successCode!==0)t.diagnostic(JSON.stringify({events,edgeErrors}));
+  if (successCode !== 0) t.diagnostic(JSON.stringify({ events, edgeErrors, command: commandDiagnostic(success),
+    setupApprovalRefused: success.stdoutText.includes('Application setup approval was refused.') }));
   assert.equal(successCode, 0, 'real public deploy and deployed-origin linking complete');
   assert.equal(events.includes('edge-error'), false);
   assert.equal(events.filter(e => e === 'initiate').length, 2);

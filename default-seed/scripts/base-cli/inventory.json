@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.g54d85e49",
+  "cliVersion": "0.2.2-dev.ge9c7bcfd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -403,7 +403,7 @@
     },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
-      "sha256": "412be05cb4a22378c881c6589e57fc2f80d5a7c35474721ee0eb68ad51cabb1e"
+      "sha256": "e99ae724aa284ab424d65eed632620910286974443841de707cd2658130d1f23"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
