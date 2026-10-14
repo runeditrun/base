@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.5-dev.gd37e3fc9",
+  "cliVersion": "0.2.5-dev.g81c13307",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -25,7 +25,7 @@
     },
     "adapter-settings.mjs": {
       "source": "onboarding/adapter-settings.mjs",
-      "sha256": "cf26029e8382c6a2a09aec0918878ee2e97fdbddd30409d579ec09f7ac560e23"
+      "sha256": "e432dcceda29922b30a9f8cbecf79edd7afdf3d282f63f3c112101e4ccb509bc"
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
@@ -117,7 +117,7 @@
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
-      "sha256": "8cfe77eab8b2ad763d2801fe3aee8259182aae13fcd3fc9065bc65e350af3756"
+      "sha256": "c0683682e84f4e6e267659f33bc2e797d30cd242ed1a586c1767650f9f388faa"
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
@@ -495,7 +495,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "49edb9403994794df9460af467ff87e2750a4f1cf8da2f18f8cbc1d268ed78f3"
+      "sha256": "7608a40206e6dc132b11e1fe7aaf93f42338763ddd3343eeb6f9f052b4229df4"
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
@@ -615,7 +615,7 @@
     },
     "cli/setup-input.mjs": {
       "source": "cli/setup-input.mjs",
-      "sha256": "7d16b37e91a01390d89d3f533193b4a30a3a8f2b482b7ca4494b767d6fb61988"
+      "sha256": "f4f6e4024d47706a6008acd31eb7717ed3ebd2eadabe5950af35095a57f9c11c"
     },
     "cli/shared.mjs": {
       "source": "cli/shared.mjs",

@@ -10,7 +10,8 @@ import { liveServers } from '../registry.mjs';
 import { checkCapacity, personEnvironment, pinPolicy } from './capacity.mjs';
 import { bringBackDoor, doorPlan } from './door.mjs';
 import { LaunchFailure } from './failure.mjs';
-import { describeCheckout, freePort, localOwner, needsInstall, portTaken, setupNeeded } from './facts.mjs';
+import { describeCheckout, freePort, needsInstall, portTaken, setupNeeded } from './facts.mjs';
+import { zeroSetupOwner } from '../../onboarding/local/owner.mjs';
 import { claimPort, installState, savedPorts, setupState } from './state.mjs';
 import { runVerb } from './steps.mjs';
 import { localDefaults } from './local-defaults.mjs';
@@ -67,7 +68,7 @@ export async function prepare({ root, args, env, report, directory, log, childre
   await step(setupState, ['setup', ...hostArgs], {}, setupEnv);
  } else if (setup === 'fresh' && plan.freshAtDoor) {
   // With the door enabled, a fresh checkout is set up at its door origin.
-  const owner = localOwner(checkout);
+  const owner = zeroSetupOwner(checkout);
   report({ phase: 'setup', message: `setting up a local owner (${owner}) at its front-door address` });
   await step(setupState, ['setup', '--owner-email', owner, '--door'], { owner, door: true }, setupEnv);
   await bringBackDoor({ ...plan, atDoor: true }, env, report);
@@ -76,7 +77,7 @@ export async function prepare({ root, args, env, report, directory, log, childre
   // An interrupted setup resumes on the port it chose while that port is free.
   // A port another process takes between choosing it and setup refusing it is
   // passed over for the next free one; a port the person passed is kept.
-  const owner = localOwner(checkout), explicit = flagValue(args, '--port');
+  const owner = zeroSetupOwner(checkout), explicit = flagValue(args, '--port');
   let from = last?.port;
   for (let attempt = 1; ; attempt++) {
    const held = explicit ? [] : [...(await liveServers(childEnv)).map(record => record.port), ...await savedPorts(checkout, childEnv)];

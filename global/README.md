@@ -104,6 +104,9 @@ A seed that declares a run site prints one more line after those,
 `RER_SITE http://127.0.0.1:8788`: a local preview of its static run site (its
 marketing homepage, `/run` and docs) on the first free port above the app's. It
 stops with the app.
+Later, `rer setup --owner-email YOU` (or `--answers`) with the real owner
+replaces that local owner in place and keeps all local data, saying so in one
+line; a checkout whose database holds any other owner is still refused.
 It never prompts and never re-runs setup on a checkout that is already set up. A
 setup a launch started that was stopped or failed is run again by the next
 `rer dev`, keeping the owner and origin it saved, unless a setup has finished

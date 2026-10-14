@@ -8,10 +8,13 @@
 // without one the launch stops naming the field and changes nothing. A fresh
 // copy of the converted checkout then builds as the trusted delivery job runs
 // it: pnpm install --frozen-lockfile && pnpm run build, with no rer on PATH.
+// Before that, the real owner's rer setup replaces the zero-setup owner and
+// keeps the local data.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { access, cp, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { DatabaseSync } from 'node:sqlite';
 import { parseEnv } from 'node:util';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -22,6 +25,19 @@ import { freePort, run, sweep } from './harness.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
+
+// The checkout's local database: its active owners and every table's row count.
+function localData(root) {
+ const directory = join(root, '.wrangler/state/v3/d1/miniflare-D1DatabaseObject'), owners = [], counts = {};
+ for (const file of readdirSync(directory).filter(name => name.endsWith('.sqlite'))) {
+  const db = new DatabaseSync(join(directory, file), { readOnly: true });
+  try {
+   for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").all()) counts[`${file}:${name}`] = db.prepare(`SELECT COUNT(*) AS count FROM "${name}"`).get().count;
+   if (counts[`${file}:oa_operators`] !== undefined) owners.push(...db.prepare("SELECT id, email FROM oa_operators WHERE role='owner' AND status='active'").all().map(row => ({ ...row })));
+  } finally { db.close(); }
+ }
+ return { owners, counts };
+}
 
 test('an installed rer launches the package-mode default-seed reference with one command, and it builds without rer', { timeout: 15 * 60_000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-journey-')), home = join(directory, 'home'), root = join(directory, 'seed with spaces'), delivery = join(directory, 'delivery');
@@ -126,6 +142,21 @@ test('an installed rer launches the package-mode default-seed reference with one
  assert.equal(stopped.code, 0, stopped.stderr);
  await assert.rejects(fetch(url + '/health'), 'rer dev --stop frees the port');
  await assert.rejects(fetch(lines.RER_SITE), 'rer dev --stop frees the run site preview port');
+
+ // The real owner's setup replaces the zero-setup owner in place: the same
+ // account under the real address, every local row kept, and rer dev then signs
+ // in as the real owner.
+ const before = localData(root), real = 'real-owner@example.com';
+ const replaced = await run(rer, ['setup', '--owner-email', real, '--non-interactive'], { cwd: root, env });
+ assert.equal(replaced.code, 0, replaced.stderr + replaced.stdout);
+ assert.equal(replaced.stdout.split('\n').filter(line => line.includes('owner@seed-with-spaces.test') && line.includes(real)).length, 1, 'one line says the zero-setup owner was replaced');
+ const after = localData(root);
+ assert.deepEqual(after.owners, [{ id: before.owners[0].id, email: real }], 'the zero-setup owner row now holds the real address');
+ for (const [table, count] of Object.entries(before.counts)) assert.ok(after.counts[table] >= count, `${table} keeps its ${count} rows`);
+ const relaunched = await run(rer, ['dev', '--port', String(port)], { cwd: root, env });
+ assert.equal(relaunched.code, 0, relaunched.stderr + relaunched.stdout);
+ assert.ok(relaunched.stdout.split('\n').includes(`RER_SIGNED_IN ${real}`), relaunched.stdout);
+ assert.equal((await run(rer, ['dev', '--stop'], { cwd: root, env })).code, 0);
 
  // The trusted delivery job: a fresh copy, the frozen lockfile and the
  // package's own rer from node_modules/.bin, with no rer on PATH.

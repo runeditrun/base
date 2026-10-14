@@ -1,5 +1,5 @@
 import {randomBytes} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
+import {readFile,realpath} from 'node:fs/promises';
 import {createInterface} from 'node:readline/promises';
 import {Writable} from 'node:stream';
 import {contained} from './project.mjs';
@@ -82,10 +82,12 @@ export async function setupInput(project, options, vars, signal, { origin } = {}
  }
  if(!mailbox(answers[names.email]))throw invalid('Provide a valid plain owner mailbox.');
  answers[names.email]=answers[names.email].toLowerCase();
- const {assertLocalOwner}=await shared('local/owner.mjs');
- const owners=await assertLocalOwner(project.root,answers[names.email],message=>refuse(message),project.adapter.hooks?.localOwner,`${names.email} in ${project.adapter.hooks?.secrets?.file??'.dev.vars'}`);
+ const {assertLocalOwner,zeroSetupOwner}=await shared('local/owner.mjs');
+ const {owners,placeholder}=await assertLocalOwner(project.root,answers[names.email],message=>refuse(message),project.adapter.hooks?.localOwner,`${names.email} in ${project.adapter.hooks?.secrets?.file??'.dev.vars'}`);
+ // The zero-setup owner gives way to the real one; lifecycle renames it in place.
+ if(placeholder&&placeholder.toLowerCase()!==answers[names.email])project.ownerReplacement={from:placeholder,to:answers[names.email]};
  if(savedEmail&&!mailbox(savedEmail))throw refuse('Saved owner is malformed. Restore private settings or run rer reset --yes.');
- if(savedEmail&&savedEmail.toLowerCase()!==answers[names.email]){
+ if(savedEmail&&savedEmail.toLowerCase()!==answers[names.email]&&(owners.length?!placeholder:savedEmail.toLowerCase()!==zeroSetupOwner(await realpath(project.root)))){
   if(owners.length)throw refuse(`Private setting ${names.email} differs from the retained database owner. Restore ${names.email} in ${project.adapter.hooks?.secrets?.file??'.dev.vars'} to ${answers[names.email]}, then run rer setup --owner-email ${answers[names.email]}; or back up data and run rer reset --yes. Private bytes were kept.`);
   throw refuse(`Owner conflicts with the saved installation (${savedEmail}). Run rer setup --owner-email ${savedEmail}, or back up data, run rer dev --stop, then rer reset --yes followed by rer setup --owner-email ${answers[names.email]}. Reset deletes local data.`);
  }

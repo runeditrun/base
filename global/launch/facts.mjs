@@ -2,7 +2,7 @@
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { listeningPorts } from '../../onboarding/process-diagnostics.mjs';
 import { LaunchFailure } from './failure.mjs';
@@ -62,11 +62,6 @@ export async function setupNeeded(root, described, last) {
  if (!await hasSettings(root, described)) return described?.local?.ownerSaved === true ? 'resume' : 'fresh';
  if (!last || last.state === 'done') return undefined;
  return await finishedSince(root, described, last.at) ? undefined : 'resume';
-}
-
-export function localOwner(root) {
- const label = basename(root).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63) || 'checkout';
- return `owner@${label}.test`;
 }
 
 async function bindable(host, port) {

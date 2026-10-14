@@ -124,11 +124,20 @@ export async function replaceSavedOrigin(root, options, origin) {
  return rewriteOrigin(root, options, (await readSettings(root, options)).values, origin);
 }
 
-async function rewriteOrigin(root, options, values, origin) {
- const key = options.originKey ?? 'AUTH_ORIGIN';
- const current = await readSettings(root, options), format = options.format ?? 'dotenv', merged = { ...values, [key]: origin };
- const text = format === 'json' ? JSON.stringify(merged, null, 1) + '\n' : current.text.replace(new RegExp(`^${key}=.*$`, 'm'), `${key}=${dotenvValue(origin)}`);
- if (format !== 'json' && localVariables(text)[key] !== origin) throw new Error(`Could not move ${key} in ${options.file ?? '.dev.vars'}; put ${key}=${origin} on its own line.`);
+// Rewrite only one saved setting (setup replacing the zero-setup owner). The
+// caller holds the local operation lock.
+export async function replaceSavedSetting(root, options, key, value) {
+ return rewriteSetting(root, options, (await readSettings(root, options)).values, key, value);
+}
+
+function rewriteOrigin(root, options, values, origin) {
+ return rewriteSetting(root, options, values, options.originKey ?? 'AUTH_ORIGIN', origin);
+}
+
+async function rewriteSetting(root, options, values, key, value) {
+ const current = await readSettings(root, options), format = options.format ?? 'dotenv', merged = { ...values, [key]: value };
+ const text = format === 'json' ? JSON.stringify(merged, null, 1) + '\n' : current.text.replace(new RegExp(`^${key}=.*$`, 'm'), `${key}=${dotenvValue(value)}`);
+ if (format !== 'json' && localVariables(text)[key] !== value) throw new Error(`Could not change ${key} in ${options.file ?? '.dev.vars'}; put ${key}=${value} on its own line.`);
  await writePrivateFile(current.path, text);
  return merged;
 }

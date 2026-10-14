@@ -59,6 +59,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
    if (options.verb !== 'outbox' && !options.site) try { operation = await localOperation(project.root, process.env.RER_LOCAL_OPERATION); } catch (error) { throw refuse(error.message); }
    const { recoverInterrupted } = await shared('local/recovery.mjs');
    if (operation) await recoverInterrupted(project.root, operation);
+   if (project.ownerReplacement) await replaceOwner(project, options, out);
   }
   const { createCommands } = await shared('commands.mjs');
   const { privateDirectory } = await shared('private-files.mjs');
@@ -176,6 +177,20 @@ async function runningRecord(root) {
  const { realpath } = await import('node:fs/promises');
  const checkout = await realpath(root), state = await readJson(join(serversDirectory(), 'state.json'), { running: [] });
  return (state.running ?? []).find(record => record.checkout === checkout);
+}
+
+// Under the local operation, before the app starts: the zero-setup owner's
+// row and saved owner setting become the real owner's, and one line says so.
+async function replaceOwner(project, options, out) {
+ const { from, to } = project.ownerReplacement, { replaceLocalOwner } = await shared('local/owner.mjs');
+ await replaceLocalOwner(project.root, from, to, message => refuse(message));
+ const secrets = project.adapter.hooks?.secrets, key = localSettingKeys(project).email;
+ if (secrets) {
+  const { readSettings, replaceSavedSetting } = await shared('adapter-settings.mjs');
+  if ((await readSettings(project.root, secrets)).values[key]?.toLowerCase() === from.toLowerCase()) await replaceSavedSetting(project.root, secrets, key, to);
+ }
+ if (options.json) out.event('owner-replaced', { from, to });
+ else out.human(`Replacing the zero-setup local owner ${from} with ${to}. Local data is kept.`);
 }
 
 // One plain line saying which port this checkout uses, and what moved.
