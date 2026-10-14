@@ -8,7 +8,7 @@ import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { observeOwner } from './deploy-observation.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookOrigin, waitForSource } from './deploy-hook.mjs';
-import { rememberHookState } from './deploy-hook-record.mjs';
+import { rememberHookState, hookState } from './deploy-hook-record.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
@@ -55,9 +55,13 @@ export async function deployCommand(context) {
  const redaction = createRedaction();
  const addSecret = value => { redaction.addSecrets([value]); store.addSecrets?.([value]); };
  for (const value of [...credentialValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment])].filter(Boolean)) addSecret(value);
- const command = (verb, extra = [], values = env) => owner([verb, '--declaration', path, '--environment', options.environment ?? 'production', ...extra], values, { cwd: root, localOnlyKeys });
+ const environment = options.environment ?? 'production';
+ // A hook keeping the kit's record in its own state file named it; every kit
+ // step after the hook (inspect, secret, record-owner) reads that record.
+ let hookRecord = await hookState(root, environment);
+ const command = (verb, extra = [], values = env) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...extra], values, { cwd: root, localOnlyKeys });
  // A hook that deployed through the kit's standard record lets rer issue and
- // retire the setup token; a hook keeping its own record keeps its token.
+ // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
  let recorded;
  const inspect = async () => {
   try { return recorded = await command('inspect'); }
@@ -78,7 +82,8 @@ export async function deployCommand(context) {
     Object.assign(process.env, saved);
    }
    if (options.dryRun) return deployed;
-   await rememberHookState(root, options.environment ?? 'production', deployed?.state);
+   await rememberHookState(root, environment, deployed?.state);
+   hookRecord = await hookState(root, environment);
    const origin = hookOrigin(deployed, deployAgain(options));
    step = 'wait for the deployed source';
    await waitForSource({ origin, sourceSha, again: deployAgain(options) });

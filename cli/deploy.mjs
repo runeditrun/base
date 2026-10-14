@@ -57,10 +57,10 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const created = [];
   let step = 'deploy', deployed;
   try {
+   // A custom hook's own state file, when its deploy named one.
+   const state = await hookState(root, environment);
    if (options.remove) {
     step = 'remove';
-    // A custom hook's own state file, when its deploy named one.
-    const state = await hookState(root, environment);
     const result = await owner('remove', state ? ['--state', state] : []);
     await forgetHookState(root, environment);
     store.report(`Removed ${result.removed.join(', ') || 'nothing (already gone)'}; read back: none of them remains.`);
@@ -69,7 +69,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    if (change.length) {
     step = 'secrets';
     const binding = options.setSecret ?? options.unsetSecret;
-    await owner('secret', [options.setSecret ? '--set' : '--unset', binding]);
+    await owner('secret', [options.setSecret ? '--set' : '--unset', binding, ...(state ? ['--state', state] : [])]);
     store.report(`${options.setSecret ? `Set ${binding}` : `Removed ${binding}`} on this environment's Worker, recorded its new version and verified hosted readiness.`);
     return { binding, present: Boolean(options.setSecret), deployed: false };
    }

@@ -14,7 +14,7 @@ import { owner } from '../onboarding/adapter-auth.mjs';
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
 // provider and hosted HTTP edge are faked. No seed source is modified.
-async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false } = {}) {
+async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false, namedState = false } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-hook-deploy-')));
  const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
@@ -27,8 +27,9 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
   const url = new URL(input); requests.push(`${init.method ?? 'GET'} ${url.pathname}`);
   if (url.pathname === '/auth/bootstrap') {
    const body = JSON.parse(init.body);
-   assert.equal(body.token, provider.state.secrets.find(item => item.name === 'SETUP_TOKEN')?.value);
    claims.push(body.token);
+   // The app answers a token the Worker does not hold as Base does.
+   if (body.token !== provider.state.secrets.find(item => item.name === 'SETUP_TOKEN')?.value) return Response.json({ error: 'invalid_setup_token' }, { status: 403 });
    if (denied) return Response.json({ error: 'owner_claim_denied' }, { status: 403 });
    if (claimed) return Response.json({ error: 'already_initialized' }, { status: 409 });
    claimed = true; return new Response(null, { status: 303, headers: { 'set-cookie': 'session=test; HttpOnly' } });
@@ -64,8 +65,9 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
   if (options.dryRun) return { dryRun: true, deployed: false };
   const args = ['--declaration', declarationPath, '--environment', options.environment ?? 'production'];
   let result;
-  // Like Penny, an own-record hook keeps its state elsewhere and its first setup token.
-  if (ownRecord) result = await ownerKit(['deploy', ...args, '--state', '.rer/hook/production.json'], { ...process.env, SETUP_TOKEN: hookToken ??= process.env.SETUP_TOKEN }, { cwd: root });
+  // Like Penny, an own-record hook keeps its state elsewhere and its first setup
+  // token; with named state it also deploys a setup token of its own.
+  if (ownRecord) result = await ownerKit(['deploy', ...args, '--state', namedState ? `.rer/deploy/environments/${options.environment}/state.json` : '.rer/hook/production.json'], { ...process.env, SETUP_TOKEN: hookToken ??= namedState ? 'hook-own-setup-token' : process.env.SETUP_TOKEN }, { cwd: root });
   else if (declared) result = await ownerKit(['deploy', ...args], process.env, { cwd: root });
   else {
    // A vendored legacy hook does not filter retired secrets and can re-upload.
@@ -200,6 +202,21 @@ test('rer deploy --remove after a hook that kept its own record removes what the
  assert.equal(f.provider.state.settings, null, 'the Worker is gone');
  assert.ok(f.progress.some(line => /read back: none of them remains/.test(line)));
  await assert.rejects(readFile(hookRecord), { code: 'ENOENT' }, 'the hook\'s record is retired with what it named');
+});
+
+test('a hook that keeps named state gets its owner claimed through that state, and an untouched repeat writes nothing', async t => {
+ const f = await fixture(t, { declared: true, ownRecord: true, returnState: true, namedState: true });
+ const first = await f.run({ environment: 'evidence' });
+ assert.equal(first.owner, 'claimed'); assert.equal(f.claims.length, 1);
+ assert.ok(!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'), 'the setup token is retired');
+ const statePath = join(f.root, '.rer/deploy/environments/evidence/state.json');
+ const state = await readFile(statePath), writes = f.provider.state.writes.length;
+ assert.equal((await f.run({ environment: 'evidence' })).owner, 'kept'); assert.equal(f.claims.length, 1);
+ assert.equal(f.provider.state.writes.length, writes, 'no provider writes');
+ assert.deepEqual(await readFile(statePath), state, 'the hook state is unchanged');
+ // A secret change reads the same record.
+ await f.run({ environment: 'evidence', unsetSecret: 'MAIL_API_KEY' });
+ assert.ok(!f.provider.state.secrets.some(item => item.name === 'MAIL_API_KEY'));
 });
 
 test('uncommitted tracked source stops the deploy before building and names the files', async t => {

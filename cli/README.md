@@ -282,9 +282,11 @@ sign-in address; a hook that reports no deployment, or whose app never names
 the commit, fails with what happened and claims nothing. When the hook deployed
 through the kit's standard deployment record, rer also records successful
 ownership separately from retired secrets and removes the setup token before
-returning success; a hook that keeps its own record keeps its token, and returns
-that kit state file as `state` so `rer deploy --remove --yes` removes what it
-deployed (`cli/deploy-hook-record.mjs` keeps the pointer). An owner
+returning success. A hook that deploys with the kit under its own state file
+returns that file as `state` (`cli/deploy-hook-record.mjs` keeps the pointer):
+every later step (inspect, setup token, owner record, `--set-secret`,
+`--unset-secret`, `--remove --yes`) reads that record, so rer claims and retires
+the token the same way; a hook that keeps an unnamed record keeps its token. An owner
 already claimed by the hook is kept without another bootstrap. An existing owner
 is explicitly reported as kept. Function owner hooks run their complete
 bootstrap flow; setup manifest paths do not replace it. A missing or ambiguous
