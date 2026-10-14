@@ -58,6 +58,6 @@ test('rer deploy and its dry run refuse RER_DEV_KEY, RER_DEMO and declared local
  await writeFile(path, JSON.stringify(declaration, null, 2));
  await writeFile(join(seed.root, 'deploy.env'), 'RER_DEMO=1\n', { mode: 0o600 });
  const settings = await seed.run(['deploy', '--dry-run', '--env-file', 'deploy.env'], 2);
- assert.match(error(settings).message, /local-only key RER_DEMO/);
+ assert.match(error(settings).message, /Local-only key RER_DEMO/);
  await assert.rejects(readdir(join(seed.root, 'dist')), 'refused before any build');
 });

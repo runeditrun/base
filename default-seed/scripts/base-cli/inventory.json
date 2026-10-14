@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.2-dev.gf32b067e",
+  "cliVersion": "0.2.2-dev.g36389dba",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -971,7 +971,7 @@
     },
     "modules/deploy-kit/env-file.mjs": {
       "source": "modules/deploy-kit/env-file.mjs",
-      "sha256": "5caa93643e4217ef091fdd6edfad47aabe1a4b8715798bca3f9a9edbc2c0ab27"
+      "sha256": "e9dd51183f0c0067413284fa318d27dab9aa152314f01dc7452e9428378b5a9a"
     },
     "modules/deploy-kit/health-request.mjs": {
       "source": "modules/deploy-kit/health-request.mjs",

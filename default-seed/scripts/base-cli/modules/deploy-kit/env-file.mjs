@@ -22,6 +22,6 @@ export async function readDeployEnvFile(root, envFile, localOnlyKeys = []) {
     settings[match[1]] = match[2].replace(/^"(.*)"$/, '$1');
   }
   const local = [...LOCAL_ONLY_KEYS, ...localOnlyKeys].find(key => Object.hasOwn(settings, key));
-  if (local) throw new Error(`local-only key ${local} is refused for deploy; remove it from the file`);
+  if (local) throw new Error(`Local-only key ${local} is refused for deploy; remove it from the file`);
   return settings;
 }
