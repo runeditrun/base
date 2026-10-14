@@ -70,3 +70,23 @@ test('public lifecycle refuses legacy saved-origin listeners despite overrides a
  await writeFile(join(root,'.dev.vars'),'OWNER_EMAIL="original@example.test"\n',{mode:0o600});
  const operation=await localOperation(root);try{const result=await run(['reset','--yes']);assert.equal(result.code,4,result.stdout);assert.match(result.stdout,new RegExp(`PID ${process.pid}`));assert.match(result.stdout,/Stop it/);}finally{await operation.release();}
 });
+test('public reset awaits the seed reset preflight before showing or deleting anything, even with --yes',async t=>{
+ // The adapter refuses while a legacy data directory still holds data, as a seed
+ // that has not yet recovered its old state would.
+ const {root,run}=await seed(t);
+ await writeFile(join(root,'scripts/installer/local.mjs'),`${await readFile(join(root,'scripts/installer/local.mjs'),'utf8')}
+import { readdir as legacyEntries } from 'node:fs/promises';
+commandAdapter.resetPreflight = async ({ root }) => { if ((await legacyEntries(root + '/.wrangler/local-build').catch(() => [])).length) throw new Error('Recover .wrangler/local-build first.'); };
+`);
+ const state=join(root,'.wrangler/state/v3/d1/kept.sqlite'),settings=join(root,'.dev.vars');
+ await mkdir(join(root,'.wrangler/state/v3/d1'),{recursive:true});await writeFile(state,'synthetic state');await writeFile(settings,'OWNER_EMAIL="owner@example.test"\n',{mode:0o600});
+ await mkdir(join(root,'.wrangler/local-build'));await writeFile(join(root,'.wrangler/local-build/data.sqlite'),'legacy');
+ const refused=await run(['reset','--yes']);
+ assert.equal(refused.code,4,refused.stdout);assert.match(refused.stdout,/Recover \.wrangler\/local-build first/);
+ assert.equal(refused.events.some(event=>event.event==='inventory'),false,'the inventory is shown only once the preflight passes');
+ assert.equal(await readFile(state,'utf8'),'synthetic state');assert.match(await readFile(settings,'utf8'),/owner@example.test/);
+ await rm(join(root,'.wrangler/local-build'),{recursive:true});
+ const reset=await run(['reset','--yes']);
+ assert.equal(reset.code,0,reset.stdout);
+ await assert.rejects(stat(state));await assert.rejects(stat(settings));
+});

@@ -81,7 +81,7 @@ export function localInstaller(hooks = {}) {
   if (verb === 'installer' && hooks.hosting) await hosting(context, hooks.hosting);
   store.state.appUrl = context.appUrl ?? (context.app ? context.origin : context.hostedUrl ?? context.origin);
   if (context.hostedUrl) store.state.hostedUrl = context.hostedUrl;
-  await store.step(labels.complete);
+  await store.step(verb === 'build' ? labels.built : labels.complete);
   await store.phase('complete');
   return context;
  }

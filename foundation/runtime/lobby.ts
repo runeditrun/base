@@ -2,8 +2,7 @@
 // says installedHome: 'lobby'. A centred lockup, one line, one button and the
 // seed's floor art. Claimed, the button is Sign in; before the owner's claim it
 // is Finish setup. It reveals nothing but that state, is the same for every
-// visitor and works without JavaScript. Visual authority: the 12ui Lobby
-// (evidence/homepage-variants/minimal in rer-consolidation).
+// visitor and works without JavaScript. Visual authority: the 12ui Lobby.
 // This file is copied unchanged to src/base by both maintained exporters.
 import { checkIdentity, deploymentLine, type EditionIdentity } from './identity'
 import { admitted, baseFirstRun, setupState, type ClaimRead, type SetupState } from './setup-state'

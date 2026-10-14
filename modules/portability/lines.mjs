@@ -14,7 +14,9 @@ export async function* archiveLines(source, maxLineBytes) {
     buffer.set(fragment, bytes); bytes = required;
   }
   function line() {
-    const value = decoder.decode(buffer.subarray(0, bytes)); bytes = 0;
+    // Invalid UTF-8 is malformed archive text: the same constant diagnostic as invalid JSON.
+    let value; try { value = decoder.decode(buffer.subarray(0, bytes)); } catch { throw new Error('archive_json'); }
+    bytes = 0;
     return value.endsWith('\r') ? value.slice(0, -1) : value;
   }
   try {

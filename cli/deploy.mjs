@@ -64,11 +64,13 @@ export function ownerDeploy(declarationPath, lifecycle) {
     store.report(`${options.setSecret ? `Set ${binding}` : `Removed ${binding}`} on this environment's Worker and recorded its new version; the next ${again} updates it.`);
     return { binding, present: Boolean(options.setSecret), deployed: false };
    }
+   store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
    deployed = await owner('deploy', [], env, { notice: line => store.report(line), onCreated: resource => created.push(redaction.redact(resource)) });
    const sent = supplied.filter(name => deployed.sentSecrets.includes(name));
    if (sent.length) store.report(`rer supplied ${sent.join(', ')} from the local setup owner and fresh generated values.`);
    step = 'health';
    await owner('health');
+   store.report(`Your application is live on your Cloudflare account at ${deployed.origin}.`);
    step = 'claim owner';
    const linked = token => linkDependencies?.(deployed.origin, token);
    const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed, env, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },

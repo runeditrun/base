@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { ownerDeploy } from './deploy.mjs';
+import { localInstaller } from '../onboarding/adapter.mjs';
 import { ownerProvider } from '../modules/deploy-kit/tests/owner-provider.mjs';
 
 // rer deploy through its public adapter door, against the fake Cloudflare account
@@ -50,14 +51,15 @@ function account(t, { claimed = false } = {}) {
 }
 
 const lifecycle = { run: async () => {}, settings: {}, hooks: { owner: { existingOwnerViaSignIn: true, displayName: input => input.displayName || 'Owner' } } };
-const store = () => { const lines = []; return { lines, state: {}, report: line => lines.push(line) }; };
+const store = () => { const lines = []; return { lines, state: {}, report: line => lines.push(line), step: async line => lines.push(line), phase: async () => {} }; };
 const secretNames = provider => provider.state.secrets.map(item => item.name).sort();
 
 test('rer deploy claims the setup owner on the hosted app, retires the setup token, and later updates the same Worker', async t => {
  const secrets = ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name }));
  const { root, git } = await checkout(t, { secrets, crons: ['* * * * *'] });
  const { provider, claims } = account(t);
- const deploy = ownerDeploy('deploy.json', lifecycle), linked = [];
+ // The seed's real installer lifecycle runs the build step of the deploy.
+ const deploy = ownerDeploy('deploy.json', localInstaller({ owner: lifecycle.hooks.owner, secrets: { file: '.dev.vars' } })), linked = [];
  const run = (options = {}, out = store()) => deploy({ root, options: { environment: 'production', ...options }, store: out, setupManifest: manifest, linkDependencies: async (origin, token) => linked.push(Boolean(origin && token)) });
  // A missing input is named, and nothing is created.
  await assert.rejects(run(), error => /Deploy needs MAIL_API_KEY/.test(error.message) && /--env-file/.test(error.message));
@@ -72,6 +74,9 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  assert.notEqual(provider.state.secrets.find(item => item.name === 'SESSION_SECRET').value, 'local-only-session', 'a hosted session secret is generated, not copied');
  assert.deepEqual(secretNames(provider), ['MAIL_API_KEY', 'OWNER_EMAIL', 'SESSION_SECRET'], 'the spent setup token is removed by rer');
  assert.ok(out.lines.some(line => line.includes('Claimed the hosted owner (owner@example.test)')));
+ // A hosted deploy talks about the person's account, never a local runtime.
+ assert.equal(out.lines.some(line => /locally|this computer/.test(line)), false, out.lines.join('\n'));
+ assert.ok(out.lines.findIndex(line => line.includes(first.origin)) < out.lines.findIndex(line => line.startsWith('Claimed the hosted owner')), 'the deployed origin is named once it is live, before the owner claim');
  // A secret rotated through rer, then newer source: the update is accepted.
  process.env.SESSION_SECRET = 'rotated-session-secret';
  await run({ setSecret: 'SESSION_SECRET' });

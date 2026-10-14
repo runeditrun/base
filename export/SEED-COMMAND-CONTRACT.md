@@ -314,6 +314,8 @@ build/dev/verify targets.
 
 A seed whose build rewrites tracked-looking files that are not source (generated migrations, widget or download assets, route trees, delivery output) lists them in `commandAdapter.generatedOutputs`: project-relative files or directories, for example `generatedOutputs: ['.generated', 'public/widget.js']`. Preview's fixed-build receipt and its during-build check ignore exactly those paths and nothing else. A real source edited during the build is still refused with its file named, and an undeclared file the build rewrites is refused with a message naming it and this declaration. Without the declaration nothing changes.
 
+A seed that must keep data `rer reset` would otherwise delete (legacy state still to be recovered, for example) declares `commandAdapter.resetPreflight`: an async function given `{ root }` that throws to refuse. Reset awaits it before showing its inventory or asking for confirmation, `--yes` does not skip it, and a refusal exits 4 with the thrown message and removes nothing.
+
 Every first-party adapter selects one root `rer-setup.json` manifest. The CLI,
 installer and deploy producer share its field selection and digest rules; do not
 create a second setup schema. Every first-party seed proves local

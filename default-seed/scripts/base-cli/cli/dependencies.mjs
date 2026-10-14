@@ -5,9 +5,11 @@ import { INTERFACE, providerMetadata } from '../modules/dependencies/protocol.mj
 import { readJson } from '../modules/operator-auth/identity/oidc/network.mjs';
 
 // Only an owner-only, untracked token file is accepted. The token never enters
-// setup answers, generated runtime configuration, logs or an archive.
+// setup answers, generated runtime configuration, logs or an archive. Returns
+// connected dependencies and the verified native owner outcome; an unanswered
+// optional dependency is skipped.
 export async function linkDependencies({project,input,origin,store,signal,appSetupToken,fetch:fetcher=globalThis.fetch,clock=Date.now}) {
- const links=[];
+ const links=[],connected=[];
  const ownerDependency = project.setupManifest?.steps?.find(step => step.type === 'owner-claim' && step.mode === 'idp')?.dependency;
  let ownerClaimed = false;
  let ownerIssuer;
@@ -20,6 +22,7 @@ export async function linkDependencies({project,input,origin,store,signal,appSet
  for(const dependency of project.setupManifest?.dependencies??[]) {
   const issuer=input?.[dependency.address];
   if(!issuer) {if(!dependency.optional)throw missing('A required dependency address is missing.');continue;}
+  connected.push(dependency);
   if(dependency.interface===ownerDependency)ownerIssuer=issuer;
   const tokenPath=approvalPath(project,dependency.interface);
   if(!tokenPath) {
@@ -60,5 +63,5 @@ export async function linkDependencies({project,input,origin,store,signal,appSet
   const status = await readJson(fetcher, origin+'/auth/dependencies/status', {timeoutMs:5000});
   ownerClaimed = unclaimedBefore !== undefined && await ownerState() === false && status.links?.some(link => link.interface === ownerDependency && link.issuer === ownerIssuer && link.linked === true) === true;
  }
- return {ownerClaimed, ...(ownerClaimed ? {ownerOutcome: unclaimedBefore ? 'claimed' : 'kept'} : {})};
+ return {connected,ownerClaimed, ...(ownerClaimed ? {ownerOutcome: unclaimedBefore ? 'claimed' : 'kept'} : {})};
 }

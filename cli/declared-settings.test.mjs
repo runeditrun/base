@@ -101,11 +101,11 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
  });
 });
 
-// A seed that declares a dependency has setup finish through the application's
-// /auth/setup-complete, proved with its own session secret. The seed's private
-// settings keep their declared format and the secret keeps its declared name.
-for (const shape of [{ name: 'JSON settings', format: 'json', file: 'settings.json', secret: 'SESSION_SECRET' },
- { name: 'a custom secret name', format: 'dotenv', file: '.dev.vars', secret: 'AUTH_SECRET' }]) test(`setup completes a declared dependency with ${shape.name}`, { timeout: 90000 }, async t => {
+// A seed may declare an optional provider dependency and still be set up
+// provider-free. With nothing connected the native owner claim has already
+// closed first setup, so setup must not need /auth/setup-complete: this app,
+// like a native-auth copy without that route, answers it with 404.
+test('setup without a connected optional dependency finishes without the completion route', { timeout: 90000 }, async t => {
  const env = await isolatedQueue(t);
  const root = await mkdtemp(join(tmpdir(), 'rer-declared-dependency-'));
  t.after(() => rm(root, { recursive: true, force: true }));
@@ -114,39 +114,30 @@ for (const shape of [{ name: 'JSON settings', format: 'json', file: 'settings.js
  await writeFile(join(root, 'package.json'), JSON.stringify({ engines: pins.engines, packageManager: pins.packageManager }));
  await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Declared dependency', groups: [], steps: [{ type: 'extension', id: 'native-owner' }],
   fields: [{ name: 'OWNER_EMAIL', label: 'Owner email', kind: 'email', required: true },
-   { name: shape.secret, label: 'Session secret', kind: 'secret', required: true, ownerVisible: false, input: 'managed', generate: 'hex' },
+   { name: 'SESSION_SECRET', label: 'Session secret', kind: 'secret', required: true, ownerVisible: false, input: 'managed', generate: 'hex' },
    { name: 'IDENTITY_PROVIDER', label: 'Identity provider', kind: 'url', required: false }],
   dependencies: [{ interface: 'oidc-provider@1', optional: true, cardinality: 1, address: 'IDENTITY_PROVIDER', paths: ['/auth/oidc/auth/callback', '/auth/oidc/auth/logout'] }] }));
- // The application answers /health and accepts /auth/setup-complete only with
- // the proof keyed by the secret in the settings file, read here by its format.
  await writeFile(join(root, 'app.mjs'), `
 import { createServer } from 'node:http';
-import { createHmac } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
-const [port, file, format, key] = process.argv.slice(2);
+import { appendFileSync } from 'node:fs';
 createServer((request, response) => {
  if (request.url === '/health') return response.end(JSON.stringify({ status: 'ok' }));
- if (request.url !== '/auth/setup-complete' || request.method !== 'POST') return response.writeHead(404).end();
- const text = readFileSync(file, 'utf8');
- const secret = format === 'json' ? JSON.parse(text)[key] : new RegExp('^' + key + '=(.*)$', 'm').exec(text)?.[1];
- const proof = createHmac('sha256', secret).update('local-cli\\0sign-in').digest('hex');
- if (request.headers['x-rer-local-cli'] !== proof) return response.writeHead(403).end('{}');
- writeFileSync('completed', 'yes');
- response.end('{}');
-}).listen(Number(port), '127.0.0.1');
+ if (request.url === '/auth/setup-complete') appendFileSync('completion-requests', 'x');
+ response.writeHead(404).end();
+}).listen(Number(process.argv[2]), '127.0.0.1');
 `);
  await writeFile(join(root, 'adapter.mjs'), `
 import { localInstaller } from ${JSON.stringify(pathToFileURL(join(base, 'onboarding/adapter.mjs')).href)};
 import { commandAdapter as declare } from ${JSON.stringify(pathToFileURL(join(base, 'cli/adapter.mjs')).href)};
-const lifecycle = localInstaller({ sessionSecretKey: ${JSON.stringify(shape.secret)}, secrets: { file: ${JSON.stringify(shape.file)}, format: ${JSON.stringify(shape.format)}, originKey: 'AUTH_ORIGIN' },
- start: context => ['node', ['app.mjs', String(context.runtimePort ?? new URL(context.origin).port), ${JSON.stringify(shape.file)}, ${JSON.stringify(shape.format)}, ${JSON.stringify(shape.secret)}]],
+const lifecycle = localInstaller({ secrets: { file: '.dev.vars', format: 'dotenv', originKey: 'AUTH_ORIGIN' },
+ start: context => ['node', ['app.mjs', String(context.runtimePort ?? new URL(context.origin).port)]],
  signIn: async () => {} });
-export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-setup.json' }, input: { names: { email: 'OWNER_EMAIL' } }, settings: [${JSON.stringify(shape.file)}] });
+export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-setup.json' }, input: { names: { email: 'OWNER_EMAIL' } }, settings: ['.dev.vars'] });
 `);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/declared-dependency', runtime: { requirements: [] }, requiredEnvironment: [],
   seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'outbox', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local declared-dependency flow.' }])) }));
  const result = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'setup', '--owner-email', 'owner@example.test', '--port', String(await freePort()), '--json', '--non-interactive'], { cwd: root, env, encoding: 'utf8', timeout: 60000 });
  assert.ifError(result.error);
  assert.equal(result.status, 0, result.stdout + result.stderr);
- assert.equal(await readFile(join(root, 'completed'), 'utf8'), 'yes', 'the application accepted the CLI proof');
+ await assert.rejects(readFile(join(root, 'completion-requests')), 'nothing was connected, so setup asks the app to complete nothing');
 });
