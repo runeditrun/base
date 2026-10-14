@@ -4,6 +4,29 @@ export const ledger = 'd1_migrations';
 const legacy = '_rer_deploy_migrations';
 export const literal = value => `'${value.replaceAll("'","''")}'`;
 export const createLedger = `CREATE TABLE ${ledger} (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, sha256 TEXT, state TEXT CHECK(state IN ('applying','applied')))`;
+
+// Every d1_migrations shape a deployment can hold: Wrangler's own; Wrangler's
+// after the kit adopted it (sha256 and state added); and the kit's own, which
+// rer 0.2.2 and later create. Seed recovery code that checks the ledger before
+// reading or restoring it accepts all three with migrationLedgerShape.
+export const ledgerShapeQuery = `SELECT cid,name,upper(type) AS type,"notnull",dflt_value,pk,hidden FROM pragma_table_xinfo('${ledger}') ORDER BY cid`;
+const column = (name, type, notnull = 0, dflt_value = null, pk = 0) => ({ name, type, notnull, dflt_value, pk, hidden: 0 });
+const wrangler = [column('id','INTEGER',0,null,1), column('name','TEXT'), column('applied_at','TIMESTAMP',1,'CURRENT_TIMESTAMP')];
+const tracked = [column('sha256','TEXT'), column('state','TEXT')];
+const shapes = {
+  wrangler,
+  adopted: [...wrangler, ...tracked],
+  kit: [column('id','INTEGER',0,null,1), column('name','TEXT',1), column('applied_at','TEXT',1,'CURRENT_TIMESTAMP'), ...tracked],
+};
+/** The ledger's shape from its ledgerShapeQuery rows (node:sqlite or D1):
+ * { name, columns, shape } where shape is 'wrangler', 'adopted' or 'kit'.
+ * Any other shape throws invalid-migration-ledger. */
+export function migrationLedgerShape(rows) {
+  const read = (rows ?? []).map(row => ({ name: row.name, type: String(row.type).toUpperCase(), notnull: Number(row.notnull), dflt_value: row.dflt_value ?? null, pk: Number(row.pk), hidden: Number(row.hidden) }));
+  const shape = Object.keys(shapes).find(key => JSON.stringify(read) === JSON.stringify(shapes[key]));
+  assert(shape, 'invalid-migration-ledger');
+  return { name: ledger, columns: read.map(row => row.name), shape };
+}
 /** An applied row records this migration: its current bytes, or bytes a seed's
  * reviewed rewrite record says this migration replaced. */
 export const recorded = (row, migration) => row.name === migration?.name && (row.sha256 === migration.sha256 || (migration.rewrites ?? []).some(rewrite => rewrite.from === row.sha256));

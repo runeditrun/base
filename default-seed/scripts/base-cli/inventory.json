@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.3-dev.g9e3bc091",
+  "cliVersion": "0.2.3-dev.g739da1e0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -995,7 +995,7 @@
     },
     "modules/deploy-kit/migration-ledger.mjs": {
       "source": "modules/deploy-kit/migration-ledger.mjs",
-      "sha256": "55a554e089a59287d8fbdd1871fe04d9987ed1900a1cafa5bdc74a25d7311296"
+      "sha256": "59aa3688bbc4e6a3ba233112f670e66b804f75b57903d437be87d845b674baf1"
     },
     "modules/deploy-kit/migrations.mjs": {
       "source": "modules/deploy-kit/migrations.mjs",

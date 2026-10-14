@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { validateMigrations, migrate } from '../migrations.mjs';
+import { ledgerShapeQuery, migrationLedgerShape } from '../migration-ledger.mjs';
 import { hash } from '../validation.mjs';
 import { cloudflare } from '../provider.mjs';
 import { providerFixture } from './provider-fixture.mjs';
@@ -131,6 +132,31 @@ test('trigger migration preserves controller claims, applied hashes and no-op re
   assert.equal(fixture.state.writes.length, writes);
 });
 
+// Seed recovery code checks the ledger before reading it. Every ledger a
+// deployment can hold passes the shared check: a fresh kit deploy's, Wrangler's
+// own, and Wrangler's after a kit deploy adopted it. Any other shape is refused.
+test('migrationLedgerShape accepts the kit, Wrangler and adopted ledgers and refuses any other', async t => {
+  const fixture = providerFixture();
+  t.after(() => fixture.close());
+  const api = cloudflare(fixture);
+  const migrations = [migration(schema)];
+  const wranglerLedger = 'CREATE TABLE IF NOT EXISTS d1_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)';
+  const deployment = async (name, before) => {
+    const resource = await api.request('/d1/database', { method: 'POST', body: { name } });
+    const db = fixture.state.databases.at(-1).db;
+    if (before) db.exec(before);
+    return { resource, db, shape: () => migrationLedgerShape(db.prepare(ledgerShapeQuery).all()) };
+  };
+  const kit = await deployment('kit');
+  await migrate(api, kit.resource.uuid, migrations);
+  assert.deepEqual(kit.shape(), { name: 'd1_migrations', columns: ['id', 'name', 'applied_at', 'sha256', 'state'], shape: 'kit' });
+  const wrangler = await deployment('wrangler', wranglerLedger);
+  assert.deepEqual(wrangler.shape(), { name: 'd1_migrations', columns: ['id', 'name', 'applied_at'], shape: 'wrangler' });
+  await migrate(api, wrangler.resource.uuid, migrations);
+  assert.deepEqual(wrangler.shape(), { name: 'd1_migrations', columns: ['id', 'name', 'applied_at', 'sha256', 'state'], shape: 'adopted' });
+  const other = await deployment('other', wranglerLedger + '; ALTER TABLE d1_migrations ADD COLUMN note TEXT');
+  assert.throws(() => other.shape(), /invalid-migration-ledger/);
+});
 
 test('conflict and trigger ROLLBACK policies cannot implicitly end the provider transaction', t => {
   const db = database(t);

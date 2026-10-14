@@ -63,6 +63,7 @@
     "./modules/portability/migration-history": "./modules/portability/migration-history.mjs",
     "./modules/portability/storage": "./modules/portability/storage.mjs",
     "./modules/erasure/fence": "./modules/erasure/fence.mjs",
+    "./modules/deploy-kit/migration-ledger": "./modules/deploy-kit/migration-ledger.mjs",
     "./modules/deploy-kit/owner": "./modules/deploy-kit/owner.mjs",
     "./modules/deploy-kit/owner-cli": "./modules/deploy-kit/owner-cli.mjs",
     "./modules/deploy-kit/prepare": "./modules/deploy-kit/prepare.mjs",
