@@ -64,16 +64,23 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,r
   return receipt;
 }
 
+// Response prefixes belong only in the caller's redacted diagnostic, never in
+// the ownership record: an unhealthy app may echo a secret, as the secret command also keeps.
+const recorded = attempts => attempts.map(({body:_,...attempt}) => attempt);
+
 /** After an upload the route may take a while to appear: wait for /health with a bound and
  * record every attempt in `receipt.health`. `onHealth(receipt)` runs after each attempt and at the end. */
 async function firstHealth({api,plan,receipt,fetch,healthOptions,readiness,onHealth,asset}) {
   receipt.health = {ok:false,attempts:[]};
   const {now,sleep,...options} = healthOptions;
   const wait = {...(now ? {clock:now} : {}),...(sleep ? {sleep} : {}),...readiness,onAttempt:async (_attempt,attempts) => {
-    receipt.health.attempts = [...attempts];
+    receipt.health.attempts = recorded(attempts);
     if (onHealth) await onHealth(receipt);
   }};
-  try { receipt.health = await verifyHealth({...options,api,plan,receipt,fetch,readiness:wait,asset}); }
+  try {
+    const health = await verifyHealth({...options,api,plan,receipt,fetch,readiness:wait,asset});
+    receipt.health = health.attempts ? {...health,attempts:recorded(health.attempts)} : health;
+  }
   catch (error) {
     receipt.health.ok = false; receipt.health.errorClass = error.message;
     if (onHealth) await onHealth(receipt);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.4-dev.g8d1e9941",
+  "cliVersion": "0.2.4-dev.ga04e9f70",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -947,7 +947,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "6635e3a3d4e7f94d2bf81d513a7fc717d7dd21ad9635f917f88b674a6a14101b"
+      "sha256": "c06fbf463a6deca4a2a5f2b4f21d8d35dcc61ace6d5e4826be9a117d88ce4ba4"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -979,7 +979,7 @@
     },
     "modules/deploy-kit/deploy.mjs": {
       "source": "modules/deploy-kit/deploy.mjs",
-      "sha256": "c37d6eaa7a247d3776cf2a1ba472d233affbb4838d8b6019a888246912ec8482"
+      "sha256": "6df02bb84e1bd16f4a371b44f6b50ffd7e87f05cf7e7c790be4acaa0304e7ebf"
     },
     "modules/deploy-kit/diagnostics.mjs": {
       "source": "modules/deploy-kit/diagnostics.mjs",

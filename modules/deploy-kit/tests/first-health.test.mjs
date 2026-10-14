@@ -19,15 +19,15 @@ test('deploy waits through 404,404,200 and records every attempt in result and r
   const receipt=await deploy({...args,onHealth:async value=>snapshots.push(structuredClone(value.health))});
   assert.deepEqual(receipt.health.attempts.map(x=>x.status),[404,404,200]);
   assert(receipt.health.attempts.every((x,i)=>i===0 || x.offsetMs>receipt.health.attempts[i-1].offsetMs));
-  assert.equal(receipt.health.attempts[0].cfRay,'ray-1');assert.equal(receipt.health.attempts[0].contentType,'text/plain');assert.equal(receipt.health.attempts[0].body,'not ready');
+  assert.equal(receipt.health.attempts[0].cfRay,'ray-1');assert.equal(receipt.health.attempts[0].contentType,'text/plain');assert.equal(receipt.health.attempts[0].body,undefined);
   assert.equal(sleeps.length,2);assert(sleeps.every(ms=>ms>0));assert.deepEqual(snapshots.at(-1),receipt.health);assert.equal(receipt.health.ok,true);
 });
 test('persistent 503 exhausts total bound and retains final status and all attempts',async t=>{
   const {fixture,args,sleeps}=setup(t);const bound=5000,body='x'.repeat(1024);fixture.state.healthOverride=()=>new Response(body,{status:503});
-  let persisted;await assert.rejects(deploy({...args,readiness:{...args.readiness,totalMs:bound},onHealth:async value=>persisted=structuredClone(value)}),error=>{
-    assert.match(error.message,/last-status-503/);assert(error.attempts.length>1);assert(error.attempts.every(x=>x.status===503));assert.equal(error.receipt.health.ok,false);return true;
+  let persisted,error0;await assert.rejects(deploy({...args,readiness:{...args.readiness,totalMs:bound},onHealth:async value=>persisted=structuredClone(value)}),error=>{
+    error0=error;assert.match(error.message,/last-status-503/);assert(error.attempts.length>1);assert(error.attempts.every(x=>x.status===503));assert.equal(error.receipt.health.ok,false);return true;
   });
-  assert.equal(sleeps.reduce((a,b)=>a+b,0),bound);assert.equal(persisted.health.attempts.length,sleeps.length);assert(persisted.health.attempts.every(x=>x.offsetMs<bound));assert(persisted.health.attempts[0].body.length<body.length);assert(body.startsWith(persisted.health.attempts[0].body));
+  assert.equal(sleeps.reduce((a,b)=>a+b,0),bound);assert.equal(persisted.health.attempts.length,sleeps.length);assert(persisted.health.attempts.every(x=>x.offsetMs<bound));assert(persisted.health.attempts.every(x=>x.body===undefined));assert(error0.attempts[0].body.length<body.length);assert(body.startsWith(error0.attempts[0].body));
 });
 for (const [title,response,pattern] of [
   ['302',()=>new Response('redirect',{status:302,headers:{location:'https://elsewhere.invalid'}}),/last-status-302/],

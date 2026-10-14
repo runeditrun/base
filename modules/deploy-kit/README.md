@@ -286,12 +286,14 @@ retains the existing window, retrying only 404, 503 and network failures for
 30 seconds by default.
 
 The returned receipt carries `health: {ok, versionId, attempts}`. Each attempt is
-`{offsetMs, status, cfRay, contentType, body, errorClass}`: `status` is null for
-a transport failure, `body` is the first 256 response bytes decoded as UTF-8 and
-`errorClass` is null for the passing attempt. A failed wait throws an error whose
-message names the class and the last status (for example
-`health-http-failed-last-status-503`) and which carries `attempts`, `status` and
-the identity `receipt` (with `health.ok` false). Provider diagnostics are never
+`{offsetMs, status, cfRay, contentType, errorClass}`: `status` is null for
+a transport failure and `errorClass` is null for the passing attempt. The receipt
+and owner state keep no response text, since an unhealthy app may echo a secret.
+A failed wait throws an error whose message names the class and the last status
+(for example `health-http-failed-last-status-503`) and which carries `attempts`
+(each with `body`, the first 256 response bytes decoded as UTF-8, for the
+caller's redacted diagnostic), `status` and the identity `receipt` (with
+`health.ok` false). Provider diagnostics are never
 retained; the endpoint must not return credentials. `readiness: {totalMs, clock,
 sleep}` selects a smaller bound and deterministic time; `healthOptions.now` and
 `healthOptions.sleep` act as `clock` and `sleep` for the same purpose.
