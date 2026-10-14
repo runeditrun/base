@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto';
 // seed with its own owner step function runs its own bootstrap; identity-provider
 // linking runs before retirement.
 // `beforeClaim(token)` runs while the token is live (dependency approvals need it).
-export async function claimHostedOwner({ hook, setupManifest, declaration, deployed, env, supplied = [], secret, addSecret, beforeClaim, recordClaim, inspect, store, signal, fetch = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), boundMs = 90000 }) {
+export async function claimHostedOwner({ hook, setupManifest, declaration, deployed, env, supplied = [], secret, addSecret, beforeClaim, recordClaim, inspect, store, signal, fetch = globalThis.fetch }) {
  const claim = setupManifest?.steps?.find(step => step.type === 'owner-claim');
  if (!hook || !['object', 'function'].includes(typeof hook) || Array.isArray(hook) || !deployed.origin) {
   if (declaration.secrets?.some(item => item.binding === (claim?.tokenField ?? 'SETUP_TOKEN'))) throw ownerFailure('the owner bootstrap hook is unavailable');
@@ -21,7 +21,9 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  if (!item) { if (claim) throw ownerFailure('the deploy declaration does not name the owner setup token secret'); return undefined; }
  const retire = async outcome => {
   try { await recordClaim?.(outcome); await secret(['--unset', tokenKey], env); }
-  catch (cause) { const error = new Error('owner-token-retirement-failed'); error.owner = outcome; error.tokenKey = tokenKey; error.cause = cause.message; throw error; }
+  catch (cause) {
+   if (cause.secretChange) { cause.owner = outcome; cause.tokenKey = tokenKey; cause.ownerFinalization = true; throw cause; }
+   const error = new Error('owner-token-retirement-failed'); error.owner = outcome; error.tokenKey = tokenKey; error.cause = cause.message; throw error; }
   return outcome;
  };
  // Only a recorded successful bootstrap proves ownership; --unset-secret alone
@@ -35,9 +37,8 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  let token = deployed.sentSecrets?.includes(tokenKey) || given ? env[item.environment] : undefined;
  if (!token) {
   token = randomBytes(32).toString('hex'); addSecret(token);
-  const { versionId } = await secret(['--set', tokenKey], { ...env, [item.environment]: token });
-  // A secret change is a new Worker version; claim once the app answers from it.
-  await servingVersion({ origin: deployed.origin, versionId, fetch, sleep, boundMs });
+  // The secret controller confirms readiness of the full new version identity.
+  await secret(['--set', tokenKey], { ...env, [item.environment]: token });
  }
  const linked = await beforeClaim?.(token);
  if (claim?.mode === 'idp') {
@@ -68,18 +69,6 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  const outcome = response.status === 303 ? 'claimed' : response.status === 409 && code === 'already_initialized' ? 'kept' : undefined;
  if (!outcome) throw ownerFailure(`HTTP ${response.status} (${code})${code === 'invalid_setup_token' && given ? `; the ${item.environment} you supplied is not the deployed setup token: leave it unset and rer issues a fresh one` : ''}`);
  return retire(outcome);
-}
-
-async function servingVersion({ origin, versionId, fetch, sleep, boundMs }) {
- const deadline = Date.now() + boundMs;
- while (true) {
-  try {
-   const response = await fetch(new URL('/health', origin), { redirect: 'manual', signal: AbortSignal.timeout(10000), headers: { 'Cache-Control': 'no-cache', Accept: 'application/json' } });
-   if ((await response.json().catch(() => null))?.deployment?.versionId === versionId) return;
-  } catch {}
-  if (Date.now() >= deadline) throw ownerFailure(`the hosted app did not answer from the Worker version holding the new setup token within ${Math.round(boundMs / 1000)} seconds`);
-  await sleep(2000);
- }
 }
 
 function ownerFailure(cause) {

@@ -1,5 +1,6 @@
 import { assert, identifier } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
+import { waitHealth } from './health-request.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
 import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDeployment, refuse, recordSecretChange, settlePendingSecret } from './owner.mjs';
 
@@ -11,7 +12,7 @@ import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDep
  * Both success and ambiguous failure read back for up to `windowMs`. An explicit refusal,
  * or an outcome not confirmed in that window, clears the pending record.
  * A removed declared secret is retired: later plans omit it until it is set again. */
-export async function ownerSecret({api: provider, target, statePath, binding, value, windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
+export async function ownerSecret({api: provider, target, statePath, binding, value, fetch = globalThis.fetch, healthOptions = {}, windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
   const api = withScopeHints(provider);
   assert(identifier(binding), 'invalid-secret-name');
   assert(value === undefined || typeof value === 'string' && value.trim(), `missing-secret-${binding}`);
@@ -47,7 +48,27 @@ export async function ownerSecret({api: provider, target, statePath, binding, va
       delete state.pendingSecret; await writeOwnerState(statePath, state);
       throw failure ?? error;
     }
+    const result = {worker:target.worker, binding, present, versionId:state.receipt.provider.versionId};
+    // Settlement is durable before readiness: a failed hosted check must never
+    // erase the applied mutation or cause the next command to reject our version.
+    state.receipt.health = {ok:false,versionId:result.versionId};
     await writeOwnerState(statePath, state);
-    return {worker:target.worker, binding, present, versionId:state.receipt.provider.versionId};
+    try {
+      if (state.receipt.origin) await waitHealth({
+        origin:state.receipt.origin, receipt:state.receipt, versionId:result.versionId, request:fetch,
+        timeoutMs:healthOptions.timeoutMs,
+        clock:healthOptions.now, sleep:healthOptions.sleep, ...healthOptions.readiness,
+      });
+      const after = await activeWorker(api, target.worker);
+      assert(after && sameDeployment(after, state.receipt.provider), 'deployment-changed-during-health');
+      // Response prefixes belong only in the caller's redacted diagnostic, never
+      // in the ownership record: an unhealthy app may accidentally echo a secret.
+      state.receipt.health = {ok:true,versionId:result.versionId};
+      await writeOwnerState(statePath, state);
+      return result;
+    } catch (error) {
+      error.secretChange = result;
+      throw error;
+    }
   });
 }

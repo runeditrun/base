@@ -301,6 +301,22 @@ sleep}` selects a smaller bound and deterministic time; `healthOptions.now` and
 replaces the mode-0600 receipt and refuses any change to its identity; the default
 CLI and owner-account state do this. A no-op repeat never rewrites the original receipt.
 
+Owner-account secret changes use the same bounded `waitHealth` after their new
+Worker version has settled and been recorded. This includes explicit
+`--set-secret`/`--unset-secret` commands, a fresh owner setup token, and the
+post-claim retirement performed by standard deploys and custom deploy hooks.
+Readiness checks the receipt source SHA, fingerprint and actual new version;
+it needs neither build output nor clean source for a secret-only command.
+Workers without a public route retain provider-only verification.
+
+A failed readiness check leaves the applied secret change, owner claim and token
+retirement recorded. The public command fails with the last HTTP status and the
+first bounded, redacted response line. Correct the seed/app configuration and
+redeploy; an app that requires an already spent setup token must remove that
+runtime requirement, rather than restoring the token or undoing ownership.
+The ownership receipt records readiness success/failure for the new version;
+untrusted response prefixes are never written into that record.
+
 ## Read-only teardown verification
 
 The kit does not perform deletes. After a seed has validated its receipt and
