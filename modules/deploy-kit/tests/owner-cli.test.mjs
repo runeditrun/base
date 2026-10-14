@@ -69,6 +69,40 @@ test('owner CLI names only its two Cloudflare inputs and refuses uncommitted sou
   assert.equal(provider.state.calls.filter(x => x.method !== 'GET').length,0);
 });
 
+// Virtual time for the kit's list waits: no test sleeps.
+function clock() { let now = 0; return {settle:{clock:() => now,sleep:async ms => { now += ms; }},elapsed:() => now}; }
+
+test('a first deploy completes while the account lists its new D1 database up to two minutes late', async t => {
+  for (const shape of ['count','omit']) {
+    const provider = ownerProvider(); t.after(() => provider.close());
+    const root = await seed(t), time = clock();
+    const argv = ['deploy','--declaration','deploy.json','--environment','production'];
+    provider.lagD1(28,shape);
+    const first = await main(argv,inputs(provider),{fetch:provider.fetch,cwd:root,settle:time.settle,notice:() => {}});
+    assert.deepEqual(first.created,['d1:vector-production-db','r2:vector-production-files'],shape);
+    assert.ok(time.elapsed() > 60000,'the listing stayed behind for over a minute');
+    assert.equal(provider.state.databases.length,1);
+    assert.equal((await main(argv,inputs(provider),{fetch:provider.fetch,cwd:root,settle:time.settle,notice:() => {}})).changed,false);
+  }
+});
+
+test('a D1 database the account never lists is named, kept in the saved state, and found by the next run', async t => {
+  for (const shape of ['count','omit']) {
+    const provider = ownerProvider(); t.after(() => provider.close());
+    const root = await seed(t), time = clock();
+    const argv = ['deploy','--declaration','deploy.json','--environment','production'];
+    provider.lagD1(Infinity,shape);
+    const failure = await main(argv,inputs(provider),{fetch:provider.fetch,cwd:root,settle:time.settle,notice:() => {}}).then(() => assert.fail('deployed'),error => error);
+    const named = report(failure);
+    assert.equal(named.code,'resource-not-listed',shape); assert.equal(named.resource,'d1:vector-production-db');
+    assert.equal(provider.state.writes.some(write => write.path?.startsWith('/workers/scripts/')),false,'nothing was uploaded');
+    provider.lagD1(0);
+    const resumed = await main(argv,inputs(provider),{fetch:provider.fetch,cwd:root,settle:time.settle,notice:() => {}});
+    assert.deepEqual(resumed.created,['r2:vector-production-files'],'the saved database is reused, not created again');
+    assert.equal(provider.state.databases.length,1,'the database was not created twice');
+  }
+});
+
 test('owner CLI reports refusal codes and resource names, never other error text', () => {
   const collision = Object.assign(new Error('resource-name-collision'),{resource:'d1:vector-production-db'});
   assert.deepEqual(report(collision),{ok:false,code:'resource-name-collision',resource:'d1:vector-production-db'});

@@ -12,6 +12,7 @@ export function ownerProvider({creationDates = false} = {}) {
   const {state} = fixture;
   state.kv = [];
   const failures = [];
+  let lag = null;
   const prefix = `/client/v4/accounts/${fixture.accountId}`;
   const ok = (result, result_info) => Response.json({success:true,errors:[],result,...(result_info ? {result_info} : {})});
   const fetch = async (input, init = {}) => {
@@ -51,6 +52,13 @@ export function ownerProvider({creationDates = false} = {}) {
       if (row && method === 'DELETE') { state.kv.splice(state.kv.indexOf(row),1); state.writes.push({method,path}); return ok(null); }
       return row ? ok(row) : Response.json({success:false,errors:[{code:10013,message:'missing'}]},{status:404});
     }
+    if (lag && lag.reads > 0 && url.origin === 'https://api.cloudflare.com' && path === '/d1/database' && method === 'GET' && state.databases.length > lag.known) {
+      // The account listing runs behind a create: the new database is counted by its rows
+      // only ('count', as measured on 13 October 2026) or missing altogether ('omit').
+      lag.reads--; state.calls.push({method,path,search:url.search,lagged:true});
+      const rows = state.databases.map(({db,...x}) => x), shown = lag.shape === 'omit' ? rows.slice(0,lag.known) : rows;
+      return ok(shown,{page:1,total_count:lag.shape === 'omit' ? shown.length : rows.length - 1,total_pages:1});
+    }
     if (creationDates && url.origin === 'https://api.cloudflare.com' && path === '/r2/buckets' && method === 'POST') {
       // Real R2 bucket rows carry a creation_date; the shared fixture's rows do not.
       await (await fixture.fetch(input,init)).arrayBuffer();
@@ -61,6 +69,8 @@ export function ownerProvider({creationDates = false} = {}) {
   };
   return {...fixture, fetch,
     fail(method, path, options = {status:500}) { failures.push({method,path,...options}); },
+    /** For its next `reads` listings, the D1 list does not yet show a database created after this call. */
+    lagD1(reads, shape = 'count') { lag = {reads,shape,known:state.databases.length}; },
     /** Resources that exist in the account but were not created by the kit. */
     foreign: {
       d1(name) { state.databases.push({uuid:randomUUID(),name,db:new DatabaseSync(':memory:')}); },

@@ -50,22 +50,35 @@ export function withScopeHints(api) {
   return {...api, scopeHints:true, request:guard('request'), envelope:guard('envelope'), list:guard('list')};
 }
 /** Right after a create, an account listing can disagree with its own page counts
- * (D1's total_count lagged its rows by about 7 seconds, measured 13 October 2026).
- * Owner mode discards such a snapshot and lists again from the start for up to
- * `windowMs`; a partial listing is never accepted. */
-export function withSettledLists(api, {windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
+ * (D1's total_count lagged its rows by about 7 seconds, measured 13 October 2026) or
+ * not show the new resource yet. Owner mode discards a partial snapshot and lists
+ * again from the start for up to `windowMs`; a partial listing is never accepted. */
+export const LIST_WINDOW_MS = 120000;
+const settleable = error => ['provider-partial-list','provider-pagination-changed'].includes(error.message);
+export function withSettledLists(api, {windowMs = LIST_WINDOW_MS, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
   if (api.settledLists) return api;
   const list = async (...args) => {
     const start = clock();
     for (let delay = 500; ; delay = Math.min(delay * 2, 4000)) {
       try { return await api.list(...args); }
       catch (error) {
-        if (!['provider-partial-list','provider-pagination-changed'].includes(error.message) || clock() - start + delay > windowMs) throw error;
+        if (!settleable(error) || clock() - start + delay > windowMs) throw error;
         await sleep(delay);
       }
     }
   };
-  return {...api, settledLists:true, list};
+  return {...api, settledLists:true, unsettled:api, list};
+}
+/** Waits until the account's listing shows a resource this run just created, so no later
+ * read mistakes it for a missing or replaced one. One that never appears is named. */
+async function listedAfterCreate(api, kind, item, {windowMs = LIST_WINDOW_MS, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
+  const start = clock();
+  for (let delay = 500; ; delay = Math.min(delay * 2, 4000)) {
+    try { if (findResource(await resourceKinds[kind].list(api.unsettled ?? api),kind,item.name)) return; }
+    catch (error) { if (!settleable(error)) throw error; }
+    if (clock() - start + delay > windowMs) throw refuse('resource-not-listed',kind,item.name);
+    await sleep(delay);
+  }
 }
 /** Reads the account's workers.dev subdomain; no other provider request. */
 export async function ownerTarget(provider, {project, environment}) {
@@ -295,15 +308,15 @@ export async function withStateLock(path, run) {
 
 /** Find or create every declared resource under the owner's account, migrate, upload and check health.
  * Ownership preflight precedes provider writes. A re-run of the same build writes nothing. */
-export async function ownerDeploy({api: provider, target, plan, artifact, statePath, env = {}, fetch = globalThis.fetch, healthOptions = {}, readiness = {}}) {
+export async function ownerDeploy({api: provider, target, plan, artifact, statePath, env = {}, fetch = globalThis.fetch, healthOptions = {}, readiness = {}, settle = {}}) {
   assert(typeof statePath === 'string' && statePath.length, 'missing-owner-state-path');
-  const api = withSettledLists(withScopeHints(provider));
+  const api = withSettledLists(withScopeHints(provider),settle);
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   validatePlan(plan); assertOwnerNames(target, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
-  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness}));
+  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle}));
 }
-async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness}) {
+async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle}) {
   const state = await readOwnerState(statePath, target);
   const save = () => writeOwnerState(statePath, state);
   await checkServiceWorkers(api, plan);
@@ -320,6 +333,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     const row = await resourceKinds[kind].create(api,item);
     assert(findResource([row],kind,item.name) === row, 'invalid-created-resource');
     state.owned[kind][item.name] = {status:'created',...(resourceId(kind,row) === undefined ? {} : {id:resourceId(kind,row)})}; await save();
+    await listedAfterCreate(api,kind,item,settle);
   }
   if (!exists && !state.owned.worker) { state.owned.worker = {status:'pending'}; await save(); }
   const upload = `/workers/scripts/${plan.worker}?bindings_inherit=strict`;

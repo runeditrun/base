@@ -25,7 +25,7 @@ async function ownerArtifact(root, product) {
 }
 
 /** Inputs: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, plus the secrets the declaration names on first deploy. */
-export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
+export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, settle, localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
   let parsed;
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string'},unset:{type:'string'},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
@@ -82,7 +82,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   }
   // Dispatch is the provider's: on some accounts a new Cron starts only at the account scheduler's next refresh.
   if (plan.crons.length) notice(cronNotice);
-  const {receipt,created,sentSecrets} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions}).catch(error => {
+  const {receipt,created,sentSecrets} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,settle}).catch(error => {
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });
