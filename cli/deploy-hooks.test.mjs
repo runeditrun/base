@@ -14,7 +14,7 @@ import { owner } from '../onboarding/adapter-auth.mjs';
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
 // provider and hosted HTTP edge are faked. No seed source is modified.
-async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false } = {}) {
+async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-hook-deploy-')));
  const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
@@ -22,7 +22,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
  for (const key of ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'SETUP_TOKEN', 'SESSION_SECRET', 'OWNER_EMAIL', 'MAIL_API_KEY']) delete process.env[key];
  const provider = ownerProvider(), requests = [], claims = [], progress = [];
  t.after(() => provider.close());
- let claimed = existing, denied = false, builds = 0, failBuild = false;
+ let claimed = existing, denied = false, builds = 0, failBuild = false, hookToken, returnToken = false;
  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
   const url = new URL(input); requests.push(`${init.method ?? 'GET'} ${url.pathname}`);
   if (url.pathname === '/auth/bootstrap') {
@@ -64,7 +64,9 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
   if (options.dryRun) return { dryRun: true, deployed: false };
   const args = ['--declaration', declarationPath, '--environment', options.environment ?? 'production'];
   let result;
-  if (declared) result = await ownerKit(['deploy', ...args], process.env, { cwd: root });
+  // Like Penny, an own-record hook keeps its state elsewhere and its first setup token.
+  if (ownRecord) result = await ownerKit(['deploy', ...args, '--state', '.rer/hook/production.json'], { ...process.env, SETUP_TOKEN: hookToken ??= process.env.SETUP_TOKEN }, { cwd: root });
+  else if (declared) result = await ownerKit(['deploy', ...args], process.env, { cwd: root });
   else {
    // A vendored legacy hook does not filter retired secrets and can re-upload.
    const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
@@ -74,13 +76,13 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
    result = { origin: receipt.origin };
   }
   if (selfClaim) await owner({ origin: result.origin, vars: { SETUP_TOKEN: process.env.SETUP_TOKEN }, input: {}, store, signal }, { displayName: () => 'Owner', returnTo: '/setup' });
-  return { deployed: true, origin: result.origin };
+  return { deployed: true, origin: result.origin, ...(returnToken ? { setupToken: hookToken } : {}) };
  };
  if (declared) adapter.deployDeclaration = declarationPath;
  const manifest = { steps: [{ type: 'owner-claim', mode: idp ? 'idp' : 'signed', ...(idp ? { dependency: 'oidc-provider@1' } : {}), path: '/auth/owner-claim', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN' }], fields: ['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ name, kind: 'secret', generate: 'hex' })) };
  const project = { root, profile: 'first-party', adapter, setupManifest: manifest };
  const run = (options = {}) => runCommand(project, { verb: 'deploy', forwarded: [], envFile: 'owner.env', json: true, ...options }, { progress: line => progress.push(line), event: () => {} });
- return { root, provider, claims, requests, progress, run, git, adapter, builds: () => builds, deny: (value = true) => { denied = value; }, failBuild: () => { failBuild = true; } };
+ return { root, provider, claims, requests, progress, run, git, adapter, builds: () => builds, deny: (value = true) => { denied = value; }, failBuild: () => { failBuild = true; }, returnToken: () => { returnToken = true; } };
 }
 
 test('conventional legacy function hook claims actual bootstrap, retires re-uploaded tokens, and bypasses hooks for changes', async t => {
@@ -142,13 +144,44 @@ test('missing or ambiguous ownership records refuse success, and denied bootstra
  const builds = f.builds(), writes = f.provider.state.writes.length;
  await assert.rejects(f.run({ unsetSecret: 'SETUP_TOKEN' }), /missing-owner-receipt/);
  assert.equal(f.builds(), builds); assert.equal(f.provider.state.writes.length, writes);
- f.adapter.deploy = async () => ({ deployed: true, origin: 'https://fixture-production.fixture-account.workers.dev' });
- await assert.rejects(f.run(), /missing-owner-receipt/);
- assert.equal(f.provider.state.writes.length, writes);
  await writeFile(join(f.root, 'other-deploy.json'), await readFile(join(f.root, 'deploy.json')));
  await assert.rejects(f.run(), /ambiguous declarations/); assert.equal(f.builds(), builds);
 });
 
+test('a hook keeping its own record is claimed from its result once /health names the commit', async t => {
+ const f = await fixture(t, { declared: true, ownRecord: true });
+ const first = await f.run();
+ assert.equal(first.owner, 'claimed'); assert.equal(first.setupToken, undefined); assert.equal(f.claims.length, 1);
+ assert.ok(f.progress.some(line => line.includes(`Sign in by email at ${first.origin}`)));
+ // A redeploy keeps the owner with the token the hook says it deployed.
+ f.returnToken();
+ assert.equal((await f.run()).owner, 'kept'); assert.equal(f.claims.length, 2);
+ // A hook whose app never shows this commit, and one that reports no deployment.
+ f.adapter.deploy = async () => ({ deployed: true, origin: first.origin });
+ let elapsed = 0;
+ t.mock.method(performance, 'now', () => elapsed);
+ f.provider.state.healthOverride = () => { elapsed += 90000; return Response.json({ ok: true, deployment: { sourceSha: '0123456789abcdef0123456789abcdef01234567' } }); };
+ await assert.rejects(f.run(), error => {
+  assert.equal(error.exitCode, 1);
+  assert.match(error.message, /never named this checkout's commit/); assert.match(error.message, /still answers for commit 0123456789ab/);
+  assert.doesNotMatch(error.message, /receipt/);
+  return true;
+ });
+ f.adapter.deploy = async () => ({ deployed: false });
+ await assert.rejects(f.run(), error => /without reporting a live deployment/.test(error.message) && !/receipt/.test(error.message));
+ assert.equal(f.claims.length, 2);
+});
+
+test('uncommitted tracked source stops the deploy before building and names the files', async t => {
+ const f = await fixture(t);
+ await writeFile(join(f.root, '.gitignore'), 'dist/\n.rer/\n.seed/\nowner.env\nnotes/\n');
+ await assert.rejects(f.run(), error => {
+  assert.equal(error.exitCode, 4);
+  assert.match(error.message, /\.gitignore/); assert.match(error.message, /git commit/); assert.match(error.message, /Nothing was uploaded/);
+  return true;
+ });
+ assert.equal(f.builds(), 0); assert.equal(f.requests.length, 0);
+});
 
 test('identity-provider deploy cannot report ownership from an absent link', async t => {
  const f = await fixture(t, { declared: true, idp: true });

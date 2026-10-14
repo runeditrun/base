@@ -6,6 +6,8 @@ import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { observeOwner } from './deploy-observation.mjs';
+import { committedSource } from './deploy-source.mjs';
+import { hookOrigin, waitForSource } from './deploy-hook.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
@@ -45,50 +47,62 @@ export async function deployCommand(context) {
  // may perform them; neither a build nor a custom upload runs here.
  if (options.remove || options.setSecret || options.unsetSecret) return ownerDeploy(path, adapter)(context);
  if (adapter.deploy.managesHostedOwner) return adapter.deploy(context);
+ const sourceSha = options.dryRun ? undefined : committedSource(root, options);
  const { env, supplied } = await deployEnvironment({ root, options, declaration, setupManifest, settings: adapter.settings, localOnlyKeys });
  const { createRedaction, credentialValues } = await shared('redaction.mjs');
  const redaction = createRedaction();
  const addSecret = value => { redaction.addSecrets([value]); store.addSecrets?.([value]); };
  for (const value of [...credentialValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment])].filter(Boolean)) addSecret(value);
  const command = (verb, extra = [], values = env) => owner([verb, '--declaration', path, '--environment', options.environment ?? 'production', ...extra], values, { cwd: root, localOnlyKeys });
+ // A hook that deployed through the kit's standard record lets rer issue and
+ // retire the setup token; a hook keeping its own record keeps its token.
  let recorded;
- const inspect = async () => (recorded = await command('inspect'));
+ const inspect = async () => {
+  try { return recorded = await command('inspect'); }
+  catch (error) { if (error.message !== 'missing-owner-receipt') throw error; }
+ };
  let observedClaims = [];
  let deployed, claimed, linked = false, linkResult, step = 'custom deploy';
- const link = async token => { if (!linked) { const state = await inspect(); linkResult = await linkDependencies?.(state.origin, token); linked = true; } return linkResult; };
+ const link = async (token, origin) => { if (!linked) { const state = await inspect(); linkResult = await linkDependencies?.(state?.origin ?? origin, token); linked = true; } return linkResult; };
  try {
   return await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret }, async claims => {
    observedClaims = claims;
    const saved = { ...process.env };
    try {
     Object.assign(process.env, env);
-    deployed = await adapter.deploy({ ...context, linkDependencies: async (_origin, token) => link(token) });
+    deployed = await adapter.deploy({ ...context, linkDependencies: async (origin, token) => link(token, origin) });
    } finally {
     for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
     Object.assign(process.env, saved);
    }
    if (options.dryRun) return deployed;
-   if (!deployed?.deployed) throw new Error('custom-deploy-did-not-confirm-deployment');
+   const origin = hookOrigin(deployed, deployAgain(options));
+   step = 'wait for the deployed source';
+   await waitForSource({ origin, sourceSha, again: deployAgain(options) });
    step = 'verify recorded deployment';
    const state = await inspect();
-   if (state.origin !== deployed.origin) throw new Error('owner-claim-origin-mismatch');
+   if ((state?.origin ?? origin) !== origin || claims.some(item => item.origin !== origin)) throw new Error('owner-claim-origin-mismatch');
    if (claims.some(item => !item.outcome)) throw new Error('owner-claim-failed');
    claimed = claims.at(-1)?.outcome;
    step = 'claim owner';
-   claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, supplied, secret: (extra, values) => command('secret', extra, values), addSecret, beforeClaim: link, recordClaim: outcome => command('record-owner', ['--outcome', outcome]), store, signal: context.signal });
-   if (!linked) await linkDependencies?.(state.origin);
-   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}; the one-time setup token was removed. Sign in by email at ${state.origin}.`);
-   return { ...deployed, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
+   if (typeof deployed.setupToken === 'string' && deployed.setupToken) addSecret(deployed.setupToken);
+   const kit = state ? { secret: (extra, values) => command('secret', extra, values), recordClaim: outcome => command('record-owner', ['--outcome', outcome]) } : { token: deployed.setupToken || undefined };
+   claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, origin, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, supplied, ...kit, addSecret, beforeClaim: token => link(token, origin), store, signal: context.signal });
+   if (!linked) await linkDependencies?.(origin);
+   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${state ? '; the one-time setup token was removed' : ''}. Sign in by email at ${origin}.`);
+   const { setupToken: _, ...result } = deployed;
+   return { ...result, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   });
  } catch (error) {
   const again = deployAgain(options);
-  if (error instanceof RerError && !deployed?.deployed && !recorded) { error.message = store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message); throw error; }
   const { commandFailure } = await shared('failures.mjs');
+  if (error.hookFailure) throw commandFailure(store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message));
+  if (error instanceof RerError && !deployed?.deployed && !recorded) { error.message = store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message); throw error; }
   const outcome = error.owner ?? claimed ?? observedClaims.at(-1)?.outcome;
-  const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}; setup token retirement is not confirmed.` : 'The custom deploy did not finish; inspect its deployment record before recovery.';
+  const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}${recorded ? '; setup token retirement is not confirmed' : ''}.` : 'The custom deploy did not finish; inspect its deployment record before recovery.';
   const redact = value => store.redact?.(redaction.redact(value)) ?? redaction.redact(value);
   const readiness = mutationReadinessFailure(error, { again, redact });
   if (readiness) throw commandFailure(readiness);
-  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
+  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
  }
 }

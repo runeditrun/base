@@ -1,6 +1,7 @@
 // Observe the actual bootstrap exchange of a custom hook, including hooks that
 // call the shared owner helper themselves. Never issue a second claim after it.
-// The deployment record is checked before linking with its live setup token.
+// The kit's deployment record, when the hook keeps one there, is checked before
+// linking with its live setup token; rer checks the origin the hook returns too.
 export async function observeOwner({ paths, inspect, beforeClaim, addSecret }, run) {
  const fetch = globalThis.fetch, claims = [];
  globalThis.fetch = async (input, init = {}) => {
@@ -12,8 +13,8 @@ export async function observeOwner({ paths, inspect, beforeClaim, addSecret }, r
   if (typeof body?.token !== 'string' || !body.token) return fetch(input, init);
   addSecret(body.token);
   const deployed = await inspect();
-  if (url.origin !== deployed.origin) throw new Error('owner-claim-origin-mismatch');
-  await beforeClaim?.(body.token);
+  if (deployed && url.origin !== deployed.origin) throw new Error('owner-claim-origin-mismatch');
+  await beforeClaim?.(body.token, url.origin);
   const response = await fetch(input, init);
   let code;
   if (response.status !== 303) {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rer deploy` with a seed's own deploy hook claims the hosted owner from what the hook returns, `{ deployed: true, origin }`, once the origin's `/health` names the checkout's commit, and prints the sign-in address. A hook that keeps its own deployment record (Penny's does) no longer ends in `missing-owner-receipt` with a live, unclaimed app; such a hook returns `setupToken` too when its Worker holds a setup token other than the `SETUP_TOKEN` rer passed it. A hook that reports no deployment, or whose app never names the commit, fails saying so and claims nothing.
+- `rer deploy` with uncommitted changes to tracked files stops before building, lists the files, says to commit them and that nothing was uploaded (exit 4), instead of building first and failing with `owner-source-not-committed`.
 - `rer deploy --demo --dry-run` and `rer build --platform container` work on an exported seed: the container import boundary admits the demo guard's `import { env } from 'cloudflare:workers'` in `src/modules/demo/index.mjs` (that file and that import only) and still refuses a Cloudflare import anywhere else in `src/`. The release smoke now runs the hosted demo dry run on a package-mode export.
 - `rer describe` lists `demo` as a verb (`rer dev --demo`), with its effects and the flags a demo takes.
 - Two launches claiming the same port, or two workers claiming the same checkout's launch, get exactly one winner: the claim is written complete and linked into place, so the other never reads it half-written and takes it as abandoned.

@@ -20,7 +20,8 @@ async function bodyPrefix(response) {
 }
 
 /** One credential-free, bounded request. Retain only bounded response evidence. */
-export async function healthRequest({origin, receipt, versionId, request, timeoutMs, offsetMs}) {
+/** `expected` holds the deploy identity fields the caller knows; each must match. */
+export async function healthRequest({origin, expected, request, timeoutMs, offsetMs}) {
   const attempt = {offsetMs,status:null,cfRay:null,contentType:null,body:'',errorClass:null};
   let response;
   try {
@@ -58,11 +59,12 @@ export async function healthRequest({origin, receipt, versionId, request, timeou
   let body;
   try { body = JSON.parse(bytes.toString('utf8')); }
   catch { attempt.errorClass = 'malformed-response'; return {attempt,transient:false}; }
-  if (body?.ok !== true || body.deployment?.sourceSha !== receipt.source.sha || body.deployment?.fingerprint !== receipt.fingerprint || body.deployment?.versionId !== versionId) {
+  if (body?.ok !== true || Object.entries(expected).some(([key, value]) => body.deployment?.[key] !== value)) {
     attempt.errorClass = 'health-identity-mismatch';
     // Right after an upload the edge can still answer from another version: that
     // settles within the bound. The expected version answering wrongly does not.
-    const other = body?.ok === true && typeof body.deployment?.versionId === 'string' && body.deployment.versionId !== versionId;
+    const key = expected.versionId ? 'versionId' : 'sourceSha';
+    const other = body?.ok === true && typeof body.deployment?.[key] === 'string' && body.deployment[key] !== expected[key];
     return {attempt,transient:other};
   }
   return {attempt,transient:false};
@@ -74,13 +76,13 @@ const MIN_DELAY_MS = 2000, MAX_DELAY_MS = 10000;
 
 /** The total bound includes requests, body reads and backoff; no request starts at the deadline.
  * Only a transient outcome is retried. Every attempt is recorded, in order, whatever the end. */
-export async function waitHealth({origin,receipt,versionId,request,timeoutMs=30000,totalMs=90000,clock=()=>performance.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onAttempt=()=>{},single=false}) {
+export async function waitHealth({origin,receipt,versionId,expected={sourceSha:receipt.source.sha,fingerprint:receipt.fingerprint,versionId},request,timeoutMs=30000,totalMs=90000,clock=()=>performance.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onAttempt=()=>{},single=false}) {
   assert(Number.isFinite(totalMs) && totalMs > 0 && totalMs <= 90000 && Number.isFinite(timeoutMs) && timeoutMs > 0,'invalid-health-bound');
   const start = clock(); const attempts = []; let delay = 1000;
   while (true) {
     const remaining = totalMs - (clock()-start);
     if (remaining <= 0) break;
-    const result = await healthRequest({origin,receipt,versionId,request,timeoutMs:Math.max(1,Math.ceil(Math.min(timeoutMs,remaining))),offsetMs:Math.round(clock()-start)});
+    const result = await healthRequest({origin,expected,request,timeoutMs:Math.max(1,Math.ceil(Math.min(timeoutMs,remaining))),offsetMs:Math.round(clock()-start)});
     attempts.push(result.attempt); await onAttempt(result.attempt,attempts);
     if (!result.attempt.errorClass) return {ok:true,versionId,attempts};
     // `single` asks once, except that an edge still answering from the previous version settles within the bound.

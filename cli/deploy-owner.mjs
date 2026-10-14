@@ -8,9 +8,11 @@ import { randomBytes } from 'node:crypto';
 // did not upload this run gets a fresh one first, unless the person supplied the
 // token (environment or --env-file) and inspection has not found it absent. A
 // seed with its own owner step function runs its own bootstrap; identity-provider
-// linking runs before retirement.
+// linking runs before retirement. Without `secret`, the Worker's secrets are a
+// deploy hook's own: rer claims with the `token` it returned, else the one rer
+// gave it, and leaves that token with the hook.
 // `beforeClaim(token)` runs while the token is live (dependency approvals need it).
-export async function claimHostedOwner({ hook, setupManifest, declaration, deployed, env, supplied = [], secret, addSecret, beforeClaim, recordClaim, inspect, store, signal, fetch = globalThis.fetch }) {
+export async function claimHostedOwner({ hook, setupManifest, declaration, deployed, env, supplied = [], secret, token: hookToken, addSecret, beforeClaim, recordClaim, inspect, store, signal, fetch = globalThis.fetch }) {
  const claim = setupManifest?.steps?.find(step => step.type === 'owner-claim');
  if (!hook || !['object', 'function'].includes(typeof hook) || Array.isArray(hook) || !deployed.origin) {
   if (declaration.secrets?.some(item => item.binding === (claim?.tokenField ?? 'SETUP_TOKEN'))) throw ownerFailure('the owner bootstrap hook is unavailable');
@@ -20,6 +22,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  const item = (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(entry => entry?.binding === tokenKey);
  if (!item) { if (claim) throw ownerFailure('the deploy declaration does not name the owner setup token secret'); return undefined; }
  const retire = async outcome => {
+  if (!secret) return outcome;
   try { await recordClaim?.(outcome); await secret(['--unset', tokenKey], env); }
   catch (cause) {
    if (cause.secretChange) { cause.owner = outcome; cause.tokenKey = tokenKey; cause.ownerFinalization = true; throw cause; }
@@ -34,7 +37,8 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  // record or live-secret inspection. Keep their completed deploys idempotent.
  if (!deployed.liveSecrets && deployed.retiredSecrets?.includes(tokenKey)) return undefined;
  const given = (!deployed.liveSecrets || deployed.liveSecrets.includes(tokenKey)) && env[item.environment]?.trim() && !supplied.includes(tokenKey);
- let token = deployed.sentSecrets?.includes(tokenKey) || given ? env[item.environment] : undefined;
+ let token = !secret ? hookToken ?? env[item.environment] : deployed.sentSecrets?.includes(tokenKey) || given ? env[item.environment] : undefined;
+ if (!token && !secret) throw ownerFailure(`the deploy hook returned no setupToken and ${item.environment} is not set`);
  if (!token) {
   token = randomBytes(32).toString('hex'); addSecret(token);
   // The secret controller confirms readiness of the full new version identity.
@@ -67,7 +71,8 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  if (response.status !== 303) { try { const body = await response.json(); if (typeof body?.error === 'string' && /^[a-z_]{1,64}$/.test(body.error)) code = body.error; } catch {} }
  else await response.body?.cancel();
  const outcome = response.status === 303 ? 'claimed' : response.status === 409 && code === 'already_initialized' ? 'kept' : undefined;
- if (!outcome) throw ownerFailure(`HTTP ${response.status} (${code})${code === 'invalid_setup_token' && given ? `; the ${item.environment} you supplied is not the deployed setup token: leave it unset and rer issues a fresh one` : ''}`);
+ const advice = code !== 'invalid_setup_token' ? '' : !secret ? `; the Worker holds another setup token: have the deploy hook return the one it deployed as setupToken, or set it as ${item.environment} with --env-file` : given ? `; the ${item.environment} you supplied is not the deployed setup token: leave it unset and rer issues a fresh one` : '';
+ if (!outcome) throw ownerFailure(`HTTP ${response.status} (${code})${advice}`);
  return retire(outcome);
 }
 

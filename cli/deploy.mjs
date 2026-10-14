@@ -9,6 +9,7 @@ import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
+import { committedSource } from './deploy-source.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -28,6 +29,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
   if (!change.length) {
+   if (!options.dryRun) committedSource(root, options);
    await lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken });
    await checkBuild();
   }

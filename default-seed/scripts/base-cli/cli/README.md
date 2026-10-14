@@ -273,13 +273,21 @@ against that registry.
 Owner-account application deploy completion is shared across standard and custom
 hooks. An adapter can declare `deployDeclaration` (or `deploy.declaration`);
 legacy hooks with one root owner deployment declaration are supported too. A
-custom hook may return only `{ deployed: true, origin }`: rer verifies the
-recorded Worker, runs the adapter's actual owner bootstrap, records successful
-ownership separately from retired secrets, and removes the setup token before
-returning success. An owner already claimed by the hook is kept without another
-bootstrap. An existing owner is explicitly reported as kept. Function owner
-hooks run their complete bootstrap flow; setup manifest paths do not replace it.
-A missing or ambiguous declaration or deployment receipt refuses completion.
+custom hook returns `{ deployed: true, origin }` once its upload is live, plus
+`setupToken` when its Worker holds a setup token other than the `SETUP_TOKEN`
+rer passed it. rer waits until the origin's `/health` names the checkout's commit,
+then runs the adapter's actual owner bootstrap with that token and prints the
+sign-in address; a hook that reports no deployment, or whose app never names
+the commit, fails with what happened and claims nothing. When the hook deployed
+through the kit's standard deployment record, rer also records successful
+ownership separately from retired secrets and removes the setup token before
+returning success; a hook that keeps its own record keeps its token. An owner
+already claimed by the hook is kept without another bootstrap. An existing owner
+is explicitly reported as kept. Function owner hooks run their complete
+bootstrap flow; setup manifest paths do not replace it. A missing or ambiguous
+declaration refuses completion. A kit or custom-hook deploy, except `--dry-run`,
+first refuses uncommitted tracked source, naming the files, before any build or
+upload.
 
 `--env-file` values are available in the command's preflight, custom hook and
 child build environment and are redacted; the caller environment is restored
