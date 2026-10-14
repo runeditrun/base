@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.5-dev.g81c13307",
+  "cliVersion": "0.2.5-dev.gab6397bc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -411,7 +411,7 @@
     },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
-      "sha256": "c21435431dd8d736c084f93573b25e036fc3b9f580450f9a9911c0a6601e5920"
+      "sha256": "ecec7ae20a5ad97ca48fb475160e0a1c81d242ab90b1ec1df0ba40a09a88b51b"
     },
     "cli/deploy-readiness.mjs": {
       "source": "cli/deploy-readiness.mjs",
@@ -947,7 +947,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "c06fbf463a6deca4a2a5f2b4f21d8d35dcc61ace6d5e4826be9a117d88ce4ba4"
+      "sha256": "07679ef1454244af9c034f0e8645933e9d24ee9ab9d5fe964ffda3dfae299179"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -979,7 +979,7 @@
     },
     "modules/deploy-kit/deploy.mjs": {
       "source": "modules/deploy-kit/deploy.mjs",
-      "sha256": "6df02bb84e1bd16f4a371b44f6b50ffd7e87f05cf7e7c790be4acaa0304e7ebf"
+      "sha256": "cf234fbf4c89aa9cb9ebbbc7f1b80280a97227d03e4e5486554ff12ed2120200"
     },
     "modules/deploy-kit/diagnostics.mjs": {
       "source": "modules/deploy-kit/diagnostics.mjs",
@@ -1015,7 +1015,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "94b3040a2f2e87b4d013b75b1f858bab299c900930117cc5c1b3dccd6850279a"
+      "sha256": "e20f89286cc61f05c8701d4cc993a088f36c38fd8a873675fe9fe47a37709ec6"
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
@@ -1031,7 +1031,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "81a9360543c6c058c9470faf0195fb0006f2e57644a942fec4a22a85b2706c3a"
+      "sha256": "f5a894cfff3bd1fcf845ba08e3394712d14d0060271b6d259c3b0d93727b9d8f"
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",

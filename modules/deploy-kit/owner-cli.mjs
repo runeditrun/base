@@ -82,7 +82,9 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   }
   // Dispatch is the provider's: on some accounts a new Cron starts only at the account scheduler's next refresh.
   if (plan.crons.length) notice(cronNotice);
-  const {receipt,created,sentSecrets} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,settle}).catch(error => {
+  // The fingerprint names every declared secret, retired ones too: an untouched repeat after the claim is a no-op.
+  const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys}).secrets;
+  const {receipt,created,sentSecrets} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,settle,declaredSecrets}).catch(error => {
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });

@@ -125,6 +125,11 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  // A hosted deploy talks about the person's account, never a local runtime.
  assert.equal(out.lines.some(line => /locally|this computer/.test(line)), false, out.lines.join('\n'));
  assert.ok(out.lines.findIndex(line => line.includes(first.origin)) < out.lines.findIndex(line => line.startsWith('Claimed the hosted owner')), 'the deployed origin is named once it is live, before the owner claim');
+ // An untouched exact repeat writes nothing: the build is unchanged with the token retired, and the claim stays recorded.
+ const statePath = join(root, '.rer/deploy/production.json'), claimedState = await readFile(statePath), claimedWrites = provider.state.writes.length;
+ assert.equal((await run({ envFile: 'deploy.env' })).owner, 'kept');
+ assert.equal(provider.state.writes.length, claimedWrites, 'an exact repeat makes no provider write');
+ assert.deepEqual(await readFile(statePath), claimedState, 'an exact repeat leaves the owner state as it was');
  // A secret rotated through rer, then newer source: the update is accepted.
  process.env.SESSION_SECRET = 'rotated-session-secret';
  provider.fail('PUT', /\/secrets$/, { afterApply: true, status: 504 });

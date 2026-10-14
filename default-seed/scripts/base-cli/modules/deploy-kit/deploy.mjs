@@ -11,8 +11,10 @@ import { verifyHealth } from './health.mjs';
 /** Controller-owned plan, inert validated artifact bytes; no project imports or subprocesses.
  * `createResources` defaults to creating only without a prior receipt. Owner-account
  * mode creates owned resources itself first, then passes false. `uploadWithoutReceipt`
- * re-uploads an identical build when no receipt survived, instead of refusing the no-op. */
-export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,repeatOnly=false,createResources=!previousReceipt,uploadWithoutReceipt=false,onReceipt,onHealth,readiness={},env={},fetch=globalThis.fetch,healthOptions={}}) {
+ * re-uploads an identical build when no receipt survived, instead of refusing the no-op.
+ * `declaredSecrets` (default `plan.secrets`) are the secrets the fingerprint names: owner mode
+ * passes the declaration's, so retiring the spent setup token leaves the build unchanged. */
+export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,repeatOnly=false,createResources=!previousReceipt,uploadWithoutReceipt=false,onReceipt,onHealth,readiness={},env={},fetch=globalThis.fetch,healthOptions={},declaredSecrets=plan.secrets}) {
   validatePlan(plan); validateArtifact(artifact);
   await verifyServiceGrants(api, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
@@ -24,7 +26,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,r
   const secrets = await secretBindings(api,plan.worker,plan,env,Boolean(existing));
   const resources = await reconcileResources(api,plan,{create:createResources});
   const baseConfig = renderConfig(plan,resources,api.accountId,artifact.source.sha,'',artifact.main,artifact.assets.length > 0);
-  const fingerprint = hash({plan,config:baseConfig,source:artifact.source,modules:artifact.modules.map(({path,sha256}) => ({path,sha256})),assets:artifact.assets.map(({path,sha256}) => ({path,sha256}))});
+  const fingerprint = hash({plan:{...plan,secrets:declaredSecrets},config:baseConfig,source:artifact.source,modules:artifact.modules.map(({path,sha256}) => ({path,sha256})),assets:artifact.assets.map(({path,sha256}) => ({path,sha256}))});
   const config = renderConfig(plan,resources,api.accountId,artifact.source.sha,fingerprint,artifact.main,artifact.assets.length > 0);
   const bindings = bindingsFor(config,resources,plan);
   const namespaces = await durableNamespaces(api,plan);

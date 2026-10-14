@@ -23,7 +23,8 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  if (!item) { if (claim) throw ownerFailure('the deploy declaration does not name the owner setup token secret'); return undefined; }
  const retire = async outcome => {
   if (!secret) return outcome;
-  try { await recordClaim?.(outcome); await secret(['--unset', tokenKey], env); }
+  // A recorded claim stays as recorded: a later deploy keeps that owner.
+  try { if (!deployed.ownerClaim) await recordClaim?.(outcome); await secret(['--unset', tokenKey], env); }
   catch (cause) {
    if (cause.secretChange) { cause.owner = outcome; cause.tokenKey = tokenKey; cause.ownerFinalization = true; throw cause; }
    const error = new Error('owner-token-retirement-failed'); error.owner = outcome; error.tokenKey = tokenKey; error.cause = cause.message; throw error; }
