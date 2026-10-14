@@ -45,10 +45,8 @@ integration as `@runeditrun/rer/deploy`.
   palette, the way the Lobby authority images show it. The run site's homepage
   and Run page may use it too.
 - **Check at 1440x900 and 390x844**: the Lobby in both states and the run site's
-  `/` and `/run`, beside the 12ui authority images
-  (`rer-consolidation/evidence/homepage-variants/minimal/12ui/round3-lobby-*`,
-  `run-page/picks/a-*`), with no horizontal scroll and the primary action above
-  the fold.
+  `/` and `/run`, beside the approved 12ui authority images for the Lobby and the
+  Run page, with no horizontal scroll and the primary action above the fold.
 - **Refresh shared behavior.** Vendored mode uses `node scripts/export-cli.mjs
   <seed>` from a Base checkout to refresh `scripts/base-cli/` and
   `scripts/base-onboarding/`. In package mode, pin a release with
