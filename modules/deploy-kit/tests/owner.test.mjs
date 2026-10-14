@@ -239,12 +239,13 @@ test('secret writes settle ambiguous answers within their window and clear refus
     fail(present ? 'PUT' : 'DELETE', present ? /\/secrets$/ : /\/secrets\/AUTH_SECRET$/, answer);
     const change = ownerSecret({api:observed,target,statePath,fetch:args.fetch,binding:'AUTH_SECRET',...(present ? {value:'test-only-rotated'} : {}),
       windowMs:6000,clock:() => elapsed,sleep:async ms => { elapsed += ms; sleeps++; }});
-    if (answer.afterApply || answer.concurrent) await change;
+    if (answer.afterApply) await change;
     else await assert.rejects(change, /provider|token-scope-missing/);
     assert.equal(intent.versionId,before.receipt.provider.versionId, 'intent is anchored before the provider write');
     const saved = await readOwnerState(statePath,target);
-    assert.equal(saved.pendingSecret,undefined);
-    if (answer.afterApply || answer.concurrent) {
+    assert.equal(saved.pendingSecret !== undefined,!!answer.concurrent);
+    assert.deepEqual(intent.names,[]);
+    if (answer.afterApply) {
       assert.equal(saved.receipt.provider.versionId,state.version.id);
       assert.equal(state.secrets.some(item => item.name === 'AUTH_SECRET'),present);
       assert.equal((saved.retiredSecrets ?? []).includes('AUTH_SECRET'),!present);
@@ -252,12 +253,12 @@ test('secret writes settle ambiguous answers within their window and clear refus
         assert.equal(state.secrets.find(item => item.name === 'AUTH_SECRET').value,'test-only-rotated');
         assert.ok(puts >= 2, 'an ambiguous rotation re-PUTs the same value before reporting success');
       }
-      if (answer.concurrent) assert.notEqual(saved.receipt.provider.versionId,foreignVersion, 'the foreign version is never proof of rotation');
     } else {
       assert.deepEqual(saved.receipt,before.receipt);
       assert.equal(state.secrets.find(item => item.name === 'AUTH_SECRET').value,args.env.AUTH_SECRET);
       assert.equal(sleeps > 0,answer.status === 500 || !!answer.transport, 'only ambiguous failures wait for readback');
     }
+    if (answer.concurrent) assert.equal(puts,1, 'a foreign added name forbids the confirming PUT');
     await api.request(`/workers/scripts/${target.worker}/secrets`,{method:'PUT',body:{name:'DASHBOARD_ADDED',text:'test-only-foreign',type:'secret_text'}});
     const writes = state.writes.length;
     await assert.rejects(ownerDeploy(args),/owned-resource-replaced/);
@@ -364,7 +365,7 @@ test('secret settlement polls delayed or failed reads, preserves unconfirmed int
         if (scenario === 'read-reset' && reads++ === 0) throw new Error('provider-transport-failed');
         if (['unsettled','all-reads-lag'].includes(scenario) || scenario === 'repeat-unsettled' && attempts > 1 || scenario === 'lag' && reads++ < 2) return {items:[{id:before.receipt.provider.versionId}]};
       }
-      if (writing && scenario === 'wrong-presence' && path.endsWith('/secrets')) return present ? [] : [{name:'AUTH_SECRET'}];
+      if (writing && scenario === 'wrong-presence' && path.endsWith('/secrets')) return present ? [] : [{name:'AUTH_SECRET',type:'secret_text'}];
       return api.request(path,options);
     }};
     const change = ownerSecret({api:observed,target,statePath,fetch:args.fetch,binding:'AUTH_SECRET',...(present ? {value:'test-only-rotated'} : {}),
@@ -376,7 +377,7 @@ test('secret settlement polls delayed or failed reads, preserves unconfirmed int
     } else {
       await assert.rejects(change,/secret-change-unsettled|provider|token-scope-missing/);
       assert.deepEqual((await readOwnerState(statePath,target)).receipt,before.receipt);
-      if (!['script-drift','two-versions','repeat-later-change'].includes(scenario)) {
+      if (!['script-drift','two-versions','repeat-later-change','repeat-foreign'].includes(scenario)) {
         const pending = (await readOwnerState(statePath,target)).pendingSecret;
         assert.equal(pending.versionId,before.receipt.provider.versionId);
         if (scenario.startsWith('repeat-')) assert.ok(pending.repeatVersionId, 'the confirming PUT is anchored before it can be interrupted');
@@ -390,6 +391,151 @@ test('secret settlement polls delayed or failed reads, preserves unconfirmed int
         assert.equal(state.writes.length,writes);
       }
     }
-    assert.equal((await readOwnerState(statePath,target)).pendingSecret !== undefined,['script-drift','two-versions','repeat-later-change'].includes(scenario));
+    assert.equal((await readOwnerState(statePath,target)).pendingSecret !== undefined,['script-drift','two-versions','repeat-later-change','repeat-foreign'].includes(scenario));
   });
+});
+
+test('stale preflight retains intent until deployment and versions agree, then retries safely', async t => {
+  for (const listing of ['newer','missing','empty','malformed','malformed-tail','failed']) await t.test(listing, async t => {
+    const {args,api,target,statePath,state} = await setup(t);
+    await ownerDeploy(args);
+    const deployments = await api.request(`/workers/scripts/${target.worker}/deployments`);
+    const stale = {...api, async request(path, options) {
+      if (path.endsWith('/deployments')) return deployments;
+      if (path.endsWith('/versions')) {
+        if (listing === 'failed') throw Object.assign(new Error('provider-http-503'),{status:503});
+        if (listing === 'missing') return {};
+        if (listing === 'empty') return {items:[]};
+        if (listing === 'malformed-tail') return {items:[{id:deployments.deployments[0].versions[0].version_id},null]};
+        if (listing === 'malformed') return {items:{0:{id:deployments.deployments[0].versions[0].version_id}}};
+      }
+      return api.request(path,options);
+    }};
+    await assert.rejects(ownerSecret({api:stale,target,statePath,fetch:args.fetch,binding:'AUTH_SECRET',value:'test-only-new-value',windowMs:0}),/secret-change-unsettled|provider/);
+    const bytes = await readFile(statePath), writes = state.writes.length;
+    for (const command of [() => settleOwnerState({api:stale,target,statePath}),
+      () => ownerSecret({api:stale,target,statePath,fetch:args.fetch,binding:'AUTH_SECRET',value:'test-only-retry'}),
+      () => ownerSecret({api:stale,target,statePath,fetch:args.fetch,binding:'OTHER',value:'test-only-new-intent'}),
+      () => ownerDeploy({...args,api:stale}), () => ownerRemove({api:stale,target,statePath})]) {
+      try { await command(); } catch (error) { assert.match(error.message,/secret-change-unsettled|provider/); }
+      assert.deepEqual(await readFile(statePath),bytes);
+      assert.equal(state.writes.length,writes, 'unconfirmed intent blocks every further mutation');
+    }
+    await ownerSecret({api,target,statePath,fetch:args.fetch,binding:'AUTH_SECRET',value:'test-only-retry'});
+    assert.equal((await ownerDeploy(args)).receipt.changed,false);
+    assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined);
+  });
+});
+
+test('pending name snapshots use live names before writes and only adopt unchanged other-name sets', async t => {
+  const malformedTypes = {'legacy-blank-type':' ','legacy-padded-type':'secret_text ','legacy-unknown-type':'unknown_binding','legacy-inherit-type':'inherit'};
+  for (const scenario of ['add','remove','rename','order','empty','set','unset','legacy-own','legacy-add','legacy-unset','legacy-missing','legacy-unavailable','legacy-malformed','legacy-wrong-id','legacy-wrong-etag','legacy-wrong-fingerprint',...Object.keys(malformedTypes)]) await t.test(scenario, async t => {
+    const {args,api,target,statePath,state} = await setup(t);
+    await ownerDeploy(args);
+    const path = `/workers/scripts/${target.worker}/secrets`;
+    // These are live, undeclared names; the plan cannot reconstruct this snapshot.
+    if (scenario !== 'empty') for (const name of ['Z_OTHER','A_OTHER']) await ownerSecret({api,target,statePath,fetch:args.fetch,binding:name,value:'test-only-other-value'});
+    const before = await readOwnerState(statePath,target), anchor = before.receipt.provider.versionId;
+    let boundary;
+    const interrupted = {...api, async request(requestPath, options) {
+      if (requestPath.includes('/secrets') && ['PUT','DELETE'].includes(options?.method)) {
+        const bytes = await readFile(statePath,'utf8');
+        boundary = JSON.parse(bytes).pendingSecret;
+        assert.deepEqual(boundary.names,scenario === 'empty' ? [] : scenario === 'set' ? ['AUTH_SECRET','A_OTHER','Z_OTHER'] : ['A_OTHER','Z_OTHER']);
+        for (const value of ['test-only-other-value','test-only-new-value',args.env.AUTH_SECRET]) assert.ok(!bytes.includes(value));
+        throw new Error('test-only-interruption');
+      }
+      return api.request(requestPath,options);
+    }};
+    const unset = scenario === 'unset' || scenario === 'legacy-unset';
+    const binding = scenario === 'set' ? 'NEW_SECRET' : 'AUTH_SECRET';
+    await assert.rejects(ownerSecret({api:interrupted,target,statePath,fetch:args.fetch,binding,...(unset ? {} : {value:'test-only-new-value'}),windowMs:0}),/test-only-interruption/);
+    // The thrown write has a corroborated unchanged readback, so emulate process
+    // interruption with the exact intent observed durably at the mutation boundary.
+    const saved = await readOwnerState(statePath,target);
+    saved.pendingSecret = boundary;
+    if (scenario.startsWith('legacy-')) delete saved.pendingSecret.names;
+    await writeOwnerState(statePath,saved);
+    if (['add','legacy-add'].includes(scenario)) await api.request(path,{method:'PUT',body:{name:'FOREIGN',text:'test-only-foreign',type:'secret_text'}});
+    else if (scenario === 'remove' || Object.hasOwn(malformedTypes,scenario)) await api.request(`${path}/A_OTHER`,{method:'DELETE'});
+    else if (scenario === 'rename') {
+      // A single foreign version can change several bindings at once.
+      state.secrets = state.secrets.filter(row => row.name !== 'A_OTHER');
+      await api.request(path,{method:'PUT',body:{name:'RENAMED',text:'test-only-foreign',type:'secret_text'}});
+    } else if (unset) await api.request(`${path}/${binding}`,{method:'DELETE'});
+    else await api.request(path,{method:'PUT',body:{name:binding,text:'test-only-new-value',type:'secret_text'}});
+    if (scenario === 'order') state.secrets.reverse();
+    const observed = {...api, async request(requestPath, options) {
+      if (requestPath === `/workers/scripts/${target.worker}/versions/${anchor}` && scenario.startsWith('legacy-')) {
+        if (scenario === 'legacy-unavailable') throw Object.assign(new Error('provider-http-404'),{status:404});
+        const version = structuredClone(await api.request(requestPath,options));
+        if (scenario === 'legacy-missing') delete version.resources.bindings;
+        if (scenario === 'legacy-malformed') version.resources.bindings = [{type:'secret_text',name:null}];
+        if (Object.hasOwn(malformedTypes,scenario)) version.resources.bindings.find(row => row.name === 'A_OTHER').type = malformedTypes[scenario];
+        if (scenario === 'legacy-wrong-id') version.id = state.version.id;
+        if (scenario === 'legacy-wrong-etag') version.resources.script.etag = 'foreign-script';
+        if (scenario === 'legacy-wrong-fingerprint') version.resources.bindings = version.resources.bindings.filter(row => row.name !== 'RER_DEPLOY_FINGERPRINT');
+        return version;
+      }
+      return api.request(requestPath,options);
+    }};
+    const writes = state.writes.length;
+    const refused = Object.hasOwn(malformedTypes,scenario) || ['add','remove','rename','legacy-add','legacy-missing','legacy-unavailable','legacy-malformed','legacy-wrong-id','legacy-wrong-etag','legacy-wrong-fingerprint'].includes(scenario);
+    if (refused) {
+      for (const command of [() => ownerDeploy({...args,api:observed}), () => ownerRemove({api:observed,target,statePath}),
+        () => ownerSecret({api:observed,target,statePath,binding:'AUTH_SECRET',value:'test-only-retry'})]) await assert.rejects(command(),/owned-resource-replaced/);
+      assert.equal(state.writes.length,writes);
+      assert.deepEqual(await readOwnerState(statePath,target),saved);
+    } else {
+      const settled = await settleOwnerState({api:observed,target,statePath});
+      assert.equal(settled.pendingSecret,undefined);
+      assert.equal(settled.receipt.provider.versionId,state.version.id);
+      if (unset) assert.ok(settled.retiredSecrets.includes(binding));
+      assert.equal(state.writes.length,writes);
+    }
+  });
+});
+
+test('legacy own secret addition recovers with every supported declared binding family', async t => {
+  const declared = {...declaration(),services:[{binding:'UPSTREAM',project:'runeditrun/upstream'}]};
+  const fixture = await setup(t,{declared});
+  const {target,statePath,state} = fixture;
+  const api = {...fixture.api, async request(path, options) {
+    // The account fake serves one Worker; model the declared service's presence.
+    if (path === '/workers/scripts/upstream-production/settings') return {bindings:[]};
+    return fixture.api.request(path,options);
+  }};
+  await ownerDeploy({...fixture.args,api});
+  await ownerSecret({api,target,statePath,fetch:fixture.args.fetch,binding:'OTHER',value:'test-only-other'});
+  let pending;
+  const interrupted = {...api, async request(path, options) {
+    if (path.endsWith('/secrets') && options?.method === 'PUT') {
+      pending = await readOwnerState(statePath,target);
+      await api.request(path,options);
+      throw new Error('test-only-interruption');
+    }
+    if (pending && path.endsWith('/deployments')) throw Object.assign(new Error('provider-http-503'),{status:503});
+    return api.request(path,options);
+  }};
+  await assert.rejects(ownerSecret({api:interrupted,target,statePath,fetch:fixture.args.fetch,binding:'NEW_SECRET',value:'test-only-new',windowMs:0}),/test-only-interruption/);
+  assert.deepEqual(await readOwnerState(statePath,target),pending);
+  delete pending.pendingSecret.names;
+  await writeOwnerState(statePath,pending);
+  const writes = state.writes.length;
+  const settled = await settleOwnerState({api,target,statePath});
+  assert.equal(settled.pendingSecret,undefined);
+  assert.equal(settled.receipt.provider.versionId,state.version.id);
+  assert.equal(state.writes.length,writes);
+  await ownerHealth({...fixture.args,api});
+});
+
+test('stored pending names must be unique identifiers excluding the changed binding', async t => {
+  const {args,api,target,statePath,state} = await setup(t);
+  await ownerDeploy(args);
+  const saved = await readOwnerState(statePath,target), writes = state.writes.length;
+  for (const names of [null,{},'OTHER',['OTHER','OTHER'],['AUTH_SECRET'],['bad-name'],[null],[{name:'OTHER',text:'test-only-value'}]]) {
+    await writeOwnerState(statePath,{...saved,pendingSecret:{binding:'AUTH_SECRET',present:true,versionId:saved.receipt.provider.versionId,names}});
+    await assert.rejects(ownerSecret({api,target,statePath,binding:'AUTH_SECRET',value:'test-only-new-value'}),/invalid-owner-state/);
+    assert.equal(state.writes.length,writes);
+  }
 });

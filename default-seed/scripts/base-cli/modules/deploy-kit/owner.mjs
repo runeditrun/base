@@ -9,6 +9,7 @@ import { secretBindings, activeWorker, deployedFingerprint } from './worker.mjs'
 import { validateMigrations } from './migrations.mjs';
 import { deploy } from './deploy.mjs';
 import { verifyHealth } from './health.mjs';
+import { validSecretNames, secretNames, pendingSecretNames } from './owner-secret-names.mjs';
 
 /* Owner-account mode: the owner's own Cloudflare account, token and account id.
  * Names are derived from the project id and the owner's environment. A local
@@ -170,7 +171,8 @@ export async function readOwnerState(path, target) {
   // Declared secrets rer removed on purpose (the spent setup token): later plans omit them.
   assert(state.pendingSecret === undefined || identifier(state.pendingSecret?.binding) && typeof state.pendingSecret?.present === 'boolean'
     && (state.pendingSecret.versionId === undefined || uuid(state.pendingSecret.versionId))
-    && (state.pendingSecret.repeatVersionId === undefined || uuid(state.pendingSecret.repeatVersionId)), 'invalid-owner-state');
+    && (state.pendingSecret.repeatVersionId === undefined || uuid(state.pendingSecret.repeatVersionId))
+    && (state.pendingSecret.names === undefined || validSecretNames(state.pendingSecret.names) && !state.pendingSecret.names.includes(state.pendingSecret.binding)), 'invalid-owner-state');
   assert(state.ownerClaim === undefined || ['claimed','kept'].includes(state.ownerClaim?.outcome), 'invalid-owner-state');
   assert(state.retiredSecrets === undefined || Array.isArray(state.retiredSecrets) && state.retiredSecrets.every(identifier), 'invalid-owner-state');
   assert(state.accountId === target.accountId && state.project === target.project && state.environment === target.environment && state.worker === target.worker, 'owner-state-target-mismatch');
@@ -245,22 +247,20 @@ export function recordSecretChange(state, current, {binding, present}) {
 /** A secret change rer recorded as pending but never confirmed (a lost response, or a run that
  * ended before the change settled). It is that change only when the Worker's versions list shows
  * exactly one version after the recorded starting version and it is the live one, still running the receipt's
- * exact script and build fingerprint: adopt its version. A confirming PUT also records its
+ * exact script and build fingerprint, with the other secret names unchanged: adopt its version. A confirming PUT also records its
  * own starting version before it writes; its immediate successor can be recovered by the
  * same checks. Anything later is left to the identity check, which refuses it. */
 export async function settlePendingSecret(api, worker, state, {preflight = false, observe, confirm} = {}) {
   if (!state.pendingSecret || !state.receipt) return false;
   const live = await activeWorker(api, worker);
   if (sameDeployment(live, state.receipt.provider)) {
-    // A new command sees that the abandoned write made no live version change.
-    // During the write's own readback this can still be propagation delay.
-    if (!preflight) {
-      // Deployment propagation can lag a secret write's version. Only a
-      // matching newest version corroborates that the write was unapplied.
-      const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
-      observe?.(Array.isArray(versions) && versions[0]?.id === live.versionId ? live : null);
-      return false;
-    }
+    // Both deployment and newest version must corroborate an unapplied write.
+    // A stale deployment alone must not erase an accepted but unsettled intent.
+    const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
+    const unchanged = Array.isArray(versions) && versions.every(item => uuid(item?.id))
+      && new Set(versions.map(item => item.id)).size === versions.length && versions[0]?.id === live.versionId;
+    observe?.(unchanged ? live : null);
+    if (!preflight || !unchanged) return false;
     delete state.pendingSecret;
     return true;
   }
@@ -269,6 +269,7 @@ export async function settlePendingSecret(api, worker, state, {preflight = false
   // Newest first, as the provider lists them.
   const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
   const ids = Array.isArray(versions) ? versions.map(item => item?.id) : [];
+  if (!ids.every(uuid) || new Set(ids).size !== ids.length) return false;
   const {versionId, repeatVersionId} = state.pendingSecret;
   const immediate = ids.indexOf(versionId) === 1;
   const repeated = repeatVersionId && ids[1] === repeatVersionId && ids.indexOf(versionId) === 2;
@@ -277,7 +278,11 @@ export async function settlePendingSecret(api, worker, state, {preflight = false
   // either the original immediate successor or the second write's successor.
   if (ids[0] !== live.versionId || !(repeatVersionId ? repeated || preflight && immediate && live.versionId === repeatVersionId : immediate)) return false;
   const rows = await api.request(`/workers/scripts/${worker}/secrets`);
-  if (!Array.isArray(rows) || rows.some(row => row.name === state.pendingSecret.binding) !== state.pendingSecret.present) return false;
+  const names = secretNames(rows);
+  if (!names || names.includes(state.pendingSecret.binding) !== state.pendingSecret.present) return false;
+  const priorNames = await pendingSecretNames(api, worker, state);
+  const otherNames = names.filter(name => name !== state.pendingSecret.binding);
+  if (!priorNames || priorNames.length !== otherNames.length || !priorNames.every(name => otherNames.includes(name))) return false;
   if (confirm && !repeatVersionId) { await confirm(live); return false; }
   recordSecretChange(state, live, state.pendingSecret);
   return true;
@@ -347,6 +352,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
   await checkServiceWorkers(api, plan);
   const priorWorker = await checkOwnedWorker(api, plan, artifact, state);
+  assert(!state.pendingSecret, 'secret-change-unsettled');
   const exists = priorWorker !== null;
   const create = await ownedResourcesToCreate(api, plan, state);
   if (exists) await checkCronOwnership(api, plan);

@@ -13,7 +13,12 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
   // A secret change deploys a new version of the same script, as the provider does.
   function secretVersion() {
     if (!state.version) return;
-    const id = randomUUID(); state.version = {...structuredClone(state.version),id}; state.versions = [state.version,...(state.versions ?? [])];
+    const id = randomUUID();
+    const bindings = [...state.version.resources.bindings.filter(row => row.type !== 'secret_text'), ...state.secrets.map(({name}) => ({name,type:'secret_text'}))];
+    state.version = {...structuredClone(state.version),id};
+    state.version.resources.bindings = structuredClone(bindings);
+    state.settings.bindings = structuredClone(bindings);
+    state.versions = [state.version,...(state.versions ?? [])];
     state.deployments = [{id:randomUUID(),versions:[{version_id:id,percentage:100}]},...state.deployments];
   }
   const imports = new Map();
@@ -121,7 +126,7 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
     if (suffix === '' && method === 'PUT') {
       const meta = JSON.parse(await body.get('metadata').text());
       for (const item of meta.bindings.filter(x => x.type === 'secret_text')) state.secrets.push({name:item.name,value:item.text});
-      const bindings = meta.bindings.map(x => x.type === 'inherit' || x.type === 'secret_text' ? {name:x.name,type:'secret_text'} : x);
+      const bindings = [...meta.bindings.filter(x => !['inherit','secret_text'].includes(x.type)), ...state.secrets.map(({name}) => ({name,type:'secret_text'}))];
       state.settings = {...meta,bindings,migration_tag:meta.migrations?.new_tag ?? state.settings?.migration_tag};
       for (const klass of meta.migrations?.new_sqlite_classes ?? []) state.namespaces.push({id:randomUUID().replaceAll('-',''),class:klass,script:name,use_sqlite:true});
       const modules = await Promise.all([...body].filter(([path]) => path !== 'metadata').map(async ([path,file]) => ({path,sha256:hash(Buffer.from(await file.arrayBuffer()))})));

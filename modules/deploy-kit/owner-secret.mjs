@@ -1,5 +1,6 @@
 import { assert, identifier } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
+import { secretNames } from './owner-secret-names.mjs';
 import { waitHealth } from './health-request.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
 import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDeployment, refuse, recordSecretChange, settlePendingSecret } from './owner.mjs';
@@ -26,10 +27,12 @@ export async function ownerSecret({api: provider, target, statePath, binding, va
     const live = await activeWorker(api, target.worker);
     if (!live) throw refuse('owned-resource-missing', 'worker', target.worker);
     if (!sameDeployment(live, state.receipt.provider)) throw refuse('owned-resource-replaced', 'worker', target.worker);
+    assert(!state.pendingSecret, 'secret-change-unsettled');
     const path = `/workers/scripts/${target.worker}/secrets`, present = value !== undefined;
-    const names = async () => { const rows = await api.request(path); assert(Array.isArray(rows), 'invalid-secret-list'); return rows.map(row => row.name); };
-    const existed = (await names()).includes(binding), changed = present || existed;
-    state.pendingSecret = {binding, present, versionId:state.receipt.provider.versionId}; await writeOwnerState(statePath, state);
+    const names = secretNames(await api.request(path));
+    assert(names, 'invalid-secret-list');
+    const existed = names.includes(binding), changed = present || existed;
+    state.pendingSecret = {binding, present, versionId:state.receipt.provider.versionId, names:names.filter(name => name !== binding).sort()}; await writeOwnerState(statePath, state);
     let failure, unchanged = false, confirming = false;
     const put = () => api.request(path, {method:'PUT', body:{name:binding, text:value, type:'secret_text'}});
     try {

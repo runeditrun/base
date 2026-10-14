@@ -56,6 +56,7 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
       if (!sameDeployment(live, expected)) throw refuse('owned-resource-replaced', 'worker', target.worker);
       worker = target.worker;
     }
+    assert(!state.pendingSecret, 'secret-change-unsettled');
     const listed = {}, doomed = [];
     for (const kind of KINDS) {
       if (!owned.some(item => item.kind === kind)) continue;
