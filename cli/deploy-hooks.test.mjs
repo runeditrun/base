@@ -14,7 +14,7 @@ import { owner } from '../onboarding/adapter-auth.mjs';
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
 // provider and hosted HTTP edge are faked. No seed source is modified.
-async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false } = {}) {
+async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-hook-deploy-')));
  const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
@@ -76,7 +76,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
    result = { origin: receipt.origin };
   }
   if (selfClaim) await owner({ origin: result.origin, vars: { SETUP_TOKEN: process.env.SETUP_TOKEN }, input: {}, store, signal }, { displayName: () => 'Owner', returnTo: '/setup' });
-  return { deployed: true, origin: result.origin, ...(returnToken ? { setupToken: hookToken } : {}) };
+  return { deployed: true, origin: result.origin, ...(returnToken ? { setupToken: hookToken } : {}), ...(returnState ? { state: result.state } : {}) };
  };
  if (declared) adapter.deployDeclaration = declarationPath;
  const manifest = { steps: [{ type: 'owner-claim', mode: idp ? 'idp' : 'signed', ...(idp ? { dependency: 'oidc-provider@1' } : {}), path: '/auth/owner-claim', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN' }], fields: ['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ name, kind: 'secret', generate: 'hex' })) };
@@ -188,6 +188,18 @@ test('a hook keeping its own record is claimed from its result once /health name
  const sent = f.requests.length;
  await assert.rejects(f.run(), error => /not https/.test(error.message) && /return its https origin/.test(error.message) && !error.message.includes('hook-token-value'));
  assert.equal(f.requests.length, sent); assert.equal(f.claims.length, 2);
+});
+
+test('rer deploy --remove after a hook that kept its own record removes what the hook deployed and reads it back gone', async t => {
+ const f = await fixture(t, { declared: true, ownRecord: true, returnState: true });
+ assert.equal((await f.run()).deployed, true);
+ const hookRecord = join(f.root, '.rer/hook/production.json');
+ assert.ok(f.provider.state.settings, 'the hook deployed a Worker');
+ const removed = await f.run({ remove: true, yes: true });
+ assert.ok(removed.removed.some(item => item.startsWith('worker:')), JSON.stringify(removed));
+ assert.equal(f.provider.state.settings, null, 'the Worker is gone');
+ assert.ok(f.progress.some(line => /read back: none of them remains/.test(line)));
+ await assert.rejects(readFile(hookRecord), { code: 'ENOENT' }, 'the hook\'s record is retired with what it named');
 });
 
 test('uncommitted tracked source stops the deploy before building and names the files', async t => {

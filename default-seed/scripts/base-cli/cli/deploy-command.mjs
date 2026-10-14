@@ -8,6 +8,7 @@ import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { observeOwner } from './deploy-observation.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookOrigin, waitForSource } from './deploy-hook.mjs';
+import { rememberHookState } from './deploy-hook-record.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
@@ -77,6 +78,7 @@ export async function deployCommand(context) {
     Object.assign(process.env, saved);
    }
    if (options.dryRun) return deployed;
+   await rememberHookState(root, options.environment ?? 'production', deployed?.state);
    const origin = hookOrigin(deployed, deployAgain(options));
    step = 'wait for the deployed source';
    await waitForSource({ origin, sourceSha, again: deployAgain(options) });

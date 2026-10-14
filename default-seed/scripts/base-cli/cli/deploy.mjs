@@ -10,6 +10,7 @@ import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { committedSource } from './deploy-source.mjs';
+import { hookState, forgetHookState } from './deploy-hook-record.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -58,7 +59,10 @@ export function ownerDeploy(declarationPath, lifecycle) {
   try {
    if (options.remove) {
     step = 'remove';
-    const result = await owner('remove');
+    // A custom hook's own state file, when its deploy named one.
+    const state = await hookState(root, environment);
+    const result = await owner('remove', state ? ['--state', state] : []);
+    await forgetHookState(root, environment);
     store.report(`Removed ${result.removed.join(', ') || 'nothing (already gone)'}; read back: none of them remains.`);
     return { removed: result.removed, deployed: false };
    }
