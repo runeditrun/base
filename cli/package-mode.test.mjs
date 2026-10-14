@@ -16,6 +16,9 @@ import { integrity, localRegistry } from '../scripts/rer-package/registry.mjs';
 import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { exportCLI } from './export.mjs';
 import { exportReference } from '../scripts/export-reference.mjs';
+import { initialize } from '../foundation/initialize.mjs';
+import { assemble } from '../composition/assemble.mjs';
+import { sourceRoots } from './export.mjs';
 import { aliases, pins, verbs } from './contract.mjs';
 import { run } from '../global/tests/harness.mjs';
 import { freePort, pause } from './fixtures/reference.mjs';
@@ -208,6 +211,34 @@ test('--to-package moves delivery operations, the scripts they run and CI workfl
  const prefixed = workflow.findIndex(line => line.includes('env -i'));
  assert.deepEqual(shell(workflow.slice(prefixed, prefixed + 2).join('\n')), ['CI=true install --frozen-lockfile', 'CI=true exec rer install']);
  assert.match(workflow[prefixed + 2], /node node_modules\/@runeditrun\/rer\/cli\/hosted-output\.mjs \.$/);
+});
+
+test('a freshly composed foundation converted with --to-package passes check, its lock no longer recording the removed copy', async t => {
+ const directory = await mkdtemp(join(tmpdir(), 'rer-to-package-composed-')), root = join(directory, 'seed'), snapshot = join(directory, 'base'), family = join(directory, 'family');
+ const registry = await localRegistry();
+ t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true }); });
+ const { version } = JSON.parse(readPackage(bytes, { integrity: integrity(bytes) }).find(file => file.path === 'package.json').data);
+ registry.publish(version, bytes);
+ await writeFile(join(directory, 'npmrc'), registry.npmrc());
+ const git = (cwd, ...args) => spawnSync('git', ['-C', cwd, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', ...args], { encoding: 'utf8' });
+ await mkdir(snapshot);
+ for (const path of [...new Set([...sourceRoots, 'modules/operator-auth', 'foundation', 'composition', 'onboarding', 'export', 'LICENSE'])]) await cp(join(base, path), join(snapshot, path), { recursive: true, filter: path => !path.includes('node_modules') && !path.includes('__pycache__') });
+ for (const args of [['init', '--quiet'], ['add', '.'], ['commit', '-qm', 'source']]) assert.equal(git(snapshot, ...args).status, 0);
+ const ref = git(snapshot, 'rev-parse', 'HEAD').stdout.trim();
+ await initialize({ baseRepo: snapshot, ref, output: family, family: 'journey', edition: 'foundation', repository: 'just-every/run-happytohelp' });
+ for (const args of [['init', '--quiet'], ['add', '.'], ['commit', '-qm', 'family']]) assert.equal(git(family, ...args).status, 0);
+ await assemble({ familyRepo: family, baseRepo: snapshot, edition: 'foundation', output: root, toolCommit: ref });
+ const lockPath = join(root, 'composition.lock.json');
+ assert.ok(Object.keys(JSON.parse(await readFile(lockPath, 'utf8')).files).some(path => path.startsWith('scripts/base-cli/')), 'the composed lock records the vendored copy');
+
+ const converted = await run(process.execPath, [join(base, 'scripts/export-cli.mjs'), '--to-package', root], { env: { PATH: process.env.PATH, HOME: process.env.HOME, NPM_CONFIG_USERCONFIG: join(directory, 'npmrc'), npm_config_cache: join(directory, 'npm-cache') } });
+ assert.equal(converted.code, 0, converted.stdout + converted.stderr);
+ await mkdir(join(root, 'node_modules/@runeditrun'), { recursive: true });
+ await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), join(root, 'node_modules/@runeditrun/rer'));
+ const checked = spawnSync(process.execPath, [join(base, 'global/rer.mjs'), 'check', '--profile', 'first-party', '--json'], { cwd: root, env: { PATH: process.env.PATH, HOME: process.env.HOME, RER_NO_UPDATE_CHECK: '1' }, encoding: 'utf8', timeout: 120000 });
+ const report = JSON.parse(checked.stdout.trim().split('\n').at(-1));
+ assert.deepEqual(report.clauses.filter(clause => !clause.ok).map(clause => clause.id), [], checked.stderr);
+ assert.equal(checked.status, 0);
 });
 
 test('converted journey and README launches bootstrap a fresh seed through their own installed rer', {timeout: 240000}, async t => {

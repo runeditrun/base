@@ -28,6 +28,16 @@
     { "repository": "just-every/run-easel", "reason": "Owner-proposed public name (13 Oct 2026), accepted ahead of the rename; created by clean-history export at the first public tag." },
     { "repository": "just-every/run-willow", "reason": "Owner-proposed public name (13 Oct 2026), accepted ahead of the rename; created by clean-history export at the first public tag." },
     { "repository": "just-every/run-pier", "reason": "Owner-proposed public name (13 Oct 2026), accepted ahead of the rename; created by clean-history export at the first public tag." },
-    { "repository": "just-every/run-linen", "reason": "Owner-proposed public name (13 Oct 2026), accepted ahead of the rename; created by clean-history export at the first public tag." }
+    { "repository": "just-every/run-linen", "reason": "Owner-proposed public name (13 Oct 2026), accepted ahead of the rename; created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-gauge", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-lodge", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-beam", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-locket", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-coaster", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-glove", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-gasket", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-pantry", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-nectar", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." },
+    { "repository": "just-every/run-larder", "reason": "Owner-declared public repository for a next-ten seed (15 Oct 2026); created by clean-history export at the first public tag." }
   ]
 }

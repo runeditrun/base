@@ -268,6 +268,14 @@ export async function toPackage(base, root, { version, log = text => process.std
   await writeFile(join(root, 'base-copies.json'), json(copies, copiesText));
   log(`base-copies.json: dropped the ${droppedCopies.length} record${droppedCopies.length === 1 ? '' : 's'} of the vendored copy (${droppedCopies.map(copy => copy.path).join(', ')}); its other ${copies.copies.length} records are unchanged.`);
  }
+ // A composed foundation's lock records every file it copied, the vendored
+ // copy's among them: those entries leave with the files.
+ const lockName = join(root, 'composition.lock.json'), composed = await readFile(lockName, 'utf8').then(text => [text, JSON.parse(text)], error => { if (error.code === 'ENOENT') return undefined; throw error; });
+ if (composed?.[1].files) {
+  const [text, lock] = composed, removed = Object.keys(lock.files).filter(path => vendoredPaths.some(vendored => path === vendored || path.startsWith(vendored + '/')));
+  for (const path of removed) delete lock.files[path];
+  if (removed.length) { await writeFile(lockName, json(lock, text)); log(`composition.lock.json: dropped the ${removed.length} entr${removed.length === 1 ? 'y' : 'ies'} of the vendored copy.`); }
+ }
  const counts = [];
  for (const path of copyChecks) if (await exists(join(root,path))) { await rm(join(root,path)); log(`Removed obsolete vendored-copy check ${path}.`); }
  for (const path of vendoredPaths) { counts.push(`${path}${path.endsWith('.mjs') ? '' : ` (${(await files(root, path)).length} files)`}`); await rm(join(root, path), { recursive: true, force: true }); }

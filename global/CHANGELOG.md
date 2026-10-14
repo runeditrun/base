@@ -7,6 +7,7 @@
 - `rer deploy --demo --dry-run` and `rer build --platform container` work on an exported seed: the container import boundary admits the demo guard's `import { env } from 'cloudflare:workers'` in `src/modules/demo/index.mjs` (that file and that import only) and still refuses a Cloudflare import anywhere else in `src/`. The release smoke now runs the hosted demo dry run on a package-mode export.
 - `rer describe` lists `demo` as a verb (`rer dev --demo`), with its effects and the flags a demo takes.
 - Two launches claiming the same port, or two workers claiming the same checkout's launch, get exactly one winner: the claim is written complete and linked into place, so the other never reads it half-written and takes it as abandoned.
+- `node scripts/export-cli.mjs --to-package` on a composed foundation drops the removed `scripts/base-cli` copy's entries from `composition.lock.json` along with its files, so `rer check` no longer fails `SC-05.auth-copy` for files the conversion deleted.
 
 ## 0.2.4
 
