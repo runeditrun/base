@@ -140,7 +140,11 @@ The seed needs, beyond the adoption above:
    cookie; either wait ends with an error naming what did not happen.
 
 `rer deploy --demo --dry-run` builds everything into `.rer/demo-host/` (add it
-to `.gitignore`) with no provider request. To try it locally with Docker, add
+to `.gitignore`) with no provider request. The build first loads the seed's
+Vite configuration, including any preparation it performs (for example,
+generating `wrangler.toml` from `deploy/wrangler.template.toml`). It then checks
+the configured Worker entry before compiling, and checks the emitted Worker
+again before packaging. To try it locally with Docker, add
 Cloudflare's always-passing Turnstile test secret to `.rer/demo-host/.dev.vars`
 (`TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA`) and run, in that
 folder, `wrangler dev --local-protocol https --var TURNSTILE_SITE_KEY:1x00000000000000000000AA`.
