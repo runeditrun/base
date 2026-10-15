@@ -157,7 +157,11 @@ test('missing or ambiguous ownership records refuse success, and denied bootstra
  assert.equal(f.claims.length, 2);
  await rm(join(f.root, '.rer/deploy/production.json'));
  const builds = f.builds(), writes = f.provider.state.writes.length;
- await assert.rejects(f.run({ unsetSecret: 'SETUP_TOKEN' }), /missing-owner-receipt/);
+ await assert.rejects(f.run({ unsetSecret: 'SETUP_TOKEN' }), error => {
+  assert.equal(error.environment, 'production');
+  assert.deepEqual(error.availableDeployments, []);
+  return true;
+ });
  assert.equal(f.builds(), builds); assert.equal(f.provider.state.writes.length, writes);
  await writeFile(join(f.root, 'other-deploy.json'), await readFile(join(f.root, 'deploy.json')));
  await assert.rejects(f.run(), /ambiguous declarations/); assert.equal(f.builds(), builds);
