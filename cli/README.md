@@ -101,7 +101,9 @@ secret generation. `--owner-email` maps to its owner-claim email field; private
 `--answers` uses declared field names. Existing owner, settings and data are kept.
 The owner name is prompted or defaulted only when the installer model declares
 the adapter's name field (normally `displayName`). Nameless installers proceed
-without it and refuse `--owner-name`.
+without it and refuse `--owner-name`. A custom `input.names.name` uses its declared
+manifest default and receives `--owner-name`; it replaces the generated
+`displayName` input while keeping the adapter's owner bootstrap hook.
 
 Run `node --test --test-concurrency=2 cli/*.test.mjs` from Base. Base's shared tests
 stay in Base; exported seeds carry runtime source and their own adopting tests.
