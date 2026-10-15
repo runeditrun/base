@@ -60,7 +60,7 @@ export function wireSql(statement) {
 /** A conservative size of D1's JSON request plus RPC envelope. A single wide
  * character makes workerd serialize every UTF-16 code unit in the call at two
  * bytes. UTF-8 also matters independently for provider payload limits. */
-export function rpcBytes(statements) {
+export function rpcSize(statements) {
   let utf8 = 2, units = 2, hasWide = false;
   const add = text => { utf8 += bytes(text); units += text.length; hasWide ||= wide.test(text); };
   for (const statement of statements) {
@@ -74,8 +74,10 @@ export function rpcBytes(statements) {
     }
     add(']},');
   }
-  return 4096 + Math.max(utf8, units * (hasWide ? 2 : 1));
+  return { utf8, units, hasWide };
 }
+export const rpcSizeBytes = ({ utf8, units, hasWide }) => 4096 + Math.max(utf8, units * (hasWide ? 2 : 1));
+export const rpcBytes = statements => rpcSizeBytes(rpcSize(statements));
 
 export function wireBatch(statements) {
   const encoded = statements.map(wireSql);
