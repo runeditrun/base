@@ -1,6 +1,6 @@
 import { Miniflare, convertV4MiniflareOptions, coupleWebSocket } from 'miniflare';
 import { readdir } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { rootCertificates } from 'node:tls';
 import { ensurePortabilitySchema } from './portability-schema.mjs';
 import { migrate } from './migrations.mjs';

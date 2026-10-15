@@ -8,14 +8,14 @@ import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 import { checkHostedSetup, hostedSetupFailure } from './deploy-setup.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
-import { observeOwner } from './deploy-observation.mjs';
+import { observeOwner, ownerExchangeFailure } from './deploy-observation.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookOrigin, waitForSource } from './deploy-hook.mjs';
 import { rememberHookState, hookState } from './deploy-hook-record.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
-import { providerRefusal, providerTransport } from '../modules/deploy-kit/diagnostics.mjs';
+import { providerFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 
 export function validateDeployOptions(options) {
@@ -108,7 +108,7 @@ export async function deployCommand(context) {
    // current version independently of the original upload's spent deadline.
    const state = await inspect(origin);
    if ((state?.origin ?? origin) !== origin || claims.some(item => item.origin !== origin)) throw new Error('owner-claim-origin-mismatch');
-   if (claims.some(item => !item.outcome)) throw new Error('owner-claim-failed');
+   if (claims.some(item => !item.outcome)) { const error = new Error('owner-claim-failed'); error.ownerExchange = claims.find(item => !item.outcome); throw error; }
    claimed = claims.at(-1)?.outcome;
    step = 'wait for the deployed source';
    await waitForSource({ origin, sourceSha, versionId: state?.versionId ?? (!claims.length && !deployed.owner ? uploaded?.versionId : undefined), again: deployAgain(options) });
@@ -136,7 +136,9 @@ export async function deployCommand(context) {
   if (setup) throw commandFailure(redact(setup));
   const readiness = mutationReadinessFailure(error, { again, redact });
   if (readiness) throw commandFailure(readiness);
-  const refused = providerRefusal(error) ?? providerTransport(error);
-  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
+  const refused = providerFailure(error,redact);
+  const exchange = error.ownerExchange ?? (error.message === 'owner-claim-failed' ? observedClaims.lastExchange ?? observedClaims.at(-1) : undefined);
+  const ownerCause = ownerExchangeFailure(exchange);
+  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${ownerCause ? ` (${ownerCause})` : ''}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
  }
 }

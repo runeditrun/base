@@ -1,3 +1,4 @@
+import { providerPages, providerListShape } from './pagination.mjs';
 import { deleteR2Object } from './r2-object-transport.mjs';
 import { isR2ObjectDelete } from './r2-objects.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
@@ -30,7 +31,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
   assert(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'invalid-cloudflare-api-token');
   let requests = 0;
   // `zone` scope: the zone-level API (/zones/...), for a run site's zone lookup and redirect rule.
-  async function envelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal } = {}) {
+  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal } = {}) {
     assert(typeof path === 'string' && (isR2ObjectDelete(path, method) || /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%')), 'invalid-provider-path');
     assert(!zone || /^\/zones(?:[/?]|$)/.test(path), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
@@ -69,7 +70,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       const bounded = text => redactAuth(text).replace(/[\x00-\x1f\x7f-\x9f]+/g,' ').trim().slice(0,300);
       const said = (Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code) || typeof x?.message === 'string').slice(0,3)
         .map(x => ({...(Number.isSafeInteger(x.code) ? {code:x.code} : {}),...(typeof x.message === 'string' ? {message:bounded(x.message)} : {})}));
-      error.providerRefusal = {operation:`${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`,errors:said.length || payload !== undefined || !output.trim() ? said : [{message:bounded(output.trim().split('\n')[0])}]};
+      error.providerRefusal = {operation:redactCredentials(operation),errors:said.length || payload !== undefined || !output.trim() ? said : [{message:bounded(output.trim().split('\n')[0])}]};
       throw recordDeployFailure(error,{providerCodes:(Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code)).map(x=>x.code).slice(0,8),
         output:redactAuth(Array.isArray(payload?.errors) ? payload.errors.filter(x=>typeof x?.message==='string').map(x=>x.message).join('\n') : output)});
     }
@@ -80,79 +81,38 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
         // D1 can fail inside a successful HTTP/API envelope. Read only typed
         // error fields; query results and metadata are never diagnostic output.
         const errors = failed.flatMap(row => [typeof row.error === 'string' ? {message:row.error} : row.error, ...(Array.isArray(row.errors) ? row.errors : [])]);
-        throw recordDeployFailure(new Error('d1-query-failed'),{providerCodes:errors.filter(error=>Number.isSafeInteger(error?.code)).map(error=>error.code).slice(0,8),
+        const error = new Error('d1-query-failed');
+        error.providerRefusal = {operation:redactCredentials(operation),errors:errors.filter(item => Number.isSafeInteger(item?.code) || typeof item?.message === 'string').map(item => ({code:item.code,message:typeof item.message === 'string' ? redactAuth(item.message).slice(0,300) : undefined})).slice(0,3)};
+        throw recordDeployFailure(error,{providerCodes:errors.filter(error=>Number.isSafeInteger(error?.code)).map(error=>error.code).slice(0,8),
           output:redactAuth(errors.filter(error=>typeof error?.message==='string').map(error=>error.message).join('\n'))});
       }
     }
     return payload;
   }
-  async function list(path, { field, pagination = 'page' } = {}) {
-    if (pagination === 'single') {
-      assert(path === '/workers/scripts' || /^\/queues\/[a-f0-9]{32}\/consumers$/.test(path),'invalid-single-list');
-      const data = await envelope(path);
-      assert(Array.isArray(data.result) && data.result.length <= 10000,'provider-invalid-list');
-      const info = data.result_info;
-      if (info != null) {
-        assert(typeof info === 'object' && !Array.isArray(info),'provider-incomplete-pagination');
-        for (const key of ['count','total_count']) if (Object.hasOwn(info,key)) assert(info[key] === data.result.length,'provider-partial-list');
-        assert([undefined,null,''].includes(info.cursor) &&
-          (info.total_pages === undefined || info.total_pages === 1 || info.total_pages === 0 && data.result.length === 0) &&
-          (info.page === undefined || info.page === 1),'provider-incomplete-pagination');
-      }
-      return data.result;
+  async function envelope(path, options = {}) {
+    try { return await rawEnvelope(path,options); }
+    catch (error) {
+      error.providerCall ??= {operation:`${options.method ?? 'GET'} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`,reason:error.message};
+      throw error;
     }
-    assert(['page','cursor','r2-bounded'].includes(pagination),'invalid-list-pagination');
-    const r2Bounded = pagination === 'r2-bounded';
-    assert(!r2Bounded || path === '/r2/buckets' && field === 'buckets', 'invalid-r2-bounded-list');
-    const result = []; const seen = new Set(); let cursor; let total;
-    for (let page = 1; page <= 100; page++) {
-      const suffix = r2Bounded || pagination === 'cursor' ? (path === '/r2/buckets' ? `?per_page=1000${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}` : (cursor ? `?cursor=${encodeURIComponent(cursor)}` : '')) : `?page=${page}&per_page=100`;
-      const data = await envelope(path + suffix); const rows = field ? data.result?.[field] : data.result;
-      assert(Array.isArray(rows), 'provider-invalid-list');
-      result.push(...rows); assert(result.length <= 10000, 'provider-list-too-large');
-      if (r2Bounded) {
-        const info = data.result_info;
-        assert(rows.length <= 1000, 'provider-partial-list');
-        // Only this endpoint's explicit bounded strategy uses the requested
-        // limit when metadata is absent. Never invent metadata for other modes.
-        if (info === undefined || info === null) {
-          assert(rows.length < 1000, 'provider-incomplete-pagination');
-          assert(total === undefined || result.length === total, 'provider-partial-list');
-          return result;
-        }
-        assert(typeof info === 'object' && !Array.isArray(info) && Number.isSafeInteger(info.per_page) && info.per_page > 0 && info.per_page <= 1000, 'provider-incomplete-pagination');
-        assert(rows.length <= info.per_page, 'provider-partial-list');
-        if (Object.hasOwn(info, 'count')) assert(info.count === rows.length, 'provider-partial-list');
-        if (Object.hasOwn(info, 'total_count')) {
-          assert(Number.isSafeInteger(info.total_count) && info.total_count >= 0, 'provider-incomplete-pagination');
-          total ??= info.total_count; assert(total === info.total_count, 'provider-pagination-changed');
-        }
-        assert(total === undefined || result.length <= total, 'provider-partial-list');
-        assert(info.cursor === undefined || typeof info.cursor === 'string', 'provider-invalid-cursor');
-        if (!info.cursor) {
-          assert(rows.length < info.per_page && (total === undefined || result.length === total), 'provider-partial-list');
-          return result;
-        }
-        assert(total === undefined || result.length < total, 'provider-partial-list');
-        cursor = info.cursor; assert(/^[a-zA-Z0-9_+\/=-]+$/.test(cursor) && !seen.has(cursor), 'provider-invalid-cursor'); seen.add(cursor);
-      } else if (pagination === 'cursor') {
-        const info = data.result_info;
-        // R2's terminal short page may explicitly report null pagination. The
-        // requested documented limit supplies the bound; a full page is ambiguous.
-        if (path === '/r2/buckets' && info === null) { assert(rows.length < 1000, 'provider-incomplete-pagination'); return result; }
-        assert(info && Number.isSafeInteger(info.per_page) && info.per_page > 0, 'provider-incomplete-pagination');
-        if (!info.cursor) { assert(rows.length < info.per_page, 'provider-partial-list'); return result; }
-        cursor = info.cursor; assert(typeof cursor === 'string' && /^[a-zA-Z0-9_+\/=-]+$/.test(cursor) && !seen.has(cursor), 'provider-invalid-cursor'); seen.add(cursor);
-      } else {
-        const info = data.result_info;
-        assert(info && info.page === page && Number.isSafeInteger(info.total_count) && info.total_count >= 0, 'provider-incomplete-pagination');
-        total ??= info.total_count; assert(total === info.total_count, 'provider-pagination-changed');
-        assert(result.length <= total, 'provider-partial-list');
-        if (result.length === total) return result;
-        assert(rows.length > 0 && (info.total_pages === undefined || page < info.total_pages), 'provider-partial-list');
-      }
+  }
+  async function collect(path, options) {
+    let result, rows = [];
+    for await (const page of providerPages(envelope, path, options)) {
+      result ??= page.data.result;
+      rows.push(...page.rows);
+      assert(rows.length <= 10000, 'provider-list-too-large');
     }
-    throw new Error('provider-pagination-limit');
+    return options?.field ? {...result,[options.field]:rows} : rows;
+  }
+  async function list(path, options = {}) {
+    const shape = {...providerListShape(path),...options};
+    const result = await collect(path,shape);
+    return shape.field ? result[shape.field] : result;
+  }
+  async function requestResult(path, options = {}) {
+    const shape = (!options.method || options.method === 'GET') && providerListShape(path);
+    return shape ? collect(path,{...shape,zone:options.zone,signal:options.signal}) : (await envelope(path,options)).result;
   }
   async function upload(url, bytes, etag) {
     const destination = importUploadURL(url);
@@ -167,6 +127,6 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     assert(response.status === 200, 'd1-import-upload-failed');
     assert(response.headers.get('etag')?.replace(/^"|"$/g, '') === etag, 'd1-import-upload-etag-mismatch');
   }
-  return { accountId, envelope, list, importSql(id, sql) { return importD1({envelope,upload}, id, sql); }, async request(path, options) { return (await envelope(path, options)).result; },
-    async zoneRequest(path, options = {}) { return (await envelope(path, { ...options, zone: true })).result; } };
+  return { accountId, envelope, list, importSql(id, sql) { return importD1({envelope,upload}, id, sql); }, request:requestResult,
+    zoneRequest(path, options = {}) { return requestResult(path, { ...options, zone: true }); } };
 }
