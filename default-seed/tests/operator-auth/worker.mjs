@@ -1,10 +1,11 @@
+import { withDemo } from '../../../modules/demo/index.mjs'
 import { authResponse } from '../../src/core/app/auth-http.server'
 import { createApi } from '../../src/core/app/hono'
 const api = createApi()
 
 // This envelope preserves hostile Host values through Miniflare's proxy. Only
 // tests import it. All application routes and guards are the actual consumer.
-export default {
+export default withDemo({
   async fetch(envelope, env, execution) {
     const { url, ...init } = await envelope.json()
     const request = new Request(url, init)
@@ -20,4 +21,4 @@ export default {
       ? authResponse(request, env)
       : api.fetch(request, env, execution)
   },
-}
+})

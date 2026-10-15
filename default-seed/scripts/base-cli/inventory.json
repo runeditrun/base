@@ -599,7 +599,7 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "a90fe4ac5e572554e88cf8721cd06470595017aae3e9c36a12aac222fcc6933b"
+      "sha256": "cc2c8a63b6d7c8c93213cb4d97fad813a9facab388705234108208710b356766"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
@@ -1011,7 +1011,7 @@
     },
     "modules/demo/effects.mjs": {
       "source": "modules/demo/effects.mjs",
-      "sha256": "2e523da1d9fcffc4b6e3e0e4901b6bd45e6f08adfb380b397e775acb0358c395"
+      "sha256": "e74d46fec165fdb5eafc62e53d6691e3064d5b9b5257c53f3cd6dd9a40386226"
     },
     "modules/demo/index.d.mts": {
       "source": "modules/demo/index.d.mts",
@@ -1943,7 +1943,7 @@
     },
     "modules/operator-auth/identity/email-link/index.mjs": {
       "source": "modules/operator-auth/identity/email-link/index.mjs",
-      "sha256": "4e42a8a3e82b1b251d52c7d39d1f38e1bea68d5578ead4672cea38e9e8e2d1ff"
+      "sha256": "a682f502d87661d6556a005c3d0caef7896e5d7a5dd36703ec0088e2d95f9d0d"
     },
     "modules/operator-auth/identity/email-link/message.mjs": {
       "source": "modules/operator-auth/identity/email-link/message.mjs",
