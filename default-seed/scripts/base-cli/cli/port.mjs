@@ -1,4 +1,3 @@
-import { createServer } from 'node:net';
 import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readJson } from '../modules/job-queue/storage.mjs';
@@ -7,23 +6,16 @@ import { shared } from './shared.mjs';
 
 export const defaultPort = 8787;
 
-async function bindable(host, port) {
- const socket = createServer();
- try { await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(port, host, resolve); }); return true; }
- catch { return false; }
- finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
-}
-
 // The first port from `from` that nothing listens on, on any address, and that
 // this host can bind. Another checkout's server may listen on every address,
 // which a bind to 127.0.0.1 alone does not notice.
 export async function firstFreePort(host, from = defaultPort, context) {
- const { listeningPorts, inspectionContext } = await shared('process-diagnostics.mjs');
- context ??= inspectionContext();
- const busy = await listeningPorts(context);
+ const { inspectionContext } = await shared('process-diagnostics.mjs');
+ const { probePort } = await shared('port-probe.mjs');
+ context ??= inspectionContext({verb:'setup'});
  for (let port = from; port <= 65535; port++) {
-  if (performance.now() >= context.deadline) throw Error('Free-port search stopped at the shared inspection deadline.');
-  if (!busy.has(port) && await bindable(host, port)) return port;
+  if ((await probePort(host, port, { context, anyAddress: true })).available) return port;
+  if (performance.now() >= context.deadline) throw Error('Could not find a free port in time (system busy). Run rer setup again.');
  }
  throw Error(`No free port from ${from} upward.`);
 }
@@ -32,7 +24,7 @@ export async function firstFreePort(host, from = defaultPort, context) {
 // command that stops it), else the process and its working directory.
 export async function portHolder(port, host, root, env = process.env, context, observed) {
  const { portListener } = await shared('process-diagnostics.mjs');
- const listener = observed ?? await portListener(port, host, context);
+ const listener = observed !== undefined ? observed : await portListener(port, host, context);
  if (!listener) return undefined;
  const state = await readJson(join(serversDirectory(env), 'state.json'), { running: [] }).catch(() => ({ running: [] }));
  const record = (state.running ?? []).find(item => item.owner?.pid === listener.pid && item.port === port);
@@ -47,7 +39,7 @@ export async function busyPortMessage({ port, host, root, saved, env = process.e
  const holder = await portHolder(port, host, root, env, context, listener);
 
  const kind = saved ? `Port ${port} is saved for this checkout but is` : `Port ${port} is`;
- if (!holder) return `${kind} unavailable for binding; completed inspection found no listener on ${host}. Pick a free port or retry after checking local socket availability.`;
+ if (!holder) return `${kind} still unavailable for binding on ${host} after retrying; no listener was identified. Run rer dev or rer setup again; if it persists, use rer setup --port PORT with a free port.`;
  if (holder.own) return `${kind} held by this checkout's own ${holder.server.mode} server (PID ${holder.pid}). Stop it with: ${stopInstruction(holder.server)}`;
  const next = await firstFreePort(host, port + 1, context).catch(() => undefined);
  const who = holder.server

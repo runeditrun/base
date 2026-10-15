@@ -2,7 +2,7 @@ import http from 'node:http';
 import net from 'node:net';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { posix } from 'node:path';
-import { refuse } from './errors.mjs';
+import { listen } from './listen.mjs';
 import { loopback } from './parse.mjs';
 import { fontResponseHeaders } from './font-cache.mjs';
 
@@ -79,11 +79,7 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
   }
   upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());socket.on('close',()=>upstream.destroy());upstream.on('close',()=>socket.destroy());
  });
- try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});}
- catch(error){
-  if(['EADDRINUSE','EACCES'].includes(error.code))throw refuse(`Requested port ${port} is unavailable. Stop its owner or choose an explicit free port; rer does not drift.`);
-  throw error;
- }
+ await listen(server,host,port);
  return {probe,port:server.address().port,async close(){for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
 }
 function doorAdmits(req,door){

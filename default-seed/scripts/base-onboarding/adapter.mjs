@@ -10,7 +10,7 @@ import { credentialValues } from './redaction.mjs';
 import { dependencyEnvironment } from './dependency-environment.mjs';
 import { labels } from './adapter-labels.mjs';
 import { chooseOrigin, prepareSettings, readSettings } from './adapter-settings.mjs';
-import {listenerPorts,listenerOwnership} from './process-diagnostics.mjs';
+import {listenerPorts,listenerOwnership,inspectionContext} from './process-diagnostics.mjs';
 import { appFetch } from './app-fetch.mjs';
 import { owner, signIn } from './adapter-auth.mjs';
 import { installerDevKey } from './dev-identity.mjs';
@@ -233,12 +233,12 @@ async function start(context, hooks) {
  // its /health would pass. Claim and sign in only against the process this
  // setup started.
  let ownership;
- try { ownership=await listenerOwnership(child.pid,expectedPort,context.runtimePort?'127.0.0.1':new URL(url).hostname); }
+ try { ownership=await listenerOwnership(child.pid,expectedPort,context.runtimePort?'127.0.0.1':new URL(url).hostname,inspectionContext({port:expectedPort,verb:context.verb??'setup'})); }
  catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}
  if (ownership.status !== 'owned') {
   const message = (store.redact??(value=>value))(ownership.status==='other'
    ? `Another process answered on port ${expectedPort}; the application did not bind it. Listener PID ${ownership.pid}. Nothing was sent. Stop that process or choose another port, then run setup again.`
-   : `The application did not bind expected internal port ${expectedPort}; completed inspection found no listener on the health address. Nothing was sent. Check the application binding, then run setup again.`);
+   : `Could not confirm the application on port ${expectedPort}: repeated inspection found no listener on the health address. Nothing was sent. Check the application binding, then run rer ${context.verb??'setup'} again.`);
   store.report?.(message);
   throw installationFailure('command_failed', { step: 'start', diagnostic: commandFailure(message, {}) });
  }

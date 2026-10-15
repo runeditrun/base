@@ -93,7 +93,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
    throw Error('Unknown management operation');
   });
   await stateSafety(project);
-  await refuseLegacyProcess(project);
+  await refuseLegacyProcess(project,{verb:options.verb});
   const {localOperation}=await shared('local/operation.mjs');
   try{operation=await localOperation(project.root);}catch(error){throw refuse(error.message);}
   const {recoverInterrupted}=await shared('local/recovery.mjs');await recoverInterrupted(project.root,operation);
@@ -101,7 +101,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   const seed=project.adapter.setup?await loadInstallerSeed(project.root,project.adapter):undefined;project.setupManifest=seed?.manifest;
   const keys=localSettingKeys(project);
   selected=await selectedOrigin(project,options);
-  if(!selected.door)await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined});
+  if(!selected.door)await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb});
   if(!selected.vars[keys.email])throw missing('Private owner settings are missing. Run rer setup first.');
   if(devIdentity&&!devKey)devKey=await requireDevKey(project.root);
   if(devIdentity&&options.verb==='dev'&&!options.login)refuseManagedInstallation(selected.vars,process.env);
