@@ -26,6 +26,19 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         self.commit()
         self.assertFalse(any(f['rule'] == 'hygiene.email' for f in self.report()['findings']))
 
+    def test_long_retained_runs_finish_without_hiding_private_email(self):
+        mailbox = 'person' + '@' + 'gmail.com'
+        self.write('retained.txt', '\n'.join(('A' * 64000, '.-' * 32000,
+                                             'YWJjZGVm' * 8000, mailbox)))
+        self.commit()
+        result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
+                                capture_output=True, text=True, timeout=5)
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(report['complete'])
+        self.assertEqual({(f['rule'], f['path']) for f in report['findings']},
+                         {('hygiene.email', 'retained.txt')})
+
     def test_copied_auth_documentation_needs_no_publication_exceptions(self):
         guide = (ROOT / 'modules/operator-auth/identity/oidc/README.md').read_text()
         sources = {'CLOUDFLARE_API_TOKEN': 'Owner-account deployment instructions in OPERATIONS.md'}
