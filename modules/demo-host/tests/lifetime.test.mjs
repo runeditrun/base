@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { front, cookieHeader, demoCookie } from './front.mjs';
 
 test('closed-page demos survive object restarts for the full idle window and enforce idle and absolute ends', async () => {
-  const { mf, demos, fetch, start } = await front({ max: 2 });
+  const { mf, demos, fetch, start } = await front({ max: 2, destroyFailures: 1 });
   try {
     const a = await start(), b = await start({ ip: '203.0.113.2' });
     assert.equal(a.status, 303); assert.equal(b.status, 303);
@@ -37,10 +37,13 @@ test('closed-page demos survive object restarts for the full idle window and enf
     assert.ok(idleEnded.headers.getSetCookie().some(value => value.startsWith('rer_demo=;') && value.includes('Max-Age=0')));
     assert.equal((await start({ ip: '203.0.113.3' })).status, 303, 'idle expiry immediately frees a place');
     // Activity refreshed the idle deadline, but never the absolute hour.
-    await advance(a, 4, { alarm: true });
+    await advance(a, 4);
     const absoluteEnded = await visit(a);
     assert.equal(absoluteEnded.status, 410);
+    assert.equal(demos.get(id(a)).destroyed, false, 'a cleanup failure still shows the ended page');
+    assert.equal((await start({ ip: '203.0.113.4' })).status, 503, 'unconfirmed destruction retains its place');
+    assert.equal((await visit(a)).status, 410);
     assert.equal(demos.get(id(a)).destroyed, true);
-    assert.equal((await start({ ip: '203.0.113.4' })).status, 303, 'absolute expiry frees its place');
+    assert.equal((await start({ ip: '203.0.113.5' })).status, 303, 'absolute expiry frees its place after cleanup');
   } finally { await mf.dispose(); }
 });

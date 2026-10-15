@@ -126,7 +126,8 @@ export class DemoContainer extends DurableObject {
   async fetch(request) {
     const state = await this.ctx.storage.get(['ends', 'seen']), now = this.now();
     if (!state.get('ends') || now >= Math.min(state.get('ends'), state.get('seen') + this.idle)) {
-      await this.end();
+      try { await this.end(); }
+      catch (cause) { report(this.correlation, this.started, 'cleanup', { error: category(cause) }); }
       return this.ended();
     }
     if (!this.container.running) return this.gone();
