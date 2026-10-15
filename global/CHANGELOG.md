@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The shell installer acquires checksum-verified Node 22 in rer's private prefix when needed, leaving system tools alone. The launcher keeps using it without Node on PATH. `rer install` and `rer verify` acquire the checkout's Playwright Chromium and headless shell; `rer doctor` reports missing browser files with `rer install` as the fix, including through the global command for older checkout pins.
+
 ## 0.2.23
 
 - Managed mail (`rer` provider) works from Cloudflare Workers. Mail transport always fetches with `redirect: 'manual'`, because Workers reject `redirect: 'error'`, which made every relay send end as `transport_uncertain` without a request. A relay 3xx is never followed and is reported as `rejected` (`provider_redirected`).

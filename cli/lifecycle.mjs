@@ -1,3 +1,4 @@
+import { ensureChromium } from './browser-runtime.mjs';
 import { dependencyInputs } from './dependency-input.mjs';
 import { linkDependencies } from './dependencies.mjs';
 import { savedSetupAnswers } from './setup-answers.mjs';
@@ -86,11 +87,13 @@ async function runLifecycle(project, options, out, deployRedaction) {
   if (options.verb === 'deploy' && options.demo) return await (await import('./demo-host.mjs')).demoHostCommand(project, options, store, signal, out, operation);
   if (options.verb === 'install') {
    const { dependencyEnvironment } = await shared('dependency-environment.mjs');
-   await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...dependencyEnvironment(), CI: 'true' } }); return {};
+   await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...dependencyEnvironment(), CI: 'true' } });
+   await ensureChromium(project.root, store, signal, { required: false }); return {};
   }
   if (options.verb === 'verify') {
    const target = adapter.verify;
    if (!Array.isArray(target)) throw refuse('A complete internal verification target is missing.');
+   await ensureChromium(project.root, store, signal);
    await store.run('Verifying application', target[0], target[1], { cwd: project.root, signal, env: { ...process.env, RER_LOCAL_OPERATION: operation.token } });
    await store.step('Serving the production build as rer deploy hosts it');
    const declaration = adapter.deployDeclaration ?? adapter.deploy?.declaration;

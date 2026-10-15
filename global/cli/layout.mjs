@@ -1,6 +1,6 @@
 // Where a user install lives. Data: ${XDG_DATA_HOME:-$HOME/.local/share}/rer,
 // as immutable versions/<version>-<digest8> directories and a `current` link.
-// Launcher: $HOME/.local/bin/rer, a POSIX sh script that runs node from PATH.
+// Launcher: $HOME/.local/bin/rer, using the installer's private Node when present.
 import { readFile, lstat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -15,14 +15,18 @@ export function layout(env = process.env) {
 const marker = '# rer launcher, written by `rer cli install` (@runeditrun/rer). Do not edit.';
 const quote = value => `'${value.replaceAll("'", `'\\''`)}'`;
 
-// No absolute Node path is baked in, so a Node upgrade never breaks it.
+// The managed runtime stays inside the install root; npx installs use PATH.
 export function launcherScript(data) {
  return `#!/bin/sh
 ${marker}
-# It runs the installed version with the node on PATH.
+# It uses the installer's private Node when present, otherwise Node on PATH.
 root=${quote(data)}
+if [ -x "$root/node/bin/node" ]; then
+ PATH="$root/node/bin:$PATH"
+ export PATH
+fi
 if ! command -v node >/dev/null 2>&1; then
- echo "rer: node is not on PATH. Install Node 22 or later, then run rer again." >&2
+ echo "rer: Node is missing. Run: curl -fsSL https://runeditrun.com/install.sh | sh" >&2
  exit 127
 fi
 exec node "$root/current/global/rer.mjs" "$@"

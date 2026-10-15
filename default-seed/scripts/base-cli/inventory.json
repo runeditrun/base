@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.23-dev.gb4b372b0",
+  "cliVersion": "0.2.23-dev.g23213585",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -361,6 +361,10 @@
       "source": "cli/bounded.mjs",
       "sha256": "db32464546f03f713f75dfb278d1783ef1c193b9309802a46a0c296f2bd69d48"
     },
+    "cli/browser-runtime.mjs": {
+      "source": "cli/browser-runtime.mjs",
+      "sha256": "5cafb40696ae245b5c9629f14405c97f4948cdc0ffe7268821589afe13d60f79"
+    },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
       "sha256": "28d90e72bf971865543149dba83e7cff81f738af8e54208b848b8e08a36377f8"
@@ -495,7 +499,7 @@
     },
     "cli/hydration/browser.mjs": {
       "source": "cli/hydration/browser.mjs",
-      "sha256": "a0cae4fd8f24b0f6e517bca77faaa47418822ac17a002c2cca4ef6b9a34933fa"
+      "sha256": "b2e70a116450d1c5839c15981f5c1dbd451869bcb1df62eeb0b9b67a69dbdb7b"
     },
     "cli/hydration/cases.mjs": {
       "source": "cli/hydration/cases.mjs",
@@ -523,7 +527,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "9b727bf3dd7de290e134eea97400ef2113831bcfcc5e28ccbcc254a8d453ef81"
+      "sha256": "7742d7a203642406deb396de17a44db1aba9721b7e4af5e356949e1d456f7628"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -531,7 +535,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "615aba7b50baece6e1578dec7e6331512f682e076001242e09b8e8d55f53718c"
+      "sha256": "8636b57c8bd62719582e1a2de14df45119748b67f2e2bc8c609f8dfc85c16bbd"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",

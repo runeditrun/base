@@ -22,13 +22,19 @@ refuses archives with absolute paths, `..` entries, links or devices, then runs
 the package's own `rer cli install`. A failed or refused download leaves the
 version you had selected.
 
+With no Node 22 or later on PATH, the script installs Node 22.20.0 from
+`nodejs.org` into `~/.local/share/rer/runtimes` (under `XDG_DATA_HOME` when set),
+verifies the tarball against that release's published `SHASUMS256.txt`, and
+prints its location. The launcher uses this private runtime on later runs.
+System Node and other PATH directories are left alone.
+
 No installer edits shell profiles. The canonical launcher is `~/.local/bin/rer`.
 Installation creates that directory if needed and never writes into another
 PATH directory. It names any existing `rer` elsewhere on PATH and leaves it
 unchanged. If `~/.local/bin` is absent from PATH or another command shadows it,
 it prints one activation line to run in the current shell:
-`export PATH="$HOME/.local/bin:$PATH"` (with fish syntax for fish). The launcher runs `node` from
-PATH, so a Node upgrade does not break it. A re-run with the same build changes
+`export PATH="$HOME/.local/bin:$PATH"` (with fish syntax for fish). Without a
+private runtime, the launcher uses `node` from PATH. A re-run with the same build changes
 nothing; a different build is installed beside the current one, the previous one
 is kept and older ones are removed. It refuses to replace a `~/.local/bin/rer`
 that it did not write.
@@ -47,11 +53,14 @@ install in place.
 ### Requirements
 
 - macOS or Linux, on x64 or arm64. WSL2 counts as Linux.
-- Node 22 or later on PATH; `rer` stops with one line naming the minimum on an
-  older Node.
-- For `install.sh`: `curl` and `tar`.
-- For `rer dev` in a checkout: the checkout's own package manager (pnpm for
-  Run Edit Run seeds).
+- For `install.sh`: `curl`, `tar`, and `shasum` or `sha256sum` when it installs
+  Node. macOS includes these tools.
+- For the npm/npx install alternatives: Node 22 or later on PATH.
+- Checkout commands acquire the checkout's pinned Node and pnpm when needed.
+  `rer install` also downloads the checkout's Playwright Chromium and headless
+  shell for verification; `rer verify` installs missing browser files on first
+  need. Downloads print progress. `rer doctor` reports a missing browser and
+  directs you to `rer install`, without downloading anything itself.
 
 Not supported: native Windows (`install.sh` and `rer` say to use WSL2), and
 `OPERATIONS.json` version 1 projects.
