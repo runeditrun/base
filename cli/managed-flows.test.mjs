@@ -153,7 +153,7 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
  assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,privateMode);
  assert.deepEqual((await f.data('SELECT value FROM managed_saved'))[0].results,[{value:'owner content'}],'failed startup retains canonical data and releases its state lock');
 
- const dev = await ready(f.start(['dev', '--port', String(port), '--json']));
+ const dev = await ready(f.launch(['--import', join(import.meta.dirname,'fixtures/slow-state-inspection.mjs'), 'scripts/rer.mjs', 'dev', '--port', String(port), '--json']));
  const original = await processTree(dev.pid);
  const alias = f.root + '-alias'; await symlink(f.root, alias);
  try {
