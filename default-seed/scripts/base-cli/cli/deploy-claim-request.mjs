@@ -1,6 +1,7 @@
 import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 // Retry only the bootstrap HTTP exchange, never the hook's other effects. The
-// current invocation must prove it uploaded this token to a newly created Worker.
+// current invocation must prove it uploaded this token to a fresh Worker version.
+// The route can still answer 404 after /health first reaches another edge.
 export async function ownerClaimRequest(fetch, input, init, { deployed, tokenKey = 'SETUP_TOKEN', signal } = {}) {
  const url = new URL(input instanceof Request ? input.url : input);
  if (deployed?.origin && url.origin !== deployed.origin) throw new Error('owner-claim-origin-mismatch');
@@ -21,11 +22,11 @@ export async function ownerClaimRequest(fetch, input, init, { deployed, tokenKey
    const destination = response.headers.get('location');
    if (destination && new URL(destination, url).origin !== url.origin) throw new Error('owner-claim-origin-mismatch');
   }
-  let invalid = false;
+  let pending = fresh && !response.redirected && response.status === 404;
   if (fresh && response.status === 403) {
-   try { invalid = (await response.clone().json())?.error === 'invalid_setup_token'; } catch {}
+   try { pending = (await response.clone().json())?.error === 'invalid_setup_token'; } catch {}
   }
-  if (!invalid || window.remaining() <= 0) return response;
+  if (!pending || window.remaining() <= 0) return response;
   await response.body?.cancel();
   await window.pause();
  }

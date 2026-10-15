@@ -1,6 +1,6 @@
 import { requireProductionAuth } from './production-auth.mjs';
 import { readFile } from 'node:fs/promises';
-import { deployDiagnostic, providerTransport } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, providerTransport, providerRefusal, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { contained } from './project.mjs';
 import { missing, invalid, refuse, RerError } from './errors.mjs';
@@ -110,6 +110,15 @@ export function ownerDeploy(declarationPath, lifecycle) {
 
 // The failing step, its redacted cause, what this run created and the command that continues.
 function failureText({ error, step, created, again, retry, secretChange, deployed, redact }) {
+ if (step === 'remove') {
+  const remaining = error.remaining;
+  if (error.message === 'nothing-to-remove') return `There are no recorded resources to remove; nothing was removed.`;
+  const cause = deployDiagnostic(error, redact)?.code ?? error.message;
+  const count = Array.isArray(remaining) ? `${remaining.length} resources remain (${remaining.join(', ') || 'none'})` : 'the remaining resource count could not be read';
+  const detail = providerTransport(error, redact) ?? providerRefusal(error, redact);
+  const failed = error.failed?.map(item => `${item.resource}: ${item.code}`).join('; ');
+  return redact(`Removal failed: ${count}; run ${retry} again. Cause: ${cause}${detail ? ` (${detail})` : ''}${failed ? `; ${failed}` : ''}.`);
+ }
  const setup = hostedSetupFailure(error, { origin: deployed?.origin, again });
  if (setup) return redact(setup);
  const readiness = mutationReadinessFailure(error, { again, redact });
@@ -119,13 +128,14 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  const at = step === 'deploy' ? diagnostic?.step ?? 'prepare deploy' : step;
  const input = /^missing-secret-([A-Z][A-Z0-9_]*)$/.exec(code)?.[1];
  if (input) return `Deploy needs ${input}, which the deploy declaration lists as a secret and the Worker does not hold it. Set ${input} in the environment or in an --env-file file (an owned 0600 file of KEY=VALUE lines), then run the same command again. Nothing was uploaded.${created.length ? ` Resources created this attempt: ${created.join(', ')}.` : ''}`;
- if (code === 'remove-incomplete') return `Removal stopped with ${error.remaining.join(', ')} still present${error.failed.length ? ` (${error.failed.map(item => `${item.resource}: ${item.code}`).join('; ')})` : ''}. Removed: ${error.removed.join(', ') || 'nothing'}. Confirmed owned R2 buckets are emptied automatically; unproved buckets are never purged. Run ${again} --remove --yes again to finish.`;
  if (code === 'nothing-to-remove') return `The deployment record selected by ${again} has no resources that rer owns, so --remove deletes nothing.`;
  if (code === 'owner-token-retirement-failed') return `The application is deployed at ${deployed?.origin}; owner ${error.owner}; setup token retirement failed (${redact(String(error.cause))}). Run ${again} --unset-secret ${error.tokenKey ?? 'SETUP_TOKEN'} using the same environment credentials, or run ${again} again to finish.`;
  if (code === 'owner-claim-failed') return `The application is deployed at ${deployed?.origin}, but claiming its owner failed: ${redact(String(error.cause))}. Owner claim and setup token retirement are not confirmed; run ${again} again using the same environment credentials to finish.`;
  const resource = diagnostic?.resource ?? (error.resource ? redact(String(error.resource)) : undefined);
  if (code === 'resource-not-listed') return `Deploy stopped at ${at}: ${resource} was created, but Cloudflare's account listing still does not show it after two minutes. Nothing was uploaded.\nResources created this attempt: ${created.join(', ') || 'none'}.\nRun ${again} again once the listing catches up: it reuses ${resource}. To delete what this environment created instead: ${again} --remove --yes.`;
  const lines = [`Deploy failed at ${at}: ${code}${resource ? ` (${resource})` : ''}${diagnostic?.providerCodes?.length ? ` (provider ${diagnostic.providerCodes.join(', ')})` : ''}.`];
+ const asset = assetFailure(error, redact);
+ if (asset) lines.push(`${asset}.`);
  const transport = providerTransport(error, redact);
  if (transport) lines.push(`${transport}.`);
  if (diagnostic?.output && diagnostic.output !== '(no provider output)') lines.push(`First redacted output lines:\n${diagnostic.output}`);
