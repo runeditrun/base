@@ -6,6 +6,15 @@ readers can explicitly import `src/readers/index.ts`. The synchronous Node API a
 unchanged. D1 uses the same reviewed plans, source identities, retained originals,
 provenance and inert-effect policy through an asynchronous native SQL port.
 
+Copy the shared [D1 transport](../../../d1-transport/index.mjs) and its
+[types](../../../d1-transport/index.d.mts), preserving their sibling location
+beside the import-kit directory.
+The D1 entry uses this shared transport automatically. It accounts for actual
+UTF-8 bytes and workerd's whole-call two-byte strings, escapes sparse wide text
+for SQLite to decode, and keeps each mutation in its original transaction.
+Retained plans are read in bounded pages, including their reserved return-query
+budget. Calls that still exceed the provider transport ceiling fail explicitly.
+
 Apply `d1Schema`, `d1ErasureSchema`, `d1StreamOriginSchema`,
 `d1LegacyStreamReceiptUpgrade`, `d1StagingSchema`,
 `d1NativeStagingSchema`, `d1CustodyStateSchema`, `d1PreparationSchema`, `d1ReversalFenceSchema` and `d1RetirementSchema` in product-owned numbered migrations, or call

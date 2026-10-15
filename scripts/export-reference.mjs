@@ -15,7 +15,7 @@ export async function exportReference(base, target) {
  for(const name of ['dependencies','owner-claim','demo'])await cp(resolve(base,'modules/'+name),resolve(target,'src/modules/'+name),runtime(resolve(base,'modules/'+name)));
  await cp(resolve(base, 'modules/operator-auth'), resolve(target, 'src/modules/operator-auth'), runtime(resolve(base, 'modules/operator-auth')));
  // The Worker's erasure route runs these at runtime; `vite dev` serves only src.
- for (const name of ['portability', 'erasure']) await cp(resolve(base, 'modules', name), resolve(target, 'src/modules', name), runtime(resolve(base, 'modules', name)));
+ for (const name of ['portability', 'd1-transport', 'erasure']) await cp(resolve(base, 'modules', name), resolve(target, 'src/modules', name), runtime(resolve(base, 'modules', name)));
  // People imports and their erasure run on import-kit's D1 engine.
  for (const part of ['src', 'schema']) await cp(resolve(base, 'modules/import-kit', part), resolve(target, 'src/modules/import-kit', part), runtime(resolve(base, 'modules/import-kit', part)));
  await cp(resolve(base, 'foundation/runtime'), resolve(target, 'src/base'), { recursive: true });

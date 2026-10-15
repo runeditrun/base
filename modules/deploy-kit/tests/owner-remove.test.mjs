@@ -66,3 +66,50 @@ test('owned R2 removal retains proof on interrupted purge and refuses replacemen
   if (scenario === 'incomplete-pagination') assert.equal(f.objects.size,2);
  });
 });
+
+test('owned R2 removal purges short object listings without metadata and refuses ambiguous pages', async t => {
+ const keys = [
+  'issues/01M4Z5M6QSXHVE57A0H79TGRRM/01M4Z5N128HB91117VG46N6FV0',
+  'issues/01M4Z5M6QSXHVE57A0H79TGRRM/01M4Z5N3F64S7RZ5R15555HF88',
+ ];
+ for (const scenario of ['absent','null','cursor','full-absent','full-null','missing-cursor','terminal-cursor','duplicate']) await t.test(scenario, async t => {
+  const f = await fixture(t), listed = [];
+  f.objects.clear();
+  for (const key of keys) f.objects.set(key, Buffer.from('stored data'));
+  f.intercept((input, init = {}) => {
+   const url = new URL(input);
+   if (url.pathname.endsWith('/objects')) {
+    listed.push(url);
+    let rows = [...f.objects.keys()].map(key => ({key, size:f.objects.get(key).length})), info;
+    if (scenario === 'null' || scenario === 'full-null') info = null;
+    if (scenario.startsWith('full-')) rows = Array.from({length:Number(url.searchParams.get('per_page'))}, (_, i) => ({key:`object-${i}`}));
+    if (scenario === 'missing-cursor') info = {is_truncated:true};
+    if (scenario === 'terminal-cursor') info = {is_truncated:false,cursor:'unexpected'};
+    if (scenario === 'duplicate') rows = [rows[0],rows[0]];
+    if (scenario === 'cursor') {
+     if (listed.length === 1) { rows = rows.slice(0,1); info = {is_truncated:true,cursor:'next+/='}; }
+     else assert.equal(url.searchParams.get('cursor'), 'next+/=');
+    }
+    return Response.json({success:true,errors:[],messages:[],result:rows,...(info === undefined ? {} : {result_info:info})});
+   }
+  });
+  if (['absent','null','cursor'].includes(scenario)) {
+   const result = await f.remove();
+   assert.deepEqual(result.remaining, []);
+   assert.equal(f.objects.size,0);
+   assert.equal(f.state.buckets.length,0);
+   await assert.rejects(readFile(f.statePath), {code:'ENOENT'});
+   assert.equal(listed.length,scenario === 'cursor' ? 2 : 1);
+  } else {
+   await assert.rejects(f.remove(), error => {
+    assert.equal(error.message,'remove-incomplete');
+    assert.deepEqual(error.remaining,[`r2:${f.name}`]);
+    assert.equal(error.failed[0].code,scenario.startsWith('full-') ? 'provider-incomplete-pagination' : scenario === 'duplicate' ? 'invalid-r2-object-list' : 'provider-invalid-cursor');
+    return true;
+   });
+   assert.deepEqual([...f.objects.keys()],keys);
+   assert.equal(f.state.buckets.length,1);
+   assert.deepEqual(JSON.parse(await readFile(f.statePath,'utf8')).owned.r2,f.saved.owned.r2);
+  }
+ });
+});

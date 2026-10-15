@@ -92,9 +92,14 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
    if(info.isSymbolicLink()||!info.isDirectory()||info.uid!==process.getuid())throw refuse('Server registry directory is foreign or linked. Preserve it and choose an owned RER_SERVERS_DIR.');
    await chmod(path,0o700);
   }
-  try{const info=await lstat(join(directory,'state.json'));if(!info.isFile()||info.isSymbolicLink()||info.nlink!==1||info.uid!==process.getuid())throw refuse('Server registry state is foreign or linked. Preserve it for inspection.');await chmod(join(directory,'state.json'),0o600);}catch(error){if(error.code!=='ENOENT')throw error;}
  }
- const change=async action=>{await (secured??=secure());return transaction(directory,lifetime.info,action);};
+ async function validateState(path){
+  // Hold the transaction lock before inspecting the state inode. A concurrent
+  // atomic replacement can otherwise make lstat report the retired inode with
+  // zero links, even though both files are regular and owned by this user.
+  try{const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink()||info.nlink!==1||info.uid!==process.getuid())throw refuse('Server registry state is foreign or linked. Preserve it for inspection.');await chmod(path,0o600);}catch(error){if(error.code!=='ENOENT')throw error;}
+ }
+ const change=async action=>{await (secured??=secure());return transaction(directory,lifetime.info,action,{validateState});};
  let owned, control, closing;
  async function inspect(state) {
   const kept=[];

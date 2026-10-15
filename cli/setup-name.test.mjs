@@ -13,7 +13,7 @@ const source = path => pathToFileURL(join(base, path)).href;
 
 test('setup accepts declared owner names and nameless installers, refusing unsupported name flags', async t => {
  const env = await isolatedQueue(t);
- for (const nameField of [undefined, 'displayName', 'ADMIN_NAME']) {
+ for (const nameField of ['FIRST_OWNER_NAME', undefined, 'displayName', 'ADMIN_NAME']) {
   const root = await mkdtemp(join(tmpdir(), 'rer-setup-name-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const pins=JSON.parse(await readFile(join(base,'default-seed/package.json'),'utf8'));
@@ -24,7 +24,9 @@ test('setup accepts declared owner names and nameless installers, refusing unsup
   const port = socket.address().port;
   await new Promise(resolve => socket.close(resolve));
   const fields = [{ name: 'ADMIN_EMAIL', label: 'Owner email', kind: 'email', required: true }];
-  if (nameField === 'ADMIN_NAME') fields.push({ name: nameField, label: 'Owner name', kind: 'text', required: true });
+  const customName = nameField && nameField !== 'displayName';
+  const defaultName = nameField === 'FIRST_OWNER_NAME' ? 'Declared Owner' : 'Owner';
+  if (customName) fields.push({ name: nameField, label: 'Owner name', kind: 'text', required: true, ...(nameField === 'FIRST_OWNER_NAME' ? {default:defaultName} : {}) });
   await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Native owner', groups: [], fields, steps: [{ type: 'extension', id: 'native-owner' }] }));
   // Use the real installer lifecycle and stop at its seed-owned start hook.
   // No application is substituted: the receipt proves validated setup handoff.
@@ -33,21 +35,24 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { localInstaller } from ${JSON.stringify(source('onboarding/adapter.mjs'))};
 import { commandAdapter as declare } from ${JSON.stringify(source('cli/adapter.mjs'))};
-const lifecycle = localInstaller({ secrets: { keepExisting: true }, async start(context) {
+const lifecycle = localInstaller({ secrets: { keepExisting: true }, ${nameField === 'FIRST_OWNER_NAME' ? 'owner: { displayName: input => input.FIRST_OWNER_NAME },' : ''} async start(context) {
  await writeFile(join(context.root, 'handoff.json'), JSON.stringify(context.input));
  throw Error('Evidence ends at the declared seed start hook');
 } });
-export const commandAdapter = declare(lifecycle, { ownerBootstrap: ${nameField === 'displayName'}, setup: { manifestFile: 'rer-setup.json' }, input: { names: ${JSON.stringify({ email: 'ADMIN_EMAIL', ...(nameField === 'ADMIN_NAME' ? { name: nameField } : {}) })} } });
+export const commandAdapter = declare(lifecycle, { ${nameField === 'displayName' ? 'ownerBootstrap: true,' : ''} setup: { manifestFile: 'rer-setup.json' }, input: { names: ${JSON.stringify({ email: 'ADMIN_EMAIL', ...(customName ? { name: nameField } : {}) })} } });
 `);
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/native-owner', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { setup: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local setup.' } } }));
   const run = args => {
    const result = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'setup', '--port', String(port), '--json', '--non-interactive', ...args], { cwd: root, env, encoding: 'utf8', timeout: 15000 });
-   assert.ifError(result.error);
+   assert.ok(!result.error, `${nameField ?? 'nameless'} setup ${JSON.stringify(args)}: ${result.error?.message ?? ''}\n${result.stdout}`);
    return { ...result, events: result.stdout.trim().split('\n').map(JSON.parse) };
   };
   const fresh = run(['--owner-email', 'owner@example.test']);
   assert.equal(fresh.status, 1, 'fresh setup reaches the seed start hook: ' + fresh.stdout);
-  assert.equal(JSON.parse(await readFile(join(root, 'handoff.json'), 'utf8')).ADMIN_EMAIL, 'owner@example.test');
+  const freshInput = JSON.parse(await readFile(join(root, 'handoff.json'), 'utf8'));
+  assert.equal(freshInput.ADMIN_EMAIL, 'owner@example.test');
+  if (nameField) assert.equal(freshInput[nameField],defaultName);
+  if (customName) assert.ok(!Object.hasOwn(freshInput,'displayName'));
   const settings = 'ADMIN_EMAIL="owner@example.test"\nSESSION_SECRET="synthetic-retained-owner-settings"\n';
   await writeFile(join(root, '.dev.vars'), settings, { mode: 0o600 });
   for (const args of [[], ['--owner-email', 'owner@example.test']]) {
@@ -55,18 +60,27 @@ export const commandAdapter = declare(lifecycle, { ownerBootstrap: ${nameField =
    assert.equal(result.status, 1, 'only the seed start hook stops setup: ' + result.stdout);
    const input = JSON.parse(await readFile(join(root, 'handoff.json'), 'utf8'));
    assert.equal(input.ADMIN_EMAIL, 'owner@example.test');
-   if (nameField) assert.equal(input[nameField], 'Owner');
+   if (nameField) assert.equal(input[nameField], defaultName);
    else assert.ok(!Object.hasOwn(input, 'displayName'), 'nameless installer receives no undeclared name');
+   if (customName) assert.ok(!Object.hasOwn(input,'displayName'));
   }
   await rm(join(root, 'handoff.json'));
   const explicit = run(['--owner-name', 'Chosen Owner']);
   if (nameField) {
    assert.equal(explicit.status, 1);
-   assert.equal(JSON.parse(await readFile(join(root, 'handoff.json'), 'utf8'))[nameField], 'Chosen Owner');
+   const input = JSON.parse(await readFile(join(root, 'handoff.json'), 'utf8'));
+   assert.equal(input[nameField], 'Chosen Owner');
+   if (customName) assert.ok(!Object.hasOwn(input,'displayName'));
   } else {
    assert.equal(explicit.status, 2);
    assert.ok(explicit.events.some(event => event.code === 'invalid_invocation' && /owner-name.*unsupported/.test(event.message)));
    await assert.rejects(readFile(join(root, 'handoff.json')), { code: 'ENOENT' });
+  }
+  if (nameField === 'FIRST_OWNER_NAME') {
+   await rm(join(root,'handoff.json'));
+   await writeFile(join(root,'answers.json'),JSON.stringify({[nameField]:''}),{mode:0o600});
+   assert.equal(run(['--answers','answers.json']).status,3,'the manifest still requires the custom owner name');
+   await assert.rejects(readFile(join(root,'handoff.json')),{code:'ENOENT'});
   }
   assert.equal(run(['--owner-email', 'other@example.test']).status, 4, 'retained owner conflict is still refused');
   assert.equal(await readFile(join(root, '.dev.vars'), 'utf8'), settings, 'setup preserves retained private bytes');
