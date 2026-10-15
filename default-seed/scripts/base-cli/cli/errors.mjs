@@ -1,3 +1,5 @@
+import { transferDiagnostic } from '../modules/portability/http-client.mjs';
+
 export class RerError extends Error {
  constructor(code, message, exitCode, details = {}) { super(message); Object.assign(this, { code, exitCode, ...details }); }
 }
@@ -7,6 +9,8 @@ export const refuse = message => new RerError('safety_refusal', message, 4);
 
 export async function lifecycleError(error, store) {
  if(error instanceof RerError)return error;
+ const transfer=transferDiagnostic(error);
+ if(transfer)return new RerError('transfer_failed',transfer,1);
  const {shared}=await import('./shared.mjs');
  const {approvedFailure}=await shared('failures.mjs');
  const approved=approvedFailure(error);

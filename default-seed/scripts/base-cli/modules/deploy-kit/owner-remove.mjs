@@ -1,3 +1,4 @@
+import { r2ObjectPages, r2ObjectPath } from './r2-objects.mjs';
 import { rm } from 'node:fs/promises';
 import { assert } from './validation.mjs';
 import { resourceKinds, findResource } from './resources.mjs';
@@ -9,16 +10,14 @@ import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, 
 
 const remove = {
   d1: (api, id) => api.request(`/d1/database/${id}`, {method:'DELETE'}),
-  r2: (api, _id, name) => api.request(`/r2/buckets/${name}`, {method:'DELETE'}),
   kv: (api, id) => api.request(`/storage/kv/namespaces/${id}`, {method:'DELETE'}),
   queues: (api, id) => api.request(`/queues/${id}`, {method:'DELETE'}),
 };
 
 /** A resource whose create response was lost (still `pending` in the state file) may be
  * rer's or someone else's. It is removed only under this environment's derived name and
- * once it is confirmed empty: a D1 with no tables, a KV namespace with no keys, an R2
- * bucket (the provider refuses to delete one holding objects). A queue's backlog cannot
- * be read, so an uncertain queue refuses with its own code. */
+ * once it is confirmed empty: a D1 with no tables or a KV namespace with no keys. R2 always
+ * requires a confirmed creation identity. A queue's backlog cannot be read, so an uncertain queue refuses with its own code. */
 async function confirmEmpty(api, worker, kind, name, id) {
   if (!name.startsWith(`${worker}-`)) throw refuse('uncertain-resource-create', kind, name);
   if (kind === 'queues') throw refuse('uncertain-resource-unverifiable', kind, name);
@@ -38,7 +37,8 @@ async function confirmEmpty(api, worker, kind, name, id) {
  * each only while it is still the one rer created. Read back that each is gone, then
  * drop the state file. Nothing else in the account is touched. Ownership is checked for
  * everything before the first delete; a replaced or uncertain resource refuses it all,
- * except an uncertain one confirmed empty (see confirmEmpty). */
+ * except an uncertain one confirmed empty (see confirmEmpty). R2 object purges
+ * additionally require the saved creation timestamp and recheck it before each delete. */
 export async function ownerRemove({api: provider, target, statePath, clock, sleep}) {
   const api = withSettledLists(withScopeHints(provider));
   return withStateLock(statePath, async () => {
@@ -64,9 +64,11 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
       for (const {name, entry} of owned.filter(item => item.kind === kind)) {
         const row = findResource(listed[kind], kind, name);
         if (!row) continue;
+        if (kind === 'r2') requireBucketIdentity(name, entry);
         if (entry.status === 'pending') await confirmEmpty(api, target.worker, kind, name, resourceId(kind, row));
         else checkResourceIdentity(kind, name, row, entry);
-        doomed.push({kind, name, id:resourceId(kind, row)});
+        if (kind === 'r2' && entry.status === 'created' && entry.id) await checkBucket(api, name, entry);
+        doomed.push({kind, name, entry, id:resourceId(kind, row)});
       }
     }
     const removed = [];
@@ -79,7 +81,11 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
     if (worker) { await deleteWorker({api, worker, ...(clock ? {clock} : {}), ...(sleep ? {sleep} : {})}); removed.push(`worker:${worker}`); }
     const failed = [];
     for (const item of doomed) {
-      try { await remove[item.kind](api, item.id, item.name); removed.push(`${item.kind}:${item.name}`); }
+      try {
+        if (item.kind === 'r2') await removeBucket(api, item);
+        else await remove[item.kind](api, item.id, item.name);
+        removed.push(`${item.kind}:${item.name}`);
+      }
       catch (error) { failed.push({resource:`${item.kind}:${item.name}`, code:error.message}); }
     }
     // Read back: nothing this environment created is still listed.
@@ -100,10 +106,34 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
         delete state.ownerClaim; delete state.retiredSecrets;
       }
       await writeOwnerState(statePath, state);
-      const error = new Error('remove-incomplete'); error.remaining = remaining; error.failed = failed; error.removed = removed;
+      const error = new Error('remove-incomplete'); error.remaining = remaining; error.failed = failed; error.removed = removed.filter(resource => !remaining.includes(resource));
       throw error;
     }
     await rm(statePath, {force:true});
     return {worker:target.worker, removed, remaining:[]};
   });
+}
+
+async function checkBucket(api, name, entry) {
+  const row = await api.request(`/r2/buckets/${name}`);
+  if (row?.name !== name) throw refuse('owned-resource-replaced', 'r2', name);
+  checkResourceIdentity('r2', name, row, entry);
+}
+function requireBucketIdentity(name, entry) {
+  if (entry.status !== 'created' || typeof entry.id !== 'string' || !entry.id) throw refuse('uncertain-resource-create', 'r2', name);
+}
+async function removeBucket(api, {name, entry}) {
+  requireBucketIdentity(name, entry);
+  await checkBucket(api, name, entry);
+  for await (const rows of r2ObjectPages(api, name)) {
+    for (const {key} of rows) {
+      // Preflight may precede Worker teardown. Re-read before each destructive
+      // request too. The provider has no conditional bucket-identity delete;
+      // out-of-band delete/recreate operations must be serialized by the owner.
+      await checkBucket(api, name, entry);
+      await api.request(r2ObjectPath(name, key), {method:'DELETE'});
+    }
+  }
+  await checkBucket(api, name, entry);
+  await api.request(`/r2/buckets/${name}`, {method:'DELETE'});
 }

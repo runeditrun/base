@@ -22,6 +22,7 @@ export async function transfer(project, options, signal, custody) {
  // A later archive of the same installation carries its latest erasure journal.
  const journal = options.journal ? await contained(project.root, options.journal, { privateFile: true }) : undefined;
  await project.adapter.prepareData?.(project.root, custody.store, signal);
+ await custody.store.step(`${target === 'remote' ? 'Hosted' : 'Local'} ${direction}`);
  // Only now can the seed's Vite configuration load in a checkout that never built.
  await located.unserved(); await legacyOutput?.unserved();
  const result=await api[direction]({ root: project.root, target, path, journal, origin: options.origin, sessionFile, signal, platform:options.platform, legacyRecovery, ...custody });

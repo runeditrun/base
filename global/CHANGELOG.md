@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.9
+
+- `rer deploy --remove --yes` empties each R2 bucket whose saved creation identity proves rer owns it, deletes the bucket, and verifies removal. Buckets with uncertain or replaced ownership are refused; interrupted deletion retains the deployment record so removal can resume.
+- A failed hosted export names the export step, job ID, HTTP status and returned machine error code. A successful pnpm preparation is no longer blamed for a later export failure.
+- The waiting-for-owner Lobby shows setup-token guidance only for an edition that declares `manualSetupTokenClaim: true`; automatic owner claims need no token from the visitor.
+- Base's shared and exported dependency graphs carry sharp 0.35.5, undici 7.29.1, source-map-js 1.2.2, patched esbuild edges at 0.28.1 or newer, and Playwright 1.63.0.
+
+### Upgrade notes
+
+- Removal's existing `--yes` confirmation includes permanently deleting objects in buckets rer proves it created. Preserve an export before removing a deployment whose data you need.
+- A seed using manual setup-token owner claims sets `manualSetupTokenClaim: true` in its edition identity. Seeds receive the shared runtime and dependency updates with their next Base refresh; updating the rer package alone does not refresh seed-owned runtime copies or dependency locks.
+
 ## 0.2.8
 
 - `rer deploy --demo` resolves Wrangler through its exported package manifest and gives the Cloudflare Container application a valid explicit name. This fixes deployments refused by package export restrictions or an application name containing consecutive dashes.
