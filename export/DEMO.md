@@ -67,6 +67,18 @@ Add `.rer/demo/` to `.gitignore`. Then run `rer setup` (once), `rer demo`, open
 `RER_OPEN`, and check the bar, the data, and a send the seed makes (it must
 appear under "Blocked sends").
 
+## Space for the demo bar
+
+The bar reserves `--rer-demo-bar-height` on the document root. Existing
+viewport-anchored fixed and sticky top chrome is offset automatically in demo
+mode, including after navigation and viewport resizing; seed shell edits are
+not required. A seed can use `top: var(--rer-demo-bar-height, 0px)` directly,
+or `top: calc(24px + var(--rer-demo-bar-height, 0px))` to keep an existing gap.
+Use `max-height: calc(100dvh - var(--rer-demo-bar-height, 0px))` for full-height
+chrome. These explicit offsets are recognized and never added twice. Nested
+scroll containers keep their own sticky offsets. Without `RER_DEMO` the
+variable and layout adjustment are absent.
+
 ## Hosting the demo
 
 `rer deploy --demo` puts the demo on the web at `demo.<domain>` (the run site's

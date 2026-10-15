@@ -9,6 +9,7 @@
 import { env } from 'cloudflare:workers';
 import { escapeHtml, isLoopbackHost } from '../operator-auth/http.mjs';
 import { allow, sha256 } from '../operator-auth/csp.mjs';
+import { LAYOUT_SCRIPT } from './layout.mjs';
 
 const on = env?.RER_DEMO === '1';
 let database = 'DB';
@@ -169,10 +170,11 @@ async function seedOnce(bindings, seed, owner) {
 // (the root's padding, so a full-height layout still fits). Its detail is a
 // popover in the top layer: it opens over the page without moving it, and the
 // browser closes it on Escape, a second click or a click outside, with no
-// script. Every rule is scoped to the bar and resets what a page might set on
+// script for the popover. The layout script reserves space for fixed chrome.
+// Every bar rule resets what a page might set on
 // its elements, so neither looks different in any seed.
-const STYLE = 'html:has(>body>#rer-demo-bar){box-sizing:border-box;padding-top:34px;scroll-padding-top:34px}#rer-demo-bar,#rer-demo-bar *{all:revert;box-sizing:border-box}#rer-demo-bar{position:fixed;top:0;right:0;left:0;z-index:2147483646;display:block;height:34px;margin:0;padding:0;border-bottom:1px solid #b45309;background:#fef3c7;color:#1c1917;font:13px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left}#rer-demo-bar>button{display:flex;align-items:center;width:100%;height:100%;margin:0;padding:0 12px;border:0;background:none;color:inherit;font:inherit;text-align:left;white-space:nowrap;cursor:pointer}#rer-demo-bar>button:focus-visible{outline:2px solid #1c1917;outline-offset:-4px}#rer-demo-bar .lead{flex:none;font-weight:700}#rer-demo-bar .rest{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:pre;padding-right:14px}#rer-demo-bar .more{flex:none;width:7px;height:7px;margin:-3px 2px 0 auto;border:solid;border-width:0 2px 2px 0;transform:rotate(45deg)}#rer-demo-bar:has(:popover-open) .more{margin-top:3px;transform:rotate(225deg)}#rer-demo-detail{display:none}#rer-demo-bar #rer-demo-detail:popover-open{position:fixed;inset:38px auto auto 8px;display:block;width:min(440px,calc(100vw - 16px));max-height:calc(100vh - 54px);margin:0;padding:12px 14px;overflow:auto;border:1px solid #a8a29e;border-radius:8px;background:#fff;color:#1c1917;box-shadow:0 8px 24px rgba(0,0,0,.18);font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}#rer-demo-detail h2{margin:10px 0 2px;font:inherit;font-weight:700}#rer-demo-detail h2:first-child{margin-top:0}#rer-demo-detail p{margin:0}#rer-demo-detail p+h2{margin-top:10px}#rer-demo-detail p+p{margin-top:4px}#rer-demo-detail ul{margin:0;padding:0 0 0 18px}';
-let styleHash;
+const STYLE = 'html:has(>body>#rer-demo-bar){box-sizing:border-box;--rer-demo-bar-height:34px;padding-top:var(--rer-demo-bar-height);scroll-padding-top:var(--rer-demo-bar-height)}#rer-demo-bar,#rer-demo-bar *{all:revert;box-sizing:border-box}#rer-demo-bar{position:fixed;top:0;right:0;left:0;z-index:2147483646;display:block;height:34px;margin:0;padding:0;border-bottom:1px solid #b45309;background:#fef3c7;color:#1c1917;font:13px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left}#rer-demo-bar>button{display:flex;align-items:center;width:100%;height:100%;margin:0;padding:0 12px;border:0;background:none;color:inherit;font:inherit;text-align:left;white-space:nowrap;cursor:pointer}#rer-demo-bar>button:focus-visible{outline:2px solid #1c1917;outline-offset:-4px}#rer-demo-bar .lead{flex:none;font-weight:700}#rer-demo-bar .rest{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:pre;padding-right:14px}#rer-demo-bar .more{flex:none;width:7px;height:7px;margin:-3px 2px 0 auto;border:solid;border-width:0 2px 2px 0;transform:rotate(45deg)}#rer-demo-bar:has(:popover-open) .more{margin-top:3px;transform:rotate(225deg)}#rer-demo-detail{display:none}#rer-demo-bar #rer-demo-detail:popover-open{position:fixed;inset:38px auto auto 8px;display:block;width:min(440px,calc(100vw - 16px));max-height:calc(100vh - 54px);margin:0;padding:12px 14px;overflow:auto;border:1px solid #a8a29e;border-radius:8px;background:#fff;color:#1c1917;box-shadow:0 8px 24px rgba(0,0,0,.18);font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}#rer-demo-detail h2{margin:10px 0 2px;font:inherit;font-weight:700}#rer-demo-detail h2:first-child{margin-top:0}#rer-demo-detail p{margin:0}#rer-demo-detail p+h2{margin-top:10px}#rer-demo-detail p+p{margin-top:4px}#rer-demo-detail ul{margin:0;padding:0 0 0 18px}';
+let styleHash, scriptHash;
 
 // The end time as the starter wrote it (local ISO with offset): show its HH:MM.
 const ends = value => /^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/.exec(value ?? '')?.[1];
@@ -200,11 +202,21 @@ async function decorate(response) {
   if (!response.headers.get('content-type')?.toLowerCase().startsWith('text/html') || !response.body) return response;
   const headers = new Headers(response.headers);
   const policy = headers.get('content-security-policy');
-  if (policy) headers.set('content-security-policy', allow(policy, 'style-src', styleHash ??= await sha256(STYLE)));
+  if (policy) {
+    let next = allow(policy, 'style-src', styleHash ??= await sha256(STYLE));
+    next = allow(next, 'script-src', scriptHash ??= await sha256(LAYOUT_SCRIPT));
+    // Element directives override their general counterparts when present.
+    if (/(?:^|;)\s*style-src-elem\s/i.test(policy)) next = allow(next, 'style-src-elem', styleHash);
+    if (/(?:^|;)\s*script-src-elem\s/i.test(policy)) next = allow(next, 'script-src-elem', scriptHash);
+    headers.set('content-security-policy', next);
+  }
   headers.delete('content-length');
   const [html, bar] = await Promise.all([response.text(), barHtml()]);
   const open = /<body\b[^>]*>/i.exec(html), at = open ? open.index + open[0].length : 0;
-  return new Response(html.slice(0, at) + bar + html.slice(at), { status: response.status, statusText: response.statusText, headers });
+  const page = html.slice(0, at) + bar + html.slice(at);
+  const end = /<\/body\s*>/i.exec(page)?.index ?? page.length;
+  const script = `<script>${LAYOUT_SCRIPT}</script>`;
+  return new Response(page.slice(0, end) + script + page.slice(end), { status: response.status, statusText: response.statusText, headers });
 }
 
 /**

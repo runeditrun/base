@@ -31,12 +31,22 @@ With `RER_DEMO=1`:
   the page starts below it. Clicking it (or Enter/Space) opens a popover over
   the page, without moving it, listing the captured mail (development outbox
   subject and recipient) and the blocked sends; Escape, a second click or a
-  click outside closes it. No script: its one style is allowed in the page's
-  CSP by hash, and every rule is scoped to `#rer-demo-bar`, resetting what a
-  page sets on its elements.
+  click outside closes it. The root reserves `--rer-demo-bar-height`; a small
+  layout script offsets viewport-anchored fixed/sticky top chrome, including
+  chrome added by client navigation or responsive layouts. A full-height fixed
+  sidebar fits in the remaining viewport. The style and script are allowed by
+  exact CSP hashes. Bar rules reset what a page sets on its elements.
 - Mail stays in the development outbox and AI stays unconfigured: demo settings
   never carry provider keys.
 
 Both tables are created by the guard at runtime, never by a migration, so they
 exist only in a demo's own throwaway database. Adopting it is three changes in a
 seed; see `export/DEMO.md`.
+
+Seed styles can use `top: var(--rer-demo-bar-height, 0px)` (or
+`calc(24px + var(--rer-demo-bar-height, 0px))` for an existing gap) on viewport
+chrome, and `max-height: calc(100dvh - var(--rer-demo-bar-height, 0px))` for a
+full-height rail. The layout script recognizes this and does not add the
+height twice. Elements fixed to a transformed ancestor and sticky elements
+inside their own scroll container keep that container's offsets. Without
+`RER_DEMO` no variable, padding, script or chrome adjustment is added.
