@@ -64,7 +64,7 @@ test('real workerd + D1: GET and every invalid claim have zero durable writes; v
   assert.equal(state.oc_owner_claims[0].completed, 1);
   assert.equal(state.oc_owner_claims[0].operator_id, state.oa_operators[0].id);
   assert.equal(state.oc_owner_claims[0].session_id, state.oa_sessions[0].id);
-  assert.equal(state.oa_limits.length, 2);
+  assert.equal(state.oa_limits.length, 1);
   assert.ok(state.oa_limits.every(row => row.count === 1));
   assert.ok(!JSON.stringify(state).includes(valid));
   await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token: valid } }), 409);
@@ -72,7 +72,7 @@ test('real workerd + D1: GET and every invalid claim have zero durable writes; v
   const fresh = await mint();
   await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token: fresh } }), 409);
 });
-test('parallel claims commit exactly one owner, session, ledger and pair of rate increments', async t => {
+test('parallel claims commit exactly one owner, session, ledger and client rate increment', async t => {
   const app = await runtime(keys.publicKey); t.after(() => app.close());
   const token = await mint();
   const other = await mint();
@@ -83,7 +83,7 @@ test('parallel claims commit exactly one owner, session, ledger and pair of rate
   const state = await app.snapshot();
   for (const table of ['oa_operators', 'oa_sessions', 'oa_bootstrap', 'oc_owner_claims']) assert.equal(state[table].length, 1, table);
   assert.equal(state.oc_owner_claims[0].completed, 1);
-  assert.equal(state.oa_limits.length, 2);
+  assert.equal(state.oa_limits.length, 1);
   assert.ok(state.oa_limits.every(row => row.count === 1));
   assert.deepEqual(state.oa_auth_settings.map(({idp_sign_in,first_setup})=>({idp_sign_in,first_setup})),[{idp_sign_in:0,first_setup:0}]);
 });

@@ -1579,7 +1579,7 @@
     },
     "modules/operator-auth/README.md": {
       "source": "modules/operator-auth/README.md",
-      "sha256": "90ed6b62dd5557e517392ef62837d1059f0c44f701db2bbf205974369c4483e9"
+      "sha256": "b38e3698db2c298361f76a18bbea5b871f093f3b5477fd5216510e820ef526da"
     },
     "modules/operator-auth/accounts/adapter.mjs": {
       "source": "modules/operator-auth/accounts/adapter.mjs",
@@ -1775,7 +1775,7 @@
     },
     "modules/operator-auth/identity/email-link/index.mjs": {
       "source": "modules/operator-auth/identity/email-link/index.mjs",
-      "sha256": "eadf57db13711637de084d763ad4fa2bfcc3c7b5896e33665bb0767112eefb2b"
+      "sha256": "db468e3ab38a8198b19306617974df5f2509a6251e4b578ba0c96646d5e9b6f3"
     },
     "modules/operator-auth/identity/email-link/message.mjs": {
       "source": "modules/operator-auth/identity/email-link/message.mjs",
@@ -1887,7 +1887,7 @@
     },
     "modules/owner-claim/README.md": {
       "source": "modules/owner-claim/README.md",
-      "sha256": "400d900fbe0981f9e6e27ff40b7913ebb140680bd045167cfb9ddb2a45a4c890"
+      "sha256": "ab3ead07f6a21347c4f084c48acbdd5d62ee9abc711982cc09ffb1c53f239459"
     },
     "modules/owner-claim/idp.mjs": {
       "source": "modules/owner-claim/idp.mjs",
@@ -1915,7 +1915,7 @@
     },
     "modules/owner-claim/transaction.mjs": {
       "source": "modules/owner-claim/transaction.mjs",
-      "sha256": "ca36db33042d7778d518b407bd9b403dd4bac82d4b89d81beeb78ed47421cca2"
+      "sha256": "56f9cf605a5a4afae2be22012e84035e661fb38c07612ec7d4f8cdc39526aa54"
     },
     "modules/owner-claim/verify.mjs": {
       "source": "modules/owner-claim/verify.mjs",

@@ -14,10 +14,10 @@ const { build } = require('esbuild');
 const output = await build({ entryPoints: [fileURLToPath(new URL('./worker.mjs', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022' });
 const schemas = await Promise.all(['../../operator-auth/accounts/schema/operator-auth.sql', '../schema/owner-claim.sql'].map(path => readFile(new URL(path, import.meta.url), 'utf8')));
 export const setupToken = 'test-only-hidden-setup-token-32-characters';
-export async function runtime(publicKey, overrides = {}, claimOverrides = {}) {
+export async function runtime(publicKey, overrides = {}, claimOverrides = {}, options = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'owner-claim-'));
   const config = { ...claimConfig(publicKey), ...claimOverrides, authConfig: { origin: 'https://app.test', OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'test-only-session-secret-32-characters', SETUP_TOKEN: setupToken, ...overrides } };
-  const initialize = () => new Miniflare({ ...convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'claim-db' }, bindings: { TEST_CONFIG: JSON.stringify(config) } }), resourcePersistencePath: join(directory, 'state') });
+  const initialize = () => new Miniflare({ ...convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'claim-db' }, bindings: { TEST_CONFIG: JSON.stringify(config), TEST_OPTIONS: JSON.stringify(options) } }), resourcePersistencePath: join(directory, 'state') });
   let mf = initialize();
   try {
     let db = await mf.getD1Database('DB');

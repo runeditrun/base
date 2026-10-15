@@ -47,7 +47,7 @@ for (const ahead of [1, 30, 31]) {
       assert.equal(state.oa_operators.length, 1);
       assert.equal(state.oa_sessions.length, 1);
       assert.equal(state.oa_bootstrap.length, 1);
-      assert.equal(state.oa_limits.length, 2);
+      assert.equal(state.oa_limits.length, 1);
       assert.ok(state.oa_limits.every(row => row.count === 1));
     }
   });
