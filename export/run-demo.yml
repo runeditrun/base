@@ -50,7 +50,21 @@ jobs:
           RER_DEMO_OPERATOR_TOKEN: ${{ secrets.RER_DEMO_OPERATOR_TOKEN }}
       # Deletes only what the demo's deploy recorded; a second run finds nothing and changes nothing.
       - if: inputs.remove
-        run: pnpm exec rer deploy --demo --remove --yes --environment "$DEMO_ENVIRONMENT"
+        run: |
+          log=$(mktemp "$RUNNER_TEMP/run-demo-remove.XXXXXX")
+          trap 'rm -f "$log"' EXIT
+          if pnpm exec rer deploy --demo --remove --yes --environment "$DEMO_ENVIRONMENT" >"$log" 2>&1; then
+            cat "$log"
+          else
+            status=$?
+            cat "$log"
+            if grep -Eq 'malformed-response|provider-http-5[0-9]{2}([^0-9]|$)' "$log"; then
+              echo "Retrying demo removal once after a transient provider failure"
+              pnpm exec rer deploy --demo --remove --yes --environment "$DEMO_ENVIRONMENT"
+            else
+              exit "$status"
+            fi
+          fi
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
