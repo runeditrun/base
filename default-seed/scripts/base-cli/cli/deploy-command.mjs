@@ -4,6 +4,7 @@ import { invalid, refuse, RerError } from './errors.mjs';
 import { ownerDeploy } from './deploy.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
+import { checkHostedSetup, hostedSetupFailure } from './deploy-setup.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { observeOwner } from './deploy-observation.mjs';
 import { committedSource } from './deploy-source.mjs';
@@ -97,6 +98,8 @@ export async function deployCommand(context) {
    const kit = state ? { secret: (extra, values) => command('secret', extra, values), recordClaim: outcome => command('record-owner', ['--outcome', outcome]) } : { token: deployed.setupToken || undefined };
    claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, origin, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, supplied, ...kit, addSecret, beforeClaim: token => link(token, origin), store, signal: context.signal });
    if (!linked) await linkDependencies?.(origin);
+   step = 'verify hosted setup';
+   await checkHostedSetup({ origin, claimed: claimed ?? state?.ownerClaim?.outcome ?? claims.at(-1)?.outcome, signal: context.signal });
    if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${state ? '; the one-time setup token was removed' : ''}. Sign in by email at ${origin}.`);
    const { setupToken: _, ...result } = deployed;
    return { ...result, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
@@ -109,6 +112,8 @@ export async function deployCommand(context) {
   const outcome = error.owner ?? claimed ?? observedClaims.at(-1)?.outcome;
   const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}${recorded ? '; setup token retirement is not confirmed' : ''}.` : 'The custom deploy did not finish; inspect its deployment record before recovery.';
   const redact = value => store.redact?.(redaction.redact(value)) ?? redaction.redact(value);
+  const setup = hostedSetupFailure(error, { origin: deployed?.origin ?? recorded?.origin, again });
+  if (setup) throw commandFailure(redact(setup));
   const readiness = mutationReadinessFailure(error, { again, redact });
   if (readiness) throw commandFailure(readiness);
   const refused = providerRefusal(error);

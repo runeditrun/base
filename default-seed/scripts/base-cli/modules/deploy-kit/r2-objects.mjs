@@ -22,6 +22,9 @@ export async function* r2ObjectPages(api, bucket) {
     const data = await api.envelope(`/r2/buckets/${bucket}/objects?per_page=1000${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
     const rows = data.result, info = data.result_info;
     assert(Array.isArray(rows) && rows.length <= 1000 && rows.every(row => typeof row?.key === 'string' && row.key.length), 'invalid-r2-object-list');
+    // Empty object listings may omit pagination or return null. Only that
+    // shape proves completion without explicit pagination evidence.
+    if (rows.length === 0 && info == null) { yield rows; return; }
     assert(info && typeof info.is_truncated === 'boolean' && (!info.delimited || Array.isArray(info.delimited) && !info.delimited.length), 'provider-incomplete-pagination');
     assert(new Set(rows.map(row => row.key)).size === rows.length, 'invalid-r2-object-list');
     if (info.is_truncated) {

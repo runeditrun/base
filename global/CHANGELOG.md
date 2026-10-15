@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.13
+
+- `rer deploy --remove` accepts empty owned R2 object listings without pagination metadata, fixing the 0.2.9 regression. Populated or malformed listings still require complete pagination proof before deletion.
+- Workerd container images may use `HTMLRewriter`, including hosted demo images. Engines without that API still refuse it.
+- A deploy whose hosted app explicitly reports setup required without a confirmed owner claim exits 1 with the recovery step. The live announcement follows owner handling and the setup check.
+
+### Upgrade notes
+
+- Update the rer package to receive these deploy fixes. An app with an unregistered native owner claim still needs that integration repaired; rer now reports the incomplete deployment and retains its resources for recovery.
+
 ## 0.2.12
 
 - Import-kit resumable field redaction finishes however large one import job is. A step takes as many jobs as fit the request (at most 25); a job that does not fit alone is redacted in pages of its entries, and a step that would not fit writes nothing and is retried smaller, so every committed step stays inside D1's per-request limit and the erasure reaches its final batch. Receipts and match counts are unchanged.

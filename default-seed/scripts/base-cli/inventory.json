@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.12-dev.g7f9103f0",
+  "cliVersion": "0.2.13-dev.gc43a8d3a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "3cec88ae86a42bba68233fb4cea53419598cc9a103fbf7b0b8b291510663c138"
+      "sha256": "657505c350b65743c5fcc8cd7e39b81a642fd7041acc639d3be6b9be40adcfd7"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -421,13 +421,17 @@
       "source": "cli/deploy-readiness.mjs",
       "sha256": "de03d00676776d16a9d6e175f66257e6295b868894027f507c9cf49e0efff15c"
     },
+    "cli/deploy-setup.mjs": {
+      "source": "cli/deploy-setup.mjs",
+      "sha256": "07d1d79bc7664c9f8e12a632340cfe613cb0ad1f726e7bc30bd7c1707c0ed94a"
+    },
     "cli/deploy-source.mjs": {
       "source": "cli/deploy-source.mjs",
       "sha256": "ee3bbaa6411528fe683c32fed1edb7c92176e14d00312794450149b7626ff1c2"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "dfbd314475f5f3d853ee6139391d206b9a6da5ee748292ffbaf24c0ff716e03a"
+      "sha256": "afca113cb9ca21453640fbcc73c6c10bdd5956569486e8d17a4a6387b1670e18"
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
@@ -799,7 +803,7 @@
     },
     "modules/container/boundary.mjs": {
       "source": "modules/container/boundary.mjs",
-      "sha256": "fcef94ab95d9a4a2c7e248f8114dcea7373ef731d469591586d01404064fcb0b"
+      "sha256": "d122039de26c75e8ba808244224ccc1cd4a360e2c057604e39960a3d4118c3e9"
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
@@ -1067,7 +1071,7 @@
     },
     "modules/deploy-kit/r2-objects.mjs": {
       "source": "modules/deploy-kit/r2-objects.mjs",
-      "sha256": "550d047d8978626039e3fb15a454bf6fb4cd5203364ad2c0bfa851625ddec84f"
+      "sha256": "55b2404707eff5d17b3c903d6ab738910465629484ab7ba187931dd3ab349fc8"
     },
     "modules/deploy-kit/receipt.mjs": {
       "source": "modules/deploy-kit/receipt.mjs",
