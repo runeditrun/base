@@ -62,9 +62,11 @@
   "packageManager": "pnpm@10.12.4",
   "pnpm": {
     "overrides": {
-      "@esbuild-kit/core-utils>esbuild": "0.25.12",
+      "@esbuild-kit/core-utils>esbuild": "0.28.1",
+      "drizzle-kit>esbuild": "0.28.1",
       "sharp": "0.35.5",
-      "undici": "7.29.1"
+      "undici": "7.29.1",
+      "source-map-js": "1.2.2"
     },
     "onlyBuiltDependencies": [
       "esbuild",
