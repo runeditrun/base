@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.20-dev.g1bae072a",
+  "cliVersion": "0.2.20-dev.gf32afcc7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1023,7 +1023,7 @@
     },
     "modules/demo/label.mjs": {
       "source": "modules/demo/label.mjs",
-      "sha256": "05c208a184941cf4c8be04502e2918c0ce9372159978022f02fb35c219f74d4f"
+      "sha256": "ace1100f445f615f72c3376f10cd7e3bd178e13acfaad770ed2ee2a9439743f3"
     },
     "modules/demo/responses.mjs": {
       "source": "modules/demo/responses.mjs",
@@ -1727,7 +1727,7 @@
     },
     "modules/operator-auth/README.md": {
       "source": "modules/operator-auth/README.md",
-      "sha256": "999850a2a54147326ab738eac1446dcb8b2321ba0046d767c1536172cefb611e"
+      "sha256": "77c610a04f30dc4c44706367cba0b0b04c6b1962daa30f5d33c06fffa6201cbe"
     },
     "modules/operator-auth/accounts/adapter.mjs": {
       "source": "modules/operator-auth/accounts/adapter.mjs",
@@ -1831,7 +1831,7 @@
     },
     "modules/operator-auth/config.mjs": {
       "source": "modules/operator-auth/config.mjs",
-      "sha256": "2299c5081b0e8731572c34066e4f9421c997f44b8c3ecd85944a54e1e2fda122"
+      "sha256": "5741effe188be9e49a6c4c98ff41d5de05db0f2edad17eb06229d2bfdf44b555"
     },
     "modules/operator-auth/conformance/README.md": {
       "source": "modules/operator-auth/conformance/README.md",
@@ -1847,7 +1847,7 @@
     },
     "modules/operator-auth/conformance/presentation.mjs": {
       "source": "modules/operator-auth/conformance/presentation.mjs",
-      "sha256": "5626e1c96f43c41dfe5ff8d15d0b98e4cd0c1965cb2693968b50ae1295671606"
+      "sha256": "5b6bb34b9b4c3a7791a54dd302248780b2a345183affb57fed6c5d31be49064b"
     },
     "modules/operator-auth/crypto.mjs": {
       "source": "modules/operator-auth/crypto.mjs",
@@ -1927,7 +1927,11 @@
     },
     "modules/operator-auth/identity/email-link/confirmation.mjs": {
       "source": "modules/operator-auth/identity/email-link/confirmation.mjs",
-      "sha256": "b01e1ea198eaada5085c4c60b836dbe458421d10553adf73cc906e54449e5a7f"
+      "sha256": "b6b2006fc646a2fc6fd28a01e8be050269e59c8360b9dd07a695417c5bd75826"
+    },
+    "modules/operator-auth/identity/email-link/expiry.mjs": {
+      "source": "modules/operator-auth/identity/email-link/expiry.mjs",
+      "sha256": "dca4a31a3796a04e4192325f1427f1d5c5d70338e59e78786c0f3d814a25889b"
     },
     "modules/operator-auth/identity/email-link/index.d.mts": {
       "source": "modules/operator-auth/identity/email-link/index.d.mts",
@@ -1935,11 +1939,11 @@
     },
     "modules/operator-auth/identity/email-link/index.mjs": {
       "source": "modules/operator-auth/identity/email-link/index.mjs",
-      "sha256": "4e42a8a3e82b1b251d52c7d39d1f38e1bea68d5578ead4672cea38e9e8e2d1ff"
+      "sha256": "cbe8056ce48dad8a6c0604138595a921a0050fa2d47f4f4310f9d424e2d1ebab"
     },
     "modules/operator-auth/identity/email-link/message.mjs": {
       "source": "modules/operator-auth/identity/email-link/message.mjs",
-      "sha256": "dcbd0eef8f8bac023235162b079945441daab3e0b27541f4738ba15c3ebebbec"
+      "sha256": "d076de1231d45890683595cc2889b32cc1fa15958c1d55a313cbb811821a0f65"
     },
     "modules/operator-auth/identity/index.d.mts": {
       "source": "modules/operator-auth/identity/index.d.mts",
@@ -2003,7 +2007,7 @@
     },
     "modules/operator-auth/index.d.mts": {
       "source": "modules/operator-auth/index.d.mts",
-      "sha256": "d51648eaed1df60a210e96375c28764e48fe5c67c9dcfdb85c09f02ffa120f31"
+      "sha256": "7a01203807464aeb68376cf35c03bc08dabd9f6fa5166b4c176c7dafb1cafb83"
     },
     "modules/operator-auth/index.mjs": {
       "source": "modules/operator-auth/index.mjs",

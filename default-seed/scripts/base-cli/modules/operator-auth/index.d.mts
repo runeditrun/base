@@ -46,6 +46,8 @@ export interface AuthConfig {
   origin: string; OWNER_EMAIL: string; SESSION_SECRET: string; SETUP_TOKEN?: string; MAIL_FROM?: string;
   /** Local HTTP is allowed only for literal localhost, 127.0.0.1 or [::1] with matching Host. */
   local?: boolean; allowList?: string[]; sessionSeconds?: number; linkSeconds?: number;
+  /** Invitation lifetime in seconds, up to seven days (the default); independent of sign-in/step-up links. */
+  invitationSeconds?: number;
   review?: { enabled: boolean; operatorEmail: string }; reviewSeconds?: number;
   limitWindowSeconds?: number; ipLimit?: number; emailLimit?: number;
   /** Issuers the original admitVerifiedIdentity/createIdentityAdmission seams accept. */
