@@ -21,12 +21,12 @@ function show(state,{label,note,live,step,notice}){
 }
 function waiting(){
   const auto=el().auto;
-  show('waiting',{label:'Waiting for the human check…',note:auto?'Starts by itself once the check passes. Usually under 10 seconds.':'Once the check passes, press Start the demo.'});
+  show('waiting',{label:'Waiting for the human check…',note:auto?'Your demo will open automatically when ready.':'Once the check passes, press Start the demo.'});
 }
 function stop(){timers.forEach(clearTimeout);timers=[]}
 async function go(){
   const p=el(),controller=attempt=new AbortController();
-  show('working',{label:'Starting your demo…',note:'Usually under 10 seconds.',live:'Check passed. Starting a private copy, usually under 10 seconds.',step:1,notice:''});
+  show('working',{label:'Starting your demo…',note:'Your demo will open automatically when ready.',live:'Check passed. Starting a private copy.',step:1,notice:''});
   timers.push(setTimeout(()=>p.note.textContent='Taking a little longer than usual. Still starting…',LONG));
   timers.push(setTimeout(()=>show('slow',{label:'Try again',note:'Still starting. It will open by itself if it finishes.',notice:'This is taking longer than it should. Keep waiting, or try again.'}),SLOW));
   try{
@@ -54,7 +54,7 @@ function again(){
 }
 // Turnstile's callbacks; once a start is under way only a new check (Try again) changes the page.
 const checking=()=>['waiting','ready'].includes(el().form.dataset.state);
-window.rerDemoVerified=()=>checking()&&(el().auto?go():show('ready',{label:'Start the demo',note:'Check passed. Starting takes under 10 seconds.',live:'Check passed. Press Start the demo.'}));
+window.rerDemoVerified=()=>checking()&&(el().auto?go():show('ready',{label:'Start the demo',note:'Check passed. Press Start the demo.',live:'Check passed. Press Start the demo.'}));
 window.rerDemoInteractive=()=>checking()&&show('waiting',{label:'Waiting for the human check…',note:'Tick the box above to show you are human.',live:'Tick the box above to show you are human.'});
 window.rerDemoChecking=()=>checking()&&waiting();
 window.rerDemoExpired=()=>checking()&&waiting();
