@@ -380,7 +380,7 @@ test('fresh deploy propagation reaches the owner once through object and observe
   const sourceFailure = kind === 'custom-source-version', statePath = join(root, '.rer/deploy/production.json');
   // Recovery uses the same caller-supplied token that this hook uploaded.
   if (sourceFailure) process.env.SETUP_TOKEN = 'test-only-recovery-token';
-  let failReadback = sourceFailure, sourceReadback = false, sourceRequests = 0, sourceState, sourceWrites, sourceWindow;
+  let failReadback = sourceFailure, sourceReadback = false, sourceRequests = 0, sourceState, sourceWrites;
   const clock = performance.now.bind(performance);
   t.mock.method(performance, 'now', () => clock() + elapsed);
   const hook = ['function', 'unproven-function'].includes(kind) ? async context => {
@@ -400,7 +400,6 @@ test('fresh deploy propagation reaches the owner once through object and observe
     if (failReadback) {
      sourceState = await readFile(statePath); sourceWrites = provider.state.writes.length;
      sourceReadback = true;
-     sourceWindow = deployed.propagation.window;
     }
     return {origin:deployed.origin,deployed:true};
    }}}) : ownerDeploy('deploy.json', { ...lifecycle, hooks: { owner: hook } })({ root, options: {}, store: store(), setupManifest: manifest });
@@ -415,7 +414,7 @@ test('fresh deploy propagation reaches the owner once through object and observe
     sourceRequests++;
     if (kind === 'custom-source-version') {
      const body = await (await inner(input, init)).json();
-     body.deployment.versionId = 'previous-version-of-the-same-commit'; elapsed += sourceWindow.remaining();
+     body.deployment.versionId = 'previous-version-of-the-same-commit'; elapsed += 120000;
      return Response.json(body);
     }
    }
