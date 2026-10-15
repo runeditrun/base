@@ -424,6 +424,70 @@ test('real D1: a cancelled invitee sharing an active invitee\'s imported source 
   assert.ok(!(await census()).includes(cancelled));
 });
 
+test('real D1: shared-source reimport keeps the active claim owner through invitee erasure and resumed undo', async t => {
+  const r = await runtime(t), cancelled = 'cancelled-invitee@example.test', cancelledName = 'Cancelled Carl', active = 'active-invitee@example.test';
+  await r.db().batch([
+    'CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT,email TEXT,details TEXT,created_at TEXT,import_revision TEXT)',
+    'CREATE TABLE privacy_epoch(epoch INTEGER)', 'INSERT INTO privacy_epoch VALUES(0)',
+  ].map(sql => r.db().prepare(sql)));
+  const context = () => ({ ...r.context(), destination: 'people', namespace: 'people', storage: { database: r.db(), targets: personTargets } });
+  const census = async () => {
+    const { results } = await r.db().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%'").all<{ name: string }>();
+    return canonicalJson(await Promise.all(results.map(async ({ name }) => (await r.db().prepare(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all()).results)));
+  };
+  const assertErased = async () => {
+    const contents = await census();
+    assert.ok(!contents.includes(cancelled) && !contents.includes(cancelledName), 'every table remains free of the cancelled invitee name and email');
+  };
+  const invitees = [{ name: 'Active Ann', email: active, status: 'active' }, { name: cancelledName, email: cancelled, status: 'cancelled' }];
+  const bundle = peopleSource([
+    { ref: 'booking-1', name: 'Active Ann', email: active, details: { invitees } },
+    { ref: 'booking-2', name: 'Other booking', email: 'other@example.test', details: {} },
+  ]);
+  const imports = [];
+  for (const edition of ['first mapping', 'second mapping']) {
+    const plan = await planD1Import(bundle, { version: 'v1', map: record => ({ effects: [{ targetKind: 'person', targetId: record.sourceId, value: { ...record.payload as any, details: { ...(record.payload as any).details, edition } } }] }) }, context());
+    const job = await createD1ImportJob(plan, { ...context(), operationKey: edition, reviewedFingerprint: plan.fingerprint });
+    imports.push({ job, plan, edition });
+  }
+  // Queue both reviewed plans before applying either. Apply/undo the first job
+  // in custody scan order, then import the other: UUID randomness cannot choose
+  // whether the old identity-only update overwrites the active owner's hashes.
+  imports.sort((a, b) => a.job.id < b.job.id ? -1 : 1);
+  const [earlier, current] = imports;
+  assert.equal(earlier.plan.entries[0].identity, current.plan.entries[0].identity, 'both imports use the same source identity');
+  assert.notEqual(canonicalJson(earlier.plan.entries[0].effects), canonicalJson(current.plan.entries[0].effects), 'each job keeps its own mapped effects');
+  assert.equal((await resumeD1Import(earlier.job.id, context())).state, 'completed');
+  assert.equal((await undoD1Import(earlier.job.id, context())).state, 'undone');
+  assert.equal((await resumeD1Import(current.job.id, context())).state, 'completed');
+  assert.equal((await r.db().prepare('SELECT job_id FROM ik_sources WHERE identity=?').bind(current.plan.entries[0].identity).first())!.job_id, current.job.id);
+  assert.ok((await census()).includes(cancelled));
+  const fields = [{ path: ['details', 'invitees', '*', 'email'], value: cancelled }, { path: ['details', 'invitees', '*', 'name'], value: cancelledName }];
+  const entry = await retireD1ImportCustody({ values: [cancelled], related: { fields } }, [], context(), [{ sql: 'UPDATE privacy_epoch SET epoch=epoch+1' }]);
+  assert.equal(entry.phase, 'complete');
+  assert.deepEqual(entry.retiredJobs, [], 'both jobs retain their shared-source custody');
+  assert.equal((await r.db().prepare('SELECT epoch FROM privacy_epoch').first())!.epoch, 1);
+  await assertErased();
+  const kept = [{ name: 'Active Ann', email: active, status: 'active' }, { status: 'cancelled' }];
+  assert.deepEqual((await personTargets.read(r.db(), 'people', 'person', 'booking-1'))!.value, { name: 'Active Ann', email: active, details: { invitees: kept, edition: current.edition } });
+  for (const { job } of imports) for (const original of await readD1ImportOriginals(job.id, context())) {
+    if (original.original.status === 'retained') {
+      const decoded = Buffer.from(original.original.base64, 'base64').toString();
+      assert.ok(!decoded.includes(cancelled) && !decoded.includes(cancelledName), 'decoded retained originals are also clear');
+    }
+  }
+  t.diagnostic('erasure complete; peer data and all-table/original privacy checks passed; reopening before active peer undo');
+  await r.reopen();
+  assert.equal((await undoD1Import(current.job.id, { ...context(), maxBatches: 1 })).state, 'undoing', 'the active peer starts a bounded undo after erasure');
+  await r.reopen();
+  assert.equal((await resumeD1Import(current.job.id, context())).state, 'undone', 'cold resume finishes the active peer undo');
+  assert.equal(await personTargets.read(r.db(), 'people', 'person', 'booking-1'), undefined);
+  assert.equal(await personTargets.read(r.db(), 'people', 'person', 'booking-2'), undefined);
+  await assertErased();
+  assert.equal((await undoD1Import(current.job.id, context())).state, 'undone', 'repeated undo is safe');
+  await assertErased();
+});
+
 test('real D1: a resumable redaction whose one import job is more than a request finishes in metered steps, each inside the request limit, and the job still undoes', { timeout: 10 * 60_000 }, async t => {
   const r = await runtime(t), actor = 'U-ERASE-ONE-LARGE-JOB', people = 1100;
   await r.db().batch(['CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT,email TEXT,details TEXT,created_at TEXT,import_revision TEXT)', 'CREATE TABLE privacy_epoch(epoch INTEGER)', 'INSERT INTO privacy_epoch VALUES(0)'].map(sql => r.db().prepare(sql)));
