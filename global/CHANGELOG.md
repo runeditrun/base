@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.15
+
+- Demo pages show a slim strip pinned to the top, collapsed by default. Captured mail and blocked-send details open in a popover without moving the page.
+- Hosted demo starts show the human-check wait, a working indicator and progress steps. Failed or slow starts explain what happened and offer a new check with Try again; status updates use live regions.
+
+### Upgrade notes
+
+- Update the exact rer package pin and redeploy hosted demos to receive the start-page changes. Refresh the demo runtime in an existing seed when that seed vendors it.
+
 ## 0.2.14
 
 - Workerd container and hosted demo builds admit native `cloudflare:workers` imports, Durable Object definitions, `WebSocketPair`, `crypto.subtle.timingSafeEqual` and `ctx.passThroughOnException`. Node-engine restrictions are unchanged.
