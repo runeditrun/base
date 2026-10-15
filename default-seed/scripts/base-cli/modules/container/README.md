@@ -12,10 +12,36 @@ at the intended memory limit. A retained-public-snapshot cache contract is
 selected through `cacheContract` when the seed implements that contract. This
 is not a general Durable Object adapter. A seed requiring KV or other
 Cloudflare-only APIs cannot use Node.
-The import boundary rejects those APIs and new Cloudflare imports outside the
+For Node, the import boundary rejects those APIs and new Cloudflare imports outside the
 platform binding/cache boundary. The one other file it admits is an exported
 seed's demo guard, `src/modules/demo/index.mjs`, and there only
 `import { env } from 'cloudflare:workers'` (it reads `RER_DEMO`).
+
+The workerd engine admits exact `cloudflare:workers` static imports, literal
+dynamic imports and re-exports, plus `HTMLRewriter`, `WebSocketPair`,
+`crypto.subtle.timingSafeEqual` and `ctx.passThroughOnException`. Other
+`cloudflare:` modules (including sockets), `require()` or arbitrary calls with
+Cloudflare module strings, `email()`, `caches.default` and `request.cf` remain
+outside the container boundary.
+Other Cloudflare modules have no admitted host adapters; raw sockets would also
+bypass the host's routed fetch egress. Native `email()` has no configured host
+delivery, `caches.default` has no declared container cache contract, and the host
+disables request CF metadata (`cf: false`). The module import rule admits native
+ES module loading, not arbitrary calls carrying module strings. Admitting
+`WebSocketPair` does not add HTTP upgrade transport or qualify a complete live
+WebSocket flow through the container host.
+
+The workerd source boundary permits Durable Object definitions, including export
+aliases and indirect inheritance. Unbound definitions create no namespace. The
+seed's Vite build selects and renders its configuration; before packaging, the
+container builder checks each namespace in the emitted
+`dist/server/wrangler.json`. It rejects `script_name` and `environment`, because
+the host binds only local namespaces, and requires each configured class name in
+the bundler's exports for the emitted Worker entry. This validates the binding
+contract without inferring source class names. Workerd readiness alone does not
+reject a missing class export; actual class behavior still needs runtime
+qualification. Node's binding, retained-cache and demo-guard exceptions are
+unchanged.
 
 The entrypoint holds a Linux kernel `flock` for the lifetime of the host. Each
 installation has one local data volume and one writer. The lock inode retains

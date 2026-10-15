@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.13-dev.gc43a8d3a",
+  "cliVersion": "0.2.14-dev.g91de0994",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -763,7 +763,7 @@
     },
     "modules/container/README.md": {
       "source": "modules/container/README.md",
-      "sha256": "31b586bcf7fbc5e893957e405234a7b51849fea6f786f61fe70a20e21a11e5d8"
+      "sha256": "b2f4a388ca36cf696b3e29f6be7b6a5e6eb1d22a632c0f819b40645563b03cb8"
     },
     "modules/container/adapters/d1.mjs": {
       "source": "modules/container/adapters/d1.mjs",
@@ -803,15 +803,19 @@
     },
     "modules/container/boundary.mjs": {
       "source": "modules/container/boundary.mjs",
-      "sha256": "d122039de26c75e8ba808244224ccc1cd4a360e2c057604e39960a3d4118c3e9"
+      "sha256": "14c1570e9906dc648cb5951a3bcf8e49f8e334411f9d8325983daf94a813af33"
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "51952aaac5c734fd96778391597568bfe82f2efb664ef3a72b72f6cc52c64f2f"
+      "sha256": "a7085139be98e477f4ffb6559cf0f5480ad8e4a5fcc1111f81cbb697dade65bc"
     },
     "modules/container/deploy-input.mjs": {
       "source": "modules/container/deploy-input.mjs",
       "sha256": "4cdc729c12be4ede7181ec445af9caa4541313268af7f166df13aa6cf66f864c"
+    },
+    "modules/container/durable-objects.mjs": {
+      "source": "modules/container/durable-objects.mjs",
+      "sha256": "076cc50a81ab990fed59491395ccafddfa1c9c0c41995cddba9aec9c22195e2e"
     },
     "modules/container/entrypoint.sh": {
       "source": "modules/container/entrypoint.sh",

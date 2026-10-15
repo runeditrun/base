@@ -1,11 +1,12 @@
-import { readFile, writeFile, readdir, cp, mkdir, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { readFile, writeFile, readdir, realpath, cp, mkdir, rm } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { parseJsonc } from '../../cli/jsonc.mjs';
 import { portabilityPlan } from './portability-schema.mjs';
 import { checkBoundary } from './boundary.mjs';
+import { localDurableObjects } from './durable-objects.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 const hash = source => createHash('sha256').update(source).digest('hex');
 export async function buildContainer(root, options={}) {
@@ -21,6 +22,13 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  const vite = await import(pathToFileURL(require.resolve('vite'))), loaded = await vite.loadConfigFromFile({ command:'build',mode:'production' },undefined,root);
  if (!loaded) throw new Error('Vite configuration missing');
  const config = loaded.config;
+ const outputExports = new Map();
+ if (engine === 'workerd') config.plugins = [...(config.plugins ?? []), {
+  name:'rer-container-exports',
+  async writeBundle(output,bundle) {
+   for (const chunk of Object.values(bundle)) if (chunk.type === 'chunk' && chunk.isEntry) outputExports.set(await realpath(resolve(root,output.dir ?? dirname(output.file),chunk.fileName)),new Set(chunk.exports));
+  },
+ }];
  if (engine === 'node') {
   const plugins = (await Promise.all(config.plugins.flat(Infinity))).filter(plugin => plugin && !plugin.name.startsWith('vite-plugin-cloudflare') && plugin.name !== 'tanstack-start-core:post-build');
   const bindingShim = resolve(import.meta.dirname,'bindings.mjs');
@@ -34,7 +42,10 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  // Apply the same local-only bundle guard before packaging any container image.
  await (await import('../../cli/dev-identity.mjs')).refuseDevLayerOutput(root);
  let workerConfig;
- if (engine === 'workerd') workerConfig = JSON.parse(await readFile(join(root,'dist/server/wrangler.json'),'utf8'));
+ if (engine === 'workerd') {
+  workerConfig = JSON.parse(await readFile(join(root,'dist/server/wrangler.json'),'utf8'));
+  localDurableObjects(workerConfig,outputExports.get(await realpath(resolve(root,'dist/server',workerConfig.main))));
+ }
  else workerConfig = parseJsonc(await readFile(join(root,'wrangler.jsonc'),'utf8'));
  const { unstable_splitSqlQuery:split } = require('wrangler');
  const migrations = {}, rewrites = await readMigrationRewrites(root);
