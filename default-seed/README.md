@@ -168,6 +168,13 @@ invalidate existing sessions and links; reactivation does not resurrect them.
 `/auth/signout` revokes the current session. Public errors contain fixed codes
 and no credentials.
 
+If mail is not working yet on a hosted install, or `OWNER_EMAIL` was mistyped,
+run `rer signin --environment NAME` from the checkout that deployed it, with the
+same Cloudflare credentials. It prints a one-time owner sign-in link that works
+once, only for the owner, and expires within 15 minutes. Its use is recorded in
+the owner's audit log. Signed in that way, correct the address under "Your
+sign-in email" in Operator access.
+
 Optional `AUTH_ALLOW_LIST` is a comma-separated additional email restriction,
 including the owner when enabled. `AUTH_IP_LIMIT` and `AUTH_EMAIL_LIMIT`
 override the shared durable fixed-window defaults (30/IP and 5/email per
