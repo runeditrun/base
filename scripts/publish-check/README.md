@@ -63,8 +63,11 @@ public report. Authoring's integrity checks remain unchanged.
 against every declared file's bytes and regular-file mode in the same scanned
 tree. Historical matches use only that commit's blobs; present files cannot
 rescue a historical mismatch. Working-tree preimages reject linked paths.
-Only the exact native match at a proved inventory field is classified. There
-is no filename, hash-value or comma-delimited credential exemption.
+Copy records use the same proof at custom JSON paths.
+The captured secret must occur unambiguously inside the exact proved JSON value;
+a native fragment ending partway through a digest qualifies too. The same value
+in another field remains a finding. There is no filename, hash-value or
+comma-delimited credential exemption.
 
 `checksum_maps.py` classifies a file-name to digest map (`'0005_operator_auth.sql':
 '<sha256>'`, in JSON, JavaScript, YAML or similar) in any file outside the

@@ -1,0 +1,31 @@
+{
+  "push": [
+    {
+      "name": "source",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "pnpm run check --profile first-party"
+      ]
+    },
+    {
+      "name": "typecheck",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "pnpm run typecheck",
+        "pnpm run test:typecheck"
+      ]
+    },
+    {
+      "name": "runtime",
+      "browser": true,
+      "hosted": true,
+      "commands": [
+        "pnpm run build",
+        "pnpm run test:runtime"
+      ]
+    }
+  ],
+  "nightly": []
+}
