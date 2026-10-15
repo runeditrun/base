@@ -90,7 +90,11 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
    assert.ok(!override.settingNames.includes('AUTH_ORIGIN') && !override.settingNames.includes('OWNER_EMAIL'), 'no default aliases introduced');
   }
   const diagnostic = run(['doctor']);
-  assert.equal(diagnostic.status, 0);
+  // These settings-only fixtures have no Playwright dependency. Their private
+  // settings are valid, while the browser prerequisite is now diagnosed too.
+  assert.equal(diagnostic.status, 3);
+  assert.equal(diagnostic.event.diagnostics.browser.ok, false);
+  assert.equal(diagnostic.event.diagnostics.browser.fix, 'rer install');
   assert.deepEqual(diagnostic.event.diagnostics.missingInputs, []);
   assert.equal(await readFile(path, 'utf8'), bytes, 'all valid flows preserve private bytes');
   await writeFile(path, encode({ SESSION_SECRET: settings.SESSION_SECRET }), { mode: 0o600 });

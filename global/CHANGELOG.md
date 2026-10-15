@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The shell installer acquires checksum-verified Node 22 in rer's private prefix when needed, leaving system tools alone. The launcher keeps using it without Node on PATH. `rer install` and `rer verify` acquire the checkout's Playwright Chromium and headless shell; `rer doctor` reports missing browser files with `rer install` as the fix, including through the global command for older checkout pins.
 - Concurrent checkout launches validate server registry state under its transaction lock, avoiding a false foreign-file refusal during atomic updates.
 - A checkout behind the front door serves its run-site preview above the app's assigned port instead of trying privileged ports.
 - Hosted demo image builds use the adapter's declared deploy file, including names other than `deploy.json`.

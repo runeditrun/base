@@ -1,24 +1,18 @@
 // Chromium from the seed's own Playwright, the two ways of serving pages to it
 // (the production build as rer deploy hosts it, or a running origin), and one
 // load: scripts held until the probe releases them, every external request aborted.
-import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { checkoutPlaywright, browserRepair } from '../browser-runtime.mjs';
 import { RerError } from '../errors.mjs';
 import { serveHosted } from '../hosted-output.mjs';
 import { probe } from './probe.mjs';
 import { cloudflareRewrite } from './cases.mjs';
 
-const INSTALL = 'pnpm exec playwright install chromium';
-
 export async function launchChromium(root) {
- const require = createRequire(join(root, 'package.json'));
- let playwright, name;
- for (const candidate of ['playwright-core', '@playwright/test', 'playwright']) { try { playwright = require(candidate); name = candidate; break; } catch {} }
- if (!playwright?.chromium) throw new RerError('hydration_browser_missing', `The hydration check runs Chromium through the seed's own Playwright, and none of playwright-core, @playwright/test or playwright resolves from ${join(root, 'package.json')}. Add @playwright/test to devDependencies, install, then run ${INSTALL}.`, 1);
+ const { playwright, name } = checkoutPlaywright(root);
  // Pages fulfilled by the check would otherwise count as public, and Chromium would
  // refuse a dev server's loopback HMR socket from them.
  try { return await playwright.chromium.launch({ args: ['--disable-features=LocalNetworkAccessChecks'] }); }
- catch (error) { throw new RerError('hydration_browser_missing', `The hydration check could not start Chromium from the seed's ${name}: ${String(error.message).split('\n').find(line => line.trim()) ?? error}. Install the browser it pins with ${INSTALL}.`, 1); }
+ catch (error) { throw new RerError('hydration_browser_missing', `The hydration check could not start Chromium from the seed's ${name}: ${String(error.message).split('\n').find(line => line.trim()) ?? error}. Install the browser it pins with ${browserRepair}.`, 1); }
 }
 
 const strip = new Set(['content-encoding', 'content-length', 'transfer-encoding', 'connection']);

@@ -1,3 +1,4 @@
+import { browserDoctor } from './browser-runtime.mjs';
 import { dependencyDoctor } from './dependency-doctor.mjs';
 import { inventory } from './export.mjs';
 import { lstat, readFile } from 'node:fs/promises';
@@ -185,12 +186,13 @@ export async function doctor(project, store, signal) {
    if (directory) { usePnpm(directory); try { pnpm = await probePnpm(project.root, store, signal); pnpmIssues.length = 0; } catch (error) { if (signal?.aborted) throw error; pnpmIssues.push(store.redact(error.message)); } }
   }
  }
+ const browser = project.profile === 'first-party' ? await browserDoctor(project.root) : undefined;
  const aiIssues = await localAiDiagnostics(project,process.env);
  const dependencies=project.profile==='first-party'?await dependencyDoctor(project.root):[];
  const expectedNode = await projectNodePin(project.root);
  const inputs = project.profile === 'first-party' ? requiredLocalSettings(project, values) : [];
  const warnings = project.profile === 'first-party' ? await cacheWarnings(project.root) : [];
- return { dependencies, warnings, operations: diagnostic, ok: !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
+ return { dependencies, warnings, browser, operations: diagnostic, ok: browser?.ok !== false && !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
   node: { actual: process.versions.node, expected: expectedNode },
   pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,
   ai: { issues: aiIssues },
