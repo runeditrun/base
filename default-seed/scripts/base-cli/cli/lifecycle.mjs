@@ -48,11 +48,11 @@ async function runLifecycle(project, options, out, deployRedaction) {
    if (!project.adapter?.run) throw refuse('The first-party command adapter is unavailable. Restore the shared lifecycle adapter.');
    if (options.forwarded.length) throw refuse('First-party commands do not accept arbitrary forwarded arguments. Run rer VERB --help.');
    await stateSafety(project);
-   if(options.verb==='setup')await refuseLegacyProcess(project);
+   if(options.verb==='setup')await refuseLegacyProcess(project,{verb:options.verb});
    if (options.verb === 'setup') {
     selected = await selectedOrigin(project, options, { setup: options.verb === 'setup' });
     if (options.verb === 'setup') {input = await setupInput(project, options, selected.vars, signal, { origin: selected.url });await dependencyInputs({project,input,origin:selected.url});}
-    if (!selected.door) await availablePort(selected.host, selected.port, { root: project.root, saved: !selected.explicitPort && selected.savedOrigin !== undefined });
+    if (!selected.door) await availablePort(selected.host, selected.port, { root: project.root, saved: !selected.explicitPort && selected.savedOrigin !== undefined, verb:options.verb });
     if (options.verb === 'setup') announcePort(out, options, selected);
    }
    const { localOperation } = await shared('local/operation.mjs');

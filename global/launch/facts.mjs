@@ -1,10 +1,10 @@
 // What a launch needs to know about a checkout before it changes anything.
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { listeningPorts } from '../../onboarding/process-diagnostics.mjs';
+import { inspectionContext } from '../../onboarding/process-diagnostics.mjs';
+import { probePort } from '../../onboarding/port-probe.mjs';
 import { LaunchFailure } from './failure.mjs';
 
 const run = promisify(execFile);
@@ -64,16 +64,9 @@ export async function setupNeeded(root, described, last) {
  return await finishedSince(root, described, last.at) ? undefined : 'resume';
 }
 
-async function bindable(host, port) {
- const socket = createServer();
- try { await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen({ port, host, exclusive: true }, resolve); }); return true; }
- catch (error) { return host === '::1' && ['EADDRNOTAVAIL', 'EAFNOSUPPORT'].includes(error.code); }
- finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
-}
-
-// Whether something now listens on a port or keeps it from binding.
+// Only a positive listener observation justifies saying another process took it.
 export async function portTaken(port) {
- return (await listeningPorts()).has(port) || !await bindable('127.0.0.1', port) || !await bindable('::1', port);
+ return Boolean((await probePort('127.0.0.1', port, { hosts: ['127.0.0.1', '::1'], anyAddress: true })).listener);
 }
 
 // The first port from 8787 (RER_DEV_PORT_FROM moves the start) that is not
@@ -84,10 +77,14 @@ export async function portTaken(port) {
 export async function freePort(ports, claim, env = process.env) {
  const from = Number(env.RER_DEV_PORT_FROM ?? 8787);
  if (!Number.isInteger(from) || from < 1 || from > 65535) throw new LaunchFailure(2, 'RER_DEV_PORT_FROM must be a port number.');
- const held = new Set(ports.filter(Boolean)), busy = await listeningPorts();
+ const held = new Set(ports.filter(Boolean)), context = inspectionContext();
  for (let port = from; port <= 65535; port++) {
-  if (held.has(port) || busy.has(port)) continue;
-  if (!await bindable('127.0.0.1', port) || !await bindable('::1', port)) continue;
+  if (held.has(port)) continue;
+  const result = await probePort('127.0.0.1', port, { context, hosts: ['127.0.0.1', '::1'], anyAddress: true });
+  if (!result.available) {
+   if (performance.now() >= context.deadline) throw new LaunchFailure(4, `Could not find a free port from ${from} in time (system busy). Run rer dev again or pass rer dev --port PORT with a free port.`);
+   continue;
+  }
   const claimed = await claim(port);
   if (claimed) return { port, ...claimed };
  }
