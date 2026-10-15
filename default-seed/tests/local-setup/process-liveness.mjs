@@ -37,5 +37,6 @@ export function isProcessRunning(pid) {
     if (!exists(pid)) return false
     throw error
   }
-  return state !== 'Z'
+  // Linux may expose EXIT_DEAD as X while the reaper releases a zombie.
+  return state !== 'Z' && state !== 'X'
 }
