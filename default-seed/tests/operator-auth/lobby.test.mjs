@@ -27,7 +27,7 @@ test('the installed Lobby offers sign-in as soon as the owner is claimed, before
     assert.equal(after.headers.get('cache-control'), 'no-store')
     const claimed = await after.text()
     assert.match(claimed, /data-state="claimed"/)
-    assert.match(claimed, /class="btn" href="\/signin"/)
+    assert.match(claimed, /class="btn" href="\/signin\?login_hint=owner%40example\.test"/, 'a local Lobby hands the sole owner to the sign-in form')
     assert.doesNotMatch(claimed, /href="\/setup"/)
     assert.ok(!claimed.includes(owner) && !claimed.includes(setupToken))
     assert.deepEqual(await (await runtime.call('/setup/state')).json(), { state: 'claimed' })
@@ -35,5 +35,17 @@ test('the installed Lobby offers sign-in as soon as the owner is claimed, before
     const head = await runtime.call('/', { method: 'HEAD' })
     assert.equal(head.status, 200)
     assert.equal(await head.text(), '')
+  } finally { await runtime.close() }
+})
+
+test('the Lobby Sign in link opens the sign-in form with the claimed owner already typed', async () => {
+  const runtime = await emittedRuntime()
+  try {
+    await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Morgan' } })
+    const href = (await (await runtime.call('/')).text()).match(/class="btn" href="([^"]+)"/)[1]
+    const signin = await runtime.call(href)
+    assert.equal(signin.status, 200)
+    assert.match(await signin.text(), /<input id="signin-email"[^>]* value="owner@example\.test"/)
+    assert.equal(runtime.mails.length, 0, 'opening the form sends nothing')
   } finally { await runtime.close() }
 })
