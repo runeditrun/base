@@ -65,7 +65,7 @@ jobs:
           path: |
             ~/.local/share/pnpm/store
             ~/.cache/ms-playwright
-          key: seed-ubuntu24-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          key: seed-ubuntu24-${{ runner.arch }}-browser-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Install Chromium and system libraries
