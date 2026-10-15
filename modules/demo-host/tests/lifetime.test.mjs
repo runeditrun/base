@@ -11,13 +11,14 @@ test('closed-page demos survive object restarts for the full idle window and enf
     const namespace = await mf.getDurableObjectNamespace('DEMO');
     const advance = async (response, minutes, options) => {
       const stub = namespace.get(namespace.idFromString(id(response)));
-      try { await stub.advance(minutes * 60_000, options); }
-      catch (error) {
-        if (!options?.restart) throw error;
-        // Miniflare's RPC bridge can lose its Promise tag when ctx.abort()
-        // discards the instance before returning the intentional restart error.
-        assert.match(String(error), /test object restart|typeHeader === "Promise"/);
-      }
+      if (options?.restart) {
+        const previous = await stub.incarnation();
+        // Aborting the instance also aborts this RPC. Its transport error
+        // varies across Node versions; prove reconstruction independently.
+        await assert.rejects(stub.advance(minutes * 60_000, options));
+        const recovered = namespace.get(namespace.idFromString(id(response)));
+        assert.notEqual(await recovered.incarnation(), previous);
+      } else await stub.advance(minutes * 60_000, options);
     };
     const visit = response => fetch('/app', { headers: { cookie: cookieHeader(response) } });
     // No page, request, or polling occurs in these virtual fourteen-minute gaps.

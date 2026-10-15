@@ -5,6 +5,8 @@ import { DemoContainer as Deployed } from '../container.mjs';
 import { platform } from './platform.mjs';
 
 export class DemoContainer extends Deployed {
+  instance = crypto.randomUUID();
+  incarnation() { return this.instance; }
   cleanupRetry = Number(this.env.TEST_CLEANUP_MS ?? this.cleanupRetry);
   startTimeout = Number(this.env.TEST_START_MS ?? this.startTimeout);
   probeTimeout = Number(this.env.TEST_PROBE_MS ?? this.probeTimeout);
