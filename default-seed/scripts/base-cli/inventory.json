@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.19-dev.ge2b056ef",
+  "cliVersion": "0.2.19-dev.ge2769b23",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -371,7 +371,7 @@
     },
     "cli/demo.mjs": {
       "source": "cli/demo.mjs",
-      "sha256": "b9d652ab69ffac46f37020c95796cd01b0c1a112cbe6b2bbb452514507b346a4"
+      "sha256": "5add17d98e72dc6ea54b81938c36ff0988084f159c38ef52787c251b95f36ef2"
     },
     "cli/dependencies.mjs": {
       "source": "cli/dependencies.mjs",
@@ -499,7 +499,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "a17ea5a362f24de0115911f46184e952fb09ac3f8c49e29813244015f6d30aca"
+      "sha256": "62a8cd968f7148b0152245e2e081295ac66ca9be15ac84133d7d7492f03a8c40"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -519,7 +519,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "affc50fabac3d0fb5b1e59576077f499bc32d10b34172a8f29bf506e42660e1e"
+      "sha256": "26e9c035d3befb56a456f7568e4d28546cb849409d09faf76072a03156e39aea"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
