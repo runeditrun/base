@@ -51,8 +51,7 @@ export function OperatorAccess() {
     catch (error) {
       if ((error as Error).message !== 'step_up_required') { setMessage((error as Error).message); return }
       try {
-        const sent = await request('step-up', { action: 'email:change', returnTo: '/app' }) as { captured?: string }
-        if (sent.captured) { window.location.href = sent.captured; return }
+        await request('step-up', { action: 'email:change', returnTo: '/app' })
         setMessage('To confirm it is you, open the link just sent to your current email, then save again.')
       }
       catch (inner) { setMessage((inner as Error).message) }
