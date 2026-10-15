@@ -631,7 +631,7 @@
     },
     "cli/setup-input.mjs": {
       "source": "cli/setup-input.mjs",
-      "sha256": "f4f6e4024d47706a6008acd31eb7717ed3ebd2eadabe5950af35095a57f9c11c"
+      "sha256": "dade17493e772d9eba9e12fa84d1032193b54c2b4ca64abeacbf25d80df968dc"
     },
     "cli/shared.mjs": {
       "source": "cli/shared.mjs",
@@ -2379,7 +2379,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "486d4160151a38d69407a35e8aeec0819a228f1ce86e886817dc4cd1ab72d5d8"
+      "sha256": "9178d442d3222fb8537db297eb42cdca0a8ec3bde594dfdeda68d88b0fdfd7e2"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",

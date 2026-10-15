@@ -47,6 +47,9 @@ export async function setupInput(project, options, vars, signal, { origin } = {}
  const savedEmail = vars[names.email];
  if (!answers[names.email] && savedEmail) answers[names.email] = savedEmail;
  if (hasOwnerName) answers[names.name] ??= seed.model.fields[names.name].default ?? 'Owner';
+ // Saved secrets satisfy readiness and must also reach the seed's owner hook
+ // when setup resumes. Keep them in private input, never the saved safe answers.
+ for(const field of seed.manifest.fields)if(field.kind==='secret'&&!answers[field.name]&&typeof vars[field.name]==='string')answers[field.name]=vars[field.name];
  if(process.env[localDefaultsVariable]==='1')applyLocalDefaults(seed,answers,vars,origin);
  const entered=seed.manifest.fields.filter(field=>field.kind==='secret'&&field.input==='entered');
  for(const field of entered)if(!answers[field.name]&&!vars[field.name]&&process.env[field.name])answers[field.name]=process.env[field.name];
