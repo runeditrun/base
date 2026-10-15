@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.22-dev.ga5ad2739",
+  "cliVersion": "0.2.22-dev.gf7141d5b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -117,7 +117,7 @@
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
-      "sha256": "749688447d1078fbe334ed31195ce9aa49d001d6aa91f479c6c5231c2e73c67d"
+      "sha256": "34eb35a78371f0f9ab7be4267a6aef3c6327afa4be7f9626d03479c31106dc87"
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
