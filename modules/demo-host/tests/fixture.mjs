@@ -1,6 +1,8 @@
 // The front Worker as deployed, with the container platform (the paid edge)
 // replaced: each demo's "container" is the test's APP service, told which
-// demo is calling. TEST_IDLE_MS shortens the idle end.
+// demo is calling. TEST_IDLE_MS shortens the idle end. With TEST_EVICT_MS the
+// platform evicts an object that has had no event in flight for that long and
+// stops its container, and the evicted object's exit watcher is lost with it.
 export { default, DemoCapacity } from '../worker.mjs';
 import { DemoContainer as Deployed } from '../container.mjs';
 
@@ -10,6 +12,16 @@ export class DemoContainer extends Deployed {
   probeTimeout = Number(this.env.TEST_PROBE_MS ?? this.probeTimeout);
   idle = Number(this.env.TEST_IDLE_MS ?? this.idle);
   get container() { return this.platform ??= platform(this.env.APP, this.ctx.id.toString()); }
+  events = 0;
+  async event(run) {
+    if (this.events++ === 0 && this.env.TEST_EVICT_MS && Date.now() - this.quiet >= Number(this.env.TEST_EVICT_MS)) this.container.evict();
+    try { return await run(); } finally { if (--this.events === 0) this.quiet = Date.now(); }
+  }
+  fetch(request) { return this.event(() => super.fetch(request)); }
+  alarm() { return this.event(() => super.alarm()); }
+  start(options) { return this.event(() => super.start(options)); }
+  end() { return this.event(() => super.end()); }
+  diagnostic() { return this.event(() => super.diagnostic()); }
 }
 
 function platform(app, id) {
@@ -21,13 +33,17 @@ function platform(app, id) {
     start(options) { running = true; void tell('start', options); },
     monitor: () => stopped,
     async destroy() { const response = await tell('destroy', {}); if (!response.ok) throw new Error('SECRET destroy'); running = false; },
+    evict() { if (running) { running = false; void tell('stopped', {}); } },
     // As on the platform, a container's port speaks plain HTTP only.
     getTcpPort: () => ({ async fetch(input, init) {
       const request = new Request(input, init);
       if (new URL(request.url).protocol !== 'http:') throw new TypeError('Connecting to a container using HTTPS is not currently supported');
+      if (!running) throw new TypeError('SECRET the container is not running');
       request.headers.set('x-demo', id);
       const response = await app.fetch(request);
       if (response.status === 599) { running = false; exit(Object.assign(new Error('SECRET exit'), { exitCode: 7 })); throw new TypeError('SECRET transport'); }
+      // The platform stopped this container (SIGTERM) while no watcher was attached.
+      if (response.status === 598) { running = false; throw new TypeError('SECRET the container is not running'); }
       return response;
     } }),
   };

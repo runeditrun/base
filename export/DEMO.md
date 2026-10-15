@@ -80,6 +80,8 @@ request too, so a send fails three ways. Only the visitor's random `rer_demo`
 cookie (HttpOnly, Secure, SameSite=Lax, one hour) reaches their container. A
 demo ends after 60 minutes, or 15 minutes with no requests; its container is
 destroyed and its state deleted, and the visitor sees "This demo has ended".
+Until then the container stays up however quiet the visitor is, and one that
+stops early anyway also ends its demo and frees its place.
 At most `maxInstances` demos (10 unless set) run at once, and one IP starts at
 most 3 a minute.
 Mail lands in the outbox (and the bar) only where the seed's development

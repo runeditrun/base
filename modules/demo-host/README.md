@@ -21,6 +21,12 @@ it with these files and the seed's container image folder (workerd engine) to
   (`claim.mjs`) to `/auth/owner-claim`. Its alarm ends the demo at its hour or
   after 15 idle minutes: `destroy()`, `deleteAll()` and the place released. A
   container that stops by itself ends its demo too.
+  The platform stops a container about two minutes after its Durable Object's
+  last event, when it evicts the object (and the object's exit watcher with
+  it). So the alarm stays in flight until the demo's next check, at most three
+  minutes, and arms the next at once, as the Containers class keeps its own
+  object alive. A request or alarm that finds the container gone ends the demo
+  and answers the ended page (410), never a 5xx.
 - `capacity.mjs`: `DemoCapacity` admits at most `max_instances` live demos.
 - `pages.mjs`: the start and ended pages (12ui designs), strict CSP.
   `start-script.mjs` is the start page's script: once Turnstile passes it
