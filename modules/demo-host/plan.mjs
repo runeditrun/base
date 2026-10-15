@@ -9,7 +9,7 @@ import { siteDeclaration } from '../deploy-kit/site.mjs';
  * running the seed's own image (`rer build --platform container`, workerd
  * engine), deployed by `wrangler deploy` with the image beside it. */
 
-export const DEMO_FILES = ['worker.mjs', 'container.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'diagnostics.mjs', 'operator.mjs'];
+export const DEMO_FILES = ['worker.mjs', 'container.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'start-script.mjs', 'diagnostics.mjs', 'operator.mjs'];
 const FRONT_SET = /^(?:RER_.*|SESSION_SECRET|SETUP_TOKEN|OWNER_EMAIL)$/;
 const SECRET = /SECRET|TOKEN|PASSWORD|_KEY$/;
 
