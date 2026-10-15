@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.19-dev.ga479ce2b",
+  "cliVersion": "0.2.19-dev.g2ad87b2b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -375,7 +375,11 @@
     },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
-      "sha256": "66ec31d3b8d9e6409fcc5a7e962e9f1b8ec39bdae33abc48d8501a976a3469cf"
+      "sha256": "0bdd08966556a426b722b1f8bcabe42558629df4a9e2ff7d5f72127b3d75fb68"
+    },
+    "cli/demo-removal-provider.mjs": {
+      "source": "cli/demo-removal-provider.mjs",
+      "sha256": "fb792f55da03b7a5b6265ff3251856b418f3e42eb359daa4833d68fa1bd8e5f5"
     },
     "cli/demo.mjs": {
       "source": "cli/demo.mjs",
