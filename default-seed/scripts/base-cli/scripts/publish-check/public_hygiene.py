@@ -12,11 +12,12 @@ from png_text import text_chunks
 from media import sample_spans
 from c2pa import certificate_spans
 URI_AUTHORITY = re.compile(r'''//(?P<authority>[^/?#\s<>"']+)''')
+ACTION_REFERENCE = re.compile(r'''uses:\s*["']?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[^\s"']+''')
 SCHEME_CHARACTERS = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+.-')
 # Match raw, complete commit trailer lines; decoded or embedded prose cannot
 # acquire trailer privileges. Only the address span is omitted from email checks.
 COAUTHOR = re.compile(
-    rb'^Co-Authored-By:[ \t]+[^<>\r\n]*[^<>\s][ \t]+<(?P<address>'
+    rb'^Co-Authored-By:[ \t]+(?=[^ \t])[^<>\r\n]*[^<>\s][ \t]+<(?P<address>'
     rb'noreply@(?:anthropic|github)\.com|'
     rb'[0-9]+\+[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}@users\.noreply\.github\.com'
     rb')>[ \t]*\r?$', re.I | re.M)
@@ -27,7 +28,7 @@ def without_public_coauthor_addresses(data):
     # A quoted attribution followed by ordinary prose stays ordinary body text.
     tail = data.rstrip(b' \t\r\n')
     block = re.split(rb'\r?\n[ \t]*\r?\n', tail)[-1]
-    if not all(re.fullmatch(rb'[A-Za-z0-9-]+:[ \t]+[^\r\n]+\r?', line)
+    if not all(re.fullmatch(rb'[A-Za-z0-9-]+:[ \t][^\r\n]+\r?', line)
                for line in block.split(b'\n')):
         return data
     offset = len(tail) - len(block)
@@ -74,9 +75,34 @@ def private_emails(text, config):
     email_text = re.sub(r'(?i)\b(?a:git@github\.com:)(?=[A-Za-z0-9]|\$\{[A-Za-z_$][A-Za-z0-9_.$]*\})', '', email_text)
     # A package manager's patch filename joins the name and version with an at sign.
     version = r'(?:v?[0-9]+(?:\.[0-9]+)*(?:-[A-Za-z0-9-]+)?|[a-f0-9]{40})(?:\.patch)?(?![A-Za-z0-9_.-])'
-    email_text = re.sub(r'(?m)^\s*-?\s*uses:\s*[\"\']?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[^\s\"\']+', '', email_text)
-    email_text = re.sub(r'(?<![A-Za-z0-9])(?:@[A-Za-z0-9_.-]+/)?[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?@' + version, '', email_text)
+    email_text = without_action_references(email_text)
+    # Only the first character of a package token can change the outcome.
+    # Keep the outer boundary for scopes preceded by punctuation (x.@scope/pkg).
+    email_text = re.sub(r'(?<![A-Za-z0-9])(?:@[A-Za-z0-9_.-]+/)?(?<![A-Za-z0-9_.-])[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?@' + version, '', email_text)
     return [match.group() for match in EMAIL.finditer(email_text) if not public_email(match.group(), config)]
+
+
+def without_action_references(text):
+    pieces, offset = [], 0
+    for match in ACTION_REFERENCE.finditer(text):
+        # Locate the literal first, then walk each whitespace gap once. A
+        # multiline ^\s*-?\s* retries and repartitions long blank-line runs.
+        start = match.start()
+        while start > offset and text[start - 1].isspace():
+            start -= 1
+        if start > offset and text[start - 1] == '-':
+            start -= 1
+            while start > offset and text[start - 1].isspace():
+                start -= 1
+        if start > 0 and text[start - 1] != '\n':
+            newline = text.find('\n', start, match.start())
+            if newline < 0:
+                continue
+            start = newline + 1
+        pieces.append(text[offset:start])
+        offset = match.end()
+    pieces.append(text[offset:])
+    return ''.join(pieces)
 
 
 # A stored host name is lower case, upper case or capitalised, label by label.
