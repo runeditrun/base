@@ -436,6 +436,7 @@ modules/portability/import.mjs
 modules/portability/payloads.mjs
 modules/portability/journal.mjs
 modules/portability/http.mjs
+modules/portability/http-client.mjs
 modules/portability/cli.mjs
 modules/portability/cli-options.mjs
 modules/portability/schema/portability.sql

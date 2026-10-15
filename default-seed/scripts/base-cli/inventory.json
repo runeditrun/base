@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.9-dev.g1a7353f8",
+  "cliVersion": "0.2.9-dev.gc3c09680",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -959,7 +959,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "777f0177fef656f84fc9caf39a57f439cda09697c82c277bf3eef49076580685"
+      "sha256": "2df10407d8ab8cb0b3e959f259016b23050995774d6db525793af736eca6a52e"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1919,7 +1919,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "80151c12d7b78d8c7870d1b073517aa5071994ff7c8fc169e75cd017328d2c15"
+      "sha256": "7c801fa3d41b37cb5147adc3fe4c0ace9239d7793a6776fb6da891b25401c7b5"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
