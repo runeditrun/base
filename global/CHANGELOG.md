@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.24
+
+- Hosted demos stay up through redeploys. The demo's Container application keeps a live demo's instance for an hour (`rollout_active_grace_period`), so a deploy that changes the image, instance type or limit no longer ends idle visitors' demos ("This demo has ended" within two minutes before).
+- Hosted demos wait out Cloudflare placement. A fresh application keeps 7 prepared instances; the eighth concurrent demo waited 16-37 s for Cloudflare to place another. Placement waits now renew the 45-second boot budget up to 90 seconds and keep the visitor's reservation. The application's own `max_instances` is twice `maxInstances`, so instances Cloudflare still counts after demos end never refuse an admitted visitor; admission still holds at `maxInstances`.
+- A new demo copy that takes over two seconds to answer is a pending start instead of a 502, and a slow status read stays pending instead of a 503.
+- The start page signs in about half a second sooner: each status poll is held until the start changes, and the reservation is extended alongside the owner claim.
+- `deploy-demo.json` takes an optional `ownerEmail`, the address the demo's owner signs in as and seed screens show (`owner@demo.invalid` unless set).
+- Each demo admission logs `demo_admitted` with the user agent and network, so a held place can be joined to whoever started it. On test hosts, automated browsers pass Turnstile's always-pass testing keys and hold real places.
+- Run-site deploys wait through Cloudflare propagation after a fresh upload, within a 90-second window, and name the serving and newest versions on a timeout.
+- Every Cloudflare list read shares one pagination reader; an incomplete list stops with `provider-incomplete-pagination` instead of treating a resource as absent. Environment removal detaches queue consumers before deleting queues and confirms their absence.
+
+### Upgrade notes
+
+- Redeploy the hosted demo (`rer deploy --demo`) once to apply the hour-long rollout grace and the doubled provider limit. The deploy that first sets the grace may itself still replace live demos, so run it when no visitor is mid-demo.
+- Add `"ownerEmail"` to `deploy-demo.json` for a plausible owner address on demo screens.
+
 ## 0.2.23
 
 - Managed mail (`rer` provider) works from Cloudflare Workers. Mail transport always fetches with `redirect: 'manual'`, because Workers reject `redirect: 'error'`, which made every relay send end as `transport_uncertain` without a request. A relay 3xx is never followed and is reported as `rejected` (`provider_redirected`).
