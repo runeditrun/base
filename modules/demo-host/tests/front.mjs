@@ -40,7 +40,11 @@ export async function front({ max = 10, secondary = [], idle, health, startMs, p
       const [client, server] = Object.values(new WebSocketPair()); server.accept();
       server.addEventListener('message', event => server.send(JSON.stringify({ id, url:request.url,
         origin:request.headers.get('x-rer-ingress-origin'), cookie:request.headers.get('cookie'), payload:event.data })));
-      server.addEventListener('close', event => server.close(event.code, event.reason));
+      server.addEventListener('close', event => {
+        if (server.readyState === 3) return;
+        if (event.code === 1005 || event.code === 1006) server.close();
+        else server.close(event.code, event.reason);
+      });
       return new UpgradeResponse(null, { status:101, webSocket:client });
     }
     return new Response(`${id} ${url.pathname}`);
