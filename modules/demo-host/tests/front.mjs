@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions, Response as UpgradeResponse, WebSocketPair } from 'miniflare';
 import { verifyOwnerClaim } from '../../owner-claim/verify.mjs';
 import { DEMO_FILES } from '../plan.mjs';
 
@@ -35,6 +35,17 @@ export async function front({ max = 10, secondary = [], idle, health, startMs, p
           appOrigin: env.AUTH_ORIGIN, expectedEmail: env.OWNER_EMAIL, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) });
       } catch { return new Response(null, { status: 403 }); }
       return new Response(null, { status: 303, headers: { location: '/app', 'set-cookie': `__Host-operator_session=${id}; Path=/; HttpOnly; Secure; SameSite=Lax` } });
+    }
+    if (url.pathname === '/api/live' && request.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+      const [client, server] = Object.values(new WebSocketPair()); server.accept();
+      server.addEventListener('message', event => server.send(JSON.stringify({ id, url:request.url,
+        origin:request.headers.get('x-rer-ingress-origin'), cookie:request.headers.get('cookie'), payload:event.data })));
+      server.addEventListener('close', event => {
+        if (server.readyState === 3) return;
+        if (event.code === 1005 || event.code === 1006) server.close();
+        else server.close(event.code, event.reason);
+      });
+      return new UpgradeResponse(null, { status:101, webSocket:client });
     }
     return new Response(`${id} ${url.pathname}`);
   }
