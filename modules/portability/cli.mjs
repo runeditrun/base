@@ -9,7 +9,7 @@ import { transferClient, transferDiagnostic } from './http-client.mjs';
 export async function main(args) {
   const opts=options([...args]),cookie=await cookieFile(opts['session-file']);
   const endpoint=opts.origin+opts.basePath;
-  const client=transferClient({endpoint,origin:opts.origin,cookie}),{request,get}=client;
+  const client=transferClient({endpoint,origin:opts.origin,cookie}),{get}=client;
   const shell=value=>"'"+value.replaceAll("'","'\\''")+"'";
   const resumeCommand=(id)=>'node '+shell(fileURLToPath(import.meta.url))+' '+opts.command+' --origin '+shell(opts.origin)+' --session-file '+shell(opts['session-file'])+' '+(opts.command==='export'?'--out '+shell(opts.out):'--from '+shell(opts.from))+' --resume '+id;
   if(opts.command==='export') {
@@ -20,8 +20,8 @@ export async function main(args) {
     let path='exports/'+id,status=await get(path);
     while(status.phase==='building'){path='exports/'+id+'/advance';status=await get(path,'POST',{expectedPart:status.completed,maxParts:16});}
     if(status.phase!=='complete')throw client.failedJob(path,status);
-    const response=await request('exports/'+id+'/download'),file=await privateFile(opts.out+'.partial',Boolean(opts.resume));
-    try{for await(const record of readArchive(response.body))await file.writeFile(canonicalJson(record)+'\n');await file.sync();}
+    const records=await client.download(id),file=await privateFile(opts.out+'.partial',Boolean(opts.resume));
+    try{for await(const record of records)await file.writeFile(canonicalJson(record)+'\n');await file.sync();}
     finally{await file.close();}
     await promote(opts.out+'.partial',opts.out);process.stdout.write('Export complete.\n');return;
   }

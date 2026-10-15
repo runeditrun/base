@@ -16,9 +16,16 @@ export async function cliJourney(t,cli,worker,{truncate=false}={}) {
   const source=await runtime(t,{worker,bindings:{TEST_COOKIE:cookie,TRUNCATE:truncate}}),target=await runtime(t,{worker,bindings:{TEST_COOKIE:cookie}});await seed(source);
   const origin=(await source.mf.ready).origin,other=(await target.mf.ready).origin,session=join(source.directory,'session.cookie'),out=join(source.directory,'archives','first.jsonl'),second=join(source.directory,'archives','second.jsonl');
   await writeFile(session,cookie,{mode:0o600});
-  let result=await cliRun(cli,origin,session,'export','--out',out);let jobId;
-  if(truncate){assert.notEqual(result.code,0);await assert.rejects(stat(out),{code:'ENOENT'});jobId=JSON.parse(await readFile(out+'.transfer.json','utf8')).id;await source.reconfigure({TRUNCATE:false});result=await cliRun(cli,(await source.mf.ready).origin,session,'export','--out',out,'--resume',jobId);}
-  assert.equal(result.code,0,result.stderr);const output=[result.stdout,result.stderr];
+  let result=await cliRun(cli,origin,session,'export','--out',out);const output=[result.stdout,result.stderr];
+  if(truncate){
+    assert.notEqual(result.code,0);await assert.rejects(stat(out),{code:'ENOENT'});
+    const jobId=JSON.parse(await readFile(out+'.transfer.json','utf8')).id;
+    assert.ok(result.stderr.includes(jobId));assert.match(result.stderr,/download.*HTTP 200.*closing_missing/);
+    assert.equal((await stat(out+'.partial')).mode&0o777,0o600);
+    await source.reconfigure({TRUNCATE:false});result=await cliRun(cli,(await source.mf.ready).origin,session,'export','--out',out,'--resume',jobId);
+    output.push(result.stdout,result.stderr);
+  }
+  assert.equal(result.code,0,result.stderr);
   const imported=await cliRun(cli,other,session,'import','--from',out);assert.equal(imported.code,0,imported.stderr);output.push(imported.stdout,imported.stderr);
   const again=await cliRun(cli,other,session,'export','--out',second);assert.equal(again.code,0,again.stderr);output.push(again.stdout,again.stderr);
   const first=await readFile(out,'utf8'),last=await readFile(second,'utf8'),a=await collect(readArchive(new Response(first).body)),b=await collect(readArchive(new Response(last).body));

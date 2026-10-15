@@ -1,6 +1,9 @@
 import { canonicalJson } from './hash.mjs';
+const errorCodes = new WeakMap();
+// A verifier's original machine code remains independent of mutable properties.
+export const portabilityErrorCode = error => errorCodes.get(error);
 export class PortabilityError extends Error {
-  constructor(code, status=400) { super(code); this.code=code; this.status=status; }
+  constructor(code, status=400) { super(code); this.code=code; this.status=status; errorCodes.set(this,code); }
 }
 export function insist(condition, code, status=400) { if (!condition) throw new PortabilityError(code,status); }
 export const quote = name => '"'+name.replaceAll('"','""')+'"';

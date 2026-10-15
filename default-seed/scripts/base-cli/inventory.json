@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.9-dev.gf39a289a",
+  "cliVersion": "0.2.9-dev.g1a7353f8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1935,7 +1935,7 @@
     },
     "modules/portability/cli.mjs": {
       "source": "modules/portability/cli.mjs",
-      "sha256": "b9f9f53c5080fd33110a51fd196a054d7d1aae74e97d7df5bdad470c9f85d22b"
+      "sha256": "312f5f7b6cc565b6be7a56601303ef619ee802e776470e80803526d312c329c4"
     },
     "modules/portability/copies.mjs": {
       "source": "modules/portability/copies.mjs",
@@ -1959,7 +1959,7 @@
     },
     "modules/portability/format.mjs": {
       "source": "modules/portability/format.mjs",
-      "sha256": "af04e47e74f8295f2dea4b81c6f311b6590f9286b4e83dd8ea4671008730cd02"
+      "sha256": "814158564d5f76b44e2db486602db4b8a06c73694d0bbc76b881119f8b67f3c6"
     },
     "modules/portability/generated.mjs": {
       "source": "modules/portability/generated.mjs",
@@ -1971,7 +1971,7 @@
     },
     "modules/portability/http-client.mjs": {
       "source": "modules/portability/http-client.mjs",
-      "sha256": "eff10e74602bf8338a1c506895415afc695502f780d4f07a27037ecc48361dd7"
+      "sha256": "4f9623396cdba0b7e4ee1d2cc52ba3636b3fbf5ee2da4a513b1d816ec15ba72b"
     },
     "modules/portability/http.mjs": {
       "source": "modules/portability/http.mjs",
@@ -2003,7 +2003,7 @@
     },
     "modules/portability/lines.mjs": {
       "source": "modules/portability/lines.mjs",
-      "sha256": "15a164e56d56dce539ec704427d7bb4567e9ad25580e3d1cd3db81dbf841f5f4"
+      "sha256": "63b23f3414962ba89abccb3d57a15d5c8dd0df953e7426b13c998242c35158b9"
     },
     "modules/portability/migration-history.mjs": {
       "source": "modules/portability/migration-history.mjs",
@@ -2031,7 +2031,7 @@
     },
     "modules/portability/storage.mjs": {
       "source": "modules/portability/storage.mjs",
-      "sha256": "9b8e4329b69afd081ea1744aae70d3a6d342d623a47790a26e198b58278518c5"
+      "sha256": "b53608a297138952b5efc785335c608c7e9629c09584e03bb943817e701d0678"
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
