@@ -11,6 +11,8 @@ export async function startHost({ root = '/app', data = '/data', settings = proc
  const release = await recordVolumeOwner(data);
  let engine, server, timer, idleTimer, runner, closing, lastMinute = -1, lastRequest=Date.now();
  try {
+  const origins = settings.RER_INGRESS_ORIGINS === undefined ? undefined : JSON.parse(settings.RER_INGRESS_ORIGINS);
+  if (origins !== undefined && (!Array.isArray(origins) || origins.some(value => { try { const url = new URL(value); return typeof value !== 'string' || url.protocol !== 'https:' || url.origin !== value; } catch { return true; } }))) throw new Error('Invalid ingress origins');
   const create = manifest.engine === 'node' ? (await import('./node-engine.mjs')).nodeEngine : (await import('./worker-engine.mjs')).workerEngine;
   engine = await create({ root,data,manifest,settings,edge });
   const schedules = (manifest.config.triggers?.crons ?? []).map(cron => [cron,parseCron(cron)]);
@@ -18,7 +20,7 @@ export async function startHost({ root = '/app', data = '/data', settings = proc
   server = createServer(async (req, res) => {
    try {
     lastRequest=Date.now();
-    const request = await incoming(req, { trustedProxy:settings.TRUSTED_PROXY, origin:settings.RER_INGRESS_ORIGIN, maxRequestBytes:manifest.maxRequestBytes });
+    const request = await incoming(req, { trustedProxy:settings.TRUSTED_PROXY, origin:settings.RER_INGRESS_ORIGIN, origins, maxRequestBytes:manifest.maxRequestBytes });
     let response = await engine.fetch(request);
     if (new URL(request.url).pathname === '/health' && response.ok) {
      const body = await response.json(); const deadJobs = engine.dead();

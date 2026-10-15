@@ -22,7 +22,7 @@ const TURNSTILE = `(() => {
 test('the start page waits for the check, shows its start working, says when it fails, and Try again starts a new one', async () => {
   let mode = 'wait', dropNextStart = false, releaseCheck;
   const checked = new Promise(resolve => { releaseCheck = resolve; });
-  const { mf, fetch } = await front({ startMs: 20_000, probeMs: 200,
+  const { mf, fetch, demos } = await front({ max: 1, startMs: 20_000, probeMs: 200,
     health: () => mode === 'ok' ? Response.json({ ok: true }) : new Response(null, { status: mode === 'exit' ? 599 : 503 }) });
   const browser = await chromium.launch({ headless: true });
   try {
@@ -37,6 +37,7 @@ test('the start page waits for the check, shows its start working, says when it 
       await route.fulfill({ status: response.status, headers, body: Buffer.from(await response.arrayBuffer()) });
     });
     const page = await context.newPage();
+    await page.clock.install();
     const form = page.locator('#start'), button = page.locator('#start .button'), notice = page.locator('#notice');
     const state = async expected => { await page.waitForFunction(value => document.getElementById('start').dataset.state === value, expected); };
     await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
@@ -62,7 +63,9 @@ test('the start page waits for the check, shows its start working, says when it 
 
     // Try again once more: while the container starts, the page shows it working.
     mode = 'wait';
+    const pendingStart = page.waitForResponse(response => response.url() === ORIGIN + '/__demo/start' && response.status() === 202);
     await button.click();
+    await pendingStart;
     await state('working');
     assert.equal(await button.isDisabled(), true);
     assert.equal(await page.locator('#start .spinner').isVisible(), true);
@@ -71,6 +74,17 @@ test('the start page waits for the check, shows its start working, says when it 
     assert.ok((await page.locator('#status').textContent()).trim(), 'screen readers hear the step');
     assert.equal(await form.getAttribute('data-state'), 'working');
 
+    // A slow start is explicitly abandoned, and its only capacity place is
+    // free before the next human check admits the replacement.
+    const prior = [...demos.values()].at(-1);
+    await page.clock.fastForward(26000);
+    await state('slow');
+    const replacementStart = page.waitForResponse(response => response.url() === ORIGIN + '/__demo/start' && response.status() === 202);
+    await button.click();
+    await replacementStart;
+    await page.waitForFunction(() => window.resets === 3);
+    assert.equal(prior.destroyed, true);
+    await state('working');
     // It comes up: the visitor lands in their signed-in demo.
     mode = 'ok';
     await page.waitForURL(`${ORIGIN}/app`);
