@@ -6,14 +6,15 @@ import {homedir} from 'node:os';
 import {isIP} from 'node:net';
 import {setTimeout as delay} from 'node:timers/promises';
 import {commandFailure,approvedFailure} from './failures.mjs';
+import {stateFiles} from './local/state-files.mjs';
 const exec=promisify(execFile);
 // macOS supplies lsof in /usr/sbin, which a command PATH may omit.
 // Diagnose sockets with the system utility even when that PATH is constrained.
 const lsof=process.platform==='darwin'?'/usr/sbin/lsof':'lsof';
 // One monotonic budget covers every command in an ownership decision.
-export const inspectionContext=(details={})=>({deadline:performance.now()+15000,...details});
+export const inspectionContext=({budgetMs=15000,...details}={})=>({deadline:performance.now()+budgetMs,budgetMs,...details});
 export const uncheckedInspection=error=>approvedFailure(error)?.ownershipUnchecked===true;
-const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,noMatch=false}={})=>{
+const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,noMatch=false,positiveResult}={})=>{
  const invocation=[command,...args].join(' ').replaceAll(homedir(),'~');
  let failure;
  for(let attempt=0;attempt<2;attempt++){
@@ -22,6 +23,9 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
   const timeout=attempt===0?Math.min(3000,remaining):remaining;
   try{return (await exec(command,args,{timeout,maxBuffer})).stdout;}
   catch(error){
+   // A selected state file positively observed before a timeout still has a
+   // holder. Partial output can never establish the absence of a holder.
+   if(typeof error.stdout==='string'&&positiveResult?.(error.stdout))return error.stdout;
    // A quiet lsof exit 1 means no match, including a selected PID exiting
    // while other selected PIDs still return records. Diagnostic output instead
    // means inspection failed, even if lsof also returned partial records.
@@ -31,7 +35,7 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
  }
  const subject=context.port?`who uses port ${context.port}`:'local process ownership';
  const cause=failure?.startsWith('timed out')||performance.now()>=context.deadline?'in time (system busy)':'because the system process check failed';
- throw commandFailure(`Could not check ${subject} ${cause}. Run rer ${context.verb??'dev'} again. No other owner was identified.\nOwnership check: ${invocation} ${failure??'total inspection deadline exhausted'} (at most 2 attempts; shared total bound 15000 ms).`,{ownershipUnchecked:true});
+ throw commandFailure(`Could not check ${subject} ${cause}. Run rer ${context.verb??'dev'} again. No other owner was identified.\nOwnership check: ${invocation} ${failure??'total inspection deadline exhausted'} (at most 2 attempts; shared total bound ${context.budgetMs??15000} ms).`,{ownershipUnchecked:true});
 };
 
 export async function processName(pid,context=inspectionContext()){
@@ -46,6 +50,7 @@ function records(text,socketTypes=false){
  let record,family;const rows=[];
  for(const line of text.split('\n')){
   if(line[0]==='p'){record={pid:Number(line.slice(1)),names:[],...(socketTypes?{sockets:[]}: {})};family=undefined;rows.push(record);}
+  else if(line[0]==='c'&&record)record.command=basename(line.slice(1)).replace(/[^a-zA-Z0-9._-]/g,'').slice(0,80);
   else if(line[0]==='f')family=undefined;
   else if(line[0]==='t')family=['IPv4','IPv6'].includes(line.slice(1))?line.slice(1):undefined;
   else if(line[0]==='n'&&record){const name=line.slice(1);record.names.push(name);if(socketTypes)record.sockets.push({name,family});}
@@ -192,8 +197,23 @@ export async function localProcessConflict(root,savedOrigin,context=inspectionCo
  let held;
  if(hasState){
   if(process.platform==='linux'){for(const pid of await linuxPids())if(!lineage.has(pid)&&(await descriptors(pid)).some(path=>path.startsWith(state+'/'))){held={pid};break;}}
-  else held=records(await run(lsof,['-nP','-b','-w','-Fpn'],context,{maxBuffer:16*1024*1024})).find(row=>!lineage.has(row.pid)&&row.names.some(path=>path.startsWith(state+'/')));
-  if(held)return {pid:held.pid,command:await processName(held.pid,context),reason:'the canonical local state'};
+  else {
+   const files=await stateFiles(state);
+   // Path selection needs stat, so -b (which skips stat) is inappropriate here.
+   // No system-wide open-file output, and no query at all for empty state.
+   if(files.length){
+    const budgetMs=context.verb==='dev'?3000:context.budgetMs??15000;
+    const stateContext=inspectionContext({verb:context.verb,budgetMs,deadline:Math.min(context.deadline,performance.now()+budgetMs)});
+    const holder=text=>records(text).find(row=>!lineage.has(row.pid)&&row.names.some(path=>path.startsWith(state+'/')));
+    held=holder(await run(lsof,['-nP','-w','-Fpcn','--',...files],stateContext,{positiveResult:holder}));
+   }
+  }
+  if(held){
+   // A slow optional label cannot discard a positively observed holder.
+   let command=held.command;
+   if(!command)try{command=await processName(held.pid,context);}catch(error){if(!uncheckedInspection(error))throw error;}
+   return {pid:held.pid,command:command||'process',reason:'the canonical local state'};
+  }
  }
  let all;
  try{all=await listeners(undefined,context);}

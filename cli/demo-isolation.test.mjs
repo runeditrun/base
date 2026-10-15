@@ -70,7 +70,7 @@ commandAdapter.localPrerequisites = async ({root, email}) => {
  await assert.rejects(access(preflightRecord), { code: 'ENOENT' });
  await writeFile(settings, privateBytes, { mode: 0o600 });
 
- const child = f.start(['demo', '--json', '--foreground']);
+ const child = f.launch(['--import', join(import.meta.dirname,'fixtures/slow-state-inspection.mjs'), 'scripts/rer.mjs', 'demo', '--json', '--foreground']);
  try {
   const deadline = Date.now() + 180_000;
   while (!child.stdoutText.includes('"event":"ready"') && child.exitCode === null && child.signalCode === null && Date.now() < deadline) await pause(100);

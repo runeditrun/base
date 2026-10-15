@@ -118,6 +118,14 @@ rebuild preview. A build that regenerates its own files declares them as
 `generatedOutputs` on the command adapter (see the seed command contract); those
 paths are not inputs, while any other file touched during the build is refused by name. Both use the same `.wrangler/state` and saved owner. Dev opens signed in through `RER_OPEN`, including with the legacy
 `--login` flag. Stop before changing modes.
+
+Local startup holds the checkout's exclusive operation lock until serving stops.
+Its state-holder inspection selects only regular files under `.wrangler/state`,
+including SQLite sidecars. Dev and demo give `lsof` three seconds to answer. A confirmed
+holder is refused with its PID and process name. If inspection cannot answer,
+dev (including demo) continues under the held checkout lock; another
+cooperating launch cannot acquire it. This lock does not inventory unmanaged
+processes. Setup, reset and preview still require their state inspection to complete.
 Stop dev or preview before build, verification or data transfer; use the
 documented `--stop` flag or Ctrl-C.
 
