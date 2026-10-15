@@ -52,8 +52,17 @@ async function go(resume=false){
     show('failed',{label:'Try again',note:'',live:'',notice:'The demo could not be reached. Check your connection, then try again.'});
   }
 }
-function again(){
+async function again(){
   attempt?.abort();attempt=null;stop();
+  el().auto=false;
+  show('working',{label:'Trying again…',note:'Your new demo will start after the human check.',live:'Trying again.',notice:''});
+  try{
+    const response=await fetch('/__demo/cancel',{method:'POST',headers:{accept:'application/json'},signal:AbortSignal.timeout(8000)});
+    if(!response.ok)throw new Error('cancel-failed');
+  }catch{
+    show('failed',{label:'Try again',note:'',live:'',notice:'The previous demo could not be ended. Try again.'});
+    return;
+  }
   el().auto=true;
   show('waiting',{label:'Waiting for the human check…',note:'Running the check again. The demo starts by itself once it passes.',live:'Running the human check again.',notice:''});
   turnstile.reset(el().form.querySelector('.cf-turnstile'));

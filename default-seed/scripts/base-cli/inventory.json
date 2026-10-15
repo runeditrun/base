@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.20-dev.gabf7f068",
+  "cliVersion": "0.2.20-dev.g7ce889b8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -375,7 +375,7 @@
     },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
-      "sha256": "681383cfcd82b3b27ef1898f90ef159074b31852d002abc7fe0b6aed8f460fcf"
+      "sha256": "9ff429afe77e08db37142f0d4a05a6c6fbe88096b4c3a10d23eee94c53983966"
     },
     "cli/demo.mjs": {
       "source": "cli/demo.mjs",
@@ -795,7 +795,7 @@
     },
     "modules/container/README.md": {
       "source": "modules/container/README.md",
-      "sha256": "41b86cbaea816a5707aa4fcd49c31a51d3f7af176376bc8ac5a0f1a5781a3ffd"
+      "sha256": "c2396717f41a9b61788e998125637bdd45ea9fb1a55c13d3689ec8d5e01befbc"
     },
     "modules/container/adapters/d1.mjs": {
       "source": "modules/container/adapters/d1.mjs",
@@ -943,7 +943,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "ba1fee3d27a31ad95f24cadf9c1875cdd0df04b0e479d1feba538ffdc5d539a3"
+      "sha256": "5896ac5bdb2f29c70c2faf828f334ad686fb843b48dfeb336a32d37bcb171e21"
     },
     "modules/demo-host/capacity.mjs": {
       "source": "modules/demo-host/capacity.mjs",
@@ -955,7 +955,7 @@
     },
     "modules/demo-host/container.mjs": {
       "source": "modules/demo-host/container.mjs",
-      "sha256": "5f6d8481a031ecac184515116353732240f2240b49d0a744cc9bc5ff288d35a2"
+      "sha256": "37a8cebed548c4c610ea56c4c37ad2ff2711e86cea7a1d54a2cd31dceaa48273"
     },
     "modules/demo-host/diagnostics.mjs": {
       "source": "modules/demo-host/diagnostics.mjs",
@@ -975,11 +975,11 @@
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "4445cb8f03038a5a444e112420b02082c4cb4cab802d4d7befb3560286fe8066"
+      "sha256": "8afb2b69a7ddced033f85ec1f9d34df3987480cfb1c05f2a590269b4dd61b1d3"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
-      "sha256": "6792b08dc3b275d1dc4028ff453ef540b8898e753dfded5c72aba4293ec4278d"
+      "sha256": "ea61745869f7a311bd00e0b288178c0ac5195fd0cba53884798f6dd7fde0efab"
     },
     "modules/demo-host/prepare.mjs": {
       "source": "modules/demo-host/prepare.mjs",
@@ -987,11 +987,11 @@
     },
     "modules/demo-host/remove.mjs": {
       "source": "modules/demo-host/remove.mjs",
-      "sha256": "1a0a06f6e322b763cdc3095ee2e6f1b2468e053d097a9bb148c29528d9c83e1e"
+      "sha256": "3bdc1727b129783b05c21302cb44f6f98d4d104c167b070e457439a463e75407"
     },
     "modules/demo-host/start-script.mjs": {
       "source": "modules/demo-host/start-script.mjs",
-      "sha256": "6fa709a8ddcc07247022db8fcebc1e47f1e32ed2c52b48e16cb9e211eca7f11e"
+      "sha256": "e6d297e9d6a2c181e82807187d08fc7ba31b0130dadabdd24316ccfafe4a677a"
     },
     "modules/demo-host/startup.mjs": {
       "source": "modules/demo-host/startup.mjs",
@@ -1003,7 +1003,7 @@
     },
     "modules/demo-host/worker.mjs": {
       "source": "modules/demo-host/worker.mjs",
-      "sha256": "8663ff69c3cd58fbe0e8de9c257e2bf8a16cf83c19486d897b0528ae0c7ac42c"
+      "sha256": "409007ef2c928bf99de0acb4f89a0270df024265de21812dcc84f0af919b8919"
     },
     "modules/demo/README.md": {
       "source": "modules/demo/README.md",

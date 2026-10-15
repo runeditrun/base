@@ -5,7 +5,14 @@ that adopted demo mode (`withDemo`, export/DEMO.md). `plan.mjs` turns `deploy-de
 (optionally `instanceType`, one of Cloudflare's predefined Container instance
 types, `basic` unless set) into the Worker's Wrangler configuration; the CLI (`cli/demo-host.mjs`) writes
 it with these files and the seed's container image folder (workerd engine) to
-`.rer/demo-host/` and runs `wrangler deploy` there.
+`.rer/demo-host/` and runs `wrangler deploy` there. Declared
+`container.hostVariables` resolve from demo settings to the primary hostname or
+its descendants (for example `page.demo.<domain>`); each gets a custom-domain
+route to the same front. The visitor cookie covers these hosts, while the
+primary host's `__Host` owner session stays host-only. The front supplies a
+validated public origin to the container ingress, so secondary page routing
+sees the requested host. Anonymous secondary requests return to the primary
+start page.
 
 - `worker.mjs`: `GET /` is the start page; `POST /__demo/start` checks the
   exact Origin, the `STARTS` rate limit (3 per IP per 60 s), Turnstile's
@@ -29,12 +36,11 @@ it with these files and the seed's container image folder (workerd engine) to
   guard simulates effects on people and third-party accounts, while the
   container egress independently refuses direct mail/SMS provider transports
   and SMTP ports. Public-address filtering and TLS remain enforced.
-  The platform stops a container about two minutes after its Durable Object's
-  last event, when it evicts the object (and the object's exit watcher with
-  it). So the alarm stays in flight until the demo's next check, at most three
-  minutes, and arms the next at once, as the Containers class keeps its own
-  object alive. A request or alarm that finds the container gone ends the demo
-  and answers the ended page (410), never a 5xx.
+  The platform inactivity timeout is set after start and reapplied when an
+  object recovers an already-running container. Persisted alarms enforce the
+  exact idle/absolute deadline without keeping a timer in flight. Requests
+  check both deadlines before refreshing activity. A container found stopped
+  ends the demo and answers the ended page (410).
 - `capacity.mjs`: `DemoCapacity` counts unexpired reservation rows inside a
   storage transaction, excluding diagnostics and expired rows. A lost start
   handoff expires after one minute; a successful claim extends the reservation
@@ -54,7 +60,8 @@ it with these files and the seed's container image folder (workerd engine) to
   with the refusal's status)
   and shows each step: the check, the private copy starting, the sign-in. A
   refusal, a network failure or a start past 25 seconds is shown with Try
-  again, which runs a new check; progress is announced through a
+  again, which first destroys the abandoned copy and releases its place through
+  `POST /__demo/cancel`, then runs a new check; progress is announced through a
   `role="status"` region and failures through `role="alert"`. Without
   JavaScript the form posts as before and gets the 303 or the page.
 - `remove.mjs`: `rer deploy --demo --remove --yes`. The deploy passes the
@@ -77,7 +84,7 @@ is in DEMO.md.
 Startup has a 45-second budget, with a separate five-second HTTP probe limit.
 The Durable Object owns that work and cleanup while the page polls; a browser
 that leaves cannot abandon it. Retrying a pending copy resumes the same
-reservation. Failed starts retain the bounded operator diagnostic and destroy
+reservation; an explicit Try again cancels it before creating a replacement. Failed starts retain the bounded operator diagnostic and destroy
 the container; cleanup retries keep a reservation only while destruction is
 unconfirmed. Every attempt logs its timestamp, elapsed time, duration and
 HTTP status or fixed error category, including successful probes. Exit records

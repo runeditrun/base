@@ -103,17 +103,33 @@ async function start(request, env, ctx) {
   }
 }
 
+// The visitor explicitly abandons this copy before running a fresh human check.
+// Wait for destruction and place release; a failed cleanup must retain the cookie
+// so another click can finish it instead of silently leaking a reservation.
+async function cancel(request, env) {
+  if (request.headers.get('origin') !== env.DEMO_ORIGIN) return refusal(request, env, 403, 'Start the demo from this page.');
+  const id = demoId(request, env);
+  try { if (id) await bounded(env.DEMO.get(id).end(), 6000); }
+  catch { return refusal(request, env, 503, 'The previous demo could not be ended. Try again.'); }
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', 'set-cookie': clearCookie(env) } });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const primary = url.origin === env.DEMO_ORIGIN;
+    const secondary = JSON.parse(env.DEMO_SECONDARY_ORIGINS ?? '[]').includes(url.origin);
+    if (!primary && !secondary) return new Response('Not found.', { status: 404 });
+    if (!primary && url.pathname.startsWith('/__demo/')) return new Response('Start the demo on its primary host.', { status: 403 });
     if (url.pathname.startsWith('/__demo/operator/')) return operatorPage(request, env, url.pathname.slice('/__demo/operator/'.length));
     if (url.pathname === '/__demo/start') return request.method === 'POST' ? start(request, env, ctx) : home();
     if (url.pathname === '/__demo/status') return request.method === 'GET' ? status(request, env) : home();
+    if (url.pathname === '/__demo/cancel') return request.method === 'POST' ? cancel(request, env) : home();
     const id = demoId(request, env);
     if (id) {
       // The JSON start leaves the browser on /. Reloading it must keep the
       // pending copy on the progress page until health and owner claim finish.
-      if (url.pathname === '/' && ['GET', 'HEAD'].includes(request.method)) {
+      if (primary && url.pathname === '/' && ['GET', 'HEAD'].includes(request.method)) {
         try {
           const state = await bounded(env.DEMO.get(id).status(), 2000);
           if (state.phase === 'starting') return progress(request, env, id, state);
@@ -122,6 +138,7 @@ export default {
       return env.DEMO.get(id).fetch(request);
     }
     if (!['GET', 'HEAD'].includes(request.method)) return new Response('Start a demo first.', { status: 403 });
+    if (!primary) return new Response(null, { status: 303, headers: { location: env.DEMO_ORIGIN + '/' } });
     if (url.pathname !== '/') return home();
     return startPage(env);
   },

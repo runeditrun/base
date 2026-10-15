@@ -49,6 +49,9 @@ PID/heartbeat diagnostics and is never unlinked. The host applies hashed
 migrations using a separately committed claim, followed by atomic SQL plus
 completion. Changed or uncertain history stops startup. Cron uses Base's five
 numeric-field grammar and dispatches matching handlers at minute boundaries.
+Image packaging uses the deployment producer's complete migration inventory,
+including packaging policy prefixes and `extraMigrationDirectories`, in declared
+directory order. Conflicting packaging policies stop the build.
 Node queues retain pending/claimed/dead messages across restarts; expired claims
 are delivered again. Consumers must already be idempotent. Dead jobs make health
 unhealthy. `/health` reports the container platform and the image ID supplied by
