@@ -24,24 +24,24 @@ ol.steps{display:none;list-style:none;margin:22px auto 0;padding:0;width:max-con
 @media(min-width:600px) and (max-width:1023px){main{width:calc(100% - 64px);max-width:666px;margin:100px auto 48px}.card{padding:36px}h1{font-size:38px;line-height:46px}.intro{font-size:18px;line-height:27px}}
 @media(max-width:599px){main,.ended main{width:calc(100% - 32px);margin:32px auto}.ended .card{padding:26px 22px}.ended h1{font-size:29px;line-height:36px}.ended .intro{font-size:17px;line-height:25px;margin-bottom:28px}.card{padding:26px 22px;border-radius:16px}.brand{font-size:16px}h1{font-size:34px;line-height:41px;letter-spacing:-.8px}.intro{font-size:17px;line-height:25px}ul{font-size:16px;line-height:25px;margin:22px 0 26px}li{padding-left:22px;margin-bottom:9px}li:before{left:2px;top:9px}.button{font-size:18px;margin-top:22px}.note{font-size:13px;line-height:20px}.steps{font-size:15px}.back{margin-top:24px;font-size:14px}}`;
 
-function html(env, { page, title, body, status = 200, headers = {}, turnstile = false }) {
+function html(env, { page, title, body, status = 200, headers = {}, turnstile = false, refresh = false }) {
   const nonce = crypto.randomUUID().replaceAll('-', ''), site = new URL(env.DEMO_SITE);
   const policy = `default-src 'none'; style-src 'nonce-${nonce}'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'${turnstile ? `; script-src 'nonce-${nonce}' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com` : ''}`;
-  return new Response(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title><style nonce="${nonce}">${STYLE}</style>${turnstile ? `<noscript><style nonce="${nonce}">#note{display:none}</style></noscript><script nonce="${nonce}">${START_SCRIPT}</script><script nonce="${nonce}" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>` : ''}</head>
+  return new Response(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title>${refresh ? '<noscript><meta http-equiv="refresh" content="2;url=/__demo/status"></noscript>' : ''}<style nonce="${nonce}">${STYLE}</style>${turnstile ? `<noscript><style nonce="${nonce}">#note{display:none}</style></noscript><script nonce="${nonce}">${START_SCRIPT}</script><script nonce="${nonce}" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>` : ''}</head>
 <body class="${page}"><main><section class="card" aria-labelledby="title"><div class="mark" aria-hidden="true"></div><p class="brand">${escape(env.DEMO_NAME)}</p>${body}</section><nav class="back" aria-label="Return"><a href="${escape(site.origin)}/">Back to ${escape(site.host)}</a></nav></main></body></html>`,
   { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': policy, 'referrer-policy': 'strict-origin', 'x-content-type-options': 'nosniff', ...headers } });
 }
 
 /** GET /: the visitor proves they are human and their demo starts. `notice` explains a refused start. */
-export function startPage(env, { status = 200, notice, headers = {} } = {}) {
+export function startPage(env, { status = 200, notice, pending = false, headers = {} } = {}) {
   const name = escape(env.DEMO_NAME);
-  return html(env, { page: 'start', title: `Try ${env.DEMO_NAME}`, status, headers, turnstile: true, body: `<h1 id="title">Try ${name}</h1>
+  return html(env, { page: 'start', title: `Try ${env.DEMO_NAME}`, status, headers, turnstile: true, refresh: pending, body: `<h1 id="title">Try ${name}</h1>
 <p class="intro">Your own copy of ${name}, signed in as its owner, with sample data.</p>
 <ul><li>Nothing is sent: mail stays in an outbox.</li><li>It ends after an hour, or 15 idle minutes.</li><li>Then it is deleted. Nobody else can see it.</li></ul>
-<p class="notice" id="notice" role="alert"${notice ? '' : ' hidden'}>${notice ? escape(notice) : ''}</p><form id="start" method="post" action="/__demo/start" data-auto="${notice ? '0' : '1'}"><div class="cf-turnstile" data-sitekey="${escape(env.TURNSTILE_SITE_KEY)}" data-size="flexible" data-callback="rerDemoVerified" data-before-interactive-callback="rerDemoInteractive" data-after-interactive-callback="rerDemoChecking" data-expired-callback="rerDemoExpired" data-error-callback="rerDemoCheckFailed"></div>
-<button class="button" type="submit"><span class="spinner" aria-hidden="true"></span><span class="label">Start the demo</span></button>
+<p class="notice" id="notice" role="alert"${notice ? '' : ' hidden'}>${notice ? escape(notice) : ''}</p><form id="start" method="post" action="/__demo/start" data-auto="${notice || pending ? '0' : '1'}"${pending ? ' data-resume="1" data-state="working"' : ''}><div class="cf-turnstile" data-sitekey="${escape(env.TURNSTILE_SITE_KEY)}" data-size="flexible" data-callback="rerDemoVerified" data-before-interactive-callback="rerDemoInteractive" data-after-interactive-callback="rerDemoChecking" data-expired-callback="rerDemoExpired" data-error-callback="rerDemoCheckFailed"></div>
+<button class="button" type="submit"${pending ? ' disabled' : ''}><span class="spinner" aria-hidden="true"></span><span class="label">${pending ? 'Starting your demo…' : 'Start the demo'}</span></button>
 <ol class="steps" aria-hidden="true"><li data-at="done">Checking you're human</li><li data-at="now">Starting a private copy</li><li data-at="next">Signing you in</li></ol>
-<p class="note" id="note">Complete the human check to start your demo.</p><noscript><p class="note">The human check needs JavaScript. Turn it on to start the demo.</p></noscript><p class="visually-hidden" id="status" role="status"></p></form>` });
+<p class="note" id="note">${pending ? 'Your demo will open automatically when ready.' : 'Complete the human check to start your demo.'}</p><noscript><p class="note">The human check needs JavaScript. Turn it on to start the demo.</p></noscript><p class="visually-hidden" id="status" role="status"></p></form>` });
 }
 
 /** A demo whose hour or idle time is up: its container and data are gone. */
