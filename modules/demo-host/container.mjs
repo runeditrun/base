@@ -30,7 +30,7 @@ export class DemoContainer extends DurableObject {
         // An interrupted start has lost its private claim key and cannot be
         // resumed after object eviction. End it instead of polling forever.
         await ctx.storage.put('startup', { phase: 'failed' });
-        ctx.waitUntil(this.end());
+        ctx.waitUntil(this.end().catch(cause => report(this.correlation, this.started, 'cleanup', { error: category(cause) })));
       } else if (this.container.running) this.watch();
     });
   }
