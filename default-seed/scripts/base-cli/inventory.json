@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.21-dev.g97dee6b7",
+  "cliVersion": "0.2.21-dev.g8a0732ea",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "a63417dc7ca1ae4a3d7d7207f00d8b89da715b0f6a642f30beb485920e6f0abb"
+      "sha256": "c0b7b20c0421bec4cd21775454b03d8d228bd590fd4697900150f9480740ab54"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -141,7 +141,11 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "4eddeaeac864119c19d6cda6963d90e5fe0c4dca7ce89c6f58d05b449631c9db"
+      "sha256": "50f31eb8aebd3dc11e38119791230112f565de6cd77f7b32040b2a4f478bfb0b"
+    },
+    "operator-migrations.mjs": {
+      "source": "onboarding/operator-migrations.mjs",
+      "sha256": "16eff9dd3e677d255980e803fb38a777c19098dcd013dd9813e3ae4302ba33e6"
     },
     "operator-prerequisites.mjs": {
       "source": "onboarding/operator-prerequisites.mjs",
@@ -323,7 +327,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "b47a9051d83afa18c058cdc6694378396b5913a08f5a45016818a3971b06d8ae"
+      "sha256": "c5279e228b5867b881b4a4a50160cc5a54c1b182472c41cddc101425168226e7"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -535,7 +539,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "07eb0b7aad04b80bd32cf5a580594c615849bf77c21ae1059f60490ce3ece847"
+      "sha256": "f9e5afce87db7137a07cdc4710cbcaf54f9b05cdceae87fa26006404dd92150d"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -1883,7 +1887,7 @@
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
-      "sha256": "c42b4bb9f335a4645d523a5547690bc1f20c3286a6c9a546adc2d139e1045340"
+      "sha256": "0d06b400bc57d066c9af21012ef941220f02828a2c43c77c9a9c6d6bf0b7e2ff"
     },
     "modules/operator-auth/dev/cli-session.mjs": {
       "source": "modules/operator-auth/dev/cli-session.mjs",
