@@ -66,7 +66,7 @@ export function sitePlan({ project, environment, compatibilityDate, declaration,
 }
 
 /** The version the Worker's latest deployment serves, as the kit reads ownership: null when there is no Worker. */
-async function servedVersion(api, worker) {
+export async function servedVersion(api, worker) {
   if (!await workerSettings(api, worker)) return null;
   const { deployments } = await api.request(`/workers/scripts/${worker}/deployments`);
   assert(Array.isArray(deployments) && deployments.length > 0, 'invalid-deployments');

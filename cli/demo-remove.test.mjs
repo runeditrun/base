@@ -1,0 +1,64 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { main } from './main.mjs';
+import { demoPlan } from '../modules/demo-host/plan.mjs';
+import { demoAccount } from '../modules/demo-host/tests/demo-account.mjs';
+
+// Public CLI dispatcher and flag parser through the demo removal; only Cloudflare's network edge is fake.
+test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by exact id, then is a no-op, and refuses what the record does not cover', async t => {
+ const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-demo-remove-')));
+ let account = demoAccount(); const saved = { ...process.env };
+ t.after(async () => { for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
+ Object.assign(process.env, { CI: 'true', CLOUDFLARE_ACCOUNT_ID: account.accountId, CLOUDFLARE_API_TOKEN: account.token });
+ t.mock.method(globalThis, 'fetch', (...args) => account.fetch(...args));
+ const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN', platforms: ['workers', 'container'] };
+ const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture' };
+ await writeFile(join(root, 'deploy.json'), JSON.stringify(app));
+ await writeFile(join(root, 'deploy-demo.json'), JSON.stringify(declaration));
+ await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+ await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
+ await writeFile(join(root, '.gitignore'), '.rer/\n.seed/\n');
+ await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('./deploy.mjs', import.meta.url).href)};
+ const lifecycle = {run:async()=>{},settings:{},hooks:{}};
+ export const commandAdapter = {...lifecycle,deploy:ownerDeploy('deploy.json',lifecycle)};`);
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: 'Deploy or remove the fixture demo in the fake Cloudflare account.' } } }));
+ const git = (...args) => execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'commit.gpgsign=false', ...args], { cwd: root, stdio: 'pipe' });
+ git('init', '-q'); git('add', '.'); git('commit', '-qm', 'fixture');
+ const remove = (...flags) => main(['deploy', '--demo', '--remove', '--cwd', root, '--json', '--environment', 'demo-test', ...flags]);
+ // The plan `rer deploy --demo --environment demo-test` deploys with `wrangler deploy --message <record>`.
+ const plan = demoPlan({ project: app.project, environment: 'demo-test', compatibilityDate: app.compatibilityDate, originVar: app.originVar, declaration });
+ const snapshot = () => JSON.stringify({ workers: [...account.state.workers.keys()], namespaces: account.state.namespaces, domains: account.state.domains, apps: account.state.apps });
+
+ account.deploy(plan); account.unrelated();
+ const before = snapshot();
+ assert.equal(await remove(), 2, 'removal needs --yes');
+ assert.equal(snapshot(), before);
+ assert.equal(await remove('--yes'), 0);
+ assert.deepEqual([...account.state.workers.keys()], ['someone-else'], 'the demo Worker is gone and the other Worker kept');
+ assert.deepEqual(account.state.namespaces.map(row => row.script), ['someone-else'], 'its Durable Objects went with it');
+ assert.deepEqual(account.state.domains.map(row => row.hostname), ['www.someone-else.test'], 'demo.test.run-fixture.test is gone');
+ assert.deepEqual(account.state.apps.map(row => row.name), ['someone-else'], 'its Container application is gone');
+ assert.ok(account.state.writes.every(write => /^DELETE \/workers\/domains\/[0-9a-f]{32}$|^DELETE \/containers\/applications\/[0-9a-f-]{36}$|^(PUT|DELETE) \/workers\/scripts\/fixture-demo-test--demo(\/schedules|\?force=true)$/.test(write)), `exact-id writes only: ${account.state.writes.join(', ')}`);
+
+ // A second run finds nothing of the demo and writes nothing.
+ account.state.writes.length = 0;
+ assert.equal(await remove('--yes'), 0);
+ assert.deepEqual(account.state.writes, []);
+
+ // Anything the record does not cover is refused before the first delete.
+ for (const extra of [
+  () => account.domain('extra.test.run-fixture.test', plan.worker), // another hostname someone attached to the demo Worker
+  () => account.app(plan.container, account.namespace('someone-else', 'Other').id), // a Container application of the demo's name on another namespace
+  () => { account.state.workers.delete(plan.worker); account.worker(plan.worker, 'Deploy from the dashboard'); }, // a Worker of the demo's name serving no record
+ ]) {
+  account = demoAccount(); account.deploy(plan); account.unrelated(); extra();
+  const kept = snapshot();
+  assert.equal(await remove('--yes'), 1);
+  assert.equal(snapshot(), kept, 'nothing was deleted');
+  assert.deepEqual(account.state.writes, []);
+ }
+});

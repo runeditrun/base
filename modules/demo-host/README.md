@@ -23,6 +23,15 @@ it with these files and the seed's container image folder (workerd engine) to
   container that stops by itself ends its demo too.
 - `capacity.mjs`: `DemoCapacity` admits at most `max_instances` live demos.
 - `pages.mjs`: the start and ended pages (12ui designs), strict CSP.
+- `remove.mjs`: `rer deploy --demo --remove --yes`. The deploy passes the
+  demo's record (`plan.record`) to `wrangler deploy --message`; removal takes
+  the Worker for the demo's only while it serves that version, the Custom
+  Domain only while it routes to that Worker and the Container application
+  only while it belongs to that Worker's DemoContainer namespace, refuses
+  anything else before the first delete, deletes by exact id (the Worker
+  last) and reads back that each is gone (export/DEMO.md "Removing a hosted
+  demo"). `cli/demo-remove.test.mjs` runs it through the CLI against a fake
+  Cloudflare account (`tests/demo-account.mjs`).
 
 `node --test modules/demo-host/tests/*.test.mjs` runs the Worker in workerd
 with its real Durable Objects and rate limit; Turnstile and the container
