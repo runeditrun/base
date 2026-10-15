@@ -25,7 +25,7 @@ export async function checkBoundary(root, { engine='node', cacheContract }={}) {
      }
     }
     if(ts.isCallExpression(node)&&node.arguments.some(arg=>ts.isStringLiteral(arg)&&arg.text.startsWith('cloudflare:')))fail('Dynamic Cloudflare import');
-    if(ts.isIdentifier(node)&&['WebSocketPair','HTMLRewriter','passThroughOnException','timingSafeEqual'].includes(node.text))fail(node.text);
+    if(ts.isIdentifier(node)&&(['WebSocketPair','passThroughOnException','timingSafeEqual'].includes(node.text)||(node.text==='HTMLRewriter'&&engine!=='workerd')))fail(node.text);
     if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.expression.text==='email'&&!localNames.has('email'))fail('email()');
     if(ts.isPropertyAccessExpression(node)&&((node.expression.getText(tree)==='caches'&&node.name.text==='default')||(node.expression.getText(tree)==='request'&&node.name.text==='cf')))fail(node.getText(tree));
     if(ts.isElementAccessExpression(node)&&ts.isStringLiteral(node.argumentExpression)&&((node.expression.getText(tree)==='caches'&&node.argumentExpression.text==='default')||(node.expression.getText(tree)==='request'&&node.argumentExpression.text==='cf')))fail(node.getText(tree));

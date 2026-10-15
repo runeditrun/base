@@ -22,3 +22,19 @@ test('the boundary admits an exported seed\'s demo guard and no other file or im
   for(const source of ["import { env as bindings } from 'cloudflare:workers';","import { env, DurableObject } from 'cloudflare:workers';","import workers, { env } from 'cloudflare:workers';","export { env } from 'cloudflare:workers';","import { env } from 'cloudflare:sockets';"]){await writeFile(join(root,'src/modules/demo/index.mjs'),source);await assert.rejects(checkBoundary(root),/import boundary/);}
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('container admission permits HTMLRewriter only for workerd and keeps other API boundaries',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'rer-container-engine-'));
+ try{
+  await mkdir(join(root,'src'),{recursive:true});await writeFile(join(root,'package.json'),'{"type":"module"}');await symlink(resolve(import.meta.dirname,'../../../default-seed/node_modules'),join(root,'node_modules'));
+  await writeFile(join(root,'src/product.ts'),'export const rewrite = response => new HTMLRewriter().transform(response);');
+  assert.deepEqual(await checkBoundary(root,{engine:'workerd'}),{engine:'workerd',ok:true});
+  const htmlBoundary=error=>error.failures?.some(failure=>failure.api==='HTMLRewriter');
+  await assert.rejects(checkBoundary(root,{engine:'node'}),htmlBoundary);
+  await assert.rejects(checkBoundary(root),htmlBoundary);
+  for(const source of ["new WebSocketPair();","passThroughOnException();","timingSafeEqual(a,b);","email(message);","caches.default;","request.cf;","import {env} from 'cloudflare:workers';","await import('cloudflare:workers');","class Cache extends DurableObject {}"]){
+   await writeFile(join(root,'src/product.ts'),source);
+   for(const engine of ['workerd','node'])await assert.rejects(checkBoundary(root,{engine}),/import boundary/);
+  }
+ }finally{await rm(root,{recursive:true,force:true});}
+});
