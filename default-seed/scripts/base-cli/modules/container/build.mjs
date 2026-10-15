@@ -1,5 +1,5 @@
 import { readFile, writeFile, readdir, realpath, cp, mkdir, rm } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -23,10 +23,18 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  if (!loaded) throw new Error('Vite configuration missing');
  const config = loaded.config;
  const outputExports = new Map();
+ const freshServerFiles = new Set(), serverOutput = resolve(root,'dist/server');
  if (engine === 'workerd') config.plugins = [...(config.plugins ?? []), {
   name:'rer-container-exports',
   async writeBundle(output,bundle) {
-   for (const chunk of Object.values(bundle)) if (chunk.type === 'chunk' && chunk.isEntry) outputExports.set(await realpath(resolve(root,output.dir ?? dirname(output.file),chunk.fileName)),new Set(chunk.exports));
+   const outputDir = resolve(root,output.dir ?? dirname(output.file));
+   if (outputDir === serverOutput || outputDir.startsWith(serverOutput + sep)) {
+    for (const chunk of Object.values(bundle)) if (chunk.type === 'chunk') {
+     const path = resolve(outputDir,chunk.fileName);
+     freshServerFiles.add(path);
+     if (chunk.isEntry) outputExports.set(await realpath(path),new Set(chunk.exports));
+    }
+   }
   },
  }];
  if (engine === 'node') {
@@ -35,7 +43,13 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
   config.plugins = [{ name:'rer-container-bindings', enforce:'pre',
    resolveId(id) { if (id === 'cloudflare:workers') return bindingShim; },
    transform(source,id) { if (cacheContract === 'lamp-retained-v1' && id === join(root,'src/server.ts')) return source.replace(/export\s*\{\s*SnapshotCache\s*\}\s*from\s*['"][^'"]+['"];?/,''); },
-  },...plugins];
+  },...plugins,{
+   name:'rer-container-boundary-output',
+   writeBundle(output,bundle) {
+    const outputDir = resolve(root,output.dir ?? dirname(output.file));
+    if (outputDir === serverOutput || outputDir.startsWith(serverOutput + sep)) for (const chunk of Object.values(bundle)) if (chunk.type === 'chunk') freshServerFiles.add(resolve(outputDir,chunk.fileName));
+   },
+  }];
   config.ssr = { ...config.ssr,noExternal:true }; config.environments = { ...config.environments,ssr:{ ...config.environments?.ssr,resolve:{ noExternal:true },build:{ ...config.environments?.ssr?.build,rolldownOptions:{ output:{ entryFileNames:'index.mjs' } } } } };
  }
  const builder = await vite.createBuilder({ ...config,root,configFile:false }); await builder.buildApp();
@@ -47,6 +61,9 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
   localDurableObjects(workerConfig,outputExports.get(await realpath(resolve(root,'dist/server',workerConfig.main))));
  }
  else workerConfig = parseJsonc(await readFile(join(root,'wrangler.jsonc'),'utf8'));
+ const serverEntry = engine === 'workerd' ? resolve(root,'dist/server',workerConfig.main) : resolve(root,'dist/server/index.mjs');
+ if (!freshServerFiles.has(serverEntry)) throw new Error('Container server entry was not emitted by this build');
+ await checkBoundary(root,{engine,cacheContract,entries:[serverEntry],emittedFiles:freshServerFiles,outputRoot:serverOutput});
  const { unstable_splitSqlQuery:split } = require('wrangler');
  const migrations = {}, rewrites = await readMigrationRewrites(root);
  for (const db of workerConfig.d1_databases ?? []) {

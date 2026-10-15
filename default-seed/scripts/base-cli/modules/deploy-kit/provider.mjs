@@ -37,7 +37,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
   assert(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'invalid-cloudflare-api-token');
   let requests = 0;
   // `zone` scope: the zone-level API (/zones/...), for a run site's zone lookup and redirect rule.
-  async function envelope(path, { method = 'GET', body, assetToken, zone = false } = {}) {
+  async function envelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal } = {}) {
     assert(typeof path === 'string' && (isR2ObjectDelete(path, method) || /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%')), 'invalid-provider-path');
     assert(!zone || /^\/zones(?:[/?]|$)/.test(path), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
@@ -46,13 +46,17 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     // Preserve complete text for the CLI's remaining redaction before truncation.
     const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? '[D1 import details omitted]' : [accountId,token,assetToken].filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
     const transportFailure = cause => recordDeployFailure(new Error('provider-transport-failed'),{output:redactAuth(transportOutput(cause))});
-    const signal = AbortSignal.timeout(timeoutMs);
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = callerSignal ? AbortSignal.any([callerSignal,timeout]) : timeout;
     let response;
     try { response = isR2ObjectDelete(path, method) ? await objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : await request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     }); } catch (cause) { throw transportFailure(cause); }
     const output = response.body ? await boundedText(response,undefined,transportFailure) : '';
+    // A successful DELETE may have no response body (including HTTP 200).
+    // Nonempty replies and all other methods still require the API envelope.
+    if (method === 'DELETE' && response.ok && output === '') return { success: true, result: null };
     let payload;
     try { payload = JSON.parse(output); } catch { if (response.ok) throw new Error('malformed-response'); }
     if (!response.ok || payload?.success === false) {

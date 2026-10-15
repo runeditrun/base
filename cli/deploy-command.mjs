@@ -1,4 +1,5 @@
 import { requireProductionAuth } from './production-auth.mjs';
+import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 import { contained } from './project.mjs';
 import { invalid, refuse, RerError } from './errors.mjs';
@@ -74,19 +75,19 @@ export async function deployCommand(context) {
  // A hook keeping the kit's record in its own state file named it; every kit
  // step after the hook (inspect, secret, record-owner) reads that record.
  let hookRecord = await hookState(root, environment);
- const command = (verb, extra = [], values = env) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...extra], values, { cwd: root, localOnlyKeys });
+ const command = (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
  // A hook that deployed through the kit's standard record lets rer issue and
  // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
  let recorded;
- const inspect = async () => {
-  try { return recorded = await command('inspect'); }
+ const inspect = async (origin = deployed?.origin) => {
+  try { return recorded = await command('inspect', [], env, {propagation:observedReadiness(origin)?.propagation}); }
   catch (error) { if (error.message !== 'missing-owner-receipt') throw error; }
  };
  let observedClaims = [];
  let deployed, claimed, linked = false, linkResult, step = 'custom deploy';
- const link = async (token, origin) => { if (!linked) { const state = await inspect(); linkResult = await linkDependencies?.(state?.origin ?? origin, token); linked = true; } return linkResult; };
+ const link = async (token, origin) => { if (!linked) { const state = await inspect(origin); linkResult = await linkDependencies?.(state?.origin ?? origin, token); linked = true; } return linkResult; };
  try {
-  return await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret }, async claims => {
+  return await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret, deployed: () => deployed, tokenKey: setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField }, async claims => {
    observedClaims = claims;
    const saved = { ...process.env };
    try {
@@ -100,8 +101,9 @@ export async function deployCommand(context) {
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
    const origin = hookOrigin(deployed, deployAgain(options));
+   const uploaded = observedReadiness(origin);
    step = 'wait for the deployed source';
-   await waitForSource({ origin, sourceSha, again: deployAgain(options) });
+   await waitForSource({ origin, sourceSha, uploaded, again: deployAgain(options) });
    step = 'verify recorded deployment';
    const state = await inspect();
    if ((state?.origin ?? origin) !== origin || claims.some(item => item.origin !== origin)) throw new Error('owner-claim-origin-mismatch');
@@ -109,8 +111,9 @@ export async function deployCommand(context) {
    claimed = claims.at(-1)?.outcome;
    step = 'claim owner';
    if (typeof deployed.setupToken === 'string' && deployed.setupToken) addSecret(deployed.setupToken);
+   const sentSecrets = (uploaded?.sentSecrets ?? []).filter(binding => uploaded.propagation.matchesToken(binding, env[declaration.secrets.find(item => item.binding === binding)?.environment]));
    const kit = state ? { secret: (extra, values) => command('secret', extra, values), recordClaim: outcome => command('record-owner', ['--outcome', outcome]) } : { token: deployed.setupToken || undefined };
-   claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, origin, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, supplied, ...kit, addSecret, beforeClaim: token => link(token, origin), store, signal: context.signal });
+   claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, sentSecrets, propagation:deployed.propagation ?? uploaded?.propagation, origin, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, supplied, ...kit, addSecret, beforeClaim: token => link(token, origin), store, signal: context.signal });
    if (!linked) await linkDependencies?.(origin);
    step = 'verify hosted setup';
    await checkHostedSetup({ origin, claimed: claimed ?? state?.ownerClaim?.outcome ?? claims.at(-1)?.outcome, signal: context.signal });
