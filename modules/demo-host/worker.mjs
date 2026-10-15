@@ -47,7 +47,7 @@ function refusal(request, env, status, notice, headers = {}) {
 function progress(request, env, id, state) {
   const headers = new Headers({ 'cache-control': 'no-store' });
   if (state.correlation) headers.set('x-rer-demo-correlation', state.correlation);
-  if (state.phase === 'failed') return refusal(request, env, state.capacity ? 503 : 502, state.capacity ? 'Every demo is in use right now. Try again in a few minutes.' : 'The demo did not start. Try again.', { ...Object.fromEntries(headers), 'set-cookie': clearCookie(env) });
+  if (state.phase === 'failed') return refusal(request, env, 502, 'The demo did not start. Try again.', { ...Object.fromEntries(headers), 'set-cookie': clearCookie(env) });
   headers.append('set-cookie', demoCookie(env, id.toString()));
   if (state.phase === 'starting') {
     headers.set('retry-after', '1');

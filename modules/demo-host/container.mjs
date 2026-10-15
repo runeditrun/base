@@ -4,6 +4,7 @@ import { bounded, boundedFetch, category, report } from './diagnostics.mjs';
 import { endedPage, clearCookie } from './pages.mjs';
 import { finishStart } from './startup.mjs';
 import { placeContainer } from './placement.mjs';
+import { fingerprint } from './capacity.mjs';
 
 // One visitor's demo: a Durable Object (newUniqueId) and its container, the
 // seed's image from `rer build --platform container` on the workerd engine.
@@ -28,7 +29,7 @@ export class DemoContainer extends DurableObject {
       if (state.get('startup')?.phase === 'starting') {
         // An interrupted start has lost its private claim key and cannot be
         // resumed after object eviction. End it instead of polling forever.
-        await ctx.storage.put('startup', { phase: 'failed' });
+        await ctx.storage.put('startup', { phase: 'starting', failure: state.get('startup').failure ?? { phase: 'failed' } });
         ctx.waitUntil(this.end().catch(cause => report(this.correlation, this.started, 'cleanup', { error: category(cause) })));
       } else if (this.container.running) {
         await this.container.setInactivityTimeout(this.idle);
@@ -172,22 +173,37 @@ export class DemoContainer extends DurableObject {
   async cleanup() {
     this.cancelled = true; this.stopped = true;
     const startup = await this.ctx.storage.get('startup');
-    // Keep the alarm and capacity reservation if destruction fails; retry cleanup.
+    const failure = startup?.failure ?? (startup?.phase === 'failed' ? startup : null);
+    // A failed start has no live visitor. Release it even if destruction needs
+    // another alarm; a live demo keeps its place until destruction succeeds.
     await this.ctx.storage.put('stopping', true);
     await this.ctx.storage.setAlarm(this.now() + this.cleanupRetry);
+    if (failure) {
+      await this.releasePlace();
+      await this.ctx.storage.put('startup', failure);
+    }
     if (this.container.running) {
-      try { await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).extend(this.ctx.id.toString(), this.now() + 60_000), 2000); }
-      catch (cause) { report(this.correlation, this.started, 'cleanup-reservation', { error: category(cause) }); }
+      if (!failure) {
+        try { await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).extend(this.ctx.id.toString(), this.now() + 60_000), 2000); }
+        catch (cause) { report(this.correlation, this.started, 'cleanup-reservation', { error: category(cause) }); }
+      }
       await bounded(this.container.destroy(), 5000);
     }
-    await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(this.ctx.id.toString()), 2000);
+    if (!failure) await this.releasePlace();
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
     // Retain only the terminal answer briefly, so polling survives a fresh DO.
-    if (startup?.phase === 'failed') {
-      await this.ctx.storage.put({ startup, correlation: this.correlation, started: this.started });
+    if (failure) {
+      await this.ctx.storage.put({ startup: failure, correlation: this.correlation, started: this.started });
       await this.ctx.storage.setAlarm(this.now() + 60_000);
     }
     report(this.correlation, this.started, 'ended');
+  }
+
+  async releasePlace() {
+    const id = this.ctx.id.toString();
+    if (await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(id), 2000)) {
+      report(this.correlation, this.started, 'released', { releasedId: await fingerprint(id) });
+    }
   }
 }
