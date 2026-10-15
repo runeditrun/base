@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.21-dev.gca7acd45",
+  "cliVersion": "0.2.22-dev.gfa6ba53e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -113,7 +113,7 @@
     },
     "local/operation.mjs": {
       "source": "onboarding/local/operation.mjs",
-      "sha256": "5f938fbd2eb550030b34da17f27e47eaa084995b79f31ef4fb67a0ff6cbd18e7"
+      "sha256": "879f2b1068afeb8e9340c317b6156faec7099ceeabf3b1e310489c79e9fa048c"
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
@@ -126,6 +126,10 @@
     "local/recovery.mjs": {
       "source": "onboarding/local/recovery.mjs",
       "sha256": "bb1c3d1f842a8c03796376100b7e3c7112671c37f47ac8b54ec0bb92ee5c6ec1"
+    },
+    "local/state-files.mjs": {
+      "source": "onboarding/local/state-files.mjs",
+      "sha256": "ac00a918b350265d395ba3b4dba8ecde0c73e66ebb41cde7037246235552e56e"
     },
     "local/state.mjs": {
       "source": "onboarding/local/state.mjs",
@@ -177,7 +181,7 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "21645acfb4f08a77eb2fbf061bffd265db331ce93baf83feb8d82baa96732fee"
+      "sha256": "b3fe50dce223a767b48ea846d552ef7dbeb9934c5d9d59b5d2050714517144eb"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
@@ -327,7 +331,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "c5279e228b5867b881b4a4a50160cc5a54c1b182472c41cddc101425168226e7"
+      "sha256": "338fa226c68606f7992ceeae469c7a228f489792ab45d28eae2b83d22adda323"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -535,7 +539,7 @@
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
-      "sha256": "9d2be470b4f66ceaefde0795ebf103d1f37a0784a3d5f3805fdc9a06fe97ea96"
+      "sha256": "24e1ca85371bb485d12f3efb39e74a1c4c069659ab674f98566beb3f31c62b01"
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
@@ -543,7 +547,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "f9e5afce87db7137a07cdc4710cbcaf54f9b05cdceae87fa26006404dd92150d"
+      "sha256": "0f393e10f93f5d6c2391be418c0c7588c8e44d72bf476eb8e533e4b8be5e3a3d"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
