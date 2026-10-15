@@ -391,7 +391,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "657505c350b65743c5fcc8cd7e39b81a642fd7041acc639d3be6b9be40adcfd7"
+      "sha256": "c327d1d5721a1c55bffa685e16e52f32e8cc69e9e929435f591a7f6a7312c00e"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -551,7 +551,7 @@
     },
     "cli/pnpm-probe.mjs": {
       "source": "cli/pnpm-probe.mjs",
-      "sha256": "e1c7ce9cf10dd6e6fd641bb4243b76d4881d426bcff2bee5485212c5c14deef8"
+      "sha256": "9574da413fdb592ca20ccd001b89b769097ea5a51ee55be2e6d0ec1ba1a27d0e"
     },
     "cli/pnpm-runtime.mjs": {
       "source": "cli/pnpm-runtime.mjs",
@@ -579,7 +579,7 @@
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
-      "sha256": "ce38760655b3cda56f592c7e16d43a78e3572232f2eaf31f03122aa3a786fef3"
+      "sha256": "5793898f0d1e8b297d1aa48369e83687a749ebba82eef656b5cde45b0410a6f6"
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",

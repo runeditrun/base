@@ -110,7 +110,7 @@ globalThis.fetch=async url=>new Response(url.endsWith('.tgz')?readFileSync(proce
   child.done = new Promise(resolve => child.once('close', code => resolve({ code, stderr })));
   return child;
  };
- const failing = failures => `const{readFileSync,writeFileSync}=require('node:fs');const f=process.env.HOME+'/runs';const n=Number(readFileSync(f,'utf8').trim()||0)+1;writeFileSync(f,String(n));if(n<=${failures}){console.error('fixture pnpm cold start failed');process.exit(1);}console.log(${JSON.stringify(pin)});\n`;
+ const failing = failures => `const{readFileSync,writeFileSync}=require('node:fs');const f=process.env.HOME+'/runs';const n=Number(readFileSync(f,'utf8').trim()||0)+1;writeFileSync(f,String(n));if(n<=${failures}){console.error('fixture pnpm cold start failed\\nAuthorization: Bearer test-only-probe-credential');process.exit(1);}console.log(${JSON.stringify(pin)});\n`;
  const transient = await acquisition(temporary, pin, edge, failing(1), 'transient');
  await writeFile(join(transient.home, 'runs'), '0');
  const settled = await transient.run(start);
@@ -121,5 +121,7 @@ globalThis.fetch=async url=>new Response(url.endsWith('.tgz')?readFileSync(proce
  const refused = await lasting.run(start);
  assert.equal(refused.code, 3, refused.stderr);
  assert.match(refused.stderr, /exited 1: fixture pnpm cold start failed/, 'the refusal names what pnpm did');
+ assert.match(refused.stderr, /Command: pnpm --version\nExit code: 1; signal: none\nStderr \(redacted\):\nfixture pnpm cold start failed/);
+ assert.doesNotMatch(refused.stderr, /test-only-probe-credential/);
  assert.equal((await readFile(join(lasting.home, 'runs'), 'utf8')).trim(), '3', 'the retry is bounded');
 });
