@@ -54,7 +54,13 @@ the setup schema and both validators they need.
 `artifact.specInputs` declares allowed public variable names, required/optional
 secret **names**, migration prefixes and additional migration directories,
 health/recovery policy, provider effects, surfaces and initial setup probes.
-It never supplies secret values. Build-emitted Wrangler JSON provides resource
+It never supplies secret values.
+Each surface's `originVariable` must be unique across surfaces; validation names
+the variable and conflicting surfaces when it is repeated. `rer check` and
+ordinary `rer deploy` (including `--dry-run`) check declarations in
+`rer-packaging.json`, `packaging.json`, `scripts/delivery/base/packaging.json`
+and `management/integration/deployment-spec.json` before starting work.
+Build-emitted Wrangler JSON provides resource
 bindings, compatibility settings, native Durable Object migrations, schedules,
 queue consumers and public defaults. Resource account IDs/names are omitted.
 Unsupported native binding/options, unknown policy fields, duplicate JSON keys,

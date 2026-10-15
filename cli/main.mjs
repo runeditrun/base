@@ -41,6 +41,11 @@ export async function main(argv = process.argv.slice(2)) {
   }
   // A checkout without a declared run site refuses --site before any effect.
   if (options.site) (await import('./site.mjs')).declaredSite(project);
+  if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret) {
+   const { deliveryDeclarationClauses } = await import('./delivery-declarations.mjs');
+   const failures = (await deliveryDeclarationClauses(project.root)).filter(clause => !clause.ok);
+   if (failures.length) throw new RerError('invalid_deployment_declaration', failures.map(clause => clause.message).join('\n'), 1);
+  }
   const bounded=await (await import('./bounded.mjs')).boundedCommand(project,options,argv,out);
   if(bounded)return bounded.exitCode;
   if(options.platform==='container' && !['export','import'].includes(options.verb)) { const result = await (await import('./container.mjs')).containerCommand(project,options,out); out.result(true,0,result); return 0; }
