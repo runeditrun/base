@@ -12,8 +12,15 @@ export function hookOrigin(deployed, again) {
  throw hookFailure(`The deploy hook finished without reporting a live deployment, so rer claimed no owner. A deploy hook returns { deployed: true, origin } once its upload is live. Check the hook's output above, fix the hook, then run ${again} again.`);
 }
 
-export async function waitForSource({ origin, sourceSha, again }) {
- try { await waitHealth({ origin, expected: { sourceSha }, request: (url, init) => globalThis.fetch(url, init) }); }
+export async function waitForSource({ origin, sourceSha, uploaded, again }) {
+ // Only a kit upload observed in this hook invocation supplies a deadline and
+ // version. An external hook without that proof keeps its independent wait.
+ const propagation = uploaded?.propagation;
+ const fresh = propagation?.freshUpload && propagation.versionId === uploaded.versionId;
+ const window = fresh ? propagation.window : undefined;
+ try { await waitHealth({ origin, expected: { sourceSha, ...(uploaded?.versionId ? { versionId: uploaded.versionId } : {}) },
+  request: (url, init) => globalThis.fetch(url, init),
+  ...(window ? { window, clock: window.clock, sleep: window.sleep, freshUpload: true } : {}) }); }
  catch (error) {
   const last = error.attempts?.at(-1);
   let named;
@@ -22,7 +29,8 @@ export async function waitForSource({ origin, sourceSha, again }) {
    : last.status !== 200 ? `its last answer was HTTP ${last.status}`
    : typeof named === 'string' && /^[0-9a-f]{7,64}$/.test(named) ? `it still answers for commit ${named.slice(0, 12)}`
    : 'it answers without a deploy identity';
-  throw hookFailure(`The deploy hook reported a deployment at ${origin}, but its /health never named this checkout's commit ${sourceSha.slice(0, 12)} (${seen}), so rer claimed no owner. Check that the hook uploaded this build and that /health answers deploymentHealth(env), then run ${again} again.`);
+  const deadline = window?.remaining() <= 0 ? ' before the upload readiness deadline' : '';
+  throw hookFailure(`The deploy hook reported a deployment at ${origin}, but its /health never named this checkout's commit ${sourceSha.slice(0, 12)}${uploaded?.versionId ? ' and the uploaded Worker version' : ''}${deadline} (${seen}), so rer stopped before owner finalization. Check that the hook uploaded this build and that /health answers deploymentHealth(env), then run ${again} again.`);
  }
 }
 

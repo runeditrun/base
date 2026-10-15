@@ -1,3 +1,4 @@
+import { ownerClaimRequest } from './deploy-claim-request.mjs';
 import { observeOwner } from './deploy-observation.mjs';
 import { randomBytes } from 'node:crypto';
 
@@ -55,7 +56,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
   let observed;
   try {
    if (deployed.observedOwner) await hook(context);
-   else await observeOwner({ paths: ['/auth/bootstrap', claim?.path].filter(Boolean), inspect, addSecret }, async claims => { await hook(context); observed = claims.at(-1)?.outcome; });
+   else await observeOwner({ paths: ['/auth/bootstrap', claim?.path].filter(Boolean), inspect, addSecret, deployed: () => deployed, tokenKey }, async claims => { await hook(context); observed = claims.at(-1)?.outcome; });
   } catch (cause) { if (cause.message === 'owner-claim-failed') throw cause; throw ownerFailure(cause.message); }
   // Function hooks can keep existing owners without returning a value. Observe
   // their actual response, instead of assuming that a resolved promise claimed.
@@ -66,9 +67,9 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
  const displayName = (typeof hook.displayName === 'function' ? hook.displayName({}) : undefined) || 'Owner';
  let response, code = 'no code';
  try {
-  response = await fetch(new URL(hook.path ?? '/auth/bootstrap', deployed.origin), { method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(30000),
-   headers: { Origin: deployed.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token, displayName, returnTo: hook.returnTo ?? '/' }) });
- } catch { throw ownerFailure('the hosted application did not answer'); }
+  response = await ownerClaimRequest(fetch, new URL(hook.path ?? '/auth/bootstrap', deployed.origin), { method: 'POST',
+   headers: { Origin: deployed.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token, displayName, returnTo: hook.returnTo ?? '/' }) }, {deployed, tokenKey, signal});
+ } catch (error) { throw ownerFailure(['owner-claim-origin-mismatch','owner-claim-redirected','owner-claim-readiness-timeout'].includes(error.message) ? error.message : 'the hosted application did not answer'); }
  if (response.status !== 303) { try { const body = await response.json(); if (typeof body?.error === 'string' && /^[a-z_]{1,64}$/.test(body.error)) code = body.error; } catch {} }
  else await response.body?.cancel();
  const outcome = response.status === 303 ? 'claimed' : response.status === 409 && code === 'already_initialized' ? 'kept' : undefined;
