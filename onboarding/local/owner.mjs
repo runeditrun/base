@@ -3,7 +3,7 @@ import {basename,join} from 'node:path';
 
 // Importing the owner-name helper must not load the database engine or emit
 // its runtime warning before the launcher registers its worker.
-async function openDatabase(path,options){
+async function openDatabase(path,options={}){
  const {DatabaseSync}=await import('node:sqlite');
  return new DatabaseSync(path,options);
 }
