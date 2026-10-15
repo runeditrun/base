@@ -41,7 +41,10 @@ async function human(env, token, ip) {
 
 const wantsJSON = request => request.headers.get('accept') === 'application/json';
 function refusal(request, env, status, notice, headers = {}) {
-  return wantsJSON(request) ? Response.json({ notice }, { status, headers: { 'cache-control': 'no-store', ...headers } }) : startPage(env, { status, notice, headers });
+  const correlation = headers['x-rer-demo-correlation'] ?? crypto.randomUUID();
+  headers = { 'cache-control': 'no-store', ...headers, 'x-rer-demo-correlation': correlation };
+  report(correlation, Date.now(), 'refused', { status });
+  return wantsJSON(request) ? Response.json({ notice }, { status, headers }) : startPage(env, { status, notice, headers });
 }
 
 function progress(request, env, id, state) {
@@ -69,9 +72,10 @@ async function status(request, env) {
 }
 
 async function start(request, env, ctx) {
-  const refuse = (status, notice, headers = {}) => refusal(request, env, status, notice, headers);
+  const correlation = crypto.randomUUID();
+  const refuse = (status, notice, headers = {}) => refusal(request, env, status, notice, { 'x-rer-demo-correlation': correlation, ...headers });
   if (request.headers.get('origin') !== env.DEMO_ORIGIN) return refuse(403, 'Start the demo from this page.');
-  let demo, correlation;
+  let demo;
   const started = Date.now();
   try {
     const ip = request.headers.get('cf-connecting-ip') ?? '';
@@ -89,10 +93,10 @@ async function start(request, env, ctx) {
     const capacity = env.CAPACITY.get(env.CAPACITY.idFromName('capacity'));
     // A lost handoff occupies a place for at most a minute. The object extends
     // it to the demo's end only after health and owner admission succeed.
-    if (!await bounded(capacity.acquire(id.toString(), Date.now() + 60_000, Number(env.DEMO_MAX_INSTANCES)), 2000)) {
+    if (!await bounded(capacity.acquire(id.toString(), Date.now() + 60_000, Number(env.DEMO_MAX_INSTANCES), correlation), 2000)) {
       return refuse(503, 'Every demo is in use right now. Try again in a few minutes.');
     }
-    demo = env.DEMO.get(id); correlation = crypto.randomUUID();
+    demo = env.DEMO.get(id);
     const state = await bounded(demo.begin({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) }), 2000);
     return progress(request, env, id, { ...state, correlation });
   } catch (error) {

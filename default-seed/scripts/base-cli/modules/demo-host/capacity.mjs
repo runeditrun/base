@@ -18,7 +18,7 @@ export class DemoCapacity extends DurableObject {
   }
   async alarm() { await this.ctx.storage.deleteAll(); }
 
-  async acquire(id, ends, max) {
+  async acquire(id, ends, max, correlation) {
     return this.ctx.storage.transaction(async storage => {
       const now = Date.now(), places = [...await storage.list()]
         .filter(([key, until]) => /^[0-9a-f]{64}$/.test(key) && typeof until === 'number');
@@ -28,7 +28,7 @@ export class DemoCapacity extends DurableObject {
       if (held.length >= max) {
         // Fingerprints identify held reservations without logging bearer cookies.
         const heldIds = await Promise.all(held.map(async ([key, until]) => ({ id: await fingerprint(key), ends: until })));
-        console.log(JSON.stringify({ event: 'demo_capacity_refused', max, held: heldIds }));
+        console.log(JSON.stringify({ event: 'demo_capacity_refused', correlation, max, held: heldIds }));
         return false;
       }
       await storage.put(id, ends);

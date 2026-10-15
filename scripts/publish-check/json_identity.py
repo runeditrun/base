@@ -67,13 +67,22 @@ class Document:
     def matches(self, hit, pointers):
         if hit.get('RuleID') not in ('generic-api-key', 'hex-api-key'):
             return False
+        secret = hit.get('Secret', '').encode('utf-8')
+        if not secret:
+            return False
         located = set()
         for left, right in match_spans(self.data, hit):
+            start = self.data.find(secret, left, right)
+            if start < 0 or self.data.find(secret, start + 1, right) >= 0:
+                continue
             for pointer in pointers:
                 span = self.spans.get(pointer)
                 if span:
                     a, b, value = span
-                    if (left <= a + 1 and b - 1 <= right and hit.get('Secret') == value
+                    # Native fragments can truncate a digest capture. Bind the
+                    # captured secret's bytes, including a partial capture, to
+                    # this exact unescaped JSON value.
+                    if (a + 1 <= start and start + len(secret) <= b - 1
                             and self.data[a + 1:b - 1] == value.encode('ascii')):
                         located.add((a, b))
         return len(located) == 1

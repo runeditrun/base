@@ -45,7 +45,8 @@ start page.
   storage transaction, excluding diagnostics and expired rows. A lost start
   handoff expires after one minute; a successful claim extends the reservation
   to the demo's end. Refusals log the held ids as SHA-256 fingerprints (also
-  logged with each start's correlation), never visitor bearer cookies.
+  logged with each start's correlation), never visitor bearer cookies. The
+  refusal's response correlation also identifies that held-place snapshot.
 - `image.mjs`, `prepare.mjs`, `template.mjs`, `entrypoint.sh`: the demo image
   build migrates fresh workerd persistence with the packaged engine and closes
   it into `/template`, with no network and no app requests. The entrypoint
@@ -91,7 +92,9 @@ correlation. Every attempt logs its timestamp, elapsed time, duration and
 HTTP status or fixed error category, including successful probes. Exit records
 include the numeric platform exit code when supplied. A separate random
 `x-rer-demo-correlation` response header joins these events without disclosing
-the visitor's bearer cookie. Worker observability also enables the platform's
+the visitor's bearer cookie. Early refusals, including capacity, rate-limit,
+Origin and human-check refusals, also carry a correlation and log their status.
+Worker observability also enables the platform's
 private Container stdout/stderr logs; historical stdout is not exposed by the
 Container lifecycle API. Read those logs with an account principal granted
 Workers Observability Write, and filter by the application and boot interval.

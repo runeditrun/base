@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.22-dev.ga2e81495",
+  "cliVersion": "0.2.22-dev.gc5c5ad5b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -967,11 +967,11 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "17dde134cb6316cc2ac75072cc5ca23eb9320972bba3b41100eaaaeafe5f1a05"
+      "sha256": "a2f13d42f58ec2a4f727bdf6b1605f459e1deaede990f241e377ad10b40a4930"
     },
     "modules/demo-host/capacity.mjs": {
       "source": "modules/demo-host/capacity.mjs",
-      "sha256": "3dd875c1112f15f133cc66ac7bbb7c4bf04397c00100fe9e439c486c49212ed3"
+      "sha256": "92450f2884ba9e17ce86d13881271d144325ecd00bd3bebbe01bfba7e41e3950"
     },
     "modules/demo-host/claim.mjs": {
       "source": "modules/demo-host/claim.mjs",
@@ -1031,7 +1031,7 @@
     },
     "modules/demo-host/worker.mjs": {
       "source": "modules/demo-host/worker.mjs",
-      "sha256": "409007ef2c928bf99de0acb4f89a0270df024265de21812dcc84f0af919b8919"
+      "sha256": "4dbfa4aa9d91b9c835c5631f3407740c4e9fcc1230e2532ae7d97b3dd0d77ab8"
     },
     "modules/demo/README.md": {
       "source": "modules/demo/README.md",
@@ -2343,7 +2343,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "47f918b689eba371f98c562c10ed6bf424a54896b61e4a706299a1e7ed0898c8"
+      "sha256": "ec4ee0717d14455d10f9db6a99c0edf8812ba22a4474aecf69e2f2e1bb080eb7"
     },
     "scripts/publish-check/c2pa.py": {
       "source": "scripts/publish-check/c2pa.py",
@@ -2371,7 +2371,7 @@
     },
     "scripts/publish-check/content_identities.py": {
       "source": "scripts/publish-check/content_identities.py",
-      "sha256": "8df2b9bf77cecdf0aeca10157a1fd12f943693611a249e15047b977d3d6ed717"
+      "sha256": "208e548f63ebcca742c8dcb0f8cc2acf65706d1722eb4840cc1cbdd41b899b44"
     },
     "scripts/publish-check/controller_metadata.py": {
       "source": "scripts/publish-check/controller_metadata.py",
@@ -2435,7 +2435,7 @@
     },
     "scripts/publish-check/json_identity.py": {
       "source": "scripts/publish-check/json_identity.py",
-      "sha256": "6da083788a0a5c67b1b7fbe7d17f8eb1e19c89e3c66f180f5f35d2b91bf4b9d3"
+      "sha256": "655a0104e470babca83d2afcc7891c3a9358751226156c37130a9cf66acbedcc"
     },
     "scripts/publish-check/license-exceptions.json": {
       "source": "scripts/publish-check/license-exceptions.json",

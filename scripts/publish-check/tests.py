@@ -11,6 +11,7 @@ import zlib
 from unittest.mock import patch
 from test_repo import ROOT, RepositoryFixture, generic_credential
 from history_scan import scan
+from test_copy_digests import CopyDigestTests
 
 
 class HistoryTests(RepositoryFixture, unittest.TestCase):
