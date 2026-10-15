@@ -19,7 +19,7 @@ export function output(options) {
    else if (!['describe', 'check', 'dev', 'preview', 'setup'].includes(options.verb) || !ok) this.human(`${options.verb}: ${ok ? 'complete' : 'failed'} (exit ${exitCode})`);
   },
   error(error) {
-   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode });
+   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}) });
    else write(2, error.message + '\n');
   },
  };
