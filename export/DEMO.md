@@ -94,6 +94,14 @@ request waiting for minutes. Admission answers within 12 seconds, each progress
 poll within two seconds, and a copy that cannot start within 45 seconds is ended.
 A retry while it is starting resumes that copy without taking a second place.
 
+Cloudflare prepares container capacity as demand grows. A temporary lack of
+available instances can occur below `maxInstances`; it is not an account cap.
+The host keeps the same visitor and reservation while requesting placement
+within the existing startup budget. It repeats placement only when Cloudflare
+explicitly reports that no instance is available, never after an application
+boot or health failure. If placement remains unavailable, the visitor gets
+"Every demo is in use right now" and the reservation is released.
+
 At most `maxInstances` demos (10 unless set) run at once, and one IP starts at
 most 3 a minute.
 Mail is suppressed silently; all other effects follow the real/mocked policy above.
