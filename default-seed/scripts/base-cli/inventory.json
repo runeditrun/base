@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.14-dev.g91de0994",
+  "cliVersion": "0.2.15",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -535,7 +535,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "2c38addd2acd76d2c797c4edf55da6aa7c2e99de4cc2ec6c3a60330d707320bd"
+      "sha256": "63dc49a95b26d252c50d2f450a8efa6b3fb627fae8a460b951b29a8d8e84257f"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
@@ -688,6 +688,10 @@
     "cli/site.mjs": {
       "source": "cli/site.mjs",
       "sha256": "9b5b7b04b9004bc6f8c335422b08e8fb07fd6892414ea563aa4c1ed91a0322c2"
+    },
+    "cli/stdio.mjs": {
+      "source": "cli/stdio.mjs",
+      "sha256": "1a1b4ed1908e801b097ded46ad3349f68afbc5b81a935efbdfece5ad1f9d1cb4"
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",

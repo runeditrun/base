@@ -1,10 +1,14 @@
-import { writeSync } from 'node:fs';
+import { handleBrokenPipes } from './stdio.mjs';
 export function output(options) {
- let closed = false, finished = false;
+ handleBrokenPipes();
+ let finished = false;
  // A bounded child retains the caller's human progress but sends its closing
  // outcome as data, so only the drained outer workflow renders the result.
  const structuredResult = options.json || process.env.RER_BOUNDED_OUTPUT === '1';
- const write = (fd, text) => { if (closed && fd === 1) return; try { writeSync(fd, text); } catch (error) { if (error.code === 'EPIPE') closed = true; else if (!['EAGAIN', 'EWOULDBLOCK'].includes(error.code)) throw error; } };
+ // Pipes can accept only part of a synchronous write (512 bytes on macOS).
+ // Writable streams queue every byte under backpressure; the entry points set
+ // exitCode so Node drains that queue before exiting naturally.
+ const write = (fd, text) => { const stream = fd === 1 ? process.stdout : process.stderr; if (!stream.destroyed) stream.write(text); };
  return {
   event(event, details = {}) { write(1, JSON.stringify({ version: 1, verb: options.verb ?? 'unknown', event, ...details }) + '\n'); },
   human(text) { write(1, text + '\n'); },
