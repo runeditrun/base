@@ -22,6 +22,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { packageReference } from '../../scripts/rer-package/reference.mjs';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 import { freePort, run, sweep } from './harness.mjs';
+import { requireSavedOwnerInput } from './resume-owner.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
@@ -107,9 +108,19 @@ test('an installed rer launches the package-mode default-seed reference with one
 
  password.localDefault = { generate: 'hex' };
  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+ await requireSavedOwnerInput(root);
+ const interrupted = await run(rer, ['dev', '--port', String(port)], { cwd: root, env });
+ assert.equal(interrupted.code, 1, 'the first setup fails before claiming the owner');
+ await access(join(root, 'owner-hook-reached'));
+ const retained = await readFile(join(root, '.dev.vars'), 'utf8');
+ assert.ok(parseEnv(retained).OWNER_PASSWORD, 'failed setup saved its generated owner password');
+ assert.deepEqual(localData(root).owners, [], 'failed setup has not claimed an owner');
+ await rm(join(root, 'fail-before-owner'));
  // Not a terminal: the one command prepares, starts, prints and returns.
  const launched = await run(rer, ['dev', '--port', String(port)], { cwd: root, env });
- assert.equal(launched.code, 0, launched.stderr + launched.stdout);
+ assert.equal(launched.code, 0, 'rer dev resumes the saved owner claim: ' + launched.stderr + launched.stdout);
+ assert.ok(retained === await readFile(join(root, '.dev.vars'), 'utf8'), 'resume preserves every private setting byte');
+ assert.deepEqual(localData(root).owners.map(owner => owner.email), [parseEnv(retained).OWNER_EMAIL], 'resume claims the saved owner');
  assert.equal(await prepared(), true);
  assert.equal((await stat(join(root, '.dev.vars'))).mode & 0o777, 0o600);
  const settings = parseEnv(await readFile(join(root, '.dev.vars'), 'utf8'));
@@ -117,7 +128,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  assert.equal(settings.WIDGET_ORIGIN, url, 'the origin local default is the chosen local origin');
  assert.match(settings.OWNER_PASSWORD, /^[0-9a-f]{64}$/);
  const serverLog = launched.stdout.match(/^Server log \(private\): (.+)$/m)[1];
- for (const text of [launched.stdout, launched.stderr, await readFile(serverLog, 'utf8'), await readFile(join(serverLog, '../launch.log'), 'utf8')]) assert.ok(!text.includes(settings.OWNER_PASSWORD), 'the generated value is never printed or logged');
+ for (const text of [interrupted.stdout, interrupted.stderr, launched.stdout, launched.stderr, await readFile(serverLog, 'utf8'), await readFile(join(serverLog, '../launch.log'), 'utf8')]) assert.ok(!text.includes(settings.OWNER_PASSWORD), 'the generated value is never printed or logged');
  const lines = Object.fromEntries(launched.stdout.split('\n').filter(line => /^RER_[A-Z_]+ /.test(line)).map(line => [line.split(' ')[0], line.slice(line.indexOf(' ') + 1)]));
  assert.equal(lines.RER_READY, url);
  assert.equal(lines.RER_SIGNED_IN, 'owner@seed-with-spaces.test');
@@ -149,6 +160,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  const before = localData(root), real = 'real-owner@example.com';
  const replaced = await run(rer, ['setup', '--owner-email', real, '--non-interactive'], { cwd: root, env });
  assert.equal(replaced.code, 0, replaced.stderr + replaced.stdout);
+ assert.ok(settings.OWNER_PASSWORD === parseEnv(await readFile(join(root, '.dev.vars'), 'utf8')).OWNER_PASSWORD, 'explicit setup passes the same saved password to the owner hook');
  assert.equal(replaced.stdout.split('\n').filter(line => line.includes('owner@seed-with-spaces.test') && line.includes(real)).length, 1, 'one line says the zero-setup owner was replaced');
  const after = localData(root);
  assert.deepEqual(after.owners, [{ id: before.owners[0].id, email: real }], 'the zero-setup owner row now holds the real address');
