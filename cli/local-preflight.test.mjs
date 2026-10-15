@@ -15,7 +15,7 @@ async function seed(t){
  const root=await mkdtemp(join(tmpdir(),'rer-public-preflight-'));t.after(()=>rm(root,{recursive:true,force:true}));
  await cp(join(base,'default-seed'),root,{recursive:true,filter:path=>!path.split('/').some(part=>['node_modules','.wrangler','.seed','.rer','dist','.cache'].includes(part))});
  await exportCLI(base,root);await cp(join(base,'onboarding'),join(root,'scripts/base-onboarding'),{recursive:true,filter:path=>!path.endsWith('.test.mjs')});
- const run=async args=>{const child=spawn(process.execPath,['scripts/rer.mjs',...args,'--json','--non-interactive'],{cwd:root,env:{...process.env,CI:'true'},stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});return {code,stdout,stderr,events:stdout.trim().split('\n').filter(Boolean).map(JSON.parse)};};
+ const run=async (args,{slow=false}={})=>{const child=spawn(process.execPath,[...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json','--non-interactive'],{cwd:root,env:{...process.env,CI:'true',RER_SERVERS_DIR:join(root,'.test-servers')},stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});return {code,stdout,stderr,events:stdout.trim().split('\n').filter(Boolean).map(JSON.parse)};};
  return {root,run};
 }
 test('public setup enumerates active missing fields and private answer shape without prompting or echoing answers',async t=>{
@@ -69,6 +69,28 @@ test('public lifecycle refuses legacy saved-origin listeners despite overrides a
  foreign.kill();await once(foreign,'exit');
  await writeFile(join(root,'.dev.vars'),'OWNER_EMAIL="original@example.test"\n',{mode:0o600});
  const operation=await localOperation(root);try{const result=await run(['reset','--yes']);assert.equal(result.code,4,result.stdout);assert.match(result.stdout,new RegExp(`PID ${process.pid}`));assert.match(result.stdout,/Stop it/);}finally{await operation.release();}
+
+ const available=createServer();await new Promise(resolve=>available.listen(0,'127.0.0.1',resolve));
+ const unused=available.address().port;await new Promise(resolve=>available.close(resolve));
+ await writeFile(join(root,'.dev.vars'),`OWNER_EMAIL="original@example.test"\nAUTH_ORIGIN="http://127.0.0.1:${unused}"\n`,{mode:0o600});
+ const state=join(root,'.wrangler/state/v3/d1');await mkdir(state,{recursive:true});
+ const database=join(state,'held.sqlite'),db=new DatabaseSync(database);db.exec('CREATE TABLE retained(value TEXT)');db.close();
+ const holderOfState=spawn(process.execPath,['-e',"require('node:fs').openSync(process.argv[1],'r');console.log('held');setInterval(()=>{},1000)",database],{cwd:tmpdir(),stdio:['ignore','pipe','inherit']});
+ t.after(()=>holderOfState.kill());await once(holderOfState.stdout,'data');
+ for(const verb of ['dev','demo']){
+  const result=await run([verb]);assert.equal(result.code,4,result.stdout);
+  assert.match(result.stdout,new RegExp(`PID ${holderOfState.pid} \\(node`));
+ }
+ holderOfState.kill();await once(holderOfState,'exit');
+ for(const verb of ['dev','demo']){
+  // No setup was done: reaching the real missing-prerequisites outcome proves
+  // the unanswered check did not refuse startup. Serving is covered separately.
+  const result=await run([verb],{slow:true});assert.equal(result.code,3,result.stdout);
+  assert.equal(result.events.find(event=>event.event==='error').code,'missing_input');
+ }
+ const launch=await localOperation(root);
+ try{const result=await run(['dev'],{slow:true});assert.equal(result.code,4,result.stdout);assert.match(result.stdout,new RegExp(`PID ${process.pid}`));}
+ finally{await launch.release();}
 });
 test('public reset awaits the seed reset preflight before showing or deleting anything, even with --yes',async t=>{
  // The adapter refuses while a legacy data directory still holds data, as a seed

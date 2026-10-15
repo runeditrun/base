@@ -22,7 +22,7 @@ export async function exportReference(base, target) {
  await exportCLI(base, target);
  for (const name of ['RUN-LOCALLY.md','SEED-COMMAND-CONTRACT.md','HOMEPAGE-VARIANTS.md','VERIFY-WORKFLOW.md','DEMO.md']) await cp(resolve(base,'export',name), resolve(target,name));
  await mkdir(resolve(target, '.github/workflows'), { recursive: true });
- await cp(resolve(base, 'export/verify.yml'), resolve(target, '.github/workflows/verify.yml'));
+ for (const name of ['verify.yml', 'verify-nightly.yml']) await cp(resolve(base, 'export', name), resolve(target, '.github/workflows', name));
  await cp(resolve(base,'LICENSE'), resolve(target,'LICENSE'));
  const idp = 'modules/operator-auth/identity/oidc/tests/idp.mjs', idpTarget = 'tests/operator-auth/idp.mjs';
  const maps = { [resolve(base, 'modules/dependencies')]: resolve(target, 'src/modules/dependencies'), [resolve(base, 'modules/owner-claim')]: resolve(target, 'src/modules/owner-claim'), [resolve(base, 'modules/demo')]: resolve(target, 'src/modules/demo'), [resolve(base, idp)]: resolve(target, idpTarget), [resolve(base, 'onboarding')]: resolve(target, 'scripts/base-onboarding'), [resolve(base, 'modules/mail')]: resolve(target, 'src/modules/mail'), [resolve(base, 'modules/ai')]: resolve(target, 'src/modules/ai'), [resolve(base, 'modules/operator-auth')]: resolve(target, 'src/modules/operator-auth'), [resolve(base, 'foundation/runtime')]: resolve(target, 'src/base'), [resolve(base, 'modules/portability')]: resolve(target, 'src/modules/portability'), [resolve(base, 'modules/erasure')]: resolve(target, 'src/modules/erasure'), [resolve(base, 'modules/import-kit')]: resolve(target, 'src/modules/import-kit') };

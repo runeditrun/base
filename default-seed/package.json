@@ -21,7 +21,7 @@
     "test:operator-auth": "node scripts/base-onboarding/queued-entry.mjs test:operator-auth -- sh -c \"pnpm build && node --test tests/operator-auth/*.test.mjs\"",
     "test:private-response": "node scripts/base-onboarding/queued-entry.mjs test:private-response -- sh -c \"pnpm build && node --test tests/e2e/private-response.test.mjs tests/e2e/start-response-stream.test.mjs\"",
     "test:built": "node scripts/base-onboarding/queued-entry.mjs test:built -- sh -c \"node --test tests/operator-auth/*.test.mjs && node --test tests/e2e/private-response.test.mjs tests/e2e/start-response-stream.test.mjs && node tests/e2e/reference-runtime.mjs\"",
-    "verify:app": "node scripts/base-onboarding/queued-entry.mjs verify:app -- sh -c \"pnpm typecheck && pnpm test:typecheck && pnpm build && pnpm test:built && pnpm test:local-setup && pnpm test:local-journey\"",
+    "verify:app": "node scripts/verify-app.mjs",
     "build:app": "node scripts/base-onboarding/queued-entry.mjs build:app -- sh -c \"vite build\"",
     "setup": "node scripts/rer.mjs setup",
     "reset": "node scripts/rer.mjs reset",

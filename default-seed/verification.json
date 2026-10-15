@@ -1,0 +1,189 @@
+{
+  "push": [
+    {
+      "name": "source",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "pnpm run check --profile first-party"
+      ]
+    },
+    {
+      "name": "typecheck",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "pnpm run typecheck",
+        "pnpm run test:typecheck"
+      ]
+    },
+    {
+      "name": "runtime",
+      "browser": true,
+      "hosted": true,
+      "commands": [
+        "pnpm run build",
+        "node tests/e2e/reference-runtime.mjs"
+      ]
+    },
+    {
+      "name": "private-response",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "pnpm run build",
+        "node --test --test-concurrency=1 tests/e2e/private-response.test.mjs tests/e2e/start-response-stream.test.mjs"
+      ]
+    },
+    {
+      "name": "auth-conformance",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "pnpm run build",
+        "node --test --test-concurrency=1 tests/operator-auth/conformance.test.mjs"
+      ]
+    },
+    {
+      "name": "auth-demo",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "pnpm run build",
+        "node --test --test-concurrency=1 tests/operator-auth/demo.test.mjs"
+      ]
+    },
+    {
+      "name": "auth-emitted",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "pnpm run build",
+        "node --test --test-concurrency=1 tests/operator-auth/emitted.test.mjs"
+      ]
+    },
+    {
+      "name": "auth-lobby",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "pnpm run build",
+        "node --test --test-concurrency=1 tests/operator-auth/lobby.test.mjs"
+      ]
+    },
+    {
+      "name": "setup-cancellation",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-setup/cancellation.test.mjs"
+      ]
+    },
+    {
+      "name": "setup-cli",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-setup/cli.test.mjs"
+      ]
+    },
+    {
+      "name": "setup-hard-kill",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-setup/hard-kill.test.mjs"
+      ]
+    },
+    {
+      "name": "setup-native-bindings",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-setup/native-bindings.test.mjs"
+      ]
+    },
+    {
+      "name": "setup-operation-lock",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-setup/operation-lock.test.mjs"
+      ]
+    },
+    {
+      "name": "setup-outbox-read",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-setup/outbox-read.test.mjs"
+      ]
+    },
+    {
+      "name": "setup-setup-rerun",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-setup/setup-rerun.test.mjs"
+      ]
+    },
+    {
+      "name": "journey-build-safety",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-journey/build-safety.test.mjs"
+      ]
+    },
+    {
+      "name": "journey-demo",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-journey/demo.test.mjs"
+      ]
+    },
+    {
+      "name": "journey-erasure",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-journey/erasure.test.mjs"
+      ]
+    },
+    {
+      "name": "journey-security",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-journey/security.test.mjs"
+      ]
+    }
+  ],
+  "nightly": [
+    {
+      "name": "journey-installer-browser",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-journey/installer-browser.test.mjs"
+      ]
+    },
+    {
+      "name": "journey-installer",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-journey/installer.test.mjs"
+      ]
+    },
+    {
+      "name": "journey-journey",
+      "browser": true,
+      "hosted": false,
+      "commands": [
+        "node --test --test-concurrency=1 tests/local-journey/journey.test.mjs"
+      ]
+    }
+  ]
+}

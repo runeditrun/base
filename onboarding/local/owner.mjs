@@ -1,6 +1,12 @@
 import {readdir,lstat,realpath} from 'node:fs/promises';
 import {basename,join} from 'node:path';
-import {DatabaseSync} from 'node:sqlite';
+
+// Importing the owner-name helper must not load the database engine or emit
+// its runtime warning before the launcher registers its worker.
+async function openDatabase(path,options={}){
+ const {DatabaseSync}=await import('node:sqlite');
+ return new DatabaseSync(path,options);
+}
 
 // The owner the zero-setup `rer dev` gives a checkout before its real owner is known.
 export function zeroSetupOwner(checkout){
@@ -21,7 +27,7 @@ export async function localOwners(root){
  const found=[];
  for(const path of await databases(root)){
   let db,owners=[];
-  try{db=new DatabaseSync(path,{readOnly:true});
+  try{db=await openDatabase(path,{readOnly:true});
    const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
    if(tables.has('oa_operators'))owners=db.prepare("SELECT email FROM oa_operators WHERE role='owner' AND status='active'").all();
   }finally{db?.close();}
@@ -47,7 +53,7 @@ export async function assertLocalOwner(root,email,failure=message=>Error(message
 // retires sign-in links issued to the placeholder.
 export async function replaceLocalOwner(root,from,to,failure=message=>Error(message)){
  for(const path of await databases(root)){
-  const db=new DatabaseSync(path);
+  const db=await openDatabase(path);
   try{
    const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
    if(!tables.has('oa_operators'))continue;

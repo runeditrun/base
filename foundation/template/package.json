@@ -18,7 +18,7 @@
     "test:runtime": "node scripts/base-onboarding/queued-entry.mjs test:runtime -- sh -c \"node tests/runtime.mjs\"",
     "onboard": "node scripts/install.mjs",
     "build:app": "node scripts/base-onboarding/queued-entry.mjs build:app -- sh -c \"vite build\"",
-    "verify:app": "node scripts/base-onboarding/queued-entry.mjs verify:app -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:runtime\"",
+    "verify:app": "node scripts/verify-app.mjs",
     "reset": "node scripts/rer.mjs reset",
     "export": "node scripts/rer.mjs export",
     "import": "node scripts/rer.mjs import",

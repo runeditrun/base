@@ -85,9 +85,10 @@ export async function managedServer(project,options,out,{clock={}}={}){
    throw Error('Unknown management operation');
   });
   await stateSafety(project);
-  await refuseLegacyProcess(project,{verb:options.verb});
   const {localOperation}=await shared('local/operation.mjs');
   try{operation=await localOperation(project.root);}catch(error){throw refuse(error.message);}
+  const ownership=await refuseLegacyProcess(project,{verb:options.verb,operation});
+  if(ownership?.lockProof)out.progress('Local process inspection did not answer; continuing with the exclusive checkout launch lock.\n');
   const {recoverInterrupted}=await shared('local/recovery.mjs');await recoverInterrupted(project.root,operation);
   const {loadInstallerSeed}=await shared('setup-manifest.mjs');
   const seed=project.adapter.setup?await loadInstallerSeed(project.root,project.adapter):undefined;project.setupManifest=seed?.manifest;
