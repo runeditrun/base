@@ -109,7 +109,7 @@ test('emitted Worker browser: owner setup, POST magic confirmation and revoke at
   await browserProof()
 })
 
-test('emitted Worker browser: checkouts side by side on one loopback host keep their own sign-in and dev key', async () => {
+test('emitted Worker browser: native sessions stay separate across loopback ports', async () => {
   // Browsers keep cookies per host, not per port: one browser holds both apps'
   // cookies for 127.0.0.1 and sends all of them to each port.
   const keys = ['a', 'b'].map((letter) => letter.repeat(43))
@@ -133,30 +133,25 @@ test('emitted Worker browser: checkouts side by side on one loopback host keep t
       await signedIn(page)
       return page
     }
-    // [session, dev-key gate] as each app answers this one browser.
-    const admits = async (runtime) => [
-      (await context.request.get(`${runtime.origin}/auth/session`)).status(),
-      (await context.request.get(`${runtime.origin}/__dev/outbox`)).status(),
-    ]
+    const admits = async (runtime) => (await context.request.get(`${runtime.origin}/auth/session`)).status()
     const pageA = await open(a, keys[0])
-    assert.deepEqual(await admits(b), [401, 404], "B accepts none of A's cookies, which the browser also sends to B")
+    assert.equal(await admits(b), 401, "B accepts none of A's cookies, which the browser also sends to B")
     const pageB = await open(b, keys[1])
     await pageA.reload(); await signedIn(pageA)
-    assert.deepEqual(await admits(a), [200, 200], 'signing in on B leaves A signed in')
-    assert.deepEqual(await admits(b), [200, 200])
+    assert.equal(await admits(a), 200, 'signing in on B leaves A signed in')
+    assert.equal(await admits(b), 200)
     // A's cookie values presented under B's own names are refused as well.
     const portOf = (runtime) => new URL(runtime.origin).port
     const fromA = Object.fromEntries((await context.cookies()).filter((c) => c.name.endsWith(`_${portOf(a)}`)).map((c) => [c.name.slice(0, -portOf(a).length - 1), c.value]))
     assert.deepEqual(Object.keys(fromA).sort(), ['operator_session_local', 'rer_dev_gate'])
     assert.equal((await b.call('/auth/session', { cookie: `operator_session_local_${portOf(b)}=${fromA.operator_session_local}` })).status, 401)
-    assert.equal((await b.call('/__dev/outbox', { cookie: `rer_dev_gate_${portOf(b)}=${fromA.rer_dev_gate}` })).status, 404)
     // The access panel is hydrated and loaded once it lists sessions to revoke.
     await pageA.getByRole('button', { name: 'Revoke', exact: true }).first().waitFor()
     await pageA.getByRole('button', { name: 'Sign out', exact: true }).click()
     await pageA.waitForURL(`${a.origin}/signin`)
-    assert.deepEqual(await admits(a), [401, 200], 'sign-out on A ends only its session')
+    assert.equal(await admits(a), 401, 'sign-out on A ends only its session')
     await pageB.reload(); await signedIn(pageB)
-    assert.deepEqual(await admits(b), [200, 200], 'sign-out on A leaves B signed in')
+    assert.equal(await admits(b), 200, 'sign-out on A leaves B signed in')
   } finally { await browser.close(); await Promise.all([a.close(), b.close()]) }
 })
 

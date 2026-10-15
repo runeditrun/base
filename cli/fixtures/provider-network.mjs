@@ -19,5 +19,12 @@ globalThis.fetch=async(input,init)=>{
 try {
  const require=createRequire(await realpath(resolve(process.cwd(),'node_modules/wrangler/package.json')));
  const path=require.resolve('miniflare'),mod=require(path),Real=mod.Miniflare;
- require.cache[path].exports=new Proxy(mod,{get(target,key){if(key!=='Miniflare')return Reflect.get(target,key);return class extends Real {constructor(options){super({...options,workers:options.workers?.map(worker=>({...worker,dev:{...worker.dev,outboundService:{type:'fetcher',handler:async request=>{const r=await globalThis.fetch(request);return Response.json(await r.json(),{status:r.status});}}}}))});}};}});
+ // Vite discovers Worker exports and calls setOptions during initial startup.
+ // Keep the controlled network edge across that update as well as construction.
+ const controlled = options => ({...options,workers:options.workers?.map(worker=>({...worker,dev:{...worker.dev,outboundService:{type:'fetcher',handler:async request=>{const r=await globalThis.fetch(request);return Response.json(await r.json(),{status:r.status});}}}}))});
+ class ProviderRuntime extends Real {
+  constructor(options){super(controlled(options));}
+  setOptions(options){return super.setOptions(controlled(options));}
+ }
+ require.cache[path].exports=new Proxy(mod,{get(target,key){return key==='Miniflare'?ProviderRuntime:Reflect.get(target,key);}});
 } catch(error) { if(error.code!=='MODULE_NOT_FOUND')throw error; }

@@ -28,7 +28,7 @@ test('deploy accepts the real pinned pnpm in a minimal environment and reports t
   GIT_CONFIG_GLOBAL: join(home, 'gitconfig'), GIT_CONFIG_NOSYSTEM: '1', TMPDIR: join(home, 'tmp'),
   LANG: 'en_US.UTF-8', TERM: 'dumb', WRANGLER_SEND_METRICS: 'false',
   CLOUDFLARE_API_TOKEN: 'test-only-deploy-token', CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
-  EMAIL_API_KEY: 'test-only-mail-key', EMAIL_PROVIDER: 'sendgrid', EMAIL_FROM: 'fixture@example.test',
+  MAIL_API_KEY: 'test-only-mail-key',
  };
  // Git sees an actual dirty committed checkout and refuses before building or
  // contacting a provider, after the tool check has accepted the real pnpm.

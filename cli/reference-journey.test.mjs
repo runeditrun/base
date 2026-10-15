@@ -158,7 +158,8 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--port',String(port),'--non-interactive','--json']);await rm(answers);
  const tables=await f.data("SELECT name FROM sqlite_master WHERE name='cli_reset_probe'");assert.equal(tables[0].results.length,0,'confirmed reset removed prior domain rows');
  const ownerRows=await f.data('SELECT email FROM oa_operators');assert.deepEqual(ownerRows[0].results,[{email:'fresh-owner@example.test'}],'fresh setup has only the new real owner');
- const dry=await f.run(['deploy','--dry-run','--json']);assert.equal(events(dry).at(-1).deployed,false);assert.equal(events(dry).at(-1).dryRun,true);
+ const deploySettings=join(f.root,'.seed/installer/dry-run.env');await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
+ const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json']);await rm(deploySettings);assert.equal(events(dry).at(-1).deployed,false);assert.equal(events(dry).at(-1).dryRun,true);
  // The run site builds from edition identity alone, even in a set-up checkout.
  const site=events(await f.run(['build','--site','--json'])).at(-1).site,siteRoot=join(f.root,site.path);
  const siteFiles=(await readdir(siteRoot,{recursive:true,withFileTypes:true})).filter(entry=>entry.isFile()).map(entry=>join(entry.parentPath,entry.name));

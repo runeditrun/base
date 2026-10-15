@@ -17,7 +17,7 @@ export async function browserProof() {
     if (captureDir) await mkdir(captureDir, { recursive: true })
     for (const width of [1440, 390]) {
       const runtime = await emittedRuntime()
-      const context = await browser.newContext({ viewport: { width, height: 900 } })
+      const context = await browser.newContext({ viewport: { width, height: 900 }, ignoreHTTPSErrors: true })
       const page = await context.newPage()
       const errors = [], failed = [], badResponses = [], documents = [], fetches = new Set()
       page.on('request', (request) => { if (request.resourceType() === 'fetch') fetches.add(request) })

@@ -31,6 +31,14 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  const configured=await seed.run(['deploy','--env-file','production.env'],4);
  assert.match(error(configured).message,/not committed/,'valid production mail gets past sign-in preflight');
  assert.ok(!JSON.stringify(configured).includes('test-only-mail-credential'));
+ // Managed RER mail counts as outbound only with its assigned relay URL.
+ const managed=JSON.parse(originalDeclaration);managed.vars.MAIL_PROVIDER='rer';
+ await writeFile(declarationPath,JSON.stringify(managed));
+ assert.match(error(await seed.run(['deploy','--env-file','production.env'],4)).message,/Production sign-in is not configured/);
+ managed.vars.MAIL_RELAY_URL='https://mail.example.test/install/relay';
+ await writeFile(declarationPath,JSON.stringify(managed));
+ assert.match(error(await seed.run(['deploy','--env-file','production.env'],4)).message,/not committed/);
+ await writeFile(declarationPath,originalDeclaration);
  await assert.rejects(access(join(seed.root,'dist')),{code:'ENOENT'});
  // Demo mode can never enter a production binding, even with valid mail.
  const declaration=JSON.parse(await readFile(join(seed.root,'deploy.json'),'utf8'));

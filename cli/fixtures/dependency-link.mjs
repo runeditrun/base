@@ -13,7 +13,7 @@ export function setupDiagnostic(child) {
  // Emit fixed classifications only; child messages and private values stay local.
  const events=new Set(['error','result','waiting','setup-ready']);
  const codes=new Set(['invalid_invocation','invalid_setup_manifest','missing_input','safety_refusal','command_failed','cancelled']);
- const reasons=[['setup_fields',/^Missing or invalid active setup fields:/],['provider_document',/^A selected provider dependency document is unavailable\.$/],['approval_scope',/^Link approval must name this exact origin,/],['approval_required',/^Provider approval is required\./],['pnpm_probe',/^The pinned pnpm version probe failed\b/]];
+ const reasons=[['setup_fields',/^Missing or invalid active setup fields:/],['provider_document',/^A selected provider dependency document is unavailable\.$/],['approval_scope',/^Link approval must name this exact origin,/],['approval_required',/^Provider approval is required\./],['pnpm_probe',/^The pinned pnpm version probe failed\b/],['provider_link',/^Provider link approval was refused or the provider is unavailable\.$/],['provider_link_incomplete',/^Provider approval did not complete linking\.$/],['app_link_incomplete',/^The application has not accepted the provider link\.$/],['owner_claim_incomplete',/^The dependency setup has not completed an owner claim\.$/]];
  const rows=[];
  for(const line of child.stdoutText.split('\n')) {
   let row;try{row=JSON.parse(line);}catch{continue;}
@@ -76,7 +76,11 @@ export async function linkedSetup(kind,t) {
  const args=['scripts/rer.mjs','setup','--answers','answers.json','--non-interactive','--json','--no-queue','--port',new URL(origin).port];
  if(kind==='foundation') {const pending=f.launch(args,process.execPath,env);assert.equal(await pending.done,3,'pending setup command has the expected outcome');assert.equal((await f.sql('SELECT count(*) n FROM oa_operators'))[0].results[0].n,0);provider.allowOwnerClaim();used.clear();for(const value of approvals.values())value.token=crypto.randomUUID();await writeApprovals();}
  const first=f.launch(args,process.execPath,env),firstCode=await first.done;
- if(firstCode!==0)t.diagnostic(JSON.stringify(setupDiagnostic(first)));
+ if(firstCode!==0){
+  const paths=new Set(['/.well-known/rer-dependencies','/.well-known/rer-provider','/link','/redeem','/remove','/.well-known/openid-configuration','/jwks']);
+  const codes=new Set(['invalid_token','invalid_code','invalid_proof','local_owner_proof_required','untrusted_link_issuer','owner_claim_unavailable','owner_claim_refused','invalid_link_grant']);
+  t.diagnostic(JSON.stringify({...setupDiagnostic(first),edge:edge.map(row=>({path:paths.has(row.path)?row.path:'other',...(Number.isInteger(row.status)?{status:row.status}:{}),...(codes.has(row.error?.error)?{error:row.error.error}:{})}))}));
+ }
  assert.equal(firstCode,0,'first setup command has the expected outcome');assert.deepEqual([...used].sort(),contracts.slice().sort());state.expectedClaim=false;for(const file of Object.values(approvalFiles))await assert.rejects(access(join(f.root,file)));
  const saved=await readFile(join(f.root,'.seed/installer/setup-answers.json'),'utf8');for(const value of approvals.values())assert.equal(saved.includes(value.token),false);
  return {f,origin,provider,contracts,approvals,approvalFiles,used,state,edge,env,args,writeApprovals};

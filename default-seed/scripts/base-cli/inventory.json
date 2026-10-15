@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.18-dev.gfb58d1fb",
+  "cliVersion": "0.2.18-dev.gd5f38ba5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -583,7 +583,7 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "b884138b16d1bb42261520576f432de67c7d82e1adf5330355c8775f0e93100d"
+      "sha256": "a90fe4ac5e572554e88cf8721cd06470595017aae3e9c36a12aac222fcc6933b"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
@@ -1439,7 +1439,7 @@
     },
     "modules/mail/README.md": {
       "source": "modules/mail/README.md",
-      "sha256": "5e702870544b07592a9880c0453228a1071422aabe866ab3379014495e07bcea"
+      "sha256": "4eae21c84caf86429a0274e5dccb002a304915c74ff58f0c75279555d2cb16a0"
     },
     "modules/mail/doctor.mjs": {
       "source": "modules/mail/doctor.mjs",
@@ -1509,6 +1509,14 @@
       "source": "modules/mail/src/adapters/messaging/serialize.mjs",
       "sha256": "4ee46c1ccb75edfd53b94bfff67ccdb08196a3ee68576c1eb0aa2494f9d4e1f5"
     },
+    "modules/mail/src/adapters/rer/contract.mjs": {
+      "source": "modules/mail/src/adapters/rer/contract.mjs",
+      "sha256": "b8ae90da173b40c7bde1a194ac35e9367802b9b608f050d63e2337a64e58454c"
+    },
+    "modules/mail/src/adapters/rer/index.mjs": {
+      "source": "modules/mail/src/adapters/rer/index.mjs",
+      "sha256": "2f27ff23d1182b4792b13b777e44fe1de9f7568474df11f3b60655415d2a6635"
+    },
     "modules/mail/src/adapters/resend/README.md": {
       "source": "modules/mail/src/adapters/resend/README.md",
       "sha256": "07487907a351cde380774bed9b1f7b8d387f55f19be02990a521e25bdb09d468"
@@ -1547,11 +1555,11 @@
     },
     "modules/mail/src/core/transport.mjs": {
       "source": "modules/mail/src/core/transport.mjs",
-      "sha256": "3f7bf52854e4908bb69b93032ac65cbd90bba57d03a62da1c2652ef4e470a1f8"
+      "sha256": "aecc91b5b12c2f315a3154679bb6780518453d04516c750517f06f25548ebb18"
     },
     "modules/mail/src/core/validation.mjs": {
       "source": "modules/mail/src/core/validation.mjs",
-      "sha256": "b1249850847bc516bf671ab09e108f17ac877e3cf6958c07ad5f9cf86574a05c"
+      "sha256": "fa1f79579a96fc7b12964d9515e98135993c18ea1af23922779139abc4221571"
     },
     "modules/mail/src/development/index.d.mts": {
       "source": "modules/mail/src/development/index.d.mts",
@@ -1663,7 +1671,7 @@
     },
     "modules/mail/src/sender.mjs": {
       "source": "modules/mail/src/sender.mjs",
-      "sha256": "1e4ec0a59b6a7a523ed929e56bc5a9433b039ff75c5611d8e1a9162d8a508a6b"
+      "sha256": "32e35cd88b3b7199f5ce7ac7139be853890428549a84f70a733a5a9a0df6979d"
     },
     "modules/mail/src/sendgrid-email/index.d.mts": {
       "source": "modules/mail/src/sendgrid-email/index.d.mts",

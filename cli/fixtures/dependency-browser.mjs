@@ -4,6 +4,7 @@ import {createHmac} from 'node:crypto';
 import {localVariables} from '../../onboarding/local/environment.mjs';
 import {resolve} from 'node:path';
 import {chromium,pause} from './reference.mjs';
+import {readDevKey} from '../../modules/operator-auth/dev/sign-in-as.mjs';
 import {editorGrant} from './dependency-editor.mjs';
 
 async function nativeLogin(context, origin, root) {
@@ -11,6 +12,8 @@ async function nativeLogin(context, origin, root) {
  const proof=createHmac('sha256',settings.SESSION_SECRET).update('local-cli\0sign-in').digest('hex');
  const response=await context.request.post(origin+'/auth/local/cli-session',{headers:{Origin:origin,'x-rer-local-cli':proof},data:{returnTo:'/setup'},maxRedirects:0});
  assert.equal(response.status(),303);
+ const key=await readDevKey(root);
+ assert.equal((await context.request.post(origin+'/__dev/key',{headers:{Origin:origin},data:{key}})).status(),204);
  const page=await context.newPage();await page.goto(origin+'/setup');
  assert.equal((await (await context.request.get(origin+'/auth/session')).json()).kind,'native');
  return page;
@@ -81,11 +84,10 @@ export async function linkedBrowser(f,origin,provider,env,kind,network) {
      assert.equal((await post(native,'/auth/oidc/auth/start',{})).status(),502);
      const recovery=await browser.newContext({viewport,javaScriptEnabled:false});
      try {
-      const signIn=await recovery.newPage();await signIn.goto(origin+'/signin');
+      const signIn=await nativeLogin(recovery,origin,f.root);await signIn.goto(origin+'/signin');
       assert.equal(await signIn.getByRole('button',{name:/Continue with/}).count(),0);
-      await signIn.getByRole('button',{name:'Email a sign-in link',exact:true}).waitFor();
+      await signIn.getByRole('link',{name:'Continue as owner',exact:true}).waitFor();
       await capture(signIn,'provider-unavailable');await signIn.close();
-      await nativeLogin(recovery,origin,key);
      }finally{await recovery.close();}
      assert.equal((await post(native,'/auth/dependencies/unlink',{interface:'oidc-provider@1'})).status(),200);
      assert.equal((await f.sql("SELECT count(*) n FROM rer_dependency_keys WHERE interface='oidc-provider@1'"))[0].results[0].n,0);
