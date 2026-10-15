@@ -2,8 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { front, cookieHeader } from './front.mjs';
 
-test('a visitor waits for placement on the same reservation; exhausted placement refuses cleanly and releases it', async () => {
-  const first = await front({ max: 1, placementFailures: 2, startMs: 5000 });
+test('a visitor waits for placement past the boot budget on the same reservation; exhausted placement refuses cleanly and releases it', async () => {
+  // Two placement waits (about a second each) outlast the 1.5 s boot budget;
+  // the placement allowance keeps the start and its place.
+  const first = await front({ max: 1, placementFailures: 2, startMs: 1500, placementMs: 6000 });
   try {
     const response = await first.begin({headers:{accept:'application/json'}});
     assert.equal(response.status,202);
@@ -20,7 +22,7 @@ test('a visitor waits for placement on the same reservation; exhausted placement
     assert.equal(first.demos.size,1);
     assert.equal((await first.fetch('/app',{headers:{cookie:cookieHeader(state)}})).status,200);
   } finally {await first.mf.dispose();}
-  const full=await front({max:1,placementFailures:1000,startMs:500});
+  const full=await front({max:1,placementFailures:1000,startMs:500,placementMs:1500});
   try {
     const response=await full.start({headers:{accept:'application/json'}});
     assert.equal(response.status,502);

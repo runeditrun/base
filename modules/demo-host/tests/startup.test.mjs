@@ -5,7 +5,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 test('a slow start answers progress, a retry resumes it, and a stuck copy frees its place without another visit', async () => {
   let healthy = false;
-  const { mf, demos, begin, start, fetch } = await front({ max: 1, startMs: 800, probeMs: 100,
+  const { mf, demos, begin, start, fetch } = await front({ max: 1, startMs: 2500, probeMs: 100,
     health: () => healthy ? Response.json({ ok: true }) : new Promise(resolve => setTimeout(() => resolve(new Response(null, { status: 503 })), 1000)) });
   try {
     const pending = await begin({ headers: { accept: 'application/json' } });
@@ -21,7 +21,7 @@ test('a slow start answers progress, a retry resumes it, and a stuck copy frees 
     assert.equal(cookieHeader(retry), cookie);
     assert.equal((await fetch('/__demo/status', { headers: { accept: 'application/json', cookie } })).status, 202);
     // Stop polling: the object must still finish cleanup and release capacity.
-    for (let i = 0; i < 60 && ![...demos.values()].some(demo => demo.destroyed); i++) await sleep(50);
+    for (let i = 0; i < 100 && ![...demos.values()].some(demo => demo.destroyed); i++) await sleep(50);
     assert.equal(demos.size, 1);
     assert.ok([...demos.values()].every(demo => demo.destroyed));
     assert.equal((await fetch('/__demo/status', { headers: { accept: 'application/json', cookie } })).status, 502);
@@ -57,5 +57,23 @@ test('an unresponsive human-check service returns the retry state without reserv
     assert.ok((await response.json()).notice);
     assert.ok(Date.now() - before < 6500, 'the network edge cannot silently hold the start');
     assert.equal(demos.size, 0);
+  } finally { await mf.dispose(); }
+});
+
+test('a visitor whose new copy answers slowly keeps waiting on it instead of failing', async () => {
+  const { mf, demos, begin, fetch } = await front({ max: 1, beginMs: 2600 });
+  try {
+    const pending = await begin({ headers: { accept: 'application/json' } });
+    assert.equal(pending.status, 202);
+    const cookie = cookieHeader(pending);
+    let response;
+    for (let polls = 0; polls < 100; polls++) {
+      response = await fetch('/__demo/status', { headers: { accept: 'application/json', cookie } });
+      if (response.status !== 202) break;
+      await response.body?.cancel();
+    }
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).location, '/app');
+    assert.equal(demos.size, 1);
   } finally { await mf.dispose(); }
 });

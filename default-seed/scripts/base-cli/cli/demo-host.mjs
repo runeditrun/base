@@ -20,7 +20,7 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  if (!(app.platforms ?? ['workers']).includes('container')) throw refuse('A hosted demo runs the seed\'s container image: declare "container" in deploy.json platforms first.');
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, hostVariables: app.container?.hostVariables, declaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }
- catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds {"version": 1, "domain": "<run site apex>", "name": "<product name>"}, optionally "maxInstances", "instanceType" (${INSTANCE_TYPES.join(', ')}; default basic) and plain "settings".`); }
+ catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds {"version": 1, "domain": "<run site apex>", "name": "<product name>"}, optionally "maxInstances", "instanceType" (${INSTANCE_TYPES.join(', ')}; default basic), "ownerEmail" (the demo owner's address; default owner@demo.invalid) and plain "settings".`); }
  if (options.remove) return removeDemo(plan, store, signal);
  if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const folder = join(project.root, '.rer', 'demo-host');

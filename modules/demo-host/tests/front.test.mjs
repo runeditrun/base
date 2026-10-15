@@ -193,3 +193,13 @@ test('failed startup cleanup preserves the retry state and releases capacity bef
     assert.equal((await start({ ip: '203.0.113.13' })).status, 503, 'the replacement remains live after the failed copy is destroyed');
   } finally { await mf.dispose(); }
 });
+
+test("a seed's demo owner signs in with the address its deploy-demo.json names", async () => {
+  const { mf, demos, start } = await front({ owner: 'ada@run-test.example' });
+  try {
+    const started = await start();
+    assert.equal(started.status, 303);
+    const id = /^rer_demo=([0-9a-f]{64});/.exec(demoCookie(started))[1];
+    assert.equal(demos.get(id).env.OWNER_EMAIL, 'ada@run-test.example');
+  } finally { await mf.dispose(); }
+});

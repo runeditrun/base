@@ -33,7 +33,8 @@ async function go(resume=false){
     let response=await fetch(resume?'/__demo/status':p.form.action,{...(resume?{}:{method:'POST',body:new URLSearchParams(new FormData(p.form))}),headers:{accept:'application/json'},signal:controller.signal});
     let result=await response.json().catch(()=>({}));
     while(response.status===202&&result.pending===true){
-      await new Promise(resolve=>setTimeout(resolve,500));
+      // The server holds each pending answer until the start changes.
+      await new Promise(resolve=>setTimeout(resolve,100));
       if(attempt!==controller)return;
       response=await fetch('/__demo/status',{headers:{accept:'application/json'},signal:controller.signal});
       result=await response.json().catch(()=>({}));

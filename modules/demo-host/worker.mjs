@@ -64,11 +64,16 @@ function progress(request, env, id, state) {
   return new Response(null, { status: 303, headers });
 }
 
+// The page asks again as soon as this answers: the object holds a pending
+// answer until the start changes. A slow answer is still pending; the start's
+// own budget decides failure.
 async function status(request, env) {
   const id = demoId(request, env);
   if (!id) return refusal(request, env, 410, 'This demo has ended. Start a new demo.');
-  try { return progress(request, env, id, await bounded(env.DEMO.get(id).status(), 2000)); }
-  catch { return refusal(request, env, 503, 'The demo could not be reached. Try again.'); }
+  let state;
+  try { state = await bounded(env.DEMO.get(id).status(1500), 3500); }
+  catch { state = { phase: 'starting' }; }
+  return progress(request, env, id, state);
 }
 
 async function start(request, env, ctx) {
@@ -96,9 +101,23 @@ async function start(request, env, ctx) {
     if (!await bounded(capacity.acquire(id.toString(), Date.now() + 60_000, Number(env.DEMO_MAX_INSTANCES), correlation), 2000)) {
       return refuse(503, 'Every demo is in use right now. Try again in a few minutes.');
     }
+    // Who holds the place: automated browsers pass Turnstile's testing keys.
+    report(correlation, started, 'admitted', { agent: (request.headers.get('user-agent') ?? '').slice(0, 160), network: request.cf?.asOrganization ?? null });
     demo = env.DEMO.get(id);
-    const state = await bounded(demo.begin({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) }), 2000);
-    return progress(request, env, id, { ...state, correlation });
+    const begun = demo.begin({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
+    // A new object can take seconds to answer. That is a slow start, not a
+    // failed one: the page polls this copy, and a begin that later fails ends
+    // it and releases its place.
+    let slow;
+    const state = await Promise.race([begun, new Promise(resolve => { slow = setTimeout(resolve, 2000, null); })]).finally(() => clearTimeout(slow));
+    if (!state) {
+      report(correlation, started, 'begin-pending');
+      ctx.waitUntil(begun.catch(error => {
+        report(correlation, started, 'failed', { error: category(error) });
+        return bounded(demo.end(), 6000);
+      }).catch(cleanup => report(correlation, started, 'cleanup', { error: category(cleanup) })));
+    }
+    return progress(request, env, id, { ...(state ?? { phase: 'starting' }), correlation });
   } catch (error) {
     report(correlation, started, 'failed', { error: category(error) });
     // Cleanup runs independently of the response: retries never wait on it.
@@ -134,10 +153,10 @@ export default {
       // The JSON start leaves the browser on /. Reloading it must keep the
       // pending copy on the progress page until health and owner claim finish.
       if (primary && url.pathname === '/' && ['GET', 'HEAD'].includes(request.method)) {
-        try {
-          const state = await bounded(env.DEMO.get(id).status(), 2000);
-          if (state.phase === 'starting') return progress(request, env, id, state);
-        } catch { return refusal(request, env, 503, 'The demo could not be reached. Try again.'); }
+        // A recovering object may answer slowly; its own fetch below still
+        // serves the demo or its ended page.
+        const state = await bounded(env.DEMO.get(id).status(), 2000).catch(() => null);
+        if (state?.phase === 'starting') return progress(request, env, id, state);
       }
       return env.DEMO.get(id).fetch(request);
     }

@@ -52,10 +52,12 @@ export class DemoContainer extends DurableObject {
   diagnostic() { return { correlation: this.correlation, tail: this.records, stdout: 'Provider container logs; not exposed by the lifecycle API.' }; }
   idle = IDLE;
   startTimeout = 45_000;
+  placementTimeout = 90_000;
   probeTimeout = 5000;
   cleanupRetry = 30_000;
   now() { return Date.now(); }
   get container() { return this.ctx.container; }
+  get owner() { return this.env.DEMO_OWNER_EMAIL || OWNER; }
   port() { return this.container.getTcpPort(PORT); }
 
   async begin(options) {
@@ -66,31 +68,41 @@ export class DemoContainer extends DurableObject {
     return this.status();
   }
 
-  async status() {
-    const startup = await this.ctx.storage.get('startup');
+  /** The start's state; `wait` holds a pending answer until it changes (at most 1.5 s), so the page learns of the sign-in without its own polling delay.
+   * A poll can also reach a new copy before its slow begin has landed. */
+  async status(wait = 0) {
+    const until = Date.now() + Math.min(wait, 1500);
+    let startup = await this.ctx.storage.get('startup');
+    while ((!startup || (startup.phase === 'starting' && !startup.failure)) && Date.now() < until) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      startup = await this.ctx.storage.get('startup');
+    }
     return { ...(startup ?? { phase: 'failed' }), correlation: this.correlation };
   }
 
   /** Start the container, wait for /health, claim the owner; returns the claim's 303. */
   async start({ origin, originVar, ends, endsLocal, settings, correlation }) {
     this.correlation = correlation; this.started = this.now(); this.stopped = false; this.cancelled = false;
-    const deadline = this.started + this.startTimeout;
+    let deadline = this.started + this.startTimeout;
     const id = this.ctx.id.toString(), keys = await claimKeys(), now = this.now();
     await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started, startDeadline: deadline });
     report(correlation, this.started, 'start');
     if (this.stopped) throw new Error('container-stopped');
-    await placeContainer(this, { enableInternet: true, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin, RER_INGRESS_ORIGINS: JSON.stringify([origin, ...JSON.parse(this.env.DEMO_SECONDARY_ORIGINS ?? '[]')]),
-      SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: OWNER, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
+    deadline = await placeContainer(this, { enableInternet: true, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin, RER_INGRESS_ORIGINS: JSON.stringify([origin, ...JSON.parse(this.env.DEMO_SECONDARY_ORIGINS ?? '[]')]),
+      SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: this.owner, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
       RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } }, deadline);
     await this.container.setInactivityTimeout(this.idle);
     await this.ctx.storage.setAlarm(deadline);
-    const token = await signClaim(keys, { origin, installationId: id, email: OWNER, now: this.now() });
+    const token = await signClaim(keys, { origin, installationId: id, email: this.owner, now: this.now() });
+    // Hold the place to the demo's end while the owner claim runs; a failed claim releases it in cleanup.
+    const held = bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).extend(id, ends), 2000).catch(() => false);
     const claimed = await boundedFetch(this.port(), 'http://container/auth/owner-claim', { method: 'POST', redirect: 'manual',
       headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }, Math.max(1, Math.min(10_000, deadline - this.now())));
     void claimed.body?.cancel().catch(() => {});
     this.record('claim', { status: claimed.status });
     if (this.stopped) throw new Error('container-stopped');
     if (claimed.status !== 303) throw new Error(`owner claim answered ${claimed.status}`);
+    if (!await held) throw new Error('start-reservation-expired');
     await this.ctx.storage.put('seen', this.now());
     await this.ctx.storage.setAlarm(Math.min(ends, this.now() + this.idle));
     return { location: claimed.headers.get('location'), cookies: claimed.headers.getSetCookie() };
@@ -109,7 +121,7 @@ export class DemoContainer extends DurableObject {
       } catch (error) {
         this.record('health', { attempt: ++attempt, durationMs: this.now() - probe, error: category(error) });
       }
-      await new Promise(resolve => setTimeout(resolve, Math.min(250, Math.max(0, deadline - this.now()))));
+      await new Promise(resolve => setTimeout(resolve, Math.min(100, Math.max(0, deadline - this.now()))));
     }
     throw new Error('health-deadline');
   }
