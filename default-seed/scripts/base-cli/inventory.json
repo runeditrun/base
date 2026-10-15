@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.22-dev.g9d0ab96f",
+  "cliVersion": "0.2.22-dev.g5c566c76",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -811,7 +811,7 @@
     },
     "modules/container/README.md": {
       "source": "modules/container/README.md",
-      "sha256": "c2396717f41a9b61788e998125637bdd45ea9fb1a55c13d3689ec8d5e01befbc"
+      "sha256": "9ad08e94be05a2ed3f4ad52ba513a7568193b8d3c2b54af727ba98d12edfe113"
     },
     "modules/container/adapters/d1.mjs": {
       "source": "modules/container/adapters/d1.mjs",
@@ -855,7 +855,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "9aad30b28e7e6372aaf86f198a829926d9c5f023d2a7a54ca0ca046d5e8c29da"
+      "sha256": "fa2b5c102cbfb70ceeea69f78b8e9e0a1efc2d36384cf4777a4a5511ba4c644f"
     },
     "modules/container/demo-egress.mjs": {
       "source": "modules/container/demo-egress.mjs",
@@ -875,7 +875,7 @@
     },
     "modules/container/host.mjs": {
       "source": "modules/container/host.mjs",
-      "sha256": "24317ecf25e87aaa87ca21e10411c2ee31c32dd9d5d3fd7e1a478b6a46d609f7"
+      "sha256": "bb8772d58bc213e05b284d50a145aafea68d5d4e2fdb64b2150dea192ea36967"
     },
     "modules/container/import-graph.mjs": {
       "source": "modules/container/import-graph.mjs",
@@ -933,9 +933,13 @@
       "source": "modules/container/transfer.mjs",
       "sha256": "cfc557037093542cb930bdaa82fdec6ad3bd3a71367e6bd0d07ca9c6204d7490"
     },
+    "modules/container/websockets.mjs": {
+      "source": "modules/container/websockets.mjs",
+      "sha256": "b596238f760f0753683eb6edaecf1290d6f918df1277cd9bea57a91a27dbe264"
+    },
     "modules/container/worker-engine.mjs": {
       "source": "modules/container/worker-engine.mjs",
-      "sha256": "c4bbd0590d5e49b98404bc792d1d41cf17ef06bbae0d06fa5a2f44cf8804e33f"
+      "sha256": "a06e1a8e12942b85ed544e5509ceca1d38bb2605e968c7d91eecb888833411ab"
     },
     "modules/d1-transport/index.d.mts": {
       "source": "modules/d1-transport/index.d.mts",

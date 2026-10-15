@@ -27,9 +27,14 @@ Other Cloudflare modules have no admitted host adapters; raw sockets would also
 bypass the host's routed fetch egress. Native `email()` has no configured host
 delivery, `caches.default` has no declared container cache contract, and the host
 disables request CF metadata (`cf: false`). The module import rule admits native
-ES module loading, not arbitrary calls carrying module strings. Admitting
-`WebSocketPair` does not add HTTP upgrade transport or qualify a complete live
-WebSocket flow through the container host.
+ES module loading, not arbitrary calls carrying module strings.
+
+The host forwards WebSocket upgrades through the same ingress and app session
+checks as HTTP. An app response with status 101 and a `WebSocketPair` is bridged
+in both directions, preserving text and binary messages, selected protocols,
+cookies and close codes. Refused upgrades retain their HTTP response; other
+upgrade protocols receive 400. Hosted demo routing selects the visitor's own
+container before forwarding the upgrade, including on declared secondary hosts.
 
 The workerd source boundary permits Durable Object definitions, including export
 aliases and indirect inheritance. Unbound definitions create no namespace. The
