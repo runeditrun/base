@@ -1,6 +1,6 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { contained } from './project.mjs';
 import { invalid, missing, refuse, RerError } from './errors.mjs';
 import { imageFolder } from './container.mjs';
@@ -18,11 +18,12 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, declaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }
  catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds {"version": 1, "domain": "<run site apex>", "name": "<product name>"}, optionally "maxInstances" and plain "settings".`); }
+ if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const folder = join(project.root, '.rer', 'demo-host');
  await rm(folder, { recursive: true, force: true });
  await mkdir(folder, { recursive: true, mode: 0o700 });
  await store.step('Building the demo container image (workerd engine)');
- await imageFolder(project, operation, app, { output: join(folder, 'image'), engine: 'workerd' });
+ await imageFolder(project, operation, { ...app, secrets: [...(app.secrets ?? []), { binding: 'RER_DEMO_OPERATOR_TOKEN' }, { binding: 'TURNSTILE_SECRET_KEY' }] }, { output: join(folder, 'image'), engine: 'workerd' });
  for (const file of DEMO_FILES) await cp(new URL(`../modules/demo-host/${file}`, import.meta.url), join(folder, file));
  await writeFile(join(folder, 'wrangler.json'), JSON.stringify(plan.wrangler, null, 2) + '\n');
  const summary = { worker: plan.worker, origin: plan.origin, hostname: plan.hostname, folder: '.rer/demo-host', maxInstances: plan.maxInstances, settings: plan.settings, instanceType: 'basic', startsPerIpPerMinute: 3, minutes: 60, idleMinutes: 15, enableInternet: false };
@@ -38,9 +39,11 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  if (names.some(name => !process.env[name]?.trim())) throw missing(`${names.join(', ')} are required; see DEMO.md "Hosting the demo".`);
  if (!options.json) for (const line of human) out.human(line);
  const secrets = join(folder, '.secrets.json');
- await writeFile(secrets, JSON.stringify({ TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY.trim() }), { mode: 0o600 });
+ await writeFile(secrets, JSON.stringify({ TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY.trim(), ...(process.env.RER_DEMO_OPERATOR_TOKEN ? { RER_DEMO_OPERATOR_TOKEN: process.env.RER_DEMO_OPERATOR_TOKEN } : {}) }), { mode: 0o600 });
  try {
-  const wrangler = createRequire(join(project.root, 'package.json')).resolve('wrangler/bin/wrangler.js');
+  const require = createRequire(join(project.root, 'package.json'));
+  const manifest = require.resolve('wrangler/package.json');
+  const wrangler = join(dirname(manifest), JSON.parse(await readFile(manifest, 'utf8')).bin.wrangler);
   await store.run('Deploying the demo Worker and its container image', process.execPath, [wrangler, 'deploy', '--config', 'wrangler.json', '--secrets-file', '.secrets.json'], { cwd: folder, signal });
  } finally { await rm(secrets, { force: true }); }
  return { dryRun: false, deployed: true, origin: plan.origin, demo: summary };

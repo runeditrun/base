@@ -9,7 +9,7 @@ import { siteDeclaration } from '../deploy-kit/site.mjs';
  * running the seed's own image (`rer build --platform container`, workerd
  * engine), deployed by `wrangler deploy` with the image beside it. */
 
-export const DEMO_FILES = ['worker.mjs', 'container.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'diagnostics.mjs'];
+export const DEMO_FILES = ['worker.mjs', 'container.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'diagnostics.mjs', 'operator.mjs'];
 const FRONT_SET = /^(?:RER_.*|SESSION_SECRET|SETUP_TOKEN|OWNER_EMAIL)$/;
 const SECRET = /SECRET|TOKEN|PASSWORD|_KEY$/;
 
@@ -46,7 +46,7 @@ export function demoPlan({ project, environment, compatibilityDate, originVar, d
       ...(turnstileSiteKey ? { TURNSTILE_SITE_KEY: turnstileSiteKey } : {}) },
     durable_objects: { bindings: [{ name: 'DEMO', class_name: 'DemoContainer' }, { name: 'CAPACITY', class_name: 'DemoCapacity' }] },
     migrations: [{ tag: 'v1', new_sqlite_classes: ['DemoContainer', 'DemoCapacity'] }],
-    containers: [{ class_name: 'DemoContainer', image: './image/Dockerfile', max_instances: maxInstances, instance_type: 'basic' }],
+    containers: [{ name: worker.replace(/-+/g, '-'), class_name: 'DemoContainer', image: './image/Dockerfile', max_instances: maxInstances, instance_type: 'basic' }],
     ratelimits: [{ name: 'STARTS', namespace_id: namespace, simple: { limit: 3, period: 60 } }],
   };
   return { worker, hostname, origin: `https://${hostname}`, maxInstances, settings: Object.keys(settings), wrangler };

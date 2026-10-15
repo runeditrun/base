@@ -12,7 +12,7 @@ import { DEMO_FILES } from '../plan.mjs';
 // owner-claim's real verifier, as the seed does.
 const ORIGIN = 'https://demo.run-test.example';
 
-async function front({ max = 10, idle } = {}) {
+async function front({ max = 10, idle, health, startMs, probeMs } = {}) {
   const demos = new Map();
   async function app(request) {
     const url = new URL(request.url), id = request.headers.get('x-demo');
@@ -24,7 +24,7 @@ async function front({ max = 10, idle } = {}) {
     const demo = demos.get(id);
     if (!demo || demo.destroyed) return new Response('no container', { status: 502 });
     demo.requests.push(`${request.method} ${url.pathname}`);
-    if (url.pathname === '/health') return Response.json({ ok: true });
+    if (url.pathname === '/health') return health ? health(demo) : Response.json({ ok: true });
     if (url.pathname === '/auth/owner-claim') {
       const { env } = demo;
       if (request.method !== 'POST' || request.headers.get('origin') !== env.AUTH_ORIGIN) return new Response(null, { status: 403 });
@@ -42,7 +42,7 @@ async function front({ max = 10, idle } = {}) {
     durableObjects: { DEMO: { className: 'DemoContainer', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
     ratelimits: { STARTS: { namespace_id: '1001', simple: { limit: 3, period: 60 } } },
     bindings: { DEMO_ORIGIN: ORIGIN, DEMO_SITE: 'https://run-test.example', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: String(max),
-      DEMO_SETTINGS: JSON.stringify({ MAIL_FROM: 'demo@demo.invalid' }), TURNSTILE_SITE_KEY: 'site-key', TURNSTILE_SECRET_KEY: 'secret-key', ...(idle ? { TEST_IDLE_MS: String(idle) } : {}) },
+      DEMO_SETTINGS: JSON.stringify({ MAIL_FROM: 'demo@demo.invalid' }), TURNSTILE_SITE_KEY: 'site-key', TURNSTILE_SECRET_KEY: 'secret-key', RER_DEMO_OPERATOR_TOKEN: 'operator-only-test-credential-123456789', ...(idle ? { TEST_IDLE_MS: String(idle) } : {}), ...(startMs ? { TEST_START_MS: String(startMs), TEST_PROBE_MS: String(probeMs ?? startMs) } : {}) },
     serviceBindings: { APP: app },
     outboundService: async request => {
       assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify');
@@ -144,5 +144,55 @@ test('an idle demo ends: its container is destroyed, its place freed, and its vi
     // The one place is free again.
     const again = await start({ ip: '203.0.113.3' });
     assert.equal(again.status, 303);
+  } finally { await mf.dispose(); }
+});
+
+
+test('bounded readiness failures are private, clean up capacity, and permit a later healthy start', async () => {
+  let failure = true;
+  const { mf, demos, start, fetch } = await front({ max: 1, startMs: 400, probeMs: 80,
+    health: () => failure ? new Promise(resolve => setTimeout(() => resolve(new Response('SECRET body', { status: 503 })), 300)) : Response.json({ ok: true }) });
+  try {
+    const before = Date.now(), refused = await start();
+    assert.equal(refused.status, 502);
+    assert.ok(Date.now() - before < 3000, 'the start is bounded even when probes are slow');
+    const correlation = refused.headers.get('x-rer-demo-correlation');
+    assert.ok(correlation);
+    assert.equal(refused.headers.getSetCookie().length, 0);
+    assert.doesNotMatch(await refused.text(), /SECRET|probe-timeout|health-deadline|platform-error/);
+    assert.ok([...demos.values()].every(demo => demo.destroyed));
+    // The public correlation is not an instance bearer or a diagnostics capability.
+    const anonymous = await fetch('/__demo/diagnostics/' + correlation);
+    assert.equal(anonymous.status, 303);
+    const operatorPath = '/__demo/operator/' + correlation;
+    assert.equal((await fetch(operatorPath)).status, 401);
+    assert.equal((await fetch(operatorPath, { headers: { authorization: 'Bearer wrong' } })).status, 401);
+    const operator = await fetch(operatorPath, { headers: { authorization: 'Bearer operator-only-test-credential-123456789' } });
+    assert.equal(operator.status, 200);
+    const diagnostic = await operator.text();
+    assert.match(diagnostic, /probe-timeout/);
+    assert.doesNotMatch(diagnostic, /SECRET|operator-only-test-credential/);
+    failure = false;
+    const started = await start({ ip: '203.0.113.10' });
+    assert.equal(started.status, 303);
+    assert.notEqual(started.headers.get('x-rer-demo-correlation'), demoCookie(started)?.split(';')[0].slice(9));
+  } finally { await mf.dispose(); }
+});
+
+
+test('a platform exit during startup fails promptly and releases the reservation', async () => {
+  let exit = true;
+  const { mf, start, fetch } = await front({ max: 1, startMs: 5000,
+    health: () => exit ? new Response(null, { status: 599 }) : Response.json({ ok: true }) });
+  try {
+    const before = Date.now(), failed = await start();
+    assert.equal(failed.status, 502);
+    assert.ok(Date.now() - before < 3000);
+    const diagnostic = await fetch('/__demo/operator/' + failed.headers.get('x-rer-demo-correlation'), { headers: { authorization: 'Bearer operator-only-test-credential-123456789' } });
+    const html = await diagnostic.text();
+    assert.match(html, /exitCode/);
+    assert.doesNotMatch(html, /SECRET/);
+    exit = false;
+    assert.equal((await start({ ip: '203.0.113.11' })).status, 303);
   } finally { await mf.dispose(); }
 });

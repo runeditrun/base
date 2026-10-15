@@ -28,3 +28,29 @@ it with these files and the seed's container image folder (workerd engine) to
 with its real Durable Objects and rate limit; Turnstile and the container
 platform are the only fakes. The end-to-end proof (`wrangler dev` with Docker)
 is in DEMO.md.
+
+Startup probes keep the existing 120-second budget, with a separate five-second
+HTTP probe limit. Every attempt logs its timestamp, elapsed time, duration and
+HTTP status or fixed error category, including successful probes. Exit records
+include the numeric platform exit code when supplied. A separate random
+`x-rer-demo-correlation` response header joins these events without disclosing
+the visitor's bearer cookie. Worker observability also enables the platform's
+private Container stdout/stderr logs; historical stdout is not exposed by the
+Container lifecycle API. Read those logs with an account principal granted
+Workers Observability Write, and filter by the application and boot interval.
+
+Optionally set a separate random `RER_DEMO_OPERATOR_TOKEN` (32–512 characters)
+when running `rer deploy --demo`. It becomes a Worker secret. A host operator
+can request `GET /__demo/operator/<correlation>` with
+`Authorization: Bearer <RER_DEMO_OPERATOR_TOKEN>` to see the existing start page
+with a bounded, redacted diagnostic line for a failed start. It retains the
+last eight probe/exit records, for at most 15 minutes and 32 failed starts.
+Unauthenticated requests, demo owner sessions and correlation IDs alone grant
+no access. The token never belongs in a URL. Ordinary visitors keep the generic
+failure page. No raw error text, health body, cookies or environment values are
+included in this diagnostic.
+
+Failed destruction retains its alarm and capacity reservation for cleanup;
+only confirmed destruction (or an already-stopped container) releases the
+place. A cleanup failure is logged separately and cannot replace the startup
+failure shown to the visitor.

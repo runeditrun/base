@@ -4,6 +4,7 @@
 // then starts a container of their own, signs its owner in and sets the
 // rer_demo cookie. Every request with that cookie goes to the visitor's
 // container; nothing else on this host is reachable.
+import { operatorPage } from './operator.mjs';
 import { category, report } from './diagnostics.mjs';
 import { startPage, demoCookie } from './pages.mjs';
 
@@ -55,6 +56,10 @@ async function start(request, env) {
     return new Response(null, { status: 303, headers });
   } catch (error) {
     report(correlation, started, 'failed', { error: ['health-deadline', 'container-stopped'].includes(error.message) ? error.message : category(error) });
+    try {
+      const diagnostic = await demo.diagnostic();
+      await env.CAPACITY.get(env.CAPACITY.idFromName('diagnostics')).record(correlation, diagnostic);
+    } catch (capture) { report(correlation, started, 'diagnostic', { error: category(capture) }); }
     try { await demo.end(); } catch (cleanup) { report(correlation, started, 'cleanup', { error: category(cleanup) }); }
     return startPage(env, { status: 502, headers: { 'x-rer-demo-correlation': correlation }, notice: 'The demo did not start. Try again.' });
   }
@@ -63,6 +68,7 @@ async function start(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/__demo/operator/')) return operatorPage(request, env, url.pathname.slice('/__demo/operator/'.length));
     if (url.pathname === '/__demo/start') return request.method === 'POST' ? start(request, env) : home();
     const id = demoId(request, env);
     if (id) return env.DEMO.get(id).fetch(request);

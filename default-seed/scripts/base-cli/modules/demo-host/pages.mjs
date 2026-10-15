@@ -33,9 +33,9 @@ function html(env, { page, title, body, status = 200, headers = {}, turnstile = 
 }
 
 /** GET /: the visitor proves they are human and their demo starts. `notice` explains a refused start. */
-export function startPage(env, { status = 200, notice } = {}) {
+export function startPage(env, { status = 200, notice, headers = {} } = {}) {
   const name = escape(env.DEMO_NAME);
-  return html(env, { page: 'start', title: `Try ${env.DEMO_NAME}`, status, turnstile: true, body: `<h1 id="title">Try ${name}</h1>
+  return html(env, { page: 'start', title: `Try ${env.DEMO_NAME}`, status, headers, turnstile: true, body: `<h1 id="title">Try ${name}</h1>
 <p class="intro">Your own copy of ${name}, signed in as its owner, with sample data.</p>
 <ul><li>Nothing is sent: mail stays in an outbox.</li><li>It ends after an hour, or 15 idle minutes.</li><li>Then it is deleted. Nobody else can see it.</li></ul>
 ${notice ? `<p class="notice" role="alert">${escape(notice)}</p>` : ''}<form id="start" method="post" action="/__demo/start"><div class="cf-turnstile" data-sitekey="${escape(env.TURNSTILE_SITE_KEY)}" data-size="flexible" data-callback="${notice ? 'rerDemoReady' : 'rerDemoStart'}"></div>

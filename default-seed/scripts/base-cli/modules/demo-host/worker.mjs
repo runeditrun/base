@@ -4,6 +4,8 @@
 // then starts a container of their own, signs its owner in and sets the
 // rer_demo cookie. Every request with that cookie goes to the visitor's
 // container; nothing else on this host is reachable.
+import { operatorPage } from './operator.mjs';
+import { category, report } from './diagnostics.mjs';
 import { startPage, demoCookie } from './pages.mjs';
 
 export { DemoContainer } from './container.mjs';
@@ -46,22 +48,27 @@ async function start(request, env) {
   if (!await env.CAPACITY.get(env.CAPACITY.idFromName('capacity')).acquire(id.toString(), ends, Number(env.DEMO_MAX_INSTANCES))) {
     return startPage(env, { status: 503, notice: 'Every demo is in use right now. Try again in a few minutes.' });
   }
-  const demo = env.DEMO.get(id);
+  const demo = env.DEMO.get(id), correlation = crypto.randomUUID(), started = Date.now();
   try {
-    const signedIn = await demo.start({ origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
-    const headers = new Headers({ location: signedIn.location, 'cache-control': 'no-store' });
+    const signedIn = await demo.start({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
+    const headers = new Headers({ location: signedIn.location, 'cache-control': 'no-store', 'x-rer-demo-correlation': correlation });
     for (const cookie of [...signedIn.cookies, demoCookie(env, id.toString())]) headers.append('set-cookie', cookie);
     return new Response(null, { status: 303, headers });
   } catch (error) {
-    console.error('Demo start failed:', error.message);
-    await demo.end();
-    return startPage(env, { status: 502, notice: 'The demo did not start. Try again.' });
+    report(correlation, started, 'failed', { error: ['health-deadline', 'container-stopped'].includes(error.message) ? error.message : category(error) });
+    try {
+      const diagnostic = await demo.diagnostic();
+      await env.CAPACITY.get(env.CAPACITY.idFromName('diagnostics')).record(correlation, diagnostic);
+    } catch (capture) { report(correlation, started, 'diagnostic', { error: category(capture) }); }
+    try { await demo.end(); } catch (cleanup) { report(correlation, started, 'cleanup', { error: category(cleanup) }); }
+    return startPage(env, { status: 502, headers: { 'x-rer-demo-correlation': correlation }, notice: 'The demo did not start. Try again.' });
   }
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/__demo/operator/')) return operatorPage(request, env, url.pathname.slice('/__demo/operator/'.length));
     if (url.pathname === '/__demo/start') return request.method === 'POST' ? start(request, env) : home();
     const id = demoId(request, env);
     if (id) return env.DEMO.get(id).fetch(request);

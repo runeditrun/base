@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { claimKeys, signClaim } from './claim.mjs';
+import { boundedFetch, category, report } from './diagnostics.mjs';
 import { endedPage, clearCookie } from './pages.mjs';
 
 // One visitor's demo: a Durable Object (newUniqueId) and its container, the
@@ -14,39 +15,79 @@ const inside = url => `http://container${url.pathname}${url.search}`;
 const random = () => [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 
 export class DemoContainer extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    ctx.blockConcurrencyWhile(async () => {
+      const state = await ctx.storage.get(['correlation', 'started']);
+      this.correlation = state.get('correlation'); this.started = state.get('started');
+      if (this.container.running) this.watch();
+    });
+  }
+  watch() {
+    if (!this.watching) {
+      this.watching = true;
+      this.ctx.waitUntil(this.container.monitor().then(() => this.exited(), error => this.exited(error)));
+    }
+  }
+  records = [];
+  record(event, detail = {}) {
+    const row = { event, at: new Date().toISOString(), elapsedMs: Date.now() - this.started, ...detail };
+    this.records.push(row); if (this.records.length > 8) this.records.shift();
+    report(this.correlation, this.started, event, detail);
+  }
+  diagnostic() { return { correlation: this.correlation, tail: this.records, stdout: 'Provider container logs; not exposed by the lifecycle API.' }; }
   idle = IDLE;
+  startTimeout = 120_000;
+  probeTimeout = 5000;
   get container() { return this.ctx.container; }
   port() { return this.container.getTcpPort(PORT); }
 
   /** Start the container, wait for /health, claim the owner; returns the claim's 303. */
-  async start({ origin, originVar, ends, endsLocal, settings }) {
+  async start({ origin, originVar, ends, endsLocal, settings, correlation }) {
+    this.correlation = correlation; this.started = Date.now(); this.stopped = false;
+    const deadline = this.started + this.startTimeout;
     const id = this.ctx.id.toString(), keys = await claimKeys(), now = Date.now();
-    await this.ctx.storage.put({ ends, seen: now });
+    await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started });
     await this.ctx.storage.setAlarm(Math.min(ends, now + this.idle));
+    report(correlation, this.started, 'start');
     this.container.start({ enableInternet: false, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
       SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: OWNER, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
       RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } });
     // A container that stops by itself ends the demo too.
-    this.container.monitor().then(() => this.end(), () => this.end());
-    await this.healthy();
+    this.watch();
+    await this.healthy(deadline);
     const token = await signClaim(keys, { origin, installationId: id, email: OWNER, now: Date.now() });
-    const claimed = await this.port().fetch('http://container/auth/owner-claim', { method: 'POST', redirect: 'manual',
-      headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) });
-    await claimed.body?.cancel();
+    const claimed = await boundedFetch(this.port(), 'http://container/auth/owner-claim', { method: 'POST', redirect: 'manual',
+      headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }, Math.max(1, Math.min(10_000, deadline - Date.now())));
+    void claimed.body?.cancel().catch(() => {});
+    report(correlation, this.started, 'claim', { status: claimed.status });
+    if (this.stopped) throw new Error('container-stopped');
     if (claimed.status !== 303) throw new Error(`owner claim answered ${claimed.status}`);
     return { location: claimed.headers.get('location'), cookies: claimed.headers.getSetCookie() };
   }
 
-  async healthy() {
-    for (const deadline = Date.now() + 120_000; ;) {
+  async healthy(deadline) {
+    let attempt = 0;
+    while (Date.now() < deadline) {
+      if (this.stopped) throw new Error('container-stopped');
+      const probe = Date.now();
       try {
-        const response = await this.port().fetch('http://container/health');
-        await response.body?.cancel();
-        if (response.ok) return;
-      } catch { /* The container is still starting. */ }
-      if (Date.now() > deadline) throw new Error('demo container never became healthy');
-      await new Promise(resolve => setTimeout(resolve, 250));
+        const response = await boundedFetch(this.port(), 'http://container/health', {}, Math.min(this.probeTimeout, deadline - Date.now()));
+        void response.body?.cancel().catch(() => {});
+        this.record('health', { attempt: ++attempt, durationMs: Date.now() - probe, status: response.status });
+        if (response.ok && !this.stopped) return;
+      } catch (error) {
+        this.record('health', { attempt: ++attempt, durationMs: Date.now() - probe, error: category(error) });
+      }
+      await new Promise(resolve => setTimeout(resolve, Math.min(250, Math.max(0, deadline - Date.now()))));
     }
+    throw new Error('health-deadline');
+  }
+
+  async exited(error) {
+    this.stopped = true;
+    this.record('exit', { outcome: error ? category(error) : 'exited', ...(Number.isInteger(error?.exitCode) ? { exitCode: error.exitCode } : {}) });
+    try { await this.end(); } catch (cause) { report(this.correlation, this.started, 'cleanup', { error: category(cause) }); }
   }
 
   /** Every request carrying this demo's cookie: proxied while the demo lives, else the ended page. */
@@ -59,6 +100,7 @@ export class DemoContainer extends DurableObject {
 
   async alarm() {
     const state = await this.ctx.storage.get(['ends', 'seen']), now = Date.now();
+    if (await this.ctx.storage.get('stopping')) return this.end();
     if (!state.get('ends')) return;
     if (now >= state.get('ends') || now - state.get('seen') >= this.idle) return this.end();
     await this.ctx.storage.setAlarm(Math.min(state.get('ends'), state.get('seen') + this.idle));
@@ -66,9 +108,20 @@ export class DemoContainer extends DurableObject {
 
   /** Destroy the container and delete this demo's state and place; safe to repeat. */
   async end() {
-    if (this.container.running) await this.container.destroy().catch(() => { /* Already stopping. */ });
+    if (this.ending) return this.ending;
+    this.ending = this.cleanup();
+    try { await this.ending; } finally { this.ending = null; }
+  }
+
+  async cleanup() {
+    this.stopped = true;
+    // Keep the alarm and capacity reservation if destruction fails; retry cleanup.
+    await this.ctx.storage.put('stopping', true);
+    await this.ctx.storage.setAlarm(Date.now() + 30_000);
+    if (this.container.running) await this.container.destroy();
+    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(this.ctx.id.toString());
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
-    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(this.ctx.id.toString());
+    report(this.correlation, this.started, 'ended');
   }
 }
