@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "moduleDetection": "force"
+  },
+  "include": ["../modules/**/*.ts", "../modules/**/*.tsx", "../modules/**/*.mts"],
+  "exclude": ["../modules/**/tests", "../modules/**/proof", "../modules/**/live-proof", "../modules/egress-service"]
+}
