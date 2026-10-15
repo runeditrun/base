@@ -107,7 +107,14 @@ The seed needs, beyond the adoption above:
    `src/core/platform/auth/dependencies.server.ts`).
 3. **The workflow.** Copy Base's `export/run-demo.yml` to
    `.github/workflows/run-demo.yml`. It deploys on each push to `main` only
-   when the repository variable `RUN_DEMO_DEPLOY` is `true`.
+   when the repository variable `RUN_DEMO_DEPLOY` is `true`, and whenever it
+   is run by hand. Run by hand with `test_only`, it deploys a separate test
+   host instead: environment `demo-test` at `demo.test.<domain>`, with
+   Cloudflare's Turnstile test keys, which let every visitor start a demo
+   (the 10-demo cap and the rate limit still apply). After a deploy it waits
+   for the new hostname to resolve in public DNS (10 minutes at most) and for
+   the start page to answer 200 (5 minutes more), then checks it sets no
+   cookie; either wait ends with an error naming what did not happen.
 
 `rer deploy --demo --dry-run` builds everything into `.rer/demo-host/` (add it
 to `.gitignore`) with no provider request. To try it locally with Docker, add
@@ -117,6 +124,33 @@ folder, `wrangler dev --local-protocol https --var TURNSTILE_SITE_KEY:1x00000000
 Wrangler serves the Worker as it is routed, so the Worker sees
 `https://demo.<domain>`: point that name at `127.0.0.1` (for example in
 `/etc/hosts`) and open `https://demo.<domain>:8787/`.
+
+### Removing a hosted demo
+
+```sh
+rer deploy --demo --remove --yes                          # demo.<domain>
+rer deploy --demo --remove --yes --environment demo-test  # with deploy-demo.json's domain set to test.<domain>
+```
+
+or run the workflow by hand with `remove` (and `test_only` for the test
+host). It needs only `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, the
+deploy's token. It deletes what the demo's deploy made, each by its exact
+provider id: the Custom Domain `demo.<domain>` (Cloudflare removes the DNS
+record it added with it), the Container application `wrangler deploy` created
+for the demo Worker's Durable Object namespace, and the front Worker, whose
+Durable Objects go with it. The demo makes no D1, KV, R2 or queue. Then it
+reads back that each is gone.
+
+The deploy leaves its record on the provider, as the message of the Worker
+version it uploads (`rer-demo:<hash>` of the Worker, hostname and container
+names), so a fresh checkout or CI runner can remove it. Removal refuses before
+any delete when the Worker of that name serves no such version, the hostname
+routes to another Worker, a Container application of that name belongs to
+another namespace, or another hostname is attached to the demo Worker; it
+touches nothing else in the account. The Worker goes last, so a run that stops
+part way leaves the record for the next run. Once the demo is gone, another
+run finds nothing and changes nothing. A demo deployed by rer before 0.2.12
+carries no record: deploy it once with this rer, then remove it.
 
 ### Owner steps
 

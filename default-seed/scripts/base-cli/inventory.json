@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.11-dev.gb96dff50",
+  "cliVersion": "0.2.12-dev.g7f9103f0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -363,11 +363,11 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "7a85495e5e36d26a64435fadd146ebd5cdb20f156c7850ad7c96bc84b2f6748c"
+      "sha256": "b2a5b211a546f6332c00120046f455cf80b272bfd0e583ccde17ec07033e6f7f"
     },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
-      "sha256": "28bb35a87713cd3a5566ae9e95628602b1f90c7cf8187ae1b5bdd6bacf788b4d"
+      "sha256": "bc3a6d212c493d04ed711b27ac884578faa5fe698bcefb86078b21db5ebf1dec"
     },
     "cli/demo.mjs": {
       "source": "cli/demo.mjs",
@@ -543,7 +543,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "3189aca89afc8df54938783c4e00a35f5193e1c2e78f8c85a61e54b3c67a5565"
+      "sha256": "3cedfcb97d049f70f20b4558e6717ff89686e540405502c34a178c6141072b93"
     },
     "cli/pnpm-probe.mjs": {
       "source": "cli/pnpm-probe.mjs",
@@ -871,7 +871,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "6bbf90851cae55ae2a9c42857c3b251a732ec15ff990723c768c25bacc291d27"
+      "sha256": "8e31954307d330a3a442319c311911fbce5dd47ebc389c32469018c08828858d"
     },
     "modules/demo-host/capacity.mjs": {
       "source": "modules/demo-host/capacity.mjs",
@@ -899,7 +899,11 @@
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
-      "sha256": "ff8ea02be4812c94c1c8132ff8191dec5cac7a6f96b998f73471ffbb8d922a5a"
+      "sha256": "fca23e1b24a172417d7f74dfb3f559e263b1dce256625c5bdeb15b99bd18a619"
+    },
+    "modules/demo-host/remove.mjs": {
+      "source": "modules/demo-host/remove.mjs",
+      "sha256": "1a0a06f6e322b763cdc3095ee2e6f1b2468e053d097a9bb148c29528d9c83e1e"
     },
     "modules/demo-host/worker.mjs": {
       "source": "modules/demo-host/worker.mjs",
@@ -1083,7 +1087,7 @@
     },
     "modules/deploy-kit/site.mjs": {
       "source": "modules/deploy-kit/site.mjs",
-      "sha256": "dfd85c19becb222dfaeccea8911c52b2df38c84c1d0a0df3a9e7e5942d9109e0"
+      "sha256": "c83d90c0debe3dcf58e7fc565247e93a0d57bb6d7f2d8f228c90d2b27a95ccdc"
     },
     "modules/deploy-kit/sql-safety.mjs": {
       "source": "modules/deploy-kit/sql-safety.mjs",

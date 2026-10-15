@@ -10,7 +10,9 @@ import { DEMO_FILES, demoPlan } from '../modules/demo-host/plan.mjs';
 // (modules/demo-host), from deploy-demo.json. It writes .rer/demo-host/: the
 // front Worker, its wrangler.json and the container image folder (workerd
 // engine). --dry-run stops there, so `wrangler dev` can serve that folder with
-// Docker; a deploy runs `wrangler deploy` on it with the Turnstile secret.
+// Docker; a deploy runs `wrangler deploy` on it with the Turnstile secret and
+// the demo's record as the version message. `--remove --yes` removes what that
+// record proves is the demo's (modules/demo-host/remove.mjs).
 export async function demoHostCommand(project, options, store, signal, out, operation) {
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Missing or malformed ${path}.`); } };
  const app = await read(project.adapter.deploy?.declaration ?? 'deploy.json'), declaration = await read('deploy-demo.json');
@@ -18,6 +20,7 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, declaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }
  catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds {"version": 1, "domain": "<run site apex>", "name": "<product name>"}, optionally "maxInstances" and plain "settings".`); }
+ if (options.remove) return removeDemo(plan, store);
  if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const folder = join(project.root, '.rer', 'demo-host');
  await rm(folder, { recursive: true, force: true });
@@ -44,7 +47,26 @@ export async function demoHostCommand(project, options, store, signal, out, oper
   const require = createRequire(join(project.root, 'package.json'));
   const manifest = require.resolve('wrangler/package.json');
   const wrangler = join(dirname(manifest), JSON.parse(await readFile(manifest, 'utf8')).bin.wrangler);
-  await store.run('Deploying the demo Worker and its container image', process.execPath, [wrangler, 'deploy', '--config', 'wrangler.json', '--secrets-file', '.secrets.json'], { cwd: folder, signal });
+  await store.run('Deploying the demo Worker and its container image', process.execPath, [wrangler, 'deploy', '--config', 'wrangler.json', '--secrets-file', '.secrets.json', '--message', plan.record], { cwd: folder, signal });
  } finally { await rm(secrets, { force: true }); }
  return { dryRun: false, deployed: true, origin: plan.origin, demo: summary };
+}
+
+async function removeDemo(plan, store) {
+ const names = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
+ if (names.some(name => !process.env[name]?.trim())) throw missing(`${names.join(' and ')} are required to remove the demo; see DEMO.md "Removing a hosted demo".`);
+ const { cloudflare } = await import('../modules/deploy-kit/provider.mjs');
+ const { providerRefusal } = await import('../modules/deploy-kit/diagnostics.mjs');
+ const { demoRemove } = await import('../modules/demo-host/remove.mjs');
+ await store.step(`Removing the demo Worker ${plan.worker} on ${plan.hostname}`);
+ let result;
+ try { result = await demoRemove({ api: cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN }), plan }); }
+ catch (error) {
+  if (error instanceof RerError) throw error;
+  const code = /^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'demo-remove-failed';
+  const detail = [error.resource && `(${error.resource})`, error.remaining?.length && `still listed: ${error.remaining.join(', ')}`, providerRefusal(error)].filter(Boolean).join('; ');
+  throw new RerError('deploy_refused', `Demo remove stopped: ${code}${detail ? ` ${detail}` : ''}. Nothing that is not the demo's was touched; run it again once the cause is fixed.`, 1);
+ }
+ store.report(result.alreadyRemoved ? `deploy --demo --remove: no demo Worker ${plan.worker} exists; nothing to remove.` : `Removed ${result.removed.join(', ')} and read back that each is gone.`);
+ return { removed: true, demo: { worker: plan.worker, hostname: plan.hostname }, deleted: result.removed, alreadyRemoved: Boolean(result.alreadyRemoved) };
 }

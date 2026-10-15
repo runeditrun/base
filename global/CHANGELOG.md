@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.12
+
+- Import-kit resumable field redaction finishes however large one import job is. A step takes as many jobs as fit the request (at most 25); a job that does not fit alone is redacted in pages of its entries, and a step that would not fit writes nothing and is retried smaller, so every committed step stays inside D1's per-request limit and the erasure reaches its final batch. Receipts and match counts are unchanged.
+- `rer deploy --demo --remove --yes [--environment E]` removes a hosted demo: its Custom Domain (and with it the domain's DNS record), its Container application and its Worker, each by exact id and only while the record the deploy left on the Worker version proves it the demo's. Anything else is refused before the first delete; a second run is a no-op.
+- `export/run-demo.yml` gains `test_only` (the demo-test host at `demo.test.<domain>`) and `remove` dispatch inputs, and its readback after a deploy waits for the new hostname to resolve in public DNS, bounded and with a clear message, instead of failing on a first deploy.
+
+### Upgrade notes
+
+- Seeds take the import-kit change with their next Base refresh (a vendored `modules/import-kit` copy is not replaced by the npm pin). A continuation stored by an earlier kit still reads.
+- A hosted demo deployed by an earlier rer carries no record, so `--remove` refuses it as not the demo's: deploy it once with 0.2.12 (`rer deploy --demo`, or run-demo with the same inputs), then remove it. Copy Base's `export/run-demo.yml` for the new inputs and readback; a manual run no longer needs `RUN_DEMO_DEPLOY`.
+
 ## 0.2.11
 
 - New Base foundations generate public Run instructions for the edition's planned product repository, distinct migration ordinals, and setup names matching the edition.
