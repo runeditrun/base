@@ -39,6 +39,8 @@ export async function main(argv = process.argv.slice(2)) {
    if (!options.json) out.human(JSON.stringify(result, null, 2));
    out.result(result.ok, result.ok ? 0 : 3, { diagnostics: result }); return result.ok ? 0 : 3;
   }
+  // The owner link is printed once to this terminal: never through the logged lifecycle.
+  if (options.verb === 'signin') { out.result(true, 0, await (await import('./signin.mjs')).signinCommand(project, options, out)); return 0; }
   // A checkout without a declared run site refuses --site before any effect.
   if (options.site) (await import('./site.mjs')).declaredSite(project);
   if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret) {

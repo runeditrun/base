@@ -30,13 +30,13 @@ pins (installed first by any verb when node_modules holds another), else its ven
                        Run COMMAND once this computer's job queue admits it (heavy package scripts
                        of a checkout that pins the rer package use it).
 
-Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy, export, import,
-outbox, doctor, describe, check, release. Run rer VERB --help in a checkout for its flags.
+Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy, signin, export,
+import, outbox, doctor, describe, check, release. Run rer VERB --help in a checkout for its flags.
 `;
 
 // The checkout verbs that install the pinned package before they run when
 // node_modules holds another version or none (dev installs it in its launch).
-const installsFirst = new Set([...Object.keys(verbs), 'release'].filter(verb => verb !== 'dev'));
+const installsFirst = new Set([...Object.keys(verbs), 'signin', 'release'].filter(verb => verb !== 'dev'));
 
 export async function main(argv) {
  handleBrokenPipes();

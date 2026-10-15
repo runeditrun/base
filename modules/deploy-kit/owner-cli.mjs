@@ -12,10 +12,11 @@ import { ownerTarget, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sam
 import { activeWorker } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
+import { ownerSignin } from './owner-signin.mjs';
 import { refuseLocalModels } from './local-only.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
-const usage = 'usage: owner-cli.mjs deploy|health|remove|inspect|record-owner --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME|--unset NAME';
+const usage = 'usage: owner-cli.mjs deploy|health|remove|inspect|record-owner|signin --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME|--unset NAME';
 
 /** The owner's committed source and existing local build. Run the seed's build first. */
 async function ownerArtifact(root, product) {
@@ -31,7 +32,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string'},unset:{type:'string'},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
   const {positionals:[command,...rest],values} = parsed;
-  if (!['deploy','health','secret','remove','inspect','record-owner'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (!['deploy','health','secret','remove','inspect','record-owner','signin'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
   if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
   await refuseLocalModels(resolve(cwd));
@@ -76,6 +77,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     await writeOwnerState(statePath, current);
     return {ok:true, owner:values.outcome};
   });
+  // The link is a credential: returned to the caller once, never written to the state file.
+  if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'signin'); })};
   if (command === 'inspect') {
     assert(!localOnlyBinding(declaration, localOnlyKeys), 'local-only-binding');
     assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');

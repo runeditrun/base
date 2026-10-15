@@ -1,11 +1,22 @@
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { refuse } from './errors.mjs';
+import { missing, refuse } from './errors.mjs';
 import { shared } from './shared.mjs';
+import { requiredLocalSettings } from './settings.mjs';
 
 // `rer demo` (dev --demo) state and its two adoption checks (export/DEMO.md).
 const adopt = 'See DEMO.md: a seed adopts demo mode with src/demo.ts, withDemo as the first import of its Worker entry, and three vite.config changes.';
+
+// Owner-data prerequisites belong to dev/preview. Older adapters ignore a demo
+// flag and open the owner's SQLite even for a refused start (rewriting -shm).
+// Check only saved configuration here; migrations and owner bootstrap are
+// verified by starting the application against its fresh demo state.
+export async function demoPreflight(project, vars, seconds) {
+ if (requiredLocalSettings(project, vars).length) throw missing('Private owner settings are missing. Run rer setup first.');
+ await demoAdopted(project.root);
+ return demoState(project.root, seconds);
+}
 
 // Before anything starts: the seed's Vite persists where rer says, so the
 // checkout's own .wrangler/state is never opened by a demo, and hands the
