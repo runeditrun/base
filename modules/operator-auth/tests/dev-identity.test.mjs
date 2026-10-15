@@ -111,7 +111,7 @@ test('dev sign-in obeys domain provider rules on issue and reuse, with an active
 
 
 test('owner-side CLI proof signs into the local dev entry without mail and fences that proof to the owner version', async () => {
-  const r = await runtime([await read('../accounts/schema/operator-auth.sql')]);
+  const r = await runtime([await read('../accounts/schema/operator-auth.sql'), await read('./fixtures/trigger-writes.sql')]);
   const headers = { 'x-rer-local-cli': createHmac('sha256', SECRET).update('local-cli\0sign-in').digest('hex') };
   try {
     assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers })).status, 403);
@@ -127,6 +127,7 @@ test('owner-side CLI proof signs into the local dev entry without mail and fence
     const session = await (await r.call('/auth/session', { cookie })).json();
     assert.equal(session.kind, 'native');
     assert.equal(session.operator.email, OWNER);
+    assert.ok(await r.db.prepare("SELECT 1 FROM test_auth_writes WHERE table_name='oa_step_up_challenges'").first(), 'the local proof also ran the product audit trigger');
     assert.equal((await r.db.prepare('SELECT count(*) AS n FROM test_mail').first()).n, 0);
     assert.equal((await r.call('/auth/settings/identity', { method: 'POST', cookie, input: { idpSignIn: false } })).status, 200, 'the private local proof authorizes an owner control without mail');
     await r.db.prepare("UPDATE oa_operators SET version=version+1 WHERE id='owner'").run();

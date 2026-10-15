@@ -24,6 +24,15 @@ export function providerRefusal(error, redact = String) {
   const said = refusal.errors.map(item => [item?.code, typeof item?.message === 'string' ? redact(item.message).slice(0,300) : undefined].filter(part => part !== undefined && part !== '').join(' ')).filter(Boolean).slice(0,3);
   return `Cloudflare refused ${redact(refusal.operation).slice(0,200)}${said.length ? `: ${said.join('; ')}` : ''}`;
 }
+/** Safe call identity travels with errors from independently vendored kits. */
+export function providerTransport(error, redact = String) {
+  const detail = error?.providerTransport;
+  if (typeof detail?.operation !== 'string' || typeof detail.endpoint !== 'string') return undefined;
+  const clean = value => redact(value).replace(/[\x00-\x1f\x7f-\x9f]+/g,' ').replace(/\b[a-f0-9]{32}\b/gi,'[REDACTED]').slice(0,300);
+  const attempts = detail.attempts === 2 ? ' after 2 attempts' : '';
+  const status = Number.isInteger(detail.status) ? `while reading HTTP ${detail.status}` : 'before any HTTP status';
+  return `Cloudflare transport failed for ${clean(detail.operation)} at ${clean(detail.endpoint)} ${status}${attempts}${typeof detail.reason === 'string' ? `: ${clean(detail.reason)}` : ''}`;
+}
 function operation(path, options = {}) {
   const write = options.method && options.method !== 'GET';
   if (/\/d1\/database\/[^/]+\/query/.test(path)) return 'migrate D1';
