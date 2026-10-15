@@ -53,6 +53,9 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     }); } catch (cause) { throw transportFailure(cause); }
     const output = response.body ? await boundedText(response,undefined,transportFailure) : '';
+    // A successful DELETE may have no response body (including HTTP 200).
+    // Nonempty replies and all other methods still require the API envelope.
+    if (method === 'DELETE' && response.ok && output === '') return { success: true, result: null };
     let payload;
     try { payload = JSON.parse(output); } catch { if (response.ok) throw new Error('malformed-response'); }
     if (!response.ok || payload?.success === false) {
