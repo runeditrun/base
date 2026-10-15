@@ -17,7 +17,7 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  await writeFile(join(root, 'configuration.mjs'), 'export function validateConfiguration(env) { throw Error(`Invalid private input: ${env.SESSION_SECRET}`); }\n');
  // A real project with many unavailable targets makes the report larger than
  // a pipe buffer. Nothing executes those targets or substitutes a tool binary.
- const commands = Object.fromEntries(Array.from({ length: 300 }, (_, index) => [
+ const commands = Object.fromEntries(Array.from({ length: 3000 }, (_, index) => [
   `verify-unavailable-product-component-${index}`,
   { argv: ['node', 'missing.mjs'], inputs: ['missing.mjs'], effects: 'Check this product component.' },
  ]));
@@ -28,7 +28,10 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  const secret = 'synthetic-private-doctor-input';
  const env = { PATH: emptyPath, HOME: home, TZ: 'UTC', RER_NODE_AUTO: '0', SESSION_SECRET: secret };
  const run = async args => {
-  const child = spawn(process.execPath, [cli, 'doctor', ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], signal: t.signal });
+  // Shell redirection supplies a real OS pipe; Node's direct child stdout is
+  // a socket on some platforms and does not reproduce a piped terminal command.
+  const pipe = '"$1" "$2" doctor "${@:3}" | "$1" -e \'setTimeout(() => process.stdin.pipe(process.stdout), 100)\'';
+  const child = spawn('/bin/bash', ['-o', 'pipefail', '-c', pipe, 'doctor-pipe', process.execPath, cli, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], signal: t.signal });
   let stdout = '', stderr = '';
   child.stdout.setEncoding('utf8').on('data', chunk => { stdout += chunk; });
   child.stderr.setEncoding('utf8').on('data', chunk => { stderr += chunk; });
@@ -38,6 +41,7 @@ test('doctor reports every failed check in complete JSON and keeps human output 
   return stdout;
  };
  const stdout = await run(['--json']);
+ if (process.env.RER_TEST_EVIDENCE_DIRECTORY) await writeFile(join(process.env.RER_TEST_EVIDENCE_DIRECTORY, 'doctor.json'), stdout);
  const events = stdout.trim().split('\n').map(line => JSON.parse(line));
  assert.equal(events.length, 1, 'JSON mode emits one structured result without a human summary');
  const { diagnostics, ok, exitCode } = events[0];
@@ -51,6 +55,7 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  assert.match(diagnostics.pnpm.issue, /pnpm could not start \(ENOENT\)/);
  assert.match(diagnostics.pnpm.issue, /Command: pnpm --version/);
  const human = await run([]);
+ if (process.env.RER_TEST_EVIDENCE_DIRECTORY) await writeFile(join(process.env.RER_TEST_EVIDENCE_DIRECTORY, 'doctor-human.txt'), human);
  const summaryAt = human.lastIndexOf('\ndoctor:');
  assert.ok(summaryAt > 0, 'human mode puts its summary on a separate line after the report');
  const report = JSON.parse(human.slice(0, summaryAt));
