@@ -4,7 +4,7 @@ import { contained } from './project.mjs';
 
 // Source policy and its committed integration projection. Inspect declarations
 // without requiring a build or executing the seed's packaging code.
-const sources = [
+export const deliveryDeclarationSources = [
  ['rer-packaging.json', value => value?.artifact?.specInputs],
  ['packaging.json', value => value?.artifact?.specInputs],
  ['scripts/delivery/base/packaging.json', value => value?.artifact?.specInputs],
@@ -13,7 +13,7 @@ const sources = [
 
 export async function deliveryDeclarationClauses(root) {
  const clauses = [];
- for (const [path, select] of sources) {
+ for (const [path, select] of deliveryDeclarationSources) {
   let text;
   try { text = await readFile(await contained(root, path, { optional: true }), 'utf8'); }
   catch (error) {
