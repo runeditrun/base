@@ -214,11 +214,15 @@ async function start(context, hooks) {
  const url = new URL(health, context.origin).href;
  const expectedPort=context.runtimePort??Number(new URL(context.origin).port||80);
  const readinessLabel=`${labels.start} (expected internal port ${expectedPort})`;
+ const ownedPorts=async()=>{
+  try{return await listenerPorts(child.pid);}
+  catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}
+ };
  try {
   await store.waitForReady(readinessLabel, child, ready ? probeSignal => ready(url, probeSignal, context) : probeSignal => (hooks.health ?? defaultHealth)(url, probeSignal, context), { signal, timeoutMs: ['dev','preview'].includes(context.verb)?Math.min(timeoutMs??60000,120000):(timeoutMs??900000), ...(softAfterMs ? { softAfterMs } : {}), ...(intervalMs ? { intervalMs } : {}) });
  } catch (error) {
   if (signal?.aborted) throw error;
-  const ports=await listenerPorts(child.pid);
+  const ports=await ownedPorts();
   if(ports.length){
    const message=store.redact(`Application listened on port ${ports.join(', ')}; readiness failed for expected internal port ${expectedPort}. Check application health and the runtime target's port binding.`);
    store.report(message);const prior=approvedFailure(error);error=commandFailure(`${prior?.message??readinessLabel}\n${message}`,prior??{});
@@ -228,7 +232,7 @@ async function start(context, hooks) {
  // Another app can take the loopback port between the port check and the bind;
  // its /health would pass. Claim and sign in only against the process this
  // setup started.
- if (!(await listenerPorts(child.pid)).includes(expectedPort)) {
+ if (!(await ownedPorts()).includes(expectedPort)) {
   const message = store.redact?.(`Another process answered on port ${expectedPort}; the application did not bind it. Nothing was sent. Stop that process or choose another port, then run setup again.`) ?? `Another process answered on port ${expectedPort}; the application did not bind it.`;
   store.report?.(message);
   throw installationFailure('command_failed', { step: 'start', diagnostic: commandFailure(message, {}) });

@@ -2,6 +2,8 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {realpath,readFile,readdir,readlink} from 'node:fs/promises';
 import {basename,join} from 'node:path';
+import {homedir} from 'node:os';
+import {commandFailure} from './failures.mjs';
 const exec=promisify(execFile);
 // macOS supplies lsof in /usr/sbin, which a command PATH may omit.
 // Diagnose sockets with the system utility even when that PATH is constrained.
@@ -11,7 +13,10 @@ const run=async(command,args)=>{
  catch(error){
   // lsof exits 1 when a selected PID has exited,
   // while still returning the live listeners of other selected PIDs.
-  return command===lsof&&error.code===1&&typeof error.stdout==='string'?error.stdout:'';
+  if(command===lsof&&error.code===1&&!error.killed&&!error.signal&&typeof error.stdout==='string')return error.stdout;
+  const invocation=[command,...args].join(' ').replaceAll(homedir(),'~');
+  const cause=error.killed ? 'timed out after 3000 ms' : `failed (${error.code??error.signal??'unknown error'}; timeout 3000 ms)`;
+  throw commandFailure(`ownership-unchecked: Listener ownership could not be checked: ${invocation} ${cause}. Launch refused; no ownership conclusion was made.`,{});
  }
 };
 export async function processName(pid){
