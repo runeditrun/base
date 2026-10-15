@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.17-dev.g978c18b5",
+  "cliVersion": "0.2.18-dev.gb1dd422d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -539,7 +539,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "2c38addd2acd76d2c797c4edf55da6aa7c2e99de4cc2ec6c3a60330d707320bd"
+      "sha256": "63dc49a95b26d252c50d2f450a8efa6b3fb627fae8a460b951b29a8d8e84257f"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
@@ -696,6 +696,10 @@
     "cli/site.mjs": {
       "source": "cli/site.mjs",
       "sha256": "b6619eb0c35ce5d19f1678ee5d9c17bca2e9c881aade448da61b59b634fa1b8e"
+    },
+    "cli/stdio.mjs": {
+      "source": "cli/stdio.mjs",
+      "sha256": "1a1b4ed1908e801b097ded46ad3349f68afbc5b81a935efbdfece5ad1f9d1cb4"
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
@@ -951,7 +955,7 @@
     },
     "modules/demo-host/worker.mjs": {
       "source": "modules/demo-host/worker.mjs",
-      "sha256": "ec107a46cb184341c09ed0dd745ba040175e763771665a91c5d71e4478192717"
+      "sha256": "eab44545b0dd850ba7377fe99c8dc7eff8d7aaddb4d24cfcb7e4a9b08e272bd9"
     },
     "modules/dependencies/README.md": {
       "source": "modules/dependencies/README.md",
