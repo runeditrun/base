@@ -23,7 +23,7 @@ export function configure(input) {
   const externalIssuers = input.externalIssuers ?? [];
   if (!Array.isArray(externalIssuers) || externalIssuers.some((v) => { try { const u = new URL(v); return u.protocol !== 'https:' || !!u.username || !!u.password || !!u.hash || !!u.search; } catch { return true; } })) throw new AuthError('invalid_configuration', 503);
   return Object.freeze({
-    ...input, branding: configureBranding(input.branding), local, secure: url.protocol === 'https:', cookieName, OWNER_EMAIL: normalizeEmail(input.OWNER_EMAIL), externalIssuers: Object.freeze([...externalIssuers]), providers: Object.freeze([...providers]),
+    ...input, branding: configureBranding(input.branding), local, demoMailCapture: input.demoMailCapture === true, secure: url.protocol === 'https:', cookieName, OWNER_EMAIL: normalizeEmail(input.OWNER_EMAIL), externalIssuers: Object.freeze([...externalIssuers]), providers: Object.freeze([...providers]),
     review: input.review ? Object.freeze({ ...input.review, operatorEmail: normalizeEmail(input.review.operatorEmail) }) : undefined,
     allowList: input.allowList === undefined ? undefined : input.allowList.map(normalizeEmail),
     sessionSeconds: seconds(input.sessionSeconds, 7 * 86400, 30 * 86400),

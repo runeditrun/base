@@ -14,6 +14,8 @@ export function authConfig(env: Bindings): AuthConfig {
     SETUP_TOKEN: env.SETUP_TOKEN,
     MAIL_FROM: env.MAIL_FROM,
     local: env.AUTH_LOCAL === 'true',
+    // Hosted demos only: rer deploy refuses RER_DEMO, so a normal deploy never sets this.
+    demoMailCapture: env.RER_DEMO === '1' && env.MAIL_PROVIDER === 'development',
     branding: { productName: theme.productName, theme: theme.href },
     allowList: list(env.AUTH_ALLOW_LIST),
     ipLimit: env.AUTH_IP_LIMIT === undefined ? undefined : Number(env.AUTH_IP_LIMIT),

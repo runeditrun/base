@@ -48,7 +48,11 @@ export function createEmailLinkLifecycle({ config: input, clock = Date.now, mail
         ...linkMessage(config, token, url.href),
         headers: { 'Auto-Submitted': 'auto-generated' } });
     } catch { await revoke(); deny('mail_unavailable', 503); }
-    if (result?.status !== 'accepted' && !(result?.status === 'development' && config.local)) {
+    // A development receipt means the message was captured, not sent: accepted
+    // only on a local runtime or under the explicit demo capture policy, which
+    // then hands the captured link back for the visitor who asked.
+    if (result?.status === 'development' && (config.local || config.demoMailCapture)) return config.demoMailCapture ? url.pathname + url.search : undefined;
+    if (result?.status !== 'accepted') {
       // Even ambiguous delivery cannot leave a valid, unreported auth link.
       await revoke(); deny('mail_unavailable', 503);
     }
@@ -76,8 +80,8 @@ export function createEmailLinkLifecycle({ config: input, clock = Date.now, mail
       if (hooks.beforeMagicLink && await hooks.beforeMagicLink({ request, email, operator }) === false) return accepted;
       const token = await newToken('magic', safeReturnTo(returnTo));
       const { token: _secret, ...record } = token;
-      if (await store.token({ ...record, operatorId: operator.id, expectedVersion: operator.version, now: clock() })) await sendLink(email, token);
-      return accepted;
+      const captured = await store.token({ ...record, operatorId: operator.id, expectedVersion: operator.version, now: clock() }) ? await sendLink(email, token) : undefined;
+      return captured ? { ...accepted, captured } : accepted;
     },
     async previewLink(request, token) {
       requireOrigin(request, config);
@@ -116,8 +120,8 @@ export function createEmailLinkLifecycle({ config: input, clock = Date.now, mail
       await limit(request, actor.operator.email, 'step-up');
       const token = await newToken('step_up', safeReturnTo(returnTo));
       if (!await store.stepUpChallenge({ id: token.id, hash: token.hash, action, returnTo: token.returnTo, now: clock(), expiresAt: token.expiresAt }, actor)) deny('authority_changed', 409);
-      await sendLink(actor.operator.email, token, () => store.revokeStepUp(token.id, clock()));
-      return { status: 'accepted' };
+      const captured = await sendLink(actor.operator.email, token, () => store.revokeStepUp(token.id, clock()));
+      return captured ? { status: 'accepted', captured } : { status: 'accepted' };
     },
     /** Server-side guard for a listed action: the session holds a fresh email-link proof. */
     async requireStepUp(request, action) {

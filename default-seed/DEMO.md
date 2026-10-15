@@ -27,7 +27,10 @@ and is listed in the bar by method and host. A loopback answer's redirects are
 followed through the same check, hop by hop. `new WebSocket`, `navigator.sendBeacon`, `new EventSource`, `node:net` (and
 so `node:tls`) and `cloudflare:sockets` `connect` answer loopback only too, and
 their refusals are listed the same way. Mail stays in the development outbox
-and is listed too. `rer deploy` refuses a deploy declaration or
+and is listed too. Sign-in mail is captured under operator-auth's explicit demo
+policy (`demoMailCapture`, set from `RER_DEMO=1`): the visitor who asks for a
+sign-in or step-up link is taken to the captured link, with the hosted HTTPS
+origin, Origin checks and secure cookie unchanged. `rer deploy` refuses a deploy declaration or
 `--env-file` that carries `RER_DEMO`.
 
 ## Adopting it in a seed

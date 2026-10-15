@@ -6,7 +6,8 @@ import { localDevelopmentEnabled } from './local.server.mjs'
 export function operatorMail(env) {
   if (!env.MAIL_PROVIDER) return undefined
   if (env.MAIL_PROVIDER === 'development') {
-    if (!localDevelopmentEnabled(env)) return undefined
+    // Captured, never sent: a local runtime, or a demo (RER_DEMO, which rer deploy refuses).
+    if (!localDevelopmentEnabled(env) && env.RER_DEMO !== '1') return undefined
     return {
       async send(message) {
         return createMailSender({ provider: 'development', mode: 'development' }, {

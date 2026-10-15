@@ -463,6 +463,20 @@ link). It revokes unused links sent to the old address and keeps sessions and
 provider bindings. An address another operator holds is refused with
 `email_in_use`. `STEP_UP_ACTIONS` gains `email:change`.
 
+## Demo mail capture
+
+`config.demoMailCapture: true` is the explicit policy for hosted demos (the
+seed sets it only when `RER_DEMO=1`, and `rer deploy` refuses `RER_DEMO`, so a
+normal deploy never has it). The demo's development mail provider captures
+auth mail instead of sending it. Under this policy a `development` receipt
+counts as delivered, and the captured link goes to the visitor who asked. A
+native form post to `/auth/magic-link` or `/auth/step-up` is redirected to the
+captured link's confirmation page. A JSON answer carries
+`captured: '/auth/confirm?token=…'`; an unknown address still gets only the
+uniform answer. The HTTPS origin, Host and Origin checks, the `__Host-` secure
+cookie, rate limits and the owner claim are unchanged. Without the policy, a
+non-local runtime still refuses a captured receipt with `mail_unavailable`.
+
 ## Local dev identity and the key gate
 
 `dev-gate.mjs` (exported as `devGate`, production-safe) is the per-checkout key
@@ -634,7 +648,10 @@ signing in once the same issuer is configured as a provider.
 `accounts/schema/owner-signin.sql` as a new numbered migration (additive, safe
 after the fresh schema; the reference applies it as
 `migrations/core/0024_owner_signin.sql`). Only the owner-signin route reads it;
-until it exists, `rer signin` refuses before writing anything.
+until it exists, `rer signin` refuses before writing anything. A seed that
+wires a development mail provider for its hosted demo passes
+`demoMailCapture: env.RER_DEMO === '1'` in its auth config (see "Demo mail
+capture").
 
 Seeds copy this module at different revisions, and an older copy lacks the
 cancellation migration and the optional OIDC and conformance files. Check each

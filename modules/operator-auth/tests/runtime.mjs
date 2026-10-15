@@ -34,14 +34,15 @@ export async function runtime(overrides = {}, options = {}) {
     const statements = schema.replace(/^--.*$/gm, '').match(/CREATE TRIGGER[\s\S]*?END;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g);
     for (const statement of statements) await db.prepare(statement).run();
     await db.exec('CREATE TABLE test_mail (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL);');
-    const call = async (path, { method = 'GET', input, cookie, headers = {}, host, origin, ip = '192.0.2.1' } = {}) => {
+    const call = async (path, { method = 'GET', input, form, cookie, headers = {}, host, origin, ip = '192.0.2.1' } = {}) => {
       const url = new URL(path, config.origin);
       const h = { Host: host ?? url.host, Origin: origin ?? config.origin, 'X-Test-IP': ip, ...headers };
       if (cookie) h.Cookie = cookie;
       if (input !== undefined) h['Content-Type'] = 'application/json';
+      if (form !== undefined) h['Content-Type'] = 'application/x-www-form-urlencoded';
       // Miniflare's HTTP proxy rewrites Host. Carry the exact Request through a
       // test-only envelope so adversarial Host/Origin reach the real handler.
-      return mf.dispatchFetch('http://localhost/__test_dispatch', { method: 'POST', redirect: 'manual', body: JSON.stringify({ url: url.href, method, headers: h, ...(input !== undefined ? { body: JSON.stringify(input) } : {}) }) });
+      return mf.dispatchFetch('http://localhost/__test_dispatch', { method: 'POST', redirect: 'manual', body: JSON.stringify({ url: url.href, method, headers: h, ...(input !== undefined ? { body: JSON.stringify(input) } : form !== undefined ? { body: new URLSearchParams(form).toString() } : {}) }) });
     };
     return {
       config, call, get db() { return mf.getD1Database('DB'); },

@@ -46,6 +46,8 @@ export interface AuthConfig {
   origin: string; OWNER_EMAIL: string; SESSION_SECRET: string; SETUP_TOKEN?: string; MAIL_FROM?: string;
   /** Local HTTP is allowed only for literal localhost, 127.0.0.1 or [::1] with matching Host. */
   local?: boolean; allowList?: string[]; sessionSeconds?: number; linkSeconds?: number;
+  /** Hosted demos only (RER_DEMO=1): accept a captured development receipt for auth mail and hand the captured link to the visitor who asked. HTTPS origin, Origin and secure-cookie checks are unchanged. */
+  demoMailCapture?: boolean;
   review?: { enabled: boolean; operatorEmail: string }; reviewSeconds?: number;
   limitWindowSeconds?: number; ipLimit?: number; emailLimit?: number;
   /** Issuers the original admitVerifiedIdentity/createIdentityAdmission seams accept. */
@@ -159,7 +161,7 @@ export interface OperatorAuth<R extends string = Role> {
   readonly accounts: AccountsAdapter<R>;
   bootstrap(request: Request, input: { token: string; displayName: string; returnTo?: string }): Promise<CompletedSession<R>>;
   /** requiredProvider names the provider the address's domain must use, whoever asks. */
-  requestMagicLink(request: Request, input: { email: string; returnTo?: string }): Promise<{ status: 'accepted'; requiredProvider?: string }>;
+  requestMagicLink(request: Request, input: { email: string; returnTo?: string }): Promise<{ status: 'accepted'; requiredProvider?: string; captured?: string }>;
   previewLink(request: Request, token: string | null): Promise<LinkPreview | null>;
   confirmLink(request: Request, input: { token: string }): Promise<CompletedSession<R> | StepUpConfirmed>;
   getSession(request: Request): Promise<Session<R> | null>;
@@ -180,7 +182,7 @@ export interface OperatorAuth<R extends string = Role> {
   /** Server-only: caller has verified a real password against this existing operator. Rate-limit that verifier independently. */
   admitVerifiedPassword(request: Request, operatorId: string, input?: { returnTo?: string }): Promise<CompletedSession<R>>;
   /** Email a step-up link to the signed-in operator's own address. */
-  requestStepUp(request: Request, input: { action: StepUpAction; returnTo?: string }): Promise<{ status: 'accepted' }>;
+  requestStepUp(request: Request, input: { action: StepUpAction; returnTo?: string }): Promise<{ status: 'accepted'; captured?: string }>;
   /** Refuse unless this session holds a fresh (10-minute) app-local email-link proof. Provider sessions never do by themselves. */
   requireStepUp(request: Request, action: StepUpAction): Promise<Session<R>>;
   /** The `rer signin` owner link (GET /auth/owner-signin): its preview, or null when invalid, used, expired or not the active owner's. Absent with native accounts. */

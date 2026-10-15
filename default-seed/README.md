@@ -178,7 +178,8 @@ run `rer signin --environment NAME` from the checkout that deployed it, with the
 same Cloudflare credentials. It prints a one-time owner sign-in link that works
 once, only for the owner, and expires within 15 minutes. Its use is recorded in
 the owner's audit log. Signed in that way, correct the address under "Your
-sign-in email" in Operator access.
+sign-in email" in Operator access. Hosted demos (`RER_DEMO=1`) capture sign-in
+mail and show the visitor its link instead of sending it.
 
 Optional `AUTH_ALLOW_LIST` is a comma-separated additional email restriction,
 including the owner when enabled. `AUTH_IP_LIMIT` and `AUTH_EMAIL_LIMIT`

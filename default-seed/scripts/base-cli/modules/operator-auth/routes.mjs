@@ -69,6 +69,8 @@ export function createAuthHandler(auth) {
         case '/auth/bootstrap': { const value = await auth.bootstrap(request, input); return seeOther(value.returnTo, value.cookie); }
         case '/auth/magic-link': {
           const result = await auth.requestMagicLink(request, input);
+          // A demo shows its captured link to the visitor who asked (config.demoMailCapture).
+          if (form && result.captured) return seeOther(result.captured);
           return form ? seeOther(notice(auth, 'sent', { returnTo: safeReturnTo(input.returnTo) === '/app' ? undefined : safeReturnTo(input.returnTo), provider: result.requiredProvider })) : json(result, 202);
         }
         case '/auth/confirm': { const value = await auth.confirmLink(request, input); return seeOther(value.returnTo, value.cookie); }
@@ -77,6 +79,7 @@ export function createAuthHandler(auth) {
         case '/auth/review-session': { const value = await auth.issueReviewSession(request, input); return seeOther(value.returnTo, value.cookie); }
         case '/auth/step-up': {
           const result = await auth.requestStepUp(request, input);
+          if (form && result.captured) return seeOther(result.captured);
           return form ? seeOther(notice(auth, 'step_up_sent')) : json(result, 202);
         }
         case '/auth/invite': return json(await auth.invite(request, input), 202);
