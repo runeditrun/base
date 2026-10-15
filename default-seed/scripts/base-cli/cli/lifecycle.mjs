@@ -11,10 +11,10 @@ import { missing, refuse, RerError, lifecycleError } from './errors.mjs';
 import { executeDeclared } from './independent.mjs';
 import { transfer } from './transfers.mjs';
 import { runtimeFrontDoor } from './runtime-front-door.mjs';
-import { localCliSessionProof, localSettingKeys, requiredLocalSettings } from './settings.mjs';
+import { localCliSessionProof, localSettingKeys } from './settings.mjs';
 import { rememberSetupAnswers } from './setup-answers.mjs';
-import { ensureDevKey, readDevKey, refuseDevLayerOutput, openUrl, DEV_KEY_HEADER } from './dev-identity.mjs';
-import { announceDoorRoute, routeRunning, verifyDoorFor } from './door-mode.mjs';
+import { ensureDevKey, refuseDevLayerOutput } from './dev-identity.mjs';
+import { announceDoorRoute } from './door-mode.mjs';
 
 export async function runCommand(project, options, out) {
  if (options.verb === 'deploy' && !options.site && !options.demo) {
@@ -27,6 +27,8 @@ export async function runCommand(project, options, out) {
 }
 
 async function runLifecycle(project, options, out, deployRedaction) {
+ if (project.profile === 'first-party' && ['build','deploy'].includes(options.verb) && !options.demo && !options.site && process.env.RER_DEMO) throw refuse('Production build and deploy refuse the local-only RER_DEMO environment binding. Unset it before retrying.');
+ if(project.profile==='first-party'&&options.verb==='outbox')throw refuse('Captured mail has been retired. Run rer dev and open its RER_OPEN link.');
  if(project.profile==='first-party'&&['dev','preview'].includes(options.verb))return (await import('./managed-server.mjs')).managedServer(project,options,out);
  const cancellation = new AbortController(), signal = cancellation.signal;
  let termination, operation, store, temporary, proxy, failed = false;
@@ -47,16 +49,15 @@ async function runLifecycle(project, options, out, deployRedaction) {
    if (options.forwarded.length) throw refuse('First-party commands do not accept arbitrary forwarded arguments. Run rer VERB --help.');
    await stateSafety(project);
    if(options.verb==='setup')await refuseLegacyProcess(project);
-   if (['setup', 'outbox'].includes(options.verb)) {
+   if (options.verb === 'setup') {
     selected = await selectedOrigin(project, options, { setup: options.verb === 'setup' });
     if (options.verb === 'setup') {input = await setupInput(project, options, selected.vars, signal, { origin: selected.url });await dependencyInputs({project,input,origin:selected.url});}
-    else if (requiredLocalSettings(project, selected.vars).length) throw missing('Private owner settings are missing. Run rer setup --owner-email EMAIL first.');
-    if (options.verb !== 'outbox' && !selected.door) await availablePort(selected.host, selected.port, { root: project.root, saved: !selected.explicitPort && selected.savedOrigin !== undefined });
+    if (!selected.door) await availablePort(selected.host, selected.port, { root: project.root, saved: !selected.explicitPort && selected.savedOrigin !== undefined });
     if (options.verb === 'setup') announcePort(out, options, selected);
    }
    const { localOperation } = await shared('local/operation.mjs');
    // The run site reads no local state: it builds beside a running rer dev.
-   if (options.verb !== 'outbox' && !options.site) try { operation = await localOperation(project.root, process.env.RER_LOCAL_OPERATION); } catch (error) { throw refuse(error.message); }
+   if (!options.site) try { operation = await localOperation(project.root, process.env.RER_LOCAL_OPERATION); } catch (error) { throw refuse(error.message); }
    const { recoverInterrupted } = await shared('local/recovery.mjs');
    if (operation) await recoverInterrupted(project.root, operation);
    if (project.ownerReplacement) await replaceOwner(project, options, out);
@@ -66,7 +67,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
   // Nested public commands stream into their caller's capture and keep their
   // own log separate, including the browser install/setup/preview journey.
   const capture = ['.seed', 'installer', ...(process.env.RER_LOCAL_OPERATION || process.env.RER_ONBOARDING_PROCESS_OWNER ? [`commands-${process.pid}`] : [])];
-  const directory = project.profile === 'first-party' && !['outbox', 'doctor'].includes(options.verb) ? await privateDirectory(project.root, capture) : (temporary = await mkdtemp(join(tmpdir(), 'rer-command-')));
+  const directory = project.profile === 'first-party' && options.verb !== 'doctor' ? await privateDirectory(project.root, capture) : (temporary = await mkdtemp(join(tmpdir(), 'rer-command-')));
   const state = { logs: [] };
   store = await createCommands(directory, state, { terminal: text => out.progress(text), onWaiting: options.json ? details => out.event('waiting', details) : undefined, queue: ['install','setup','build','verify','deploy','export','import'].includes(options.verb)?{verb:options.verb,originalCI:process.env.CI==='true'}:undefined });
   store.state = state;
@@ -101,30 +102,19 @@ async function runLifecycle(project, options, out, deployRedaction) {
   if (options.verb === 'deploy') {
    if (typeof adapter.deploy !== 'function') throw refuse('Owner-account deploy declaration is missing.');
    const link = async (origin, appSetupToken) => linkDependencies({project,input:project.setupSeed?await savedSetupAnswers(project,project.setupSeed.model):undefined,origin,store,signal,appSetupToken});
-   return await (await import('./deploy-command.mjs')).deployCommand({ adapter, root: project.root, options, store, signal, operationToken: operation.token, localOnlyKeys: adapter.localOnlyKeys ?? [], checkBuild: () => refuseDevLayerOutput(project.root, adapter.devIdentity), setupManifest: project.setupManifest, linkDependencies: link });
+   return await (await import('./deploy-command.mjs')).deployCommand({ adapter, root: project.root, options, store, signal, operationToken: operation.token, localOnlyKeys: adapter.localOnlyKeys ?? [], checkBuild: () => refuseDevLayerOutput(project.root, adapter.devIdentity), setupManifest: project.setupManifest, setupSeed: project.setupSeed, linkDependencies: link });
   }
-  // Setup writes the checkout's dev key; its temporary app and the CLI's own
-  // outbox reads present it. Captured logs redact it.
-  const devKey = adapter.devIdentity ? options.verb === 'setup' ? await ensureDevKey(project.root) : await readDevKey(project.root) : null;
+  const devKey = adapter.devIdentity && options.verb === 'setup' ? await ensureDevKey(project.root) : null;
   if (devKey) store.addSecrets?.([devKey]);
   let app;
   if (options.verb === 'setup') { proxy = await runtimeFrontDoor({ ...selected, devKey: devKey ?? undefined, origin: selected.url }); if (selected.door) await announceDoorRoute(selected, proxy); }
-  // The outbox of a door-mode checkout is read from its running server's own
-  // proxy, never through the door: with no such server nothing is sent. A key
-  // is sent only once the door has proved it is this account's.
-  if (options.verb === 'outbox' && selected?.door) {
-   const running = await runningRecord(project.root);
-   if (!running?.door) throw new RerError('outbox_unavailable', 'The local application outbox is unavailable. Start rer dev first.', 1);
-   if (devKey) await verifyDoorFor(selected.url);
-   await routeRunning(running);
-  }
   const { appFetch } = await shared('app-fetch.mjs');
   const emailKey = localSettingKeys(project).email;
   await adapter.run(project.root, input ?? { [emailKey]: options.ownerEmail ?? selected?.vars[emailKey] }, store,
    child => { app = child; }, signal,
-   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, privateSettings: [...adapter.settings, '.rer/local/models.json', ...(project.privateInputs??[])], signInEmail: options.verb === 'outbox' ? options.ownerEmail : undefined, requestSignIn: Boolean(options.ownerEmail), devKey: devKey ?? undefined });
+   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, privateSettings: [...adapter.settings, '.rer/local/models.json', ...(project.privateInputs??[])], devKey: devKey ?? undefined });
   if (['setup', 'build'].includes(options.verb)) await refuseDevLayerOutput(project.root, adapter.devIdentity);
-  const url = selected?.url, signInUrl = url ? url + '/__dev/outbox' : undefined;
+  const url = selected?.url;
   if (options.verb === 'setup') {
    // Only a connected provider leaves first setup open; a native claim with
    // every optional dependency unanswered has already closed it.
@@ -138,16 +128,8 @@ async function runLifecycle(project, options, out, deployRedaction) {
    }
    await store.stop(app);
    await rememberSetupAnswers(project, input);
-   if (options.json) out.event('setup-ready', { url, signInUrl, setupUrl: url+'/setup' });
-   else if (devKey) { out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup.`); }
-   else { out.human(`RER_SETUP_READY ${url}`); signInInstructions(out, signInUrl); out.human(`Finish first-run setup at ${url}/setup after sign-in.`); out.human('Next: rer dev'); }
-  } else if (options.verb === 'outbox') {
-   const response = await appFetch(signInUrl, { headers: devKey ? { [DEV_KEY_HEADER]: devKey } : {}, signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]) }).catch(() => ({ ok: false }));
-   if (!response.ok) throw new RerError('outbox_unavailable', 'The local application outbox is unavailable. Start rer dev first.', 1);
-   await response.body?.cancel();
-   const open = devKey ? openUrl(url, devKey, { path: '/__dev/key', next: '/__dev/outbox' }) : signInUrl;
-   if (options.json) out.event('outbox', { signInUrl, ...(devKey ? { openUrl: open } : {}) }); else { signInInstructions(out, signInUrl); if (devKey) out.human(`RER_OPEN ${open}`); }
-   if (options.open && !options.json && !options.nonInteractive) await store.run('Opening local outbox', process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer.exe' : 'xdg-open', [open], { cwd: project.root, signal });
+   if (options.json) out.event('setup-ready', { url, setupUrl: url+'/setup' });
+   else { out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup.`); }
   } else if (options.verb !== 'build') throw refuse('The requested first-party capability is unavailable.');
   return {};
  } catch (error) {
@@ -167,16 +149,6 @@ async function runLifecycle(project, options, out, deployRedaction) {
   for (const [name, handler] of handlers) process.removeListener(name, handler);
   if (termination) throw new RerError('cancelled', `Stopped by ${termination} after owned children were stopped.`, termination === 'SIGINT' ? 130 : 143);
  }
-}
-
-// This checkout's running server, from the shared registry (routeRunning
-// checks that it is alive and holds its proxy port).
-async function runningRecord(root) {
- const { readJson } = await import('../modules/job-queue/storage.mjs');
- const { serversDirectory } = await import('./server-registry.mjs');
- const { realpath } = await import('node:fs/promises');
- const checkout = await realpath(root), state = await readJson(join(serversDirectory(), 'state.json'), { running: [] });
- return (state.running ?? []).find(record => record.checkout === checkout);
 }
 
 // Under the local operation, before the app starts: the zero-setup owner's
@@ -202,9 +174,4 @@ function announcePort(out, options, selected) {
  if (!line) return;
  if (options.json) out.event('port', { port: selected.port, ...(moved ? { movedFrom: moved.from } : {}) });
  else out.human(line);
-}
-
-function signInInstructions(out, url) {
- out.human(`RER_SIGN_IN ${url}`);
- out.human('Open the outbox, choose the newest sign-in message and follow its link. No email was sent.');
 }

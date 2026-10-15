@@ -52,7 +52,7 @@ export function refuseManagedInstallation(...sources) {
  for (const vars of sources) {
   if (!vars?.RER_INSTALLATION_ID || !vars.RER_MANAGEMENT_ORIGIN) continue;
   let host; try { host = new URL(vars.RER_MANAGEMENT_ORIGIN).hostname.replace(/^\[|\]$/g, ''); } catch {}
-  if (!loopback(host)) throw refuse('Dev identity refuses to start beside RER_INSTALLATION_ID with a non-loopback RER_MANAGEMENT_ORIGIN. Remove them from local settings or run rer dev --login.');
+  if (!loopback(host)) throw refuse('Dev identity refuses to start beside RER_INSTALLATION_ID with a non-loopback RER_MANAGEMENT_ORIGIN. Remove them from local settings before starting local dev identity.');
  }
 }
 

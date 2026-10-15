@@ -16,12 +16,12 @@ export async function demoAdopted(root) {
   try { text = await readFile(join(root, name), 'utf8'); break; } catch (error) { if (error.code !== 'ENOENT') throw error; }
  }
  if (!text.includes('RER_STATE_DIR')) throw refuse(`This seed's vite.config does not persist to RER_STATE_DIR, so a demo would run on this checkout's own data. ${adopt}`);
- if (!text.includes('demoSockets(')) throw refuse(`This seed's vite.config does not list demoSockets(), so a demo's cloudflare:sockets connections could leave this computer. ${adopt}`);
+ if (!text.includes('demoSockets(')) throw refuse(`This seed's vite.config does not list demoSockets(), so direct mail transports would not pass through the demo effect guard. ${adopt}`);
 }
 
 // A demo's data lives in .rer/demo/START. Only one server runs per checkout, so
 // any other demo folder is a stopped demo's leftover (a hard kill) and goes now.
-// The end is local ISO time with its offset: the Demo bar shows its HH:MM as written.
+// The end is local ISO time with its offset, also returned in readiness metadata.
 export async function demoState(root, seconds) {
  const { privateDirectory } = await shared('private-files.mjs');
  const started = new Date(), stamp = started.toISOString().replace(/[-:]|\.\d+/g, '');
@@ -34,7 +34,7 @@ export async function demoState(root, seconds) {
 }
 
 // After start: a request has passed withDemo, which creates rer_demo in the
-// demo's own database. Without it nothing is blocked, so the demo stops.
+// demo's own database. Without it effect simulation is unproved, so the demo stops.
 export async function demoGuarded(url, state, signal) {
  const { appFetch } = await shared('app-fetch.mjs');
  await (await appFetch(url + '/health', { signal })).body?.cancel();
@@ -43,5 +43,5 @@ export async function demoGuarded(url, state, signal) {
   const db = new DatabaseSync(join(directory, file), { readOnly: true });
   try { if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'rer_demo'").get()) return; } finally { db.close(); }
  }
- throw refuse(`The app did not start in demo mode (no withDemo guard answered), so it could send. The demo was stopped and its data deleted. ${adopt}`);
+ throw refuse(`The app did not start in demo mode (no withDemo guard answered), so external writes might run for real. The demo was stopped and its data deleted. ${adopt}`);
 }

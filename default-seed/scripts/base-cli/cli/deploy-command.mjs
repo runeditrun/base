@@ -1,3 +1,4 @@
+import { requireProductionAuth } from './production-auth.mjs';
 import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 import { contained } from './project.mjs';
@@ -62,6 +63,8 @@ export async function deployCommand(context) {
  // may perform them; neither a build nor a custom upload runs here.
  if (options.remove || options.setSecret || options.unsetSecret) return ownerDeploy(path, adapter)(context);
  if (adapter.deploy.managesHostedOwner) return adapter.deploy(context);
+ const production = await deployEnvironment({ root, options, declaration, setupManifest, settings: adapter.settings, localOnlyKeys });
+ await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
  const sourceSha = options.dryRun ? undefined : committedSource(root, options);
  const { env, supplied } = await deployEnvironment({ root, options, declaration, setupManifest, settings: adapter.settings, localOnlyKeys });
  const { createRedaction, credentialValues } = await shared('redaction.mjs');

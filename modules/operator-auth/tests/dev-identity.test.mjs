@@ -29,6 +29,9 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     const both = cookies(entered);
     assert.equal((await r.call('/auth/session', { cookie: both })).status, 200);
     assert.equal((await r.call('/auth/session', { cookie: sessionOnly(both) })).status, 401, 'a dev session without the gate is refused');
+    const signin = await (await r.call('/signin', { cookie: gateOnly(both) })).text();
+    assert.match(signin, /href="\/auth\/dev\/enter\?as=owner/);
+    assert.doesNotMatch(signin, /type="email"/);
     // The browser cookie alone passes the gate; reuse keeps the same session row.
     assert.equal((await r.call('/auth/dev/enter?as=owner', { cookie: both })).status, 303);
     assert.equal((await r.db.prepare("SELECT count(*) AS n FROM oa_sessions WHERE kind='dev'").first()).n, 1, 'reused');

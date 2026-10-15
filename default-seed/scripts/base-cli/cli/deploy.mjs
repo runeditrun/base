@@ -1,3 +1,4 @@
+import { requireProductionAuth } from './production-auth.mjs';
 import { readFile } from 'node:fs/promises';
 import { deployDiagnostic } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
@@ -15,7 +16,7 @@ import { hookState, forgetHookState } from './deploy-hook-record.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
- return Object.assign(async ({ root, options, store, signal, operationToken, localOnlyKeys = [], checkBuild = async () => {}, setupManifest, linkDependencies }) => {
+ return Object.assign(async ({ root, options, store, signal, operationToken, localOnlyKeys = [], checkBuild = async () => {}, setupManifest, setupSeed, linkDependencies }) => {
   try { await refuseLocalModels(root); } catch { throw refuse('Deploy refuses the local-only key file .rer/local/models.json. Remove live-dev credentials before deployment.'); }
   const path = await contained(root, declarationPath);
   let declaration; try { declaration = JSON.parse(await readFile(path, 'utf8')); } catch { throw invalid('Malformed owner-account deploy declaration.'); }
@@ -31,6 +32,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
   if (!change.length) {
+   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
+   await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options });
    if (!options.dryRun) committedSource(root, options);
    await lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken });
    await checkBuild();

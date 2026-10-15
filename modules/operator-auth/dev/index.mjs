@@ -7,7 +7,7 @@ import { AuthStore } from '../accounts/store.mjs';
 import { createOperatorAuth } from '../service.mjs';
 import { AuthError } from '../errors.mjs';
 import { hashToken, opaqueToken } from '../crypto.mjs';
-import { readCookie, sessionCookie, isLoopbackHost } from '../http.mjs';
+import { readCookie, sessionCookie, isLoopbackHost, escapeHtml } from '../http.mjs';
 import { safeReturnTo } from '../policy.mjs';
 import { isActiveOperator, defaultRolePolicy } from '../accounts/roles.mjs';
 import { devGate, devNotFound } from '../dev-gate.mjs';
@@ -15,6 +15,7 @@ import { registerDevAdmission } from '../dev-admission.mjs';
 import { definePersonas } from './personas.mjs';
 import { cliSession } from './cli-session.mjs';
 import { decorateLabel } from '../../demo/label.mjs';
+import { pageResponse } from '../page.mjs';
 
 export const DEV_LAYER_MARKER = 'rer-dev-layer:local-only-never-deploy';
 const headers = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow', 'x-rer-dev-layer': DEV_LAYER_MARKER };
@@ -49,6 +50,13 @@ export function withDevIdentity(worker, { bindings = env => env, config: authCon
       registerDevAdmission(gate ? r => gate.admits(r) : null);
       const path = new URL(request.url).pathname;
       if (path === '/__dev/key') return gate ? gate.exchange(request) : devNotFound();
+      if (path === '/signin' && gate && env.RER_DEV_IDENTITY !== 'off' && request.method === 'GET') {
+        if (!await gate.admits(request)) return new Response(null, { status: 303, headers: { ...headers, location: '/__dev/key' } });
+        const { config } = identity(env, authConfig, declared);
+        const returnTo = safeReturnTo(new URL(request.url).searchParams.get('returnTo'));
+        const href = `/auth/dev/enter?as=owner&returnTo=${encodeURIComponent(returnTo)}`;
+        return decorateLabel(await pageResponse({ branding: config.branding, heading: 'Open your local app', content: `<a class="action" href="${escapeHtml(href)}">Continue as owner</a>` }), env.RER_DEMO === '1' ? 'Demo' : 'Dev');
+      }
       if (path === '/auth/dev/enter' || path === '/__dev/personas' || path === '/auth/local/cli-session') {
         if (!gate || env.RER_DEV_IDENTITY === 'off' || (path !== '/auth/local/cli-session' && !await gate.admits(request))) return rejectedResponse(request, devNotFound());
         const context = identity(env, authConfig, declared);

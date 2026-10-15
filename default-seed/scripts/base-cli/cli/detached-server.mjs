@@ -34,8 +34,8 @@ export async function detachedServer(options, argv, out) {
     if (event.event==='error') failure=event;
     if (event.event==='ready') {
      keep=true;child.unref();
-     const dev = event.openUrl ? {openUrl:event.openUrl,identity:options.verb === 'dev' && !options.login,signedInAs:event.signedInAs,ownerLeft:options.verb === 'dev' && !options.login && event.signedInAs === null} : undefined;
-     ready(out,event.url,dev,options.json,Boolean(event.signInUrl),event.siteUrl,event.demo);
+     const dev = event.openUrl ? {openUrl:event.openUrl,identity:options.verb === 'dev',signedInAs:event.signedInAs,ownerLeft:options.verb === 'dev' && event.signedInAs === null} : undefined;
+     ready(out,event.url,dev,options.json,event.siteUrl,event.demo);
      return 0;
     }
     if (event.event==='waiting' || event.event==='warning') out.event(event.event,event);

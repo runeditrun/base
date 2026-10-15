@@ -6,7 +6,7 @@ import { cliVersion } from './version.mjs';
 
 // Copy whole maintained source/tooling directories. Python publication scans
 // load sibling modules and data dynamically; they belong in the inventory too.
-export const sourceRoots = ['bin/rer.mjs', 'cli', 'modules/job-queue', 'modules/release', 'modules/deploy-kit', 'modules/container', 'modules/demo-host', 'modules/integrations/core', 'modules/mail', 'modules/ai', 'modules/portability', 'modules/erasure', 'modules/dependencies', 'modules/operator-auth', 'modules/owner-claim', 'operations', 'scripts/publish-check', 'scripts/publish-check.mjs', 'composition/git-source.mjs', 'edition-authoring/manifest.mjs', 'edition-authoring/files.mjs'];
+export const sourceRoots = ['bin/rer.mjs', 'cli', 'modules/job-queue', 'modules/release', 'modules/deploy-kit', 'modules/container', 'modules/demo-host', 'modules/demo', 'modules/integrations/core', 'modules/mail', 'modules/ai', 'modules/portability', 'modules/erasure', 'modules/dependencies', 'modules/operator-auth', 'modules/owner-claim', 'operations', 'scripts/publish-check', 'scripts/publish-check.mjs', 'composition/git-source.mjs', 'edition-authoring/manifest.mjs', 'edition-authoring/files.mjs'];
 export async function inventory(base, roots = sourceRoots) {
  const files = [];
  async function walk(path) {
