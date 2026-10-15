@@ -15,11 +15,13 @@ export async function finishStart(demo, options) {
   } catch (error) {
     const failure = ['health-deadline', 'container-stopped', 'start-reservation-expired'].includes(error.message) ? error.message : category(error);
     demo.record('failed', { error: failure });
+    // Release before publishing the retry state, diagnostic capture or a slow
+    // destruction retry. This copy never became a live visitor's demo.
+    await demo.ctx.storage.put('startup', { phase: 'starting', failure: { phase: 'failed' } });
+    try { await demo.end(); } catch (cleanup) { report(correlation, demo.started, 'cleanup', { error: category(cleanup) }); }
     try {
       const diagnostic = await bounded(demo.diagnostic(), 3000);
       await bounded(demo.env.CAPACITY.get(demo.env.CAPACITY.idFromName('diagnostics')).record(correlation, { ...diagnostic, failure }), 3000);
     } catch (capture) { report(correlation, demo.started, 'diagnostic', { error: category(capture) }); }
-    await demo.ctx.storage.put('startup', { phase: 'failed', capacity: failure === 'placement-unavailable' });
-    try { await demo.end(); } catch (cleanup) { report(correlation, demo.started, 'cleanup', { error: category(cleanup) }); }
   }
 }
