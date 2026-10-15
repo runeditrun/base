@@ -85,7 +85,7 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  }
  const base = resolve(import.meta.dirname,'../..');
  for (const path of ['modules/container','modules/portability','modules/d1-transport','modules/deploy-kit','cli/scheduled.mjs','cli/jsonc.mjs','modules/integrations/core/public-address.ts']) { await mkdir(join(output,'runtime',path,'..'),{recursive:true}); await cp(join(base,path),join(output,'runtime',path),{recursive:true,filter:path => !path.includes('/tests/')}); }
- const dependencies = engine === 'workerd' ? { miniflare:'5.20260907.0-alpha' } : {};
+ const dependencies = { ws:'8.21.0', ...(engine === 'workerd' ? { miniflare:'5.20260907.0-alpha' } : {}) };
  await writeFile(join(output,'runtime/package.json'),JSON.stringify({private:true,type:'module',dependencies}));
  await writeFile(join(output,'Dockerfile'),`FROM node:26.8.1-bookworm-slim\nRUN apt-get update && apt-get install -y --no-install-recommends util-linux ca-certificates && apt-get clean\nRUN mkdir -p /private /archive\nWORKDIR /runtime\nCOPY runtime/package.json ./package.json\nRUN npm install --omit=dev --no-audit --no-fund\nCOPY runtime/ /runtime/\nCOPY app/ /app/\nENV NODE_ENV=production PORT=8080 WRANGLER_SEND_METRICS=false\nEXPOSE 8080\nVOLUME /data\nENTRYPOINT ["sh", "/runtime/modules/container/entrypoint.sh"]\n`);
  return { output,manifest };

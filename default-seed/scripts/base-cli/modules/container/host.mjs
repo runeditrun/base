@@ -3,13 +3,14 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { recordVolumeOwner } from './lock.mjs';
 import { incoming, outgoing } from './ingress.mjs';
+import { attachWebSockets } from './websockets.mjs';
 import { parseCron, cronMatches } from '../../cli/scheduled.mjs';
 import { superviseRunner } from './runner.mjs';
 export async function startHost({ root = '/app', data = '/data', settings = process.env, port = Number(process.env.PORT ?? 8080), edge, engineVersion = process.version, automaticTicks=true, runnerEnabled=true } = {}) {
  await mkdir(data, { recursive:true });
  const manifest = JSON.parse(await readFile(join(root, 'container.json'), 'utf8'));
  const release = await recordVolumeOwner(data);
- let engine, server, timer, idleTimer, runner, closing, lastMinute = -1, lastRequest=Date.now();
+ let engine, server, timer, idleTimer, runner, closing, closeWebSockets, lastMinute = -1, lastRequest=Date.now();
  try {
   const origins = settings.RER_INGRESS_ORIGINS === undefined ? undefined : JSON.parse(settings.RER_INGRESS_ORIGINS);
   if (origins !== undefined && (!Array.isArray(origins) || origins.some(value => { try { const url = new URL(value); return typeof value !== 'string' || url.protocol !== 'https:' || url.origin !== value; } catch { return true; } }))) throw new Error('Invalid ingress origins');
@@ -17,10 +18,11 @@ export async function startHost({ root = '/app', data = '/data', settings = proc
   engine = await create({ root,data,manifest,settings,edge });
   const schedules = (manifest.config.triggers?.crons ?? []).map(cron => [cron,parseCron(cron)]);
   const tick = async time => { for (const [cron, expression] of schedules) if (cronMatches(expression, new Date(time))) await engine.scheduled({ cron,scheduledTime:time }); await engine.drain(); };
+  const requestFrom = req => incoming(req, { trustedProxy:settings.TRUSTED_PROXY, origin:settings.RER_INGRESS_ORIGIN, origins, maxRequestBytes:manifest.maxRequestBytes });
   server = createServer(async (req, res) => {
    try {
     lastRequest=Date.now();
-    const request = await incoming(req, { trustedProxy:settings.TRUSTED_PROXY, origin:settings.RER_INGRESS_ORIGIN, origins, maxRequestBytes:manifest.maxRequestBytes });
+    const request = await requestFrom(req);
     let response = await engine.fetch(request);
     if (new URL(request.url).pathname === '/health' && response.ok) {
      const body = await response.json(); const deadJobs = engine.dead();
@@ -29,14 +31,15 @@ export async function startHost({ root = '/app', data = '/data', settings = proc
     outgoing(response, res);
    } catch (cause) { res.statusCode = cause.status ?? 500; res.end('Container request failed'); console.error('Container request failed:', cause.name); }
   });
+  closeWebSockets = attachWebSockets(server, { engine, incoming:requestFrom, activity:() => { lastRequest=Date.now(); } });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port,'0.0.0.0',resolve); });
   let ticking=false;
   if(automaticTicks){timer = setInterval(async () => { if(ticking)return;ticking=true;const minute = Math.floor(Date.now()/60000); try { if (minute !== lastMinute) { lastMinute = minute; await tick(minute * 60000); } else await engine.drain(); } catch { console.error('Container scheduled event failed'); }finally{ticking=false;} },1000); timer.unref();}
-  const close = () => closing ??= (async () => { clearInterval(timer); clearInterval(idleTimer); await runner?.close(); await new Promise(resolve => server.close(resolve)); await engine.close(); await release(); })();
+  const close = () => closing ??= (async () => { clearInterval(timer); clearInterval(idleTimer); await runner?.close(); closeWebSockets(); await new Promise(resolve => server.close(resolve)); await engine.close(); await release(); })();
   const idle=Number(settings.RER_CONTAINER_IDLE_SECONDS);if(Number.isFinite(idle)&&idle>0){idleTimer=setInterval(()=>{if(Date.now()-lastRequest>=idle*1000)void close();},Math.min(1000,idle*1000));idleTimer.unref();}
   if(runnerEnabled)runner=superviseRunner({root,manifest,settings,failed(){console.error('Required container runner stopped');void close().finally(()=>{process.exitCode=1;});}});
   return { engine,manifest,server,tick,close };
- } catch (cause) { clearInterval(timer); clearInterval(idleTimer); await runner?.close(); server?.close(); await engine?.close(); await release(); throw cause; }
+ } catch (cause) { clearInterval(timer); clearInterval(idleTimer); await runner?.close(); closeWebSockets?.(); server?.close(); await engine?.close(); await release(); throw cause; }
 }
 if (process.argv[1] === import.meta.filename) {
  let host;
