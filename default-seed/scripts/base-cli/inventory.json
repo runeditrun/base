@@ -2139,7 +2139,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "b228b22ca2d81eebcb8e261fae0ddf02b625fbcc939d01cb4979dc3aa9c48626"
+      "sha256": "1a3d8150500179ed17d80574007197d9e71e4d38bc180f3d015541a7fae4aa7a"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
@@ -2197,9 +2197,13 @@
       "source": "modules/portability/http.mjs",
       "sha256": "c4dad3b6ea5c2a5384262e391bfebe83365ba3f934f99050cb3efd54171af16d"
     },
+    "modules/portability/import-staging.mjs": {
+      "source": "modules/portability/import-staging.mjs",
+      "sha256": "54e08876ce1eb15f28b60a3101a17129cc75e897b76450d5ae866cd3c6a17987"
+    },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "3d6b3163873d3d3153189f047e30559f622642c0600e777c488f2632006d9d11"
+      "sha256": "1ca468fed5354615ca3d4b6394e14d733c99f73d66c109cd5b5dd7c2dfee6fac"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
@@ -2251,7 +2255,7 @@
     },
     "modules/portability/storage.mjs": {
       "source": "modules/portability/storage.mjs",
-      "sha256": "2841c190f9e9fc6cc08d00a5701ae5cf24111ab727c12e8af6026a665186d8ee"
+      "sha256": "4b25a8d56c8905817b3f5b7955b68843c83cbf1350a1e36b219cd5ef62fded6a"
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
