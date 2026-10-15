@@ -25,6 +25,7 @@ async function boundedText(response, limit = 4 * 1024 * 1024, onReadError) {
 export async function boundedJSON(response, limit) {
   try { return JSON.parse(await boundedText(response,limit)); } catch (error) { if (error instanceof SyntaxError) throw new Error('malformed-response'); throw error; }
 }
+const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
 export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500, removal = false }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
@@ -38,8 +39,9 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     assert(!assetToken || path === '/workers/assets/upload?base64=true', 'invalid-asset-auth-target');
     // Asset-session credentials are discovered at runtime, outside the CLI env.
     // Preserve complete text for the CLI's remaining redaction before truncation.
-    const redactCredentials = text => [accountId,token,assetToken].filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
-    const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? '[D1 import details omitted]' : redactCredentials(text);
+    const redactCredentials = text => redactValues(text,[accountId,token,assetToken]);
+    // D1 import text keeps Cloudflare's reason, never its signed upload destinations.
+    const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? redactCredentials(text).replace(/\bhttps?:\/\/\S+/gi,'[URL omitted]') : redactCredentials(text);
     const operation = `${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`;
     const endpoint = redactCredentials(`https://api.cloudflare.com/client/v4${zone ? '' : '/accounts/[REDACTED]'}${operation.slice(method.length + 1)}`);
     const transportFailure = (cause, attempts, status = null) => {
@@ -128,6 +130,6 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     assert(response.status === 200, 'd1-import-upload-failed');
     assert(response.headers.get('etag')?.replace(/^"|"$/g, '') === etag, 'd1-import-upload-etag-mismatch');
   }
-  return { accountId, envelope, list, importSql(id, sql) { return importD1({envelope,upload}, id, sql); }, request:requestResult,
+  return { accountId, envelope, list, importSql(id, sql) { return importD1({envelope,upload,redact:text => redactValues(text,[accountId,token])}, id, sql); }, request:requestResult,
     zoneRequest(path, options = {}) { return requestResult(path, { ...options, zone: true }); } };
 }

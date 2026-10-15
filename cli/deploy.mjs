@@ -1,6 +1,6 @@
 import { requireProductionAuth } from './production-auth.mjs';
 import { readFile } from 'node:fs/promises';
-import { deployDiagnostic, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { contained } from './project.mjs';
 import { missing, invalid, refuse, RerError } from './errors.mjs';
@@ -140,7 +140,9 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  if (transport) lines.push(`${transport}.`);
  if (diagnostic?.output && diagnostic.output !== '(no provider output)') lines.push(`First redacted output lines:\n${diagnostic.output}`);
  lines.push(`Resources created this attempt: ${created.join(', ') || 'none'}.`);
- lines.push(recovery({ code, at, resource, again, retry, secretChange }));
+ const migration = migrationFailure(error, again);
+ if (migration) lines.push(redact(migration));
+ if (code !== 'uncertain-migration-claim') lines.push(recovery({ code, at, resource, again, retry, secretChange }));
  return lines.join('\n');
 }
 
@@ -155,7 +157,7 @@ function recovery({ code, at, resource, again, retry, secretChange }) {
  }
  if (code === 'uncertain-resource-not-empty') return `Possibly created: ${resource}, but it holds data, so it may not be the one rer's interrupted run made and rer will not delete it. Inspect it in the Cloudflare dashboard; delete it yourself only if its data is disposable, then run ${retry} again.`;
  if (code === 'uncertain-resource-unverifiable') return `Possibly created: ${resource}. rer cannot read whether a queue holds messages, so it will not delete it. Inspect it in the Cloudflare dashboard: if it is the empty one from the interrupted run, delete it, then run ${retry} again.`;
- if (code === 'changed-or-uncertain-migration-history') return `${resource ?? 'A D1 database'} holds a migration rer started but could not confirm, or one changed since it was applied; rer never retries or guesses a migration. Inspect it in the Cloudflare dashboard: if it is the empty one from this interrupted first deploy, delete it with ${remove} (that deletes everything this environment created), then run ${again} again. If it holds data, resolve the interrupted migration by hand first (deploy-kit README, Migration safety).`;
+ if (code === 'changed-or-uncertain-migration-history') return `${resource ?? 'A D1 database'} holds migration history this build does not match: a migration changed or missing since it was applied, or an unconfirmed one that is not this build's next migration; rer never guesses migration history. Inspect it in the Cloudflare dashboard: if it is the empty one from this interrupted first deploy, delete it with ${remove} (that deletes everything this environment created), then run ${again} again. If it holds data, resolve the interrupted migration by hand first (deploy-kit README, Migration safety).`;
  if (removing) return `Fix the cause, then run ${retry} again.`;
  if (secretChange) return `Fix the cause, then run ${retry} again; a plain ${again} does not make this change.`;
  return `Fix the cause, then run ${again} again: it continues with what was created. To delete what this environment created instead: ${remove}.`;

@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, mkdir, symlink, link, rm, readFile, realpath } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { deployDiagnostic } from '../diagnostics.mjs';
+import { deployDiagnostic, providerRefusal } from '../diagnostics.mjs';
 import { cloudflare } from '../provider.mjs';
 import { regularBytes, readArtifact, collectFiles } from '../artifact.mjs';
 import { assertCredentialFree } from '../prepare.mjs';
@@ -135,7 +135,7 @@ test('D1 file import confines signed uploads, verifies bytes and polls without f
   }
 });
 
-test('D1 import failures never expose upload secrets or SQL and never retry uncertain ingestion', async () => {
+test('D1 import failures keep Cloudflare\'s reason without upload secrets or credentials and never retry uncertain ingestion', async () => {
   const id='12345678-1234-1234-1234-123456789abc';
   for(const mode of ['etag','redirect','transport','poll','envelope','limit','cached']){
     let calls=0;
@@ -146,12 +146,16 @@ test('D1 import failures never expose upload secrets or SQL and never retry unce
       if(mode==='transport')throw Error('secret-upload');
       if(mode==='redirect')return new Response(null,{status:302,headers:{location:'https://evil.test'}});
       if(mode==='etag')return new Response(null,{headers:{etag:'wrong'}});
-      if(mode==='envelope')return Response.json({success:false,errors:[{message:'secret-upload private SQL'}]},{status:400});
-      if(mode==='poll')return response({...result,status:'error',errors:['secret-upload private SQL']});
+      if(mode==='envelope')return Response.json({success:false,errors:[{code:7500,message:`no such table: lookup; upload https://${accountId}.r2.cloudflarestorage.com/sql?sig=secret-upload with test-token`}]},{status:400});
+      if(mode==='poll')return response({...result,status:'error',errors:[`no such table: lookup; upload https://${accountId}.r2.cloudflarestorage.com/sql?sig=secret-upload with test-token`]});
       return response(result);
     }});
     if(mode==='cached'){await api.importSql(id,'SELECT 1;');assert.equal(calls,1);continue;}
-    await assert.rejects(api.importSql(id,'SELECT 1;'),error=>{assert(!JSON.stringify(deployDiagnostic(error,String) ?? error).includes('secret-upload'));assert(!error.message.includes('secret-upload'));return /d1-import|provider-http|budget/.test(error.message);});
+    await assert.rejects(api.importSql(id,'SELECT 1;'),error=>{
+      const kept=JSON.stringify([deployDiagnostic(error,String),error.providerRefusal,error.message]);
+      for(const secret of ['secret-upload','test-token',accountId])assert(!kept.includes(secret));
+      if(['envelope','poll'].includes(mode))assert.match(providerRefusal(error),/no such table: lookup; upload \[URL omitted\] with \[REDACTED\]/);
+      return /d1-import|provider-http|budget/.test(error.message);});
     assert.equal(calls,mode==='limit'?5:2);
   }
   const complete={success:true,type:'import',status:'complete',result:{num_queries:1,final_bookmark:'finished'}};
