@@ -3,7 +3,8 @@
 The front Worker `rer deploy --demo` deploys at `demo.<domain>` for a seed
 that adopted demo mode (`withDemo`, export/DEMO.md). `plan.mjs` turns `deploy-demo.json`
 (optionally `instanceType`, one of Cloudflare's predefined Container instance
-types, `basic` unless set) into the Worker's Wrangler configuration; the CLI (`cli/demo-host.mjs`) writes
+types, `basic` unless set, and `ownerEmail`, the address the demo's owner signs
+in as, `owner@demo.invalid` unless set) into the Worker's Wrangler configuration; the CLI (`cli/demo-host.mjs`) writes
 it with these files and the seed's container image folder (workerd engine) to
 `.rer/demo-host/` and runs `wrangler deploy` there. Declared
 `container.hostVariables` resolve from demo settings to the primary hostname or
@@ -20,14 +21,20 @@ start page.
   202 progress and a `rer_demo` cookie; `GET /__demo/status` polls that same
   copy until it can relay the owner claim's 303 (JSON `{ location }` for the
   page script) and session cookie. Every external admission step is bounded:
-  the start answers within 12 seconds, and status within two seconds. A request
+  the start answers within 12 seconds. A new copy that takes over two seconds
+  to answer is still a pending start, not a failure. Each status request is
+  held (at most 1.5 seconds) until the start changes, so the page learns of the
+  sign-in at once; a slow status read answers pending. Each admission logs
+  `demo_admitted` with the request's user agent and network owner, so a held
+  place can be joined to whoever started it (automated browsers pass
+  Turnstile's always-pass testing keys on test hosts). A request
   with that cookie goes to the visitor's Durable Object; nothing else reaches
   a container.
 - `container.mjs`: `DemoContainer`, one per visitor (`newUniqueId`, checked
   with `idFromString`). It starts the container with public internet enabled,
   `RER_DEMO=1`, the fixed origin (`RER_INGRESS_ORIGIN` and the seed's origin
   variable), fresh `SESSION_SECRET` and `SETUP_TOKEN`,
-  `OWNER_EMAIL=owner@demo.invalid` and the owner claim's issuer, installation
+  `OWNER_EMAIL` (`DEMO_OWNER_EMAIL`, else `owner@demo.invalid`) and the owner claim's issuer, installation
   id and public key; waits for `/health`; and posts a five-minute ES256 claim
   (`claim.mjs`) to `/auth/owner-claim`. Its alarm ends the demo at its hour or
   after 15 idle minutes: `destroy()`, `deleteAll()` and the place released. A
@@ -82,7 +89,9 @@ Chromium (default-seed's Playwright) through waiting, failure, Try again,
 working and the signed-in landing. The end-to-end proof (`wrangler dev` with Docker)
 is in DEMO.md.
 
-Startup has a 45-second budget, with a separate five-second HTTP probe limit.
+Startup has a 45-second boot budget, with a separate five-second HTTP probe
+limit; waiting for Cloudflare to place the container renews it, up to 90
+seconds from the start (see placement below).
 The Durable Object owns that work and cleanup while the page polls; a browser
 that leaves cannot abandon it. Retrying a pending copy resumes the same
 reservation; an explicit Try again cancels it before creating a replacement. Failed starts release their place before returning the retry state, retain the bounded operator diagnostic and destroy
@@ -116,12 +125,25 @@ container is already stopped); a terminal start failure releases it immediately.
 A cleanup failure is logged separately and cannot replace the startup failure
 shown to the visitor.
 
-Cloudflare may briefly report that it has no prepared container instance even
-when the application is below `max_instances`. `placement.mjs` keeps the same
+Cloudflare keeps a small prepared pool per application (7 instances on fresh
+test hosts, measured in October 2026, whatever `max_instances` is) and places a
+new instance only on demand: a start beyond the pool gets "no container instance
+that can be provided" until Cloudflare has placed one (16 to 37 seconds
+measured, after which boot was normal). `placement.mjs` keeps the same
 reservation and launch options, requests placement again only for that specific
-provider response, and stays within the original startup deadline. Boot, health
+provider response, and renews the 45-second boot budget after each wait, up to
+90 seconds from the start, extending the reservation to match. Boot, health
 and claim errors are not retried. Placement exhaustion answers with the normal
 failed-start retry state and releases the reservation; the capacity notice is
 reserved for actual reservation exhaustion. Cleanup keeps only that terminal
 answer and correlation for one minute, so a status poll after object recovery
 still receives the right answer; its alarm then deletes the remaining metadata.
+
+`DemoCapacity` alone admits visitors (`maxInstances` live demos). The Container
+application's own `max_instances` is twice that, so instances Cloudflare still
+counts after a demo ends or a start fails never refuse a place admission gave.
+Its `rollout_active_grace_period` is an hour, a demo's longest life: a redeploy
+that rolls the application out (a new image, instance type or limit) replaces
+idle prepared instances at once and leaves every live demo running until it
+ends. With no grace period a rollout replaced live demos' containers within two
+minutes, and their visitors saw "This demo has ended".

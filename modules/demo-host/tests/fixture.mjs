@@ -9,8 +9,13 @@ export class DemoContainer extends Deployed {
   incarnation() { return this.instance; }
   cleanupRetry = Number(this.env.TEST_CLEANUP_MS ?? this.cleanupRetry);
   startTimeout = Number(this.env.TEST_START_MS ?? this.startTimeout);
+  placementTimeout = Number(this.env.TEST_PLACEMENT_MS ?? this.placementTimeout);
   probeTimeout = Number(this.env.TEST_PROBE_MS ?? this.probeTimeout);
   idle = Number(this.env.TEST_IDLE_MS ?? this.idle);
+  async begin(options) {
+    if (this.env.TEST_BEGIN_MS) await new Promise(resolve => setTimeout(resolve, Number(this.env.TEST_BEGIN_MS)));
+    return super.begin(options);
+  }
   get container() { return this.platform ??= platform(this.ctx, this.env.APP, Number(this.env.TEST_PLACEMENT_FAILURES)); }
   now() { return this.container.now(); }
   events = 0;
@@ -22,7 +27,7 @@ export class DemoContainer extends Deployed {
   alarm() { return this.event(() => super.alarm()); }
   start(options) { return this.event(() => super.start(options)); }
   end() { return this.event(() => super.end()); }
-  status() { return this.event(() => super.status()); }
+  status(wait) { return this.event(() => super.status(wait)); }
   diagnostic() { return this.event(() => super.diagnostic()); }
   async advance(ms, { restart = false, alarm = false } = {}) {
     this.container.advance(ms);

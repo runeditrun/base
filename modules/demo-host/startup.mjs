@@ -5,11 +5,11 @@ import { fingerprint } from './capacity.mjs';
 // responses. A dropped browser request cannot abandon cleanup or hold a place
 // until the demo's hour expires.
 export async function finishStart(demo, options) {
-  const { correlation, ends } = options, id = demo.ctx.id.toString();
+  const { correlation } = options, id = demo.ctx.id.toString();
   try {
     report(correlation, Date.now(), 'reservation', { heldId: await fingerprint(id) });
-    const result = await bounded(demo.start(options), demo.startTimeout + 1000);
-    if (!await bounded(demo.env.CAPACITY.get(demo.env.CAPACITY.idFromName('capacity')).extend(id, ends), 2000) || demo.stopped) throw new Error('start-reservation-expired');
+    const result = await bounded(demo.start(options), demo.placementTimeout + 1000);
+    if (demo.stopped) throw new Error('container-stopped');
     await demo.ctx.storage.put('startup', { phase: 'ready', ...result });
     await demo.ctx.storage.delete('startDeadline');
   } catch (error) {
