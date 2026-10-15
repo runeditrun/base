@@ -11,7 +11,7 @@ const exec=promisify(execFile);
 const lsof=process.platform==='darwin'?'/usr/sbin/lsof':'lsof';
 // One monotonic budget covers every command in an ownership decision.
 export const inspectionContext=()=>({deadline:performance.now()+15000});
-const run=async(command,args,context=inspectionContext(),maxBuffer=1024*1024)=>{
+const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,noMatch=false}={})=>{
  const invocation=[command,...args].join(' ').replaceAll(homedir(),'~');
  let failure;
  for(let attempt=0;attempt<2;attempt++){
@@ -23,7 +23,7 @@ const run=async(command,args,context=inspectionContext(),maxBuffer=1024*1024)=>{
    // A quiet lsof exit 1 means no match, including a selected PID exiting
    // while other selected PIDs still return records. Diagnostic output instead
    // means inspection failed, even if lsof also returned partial records.
-   if(command===lsof&&error.code===1&&!error.killed&&!error.signal&&typeof error.stdout==='string'&&typeof error.stderr==='string'&&!error.stderr.trim())return error.stdout;
+   if((command===lsof||noMatch)&&error.code===1&&!error.killed&&!error.signal&&typeof error.stdout==='string'&&typeof error.stderr==='string'&&!error.stderr.trim())return error.stdout;
    failure=error.killed ? `timed out after ${timeout} ms` : `failed (${error.code??error.signal??'unknown error'}${typeof error.stderr==='string'&&error.stderr.trim()?'; diagnostic output':''}; attempt bound ${timeout} ms)`;
   }
  }
@@ -31,8 +31,11 @@ const run=async(command,args,context=inspectionContext(),maxBuffer=1024*1024)=>{
 };
 
 export async function processName(pid,context=inspectionContext()){
+ try{process.kill(pid,0);}catch(error){if(error.code==='ESRCH')return 'process';}
  if(process.platform==='linux'){const name=await readFile(`/proc/${pid}/comm`,'utf8').catch(()=>'');if(name)return name.trim().replace(/[^a-zA-Z0-9._-]/g,'').slice(0,80)||'process';}
- const text=await run('/bin/ps',['-p',String(pid),'-o','comm='],context);
+ // A completed quiet ps exit 1 means the PID has exited. Its display label
+ // is optional; this does not prove listener ownership or process liveness.
+ const text=await run('/bin/ps',['-p',String(pid),'-o','comm='],context,{noMatch:true});
  return basename(text.trim()).replace(/[^a-zA-Z0-9._-]/g,'').slice(0,80)||'process';
 }
 function records(text,socketTypes=false){
@@ -188,7 +191,7 @@ export async function localProcessConflict(root,savedOrigin,context=inspectionCo
   // +D requires blocking pathname metadata even for a narrow directory. Read
   // kernel-provided open paths instead, then match only canonical state files.
   // This preflight protects data held by processes outside the app's tree.
-  held=records(await run(lsof,['-nP','-b','-w','-Fpn'],context,16*1024*1024)).find(row=>!lineage.has(row.pid)&&row.names.some(path=>path.startsWith(state+'/')));
+  held=records(await run(lsof,['-nP','-b','-w','-Fpn'],context,{maxBuffer:16*1024*1024})).find(row=>!lineage.has(row.pid)&&row.names.some(path=>path.startsWith(state+'/')));
  }
  if(held)return {pid:held.pid,command:await processName(held.pid,context),reason:'the canonical local state'};
 }
