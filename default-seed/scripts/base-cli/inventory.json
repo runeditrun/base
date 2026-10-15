@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.18-dev.ge8296d97",
+  "cliVersion": "0.2.18-dev.gfa802487",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -519,7 +519,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "85117310a297b2a096ca267f5dc1bae72e7f43a395bd0a8fb64abc4447820de4"
+      "sha256": "affc50fabac3d0fb5b1e59576077f499bc32d10b34172a8f29bf506e42660e1e"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -611,7 +611,7 @@
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
-      "sha256": "e430e982993787bdfea482770057eb7d725c678a8413861ef169607ef71640f1"
+      "sha256": "8c9312c86a6cd834197b9d5c3e46db7f4416b7fa1b7f5c9a4b7badec4adde617"
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",
@@ -1379,7 +1379,7 @@
     },
     "modules/job-queue/storage.mjs": {
       "source": "modules/job-queue/storage.mjs",
-      "sha256": "65b15606e2f605b97c5c920573f81973f74f5a6c7b9dbb83147449964648fe4c"
+      "sha256": "670393df1d57f2abc3c7677390581e2a8a598cb9fdc779b2884237dac71cc8f9"
     },
     "modules/job-queue/supervisor.mjs": {
       "source": "modules/job-queue/supervisor.mjs",

@@ -20,7 +20,7 @@ export async function readJson(path, fallback) {
 // Lamport's bakery lock: publish choosing before reading tickets, then wait for
 // every earlier (number,id). Unique records avoid the stale-unlink/new-lock race
 // of a single reclaimable lock file. Every publication is atomic and complete.
-export async function transaction(directory, owner, action) {
+export async function transaction(directory, owner, action, { validateState } = {}) {
   const locks = join(directory, 'locks');
   await mkdir(locks, { recursive: true, mode: 0o700 });
   const id = randomUUID(), path = join(locks, `${id}.json`);
@@ -55,6 +55,9 @@ export async function transaction(directory, owner, action) {
     while ((await participants()).some(record => record.id !== id && (record.choosing
       || record.number < number || (record.number === number && record.id < id)))) await delay(20);
     const statePath = join(directory, 'state.json');
+    // Registry custody checks must share the writer's lock and precede any
+    // state read, so an atomic replacement cannot invalidate their inode.
+    await validateState?.(statePath);
     const state = await readJson(statePath, { version: 1, sequence: 0, queued: [], running: [] });
     if (state.version !== 1 || !Array.isArray(state.queued) || !Array.isArray(state.running)) throw Error('Invalid job queue state');
     const result = await action(state);

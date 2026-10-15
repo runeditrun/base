@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Concurrent checkout launches validate server registry state under its transaction lock, avoiding a false foreign-file refusal during atomic updates.
+- A checkout behind the front door serves its run-site preview above the app's assigned port instead of trying privileged ports.
 - Hosted demo image builds use the adapter's declared deploy file, including names other than `deploy.json`.
 - `rer deploy --remove --yes` empties small R2 buckets whose object listing omits pagination metadata. Ambiguous full pages and inconsistent cursors still stop removal.
 - Setup uses a mapped owner-name field and its declared default without requiring a second `displayName`. `--owner-name` supplies that mapped field.
