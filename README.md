@@ -20,6 +20,7 @@ admission without acquiring another slot. The wait is asynchronous and
 cancellable; command-store cancellation and SIGINT/SIGTERM stop the wait before
 a child starts. Normal queue admission retains its operational maximum wait.
 Running units finish uninterrupted, with their existing deadlines and thresholds.
+`VERIFY_STAGE ... seconds` measures wall duration including command-admission waits; it is not an enforced case deadline.
 Fleet supervisors must replace external SIGSTOP/SIGCONT suspension with this
 cooperative admission at command boundaries. The observed signal suspension was
 external to Base; this mechanism does not guarantee arbitrary signal pauses are
