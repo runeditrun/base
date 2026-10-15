@@ -45,7 +45,8 @@
   "devDependencies": {
     "ajv": "8.18.0",
     "ajv-formats": "3.0.1",
-    "miniflare": "5.20260907.0-alpha"
+    "miniflare": "5.20260907.0-alpha",
+    "ws": "8.21.0"
   },
   "pnpm": {
     "overrides": {

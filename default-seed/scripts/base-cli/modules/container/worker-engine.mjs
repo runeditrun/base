@@ -1,4 +1,4 @@
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions, coupleWebSocket } from 'miniflare';
 import { readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { rootCertificates } from 'node:tls';
@@ -27,7 +27,7 @@ export async function workerEngine({ root, data, manifest, settings, edge }) {
  for (const [binding, plan] of Object.entries(manifest.migrations)) { const db = await mf.getD1Database(binding, 'app'); databases[binding] = db; await migrate(db, plan); await ensurePortabilitySchema(db, manifest.portabilityMigrations); }
  for (const bucket of config.r2_buckets ?? []) objects[bucket.binding] = await mf.getR2Bucket(bucket.binding, 'app');
  const worker = await mf.getWorker('app');
- return { mf, databases, objects, app:worker,
+ return { mf, databases, objects, app:worker, coupleWebSocket,
   fetch(request) { const headers = new Headers(request.headers); headers.set('x-rer-original-url', request.url); return mf.dispatchFetch(request.url, { method:request.method,headers,body:request.body,duplex:'half',redirect:'manual' }); },
   scheduled:event => worker.scheduled(event), async drain() {}, dead:() => 0, close:() => mf.dispose(),
  };
