@@ -24,14 +24,20 @@ function waiting(){
   show('waiting',{label:'Waiting for the human check…',note:auto?'Your demo will open automatically when ready.':'Once the check passes, press Start the demo.'});
 }
 function stop(){timers.forEach(clearTimeout);timers=[]}
-async function go(){
+async function go(resume=false){
   const p=el(),controller=attempt=new AbortController();
   show('working',{label:'Starting your demo…',note:'Your demo will open automatically when ready.',live:'Check passed. Starting a private copy.',step:1,notice:''});
   timers.push(setTimeout(()=>p.note.textContent='Taking a little longer than usual. Still starting…',LONG));
   timers.push(setTimeout(()=>show('slow',{label:'Try again',note:'Still starting. It will open by itself if it finishes.',notice:'This is taking longer than it should. Keep waiting, or try again.'}),SLOW));
   try{
-    const response=await fetch(p.form.action,{method:'POST',body:new URLSearchParams(new FormData(p.form)),headers:{accept:'application/json'},signal:controller.signal});
-    const result=await response.json().catch(()=>({}));
+    let response=await fetch(resume?'/__demo/status':p.form.action,{...(resume?{}:{method:'POST',body:new URLSearchParams(new FormData(p.form))}),headers:{accept:'application/json'},signal:controller.signal});
+    let result=await response.json().catch(()=>({}));
+    while(response.status===202&&result.pending===true){
+      await new Promise(resolve=>setTimeout(resolve,500));
+      if(attempt!==controller)return;
+      response=await fetch('/__demo/status',{headers:{accept:'application/json'},signal:controller.signal});
+      result=await response.json().catch(()=>({}));
+    }
     if(attempt!==controller)return;
     stop();
     if(response.ok&&typeof result.location==='string'){
@@ -60,7 +66,8 @@ window.rerDemoChecking=()=>checking()&&waiting();
 window.rerDemoExpired=()=>checking()&&waiting();
 window.rerDemoCheckFailed=()=>checking()&&show('failed',{label:'Try again',note:'',live:'',notice:'The human check did not load. Try again.'});
 addEventListener('DOMContentLoaded',()=>{
-  if(!el().form.dataset.state)waiting();
+  if(el().form.dataset.resume==='1')go(true);
+  else if(!el().form.dataset.state)waiting();
   el().form.addEventListener('submit',event=>{
     event.preventDefault();
     const state=el().form.dataset.state;

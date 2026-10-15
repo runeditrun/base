@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { claimKeys, signClaim } from './claim.mjs';
 import { bounded, boundedFetch, category, report } from './diagnostics.mjs';
 import { endedPage, clearCookie } from './pages.mjs';
+import { finishStart } from './startup.mjs';
 
 // One visitor's demo: a Durable Object (newUniqueId) and its container, the
 // seed's image from `rer build --platform container` on the workerd engine.
@@ -23,9 +24,14 @@ export class DemoContainer extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
-      const state = await ctx.storage.get(['correlation', 'started']);
+      const state = await ctx.storage.get(['correlation', 'started', 'startup']);
       this.correlation = state.get('correlation'); this.started = state.get('started');
-      if (this.container.running) this.watch();
+      if (state.get('startup')?.phase === 'starting') {
+        // An interrupted start has lost its private claim key and cannot be
+        // resumed after object eviction. End it instead of polling forever.
+        await ctx.storage.put('startup', { phase: 'failed' });
+        ctx.waitUntil(this.end());
+      } else if (this.container.running) this.watch();
     });
   }
   watch() {
@@ -42,20 +48,34 @@ export class DemoContainer extends DurableObject {
   }
   diagnostic() { return { correlation: this.correlation, tail: this.records, stdout: 'Provider container logs; not exposed by the lifecycle API.' }; }
   idle = IDLE;
-  startTimeout = 120_000;
+  startTimeout = 45_000;
   probeTimeout = 5000;
   cleanupRetry = 30_000;
   hold = 3 * 60_000;
   get container() { return this.ctx.container; }
   port() { return this.container.getTcpPort(PORT); }
 
+  async begin(options) {
+    if (!await this.ctx.storage.get('startup')) {
+      await this.ctx.storage.put('startup', { phase: 'starting' });
+      this.ctx.waitUntil(finishStart(this, options));
+    }
+    return this.status();
+  }
+
+  async status() {
+    const startup = await this.ctx.storage.get('startup');
+    return { ...(startup ?? { phase: 'failed' }), correlation: this.correlation };
+  }
+
   /** Start the container, wait for /health, claim the owner; returns the claim's 303. */
   async start({ origin, originVar, ends, endsLocal, settings, correlation }) {
     this.correlation = correlation; this.started = Date.now(); this.stopped = false;
     const deadline = this.started + this.startTimeout;
     const id = this.ctx.id.toString(), keys = await claimKeys(), now = Date.now();
-    await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started });
+    await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started, startDeadline: deadline });
     report(correlation, this.started, 'start');
+    if (this.stopped) throw new Error('container-stopped');
     this.container.start({ enableInternet: false, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
       SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: OWNER, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
       RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } });
@@ -94,6 +114,7 @@ export class DemoContainer extends DurableObject {
   async exited(error) {
     this.stopped = true;
     this.record('exit', { outcome: error ? category(error) : 'exited', ...(Number.isInteger(error?.exitCode) ? { exitCode: error.exitCode } : {}) });
+    if ((await this.ctx.storage.get('startup'))?.phase === 'starting') return;
     try { await this.end(); } catch (cause) { report(this.correlation, this.started, 'cleanup', { error: category(cause) }); }
   }
 
@@ -117,11 +138,14 @@ export class DemoContainer extends DurableObject {
   }
 
   async alarm() {
-    const state = await this.ctx.storage.get(['ends', 'seen']), now = Date.now();
+    const state = await this.ctx.storage.get(['ends', 'seen', 'startDeadline']), now = Date.now();
     if (await this.ctx.storage.get('stopping')) return this.end();
     if (!state.get('ends')) return;
-    const due = Math.min(state.get('ends'), state.get('seen') + this.idle);
-    if (now >= due || !this.container.running) return this.end();
+    const due = Math.min(state.get('ends'), state.get('seen') + this.idle, state.get('startDeadline') ?? Infinity);
+    if (now >= due || !this.container.running) {
+      if ((await this.ctx.storage.get('startup'))?.phase === 'starting') { this.stopped = true; return; }
+      return this.end();
+    }
     await new Promise(resolve => { this.wake = resolve; setTimeout(resolve, Math.min(due - now, this.hold)); });
     if (!this.stopped) await this.ctx.storage.setAlarm(Date.now());
   }
@@ -138,8 +162,12 @@ export class DemoContainer extends DurableObject {
     // Keep the alarm and capacity reservation if destruction fails; retry cleanup.
     await this.ctx.storage.put('stopping', true);
     await this.ctx.storage.setAlarm(Date.now() + this.cleanupRetry);
-    if (this.container.running) await bounded(this.container.destroy(), 5000);
-    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(this.ctx.id.toString());
+    if (this.container.running) {
+      try { await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).extend(this.ctx.id.toString(), Date.now() + 60_000), 2000); }
+      catch (cause) { report(this.correlation, this.started, 'cleanup-reservation', { error: category(cause) }); }
+      await bounded(this.container.destroy(), 5000);
+    }
+    await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(this.ctx.id.toString()), 2000);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
     report(this.correlation, this.started, 'ended');
