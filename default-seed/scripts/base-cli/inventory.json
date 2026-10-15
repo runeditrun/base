@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.20-dev.g2e9edc3e",
+  "cliVersion": "0.2.20-dev.gabf7f068",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -467,7 +467,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "38dacde6521eef062d1b4171f03bd2d0534c447c240bc8788c4796af2f103291"
+      "sha256": "52c727d2373893caa79357a29cb7a169d2b6788ccceece61a30bd607c13c9437"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -795,7 +795,7 @@
     },
     "modules/container/README.md": {
       "source": "modules/container/README.md",
-      "sha256": "b2f4a388ca36cf696b3e29f6be7b6a5e6eb1d22a632c0f819b40645563b03cb8"
+      "sha256": "41b86cbaea816a5707aa4fcd49c31a51d3f7af176376bc8ac5a0f1a5781a3ffd"
     },
     "modules/container/adapters/d1.mjs": {
       "source": "modules/container/adapters/d1.mjs",
@@ -839,7 +839,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "f2280b459d6169c75f58aa7b63974faeec2fa56a88297201a7f29e429aeaceba"
+      "sha256": "03a7efa1c474c175607fc7ed2942fc0122fd045745604fb75b5c7fd21f002ffc"
     },
     "modules/container/demo-egress.mjs": {
       "source": "modules/container/demo-egress.mjs",
@@ -859,7 +859,7 @@
     },
     "modules/container/host.mjs": {
       "source": "modules/container/host.mjs",
-      "sha256": "f0df00c491295b96453d455e89953d2cd967c5475c7a155f162b40821116889c"
+      "sha256": "24317ecf25e87aaa87ca21e10411c2ee31c32dd9d5d3fd7e1a478b6a46d609f7"
     },
     "modules/container/import-graph.mjs": {
       "source": "modules/container/import-graph.mjs",
@@ -867,15 +867,19 @@
     },
     "modules/container/ingress.mjs": {
       "source": "modules/container/ingress.mjs",
-      "sha256": "94dbe667bb4768a33b73ae5bc25560bbec48a84b1167f335975a0b31e9dcdf7e"
+      "sha256": "8ac5d34202a09127da544c0db397623092cb4e6e210de2b3cc0fa9d69cac6628"
     },
     "modules/container/lock.mjs": {
       "source": "modules/container/lock.mjs",
       "sha256": "61eee611ea4dc27dac2878d2abfd055e78d2d8c5ac6876f0a12c5ed7399bed9b"
     },
+    "modules/container/migration-inventory.mjs": {
+      "source": "modules/container/migration-inventory.mjs",
+      "sha256": "a74d48c730a0420f8f4c86f0a3d2f5671613960f36a14aaa4b13958b967ff409"
+    },
     "modules/container/migrations.mjs": {
       "source": "modules/container/migrations.mjs",
-      "sha256": "42883652d59ca5b4162eff5a4de3648d72640f7b7cfa19c10bdb51cced2b2354"
+      "sha256": "370bba177ecc1e70fcb62759b7e92a36942db0e093b3af12d992010e74922192"
     },
     "modules/container/node-engine.mjs": {
       "source": "modules/container/node-engine.mjs",
@@ -932,6 +936,10 @@
     "modules/delivery-producer/declarations.mjs": {
       "source": "modules/delivery-producer/declarations.mjs",
       "sha256": "00924a1564e172d4d210a32936afe757870e226796465c11ac148e39d0ea0a85"
+    },
+    "modules/delivery-producer/migrations.mjs": {
+      "source": "modules/delivery-producer/migrations.mjs",
+      "sha256": "41650d5f2c22c0dbf8c4d8640bc89d872907828b558df4af89c4f70059d4878f"
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",

@@ -71,6 +71,13 @@ headers from other peers are discarded. `RER_SSH_IDENTITY` and
 are logged. Local loopback origins support a disposable SSH Docker host for
 qualification. Owner hosting/account setup remains an owner step.
 
+An isolated front can set `RER_INGRESS_ORIGIN` to its primary public origin and
+`RER_INGRESS_ORIGINS` to a JSON array of allowed HTTPS origins. It must overwrite
+`x-rer-ingress-origin` on each forwarded request with its validated public
+origin. The container accepts that header only with a fixed primary origin and
+an exact allowlist match, then strips it before the app. Requests without the
+header, including health probes and owner claims, use the primary origin.
+
 A seed can package its own scoped Node runner with a declaration such as:
 
 ```json
