@@ -23,7 +23,8 @@ test('a visitor waits for placement on the same reservation; exhausted placement
   const full=await front({max:1,placementFailures:1000,startMs:500});
   try {
     const response=await full.start({headers:{accept:'application/json'}});
-    assert.equal(response.status,503);
+    assert.equal(response.status,502);
+    assert.ok((await response.json()).notice);
     const fresh=await full.begin({ip:'203.0.113.3',headers:{accept:'application/json'}});
     assert.equal(fresh.status,202,'the failed placement must release the reservation');
     assert.equal(full.demos.size,0);

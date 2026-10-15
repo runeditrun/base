@@ -176,7 +176,7 @@ test('a platform exit during startup fails promptly and releases the reservation
 });
 
 
-test('failed cleanup preserves the startup failure and holds capacity until destruction succeeds', async () => {
+test('failed startup cleanup preserves the retry state and releases capacity before destruction retries', async () => {
   let healthy = false;
   const { mf, start, demos } = await front({ max: 1, startMs: 80, cleanupMs: 500, destroyFailures: 1,
     health: () => new Response(null, { status: healthy ? 200 : 503 }) });
@@ -184,10 +184,11 @@ test('failed cleanup preserves the startup failure and holds capacity until dest
     const failed = await start();
     assert.equal(failed.status, 502);
     assert.doesNotMatch(await failed.text(), /SECRET/);
+    const failedCopies = [...demos.values()];
     healthy = true;
-    assert.equal((await start({ ip: '203.0.113.12' })).status, 503);
-    for (let i = 0; i < 100 && ![...demos.values()].every(demo => demo.destroyed); i++) await new Promise(resolve => setTimeout(resolve, 50));
-    assert.ok([...demos.values()].every(demo => demo.destroyed));
-    assert.equal((await start({ ip: '203.0.113.13' })).status, 303);
+    assert.equal((await start({ ip: '203.0.113.12' })).status, 303);
+    for (let i = 0; i < 100 && !failedCopies.every(demo => demo.destroyed); i++) await new Promise(resolve => setTimeout(resolve, 50));
+    assert.ok(failedCopies.every(demo => demo.destroyed));
+    assert.equal((await start({ ip: '203.0.113.13' })).status, 503, 'the replacement remains live after the failed copy is destroyed');
   } finally { await mf.dispose(); }
 });

@@ -45,7 +45,7 @@ export class DemoCapacity extends DurableObject {
   }
 
   async release(id) {
-    await this.ctx.storage.delete(id);
+    return this.ctx.storage.delete(id);
   }
 }
 
