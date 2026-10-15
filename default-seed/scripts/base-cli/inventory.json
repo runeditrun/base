@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.19-dev.gdee92147",
+  "cliVersion": "0.2.19-dev.gad24ec20",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -141,11 +141,11 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "9f4c9da09fc7be8de78e5ab36f3e756cc64b4194285885b1fb13a4c73c263ebf"
+      "sha256": "4eddeaeac864119c19d6cda6963d90e5fe0c4dca7ce89c6f58d05b449631c9db"
     },
     "operator-prerequisites.mjs": {
       "source": "onboarding/operator-prerequisites.mjs",
-      "sha256": "975d61bcdcf1ea62f59b1a6061890cd90a92fd5cde0f30016c6172b87925d741"
+      "sha256": "d914ec57c090ad08e4531ed13f34c891cf5f1162080e5a4348fc2d8adcc63ce2"
     },
     "package.json": {
       "source": "onboarding/package.json",
