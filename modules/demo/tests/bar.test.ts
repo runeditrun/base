@@ -9,7 +9,7 @@ const ROOT = new URL('../../', import.meta.url);
 // A seed Worker wrapped by withDemo, through its fetch door in workerd, with
 // and without RER_DEMO. The only send it makes is refused by the guard itself.
 async function worker(t, bindings) {
-  const modules = ['demo/tests/fixture.mjs', 'demo/index.mjs', ...['http', 'csp', 'errors', 'crypto', 'loopback'].map(name => `operator-auth/${name}.mjs`)];
+  const modules = ['demo/tests/fixture.mjs', 'demo/index.mjs', 'demo/layout.mjs', ...['http', 'csp', 'errors', 'crypto', 'loopback'].map(name => `operator-auth/${name}.mjs`)];
   const mf = new Miniflare(convertV4MiniflareOptions({ modulesRoot: fileURLToPath(ROOT), modules: modules.map(path => ({ type: 'ESModule', path: fileURLToPath(new URL(path, ROOT)) })), compatibilityDate: '2026-09-08', d1Databases: { DB: 'demo' }, bindings }));
   t.after(() => mf.dispose());
   return async path => { const response = await mf.dispatchFetch(`http://127.0.0.1${path}`); return { response, text: await response.text() }; };
@@ -22,6 +22,9 @@ test('under RER_DEMO every HTML page opens with the Demo bar, allowed by its CSP
   assert.match(text, /<body class="app"><style>[^<]+<\/style><aside id="rer-demo-bar" aria-label="Demo">/, 'the bar opens the body');
   assert.match(text, /<\/aside><header>App header<\/header>/, 'the page follows it unchanged');
   const style = /<style>([^<]+)<\/style>/.exec(text)[1];
+  assert.match(style, /--rer-demo-bar-height:[^;]+;padding-top:var\(--rer-demo-bar-height\)/, 'demo reserves its height');
+  const script = /<script>([\s\S]+)<\/script>/.exec(text)[1];
+  assert.ok(response.headers.get('content-security-policy').includes(hash(script)), 'fixed chrome adjustment is allowed by hash');
   assert.ok(response.headers.get('content-security-policy').includes(hash(style)), "the bar's style is allowed by hash");
   assert.doesNotMatch(/<aside id="rer-demo-bar"[\s\S]*?<\/aside>/.exec(text)[0], /hooks\.example\.com/);
 
