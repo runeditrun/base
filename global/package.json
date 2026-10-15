@@ -1,6 +1,6 @@
 {
   "name": "@runeditrun/rer",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "description": "The rer command: install, set up, run and launch Run Edit Run checkouts.",
   "license": "MIT",
   "type": "module",

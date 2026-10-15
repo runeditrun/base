@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.14
+
+- Workerd container and hosted demo builds admit native `cloudflare:workers` imports, Durable Object definitions, `WebSocketPair`, `crypto.subtle.timingSafeEqual` and `ctx.passThroughOnException`. Node-engine restrictions are unchanged.
+- Container packaging requires configured Durable Objects to be local and exported by the built Worker. External namespace bindings and missing exports fail before packaging. Raw sockets and the existing container isolation restrictions remain refused.
+
+### Upgrade notes
+
+- Update rer and rebuild the demo image to receive the workerd admission fix. Durable Object namespaces still need local Wrangler bindings and exported classes. Allowing `WebSocketPair` does not add WebSocket upgrade handling to the container HTTP host.
+
 ## 0.2.13
 
 - `rer deploy --remove` accepts empty owned R2 object listings without pagination metadata, fixing the 0.2.9 regression. Populated or malformed listings still require complete pagination proof before deletion.
