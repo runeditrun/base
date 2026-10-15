@@ -83,8 +83,8 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  // RER_SITE serves the static run site on its own loopback port.
  const claimState=async()=>{const response=await fetch(url+'/setup/state');assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);assert.equal(response.headers.get('set-cookie'),null);return response.json();};
  const lobbyLinks=async()=>{const response=await fetch(url+'/');assert.equal(response.status,200);return [...(await response.text()).matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].map(match=>match[1]).filter(href=>href.startsWith('/'));};
- assert.deepEqual(await claimState(),{state:'unclaimed'},'a set-up installation is unclaimed until the owner confirms');
- assert.deepEqual(await lobbyLinks(),['/','/setup'],'the unclaimed Lobby offers only first-run setup');
+ assert.deepEqual(await claimState(),{state:'claimed'},'setup claims the owner before first-run confirmation');
+ assert.deepEqual(await lobbyLinks(),['/','/signin'],'the claimed Lobby offers sign-in before first-run confirmation');
  assert.equal((await fetch(url+'/setup/state',{method:'POST'})).status,405);
  assert.match(ready.siteUrl,/^http:\/\/127\.0\.0\.1:\d+$/,'rer dev names the run site preview');assert.notEqual(ready.siteUrl,url);
  for(const path of ['/','/run'])assert.equal((await fetch(ready.siteUrl+path)).status,200,`run site preview ${path}`);
