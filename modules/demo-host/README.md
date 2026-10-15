@@ -84,9 +84,10 @@ is in DEMO.md.
 Startup has a 45-second budget, with a separate five-second HTTP probe limit.
 The Durable Object owns that work and cleanup while the page polls; a browser
 that leaves cannot abandon it. Retrying a pending copy resumes the same
-reservation; an explicit Try again cancels it before creating a replacement. Failed starts retain the bounded operator diagnostic and destroy
-the container; cleanup retries keep a reservation only while destruction is
-unconfirmed. Every attempt logs its timestamp, elapsed time, duration and
+reservation; an explicit Try again cancels it before creating a replacement. Failed starts release their place before returning the retry state, retain the bounded operator diagnostic and destroy
+the container. Destruction retries for failed starts never extend or reclaim the
+released place. Each release logs the id's SHA-256 fingerprint with the start's
+correlation. Every attempt logs its timestamp, elapsed time, duration and
 HTTP status or fixed error category, including successful probes. Exit records
 include the numeric platform exit code when supplied. A separate random
 `x-rer-demo-correlation` response header joins these events without disclosing
@@ -106,16 +107,18 @@ no access. The token never belongs in a URL. Ordinary visitors keep the generic
 failure page. No raw error text, health body, cookies or environment values are
 included in this diagnostic.
 
-Failed destruction retains its alarm and capacity reservation for cleanup;
-only confirmed destruction (or an already-stopped container) releases the
-place. A cleanup failure is logged separately and cannot replace the startup
-failure shown to the visitor.
+Failed destruction retains its alarm for cleanup. A live visitor's demo also
+retains its capacity reservation until destruction is confirmed (or the
+container is already stopped); a terminal start failure releases it immediately.
+A cleanup failure is logged separately and cannot replace the startup failure
+shown to the visitor.
 
 Cloudflare may briefly report that it has no prepared container instance even
 when the application is below `max_instances`. `placement.mjs` keeps the same
 reservation and launch options, requests placement again only for that specific
 provider response, and stays within the original startup deadline. Boot, health
-and claim errors are not retried. Placement exhaustion answers 503 with the
-capacity notice and releases the reservation. Cleanup keeps only that terminal
+and claim errors are not retried. Placement exhaustion answers with the normal
+failed-start retry state and releases the reservation; the capacity notice is
+reserved for actual reservation exhaustion. Cleanup keeps only that terminal
 answer and correlation for one minute, so a status poll after object recovery
 still receives the right answer; its alarm then deletes the remaining metadata.
