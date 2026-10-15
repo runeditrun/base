@@ -17,6 +17,7 @@ export default withDemo({
     }
     if (pathname === '/chat') return fetch('https://slack.com/api/chat.postMessage', { method: 'POST' });
     if (pathname === '/payment') return fetch('https://api.stripe.com/v1/checkout/sessions', { method: 'POST', body: new URLSearchParams({ success_url: 'http://127.0.0.1/paid?session={CHECKOUT_SESSION_ID}' }) });
+    if (pathname === '/mail') return fetch(`https://${new URL(request.url).searchParams.get('host')}/v3/mg.example.com/messages`, { method: 'POST' });
     if (pathname === '/webhook') return fetch('https://hooks.example.com/notify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event: 'record.created' }) });
     if (pathname === '/binding') return Response.json(await demoEffect(() => ({ sent: 'real' }), { sent: 'demo' }));
     return page('<header><span data-rer-name>App</span></header>');
