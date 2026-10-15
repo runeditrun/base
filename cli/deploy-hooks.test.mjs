@@ -15,7 +15,7 @@ import { finalizingDeploy } from './fixtures/finalizing-deploy.mjs';
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
 // provider and hosted HTTP edge are faked. No seed source is modified.
-async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false, namedState = false } = {}) {
+async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false, namedState = false, queued = false } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-hook-deploy-')));
  const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
@@ -45,6 +45,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
  await writeFile(join(root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@10.12.4' }));
  const declarationPath = declared ? 'owner-deployment.json' : 'deploy.json';
  const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', vars: {MAIL_PROVIDER:'resend',MAIL_FROM:'owner@example.test'}, secrets: ['OWNER_EMAIL', 'SETUP_TOKEN', 'SESSION_SECRET', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name })) };
+ if (queued) declaration.queues = [{binding:'JOBS'}];
  await writeFile(join(root, declarationPath), JSON.stringify(declaration));
  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\nowner.env\n');
  await writeFile(join(root, 'owner.env'), `CLOUDFLARE_ACCOUNT_ID=${provider.accountId}\nCLOUDFLARE_API_TOKEN=${provider.token}\nOWNER_EMAIL=owner@example.test\nMAIL_API_KEY=synthetic-mail-value\n`, { mode: 0o600 });
@@ -157,6 +158,57 @@ test('a custom deploy that Cloudflare refuses names the call and Cloudflare\'s o
   assert.ok(!error.message.includes(f.provider.accountId) && !error.message.includes(f.provider.token), 'no credentials');
   assert.ok(!error.message.includes('x'.repeat(400)), 'the message is bounded');
   return true;
+ });
+});
+
+test('custom deploy retries one reset before HTTP status and names a second reset with same-input recovery', async t => {
+ for (const failures of [1,2]) await t.test(`${failures} reset${failures === 1 ? '' : 's'}`, async t => {
+  const f = await fixture(t, { declared: true });
+  const original = f.provider.fetch; let attempts = 0;
+  t.mock.method(f.provider, 'fetch', async (input, init) => {
+   if (new URL(input).pathname.endsWith('/workers/subdomain') && ++attempts <= failures) {
+    throw new TypeError(`fetch failed https://user:private-password@api.cloudflare.com/?signature=private-signature#private-fragment`, {cause:Object.assign(new Error(`reset ${f.provider.token}`),{code:'ECONNRESET'})});
+   }
+   return original(input,init);
+  });
+  if (failures === 1) {
+   assert.equal((await f.run()).owner, 'claimed');
+   assert.ok(attempts >= 2);
+  } else {
+   await assert.rejects(f.run(), error => {
+    assert.equal(error.exitCode,1);
+    assert.match(error.message,/GET \/workers\/subdomain/);
+    assert.match(error.message,/https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/\[REDACTED\]\/workers\/subdomain/);
+    assert.match(error.message,/before any HTTP status after 2 attempts: ECONNRESET/);
+    assert.match(error.message,/run rer deploy --environment production --env-file owner.env again/);
+    for (const value of [f.provider.accountId,f.provider.token,'private-password','private-signature','private-fragment']) assert.ok(!error.message.includes(value));
+    return true;
+   });
+   assert.equal(attempts,2);
+   assert.equal(f.provider.state.writes.length,0);
+  }
+ });
+});
+
+test('custom deploy retries a queue create only when its connection failed before dispatch', async t => {
+ for (const failures of [1,2]) await t.test(`${failures} connection failure${failures === 1 ? '' : 's'}`, async t => {
+  const f = await fixture(t, { declared: true, queued: true });
+  const original = f.provider.fetch; let attempts = 0;
+  t.mock.method(f.provider,'fetch', async (input,init) => {
+   if (init?.method === 'POST' && new URL(input).pathname.endsWith('/queues') && ++attempts <= failures) {
+    throw new TypeError('fetch failed',{cause:Object.assign(new Error('connection refused'),{code:'ECONNREFUSED'})});
+   }
+   return original(input,init);
+  });
+  if (failures === 1) {
+   assert.equal((await f.run()).owner,'claimed');
+   assert.equal(attempts,2);
+   assert.equal(f.provider.state.queues.length,1);
+  } else {
+   await assert.rejects(f.run(), error => /POST \/queues/.test(error.message) && /after 2 attempts: ECONNREFUSED/.test(error.message) && /run rer deploy --environment production --env-file owner.env again/.test(error.message));
+   assert.equal(attempts,2);
+   assert.equal(f.provider.state.queues.length,0);
+  }
  });
 });
 

@@ -14,10 +14,44 @@ import { inspectOperations } from '../../../operations/operations.mjs';
 const accountId='a'.repeat(32);
 const response=(result,result_info)=>Response.json({success:true,result,errors:[],result_info});
 async function temporary(t) {const dir=await realpath(await mkdtemp(join(tmpdir(),'deploy-kit-')));t.after(()=>rm(dir,{recursive:true,force:true}));return dir;}
-test('transport uses exact account, rejects arbitrary URLs, redacts provider errors, and has no retry',async()=>{
+test('transport uses exact account, rejects arbitrary URLs, redacts provider errors, and never retries an HTTP refusal',async()=>{
   let calls=0;const api=cloudflare({accountId,token:'test-secret',fetch:async(url,init)=>{calls++;assert.equal(url,`https://api.cloudflare.com/client/v4/accounts/${accountId}/queues`);assert.equal(init.redirect,'error');return Response.json({error:'test-secret'},{status:403});}});
   await assert.rejects(api.request('https://evil.test'),/invalid-provider-path/);assert.equal(calls,0);
   await assert.rejects(api.request('/queues'),error=>error.message==='provider-http-403');assert.equal(calls,1);
+});
+test('provider read retries share the original timeout, cancellation and request budget', async () => {
+  const pending = signal => new Promise((resolve,reject) => {
+    if (signal.aborted) reject(signal.reason);
+    else signal.addEventListener('abort',() => reject(signal.reason),{once:true});
+  });
+  // AbortSignal.timeout uses unref timers; this bounds and keeps this one request alive.
+  const hold = setTimeout(() => {},1000);
+  try {
+    let calls = 0;
+    const recovering = cloudflare({accountId,token:'test-secret',timeoutMs:80,fetch:async (url,{signal}) => {
+      calls++;
+      if (calls === 1) await pending(signal);
+      return response([]);
+    }});
+    assert.deepEqual(await recovering.request('/queues'),[]);
+    assert.equal(calls,2,'a timed-out first read leaves time for one retry');
+    calls = 0;
+    const timed = cloudflare({accountId,token:'test-secret',timeoutMs:80,fetch:async (url,{signal}) => {calls++;await pending(signal);}});
+    await assert.rejects(timed.request('/queues'),error => error.message === 'provider-transport-failed' && error.providerTransport.attempts === 2 && error.providerTransport.reason === 'TimeoutError');
+    assert.equal(calls,2,'the second read ends at the original request deadline');
+    const controller = new AbortController(); calls = 0;
+    const cancelled = cloudflare({accountId,token:'test-secret',fetch:async (url,{signal}) => {calls++;controller.abort();await pending(signal);}});
+    await assert.rejects(cancelled.request('/queues',{signal:controller.signal}),/provider-transport-failed/);
+    assert.equal(calls,1,'caller cancellation never starts another request');
+    calls = 0;
+    const limited = cloudflare({accountId,token:'test-secret',maxRequests:1,fetch:async () => {calls++;throw Object.assign(new Error('reset'),{code:'ECONNRESET'});}});
+    await assert.rejects(limited.request('/queues'),/provider-transport-failed/);
+    assert.equal(calls,1,'a retry cannot spend beyond the provider request budget');
+    calls = 0;
+    const shared = cloudflare({accountId,token:'test-secret',maxRequests:2,fetch:async () => {if (++calls === 1) throw Object.assign(new Error('reset'),{code:'ECONNRESET'});return response([]);}});
+    assert.deepEqual(await shared.request('/queues'),[]);
+    await assert.rejects(shared.request('/queues'),/provider-request-budget/);
+  } finally { clearTimeout(hold); }
 });
 test('complete multi-page listing, partial page failure and request limits',async()=>{
   let calls=0;const api=cloudflare({accountId,token:'test',fetch:async()=>{calls++;return response([{name:`resource-${calls}`}],{page:calls,total_pages:2,total_count:2});}});

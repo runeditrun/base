@@ -52,7 +52,7 @@ Cron reads require the documented `result: {schedules: [...]}` envelope, includi
 
 `workerConsumerScript(consumer)` (also exported from `index.mjs`) decodes Worker consumer identities from either documented `script_name` or the observed GET response string `script`. It returns the exact name using the plan's resource-name grammar, or `null` for missing, malformed, conflicting, or non-Worker identities. If both fields are present, each must be valid and both must agree; a malformed alias is never ignored. Reconciliation checks every consumer on queues with a requested consumer before any trigger write and rejects foreign or duplicate consumers. Writes continue to use the documented `script_name` request field. Read-only health and retained-receipt repeats accept either response variant without repairs.
 
-D1/Queue/DO account listings fully paginate with bounded page/request budgets. R2 follows provider cursors. Missing pagination evidence, duplicate names, permission errors, partial success, redirects and transport failures fail visibly. Requests go only to Cloudflare's exact account API. Every read has a 30-second timeout and bounded response size; no request is retried. Asset upload tokens are used only on the documented same-account assets endpoint.
+D1/Queue/DO account listings fully paginate with bounded page/request budgets. R2 follows provider cursors. Missing pagination evidence, duplicate names, permission errors, partial success, redirects and transport failures fail visibly. Requests go only to Cloudflare's exact account API. Requests have a 30-second timeout and bounded response size. Before any HTTP status, GET/HEAD reads and writes that provably failed before connecting (DNS failure, connection refusal or connect timeout) may retry once, sharing the original timeout and request budget. The first read reserves half the timeout for a retry; caller deadlines and cancellation still apply. HTTP responses, failed response-body reads and ambiguous write failures are never replayed. Asset upload tokens are used only on the documented same-account assets endpoint.
 
 The first receipt binds source commit SHA and tree, artifact/config SHA-256, effective deployment fingerprint, account/Worker, actual resource IDs, migration hashes, secret names and active provider deployment/version/etag. It contains no secret value. The CLI creates it exclusively at mode 0600 before the first health request; it is an identity receipt, not a claim that health passed (health attempts are added afterwards, see below). A failed health request still exits nonzero, while the retained identity allows the next explicit invocation to authenticate state without another upload. For the second deployment use the **same artifact, run/attempt and receipt**. Current provider state must match the prior receipt. The kit performs no resource creation, Worker/asset upload, SQL mutation, Cron/consumer update, or secret rewrite when unchanged. Read-only D1 queries use the provider's POST query transport; a POST is not by itself a database mutation. The receipt remains byte-identical on a repeat. Missing resources, drift or stale state fail without repair during this repeat.
 
@@ -108,6 +108,8 @@ Ownership lives in a state file, by default `.rer/deploy/<environment>.json` und
 
 The CLI prints JSON: refusal codes and resource names only, never inputs, tokens or provider bodies.
 A refused provider call also carries `providerRefusal` on the thrown error: the call (`PUT /workers/scripts/<name>`) and Cloudflare's own codes and messages, with the account id and token removed and each message cut to 300 characters. `rer deploy` names it when a custom deploy hook fails on one.
+
+A transport failure carries `providerTransport`: the operation, sanitized endpoint, attempt count, whether an HTTP status was received and a structural network reason. Both standard and custom-hook `rer deploy` failures name the call and retain the same-input recovery command. Endpoint details omit URL credentials, queries, account ids and R2 object keys; signed D1 import destinations are withheld.
 
 ### rer deploy: inputs, the hosted owner, secret changes and removal
 
@@ -261,7 +263,7 @@ without metadata fails closed. Present metadata must supply a valid positive
 Cursors are encoded, validated and checked for cycles. Any supplied count or
 total count must agree with returned rows and completion, and totals cannot
 change between pages. Request, page, row and response-size budgets still apply.
-No metadata is fabricated and no request is retried. Generic `pagination:'cursor'`
+No metadata is fabricated; only the bounded pre-status transport retry above applies. Generic `pagination:'cursor'`
 retains its existing contract: omitted metadata fails, and its R2 null-metadata
 exception accepts only a short page. D1/Queue/DO page pagination is unchanged.
 The bounded strategy is covered with local provider fixtures; this change does
