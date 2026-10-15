@@ -2,6 +2,7 @@
 // container response body, cookie, environment value or raw error is retained.
 export function category(error) {
   const message = String(error?.message ?? '');
+  if (message === 'placement-unavailable' || /there is no container instance that can be provided to this Durable Object, try again later/i.test(message)) return 'placement-unavailable';
   if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return 'probe-timeout';
   if (/connection refused|not listening|port.*not.*ready/i.test(message)) return 'port-not-ready';
   if (/container.*not.*running|container.*stopped/i.test(message)) return 'container-stopped';

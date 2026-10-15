@@ -19,7 +19,7 @@ export async function finishStart(demo, options) {
       const diagnostic = await bounded(demo.diagnostic(), 3000);
       await bounded(demo.env.CAPACITY.get(demo.env.CAPACITY.idFromName('diagnostics')).record(correlation, { ...diagnostic, failure }), 3000);
     } catch (capture) { report(correlation, demo.started, 'diagnostic', { error: category(capture) }); }
-    await demo.ctx.storage.put('startup', { phase: 'failed' });
+    await demo.ctx.storage.put('startup', { phase: 'failed', capacity: failure === 'placement-unavailable' });
     try { await demo.end(); } catch (cleanup) { report(correlation, demo.started, 'cleanup', { error: category(cleanup) }); }
   }
 }

@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.2.21
+
+- Hosted demos keep the same visitor reservation while Cloudflare prepares an available container, within the existing startup budget. Placement exhaustion returns a clean capacity refusal.
+- Status polling retains a failed start's terminal answer briefly after cleanup, including after Durable Object recovery.
+- Demo image builds load Vite configuration preparation before checking the root Wrangler Worker entry.
 
 - Concurrent checkout launches validate server registry state under its transaction lock, avoiding a false foreign-file refusal during atomic updates.
 - A checkout behind the front door serves its run-site preview above the app's assigned port instead of trying privileged ports.
