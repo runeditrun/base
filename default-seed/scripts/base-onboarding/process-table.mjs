@@ -7,6 +7,21 @@ const execute = promisify(execFile)
 // One bounded wait for any process inspection; a loaded machine can take over a
 // second to list processes, which must not abort an otherwise healthy cleanup.
 export const inspectionMs = 5000
+// A snapshot taken while processes start or exit can hold a row ps has not yet
+// finished, or ps itself can fail for an instant. Such a read says nothing
+// about ownership; it is repeated within the same bound rather than ending a
+// launch whose own processes are accounted for.
+const transient = (message) => Object.assign(new Error(message), { transient: true })
+const retryMs = 10
+async function withinBound(timeout, attempt) {
+  const deadline = Date.now() + timeout
+  for (;;) {
+    try { return await attempt(Math.max(1, deadline - Date.now())) } catch (error) {
+      if (!error.transient || Date.now() + retryMs >= deadline) throw error
+      await delay(retryMs)
+    }
+  }
+}
 export const validPid = (pid) => Number.isSafeInteger(pid) && pid > 0 && pid <= 0x7fffffff
 
 // Inspect numeric identity and the executable name, never private argv.
@@ -60,20 +75,23 @@ async function processGroup(pgid, signal) {
     }
     return group
   }
-  const { stdout } = await execute('/bin/ps', [
-    '-ax', '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=',
-  ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 })
+  let stdout
+  try {
+    ({ stdout } = await execute('/bin/ps', [
+      '-ax', '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=',
+    ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
+  } catch (error) { if (signal.aborted) throw error; throw transient('Could not read process identities.') }
   const group = []
   for (const line of stdout.split('\n').filter((line) => line.trim())) {
     const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.{24})\s*$/)
-    if (!match) throw new Error('Could not read process identities.')
+    if (!match) throw transient('Could not read process identities.')
     const [, id, parent, groupId, uid, state, birth] = match
     const pid = Number(id)
     const ppid = Number(parent)
     if (pgid === undefined && (pid === 0 || Number(groupId) === 0)) continue
     if (pgid !== undefined && Number(groupId) !== pgid) continue
     if (!validPid(pid) || !validPid(Number(groupId)) || !Number.isSafeInteger(ppid) || ppid < 0 || !Number.isFinite(Date.parse(birth))) {
-      throw new Error('Invalid process identity.')
+      throw transient('Invalid process identity.')
     }
     group.push({ pid, ppid, pgid: Number(groupId), uid: Number(uid), state, birth })
   }
@@ -86,30 +104,38 @@ async function processGroup(pgid, signal) {
 export async function readProcessIdentity(pid, timeout = inspectionMs) {
   if (!validPid(pid) || !(timeout > 0)) throw new Error('Invalid process identity deadline.')
   if (process.platform === 'linux') return linuxProcess(pid, undefined, AbortSignal.timeout(timeout))
+  return withinBound(timeout, (remaining) => psIdentity(pid, remaining))
+}
+
+async function psIdentity(pid, timeout) {
   let stdout
   try {
     ({ stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'comm='],
       { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
-  } catch (error) { if (error.code === 1 && !error.stdout?.trim()) return; throw new Error('Could not inspect process identity.') }
+  } catch (error) { if (error.code === 1 && !error.stdout?.trim()) return; throw transient('Could not inspect process identity.') }
   const match = stdout.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.{24})\s+(.+?)\s*$/)
-  if (!match) throw new Error('Invalid process identity.')
+  if (!match) throw transient('Invalid process identity.')
   const [, id, parent, groupId, uid, state, birth, command] = match
-  if (Number(id) !== pid || !validPid(Number(groupId)) || !Number.isFinite(Date.parse(birth + ' UTC'))) throw new Error('Invalid process identity.')
+  if (Number(id) !== pid || !validPid(Number(groupId)) || !Number.isFinite(Date.parse(birth + ' UTC'))) throw transient('Invalid process identity.')
   return { pid, ppid: Number(parent), pgid: Number(groupId), uid: Number(uid), state, birth, command }
 }
 
-export async function readProcessTable(timeout = inspectionMs, pgid) {
+// `read` is the process edge: it returns the table or throws; tests supply a
+// failing one.
+export async function readProcessTable(timeout = inspectionMs, pgid, read = processGroup) {
   if (!(timeout > 0)) throw new Error('Process inspection deadline expired.')
-  const controller = new AbortController()
-  let timer
-  try {
-    return await Promise.race([processGroup(pgid, controller.signal), new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort()
-        reject(new Error('Process inspection deadline expired.'))
-      }, timeout)
-    })])
-  } finally { clearTimeout(timer) }
+  return withinBound(timeout, async (remaining) => {
+    const controller = new AbortController()
+    let timer
+    try {
+      return await Promise.race([read(pgid, controller.signal), new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort()
+          reject(new Error('Process inspection deadline expired.'))
+        }, remaining)
+      })])
+    } finally { clearTimeout(timer) }
+  })
 }
 
 export const sameBirth = (left, right) => validPid(left?.pid) && left.pid === right?.pid && left.birth === right?.birth
