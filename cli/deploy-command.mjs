@@ -78,9 +78,9 @@ export async function deployCommand(context) {
  const command = (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
  // A hook that deployed through the kit's standard record lets rer issue and
  // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
- let recorded;
+ let recorded, hookReturned = false;
  const inspect = async (origin = deployed?.origin) => {
-  try { return recorded = await command('inspect', [], env, {propagation:observedReadiness(origin)?.propagation}); }
+  try { return recorded = await command('inspect', [], env, hookReturned ? {} : {propagation:observedReadiness(origin)?.propagation}); }
   catch (error) { if (error.message !== 'missing-owner-receipt') throw error; }
  };
  let observedClaims = [];
@@ -97,18 +97,21 @@ export async function deployCommand(context) {
     for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
     Object.assign(process.env, saved);
    }
+   hookReturned = true;
    if (options.dryRun) return deployed;
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
    const origin = hookOrigin(deployed, deployAgain(options));
    const uploaded = observedReadiness(origin);
-   step = 'wait for the deployed source';
-   await waitForSource({ origin, sourceSha, uploaded, again: deployAgain(options) });
    step = 'verify recorded deployment';
-   const state = await inspect();
+   // A hook may already have claimed the owner and retired its token. Read the
+   // current version independently of the original upload's spent deadline.
+   const state = await inspect(origin);
    if ((state?.origin ?? origin) !== origin || claims.some(item => item.origin !== origin)) throw new Error('owner-claim-origin-mismatch');
    if (claims.some(item => !item.outcome)) throw new Error('owner-claim-failed');
    claimed = claims.at(-1)?.outcome;
+   step = 'wait for the deployed source';
+   await waitForSource({ origin, sourceSha, versionId: state?.versionId ?? (!claims.length && !deployed.owner ? uploaded?.versionId : undefined), again: deployAgain(options) });
    step = 'claim owner';
    if (typeof deployed.setupToken === 'string' && deployed.setupToken) addSecret(deployed.setupToken);
    const sentSecrets = (uploaded?.sentSecrets ?? []).filter(binding => uploaded.propagation.matchesToken(binding, env[declaration.secrets.find(item => item.binding === binding)?.environment]));
