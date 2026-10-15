@@ -6,7 +6,7 @@ checkout always gets the behaviour it was built and tested with.
 
 ## Install
 
-Any one of these leaves `rer` on your PATH:
+Install `rer` with one of these commands:
 
 ```sh
 npx -y @runeditrun/rer cli install                # user install in ~/.local/share/rer, launcher ~/.local/bin/rer
@@ -23,9 +23,10 @@ the package's own `rer cli install`. A failed or refused download leaves the
 version you had selected.
 
 No installer edits shell profiles. The canonical launcher is `~/.local/bin/rer`.
-When that directory is absent from PATH, installation also links it into an
-existing writable, user-owned PATH directory if available, preserving foreign
-commands. Otherwise it prints one activation line to run in the current shell:
+Installation creates that directory if needed and never writes into another
+PATH directory. It names any existing `rer` elsewhere on PATH and leaves it
+unchanged. If `~/.local/bin` is absent from PATH or another command shadows it,
+it prints one activation line to run in the current shell:
 `export PATH="$HOME/.local/bin:$PATH"` (with fish syntax for fish). The launcher runs `node` from
 PATH, so a Node upgrade does not break it. A re-run with the same build changes
 nothing; a different build is installed beside the current one, the previous one
