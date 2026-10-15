@@ -1,3 +1,4 @@
+import { rejectedResponse } from './rejected-response'
 // Whether the owner has claimed this installation: the one fact an anonymous
 // visitor may learn about it. Claimed means the first-run record exists (the
 // owner confirmed at /setup); anything before that is unclaimed.
@@ -39,8 +40,8 @@ export function admitted(request: Request, origin: string | undefined): boolean 
 export async function setupStateResponse(request: Request, bindings: StateBindings, claimed: ClaimRead = baseFirstRun): Promise<Response | null> {
   if (new URL(request.url).pathname !== '/setup/state') return null
   // Another origin or Host gets the app's ordinary document 404.
-  if (!admitted(request, bindings.AUTH_ORIGIN)) return new Response('Not found', { status: 404, headers })
-  if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405, headers: { ...headers, allow: 'GET, HEAD' } })
+  if (!admitted(request, bindings.AUTH_ORIGIN)) return rejectedResponse(request, new Response('Not found', { status: 404, headers }))
+  if (request.method !== 'GET' && request.method !== 'HEAD') return rejectedResponse(request, new Response(null, { status: 405, headers: { ...headers, allow: 'GET, HEAD' } }))
   let state: SetupState
   try { state = await setupState(bindings.DB, claimed) } catch { return Response.json({ error: 'setup_unavailable' }, { status: 503, headers }) }
   const body = JSON.stringify({ state })

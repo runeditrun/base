@@ -1,3 +1,4 @@
+import { rejectedResponse } from '../rejected-response.mjs';
 // Local dev identity. SERVER-ONLY and LOCAL-ONLY: load this layer only from a
 // local-only Worker entry (a `wrangler dev` or Vite-serve entry), never from the
 // deployed main. `rer build` refuses any build output containing the marker.
@@ -40,19 +41,20 @@ export function withDevIdentity(worker, { bindings = env => env, config: authCon
       if (managedInstallation(env)) {
         // Never admit a dev credential here; with dev identity on, serve nothing.
         registerDevAdmission(null);
-        if (env.RER_DEV_IDENTITY !== 'off') return text(503, 'Dev identity refuses to run beside RER_INSTALLATION_ID with a non-loopback RER_MANAGEMENT_ORIGIN. Remove those bindings from local settings or use rer dev --login.');
-        return new URL(request.url).pathname === '/auth/dev/enter' || new URL(request.url).pathname === '/__dev/personas' ? devNotFound() : worker.fetch(request, original, execution);
+        if (env.RER_DEV_IDENTITY !== 'off') return rejectedResponse(request, text(503, 'Dev identity refuses to run beside RER_INSTALLATION_ID with a non-loopback RER_MANAGEMENT_ORIGIN. Remove those bindings from local settings or use rer dev --login.'));
+        return new URL(request.url).pathname === '/auth/dev/enter' || new URL(request.url).pathname === '/__dev/personas' ? rejectedResponse(request, devNotFound()) : worker.fetch(request, original, execution);
       }
       const gate = devGate({ key: env.RER_DEV_KEY, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true' });
       registerDevAdmission(gate ? r => gate.admits(r) : null);
       const path = new URL(request.url).pathname;
       if (path === '/auth/dev/enter' || path === '/__dev/personas') {
-        if (!gate || env.RER_DEV_IDENTITY === 'off' || !await gate.admits(request)) return devNotFound();
+        if (!gate || env.RER_DEV_IDENTITY === 'off' || !await gate.admits(request)) return rejectedResponse(request, devNotFound());
         const context = identity(env, authConfig, declared);
         try {
-          return path === '/__dev/personas' ? Response.json(await context.list(), { headers }) : await enter(request, gate, context);
+          const response = path === '/__dev/personas' ? Response.json(await context.list(), { headers }) : await enter(request, gate, context);
+          return rejectedResponse(request, response);
         } catch (error) {
-          if (error instanceof AuthError) return Response.json({ error: error.code }, { status: error.status, headers });
+          if (error instanceof AuthError) return rejectedResponse(request, Response.json({ error: error.code }, { status: error.status, headers }));
           throw error;
         }
       }

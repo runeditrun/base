@@ -1,3 +1,4 @@
+import { rejectedResponse } from './rejected-response'
 // The Lobby: what an installed instance serves at / when its edition identity
 // says installedHome: 'lobby'. A centred lockup, one line, one button and the
 // seed's floor art. Claimed, the button is Sign in; before the owner's claim it
@@ -64,8 +65,8 @@ export async function lobbyResponse(request: Request, bindings: LobbyBindings, i
   if (new URL(request.url).pathname !== '/' || identity.installedHome !== 'lobby') return null
   const base = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-rer-document': 'lobby' }
   // Another origin or Host gets the app's ordinary document 404.
-  if (!admitted(request, bindings.AUTH_ORIGIN)) return new Response('Not found', { status: 404, headers: base })
-  if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405, headers: { ...base, allow: 'GET, HEAD' } })
+  if (!admitted(request, bindings.AUTH_ORIGIN)) return rejectedResponse(request, new Response('Not found', { status: 404, headers: base }))
+  if (request.method !== 'GET' && request.method !== 'HEAD') return rejectedResponse(request, new Response(null, { status: 405, headers: { ...base, allow: 'GET, HEAD' } }))
   let state: SetupState
   try { state = await setupState(bindings.DB, claimed) } catch { return Response.json({ error: 'setup_unavailable' }, { status: 503, headers: base }) }
   const style = accentStyle(identity) + STYLE

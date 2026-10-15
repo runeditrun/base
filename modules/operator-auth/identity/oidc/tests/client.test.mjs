@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, authProvider, clientKey, ORIGIN, sessionCookie } from './runtime.mjs';
 import { keys } from './idp.mjs';
-import { createOperatorAuth } from '../../../index.mjs';
+import { createOperatorAuth, createAuthHandler, createSignInHandler } from '../../../index.mjs';
+import { createOidcHandler } from '../index.mjs';
 async function fixture(t, entries, core) { const r = await runtime(entries, core); t.after(() => r.close()); return r; }
 async function denied(response, status = 400) { assert.equal(response.status, status, await response.clone().text()); assert.ok(!response.headers.get('set-cookie')?.includes('__Host-operator_session=')); }
 
@@ -189,4 +190,42 @@ test('a substituted key under a known kid fails without a refetch', async t => {
   const before = r.provider.requests.filter(x => x.uri.endsWith('/jwks')).length;
   assert.equal((await r.finish(await r.flow())).status, 400);
   assert.equal(r.provider.requests.filter(x => x.uri.endsWith('/jwks')).length, before);
+});
+
+// Refusing an owned upload must finish it before the adapter returns. Optional
+// adapters must leave downstream bodies alone when they decline ownership.
+test('owned early HTTP refusals drain input, while unowned requests remain available downstream', async () => {
+  const r = await runtime();
+  try {
+    const auth = createAuthHandler(r.auth), oidc = createOidcHandler(r.auth.providers);
+    for (const [handler, path, status] of [
+      [auth, '/auth/unknown', 404],
+      [auth, '/auth/bootstrap?token=refused', 400],
+      [auth, '/auth/magic-link', 415],
+      [oidc, '/auth/oidc/auth/start', 415],
+      [oidc, '/auth/oidc/auth/callback', 405],
+    ]) {
+      let completed = false;
+      const chunks = ['unread ', 'input'].map(text => new TextEncoder().encode(text));
+      const body = new ReadableStream({ pull(controller) {
+        if (chunks.length) controller.enqueue(chunks.shift());
+        else { completed = true; controller.close(); }
+      } }, { highWaterMark: 0 });
+      const request = new Request(r.request(path, { method: 'POST', headers: { 'Content-Type': 'text/plain' } }), { body, duplex: 'half' });
+      const response = await handler(request);
+      assert.equal(response.status, status);
+      assert.equal(completed, true, 'the complete upload was discarded before responding');
+      assert.equal(request.bodyUsed, true);
+      assert.equal(response.headers.get('set-cookie'), null);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+    }
+    for (const [handler, path] of [[auth, '/application'], [oidc, '/auth/oidc/unknown/start'], [createSignInHandler(r.auth), '/signin']]) {
+      const request = r.request(path, { method: 'POST', body: 'downstream input' });
+      assert.equal(await handler(request), null);
+      assert.equal(request.bodyUsed, false);
+      assert.equal(await request.text(), 'downstream input');
+    }
+    assert.equal(r.sqlite.prepare('SELECT COUNT(*) AS n FROM oa_operators').get().n, 0);
+    assert.equal(r.sqlite.prepare('SELECT COUNT(*) AS n FROM oa_sessions').get().n, 0);
+  } finally { await r.close(); }
 });

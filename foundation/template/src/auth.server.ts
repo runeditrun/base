@@ -1,3 +1,4 @@
+import { rejectedResponse } from './base/rejected-response'
 import { createDependencies } from './modules/dependencies/index.mjs'
 import { createIdpOwnerClaimHandler } from './modules/owner-claim/index.mjs'
 import { firstRunResponse } from './base/setup'
@@ -52,7 +53,7 @@ async function html(body: string) {
  return new Response(`<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(branding.name)}</title>${fontHead}${frame.head}</head><body><main>${frame.brand}${body}</main></body></html>`, { headers: { ...privateHeaders, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': `default-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; ${frame.policy}` } })
 }
 
-export async function authResponse(request: Request, original: Bindings): Promise<Response | null> {
+async function handleAuthResponse(request: Request, original: Bindings): Promise<Response | null> {
  const env = runtimeBindings(original), url = new URL(request.url)
  if (url.pathname.startsWith('/.well-known/rer-') || url.pathname.startsWith('/auth/dependencies/')) {
   const linked = await createDependencies({ db: env.DB, origin: env.AUTH_ORIGIN, name: branding.name, provider: env.IDENTITY_PROVIDER, local: env.AUTH_LOCAL === 'true', auth: operatorAuth(env), claimOwner: token => createIdpOwnerClaimHandler({db:env.DB,authConfig:authConfig(env),clientIp:()=>request.headers.get('CF-Connecting-IP')??''})(new Request(env.AUTH_ORIGIN+'/auth/owner-claim',{method:'POST',headers:{Host:new URL(env.AUTH_ORIGIN).host,Origin:env.AUTH_ORIGIN,'Content-Type':'application/json'},body:JSON.stringify({token})})) }).handle(request)
@@ -87,4 +88,9 @@ export async function authResponse(request: Request, original: Bindings): Promis
   return html(`<h1>${escape(branding.name)}</h1><p>Signed in as ${escape(session.operator.displayName)}</p>`)
  }
  return null
+}
+
+export async function authResponse(request: Request, original: Bindings): Promise<Response | null> {
+ const response = await handleAuthResponse(request, original)
+ return response ? rejectedResponse(request, response) : null
 }

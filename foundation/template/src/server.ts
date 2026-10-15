@@ -1,3 +1,4 @@
+import { rejectedResponse } from './base/rejected-response'
 import start from '@tanstack/react-start/server-entry'
 import { Hono } from 'hono'
 import { dispatch } from './base/dispatch'
@@ -32,6 +33,6 @@ export default {
     if (state) return state
     const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
     if (lobby) return lobby
-    return dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request)))
+    return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
   },
 } satisfies ExportedHandler<Bindings>
