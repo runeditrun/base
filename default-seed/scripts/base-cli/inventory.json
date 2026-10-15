@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.17-dev.g343d555c",
+  "cliVersion": "0.2.17-dev.g2b8c61a0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1667,7 +1667,7 @@
     },
     "modules/operator-auth/accounts/owner-signin.mjs": {
       "source": "modules/operator-auth/accounts/owner-signin.mjs",
-      "sha256": "a2ea0cdb03754b12a18175d0776a51c37eb298c081ff72edbf2712a500a1f20c"
+      "sha256": "20a538bf6b343edc3209718174f63f7b2015d98f64c19fe5b5f878e02e83b3a0"
     },
     "modules/operator-auth/accounts/provider-control.mjs": {
       "source": "modules/operator-auth/accounts/provider-control.mjs",

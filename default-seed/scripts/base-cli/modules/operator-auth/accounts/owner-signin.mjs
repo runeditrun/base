@@ -25,7 +25,8 @@ export function ownerSignIn({ config, store, clock, sessions, limit }) {
     },
     async confirmOwnerSignIn(request, { token }) {
       requirePost(request, config);
-      await limit(request, 'owner-signin', 'confirmation');
+      // Keyed per token like /auth/confirm: bad guesses cannot spend the owner's own attempts.
+      await limit(request, typeof token === 'string' ? `owner-signin:${token.slice(0, 128)}` : '', 'confirmation');
       if (!validToken(token)) deny('invalid_or_expired', 400);
       const digest = await ownerSigninDigest(token), now = clock(), allow = allowed();
       const session = await sessions.newSession();
