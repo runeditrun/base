@@ -159,10 +159,11 @@ The seed needs, beyond the adoption above:
    deploy's measurement token, as the cookie `rer_demo_measure=<token>` on
    `demo.test.<domain>` or the header `x-rer-demo-measurement: <token>`; any
    other start gets the start page's refusal (the 10-demo cap and the rate
-   limit still apply). `rer deploy --demo` makes a new token on each test
-   deploy and prints it, or uses `RER_DEMO_MEASUREMENT_TOKEN` (32 to 512
-   characters) when that is set, which keeps it out of a public workflow log:
-   set it as the repository secret `RER_DEMO_MEASUREMENT_TOKEN`. A host with a
+   limit still apply). `rer deploy --demo` uses `RER_DEMO_MEASUREMENT_TOKEN`
+   (32 to 512 characters) when that is set, as the workflow does from the
+   repository secret of that name; otherwise it makes a new token on each
+   test deploy and writes it to `.rer/demo-host/measurement-token` (private
+   to the operator). Either way it prints where the token is, never the token. A host with a
    real Turnstile secret never asks for a token. After `wrangler deploy`,
    `rer deploy --demo` waits for each demo hostname's certificate (a TLS
    handshake that verifies for that name, about 2.5 minutes on a fresh zone,

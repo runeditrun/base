@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.24",
+  "cliVersion": "0.2.24-dev.g08d02a6d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -383,7 +383,7 @@
     },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
-      "sha256": "b2abf62cc81736af558b8b01e0856af9fa00491795fd297c77bef95e47d56328"
+      "sha256": "769e46411201eebc9a0fbfaf782856e2c4c4c9c884aa5a8afe1799ce5b5082aa"
     },
     "cli/demo-removal-provider.mjs": {
       "source": "cli/demo-removal-provider.mjs",
@@ -999,7 +999,7 @@
     },
     "modules/demo-host/measurement.mjs": {
       "source": "modules/demo-host/measurement.mjs",
-      "sha256": "debd4a07c0a732456b043322f0233e4ecf7a26f015341f8afb40f09c274fd68c"
+      "sha256": "6e8a755c0395d672b34f79bd44070e9a8959f97a6300abecc2dbebde98975cc2"
     },
     "modules/demo-host/operator.mjs": {
       "source": "modules/demo-host/operator.mjs",

@@ -48,7 +48,7 @@ jobs:
           TURNSTILE_SITE_KEY: ${{ inputs.test_only && '1x00000000000000000000AA' || vars.TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ inputs.test_only && '1x0000000000000000000000000000000AA' || secrets.TURNSTILE_SECRET_KEY }}
           RER_DEMO_OPERATOR_TOKEN: ${{ secrets.RER_DEMO_OPERATOR_TOKEN }}
-          # The test host's measurement token; unset, the deploy makes one and prints it in this log.
+          # Starts on the test host must carry this token; unset, the token stays on the runner and no start is admitted.
           RER_DEMO_MEASUREMENT_TOKEN: ${{ inputs.test_only && secrets.RER_DEMO_MEASUREMENT_TOKEN || '' }}
       # Deletes only what the demo's deploy recorded; a second run finds nothing and changes nothing.
       - if: inputs.remove

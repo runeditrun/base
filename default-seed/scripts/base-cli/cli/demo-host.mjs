@@ -17,7 +17,7 @@ import { MEASUREMENT_COOKIE, MEASUREMENT_HEADER, TESTING_SECRET } from '../modul
 // Docker; a deploy runs `wrangler deploy` on it with the Turnstile secret and
 // the demo's record as the version message, then waits for every demo host's
 // certificate. On Turnstile's testing secret (a test host) it also sets the
-// measurement token starts must carry and prints it. `--remove --yes` removes
+// measurement token starts must carry, and says where it is. `--remove --yes` removes
 // what that record proves is the demo's (modules/demo-host/remove.mjs).
 export async function demoHostCommand(project, options, store, signal, out, operation) {
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Missing or malformed ${path}.`); } };
@@ -67,12 +67,17 @@ export async function demoHostCommand(project, options, store, signal, out, oper
   if (error.message !== 'demo-certificate-timeout') throw error;
   throw new RerError('deploy_refused', `The demo is deployed, but its certificate is not active 10 minutes later (${error.hosts.join('; ')}). Run the deploy again to wait again; nothing needs removing.`, 1);
  }
+ let measured;
  if (measurement) {
+  // Output redaction masks credentials, so a token rer made goes to a private file.
+  const file = '.rer/demo-host/measurement-token';
+  if (!supplied) await writeFile(join(project.root, file), measurement + '\n', { mode: 0o600 });
+  measured = { cookie: MEASUREMENT_COOKIE, header: MEASUREMENT_HEADER, token: supplied ? 'RER_DEMO_MEASUREMENT_TOKEN' : file };
   const how = `send it as the cookie ${MEASUREMENT_COOKIE}=<token> on ${plan.hostname} or the header ${MEASUREMENT_HEADER}: <token>`;
-  if (options.json) out.event('demo-measurement', { cookie: MEASUREMENT_COOKIE, header: MEASUREMENT_HEADER, ...(supplied ? { source: 'RER_DEMO_MEASUREMENT_TOKEN' } : { token: measurement }) });
-  else out.human(supplied ? `Test host: it starts demos only with the token in RER_DEMO_MEASUREMENT_TOKEN; ${how}.` : `Test host: it starts demos only with this deploy's measurement token; ${how}.\n  token: ${measurement}`);
+  if (options.json) out.event('demo-measurement', measured);
+  else out.human(`Test host: it starts demos only with the measurement token in ${supplied ? 'RER_DEMO_MEASUREMENT_TOKEN' : file}; ${how}.`);
  }
- return { dryRun: false, deployed: true, origin: plan.origin, demo: summary, ...(measurement ? { measurement: { cookie: MEASUREMENT_COOKIE, header: MEASUREMENT_HEADER } } : {}) };
+ return { dryRun: false, deployed: true, origin: plan.origin, demo: summary, ...(measured ? { measurement: measured } : {}) };
 }
 
 async function removeDemo(plan, store, signal) {
