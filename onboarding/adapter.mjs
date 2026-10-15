@@ -66,10 +66,18 @@ export function localInstaller(hooks = {}) {
   if (['dev','preview'].includes(verb) && hooks.secrets?.originKey) context.vars[hooks.secrets.originKey] = context.origin;
   store.addSecrets?.(Object.entries(context.vars).filter(([key]) => /secret|token|password/i.test(key)).map(([, value]) => value));
   if (['installer', 'setup', 'build'].includes(verb) && hooks.build) await build(context, hooks);
-  // A demo (dev with options.demo) starts on fresh state in options.demo.state:
-  // migrate it, then claim the saved owner there exactly as setup does.
+  // Every dev start applies pending local migrations before starting the app.
+  // A demo uses only options.demo.state, then claims the owner there.
   const demo = verb === 'dev' && Boolean(options.demo);
-  if ((['installer', 'setup'].includes(verb) || demo) && hooks.migrate) await phase(context, hooks, 'migrate', hooks.migrate);
+  if (['installer', 'setup', 'dev'].includes(verb) && hooks.migrate) {
+   try { await phase(context, hooks, 'migrate', hooks.migrate); }
+   catch (error) {
+    if (verb !== 'dev' || signal?.aborted) throw error;
+    const failure = approvedFailure(error);
+    throw commandFailure(`${store.redact(failure?.message ?? error.message)}\nLocal migrations failed. Fix the error and run rer setup before trying again.`, failure ?? {});
+   }
+  }
+  await options.beforeStart?.(context);
   if (['installer', 'setup', 'dev', 'preview'].includes(verb) && hooks.start) await start(context, verb === 'preview' ? {...hooks,start:options.preview} : verb === 'dev' && options.dev ? { ...hooks, start: options.dev } : hooks);
   if ((['installer', 'setup'].includes(verb) || demo) && hooks.owner) {
    if (typeof hooks.owner === 'function' || Array.isArray(hooks.owner)) await phase(context, hooks, 'owner', hooks.owner);

@@ -11,12 +11,13 @@ const { build } = require('esbuild')
 const { unstable_splitSqlQuery: splitSql } = require('wrangler')
 const output = await build({ entryPoints: [fileURLToPath(new URL('./worker.mjs', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers', 'node:*'] })
 
-export async function openConsumerRuntime({ config, mailStatus, noMail }) {
+export async function openConsumerRuntime({ config, mailStatus, noMail, demo = false }) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-conformance-'))
   const bindings = {
     AUTH_ORIGIN: config.origin, AUTH_LOCAL: String(config.local === true),
     OWNER_EMAIL: config.OWNER_EMAIL, SESSION_SECRET: config.SESSION_SECRET,
     SETUP_TOKEN: config.SETUP_TOKEN, MAIL_FROM: config.MAIL_FROM,
+    ...(demo ? { RER_DEMO: '1' } : {}),
     ...(config.allowList ? { AUTH_ALLOW_LIST: config.allowList.join(',') } : {}),
     ...(config.ipLimit ? { AUTH_IP_LIMIT: String(config.ipLimit) } : {}),
     ...(config.emailLimit ? { AUTH_EMAIL_LIMIT: String(config.emailLimit) } : {}),
@@ -37,12 +38,12 @@ export async function openConsumerRuntime({ config, mailStatus, noMail }) {
       for (const statement of splitSql(sql)) await db.prepare(statement).run()
     }
     await db.exec('CREATE TABLE test_mail (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL);')
-    const call = async (path, { method = 'GET', input, cookie, headers = {}, ip = '192.0.2.1' } = {}) => {
+    const call = async (path, { method = 'GET', input, body, cookie, headers = {}, ip = '192.0.2.1' } = {}) => {
       const url = new URL(path, config.origin)
       return mf.dispatchFetch('http://localhost/test-dispatch', { method: 'POST', redirect: 'manual', body: JSON.stringify({
         url: url.href, method,
         headers: { host: url.host, ...(method === 'POST' ? { origin: config.origin, 'content-type': 'application/json' } : {}), 'CF-Connecting-IP': ip, ...(cookie ? { cookie } : {}), ...headers },
-        ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+        ...(body === undefined && input === undefined ? {} : { body: body ?? JSON.stringify(input) }),
       }) })
     }
     return {
