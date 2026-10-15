@@ -5,6 +5,9 @@ import { nativeStageAtomic, type NativeStageBinding } from './native-staging-sta
 import { nativeStageOffsetGuards, nativeStageOffsetProgress, validateNativeStageRows, type NativeStageCheckpoint, type VerifiedNativeStageOffset } from './native-staging-offset.ts';
 export { verifyNativeStageOffset, type VerifiedNativeStageOffset, type NativeStageCheckpoint, type NativeStageProgress } from './native-staging-offset.ts';
 export const NATIVE_STAGE_ROWS_BYTES = 512 * 1024;
+/** Both insertion and atomic equality bind the body. Leave the rest of a
+ * smaller caller-selected transport limit for escaping, guards and journals. */
+export const nativeStageRowsBytes = (context:D1ImportContext) => Math.min(NATIVE_STAGE_ROWS_BYTES, Math.floor(Math.min(context.maxBatchBytes??2*1024*1024,2*1024*1024)/4));
 export interface NativeStageRowsOptions { offset?: VerifiedNativeStageOffset; checkpoint?: NativeStageCheckpoint }
 
 /** Replay deterministic input from its beginning; only authenticated prior rows
@@ -22,10 +25,12 @@ export class NativeStageRows {
   private table: 'index' | 'values';
   private columns: string[];
   private checkpoint?: NativeStageCheckpoint;
+  private rowBytes: number;
   constructor(context: D1ImportContext, stage: NativeStageBinding, baseline: D1Sql[], table: 'index' | 'values', columns: string[], options: NativeStageRowsOptions = {}) {
     validateNativeStageRows(context, stage, table, columns);
     if (!options || typeof options !== 'object' || Array.isArray(options) || Object.keys(options).some(key => key !== 'offset' && key !== 'checkpoint') || options.checkpoint !== undefined && typeof options.checkpoint !== 'function') throw new Error('IMPORT_NATIVE_STAGE_OFFSET_INVALID');
     this.context = context; this.stage = {...stage}; this.baseline = [...baseline]; this.table = table; this.columns = [...columns]; this.checkpoint = options.checkpoint;
+    this.rowBytes = nativeStageRowsBytes(context);
     if (Object.hasOwn(options, 'offset')) {
       const progress = nativeStageOffsetProgress(options.offset!, context, stage, baseline, table);
       this.committed = this.replay = progress.written; this.revision = progress.revision;
@@ -35,8 +40,8 @@ export class NativeStageRows {
   async append(row: unknown[]): Promise<void> {
     if (this.skipped < this.replay) { this.skipped++; return; }
     const text = JSON.stringify(row), bytes = Buffer.byteLength(text) + 1;
-    if (bytes + 2 > NATIVE_STAGE_ROWS_BYTES) throw new Error('IMPORT_D1_TRANSPORT_LIMIT');
-    if (this.rows.length && this.bytes + bytes > NATIVE_STAGE_ROWS_BYTES) await this.flush();
+    if (bytes + 2 > this.rowBytes) throw new Error('IMPORT_D1_TRANSPORT_LIMIT');
+    if (this.rows.length && this.bytes + bytes > this.rowBytes) await this.flush();
     this.rows.push(text); this.bytes += bytes;
   }
   async flush(): Promise<void> {

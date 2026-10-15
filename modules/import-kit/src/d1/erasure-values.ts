@@ -57,7 +57,9 @@ export function prepareErasureFragment(fragment:ErasureFragment,id:string,start:
 export class ErasureRowsAdmission {
   private parts:string[]=[];private bytes=2;private written=0;
   private batches:{count:number;written:number;raw:RpcSize;encoded:RpcSize}[]=[];
-  append(row:unknown[]){const text=JSON.stringify(row),bytes=Buffer.byteLength(text)+1;if(bytes+2>NATIVE_STAGE_ROWS_BYTES)throw new Error('IMPORT_D1_TRANSPORT_LIMIT');if(this.parts.length&&this.bytes+bytes>NATIVE_STAGE_ROWS_BYTES)this.flush();this.parts.push(text);this.bytes+=bytes;}
+  private limit:number;
+  constructor(limit=NATIVE_STAGE_ROWS_BYTES){this.limit=limit;}
+  append(row:unknown[]){const text=JSON.stringify(row),bytes=Buffer.byteLength(text)+1;if(bytes+2>this.limit)throw new Error('IMPORT_D1_TRANSPORT_LIMIT');if(this.parts.length&&this.bytes+bytes>this.limit)this.flush();this.parts.push(text);this.bytes+=bytes;}
   private flush(){
     if(!this.parts.length)return;
     const body='['+this.parts.join(',')+']',statement={sql:'SELECT value FROM json_each(?)',params:[body]},empty=rpcSize([{...statement,params:['']}]);

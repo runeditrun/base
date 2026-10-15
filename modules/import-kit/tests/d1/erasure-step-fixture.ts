@@ -13,7 +13,7 @@ export async function erasureStepFixture(t: any) {
   const measure = (value: unknown, mutation = false) => {
     const json = JSON.stringify(value), bytes = Math.max(Buffer.byteLength(json), json.length * (/[^\u0000-\u00ff]/.test(json) ? 2 : 1));
     assert.ok(bytes < 32 * 1024 * 1024, `hosted D1 RPC: ${bytes}`);
-    if (erasing && mutation) { maximum = Math.max(maximum, bytes); assert.ok(bytes <= 2 * 1024 * 1024, `erasure batch: ${bytes}`); }
+    if (erasing && mutation) { maximum = Math.max(maximum, bytes); assert.ok(bytes <= 1024 * 1024, `erasure batch: ${bytes}`); }
   };
   const database = () => {
     const native = r.db();
@@ -36,7 +36,7 @@ export async function erasureStepFixture(t: any) {
   const checkpoint = [{ sql: 'UPDATE privacy_epoch SET value=value+1' }];
   async function erase(id: string, options: D1ErasureStepOptions) {
     erasing = true; executions = 0; maximum = 0;
-    const result = await retireD1ImportCustodyStep({ target: { kind: 'record', id } }, targets.remove('workspace', 'record', id), context(), checkpoint, options);
+    const result = await retireD1ImportCustodyStep({ target: { kind: 'record', id } }, targets.remove('workspace', 'record', id), { ...context(), maxBatchBytes: 1024 * 1024 }, checkpoint, options);
     assert.ok(executions <= (options.maxStatements ?? 1000), `${executions} statements`);
     return { response: Response.json(result, { status: result.phase === 'pending' ? 202 : 200 }), result, executions, maximum };
   }
