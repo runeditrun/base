@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.19-dev.g9304b994",
+  "cliVersion": "0.2.19-dev.g386da5d5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -519,11 +519,11 @@
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
-      "sha256": "df11b6a8e0af39f73e901b52c05f0df4d47861e060bad858690707394bfcb997"
+      "sha256": "a18ad605bfdaf550c2fb3934bae46e720db2618f52370ec9672e43ac494063ff"
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
-      "sha256": "4a369e9035c117d3a5b683c651869e8c0f50379e1d18eb958be95598b8fde3c4"
+      "sha256": "9d2be470b4f66ceaefde0795ebf103d1f37a0784a3d5f3805fdc9a06fe97ea96"
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
@@ -575,7 +575,7 @@
     },
     "cli/port.mjs": {
       "source": "cli/port.mjs",
-      "sha256": "66dccecd39605796b581774fb4fcd7c55cce3490967aba15896546ffa780ab45"
+      "sha256": "45cb6a256469604f595a87c742f86f19c459d4c3ca8d39c2416951e3014c82c8"
     },
     "cli/portability-policy.mjs": {
       "source": "cli/portability-policy.mjs",
