@@ -80,6 +80,8 @@ request too, so a send fails three ways. Only the visitor's random `rer_demo`
 cookie (HttpOnly, Secure, SameSite=Lax, one hour) reaches their container. A
 demo ends after 60 minutes, or 15 minutes with no requests; its container is
 destroyed and its state deleted, and the visitor sees "This demo has ended".
+Until then the container stays up however quiet the visitor is, and one that
+stops early anyway also ends its demo and frees its place.
 At most `maxInstances` demos (10 unless set) run at once, and one IP starts at
 most 3 a minute.
 Mail lands in the outbox (and the bar) only where the seed's development
@@ -94,10 +96,21 @@ The seed needs, beyond the adoption above:
    { "version": 1, "domain": "run-lamp.com", "name": "Lamp" }
    ```
 
-   Optional: `"maxInstances"`, and `"settings"`, plain demo settings for the
+   Optional: `"maxInstances"`; `"instanceType"`, the Cloudflare Containers
+   instance type every visitor's container runs on (`lite`, `basic`,
+   `standard-1`, `standard-2`, `standard-3` or `standard-4`; `basic` unless
+   set); and `"settings"`, plain demo settings for the
    container (never secrets, never `RER_*`, the origin, `OWNER_EMAIL`,
    `SESSION_SECRET` or `SETUP_TOKEN`, which the front sets). `deploy.json`
    must list `"container"` in `platforms`.
+
+   A larger type starts a demo sooner and costs more for every minute a demo
+   runs: Cloudflare bills a container's memory and disk as provisioned and
+   its CPU as used. `standard-1` (1/2 vCPU, 4 GiB) costs about 4x `basic`
+   (1/4 vCPU, 1 GiB) for memory, 2x for disk, and can use 2x its CPU;
+   `standard-2` (1 vCPU, 6 GiB) costs about 6x for memory and can use 4x the
+   CPU. `rer deploy --demo --dry-run` prints the type it plans. Rates are on
+   Cloudflare's Containers pricing page.
 2. **The signed owner claim.** The front signs the owner in with a
    five-minute claim to `/auth/owner-claim`, signed by a key pair made for
    that one container. The seed serves `modules/owner-claim`'s

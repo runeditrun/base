@@ -9,6 +9,11 @@ import { endedPage, clearCookie } from './pages.mjs';
 // engine's egress worker refuse every send. The front signs the owner in
 // through the existing signed owner claim. The demo ends at its hour or after
 // 15 idle minutes: the alarm destroys the container and deletes everything.
+// The platform stops a container about two minutes after its Durable Object's
+// last event, when the object is evicted, and the exit watcher goes with it.
+// So the alarm stays in flight until the demo's next check and then arms the
+// next at once, as the Containers class keeps its object alive; a container
+// that is gone anyway answers the ended page and frees its place.
 const PORT = 8080, IDLE = 15 * 60_000, OWNER = 'owner@demo.invalid';
 // The container's port speaks plain HTTP; the app takes its public origin from RER_INGRESS_ORIGIN.
 const inside = url => `http://container${url.pathname}${url.search}`;
@@ -40,6 +45,7 @@ export class DemoContainer extends DurableObject {
   startTimeout = 120_000;
   probeTimeout = 5000;
   cleanupRetry = 30_000;
+  hold = 3 * 60_000;
   get container() { return this.ctx.container; }
   port() { return this.container.getTcpPort(PORT); }
 
@@ -49,13 +55,13 @@ export class DemoContainer extends DurableObject {
     const deadline = this.started + this.startTimeout;
     const id = this.ctx.id.toString(), keys = await claimKeys(), now = Date.now();
     await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started });
-    await this.ctx.storage.setAlarm(Math.min(ends, now + this.idle));
     report(correlation, this.started, 'start');
     this.container.start({ enableInternet: false, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
       SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: OWNER, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
       RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } });
     // A container that stops by itself ends the demo too.
     this.watch();
+    await this.ctx.storage.setAlarm(Date.now());
     await this.healthy(deadline);
     const token = await signClaim(keys, { origin, installationId: id, email: OWNER, now: Date.now() });
     const claimed = await boundedFetch(this.port(), 'http://container/auth/owner-claim', { method: 'POST', redirect: 'manual',
@@ -94,17 +100,30 @@ export class DemoContainer extends DurableObject {
   /** Every request carrying this demo's cookie: proxied while the demo lives, else the ended page. */
   async fetch(request) {
     const state = await this.ctx.storage.get(['ends', 'seen']), now = Date.now();
-    if (!(state.get('ends') > now)) return endedPage(this.env, { status: 410, headers: { 'set-cookie': clearCookie(this.env) } });
+    if (!(state.get('ends') > now)) return this.ended();
+    if (!this.container.running) return this.gone();
     if (now - state.get('seen') > 60_000) await this.ctx.storage.put('seen', now);
-    return this.port().fetch(new Request(inside(new URL(request.url)), request));
+    try { return await this.port().fetch(new Request(inside(new URL(request.url)), request)); }
+    catch (error) { if (this.container.running && !this.stopped) throw error; return this.gone(); }
+  }
+
+  ended() { return endedPage(this.env, { status: 410, headers: { 'set-cookie': clearCookie(this.env) } }); }
+
+  /** A container the platform stopped while nothing watched it: end the demo (the alarm retries a failed cleanup). */
+  async gone() {
+    this.record('exit', { outcome: 'gone' });
+    try { await this.end(); } catch (cause) { report(this.correlation, this.started, 'cleanup', { error: category(cause) }); }
+    return this.ended();
   }
 
   async alarm() {
     const state = await this.ctx.storage.get(['ends', 'seen']), now = Date.now();
     if (await this.ctx.storage.get('stopping')) return this.end();
     if (!state.get('ends')) return;
-    if (now >= state.get('ends') || now - state.get('seen') >= this.idle) return this.end();
-    await this.ctx.storage.setAlarm(Math.min(state.get('ends'), state.get('seen') + this.idle));
+    const due = Math.min(state.get('ends'), state.get('seen') + this.idle);
+    if (now >= due || !this.container.running) return this.end();
+    await new Promise(resolve => { this.wake = resolve; setTimeout(resolve, Math.min(due - now, this.hold)); });
+    if (!this.stopped) await this.ctx.storage.setAlarm(Date.now());
   }
 
   /** Destroy the container and delete this demo's state and place; safe to repeat. */
@@ -115,7 +134,7 @@ export class DemoContainer extends DurableObject {
   }
 
   async cleanup() {
-    this.stopped = true;
+    this.stopped = true; this.wake?.();
     // Keep the alarm and capacity reservation if destruction fails; retry cleanup.
     await this.ctx.storage.put('stopping', true);
     await this.ctx.storage.setAlarm(Date.now() + this.cleanupRetry);
