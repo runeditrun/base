@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.15-dev.g02cf45a8",
+  "cliVersion": "0.2.16",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1347,7 +1347,7 @@
     },
     "modules/mail/README.md": {
       "source": "modules/mail/README.md",
-      "sha256": "5b7a0e638c367eef44557c9941b74372da3fd752ad210fba90238226643c90d2"
+      "sha256": "5d8fa21e6186af2cbf7e65a0541ac934bbeb74e34b01562ee8e751d4839e0c69"
     },
     "modules/mail/doctor.mjs": {
       "source": "modules/mail/doctor.mjs",
@@ -1417,6 +1417,14 @@
       "source": "modules/mail/src/adapters/messaging/serialize.mjs",
       "sha256": "4ee46c1ccb75edfd53b94bfff67ccdb08196a3ee68576c1eb0aa2494f9d4e1f5"
     },
+    "modules/mail/src/adapters/rer/contract.mjs": {
+      "source": "modules/mail/src/adapters/rer/contract.mjs",
+      "sha256": "b8ae90da173b40c7bde1a194ac35e9367802b9b608f050d63e2337a64e58454c"
+    },
+    "modules/mail/src/adapters/rer/index.mjs": {
+      "source": "modules/mail/src/adapters/rer/index.mjs",
+      "sha256": "2f27ff23d1182b4792b13b777e44fe1de9f7568474df11f3b60655415d2a6635"
+    },
     "modules/mail/src/adapters/resend/README.md": {
       "source": "modules/mail/src/adapters/resend/README.md",
       "sha256": "07487907a351cde380774bed9b1f7b8d387f55f19be02990a521e25bdb09d468"
@@ -1455,11 +1463,11 @@
     },
     "modules/mail/src/core/transport.mjs": {
       "source": "modules/mail/src/core/transport.mjs",
-      "sha256": "3f7bf52854e4908bb69b93032ac65cbd90bba57d03a62da1c2652ef4e470a1f8"
+      "sha256": "aecc91b5b12c2f315a3154679bb6780518453d04516c750517f06f25548ebb18"
     },
     "modules/mail/src/core/validation.mjs": {
       "source": "modules/mail/src/core/validation.mjs",
-      "sha256": "6a08d0f42f795b8e16520a3f7ea2a1accef17c91584f13f9be791c2d3e6f4f56"
+      "sha256": "382fe04dfa3dbcacb81b817e9d69ea5d4fd6542a887765078991c6fd0acc91b0"
     },
     "modules/mail/src/development/index.d.mts": {
       "source": "modules/mail/src/development/index.d.mts",
@@ -1579,7 +1587,7 @@
     },
     "modules/mail/src/sender.mjs": {
       "source": "modules/mail/src/sender.mjs",
-      "sha256": "1e4ec0a59b6a7a523ed929e56bc5a9433b039ff75c5611d8e1a9162d8a508a6b"
+      "sha256": "32e35cd88b3b7199f5ce7ac7139be853890428549a84f70a733a5a9a0df6979d"
     },
     "modules/mail/src/sendgrid-email/index.d.mts": {
       "source": "modules/mail/src/sendgrid-email/index.d.mts",
