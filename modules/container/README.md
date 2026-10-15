@@ -35,6 +35,11 @@ in both directions, preserving text and binary messages, selected protocols,
 cookies and close codes. Refused upgrades retain their HTTP response; other
 upgrade protocols receive 400. Hosted demo routing selects the visitor's own
 container before forwarding the upgrade, including on declared secondary hosts.
+In a hosted demo (`RER_DEMO=1` with `RER_INGRESS_ORIGIN`), the workerd demo
+egress serves the app's own fetch of any of its ingress origins through this
+container's ingress, never the network: the front admits only the visitor's
+cookie, so this is how the app reads its own public pages. Other destinations
+keep the demo egress and its refusals.
 
 The workerd source boundary permits Durable Object definitions, including export
 aliases and indirect inheritance. Unbound definitions create no namespace. The
