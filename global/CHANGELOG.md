@@ -2,6 +2,18 @@
 
 ## 0.2.23
 
+- `rer dev` and `rer demo` find out who owns a checkout's running server by looking at that checkout's own state files only. When inspecting them is slow, the checkout's launch lock proves ownership, so a slow disk no longer ends in a false foreign-owner refusal.
+- Every refusal from a hosted demo carries a start correlation, so a refused visitor can be matched to the capacity that was held for them.
+- The demo module's mail host match and label script pass CodeQL.
+- Seed copies of reusable modules are typechecked with the seed's strict settings (`tsconfig.seed-copies.json`), so a copy that only compiles loosely is caught before it ships.
+- Hosted demo owners pass step-up inside their own demo, so they can send invitations without an email link.
+- The publication scanner accepts a proven copy digest that a native scan captured only in part.
+- Container WebSocket upgrades reach the app through the container's ingress.
+- Production mail preflight resolves public variables and mail credentials from the deployment inputs the seed declares (`artifact.specInputs`), not from the shell environment.
+- Local owner replacement loads SQLite only when it opens owner data, and keeps the default SQLite options.
+- `rer signin`, `--remove`, `--set-secret` and `--unset-secret` against an environment this checkout never deployed name the environments it does hold, with the command for each.
+- The publication scanner stays linear on long retained text runs.
+- Exported seeds shard their Verify workflow and run the full installation journeys nightly and on release tags.
 - Managed mail (`rer` provider) works from Cloudflare Workers. Mail transport always fetches with `redirect: 'manual'`, because Workers reject `redirect: 'error'`, which made every relay send end as `transport_uncertain` without a request. A relay 3xx is never followed and is reported as `rejected` (`provider_redirected`).
 - The `rer` relay adapter accepts `Auto-Submitted: auto-generated`, which Base's sign-in and invitation mail sets, and does not transmit it: the platform relay sets it on every message. It maps `List-Unsubscribe` and one-click `List-Unsubscribe-Post` to the relay's `listUnsubscribe` and `listUnsubscribePost` fields. Values the relay would refuse are refused before sending, and every other header is still refused.
 
