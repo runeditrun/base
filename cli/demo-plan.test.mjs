@@ -49,7 +49,7 @@ test('rer deploy --demo --dry-run builds the declared deploy file and validates 
 export default {logLevel:'silent',plugins:[cloudflare({viteEnvironment:{name:'ssr'}})],environments:{ssr:{build:{outDir:'dist/server'}}},builder:{buildApp:async builder=>{await builder.build(builder.environments.ssr);}}};`);
  await writeFile(join(root, 'deploy-demo.json'), JSON.stringify(declaration));
  const built = run();
- assert.equal(built.status, 0, built.stdout + built.stderr + await readFile(join(root, '.seed/installer/install.log'), 'utf8'));
+ assert.equal(built.status, 0, built.stdout + built.stderr);
  const manifest = JSON.parse(await readFile(join(root, '.rer/demo-host/image/app/container.json'), 'utf8'));
  assert.equal(manifest.engine, 'workerd');
  await access(join(root, '.rer/demo-host/image/app', manifest.entry));
