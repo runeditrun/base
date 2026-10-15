@@ -11,7 +11,7 @@ export class DemoContainer extends Deployed {
   startTimeout = Number(this.env.TEST_START_MS ?? this.startTimeout);
   probeTimeout = Number(this.env.TEST_PROBE_MS ?? this.probeTimeout);
   idle = Number(this.env.TEST_IDLE_MS ?? this.idle);
-  get container() { return this.platform ??= platform(this.env.APP, this.ctx.id.toString()); }
+  get container() { return this.platform ??= platform(this.env.APP, this.ctx.id.toString(), Number(this.env.TEST_PLACEMENT_FAILURES)); }
   events = 0;
   async event(run) {
     if (this.events++ === 0 && this.env.TEST_EVICT_MS && Date.now() - this.quiet >= Number(this.env.TEST_EVICT_MS)) this.container.evict();
@@ -24,13 +24,20 @@ export class DemoContainer extends Deployed {
   diagnostic() { return this.event(() => super.diagnostic()); }
 }
 
-function platform(app, id) {
+function platform(app, id, failures) {
   let running = false, exit;
-  const stopped = new Promise((_, reject) => { exit = reject; });
+  let stopped;
   const tell = (what, body) => app.fetch(`http://platform/${what}`, { method: 'POST', headers: { 'x-demo': id }, body: JSON.stringify(body) });
   return {
     get running() { return running; },
-    start(options) { running = true; void tell('start', options); },
+    start(options) {
+      stopped = new Promise((_, reject) => { exit = reject; });
+      running = true;
+      if (failures-- > 0) {
+        running = false;
+        queueMicrotask(() => exit(new Error('There is no container instance that can be provided to this Durable Object, try again later')));
+      } else void tell('start', options);
+    },
     monitor: () => stopped,
     async destroy() { const response = await tell('destroy', {}); if (!response.ok) throw new Error('SECRET destroy'); running = false; },
     evict() { if (running) { running = false; void tell('stopped', {}); } },

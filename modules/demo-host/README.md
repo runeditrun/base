@@ -103,3 +103,12 @@ Failed destruction retains its alarm and capacity reservation for cleanup;
 only confirmed destruction (or an already-stopped container) releases the
 place. A cleanup failure is logged separately and cannot replace the startup
 failure shown to the visitor.
+
+Cloudflare may briefly report that it has no prepared container instance even
+when the application is below `max_instances`. `placement.mjs` keeps the same
+reservation and launch options, requests placement again only for that specific
+provider response, and stays within the original startup deadline. Boot, health
+and claim errors are not retried. Placement exhaustion answers 503 with the
+capacity notice and releases the reservation. Cleanup keeps only that terminal
+answer and correlation for one minute, so a status poll after object recovery
+still receives the right answer; its alarm then deletes the remaining metadata.
