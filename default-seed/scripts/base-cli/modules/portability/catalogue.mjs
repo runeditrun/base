@@ -52,7 +52,7 @@ export async function catalogue(db,config) {
     columns.forEach(c=>{if(c.hidden)c.generated=c.hidden===2?'virtual':'stored';delete c.hidden;});
     // Both archived base cells and visible staging reads must fit D1's SQL
     // limit, with room for copy names and joins.
-    insist([false,true].every(encoded=>utf8(projectedColumns({columns},encoded)).length+1024<=100000),'transfer_sql_limit:'+entry.name);
+    insist([false,true].every(encoded=>utf8(projectedColumns({columns},encoded)).length+1024+columns.length*64<=100000),'transfer_sql_limit:'+entry.name);
     const dependencies=[...new Set((await all(db,`PRAGMA foreign_key_list(${quote(entry.name)})`)).map(ref=>objects.find(x=>x.type==='table' && identifier(x.name)===identifier(ref.table))?.name??ref.table))].sort();
     for(const parent of dependencies) insist(!excluded.some(x=>x.name===parent),'excluded_foreign_key:'+entry.name+':'+parent);
     const rowidAlias=columns.some(c=>c.pk)?null:['rowid','_rowid_','oid'].find(alias=>!columns.some(c=>c.name.toLowerCase()===alias));

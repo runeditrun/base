@@ -141,7 +141,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   if(options.verb==='dev'&&project.adapter.site){
    const {devSite}=await import('./site.mjs');
    try {
-    site=await devSite(project,store,controller.signal,{host:selected.host,port:selected.port});
+    site=await devSite(project,store,controller.signal,{host:selected.host,port:proxy.port});
     await registry.update({siteUrl:site.url});
    } catch(error) {
     if(error.code!=='site_private_data')throw error;
