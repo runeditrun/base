@@ -14,7 +14,7 @@ import { tools } from './inspect.mjs';
 import { invalid,missing,refuse,RerError,lifecycleError } from './errors.mjs';
 import { processInfo } from '../modules/job-queue/processes.mjs';
 import { declaredCrons,runScheduled } from './scheduled.mjs';
-import { demoAdopted,demoGuarded,demoState } from './demo.mjs';
+import { demoGuarded,demoPreflight } from './demo.mjs';
 import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openUrl } from './dev-identity.mjs';
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
 
@@ -97,11 +97,11 @@ export async function managedServer(project,options,out,{clock={}}={}){
   if(!selected.vars[keys.email])throw missing('Private owner settings are missing. Run rer setup first.');
   if(devIdentity&&!devKey)devKey=await requireDevKey(project.root);
   if(devIdentity&&options.verb==='dev')refuseManagedInstallation(selected.vars,process.env);
-  if(project.adapter.localPrerequisites&&!await project.adapter.localPrerequisites({root:project.root,vars:selected.vars,email:selected.vars[keys.email],demo:Boolean(options.demo)}))throw missing('Local migrations, owner or local authentication/mail settings are missing. Run rer setup first.');
+  if(options.demo)demo=await demoPreflight(project,selected.vars,options.idleTimeout);
+  else if(project.adapter.localPrerequisites&&!await project.adapter.localPrerequisites({root:project.root,vars:selected.vars,email:selected.vars[keys.email],demo:false}))throw missing('Local migrations, owner or local authentication/mail settings are missing. Run rer setup first.');
   await registry.update({url:selected.url,host:selected.host,port:selected.port,models:options.models??'fake'});
   const {privateDirectory}=await shared('private-files.mjs');
-  if(options.demo){await demoAdopted(project.root);demo=await demoState(project.root,options.idleTimeout);}
-  else await privateDirectory(project.root,['.wrangler','state']);
+  if(!demo)await privateDirectory(project.root,['.wrangler','state']);
   const directory=await privateDirectory(project.root,['.seed','installer',...(process.env.RER_ONBOARDING_PROCESS_OWNER?[`commands-${process.pid}`]:[])]);
   const {createCommands}=await shared('commands.mjs');const state={logs:[]};
   store=await createCommands(directory,state,{terminal:text=>out.progress(text),onWaiting:options.json?details=>out.event('waiting',details):undefined,custodyToken:registry.custodyToken(),queue:{verb:options.verb,originalCI:process.env.CI==='true'}});

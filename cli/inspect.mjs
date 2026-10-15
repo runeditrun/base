@@ -158,14 +158,15 @@ export async function doctor(project, store, signal) {
  const { inspectOperations } = await import('../operations/operations.mjs');
  const diagnostic = await inspectOperations(project.root);
  const { localVariables } = await shared('local/environment.mjs');
- let values = {}, pnpm, expectedPnpm, pnpmIssue, stateValid = true;
+ let values = {}, pnpm, expectedPnpm, stateIssue, stateValid = true;
+ const pnpmIssues = [];
  if (project.profile === 'first-party') {
   try { expectedPnpm = await (await import('./project-pnpm.mjs')).projectPnpmPin(project.root); }
-  catch (error) { pnpmIssue = error.message; }
+  catch (error) { pnpmIssues.push(store.redact(error.message)); }
  }
  if (project.profile === 'first-party') {
   const { selectLocalState } = await shared('local/state.mjs');
-  try { await selectLocalState(project.root, project.adapter.state); } catch { stateValid = false; }
+  try { await selectLocalState(project.root, project.adapter.state); } catch (error) { stateValid = false; stateIssue = store.redact(error.message); }
  }
  if (project.profile === 'first-party') {
   try {
@@ -175,25 +176,24 @@ export async function doctor(project, store, signal) {
    const parsed = settings.format === 'json' ? JSON.parse(text) : localVariables(text);
    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) values = parsed;
   } catch {}
-  try { pnpm = await probePnpm(project.root, store, signal); } catch (error) { if (signal?.aborted) throw error; }
+  try { pnpm = await probePnpm(project.root, store, signal); } catch (error) { if (signal?.aborted) throw error; pnpmIssues.push(store.redact(error.message)); }
   // A pnpm rer already provides counts; doctor never fetches one.
   if (expectedPnpm && pnpm !== expectedPnpm) {
    const directory = await (await import('./pnpm-runtime.mjs')).cachedPnpm(expectedPnpm).catch(() => undefined);
-   if (directory) { usePnpm(directory); try { pnpm = await probePnpm(project.root, store, signal); } catch (error) { if (signal?.aborted) throw error; } }
+   if (directory) { usePnpm(directory); try { pnpm = await probePnpm(project.root, store, signal); pnpmIssues.length = 0; } catch (error) { if (signal?.aborted) throw error; pnpmIssues.push(store.redact(error.message)); } }
   }
  }
  const aiIssues = await localAiDiagnostics(project,process.env);
  const dependencies=project.profile==='first-party'?await dependencyDoctor(project.root):[];
  const expectedNode = await projectNodePin(project.root);
- const keys = localSettingKeys(project);
  const inputs = project.profile === 'first-party' ? requiredLocalSettings(project, values) : [];
  const warnings = project.profile === 'first-party' ? await cacheWarnings(project.root) : [];
- return { dependencies, warnings, ok: !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
+ return { dependencies, warnings, operations: diagnostic, ok: !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
   node: { actual: process.versions.node, expected: expectedNode },
-  pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssue ? { issue: pnpmIssue } : {}) } : undefined,
+  pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,
   ai: { issues: aiIssues },
   missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])],
-  sources: project.descriptor.environmentSources ?? {}, state: { path: project.adapter?.state, safe: stateValid }, scope: 'local-inputs-only' };
+  sources: project.descriptor.environmentSources ?? {}, state: { path: project.adapter?.state, safe: stateValid, ...(stateIssue ? { issue: stateIssue } : {}) }, scope: 'local-inputs-only' };
 }
 
 // SC-05: a seed declaring devIdentity loads the dev layer only from a local-only
