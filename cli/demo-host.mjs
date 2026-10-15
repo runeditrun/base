@@ -1,6 +1,6 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { contained } from './project.mjs';
 import { invalid, missing, refuse, RerError } from './errors.mjs';
 import { imageFolder } from './container.mjs';
@@ -40,7 +40,9 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  const secrets = join(folder, '.secrets.json');
  await writeFile(secrets, JSON.stringify({ TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY.trim() }), { mode: 0o600 });
  try {
-  const wrangler = createRequire(join(project.root, 'package.json')).resolve('wrangler/bin/wrangler.js');
+  const require = createRequire(join(project.root, 'package.json'));
+  const manifest = require.resolve('wrangler/package.json');
+  const wrangler = join(dirname(manifest), JSON.parse(await readFile(manifest, 'utf8')).bin.wrangler);
   await store.run('Deploying the demo Worker and its container image', process.execPath, [wrangler, 'deploy', '--config', 'wrangler.json', '--secrets-file', '.secrets.json'], { cwd: folder, signal });
  } finally { await rm(secrets, { force: true }); }
  return { dryRun: false, deployed: true, origin: plan.origin, demo: summary };

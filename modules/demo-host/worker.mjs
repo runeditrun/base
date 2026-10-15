@@ -4,6 +4,7 @@
 // then starts a container of their own, signs its owner in and sets the
 // rer_demo cookie. Every request with that cookie goes to the visitor's
 // container; nothing else on this host is reachable.
+import { category, report } from './diagnostics.mjs';
 import { startPage, demoCookie } from './pages.mjs';
 
 export { DemoContainer } from './container.mjs';
@@ -46,16 +47,16 @@ async function start(request, env) {
   if (!await env.CAPACITY.get(env.CAPACITY.idFromName('capacity')).acquire(id.toString(), ends, Number(env.DEMO_MAX_INSTANCES))) {
     return startPage(env, { status: 503, notice: 'Every demo is in use right now. Try again in a few minutes.' });
   }
-  const demo = env.DEMO.get(id);
+  const demo = env.DEMO.get(id), correlation = crypto.randomUUID(), started = Date.now();
   try {
-    const signedIn = await demo.start({ origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
-    const headers = new Headers({ location: signedIn.location, 'cache-control': 'no-store' });
+    const signedIn = await demo.start({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
+    const headers = new Headers({ location: signedIn.location, 'cache-control': 'no-store', 'x-rer-demo-correlation': correlation });
     for (const cookie of [...signedIn.cookies, demoCookie(env, id.toString())]) headers.append('set-cookie', cookie);
     return new Response(null, { status: 303, headers });
   } catch (error) {
-    console.error('Demo start failed:', error.message);
-    await demo.end();
-    return startPage(env, { status: 502, notice: 'The demo did not start. Try again.' });
+    report(correlation, started, 'failed', { error: ['health-deadline', 'container-stopped'].includes(error.message) ? error.message : category(error) });
+    try { await demo.end(); } catch (cleanup) { report(correlation, started, 'cleanup', { error: category(cleanup) }); }
+    return startPage(env, { status: 502, headers: { 'x-rer-demo-correlation': correlation }, notice: 'The demo did not start. Try again.' });
   }
 }
 
