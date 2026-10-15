@@ -19,7 +19,7 @@ export async function projectPnpmPin(root) {
 }
 async function probe(root, env, signal, store, timeoutMs) {
  try { return { version: await probePnpm(root, store, signal, env, timeoutMs) }; }
- catch (error) { if (signal?.aborted) throw error; return { reason: error.reason ?? error.message }; }
+ catch (error) { if (signal?.aborted) throw error; return { reason: error.reason ?? error.message, diagnostic: error.diagnostic }; }
 }
 export async function ensureProjectPnpm(root, options = {}) {
  if (options.store) return ensure(root, options);
@@ -71,5 +71,7 @@ async function ensure(root, { env = process.env, signal, report = () => {}, stor
   if (result.version === pin) { Object.assign(env, supplied); return env; }
  }
  const failed = result.version === undefined ? result.reason : `it reported ${JSON.stringify(result.version.slice(0, 64))}`;
- throw missing(`The verified pnpm ${pin} did not report the project version after 3 tries (${failed}). Run ${shellQuote(join(directory, 'pnpm'))} --version to inspect it, then rerun rer.`);
+ const message = `The verified pnpm ${pin} did not report the project version after 3 tries (${failed}).${result.diagnostic ? `\n${result.diagnostic}\n` : ' '}Run ${shellQuote(join(directory, 'pnpm'))} --version to inspect it, then rerun rer.`;
+ store.report(message);
+ throw missing(message);
 }

@@ -44,7 +44,18 @@ export async function deployCommand(context) {
  validateDeployOptions(options);
  try { await refuseLocalModels(root); } catch { throw refuse('Deploy refuses the local-only key file .rer/local/models.json. Remove live-dev credentials before deployment.'); }
  const { path, value: declaration } = await declarationFor(root, adapter);
- ownerWorkerName(declaration.project, options.environment ?? 'production');
+ try { ownerWorkerName(declaration.project, options.environment ?? 'production'); }
+ catch (error) {
+  const message = {
+   'invalid-owner-environment': 'Invalid deployment environment: use at most 32 characters, starting with a lowercase letter, with lowercase letters or digits separated by single hyphens.',
+   'invalid-owner-project': 'Invalid deployment project in the deploy declaration: use a lowercase project name, optionally preceded by its owner and a slash.',
+   'owner-name-too-long': 'The project and environment produce a Worker name longer than 63 characters.',
+  }[error.message];
+  if (!message) throw error;
+  const failure = invalid(`${message} Nothing was uploaded.`);
+  store.report(failure.message);
+  throw failure;
+ }
  const local = localOnlyBinding(declaration, localOnlyKeys);
  if (local) throw refuse(`${path} names the local-only key ${local} as a deploy binding or secret. Remove it; local dev keys never reach a deployment.`);
  // Custom hooks historically ignored these flags. Only the ownership controller
