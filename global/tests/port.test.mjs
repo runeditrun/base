@@ -51,7 +51,7 @@ const lifecycle = localInstaller({ secrets: { file: '.dev.vars', format: 'dotenv
 export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-setup.json' }, input: { names: { email: 'OWNER_EMAIL' } }, settings: ['.dev.vars'] });
 `);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/port', runtime: { requirements: [] }, requiredEnvironment: [],
-  seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'outbox', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local port flow.' }])) }));
+  seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local port flow.' }])) }));
  // The first setup finds its chosen port already taken by another program.
  await writeFile(join(root, 'scripts/rer.mjs'), `
 import { spawn } from 'node:child_process';

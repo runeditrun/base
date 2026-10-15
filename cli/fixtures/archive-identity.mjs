@@ -2,38 +2,27 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHmac } from 'node:crypto';
-import { readDevKey } from '../../modules/operator-auth/dev/sign-in-as.mjs';
 import { pause } from './reference.mjs';
 import { localVariables } from '../../onboarding/local/environment.mjs';
 
 const post = (origin, path, body, headers = {}) => fetch(origin + path, { method: 'POST', redirect: 'manual', headers: { Origin: origin, 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
 
 async function nativeSignIn(f, origin) {
- const key = await readDevKey(f.root);
- const sent = await post(origin, '/auth/magic-link', { email: 'fresh-owner@example.test', returnTo: '/app' });
- assert.equal(sent.status, 202, 'native recovery requests an ordinary email link');
- const outbox = await (await fetch(origin + '/__dev/outbox', { headers: { 'x-rer-dev-key': key } })).text();
- const article = outbox.split('<article>').find(part => part.includes('To: fresh-owner@example.test'));
- const message = article?.match(/href="([^\"]+\?message=[^\"]+)"/)?.[1];
- assert.ok(message, 'the ordinary owner link reaches the local outbox');
- const document = await (await fetch(new URL(message.replaceAll('&amp;', '&'), origin), { headers: { 'x-rer-dev-key': key } })).text();
- const link = document.match(/class="open" href="([^\"]+)"/)?.[1];
- assert.ok(link, 'the outbox has an ordinary confirmation link');
- const token = new URL(link.replaceAll('&amp;', '&')).searchParams.get('token');
- const confirmed = await post(origin, '/auth/confirm', { token });
- assert.equal(confirmed.status, 303, 'the owner completes native confirmation');
+ const settings = localVariables(await readFile(join(f.root, '.dev.vars'), 'utf8'));
+ const proof = createHmac('sha256', settings.SESSION_SECRET).update('local-cli\0sign-in').digest('hex');
+ const confirmed = await post(origin, '/auth/local/cli-session', { returnTo: '/app' }, { 'x-rer-local-cli': proof });
+ assert.equal(confirmed.status, 303, 'local owner tooling obtains a fresh native session');
  const cookie = confirmed.headers.get('set-cookie')?.split(';')[0];
  assert.ok(cookie, 'confirmation issues a fresh native session');
  const response = await fetch(origin + '/auth/session', { headers: { Cookie: cookie } });
  assert.equal(response.status, 200);
  const session = await response.json();
  assert.equal(session.kind, 'native');assert.equal(session.operator.email, 'fresh-owner@example.test');assert.equal(session.operator.role, 'owner');
- assert.equal((await post(origin, '/auth/confirm', { token })).status, 400, 'native confirmation remains one-use');
  return { cookie, session };
 }
 
 export async function archiveIdentityRuntime(f, origin, action) {
- const child = f.start(['preview', '--port', new URL(origin).port, '--json', '--non-interactive']);
+ const child = f.start(['dev', '--port', new URL(origin).port, '--json', '--non-interactive']);
  try {
   const deadline = Date.now() + 120000;
   while (!child.stdoutText.includes('"event":"ready"') && child.exitCode === null && Date.now() < deadline) await pause(100);

@@ -16,8 +16,7 @@ rer dev
   email, port, password or answers file.
 - Give the owner the `RER_READY` address and the `RER_OPEN` link, and ask
   nothing. `RER_OPEN` is a credential: share it only with the owner, in this
-  chat. A seed without dev identity prints `RER_SIGN_IN` (its local outbox)
-  instead.
+  chat.
 - Stop the app with `rer dev --stop`. If a start is refused, the message names
   the cause and the next command: run that command.
 
@@ -51,11 +50,10 @@ Help, check, describe, doctor and stop do not select or acquire Node.
 After `RER_READY`, `dev` prints `RER_SIGNED_IN EMAIL` and `RER_OPEN URL`.
 Open that URL on this computer: the app opens signed in as the owner and
 finishes first-run setup at `/setup`. Treat the line as a credential.
-`dev --as PERSONA` starts as a persona or signed out; `dev --login` prints
-the outbox instead: follow its newest ordinary sign-in link. Until first-run
-completion is stored durably, app routes send the signed-in owner to `/setup`;
+`dev --as PERSONA` starts as a persona or signed out. Legacy `dev --login`
+uses the same automatic sign-in. Until first-run completion is stored durably, app routes send the signed-in owner to `/setup`;
 signed-out visitors sign in and return there. Once complete, `/setup` opens the
-app or settings. The local outbox sends no external email.
+app or settings. Development and demo mail is silently suppressed.
 
 The saved local port is used; a first setup saves the first free port from 8787. Explicit ports are decimal
 integers from 1 through 65535 and must be free; a busy requested port fails
@@ -80,9 +78,8 @@ root, inspect the live queue with
 
 Use the setup prompt instead of `--owner-email` when entering the real owner
 mailbox. Open the `RER_OPEN` URL printed by `dev` on this computer; the app opens
-signed in as the owner. With `dev --login`, open the outbox it prints, choose
-the newest ordinary sign-in message and follow its link. No external email is
-sent. Stop `dev` with
+signed in as the owner, including with legacy `dev --login`. No external
+email is sent in development or demo mode. Stop `dev` with
 `rer dev --stop` or Ctrl-C, and stop `preview` with
 `rer preview --stop` before build or verification.
 
@@ -106,8 +103,8 @@ flags, private state, deployment inputs and remote limitations.
 ## Work on this foundation
 
 Choose and verify the edition UX before adding product functionality. This
-source includes minimal real owner/operator auth, D1 and local development
-outbox mail. It has no product domain or background jobs.
+source includes minimal real owner/operator auth, D1 and silent development
+mail suppression. It has no product domain or background jobs.
 
 When adding private HTTP routes or Start functions, reuse native sessions and
 enforce authorization in every server function handler, including direct
@@ -120,8 +117,8 @@ Keep actual Queue/Cron handlers and named Worker exports in `src/server.ts`
 when adding those capabilities. The dispatcher only selects HTTP ownership; it
 does not authenticate or catch failures.
 
-`setup` builds, applies auth/outbox migrations, prepares the explicit first
-owner, checks an ordinary sign-in message and stops its temporary Worker. `dev`
+`setup` builds, applies declared migrations, prepares the explicit first
+owner and stops its temporary Worker. `dev`
 serves actual Vite HMR with the same auth and data. Managed foreground servers
 remain active in their first invocation; compatible repeated invocations reuse
 the server and exit. Stop before build or verification.

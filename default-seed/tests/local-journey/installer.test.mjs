@@ -10,8 +10,7 @@ import { assertDistExcludesSecrets } from './readme.mjs'
 
 // The reference's own installer adapter on the shared Base kit, run natively:
 // a forced failing first attempt, resume, real build and migrations, the
-// running Worker's /health, operator-auth bootstrap, sign-in through the
-// development outbox, private diagnostics, a rerun that keeps the owner's
+// running Worker's /health, operator-auth bootstrap, one-click development sign-in, private diagnostics, a rerun that keeps the owner's
 // settings, and teardown.
 let copy
 before(async () => { copy = await freshBuildCopy() }, { timeout: 20 * 60_000 })
@@ -47,7 +46,7 @@ const portFree = (port) => new Promise((resolve) => {
   socket.listen(port, '127.0.0.1', () => socket.close(() => resolve(true)))
 })
 
-test('the reference installer fails, resumes, claims the owner and signs in through the outbox', { timeout: 30 * 60_000 }, async () => {
+test('the reference installer fails, resumes, claims the owner and offers one-click owner entry', { timeout: 30 * 60_000 }, async () => {
   const path = process.env.PATH
   const queueEnvironment = Object.fromEntries(['RER_JOBS_DIR', 'RER_JOBS_LOAD_THRESHOLD', 'RER_JOBS_MIN_FREE_MEMORY_BYTES', 'RER_SERVERS_LOAD_THRESHOLD', 'RER_SERVERS_MIN_MEMORY_BYTES', 'RER_JOB_POLICY', 'RER_JOB_MEMBERSHIP'].map(name => [name, process.env[name]]))
   const shim = join(copy.root, '../.temporary/failing-bin')
@@ -99,8 +98,8 @@ test('the reference installer fails, resumes, claims the owner and signs in thro
     const origin = vars.AUTH_ORIGIN
     const appUrl = new URL(complete.appUrl)
     assert.equal(appUrl.origin, origin)
-    assert.equal(appUrl.pathname, '/__dev/outbox')
-    // The outbox opens through the key gate; the key never enters installer state.
+    assert.equal(appUrl.pathname, '/setup')
+    // Dev identity opens through the key gate; the key never enters installer state.
     assert.equal(complete.devOpen, true)
     const key = { 'x-rer-dev-key': /^RER_DEV_KEY=(.+)$/m.exec(await readFile(join(copy.root, '.rer/local/dev-key.env'), 'utf8'))[1] }
     // Only the authenticated installer page receives the open link, key in its fragment.
@@ -111,19 +110,9 @@ test('the reference installer fails, resumes, claims the owner and signs in thro
 
     // 3. The running Worker is healthy and the bootstrap made the owner.
     assert.equal((await fetch(origin + '/health')).status, 200)
-    assert.equal((await fetch(origin + '/__dev/outbox')).status, 404, 'the outbox needs the key gate')
-    // Follow the newest captured message, just as the owner does, before
-    // opening the ordinary sign-in link.
-    const outbox = await (await fetch(origin + '/__dev/outbox', { headers: key })).text()
-    const messageUrl = new URL(outbox.match(/<article>[\s\S]*?<a href="([^"]+\?message=[^"]+)"/)[1].replaceAll('&amp;', '&'), origin)
-    assert.equal(messageUrl.origin + messageUrl.pathname, origin + '/__dev/outbox')
-    const message = await (await fetch(messageUrl, { headers: key })).text()
-    const link = new URL(message.match(/<a class="open" href="([^"]+)"/)[1].replaceAll('&amp;', '&'))
-    assert.equal(link.origin + link.pathname, origin + '/auth/confirm')
-    assert.equal((await fetch(link)).status, 200, 'the confirmation preview opens without signing in')
-    const confirmed = await fetch(origin + '/auth/confirm', { method: 'POST', redirect: 'manual', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: link.searchParams.get('token') }) })
+    const confirmed = await fetch(origin + '/auth/dev/enter?as=owner&returnTo=/setup', { redirect: 'manual', headers: key })
     assert.equal(confirmed.status, 303)
-    const cookie = confirmed.headers.get('set-cookie').split(';')[0]
+    const cookie = confirmed.headers.getSetCookie().map(line => line.split(';')[0]).join('; ')
     const session = await (await fetch(origin + '/auth/session', { headers: { Cookie: cookie } })).json()
     assert.equal(session.operator.email, answers.OWNER_EMAIL)
     assert.equal(session.operator.role, 'owner')

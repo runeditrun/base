@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { access, cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { spawn as spawnProcess } from 'node:child_process';
@@ -16,6 +16,9 @@ test('actual template shared lifecycle routes each phase through the store and f
  await mkdir(join(root, 'scripts/installer'), { recursive: true });
  await mkdir(join(root, 'scripts/base-onboarding'), { recursive: true });
  await mkdir(join(root, 'src'));
+ // Command resolution uses the real installed Vite; this unit supplies only
+ // the process store, while the default-seed journey executes that process.
+ await symlink(resolve(import.meta.dirname, '../default-seed/node_modules'), join(root, 'node_modules'), 'dir');
  await cp(resolve(import.meta.dirname, '../foundation/template/scripts/installer/local.mjs'), join(root, 'scripts/installer/local.mjs'));
  await cp(resolve(import.meta.dirname, '../foundation/template/scripts/installer/ui'), join(root, 'scripts/installer/ui'), { recursive: true });
  await cp(import.meta.dirname, join(root, 'scripts/base-onboarding'), { recursive: true });
@@ -26,11 +29,8 @@ test('actual template shared lifecycle routes each phase through the store and f
  const child = { exitCode: null, signalCode: null };
  let registered, fetchSignal, healthUrl, listener, stopped = false;
  t.after(() => listener?.kill());
- let outboxReads = 0;
  t.mock.method(globalThis, 'fetch', async (url, options) => {
   if(String(url).endsWith('/auth/bootstrap'))return new Response(null,{status:303});
-  if(String(url).endsWith('/auth/magic-link'))return new Response(null,{status:202});
-  if(String(url).endsWith('/__dev/outbox'))return new Response(outboxReads++ ? '<article><p>To: owner@example.test</p><a href="?message=new-message">Message</a></article>' : '');
   fetchSignal = options.signal; healthUrl = url;
   return new Response(JSON.stringify({ status: 'ok' }), { headers: { 'Content-Type': 'application/json' } });
  });
@@ -65,17 +65,18 @@ test('actual template shared lifecycle routes each phase through the store and f
  await adapter.run(root, input, store, app => { registered = app; }, installSignal, {runtimePort});
  assert.equal(store.state.phase, 'complete');
  assert.equal(stopped, false);
- for(const label of ['Saving application branding','Installing locked dependencies','Building your application','Starting your application on this computer','First owner claimed','Your sign-in link is waiting in the development outbox','Your application is running locally'])assert.ok(labels.includes(label),label);
+ for(const label of ['Saving application branding','Installing locked dependencies','Building your application','Starting your application on this computer','First owner claimed','Opening your application','Your application is running locally'])assert.ok(labels.includes(label),label);
  assert.deepEqual(commands.slice(0, 2).map(({ command, args }) => [command, args]), [['pnpm', ['install', '--frozen-lockfile']], ['pnpm', ['run', 'build:app']]]);
  assert.ok(commands.every(({ options }) => options.signal === installSignal && options.cwd === root));
  assert.equal(fetchSignal, probeSignal);
  assert.equal(healthUrl, new URL(store.state.appUrl).origin + '/health');
  assert.deepEqual(JSON.parse(await readFile(join(root, 'src/branding.json'), 'utf8')), { name:input.APP_NAME,primaryColor:input.PRIMARY_COLOR });
- // Setup's production runtime binds the internal port, keeping public origin.
+ // Setup's local runtime binds the internal port, keeping public origin.
  const spawn = commands[3];
- assert.deepEqual([spawn.command, basename(spawn.args[0])], [process.execPath, 'production-runtime.mjs']);
- assert.equal(spawn.options.env.RER_RUNTIME_PORT, String(runtimePort));
- assert.notEqual(spawn.options.env.RER_RUNTIME_PORT, new URL(store.state.appUrl).port);
+ assert.equal(spawn.command, process.execPath);
+ assert.equal(spawn.args[1], 'dev');
+ assert.ok(spawn.args.includes(String(runtimePort)));
+
  assert.equal(spawn.options.env.X_LOCAL_EXPLORER, 'false');
 });
 

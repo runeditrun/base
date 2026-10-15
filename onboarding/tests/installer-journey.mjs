@@ -10,8 +10,8 @@ import { createOutputRoot, finishOutputRoot } from '../ui/browser-output.mjs';
 
 // The browser installer as an owner runs it: `node scripts/install.mjs` from a
 // fresh standalone reference checkout, which stays the long-lived process that
-// launches install, setup and preview. The owner approves in the page, opens the
-// app and signs in from the newest outbox message.
+// launches install, setup and dev. The owner approves in the page and opens the
+// app signed in through its one-click development entry.
 const base = resolve(import.meta.dirname, '../..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
 const taskTemp = resolve(process.env.TMPDIR || tmpdir());
@@ -57,20 +57,13 @@ try {
       await page.waitForTimeout(200);
     }
     await page.locator('#approve').click();
-    // Install, setup (build, migrations, owner claim) and preview all run here.
+    // Install, setup (build, migrations, owner claim) and dev all run here.
     await page.waitForFunction(() => document.querySelector('#open')?.dataset.devOpen === 'ready' || !document.querySelector('#failed-note')?.hidden, null, { timeout: 15 * 60_000 });
     assert.equal(await page.locator('#open').getAttribute('data-dev-open'), 'ready', 'the browser installer finished:\n' + await page.locator('#installation').innerText());
     const app = new URL(await page.locator('#open').getAttribute('href')).origin;
 
-    // Open the app from the installer, as the owner does, then follow the
-    // newest sign-in message in the development outbox.
     await page.locator('#open').click();
-    await page.waitForURL(app + '/__dev/outbox**');
-    await page.locator('article a[href*="message="]').first().click();
-    await page.locator('a.open').click();
-    await page.waitForURL(app + '/auth/confirm**');
-    await page.locator('form button[type="submit"], button[type="submit"]').first().click();
-    await page.waitForURL(url => !url.pathname.startsWith('/auth/confirm'));
+    await page.waitForURL(app + '/setup');
     const session = await (await context.request.get(app + '/auth/session')).json();
     assert.equal(session.operator?.email, email);
     assert.equal(session.operator?.role, 'owner');
@@ -83,7 +76,7 @@ try {
     const code = await new Promise(done => separate.once('close', done));
     assert.equal(code, 4, events);
     assert.ok(events.split('\n').some(line => { try { const event = JSON.parse(line); return event.event === 'error' && event.code === 'safety_refusal'; } catch { return false; } }), events);
-    console.log('Installer journey: browser install, setup, open and outbox sign-in passed; a separate setup was refused');
+    console.log('Installer journey: browser install, setup, one-click signed-in open passed; a separate setup was refused');
 
     process.kill(-installer.pid, 'SIGTERM');
     await new Promise(done => exited() ? done() : installer.once('exit', done));

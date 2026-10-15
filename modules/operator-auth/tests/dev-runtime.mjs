@@ -39,8 +39,8 @@ export async function runtime(schemas, extraConfig = {}, worker = 'dev-worker.mj
     await db.prepare('CREATE TABLE test_mail(id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL)').run();
     return {
       db,
-      call(path, { method = 'GET', cookie, key, input } = {}) {
-        const url = new URL(path, ORIGIN), headers = { Host: url.host, Origin: ORIGIN };
+      call(path, { method = 'GET', cookie, key, input, headers: extraHeaders = {} } = {}) {
+        const url = new URL(path, ORIGIN), headers = { Host: url.host, Origin: ORIGIN, ...extraHeaders };
         if (cookie) headers.Cookie = cookie;
         if (key) headers['x-rer-dev-key'] = key;
         if (input !== undefined) headers['Content-Type'] = 'application/json';

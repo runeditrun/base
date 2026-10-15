@@ -42,7 +42,7 @@ export async function launchDev(target) {
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
  }
  const here = await realpath(process.cwd()).catch(() => undefined);
- const out = printer({ json: devArgs.includes('--json'), login: devArgs.includes('--login'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
+ const out = printer({ json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
  const detach = args.includes('--detach') || (!args.includes('--foreground') && !process.stdout.isTTY);
  return detach ? detached(target, devArgs, directory, out, doorStart) : foreground(target, devArgs, directory, out, doorStart);
 }

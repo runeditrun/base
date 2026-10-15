@@ -56,7 +56,7 @@ const lifecycle = localInstaller({ secrets: ${JSON.stringify(secrets)}, start: c
 export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-setup.json' }, input: { names: ${JSON.stringify(names)} }, settings: [${JSON.stringify(file)}] });
 `);
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/native-settings', runtime: { requirements: [] }, requiredEnvironment: [],
-   seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'outbox', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local declared-settings flow.' }])) }));
+   seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local declared-settings flow.' }])) }));
   const settings = { [originKey]: origin, [emailKey]: email, OWNER_NAME: 'Owner', ...(declaration === 'adapter' ? {} : {SESSION_SECRET: 'test-synthetic-retained-session'}), ...(declaration === 'manifest' ? { SETUP_TOKEN: 'test-synthetic-retained-bootstrap' } : {}) };
   const encode = values => format === 'json' ? JSON.stringify(values, null, 2) + '\n' : '# Retained private settings\n' + Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n') + '\n';
   const bytes = encode(settings), path = join(root, file);
@@ -84,7 +84,6 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
   const dev = await handoff(['dev']);
   assert.equal(dev.input[emailKey], email);
   assert.equal(dev.origin, origin);
-  assert.equal((await handoff(['outbox', '--owner-email', email])).input[emailKey], email);
   if (declaration !== 'default') {
    const override = await handoff(['dev', '--port', String(alternatePort)]);
    assert.equal(override.origin, `http://127.0.0.1:${alternatePort}`);
@@ -135,7 +134,7 @@ const lifecycle = localInstaller({ secrets: { file: '.dev.vars', format: 'dotenv
 export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-setup.json' }, input: { names: { email: 'OWNER_EMAIL' } }, settings: ['.dev.vars'] });
 `);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/declared-dependency', runtime: { requirements: [] }, requiredEnvironment: [],
-  seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'outbox', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local declared-dependency flow.' }])) }));
+  seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local declared-dependency flow.' }])) }));
  const result = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'setup', '--owner-email', 'owner@example.test', '--port', String(await freePort()), '--json', '--non-interactive'], { cwd: root, env, encoding: 'utf8', timeout: 60000 });
  assert.ifError(result.error);
  assert.equal(result.status, 0, result.stdout + result.stderr);

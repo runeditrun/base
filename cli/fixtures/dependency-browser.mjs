@@ -1,26 +1,17 @@
 import assert from 'node:assert/strict';
-import {mkdir} from 'node:fs/promises';
+import {mkdir,readFile} from 'node:fs/promises';
+import {createHmac} from 'node:crypto';
+import {localVariables} from '../../onboarding/local/environment.mjs';
 import {resolve} from 'node:path';
 import {chromium,pause} from './reference.mjs';
-import {readDevKey} from '../../modules/operator-auth/dev/sign-in-as.mjs';
 import {editorGrant} from './dependency-editor.mjs';
 
-async function nativeLogin(context, origin, key, capture) {
- const page=await context.newPage();
- assert.equal((await context.request.post(origin+'/__dev/key',{headers:{Origin:origin},data:{key}})).status(),204);
- await page.goto(origin+'/signin?returnTo=%2Fsetup');
- await page.getByLabel('Email',{exact:true}).fill('cli-owner@example.test');
- const sent=page.waitForResponse(r=>r.request().method()==='POST' && new URL(r.url()).pathname==='/auth/magic-link');
- await page.getByRole('button',{name:'Email a sign-in link',exact:true}).click();
- assert.equal((await sent).status(),303);
- await page.goto(origin+'/__dev/outbox');
- await page.getByRole('link',{name:'Read message'}).first().click();
- await page.getByRole('link',{name:'Open this link'}).click();
- await page.getByRole('button',{name:'Confirm',exact:true}).waitFor();
- if(capture)await capture(page,'confirmation-no-js');
- const confirmed=page.waitForResponse(r=>r.request().method()==='POST' && new URL(r.url()).pathname==='/auth/confirm');
- await page.getByRole('button',{name:'Confirm',exact:true}).click();
- assert.equal((await confirmed).status(),303);await page.waitForURL(origin+'/setup');
+async function nativeLogin(context, origin, root) {
+ const settings=localVariables(await readFile(resolve(root,'.dev.vars'),'utf8'));
+ const proof=createHmac('sha256',settings.SESSION_SECRET).update('local-cli\0sign-in').digest('hex');
+ const response=await context.request.post(origin+'/auth/local/cli-session',{headers:{Origin:origin,'x-rer-local-cli':proof},data:{returnTo:'/setup'},maxRedirects:0});
+ assert.equal(response.status(),303);
+ const page=await context.newPage();await page.goto(origin+'/setup');
  assert.equal((await (await context.request.get(origin+'/auth/session')).json()).kind,'native');
  return page;
 }
@@ -35,13 +26,13 @@ async function oidcLogin(context, page, origin, provider, claims={}) {
 }
 
 export async function linkedBrowser(f,origin,provider,env,kind,network) {
- const preview=f.launch(['scripts/rer.mjs','preview','--port',new URL(origin).port,'--non-interactive','--json','--no-queue'],process.execPath,env);
+ const preview=f.launch(['scripts/rer.mjs','dev','--port',new URL(origin).port,'--non-interactive','--json','--no-queue'],process.execPath,env);
  let browser;
  try {
   const deadline=Date.now()+120000;while(!preview.stdoutText.includes('"event":"ready"')&&preview.exitCode===null&&Date.now()<deadline)await pause(100);
-  assert.ok(preview.stdoutText.includes('"event":"ready"'),'preview reaches readiness');
+  assert.ok(preview.stdoutText.includes('"event":"ready"'),'dev reaches readiness');
   browser=await chromium.launch();
-  const key=await readDevKey(f.root),evidence=resolve('evidence/auth-6');await mkdir(evidence,{recursive:true});
+  const evidence=resolve('evidence/auth-6');await mkdir(evidence,{recursive:true});
   for(const width of [1440,390]) {
    const viewport={width,height:900};
    const native=await browser.newContext({viewport,javaScriptEnabled:false});
@@ -52,7 +43,7 @@ export async function linkedBrowser(f,origin,provider,env,kind,network) {
    };
    const post=(context,path,data)=>context.request.post(origin+path,{headers:{Origin:origin},data,maxRedirects:0});
    try {
-    const page=await nativeLogin(native,origin,key,capture),providerPage=await providerContext.newPage();
+    const page=await nativeLogin(native,origin,f.root),providerPage=await providerContext.newPage();
     await page.goto(origin+'/auth/settings/identity');
     const save=async()=>{const posted=page.waitForResponse(r=>r.request().method()==='POST' && r.url()===origin+'/auth/settings/identity');await page.getByRole('button',{name:'Save'}).click();assert.equal((await posted).status(),303);await page.waitForLoadState();};
     const setting=page.getByRole('checkbox');assert.equal(await setting.isChecked(),true);

@@ -1,3 +1,4 @@
+import { requireProductionAuth } from './production-auth.mjs';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -36,13 +37,17 @@ export async function containerCommand(project,options,out) {
 }
 async function runContainer(project,options,out,operation) {
  const {root}=project;
+ if(['build','deploy'].includes(options.verb)&&process.env.RER_DEMO)throw refuse('Production build and deploy refuse the local-only RER_DEMO environment binding. Unset it before retrying.');
  if(options.verb==='deploy'){try{await refuseLocalModels(root);}catch{throw refuse('Deploy refuses the local-only key file .rer/local/models.json. Remove live-dev credentials before deployment.');}}
  const config=JSON.parse(await readFile(join(root,'deploy.json'),'utf8'));
  if(!(config.platforms??['workers']).includes('container'))throw refuse('This seed does not declare container support.');
  const name='rer-local-'+createHash('sha256').update(root).digest('hex').slice(0,16),image=name+':candidate';
  if(options.stop){await execute('docker',['stop','-t','10',name]);return{stopped:true};}
  if(['build','deploy'].includes(options.verb)){
-  if(options.verb==='deploy'){if(!options.host)throw missing('Container deploy requires --host ssh://user@host.');sshTarget(options.host);await deployInputs({root,envFile:options.envFile,localOnlyKeys:project.adapter?.localOnlyKeys});}
+  if(options.verb==='deploy'){if(!options.host)throw missing('Container deploy requires --host ssh://user@host.');sshTarget(options.host);const production=await deployInputs({root,envFile:options.envFile,localOnlyKeys:project.adapter?.localOnlyKeys});
+   const {loadInstallerSeed}=await shared('setup-manifest.mjs');
+   const setupSeed=project.adapter?.setup?await loadInstallerSeed(root,project.adapter):undefined;
+   await requireProductionAuth({root,declaration:config,env:production.settings,setupManifest:setupSeed?.manifest,setupSeed,adapter:project.adapter,options});}
   const ingress={...(options.bindAddress?{address:options.bindAddress}:{}),...(options.httpPort?{httpPort:options.httpPort}:{}),...(options.httpsPort?{httpsPort:options.httpsPort}:{})};
   ingressBindings({...config.container?.ingress,...ingress});
   if(!options.image){await imageFolder(project,operation,config);await run('docker',['build','--tag',image,join(root,'.rer/container/image')],{cwd:root});}

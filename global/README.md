@@ -99,7 +99,6 @@ RER_SIGNED_IN owner@cradle.test
 RER_OPEN http://127.0.0.1:8787/__dev/key#...
 ```
 
-or `RER_SIGN_IN <outbox>` for a seed that signs in through its development outbox.
 A seed that declares a run site prints one more line after those,
 `RER_SITE http://127.0.0.1:8788`: a local preview of its static run site (its
 marketing homepage, `/run` and docs) on the first free port above the app's. It
@@ -262,7 +261,7 @@ line that still names it. A later refresh is a version bump:
 | `@runeditrun/rer/modules/portability`, `/catalogue`, `/cli`, `/cli-options`, `/files`, `/format`, `/http`, `/import`, `/journal`, `/legacy-safety`, `/migration-history`, `/storage` | portability module | `scripts/base-cli/modules/portability/*.mjs` |
 | `@runeditrun/rer/modules/release/export`, `/publication-scan`, `/source`, `/signature` | release export, publication scan and shared signature verifier | `scripts/base-cli/modules/release/*.mjs` |
 | `@runeditrun/rer/modules/deploy-kit/owner`, `/owner-cli`, `/prepare`, `/provider` | deploy kit | `scripts/base-cli/modules/deploy-kit/*.mjs` |
-| `@runeditrun/rer/modules/operator-auth`, `/dev`, `/dev/badge`, `/dev-admission`, `/accounts/native`, `/identity/email-link` | operator auth | `scripts/base-cli/modules/operator-auth/index.mjs`, `dev/index.mjs`, `dev/badge.mjs`, `dev-admission.mjs`, `accounts/native.mjs`, `identity/email-link/index.mjs` |
+| `@runeditrun/rer/modules/operator-auth`, `/dev`, `/dev-admission`, `/accounts/native`, `/identity/email-link` | operator auth | `scripts/base-cli/modules/operator-auth/index.mjs`, `dev/index.mjs`, `dev-admission.mjs`, `accounts/native.mjs`, `identity/email-link/index.mjs` |
 | `@runeditrun/rer/modules/erasure/fence` | erasure fence statements | `scripts/base-cli/modules/erasure/fence.mjs` |
 | `@runeditrun/rer/modules/owner-claim`, `/modules/dependencies` | owner claim, dependency links | `scripts/base-cli/modules/owner-claim/index.mjs`, `dependencies/index.mjs` |
 | `@runeditrun/rer/internal/PATH` | any other package file, for tests | `scripts/base-cli/PATH`, and `scripts/base-onboarding/PATH` with PATH under `onboarding/` |
@@ -273,7 +272,7 @@ In a checkout, every verb runs that checkout's own pinned `rer`; `rer VERB --hel
 there lists its flags:
 
 `install`, `setup`, `dev`, `preview`, `build`, `verify`, `reset --yes`, `deploy`,
-`export`, `import`, `outbox`, `doctor`, `describe`, `check`, `release`,
+`export`, `import`, `doctor`, `describe`, `check`, `release`,
 `release sign`, `release receipt` and `release keygen`.
 
 Anywhere: `rer list [DIR]`, `rer cli status|install|uninstall`, `rer update`,

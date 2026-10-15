@@ -13,7 +13,7 @@ import { labels } from './adapter-labels.mjs';
 const rerEntry=root=>existsSync(join(root,'scripts/rer.mjs'))?'scripts/rer.mjs':fileURLToPath(new URL('../bin/rer.mjs',import.meta.url));
 
 // The browser and terminal use the same bounded setup journey. Its temporary
-// runtime is gone before that lease releases. The foreground preview belongs
+// runtime is gone before that lease releases. The foreground development server belongs
 // to the installer process, outside the bounded job's descendant tree.
 export async function installOperator(root,input,store,onApp,signal,hooks){
  let answer,app,step='setup';
@@ -30,20 +30,19 @@ export async function installOperator(root,input,store,onApp,signal,hooks){
   step='dependencies';await store.step(labels.dependencies);await run(labels.dependencies,['install']);
   step='setup';await store.step(labels.build);await run(labels.build,['setup','--answers',relative(root,answer),'--host',address.hostname.replace(/^\[|\]$/g,''),'--port',address.port]);
   await unlink(answer);answer=undefined;
-  // Preview's ready event carries RER_OPEN; keep the checkout's dev key out of this log.
+  // Dev's ready event carries RER_OPEN; keep the checkout's dev key out of this log.
   const devKey=/^RER_DEV_KEY=(\S+)$/m.exec(await readFile(join(root,'.rer/local/dev-key.env'),'utf8').catch(()=>''))?.[1];if(devKey)store.addSecrets?.([devKey]);
   step='start';await store.step(labels.start);
-  app=store.spawn(labels.start,process.execPath,[rerEntry(root),'preview','--non-interactive','--json'],{cwd:root,signal,env});onApp(app);
+  app=store.spawn(labels.start,process.execPath,[rerEntry(root),'dev','--non-interactive','--json'],{cwd:root,signal,env});onApp(app);
   let buffer='',ready=false,openUrl;
-  app.stdout.on('data',chunk=>{buffer+=chunk;let end;while((end=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);try{const event=JSON.parse(line);if(event.version===1&&event.verb==='preview'&&event.event==='ready'&&event.url===origin){ready=true;openUrl=event.openUrl;}}catch{}}});
+  app.stdout.on('data',chunk=>{buffer+=chunk;let end;while((end=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);try{const event=JSON.parse(line);if(event.version===1&&event.verb==='dev'&&event.event==='ready'&&event.url===origin){ready=true;openUrl=event.openUrl;}}catch{}}});
   await store.waitForReady(labels.start,app,async probeSignal=>{
    if(!ready)return {ready:false,message:'Waiting for managed application readiness'};
    const response=await fetch(origin+'/health',{signal:probeSignal});
    return {ready:response.ok&&(await response.json()).status==='ok'};
   },{signal,timeoutMs:1200000});
-  // A dev-identity seed's outbox needs the key exchange RER_OPEN carries. State
-  // never holds the key: the installer page asks /api/open-app when it shows the link.
-  store.state.appUrl=origin+'/__dev/outbox';store.state.devOpen=Boolean(openUrl?.startsWith(origin+'/'));await store.step(labels.complete);await store.phase('complete');
+  // State never holds the key; /api/open-app supplies the browser entry.
+  store.state.appUrl=origin+'/setup';store.state.devOpen=Boolean(openUrl?.startsWith(origin+'/'));await store.step(labels.complete);await store.phase('complete');
  }catch(error){
   if(app)await store.stop(app);await store.stopCommands?.(signal);
   store.state.error=installationFailureMessage(installationFailure('command_failed',{step,diagnostic:error}));await store.phase('failed');

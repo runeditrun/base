@@ -26,9 +26,8 @@ test('a visitor starts their own signed-in demo, and only their cookie reaches i
     for (const attribute of ['Domain=demo.run-test.example', 'Path=/', 'Max-Age=3600', 'HttpOnly', 'Secure', 'SameSite=Lax']) assert.ok(cookie.split('; ').includes(attribute), attribute);
     assert.ok(started.headers.getSetCookie().some(value => value.startsWith(`__Host-operator_session=${id};`)), 'the owner session from the claim is relayed');
 
-    // The container started in demo mode with no internet, its own secrets and the claim's public key.
-    const { env, enableInternet } = demos.get(id);
-    assert.equal(enableInternet, false);
+    // The container starts in demo mode with its own secrets and the claim's public key.
+    const { env } = demos.get(id);
     assert.equal(env.RER_DEMO, '1');
     assert.equal(env.AUTH_ORIGIN, ORIGIN);
     assert.equal(env.RER_INGRESS_ORIGIN, ORIGIN);

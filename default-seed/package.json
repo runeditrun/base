@@ -29,7 +29,6 @@
     "export": "node scripts/rer.mjs export",
     "import": "node scripts/rer.mjs import",
     "release": "node scripts/rer.mjs release",
-    "outbox": "node scripts/rer.mjs outbox",
     "doctor": "node scripts/rer.mjs doctor",
     "describe": "node scripts/rer.mjs describe",
     "check": "node scripts/rer.mjs check",

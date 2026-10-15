@@ -8,7 +8,7 @@ import { createApi } from './core/app/hono'
 import { uncachedStartResponse } from './core/app/start-response.server'
 import { completeReferenceJob, recordScheduledRun } from './core/features/reference/service'
 import { requireBindings, type Bindings } from './core/platform/bindings.server'
-import { developmentOutboxResponse } from './core/platform/auth/outbox.server.mjs'
+import { developmentKeyResponse } from './core/platform/auth/key.server.mjs'
 import { theme } from './core/app/theme'
 import { identity } from './core/app/identity'
 import { lobbyResponse } from '../../foundation/runtime/lobby'
@@ -27,8 +27,8 @@ export default withDemo({
     const asset = await staticAssetResponse(request, bindings)
     if (asset) return asset
     bindings = requireBindings(bindings)
-    const outbox = await developmentOutboxResponse(request, bindings)
-    if (outbox) return outbox
+    const keyExchange = await developmentKeyResponse(request, bindings)
+    if (keyExchange) return keyExchange
     if (new URL(request.url).pathname.startsWith('/.well-known/rer-') || new URL(request.url).pathname.startsWith('/auth/dependencies/') || new URL(request.url).pathname === '/auth/owner-claim') {
       const linked = await dependenciesResponse(request, bindings)
       if (linked) return linked

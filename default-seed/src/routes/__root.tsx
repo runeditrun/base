@@ -18,7 +18,7 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { name: 'description', content: 'A real Cloudflare reference seed.' },
-      { title: 'Default seed reference' },
+      { title: 'Base' },
     ],
   }),
   notFoundComponent: NotFound,
@@ -33,6 +33,7 @@ function Root() {
       <HydrationUnit>
         <header>
           <nav aria-label="Reference navigation">
+            <Link to="/" data-rer-name="Base">Base</Link>{' '}
             <Link to="/records">Public record</Link>{' '}
             <Link to="/reference">Prerendered reference</Link>{' '}
             <Link to="/app">Operator app</Link>

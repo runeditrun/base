@@ -14,7 +14,7 @@ it with these files and the seed's container image folder (workerd engine) to
   with that cookie goes to the visitor's Durable Object; nothing else reaches
   a container.
 - `container.mjs`: `DemoContainer`, one per visitor (`newUniqueId`, checked
-  with `idFromString`). It starts the container with `enableInternet: false`,
+  with `idFromString`). It starts the container with public internet enabled,
   `RER_DEMO=1`, the fixed origin (`RER_INGRESS_ORIGIN` and the seed's origin
   variable), fresh `SESSION_SECRET` and `SETUP_TOKEN`,
   `OWNER_EMAIL=owner@demo.invalid` and the owner claim's issuer, installation
@@ -22,6 +22,10 @@ it with these files and the seed's container image folder (workerd engine) to
   (`claim.mjs`) to `/auth/owner-claim`. Its alarm ends the demo at its hour or
   after 15 idle minutes: `destroy()`, `deleteAll()` and the place released. A
   container that stops by itself ends its demo too.
+  Public internet reads and checks run against real services. The app's demo
+  guard simulates effects on people and third-party accounts, while the
+  container egress independently refuses direct mail/SMS provider transports
+  and SMTP ports. Public-address filtering and TLS remain enforced.
   The platform stops a container about two minutes after its Durable Object's
   last event, when it evicts the object (and the object's exit watcher with
   it). So the alarm stays in flight until the demo's next check, at most three

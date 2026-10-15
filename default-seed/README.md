@@ -31,11 +31,10 @@ Help, check, describe, doctor and stop do not select or acquire Node.
 After `RER_READY`, `dev` prints `RER_SIGNED_IN EMAIL` and `RER_OPEN URL`.
 Open that URL on this computer: the app opens signed in as the owner and
 finishes first-run setup at `/setup`. Treat the line as a credential.
-`dev --as PERSONA` starts as a persona or signed out; `dev --login` prints
-the outbox instead: follow its newest ordinary sign-in link. Until first-run
+`dev --as PERSONA` starts as a persona or signed out. Until first-run
 completion is stored durably, app routes send the signed-in owner to `/setup`;
 signed-out visitors sign in and return there. Once complete, `/setup` opens the
-app or settings. The local outbox sends no external email.
+app or settings. Development and demo silently suppress application mail.
 
 The saved local port is used; a first setup saves the first free port from 8787. Explicit ports are decimal
 integers from 1 through 65535 and must be free; a busy requested port fails
@@ -70,11 +69,9 @@ pnpm run dev -- --port 8787
 ```
 
 Setup builds the real app, applies local migrations, prepares the first owner,
-requests an ordinary sign-in message and stops its temporary Worker. Dev serves
-Vite assets and HMR using the same database and auth. Wait for `RER_READY`, then
-open the `RER_SIGN_IN` outbox URL, choose the newest ordinary sign-in message and
-follow its link. No external email is sent. The URL is for the local outbox and
-does not expose the sign-in token.
+and stops its temporary Worker. Dev serves Vite assets and HMR using the same
+database and auth. Wait for `RER_READY`, then open `RER_OPEN` to enter signed in
+as the owner. Its fragment holds the checkout key; treat the link as a credential.
 
 To rebuild and restart, stop the managed foreground server before build or
 verification with `pnpm run dev -- --stop` (or Ctrl-C), or stop preview with
@@ -91,8 +88,7 @@ To run setup again with the saved owner:
 pnpm run setup -- --non-interactive
 ```
 
-Use `pnpm run outbox` to print the local outbox URL. `--help` has no project
-effects; `--json` emits events and one result for bounded commands. The complete
+`--help` has no project effects; `--json` emits events and one result for bounded commands. The complete
 `rer` command list and flags are in [RUN-LOCALLY.md](RUN-LOCALLY.md).
 Managed foreground dev and preview support explicit `--stop` and
 `--idle-timeout`; their first invocation stays active while serving, and a
@@ -105,7 +101,7 @@ Conflicting owner or origin answers fail before effects. Builds exclude and
 restore private settings, including interrupted-build recovery. Canonical local
 data is `.wrangler/state`; symlinked or ambiguous legacy state is refused. Reset
 shows its exact inventory and requires `pnpm run reset -- --yes`; it removes
-declared local data, owner, outbox, bookkeeping and generated settings while
+declared local data, owner, bookkeeping and generated settings while
 preserving source, dependencies, archives and deployment receipts. It refuses
 active local operations.
 
@@ -125,8 +121,8 @@ codes, deployment requirements and compatibility behavior.
 
 This is a technical reference, not a finished product edition.
 
-Local mode and its outbox are for one user's machine: any local process or user
-can read the outbox and sign in as the owner. It runs one Cloudflare Worker: Hono owns `/health`,
+Local mode is for one user’s machine: a process with access to its private
+settings and checkout key can sign in as the owner. It runs one Cloudflare Worker: Hono owns `/health`,
 `/api`, and `/api/*`; shared operator-auth handlers own `/auth/*`; TanStack Start
 owns documents and `/_serverFn/*`. Queue and scheduled exports remain on the
 same entrypoint. `/` is the Lobby, the installed instance's homepage (Sign in,
@@ -143,9 +139,8 @@ The RER `setup` command creates the real first owner through operator-auth and
 preserves an existing owner and data on reruns. Local dev opens signed in
 through a real, key-gated dev session for that owner (`src/server.dev.ts` is the
 local-only entry; `rer build` refuses output containing the dev layer). The
-ordinary email link still works through Base mail's development provider and
-the key-gated `/__dev/outbox`, proven end to end by `tests/local-journey`; no
-external mail credential or static session is used. Setup and dev do not rotate secrets. Production
+one-click development entry is exercised through the browser in
+`tests/local-journey`; no external mail credential or static session is used. Setup and dev do not rotate secrets. Production
 deployment uses the owner-account procedure described in
 [RUN-LOCALLY.md](RUN-LOCALLY.md); configure `OWNER_EMAIL`, `AUTH_ORIGIN`,
 `SESSION_SECRET`, `SETUP_TOKEN`, and mail settings through its private inputs.
@@ -157,8 +152,8 @@ For production, set `MAIL_PROVIDER` to `resend`, `sendgrid` or `cloudflare`,
 `MAIL_API_KEY`, and `MAIL_FROM` to a sender verified at that provider.
 Cloudflare additionally needs `MAIL_ACCOUNT_ID`. Sends use the actual
 `modules/mail/index.mjs` facade in production mode. The explicit `development`
-provider is available only with loopback local auth and captures mail in a
-private local outbox; it never selects itself after a remote-provider failure.
+provider silently suppresses mail in development and demo. Production never
+selects it after a remote-provider failure.
 Missing or failing mail denies link issuance; bootstrap and existing-session
 access remain independent of mail. Provider API acceptance does not establish
 inbox delivery.
@@ -192,7 +187,7 @@ headers. Disable this flag outside a loopback listener.
 ([`createSignInHandler`](../modules/operator-auth/README.md#the-sign-in-page)),
 answered by the Worker before the route renderer, so it works before
 hydration. It offers the email link, the first-owner setup form while the owner
-is unclaimed, the local development outbox link, and "Continue with Auth" when
+is unclaimed, and "Continue with Auth" when
 the app is linked to an Auth install.
 
 To link one, set the optional `IDENTITY_PROVIDER` setup answer to the install's
@@ -249,8 +244,8 @@ when rolling application code back or pruning expired credentials.
 | `GET /api/people/imports/:id`, `POST /api/people/imports/:id/resume`, `POST /api/people/imports/:id/undo` | Read, apply (`{"batches":N}` applies N people) or undo an import. A retired import answers 410 with its journal `receiptId`. |
 | `GET /api/erasures/journal` | The import erasure journal: receipt id, stores touched with row counts, time. No erased values. |
 
-Erasure deletes the person, notes, files and their bytes, plus mail captured
-for the person in the development outbox. Audit rows stay, relabelled
+Erasure deletes the person, notes, files and their bytes, plus any historical
+development mail stored for the person. Audit rows stay, relabelled
 `erased:<random>`. Each deleted row is written to portability's erasure
 journal, so `rer import` refuses an older archive that still
 holds any of them. On a fresh destination, pass the latest archive as
@@ -301,10 +296,10 @@ separate checks.
 Use `rer preview` for fixed production output or
 `rer dev` for live HMR. The first invocation stays in the
 foreground. A compatible repeated invocation verifies the registered server,
-prints its ready/outbox URLs and exits. Stop with
+prints readiness and exits. Stop with
 `rer preview --stop` or `rer dev --stop`
 before build, verification, reset or data transfer. Both retain the owner,
-outbox and canonical local state. The default idle timeout is 12 hours and
+canonical local state. The default idle timeout is 12 hours and
 the combined machine cap is ten servers. Bounded preparation uses the shared
 heavy-job queue. See [RUN-LOCALLY.md](RUN-LOCALLY.md) for timeout, reuse,
 capacity, sign-in and CI policy.

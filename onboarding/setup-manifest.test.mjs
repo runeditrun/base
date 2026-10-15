@@ -101,20 +101,19 @@ test('legacy drafts resume and drop keys absent from the manifest',async t=>{
  await writeFile(join(root,'.seed/installer/state.json'),JSON.stringify({product:presentation.product.name,draft:{email:'old@example.test',MODE:'local',alien:'old'}}));
  const {server}=await session(t,root);assert.deepEqual(server.state.draft,{MODE:'local'});
 });
-test('owner and sign-in hooks use the manifest email and token names unless overridden',async t=>{
+test('owner hook uses manifest token names and the sign-in hook keeps a plain destination',async t=>{
  const {owner,signIn}=await import('./adapter-auth.mjs');
- const requests=[];let outboxReads=0;
+ const requests=[];
  t.mock.method(globalThis,'fetch',async(url,options={})=>{
   if(options.method==='POST'){
    requests.push({path:new URL(url).pathname,input:JSON.parse(options.body)});
    return new Response(null,{status:requests.length===1?303:202});
   }
-  outboxReads++;
-  return new Response(outboxReads===1?'':'<article><p>To: admin@example.test</p><a href="?message=new-message">Open</a></article>');
+  assert.fail('setup must not read a captured-mail interface');
  });
  const context={origin:'http://127.0.0.1:9000',input:{displayName:'Owner'},vars:{ADMIN_EMAIL:'admin@example.test',BOOTSTRAP_KEY:'test-private-bootstrap'},ownerClaim:{emailField:'ADMIN_EMAIL',tokenField:'BOOTSTRAP_KEY'},store:{step:async()=>{},report:()=>{}},fail:()=>Error('hook failed')};
  await owner(context,{});await signIn(context,{attempts:1});
  assert.equal(requests[0].input.token===context.vars.BOOTSTRAP_KEY,true);
- assert.equal(requests[1].input.email,'admin@example.test');
- assert.match(context.appUrl,/message=new-message/);
+ assert.equal(requests.length,1);
+ assert.equal(context.appUrl,context.origin+'/');
 });

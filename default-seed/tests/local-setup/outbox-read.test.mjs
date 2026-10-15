@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
-import { createD1DevelopmentOutbox, createDevelopmentOutboxHandler } from '../../../modules/mail/src/development/index.mjs';
+import { createD1DevelopmentOutbox } from '../../../modules/mail/src/development/index.mjs';
 
 const schema = await readFile(new URL('../../../modules/mail/src/development/schema.sql', import.meta.url), 'utf8');
 const message = id => ({
@@ -101,16 +101,6 @@ test('get restores complete attachment payloads as independent Uint8Array bytes'
   assert.notEqual(capture.message.attachments[0].content, input.attachments[0].content);
 });
 
-test('viewer retains its readable UTC received time for listed captures', async t => {
-  const { db } = database(t);
-  const createdAt = Date.UTC(2026, 9, 8, 4, 5);
-  const outbox = createD1DevelopmentOutbox({ db, clock: () => createdAt });
-  await outbox.put(message('viewer-time'));
-  const handler = createDevelopmentOutboxHandler({ local: true, origin: 'http://localhost:8787', outbox });
-  const response = await handler(new Request('http://localhost:8787/__dev/outbox', { headers: { host: 'localhost:8787' } }));
-  assert.equal(response.status, 200);
-  assert.match(await response.text(), /Received: <time datetime="2026-10-08T04:05:00\.000Z">Thu, 08 Oct 2026 04:05:00 GMT<\/time>/);
-});
 
 test('failed retention rolls back the insert and invalid storage results reject reads', async t => {
   const { db, sqlite } = database(t);

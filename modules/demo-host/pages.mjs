@@ -37,7 +37,7 @@ export function startPage(env, { status = 200, notice, headers = {} } = {}) {
   const name = escape(env.DEMO_NAME);
   return html(env, { page: 'start', title: `Try ${env.DEMO_NAME}`, status, headers, turnstile: true, body: `<h1 id="title">Try ${name}</h1>
 <p class="intro">Your own copy of ${name}, signed in as its owner, with sample data.</p>
-<ul><li>Nothing is sent: mail stays in an outbox.</li><li>It ends after an hour, or 15 idle minutes.</li><li>Then it is deleted. Nobody else can see it.</li></ul>
+<ul><li>Public checks run live. Messages and account changes are simulated.</li><li>It ends after an hour, or 15 idle minutes.</li><li>Then it is deleted. Nobody else can see it.</li></ul>
 <p class="notice" id="notice" role="alert"${notice ? '' : ' hidden'}>${notice ? escape(notice) : ''}</p><form id="start" method="post" action="/__demo/start" data-auto="${notice ? '0' : '1'}"><div class="cf-turnstile" data-sitekey="${escape(env.TURNSTILE_SITE_KEY)}" data-size="flexible" data-callback="rerDemoVerified" data-before-interactive-callback="rerDemoInteractive" data-after-interactive-callback="rerDemoChecking" data-expired-callback="rerDemoExpired" data-error-callback="rerDemoCheckFailed"></div>
 <button class="button" type="submit"><span class="spinner" aria-hidden="true"></span><span class="label">Start the demo</span></button>
 <ol class="steps" aria-hidden="true"><li data-at="done">Checking you're human</li><li data-at="now">Starting a private copy</li><li data-at="next">Signing you in</li></ol>

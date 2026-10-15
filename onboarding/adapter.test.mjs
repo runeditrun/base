@@ -10,20 +10,15 @@ import { createState } from './state.mjs';
 import { adapterFeatures, localInstaller, ownerAccountHosting } from './adapter.mjs';
 import { localVariables } from './local/environment.mjs';
 
-// Test-only application: an operator-auth shaped bootstrap and magic-link,
-// /health, and the listing markup of Base modules/mail/src/development (kept
-// inline so this suite also runs in a seed's scripts/base-onboarding copy; the
-// default-seed installer journey checks the real outbox).
+// Test-only owner bootstrap and health transport; the real development
+// identity journey runs against the default seed.
 const application = `
 import http from 'node:http';
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
-const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const listing = (rows, path) => rows.map(row => '<article><h2>' + escape(row.message.subject) + '</h2><p>To: ' + escape(row.message.to.join(', ')) + '</p><p><a href="' + escape(path + '?message=' + encodeURIComponent(row.id)) + '">Read message</a></p></article>').join('') || '<p>No messages yet.</p>';
 const port = Number(process.argv[2]), origin = 'http://127.0.0.1:' + port;
 const vars = parseEnv(readFileSync('.dev.vars', 'utf8'));
 appendFileSync('app-events.jsonl', JSON.stringify({ event: 'start', pid: process.pid, origin: vars.AUTH_ORIGIN, inherited: process.env.APP_SECRET_SENTINEL ?? null }) + '\\n');
-const outbox = existsSync('outbox.json') ? JSON.parse(readFileSync('outbox.json', 'utf8')) : [];
 const body = request => new Promise(resolve => { let text = ''; request.on('data', chunk => text += chunk); request.on('end', () => resolve(text)); });
 const json = (response, status, value) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
 http.createServer(async (request, response) => {
@@ -38,13 +33,6 @@ http.createServer(async (request, response) => {
   writeFileSync('claimed.json', JSON.stringify({ email: vars.OWNER_EMAIL, displayName: input.displayName }));
   response.writeHead(303, { location: input.returnTo, 'set-cookie': 'session=fixture' }); return response.end();
  }
- if (url.pathname === '/auth/magic-link') {
-  const input = JSON.parse(await body(request));
-  outbox.unshift({ id: 'm' + outbox.length + '-' + process.pid, createdAt: Date.now(), message: { to: [input.email], subject: 'Sign in', text: origin + '/auth/confirm?token=fixture' } });
-  writeFileSync('outbox.json', JSON.stringify(outbox));
-  return json(response, 202, { status: 'accepted' });
- }
- if (url.pathname === '/__dev/outbox') { if (process.env.RER_DEV_KEY && request.headers['x-rer-dev-key'] !== process.env.RER_DEV_KEY) return json(response, 404, { error: 'not_found' }); response.writeHead(200, { 'content-type': 'text/html' }); return response.end(listing(outbox, '/__dev/outbox')); }
  json(response, 404, { error: 'not_found' });
 }).listen(port, '127.0.0.1');
 `;
@@ -99,7 +87,7 @@ test('feature flags must describe the hooks the adapter really runs', () => {
  assert.throws(() => localInstaller({ migrations: [] }), /Unknown installer hook: migrations/);
 });
 
-test('a complete install generates private settings, hides them from the build, claims the owner and ends at the outbox message', async t => {
+test('a complete install generates private settings, hides them from the build, claims the owner and opens the application', async t => {
  const f = await fixture(t);
  const { store, app } = await installOnce(f, localInstaller(hooks()));
  t.after(async () => { if (app) await store.stop(app); });
@@ -111,15 +99,15 @@ test('a complete install generates private settings, hides them from the build, 
  assert.deepEqual(JSON.parse(await readFile(join(f.root, 'build.json'), 'utf8')), { varsPresent: false, nested: true, session: null }, 'the build ran without .dev.vars, inside the operation');
  assert.equal(await readFile(join(f.root, 'migrations.log'), 'utf8'), 'applied\n');
  assert.deepEqual(JSON.parse(await readFile(join(f.root, 'claimed.json'), 'utf8')), { email: input.email, displayName: input.displayName });
- const outbox = new URL(store.state.appUrl);
- assert.equal(outbox.origin, vars.AUTH_ORIGIN); assert.equal(outbox.pathname, '/__dev/outbox'); assert.match(outbox.searchParams.get('message'), /^m0-/);
+ const appUrl = new URL(store.state.appUrl);
+ assert.equal(appUrl.origin, vars.AUTH_ORIGIN); assert.equal(appUrl.pathname, '/');
  assert.equal(app.exitCode, null, 'the application keeps running for the owner');
  assert.equal(store.state.devOpen, undefined, 'a seed without devIdentity offers no key exchange');
  assert.deepEqual(await readdirSafe(join(f.root, '.rer')), [], 'and gets no dev key');
  const log = await readFile(store.logPath, 'utf8');
  for (const secret of [vars.SESSION_SECRET, vars.SETUP_TOKEN]) { assert.ok(!log.includes(secret)); assert.ok(!JSON.stringify(store.state).includes(secret)); }
- assert.match(log, /First owner claimed/); assert.match(log, /sign-in link is waiting in the development outbox/);
- assert.deepEqual(await proofs(f), Array(2).fill(localCliProof(vars.SESSION_SECRET)), 'the default session secret setting is SESSION_SECRET');
+ assert.match(log, /First owner claimed/); assert.match(log, /Opening your application/);
+ assert.deepEqual(await proofs(f), [localCliProof(vars.SESSION_SECRET)], 'the default session secret setting is SESSION_SECRET');
  assert.deepEqual(await readdirSafe(join(f.root, '.wrangler/local-build')), [], 'the build restored .dev.vars and removed its run folder');
 });
 
@@ -131,13 +119,11 @@ test('a devIdentity seed\'s install gives the temporary app the dev key and offe
  const gated = hooks({ start: ({ origin, devKey }) => [node, ['app.mjs', new URL(origin).port], { env: { ...process.env, RER_DEV_KEY: devKey } }] });
  const { store, app } = await installOnce(f, localInstaller(gated));
  t.after(async () => { if (app) await store.stop(app); });
- // Sign-in reached the outbox only through the key gate, and the key never enters state or the log.
+ // The installer keeps the key in its private file, outside saved state and logs.
  assert.equal(store.state.phase, 'complete', store.state.error);
  assert.equal(store.state.devOpen, true);
  const keyFile = join(f.root, '.rer/local/dev-key.env'), key = /^RER_DEV_KEY=(\S+)$/m.exec(await readFile(keyFile, 'utf8'))[1];
  assert.equal((await stat(keyFile)).mode & 0o777, 0o600);
- assert.equal((await fetch(store.state.appUrl)).status, 404, 'the outbox is closed without the key');
- assert.equal((await fetch(store.state.appUrl, { headers: { 'x-rer-dev-key': key } })).status, 200);
  assert.ok(!JSON.stringify(store.state).includes(key) && !(await readFile(store.logPath, 'utf8')).includes(key));
 });
 
@@ -151,7 +137,7 @@ test('the CLI\'s local sign-in proof comes from the setting the adapter declares
  assert.equal(store.state.phase, 'complete', store.state.error);
  const vars = localVariables(await readFile(join(f.root, '.dev.vars'), 'utf8'));
  assert.equal(vars.SESSION_SECRET, undefined);
- assert.deepEqual(await proofs(f), Array(2).fill(localCliProof(vars.AUTH_SECRET)), 'claim and sign-in request both carry the proof');
+ assert.deepEqual(await proofs(f), [localCliProof(vars.AUTH_SECRET)], 'owner claim carries the proof');
  assert.throws(() => localInstaller({ sessionSecretKey: 'auth secret' }), /sessionSecretKey must name a setting/);
 });
 
@@ -188,7 +174,7 @@ test('a rerun keeps the owner\'s settings, origin and claimed owner', async t =>
  assert.ok((await readFile(varsPath)).equals(before), 'the exact owner file was kept');
  assert.equal(new URL(second.store.state.appUrl).origin, localVariables(before.toString()).AUTH_ORIGIN, 'the saved origin was reused');
  assert.match(await readFile(second.store.logPath, 'utf8'), /An owner is already claimed; the existing owner was kept/);
- assert.match(new URL(second.store.state.appUrl).searchParams.get('message'), /^m1-/, 'the new sign-in message, not the first one');
+ assert.equal(new URL(second.store.state.appUrl).pathname, '/');
 });
 
 test('missing settings are added after the owner\'s exact existing lines', async t => {
@@ -314,7 +300,7 @@ test('owner-account hosting deploys with the owner\'s account and token, checks 
  assert.deepEqual(calls.map(call => [call.command, ...call.args]), [['deploy', '--declaration', 'deploy.json', '--environment', 'production'], ['health', '--declaration', 'deploy.json', '--environment', 'production']]);
  assert.ok(calls.every(call => call.account === account && call.token && call.secret));
  assert.equal(store.state.hostedUrl, 'https://fixture-production.example.workers.dev');
- assert.match(store.state.appUrl, /\/__dev\/outbox\?message=/, 'the local trial still ends at the outbox');
+ assert.equal(new URL(store.state.appUrl).pathname, '/', 'the local trial opens the application');
  const log = await readFile(store.logPath, 'utf8');
  assert.match(log, /Deployed to https:\/\/fixture-production\.example\.workers\.dev/);
  assert.ok(!log.includes(token) && !JSON.stringify(store.state).includes(token), 'the API token never reaches the log or state');

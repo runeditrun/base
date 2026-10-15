@@ -13,7 +13,7 @@ test('explicit provider configuration never falls back to development', () => {
   }
   rejects(() => validateConfig({ provider: 'fixture', mode: 'test' }), 'invalid_provider');
   rejects(() => validateConfig({ provider: 'development', mode: 'production' }), 'development_mode_required');
-  rejects(() => validateConfig({ provider: 'development', mode: 'development' }), 'development_outbox_required');
+  assert.doesNotThrow(() => validateConfig({ provider: 'development', mode: 'development' }));
   assert.equal(validateConfig({ provider: 'development', mode: 'development' }, { outbox: { async put() {} } }).provider, 'development');
   rejects(() => validateConfig({ provider: 'sendgrid', mode: 'production', apiKey: 'SENSITIVE\r\nInjected:x' }), 'invalid_api_key');
 });

@@ -5,7 +5,7 @@ const quiet = 20000;
 
 // `keyless` (a start by the front door, whose log this is): the ready lines
 // leave out the dev-key link, so the door's files never hold a key.
-export function printer({ json, login, stopHint, keyless = false }) {
+export function printer({ json, stopHint, keyless = false }) {
  const started = Date.now();
  let current = 'preparing', last = Date.now();
  const event = (name, fields) => process.stdout.write(JSON.stringify({ version: 1, verb: 'dev', event: name, ...fields }) + '\n');
@@ -24,13 +24,9 @@ export function printer({ json, login, stopHint, keyless = false }) {
    if (keyless) { const { openUrl, ...rest } = ready; ready = rest; }
    if (json) { event('server', { pid, log }); process.stdout.write(JSON.stringify(ready) + '\n'); return; }
    const out = [`RER_READY ${ready.url}`];
-   if (ready.openUrl && !login) {
+   if (ready.openUrl) {
     if (ready.signedInAs) out.push(`RER_SIGNED_IN ${ready.signedInAs}`);
     out.push(`RER_OPEN ${ready.openUrl}`, 'Open that link on this computer. Its fragment holds this checkout\'s dev key, which the page keeps only as a cookie; never share the link.');
-   } else if (ready.signInUrl) {
-    out.push(`RER_SIGN_IN ${ready.signInUrl}`);
-    if (ready.openUrl) out.push(`RER_OPEN ${ready.openUrl}`);
-    out.push(`Open ${ready.openUrl ? 'the last link on this computer (it carries the dev key; never share it)' : 'the outbox'}, choose the newest sign-in message and follow its link. No email was sent.`);
    }
    // A seed with a run site: its static homepage, /run and docs, served locally.
    if (ready.siteUrl) out.push(`RER_SITE ${ready.siteUrl}`);

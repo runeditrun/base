@@ -1,5 +1,5 @@
 /* Default seed's declared theme. The installer, sign-in confirmation, /setup
-   and development outbox read these --rer-* tokens; the app serves this file and its fonts. */
+   read these --rer-* tokens; the app serves this file and its fonts. */
 @font-face {
   font-family: Outfit;
   font-style: normal;
