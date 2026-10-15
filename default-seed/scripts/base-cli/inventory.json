@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.21-dev.g83122739",
+  "cliVersion": "0.2.21-dev.gafab9f32",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -185,7 +185,7 @@
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "bd91963a9e6f012805b723fa63fa83b9c81393bb6c781f8d668ed7cbcef0f224"
+      "sha256": "cb674f29143a788c6ec02c4b7d0ee888465bf31e73595239aca64388093c8056"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
@@ -1747,7 +1747,7 @@
     },
     "modules/operator-auth/README.md": {
       "source": "modules/operator-auth/README.md",
-      "sha256": "77c610a04f30dc4c44706367cba0b0b04c6b1962daa30f5d33c06fffa6201cbe"
+      "sha256": "ba50889563c5ee27a853a9cd0707f191488a81da56e7a06ad1928fb14f6274ad"
     },
     "modules/operator-auth/accounts/adapter.mjs": {
       "source": "modules/operator-auth/accounts/adapter.mjs",
@@ -2075,7 +2075,7 @@
     },
     "modules/operator-auth/signin/index.mjs": {
       "source": "modules/operator-auth/signin/index.mjs",
-      "sha256": "c902a6895f5ffb8c141eb3214d78ccd654dc094671569594c51b0a73dfb1f3ce"
+      "sha256": "4dfa87e4c9699834bfc0271e8c0ad39c50062a30548b57d2a147052dcdb56ec2"
     },
     "modules/owner-claim/README.md": {
       "source": "modules/owner-claim/README.md",
