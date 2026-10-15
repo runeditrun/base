@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.22-dev.g1a5bb5f9",
+  "cliVersion": "0.2.22-dev.gc58d4b0f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -483,7 +483,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "52c727d2373893caa79357a29cb7a169d2b6788ccceece61a30bd607c13c9437"
+      "sha256": "1d6b6f4f0f1cf1b3f42adea1bebfc8f0cb857e41bf66989b9a86660f9c677ea4"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -815,7 +815,7 @@
     },
     "modules/container/README.md": {
       "source": "modules/container/README.md",
-      "sha256": "9ad08e94be05a2ed3f4ad52ba513a7568193b8d3c2b54af727ba98d12edfe113"
+      "sha256": "982e94837b1d6396afcb6d95452e31f55a51414e67671eee0239aa116acae10b"
     },
     "modules/container/adapters/d1.mjs": {
       "source": "modules/container/adapters/d1.mjs",
@@ -859,7 +859,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "fa2b5c102cbfb70ceeea69f78b8e9e0a1efc2d36384cf4777a4a5511ba4c644f"
+      "sha256": "8045a14a8a805fa703af785c9cc0956a5af4a57761b5ec107f506384639ff16a"
     },
     "modules/container/demo-egress.mjs": {
       "source": "modules/container/demo-egress.mjs",
@@ -880,6 +880,10 @@
     "modules/container/host.mjs": {
       "source": "modules/container/host.mjs",
       "sha256": "bb8772d58bc213e05b284d50a145aafea68d5d4e2fdb64b2150dea192ea36967"
+    },
+    "modules/container/image-variables.mjs": {
+      "source": "modules/container/image-variables.mjs",
+      "sha256": "bc5dff0d8f6deae55cab37610b84eb9a0216558e5392848fdd5677dac545a746"
     },
     "modules/container/import-graph.mjs": {
       "source": "modules/container/import-graph.mjs",
@@ -960,6 +964,10 @@
     "modules/delivery-producer/declarations.mjs": {
       "source": "modules/delivery-producer/declarations.mjs",
       "sha256": "00924a1564e172d4d210a32936afe757870e226796465c11ac148e39d0ea0a85"
+    },
+    "modules/delivery-producer/mail.mjs": {
+      "source": "modules/delivery-producer/mail.mjs",
+      "sha256": "2323205c7cbc1aea81ec85509d597df2e486abfc9443981ceaee04950db913a4"
     },
     "modules/delivery-producer/migrations.mjs": {
       "source": "modules/delivery-producer/migrations.mjs",
