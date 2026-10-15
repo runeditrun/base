@@ -35,6 +35,25 @@ test('demo public reads and POST probes reach the network, sends complete succes
   assert.equal(calls.length, before, 'no send reached the network');
 });
 
+test('demo answers the Mailgun envelope for its exact host and subdomains, not for lookalike hosts', async t => {
+  const { get, calls } = await worker(t, { RER_DEMO: '1' });
+  for (const host of ['mailgun.net', 'api.mailgun.net', 'api.eu.mailgun.net']) assert.equal((await (await get(`/mail?host=${host}`)).json()).message, 'Queued. Thank you.', host);
+  for (const host of ['evilmailgun.net', 'mailgun.net.example.com']) assert.equal((await (await get(`/mail?host=${host}`)).json()).message, undefined, host);
+  assert.equal(calls.length, 0, 'no send reached the network');
+});
+
+test('demo label: one static script, the suffix as data, the title suffixed, CSP admits the script hash', async t => {
+  const { get } = await worker(t, { RER_DEMO: '1' });
+  const response = await get('/');
+  const html = await response.text();
+  assert.match(html, /<title>App Demo<\/title>/);
+  assert.match(html, /<style data-rer-label="Demo">/);
+  const script = /<script>([^]*?)<\/script>/.exec(html)[1];
+  assert.ok(script.includes('dataset.rerLabel'), 'the script reads the suffix from the style element');
+  const digest = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(script))).toString('base64');
+  assert.ok(response.headers.get('content-security-policy').includes(`script-src 'sha256-${digest}'`));
+});
+
 test('ordinary runtime sends remain real and the Worker is undecorated', async t => {
   const { get, calls } = await worker(t, {});
   assert.deepEqual(await (await get('/send')).json(), { accepted: true, id: 'real-network-id' });
