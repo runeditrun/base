@@ -1,11 +1,11 @@
 import type { Page } from '@playwright/test';
-import { PINS, startRuntime, journey, capture, signInThroughOutbox, evaluateGates, type CaptureEntry, type RuntimeOptions, type Report, audit } from '../index.mjs';
+import { PINS, startRuntime, journey, capture, signIn, evaluateGates, type CaptureEntry, type RuntimeOptions, type Report, audit } from '../index.mjs';
 
 declare const page: Page;
 const expected: '1.63.0' = PINS['@playwright/test'];
 const options: RuntimeOptions = { cwd: '.', command: 'node', args: ['server.mjs', '{PORT}'], fixtures: async origin => { void origin; } };
 const runtime = await startRuntime(options);
-await signInThroughOutbox(page, { origin: runtime.origin, email: 'reviewer@example.test', request: async page => { await page.getByLabel('Email').fill('reviewer@example.test'); } });
+await signIn(page, { origin: runtime.origin, open: async (_page, signal) => { signal?.throwIfAborted(); return '/auth/oneclick'; } });
 const entry: CaptureEntry = await capture(page, 'app', { cwd: '.', evidence: '.', failOn: 'any', keyboard: false, keyboardReason: 'Document only' });
 const gate: boolean = evaluateGates(entry).passed;
 const { report }: { report: Report } = await journey({ cwd: '.', origin: runtime.origin, evidence: '.', capturePolicy: 'failures', historyLimit: 0, widths: [390, { width: 1440, height: 900 }], async run({ page, context, capture, viewport }) {

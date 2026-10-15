@@ -9,7 +9,7 @@ export function pageState(page) {
 
 export async function installCollection(context, { origin, secrets = [], captureFiles = new Set() }) {
   // WebSocketRoute has no owning-page accessor. Collect sockets across the
-  // context, including temporary outbox pages, into the next capture.
+  // context, including seed-created pages, into the next capture.
   const socketRequests = [];
   function observe(page) {
     if (states.has(page)) return;

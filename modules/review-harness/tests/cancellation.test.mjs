@@ -39,22 +39,22 @@ function kill(pid, group = false) {
 }
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
-  for (const phase of ['startup', 'fixtures', 'journey', 'outbox']) {
+  for (const phase of ['startup', 'fixtures', 'journey', 'signin']) {
     test(`${signal} during ${phase} awaits cleanup of the real runtime tree and browser`, { timeout: 40_000 }, async t => {
       const directory = await temporary(t, 'review-signal-');
       const receiptPath = join(directory, 'tree.json'), stagePath = join(directory, 'stage.json');
       const start = { cwd: consumer, command: process.execPath, args: [fixture, '{PORT}', receiptPath, phase], readyTimeoutMs: 60_000, stopTimeoutMs: 150 };
       const pending = `async (...args) => { await recordStage({ signal: Boolean(args[1]?.addEventListener) }); await new Promise(() => {}); }`;
-      const request = phase === 'outbox'
+      const open = phase === 'signin'
         ? `async (page, signal) => { await recordStage({ signal: Boolean(signal?.addEventListener) }); await new Promise(() => {}); }`
         : `async page => { await recordStage({}); await page.waitForFunction(() => false, null, { timeout: 60_000 }); }`;
-      const signedIn = ['journey', 'outbox'].includes(phase);
+      const signedIn = ['journey', 'signin'].includes(phase);
       const config = join(directory, 'config.mjs');
       await writeFile(config, `import { writeFile, rename } from 'node:fs/promises';
 async function recordStage(value) { const path=${JSON.stringify(stagePath)}; await writeFile(path+'.tmp',JSON.stringify(value)); await rename(path+'.tmp',path); }
 export default { start: ${JSON.stringify(start)}, widths: [390,1440],
 ${phase === 'fixtures' ? `fixtures: ${pending},` : ''}
-${signedIn ? `signIn: { email: 'reviewer@example.test', request: ${request} },` : ''}
+${signedIn ? `signIn: { open: ${open} },` : ''}
 routes: [{ name: 'signal', path: '/', signedIn: ${signedIn} }] };`);
       const child = spawn(process.execPath, [cli, '--config', config, '--evidence', join(directory, 'evidence')], { cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
       const closed = once(child, 'close');
@@ -81,7 +81,7 @@ routes: [{ name: 'signal', path: '/', signedIn: ${signedIn} }] };`);
       const remaining = processes().filter(row => owned.includes(row.pid) && !row.state.startsWith('Z'));
       assert.deepEqual(remaining, [], 'no runtime, descendant or Chromium process survives CLI exit');
       await assert.rejects(fetch(`http://127.0.0.1:${tree.port}/health`, { signal: AbortSignal.timeout(500) }));
-      if (['fixtures', 'outbox'].includes(phase)) assert.equal((await waitForFile(stagePath)).signal, true, 'pending hooks receive cancellation');
+      if (['fixtures', 'signin'].includes(phase)) assert.equal((await waitForFile(stagePath)).signal, true, 'pending hooks receive cancellation');
       if (signedIn) {
         const report = JSON.parse(await readFile(join(directory, 'evidence/review.json'), 'utf8'));
         assert.equal(report.passed, false);

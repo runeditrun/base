@@ -22,9 +22,7 @@ export async function fixture(t, options = {}) {
   t.after(async () => { try { await runtime.stop(); } finally { await rm(directory, { recursive: true, force: true }); } });
   return { ...runtime, directory, evidence: resolve(directory, 'evidence') };
 }
-export async function requestSignIn(page, email = 'reviewer@example.test') {
+export async function openSignIn(page) {
   await page.goto('/signin');
-  await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByRole('button', { name: 'Email a sign-in link', exact: true }).click();
-  await page.getByRole('status').waitFor();
+  return page.getByRole('link', { name: 'Sign in', exact: true }).getAttribute('href');
 }

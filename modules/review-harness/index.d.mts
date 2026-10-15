@@ -13,11 +13,11 @@ export interface RuntimeOptions {
 export interface Runtime { origin: string; port: number; logPath: string; pid: number; stop(): Promise<void> }
 export function startRuntime(options: RuntimeOptions): Promise<Runtime>;
 export interface SignInOptions {
-  origin: string; email: string; request(page: Page, signal?: AbortSignal): Promise<void>;
-  signal?: AbortSignal;
-  outboxPath?: string; timeoutMs?: number;
+  origin: string;
+  open: string | URL | ((page: Page, signal?: AbortSignal) => Promise<string | URL | void> | string | URL | void);
+  signal?: AbortSignal; timeoutMs?: number;
 }
-export function signInThroughOutbox(page: Page, options: SignInOptions): Promise<void>;
+export function signIn(page: Page, options: SignInOptions): Promise<void>;
 export function installCollection(context: BrowserContext, options: { origin: string; secrets?: string[] }): Promise<void>;
 export interface GateOptions { failOn?: 'serious' | 'any'; expectStatus?: number }
 export type CapturePolicy = 'canonical' | 'failures' | 'exhaustive';

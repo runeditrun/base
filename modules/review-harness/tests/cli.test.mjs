@@ -11,7 +11,7 @@ const moduleRoot = resolve(import.meta.dirname, '..');
 async function config(directory, cwd, defect = false) {
   const path = join(directory, 'review.config.mjs');
   const source = `export const start = ${JSON.stringify({ cwd, command: process.execPath, args: [fixtureScript, '--port', '{PORT}'], readyTimeoutMs: 30_000 })};
-export const signIn = { email: 'reviewer@example.test', async request(page) { await page.goto('/signin'); await page.getByLabel('Email').fill('reviewer@example.test'); await page.getByRole('button', {name:'Email a sign-in link'}).click(); await page.getByRole('status').waitFor(); } };
+export const signIn = { open: '/auth/oneclick' };
 export const fixtures = async origin => { if ((await fetch(origin+'/__fixtures/setup',{method:'POST'})).status !== 200) throw new Error('fixtures failed'); };
 export const routes = ${JSON.stringify([{ name: 'sign in', path: '/signin' }, { name: 'app', path: '/app', signedIn: true }, { name: 'app again', path: '/app', signedIn: true }, ...(defect ? [{ name: 'broken', path: '/defects/page-error' }] : [])])};`;
   await writeFile(path, source);

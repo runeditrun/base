@@ -1,8 +1,8 @@
 # Local browser review
 
 This optional source module launches a synthetic loopback Worker, signs in through
-the development outbox, checks Chromium pages and writes private evidence. Product
-journeys, assertions about the signed-in UI, synthetic data and migrations stay in
+a seed-provided oneclick URL or browser callback, checks Chromium pages and writes
+private evidence. Product journeys, assertions about the signed-in UI, synthetic data and migrations stay in
 the seed. It does not build, migrate, deploy or choose a product's routes for it.
 
 Node 22 or newer and a POSIX host with `ps` are required for owned process groups.
@@ -24,7 +24,7 @@ Chromium is launched; no fallback browser or version range is selected.
 ## API
 
 ```js
-import { startRuntime, journey, signInThroughOutbox } from './vendor/base/modules/review-harness/index.mjs';
+import { startRuntime, journey, signIn } from './vendor/base/modules/review-harness/index.mjs';
 
 const runtime = await startRuntime({
   cwd: process.cwd(), command: 'pnpm',
@@ -39,14 +39,12 @@ try {
     async run({ page, capture, width }) {
       await page.goto('/signin');
       await capture('sign in');
-      await signInThroughOutbox(page, {
-        origin: runtime.origin, email: 'reviewer@example.test',
-        async request(page) {
-          await page.getByLabel('Email', { exact: true }).fill('reviewer@example.test');
-          await page.getByRole('button', { name: 'Email a sign-in link' }).click();
-        },
+      await signIn(page, {
+        origin: runtime.origin,
+        // Obtain a fresh oneclick URL from this seed's dev identity adapter.
+        open: async (_page, signal) => createReviewSignInUrl(runtime.origin, signal),
       });
-      // Confirm the seed's own UI here, including any confirmation button.
+      // Assert the seed's signed-in UI here.
       await page.goto('/app');
       await capture('app', { canonical: true });
     },
@@ -72,23 +70,20 @@ group. Fixtures receive `(origin, signal)` so seed-owned work can cooperate.
 Readiness also probes the host's non-loopback IPv4 interfaces and refuses a
 command that exposes the selected port there; the host must permit that check.
 
-`signInThroughOutbox(page,{origin,email,request,outboxPath?,timeoutMs?,signal?})` calls the
-seed's request hook, reads the real viewer in a temporary page in the same context,
-selects the newest matching recipient received since that request, checks the
-"Open this link" target's origin and navigates the original page there. The
-default viewer path is `/__dev/outbox` and sign-in work is bounded to 10 seconds.
-Cancellation clears that deadline even when the request hook never resolves;
-the hook receives `(page, signal)`, and late work cannot open or navigate pages.
-Reader cleanup has a separate one-second bound and fails clearly if closing stalls;
-the caller owns context cleanup, which `journey` performs. Late work cannot navigate
-the original page. Links and browser call logs from
-this operation are never emitted or retained. Confirmation and UI assertions
-remain seed-owned. The seed must explicitly wire local mail to the development
-sender and apply the outbox migration before starting review. A seed that declares
-`devIdentity` gates its outbox with the checkout's dev key: first give the
-context the gate cookie, either by opening the `RER_OPEN` URL or by adding the
-cookies from operator-auth's `dev/sign-in-as.mjs` `signInAs({origin,key})`
-(read the key with its `readDevKey(root)`).
+`signIn(page,{origin,open,timeoutMs?,signal?})` opens the seed's oneclick URL.
+`open` can be a same-origin URL string or `URL`, or a callback `(page, signal)`
+that returns one. A callback may instead complete the browser sign-in itself
+and return nothing. The seed owns URL acquisition, identity selection and any UI
+assertions; the harness does not request or store email. Supply fresh credentials
+for every viewport when the seed uses single-use links.
+
+Sign-in is bounded to 10 seconds by default. Cancellation or expiry aborts the
+signal given to the callback; seed-owned work must cooperate with that signal.
+A URL returned after cancellation or expiry is never opened. Browser navigation
+uses the remaining deadline, while context cleanup belongs to the caller and is
+handled by `journey`. Failure messages omit callback errors and browser call logs
+because they may contain credential URLs. Keep oneclick credentials out of logs,
+reports and captures; complete sign-in before capturing the application.
 
 `journey({cwd,origin,evidence,widths?,secrets?,signal?,run,...captureDefaults})` launches one
 browser and creates a fresh context per viewport, blocking service workers and
@@ -168,7 +163,7 @@ External origins are aborted before dispatch; `data:` and `blob:` are permitted.
 WebSocket routing is installed on the context before navigation. Same-origin
 `ws:`/`wss:` connections use the corresponding HTTP origin and reach the real
 server; foreign sockets are recorded and closed without connecting. Socket
-attempts anywhere in the context, including outbox pages, enter its next capture.
+attempts anywhere in the context, including seed-created pages, enter its next capture.
 `expectStatus` sets the main document's expected status (200 by default); it never
 excuses a failed subresource. A settle timeout also fails visibly.
 
@@ -207,8 +202,8 @@ pnpm exec wrangler dev --config dist/server/wrangler.json --local --persist-to .
 ```
 
 In launcher arguments use `{PORT}` instead of `PORT`. Configure local auth and
-development mail explicitly, for example Wrangler `--var AUTH_ORIGIN:{ORIGIN}`,
-`--var AUTH_LOCAL:true` and `--var MAIL_PROVIDER:development`, plus the seed's
+dev identity explicitly, for example Wrangler `--var AUTH_ORIGIN:{ORIGIN}`
+and `--var AUTH_LOCAL:true`, plus the seed's
 own required synthetic owner/session bindings. The harness intentionally disables
 implicit `.env` binding loads. Fixtures run against the healthy Worker; they never
 enter a product build. Build and migrations are preparation steps, not fixtures.
@@ -230,7 +225,7 @@ modules/review-harness/process-group.mjs
 modules/review-harness/process.mjs
 modules/review-harness/runtime.mjs
 modules/review-harness/collect.mjs
-modules/review-harness/outbox.mjs
+modules/review-harness/signin.mjs
 modules/review-harness/settle.mjs
 modules/review-harness/capture.mjs
 modules/review-harness/audit.mjs
@@ -259,18 +254,13 @@ export default {
     cwd: '.', command: 'pnpm',
     args: ['exec', 'wrangler', 'dev', '--config', 'dist/server/wrangler.json',
       '--local', '--persist-to', '.wrangler/review', '--ip', '127.0.0.1', '--port', '{PORT}',
-      '--var', 'AUTH_ORIGIN:{ORIGIN}', '--var', 'AUTH_LOCAL:true', '--var', 'MAIL_PROVIDER:development'],
+      '--var', 'AUTH_ORIGIN:{ORIGIN}', '--var', 'AUTH_LOCAL:true'],
     // Add this seed's explicit synthetic bindings before running.
   },
   fixtures: async origin => { /* Seed-owned synthetic setup. */ },
   signIn: {
-    email: 'reviewer@example.test',
-    async request(page) {
-      await page.goto('/signin');
-      await page.getByLabel('Email', { exact: true }).fill('reviewer@example.test');
-      await page.getByRole('button', { name: 'Email a sign-in link' }).click();
-    },
-    // Optional confirm(page) for a seed with an explicit confirmation action.
+    // Import this seed-owned adapter in the config. Return a fresh oneclick URL.
+    open: async (_page, signal) => createReviewSignInUrl(signal),
   },
   routes: [
     { name: 'sign in', path: '/signin' },
@@ -287,9 +277,9 @@ before its first signed-in route. Keep public routes before signed-in routes if
 their behavior depends on being signed out. It prints one summary with the report
 path and exits zero only when all gates pass. Runtime launch/configuration errors
 produce a failure summary; gate and journey failures also leave `review.json`.
-SIGINT and SIGTERM cancel startup, fixtures, outbox sign-in and journeys. The CLI awaits runtime
+SIGINT and SIGTERM cancel startup, fixtures, oneclick sign-in and journeys. The CLI awaits runtime
 group cleanup and browser cleanup before exiting nonzero (130 or 143).
-Its sign-in request and confirmation hooks receive `(page, signal)` for
+Its sign-in callback receives `(page, signal)` for
 cooperative cancellation of seed-owned work.
 
 Declare the component in `edition.json`, using the real Base repository and the
@@ -362,6 +352,6 @@ Its product journeys stay. Adoption and its integrated proof are seed-owned work
 ## Module verification
 
 From Base run `TZ=UTC pnpm verify:review-harness`. The tests use real Chromium and
-Miniflare with synthetic D1 mail, isolated defect pages, launcher process trees,
+Miniflare with synthetic sessions, isolated defect pages, launcher process trees,
 temporary consumer packages and a byte-for-byte vendor-folder adoption. The
 declaration check uses the reference seed's installed TypeScript and browser types.

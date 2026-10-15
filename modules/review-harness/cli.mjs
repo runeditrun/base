@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 import { dirname, resolve } from 'node:path';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { startRuntime, signInThroughOutbox, ReviewError } from './index.mjs';
+import { startRuntime, signIn, ReviewError } from './index.mjs';
 import { redact } from './privacy.mjs';
 import { abortable } from './cancellation.mjs';
 import { prepareEvidence } from './history.mjs';
@@ -49,8 +49,7 @@ async function review(argv, signal) {
             signal.throwIfAborted();
             if (route.signedIn && !signedIn) {
               if (!config.signIn) throw new Error('A signed-in route requires signIn config');
-              await signInThroughOutbox(page, { ...config.signIn, origin: runtime.origin, signal });
-              await config.signIn.confirm?.(page, signal);
+              await signIn(page, { ...config.signIn, origin: runtime.origin, signal });
               signedIn = true;
             }
             const url = new URL(route.path, runtime.origin);
