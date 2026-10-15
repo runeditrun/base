@@ -19,7 +19,9 @@ export const INSTANCE_TYPES = ['lite', 'basic', 'standard-1', 'standard-2', 'sta
  * deploy-demo.json: `{ "version": 1, "domain": "run-lamp.com", "name": "Lamp" }`, plus optionally
  * `maxInstances` (concurrent demos, default 10), `instanceType` (one of INSTANCE_TYPES, default
  * "basic") and `settings`, the seed's plain demo settings (such as MAIL_PROVIDER: "development").
- * Settings never carry secrets or what the front sets.
+ * Settings never carry secrets or what the front sets. The app declaration's
+ * container.hostVariables select hostname settings: the primary demo hostname
+ * or its descendants, routed through the same visitor isolation.
  */
 export function demoDeclaration(value, originVar) {
   assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'instanceType', 'settings'].includes(key)), 'invalid-demo-declaration');
@@ -36,28 +38,39 @@ export function demoDeclaration(value, originVar) {
 }
 
 /** The demo Worker's name and its Wrangler configuration; no provider request. */
-export function demoPlan({ project, environment, compatibilityDate, originVar, declaration, turnstileSiteKey }) {
+export function demoPlan({ project, environment, compatibilityDate, originVar, hostVariables = [], declaration, turnstileSiteKey }) {
   assert(/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate ?? '') && /^[A-Z][A-Z0-9_]{0,63}$/.test(originVar ?? ''), 'invalid-plan');
   const { domain, name, maxInstances, instanceType, settings } = demoDeclaration(declaration, originVar);
   const worker = `${ownerWorkerName(project, environment)}--demo`, hostname = `demo.${domain}`, container = worker.replace(/-+/g, '-');
   assert(resourceName(worker), 'owner-name-too-long');
+  assert(Array.isArray(hostVariables) && hostVariables.every(variable => typeof variable === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(variable)), 'invalid-demo-host-variables');
+  const declaredHosts = hostVariables.map(variable => {
+    const host = settings[variable];
+    assert(Object.hasOwn(settings, variable) && typeof host === 'string' && host.length <= 253 &&
+      /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(host) &&
+      (host === hostname || host.endsWith(`.${hostname}`)), 'invalid-demo-host-setting');
+    return host;
+  });
+  const secondaryHosts = [...new Set(declaredHosts)].filter(host => host !== hostname).sort();
+  const hostnames = [hostname, ...secondaryHosts];
   // Rate limit namespaces are account-wide integers: one per demo Worker.
   const namespace = String(1000 + parseInt(createHash('sha256').update(worker).digest('hex').slice(0, 8), 16) % 1_000_000_000);
   const wrangler = {
     name: worker, main: 'worker.mjs', compatibility_date: compatibilityDate, workers_dev: false, preview_urls: false,
-    routes: [{ pattern: hostname, custom_domain: true }],
+    routes: hostnames.map(pattern => ({ pattern, custom_domain: true })),
     observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },
-    vars: { DEMO_ORIGIN: `https://${hostname}`, DEMO_SITE: `https://${domain}`, DEMO_NAME: name, DEMO_ORIGIN_VAR: originVar, DEMO_MAX_INSTANCES: String(maxInstances), DEMO_SETTINGS: JSON.stringify(settings),
+    vars: { DEMO_ORIGIN: `https://${hostname}`, DEMO_SITE: `https://${domain}`, DEMO_NAME: name, DEMO_ORIGIN_VAR: originVar, DEMO_MAX_INSTANCES: String(maxInstances), DEMO_SETTINGS: JSON.stringify(settings), DEMO_SECONDARY_ORIGINS: JSON.stringify(secondaryHosts.map(host => `https://${host}`)),
       ...(turnstileSiteKey ? { TURNSTILE_SITE_KEY: turnstileSiteKey } : {}) },
     durable_objects: { bindings: [{ name: 'DEMO', class_name: 'DemoContainer' }, { name: 'CAPACITY', class_name: 'DemoCapacity' }] },
     migrations: [{ tag: 'v1', new_sqlite_classes: ['DemoContainer', 'DemoCapacity'] }],
     containers: [{ name: container, class_name: 'DemoContainer', image: './image/Dockerfile', max_instances: maxInstances, instance_type: instanceType }],
     ratelimits: [{ name: 'STARTS', namespace_id: namespace, simple: { limit: 3, period: 60 } }],
   };
-  return { worker, hostname, container, record: demoRecord({ worker, hostname, container }), origin: `https://${hostname}`, maxInstances, instanceType, settings: Object.keys(settings), wrangler };
+  return { worker, hostname, hostnames, container, record: demoRecord({ worker, hostname, hostnames, container }), origin: `https://${hostname}`, maxInstances, instanceType, settings: Object.keys(settings), wrangler };
 }
 
 /** The demo's record of what `rer deploy --demo` creates, kept on the provider so a
  * fresh checkout (a CI runner) can remove it: the deploy writes it as the Worker
  * version's message, and only a Worker serving it is taken for the demo's own. */
-export const demoRecord = ({ worker, hostname, container }) => `rer-demo:${hash({ worker, hostname, container })}`;
+export const demoRecord = ({ worker, hostname, hostnames = [hostname], container }) =>
+  `rer-demo:${hash({ worker, hostname, container, ...(hostnames.length > 1 ? { hostnames } : {}) })}`;
