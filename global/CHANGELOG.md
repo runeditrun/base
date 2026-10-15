@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.19
+
+- `rer signin [--environment NAME]` uses the credentials that deployed a seed to print a one-time owner sign-in link, valid for 15 minutes. It requires no email delivery, refuses non-owners and used or expired links, and records successful use in the auth audit log.
+- A freshly signed-in owner can correct their sign-in email in Operator access. The global command installs the checkout's pinned rer package before running `signin`.
+
+### Upgrade notes
+
+- Update the exact rer package pin or refresh vendored commands and operator-auth. Apply `modules/operator-auth/accounts/schema/owner-signin.sql` as a new numbered migration, then redeploy. The reference seed includes the migration and README instructions. Run `rer signin` from the checkout that deployed the environment with its Cloudflare credentials.
+
 ## 0.2.17
 
 - Container builds check the app's reachable runtime imports from Wrangler main and fresh server output. Dormant source files and ordinary calls containing cloudflare-looking strings no longer fail the boundary; reachable Node-engine restrictions remain.
