@@ -53,7 +53,7 @@ test('missing deployment commands name the requested environment and offer the c
   assert.ok(error.message.includes(error.environment));
   for (const item of error.availableDeployments) {
    const flags = args.slice(1).join(' ');
-   assert.equal(item.command, `rer ${args[0]} --environment ${item.environment} --cwd ${root}${flags ? ` ${flags}` : ''}`);
+   assert.equal(item.command, `rer ${args[0]} --environment ${item.environment} --cwd .${flags ? ` ${flags}` : ''}`);
    assert.ok(error.message.includes(item.command));
   }
   const human = await run(args, false);

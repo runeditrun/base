@@ -55,6 +55,23 @@ the setup schema and both validators they need.
 secret **names**, migration prefixes and additional migration directories,
 health/recovery policy, provider effects, surfaces and initial setup probes.
 It never supplies secret values.
+Optional `surfaces.app.signIn: {path: "/login", loginHint: true}` declares the
+browser sign-in path. `loginHint` is a required boolean; declare `true` only if
+the app reads `login_hint`. The path starts with one slash and contains only
+ASCII letters, digits, slashes, underscores and hyphens. Only the app surface
+may declare sign-in. Without an explicit sign-in policy, a seed's
+`OPERATIONS.json` `seedContract.adapter` supplies its `commandAdapter.signInPath`
+with `loginHint: false`; without either declaration the field stays absent.
+
+Optional `nativeExport: {path: "/export", covers: ["DB", "CHAT_HUB"]}` declares
+the app's native export. These are its only keys. The path is at most 256
+characters, starts with one slash, uses letters, digits, `.`, `_`, `~`, `-`
+and single separating slashes, and has no `.` or `..` segments. `covers` names
+1–64 distinct declared bindings: D1 databases whose migration statements create
+virtual tables, or Durable Objects. Comments, strings and trigger bodies do not
+establish virtual-table coverage. Other bindings are refused. The declaration
+is absent unless supplied; it does not change `recovery`.
+
 Each surface's `originVariable` must be unique across surfaces; validation names
 the variable and conflicting surfaces when it is repeated. `rer check` and
 ordinary `rer deploy` (including `--dry-run`) check declarations in

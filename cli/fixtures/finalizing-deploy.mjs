@@ -26,7 +26,7 @@ export const commandAdapter = { ...lifecycle, deployDeclaration: 'deploy.json', 
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: 'Deploy to the test provider.' } } }));
  const git = (...args) => execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'commit.gpgsign=false', ...args], { cwd: root, stdio: 'pipe' }).toString().trim();
  git('init', '-q'); git('add', '.'); git('commit', '-qm', 'fixture');
- const again = `rer deploy --environment review --env-file 'owner credentials.env' --cwd '${root}'`;
+ const again = "rer deploy --environment review --env-file 'owner credentials.env' --cwd .";
  const run = async mode => {
   try { return { code: 0, ...await promisify(execFile)(process.execPath, [new URL('../../bin/rer.mjs', import.meta.url).pathname, 'deploy', '--environment', 'review', '--env-file', 'owner credentials.env', '--cwd', root, '--json'], {
    cwd: root, env: { ...process.env, CI: 'true', RER_TEST_FINAL_HEALTH: mode, NODE_OPTIONS: `--import=${new URL('./finalizing-deploy-network.mjs', import.meta.url).href}` }, timeout: 30000,
