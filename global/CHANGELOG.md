@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.8
+
+- `rer deploy --demo` resolves Wrangler through its exported package manifest and gives the Cloudflare Container application a valid explicit name. This fixes deployments refused by package export restrictions or an application name containing consecutive dashes.
+- Hosted demos record every readiness probe's timing and status or safe error category, plus available container exit codes. Early exits and stalled probes fail promptly within the existing startup budget. Failed destruction keeps the capacity reservation and schedules cleanup again.
+- An optional host-operator credential grants access to a bounded, redacted failure summary on the existing start page. Visitors retain the generic failure page; their demo session and the diagnostic correlation ID grant no operator access.
+
+### Upgrade notes
+
+- Redeploy the demo host to enable the new diagnostics. Set a separate random `RER_DEMO_OPERATOR_TOKEN` to enable the operator page; see `modules/demo-host/README.md`. Container stdout/stderr remains in Cloudflare's authenticated observability service.
+
 ## 0.2.7
 
 - `rer deploy` after a custom deploy hook that returned its own kit state file as `state` reads that record for every finalization step (inspect, the setup token, the owner record), so it issues a setup token, claims the hosted owner, retires the token and exits 0, instead of failing with `HTTP 403 (invalid_setup_token)` because it looked only at `.rer/deploy/<environment>.json`. `--set-secret` and `--unset-secret` read the same record. An untouched repeat still writes nothing.
