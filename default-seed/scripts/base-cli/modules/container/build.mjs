@@ -8,6 +8,7 @@ import { checkBoundary } from './boundary.mjs';
 import { localDurableObjects } from './durable-objects.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 import { containerMigrationInventory } from './migration-inventory.mjs';
+import { checkImageVariables } from './image-variables.mjs';
 export async function buildContainer(root, options={}) {
  const previous=process.cwd();process.chdir(root);
  try{return await buildImage(root,options);}finally{process.chdir(previous);}
@@ -74,7 +75,7 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  const entry = engine === 'workerd' ? 'dist/server/'+workerConfig.main : 'dist/server/index.mjs';
  await readFile(join(root,entry));
  if (engine === 'node' && workerConfig.kv_namespaces?.length) throw new Error('Node container does not support KV');
- for (const secret of declaration.secrets ?? []) if (Object.hasOwn(workerConfig.vars ?? {},secret.binding)) throw new Error('Secret declared as an image variable: '+secret.binding);
+ await checkImageVariables(root,workerConfig.vars ?? {},declaration.secrets ?? []);
  const manifest = { version:1,engine,entry,cacheContract,runner,config:workerConfig,migrations,portabilityMigrations:await portabilityPlan(split),maxRequestBytes:25*1024*1024 };
  await rm(output,{recursive:true,force:true}); await mkdir(join(output,'app'),{recursive:true});
  await cp(join(root,'dist'),join(output,'app/dist'),{recursive:true}); await writeFile(join(output,'app/container.json'),JSON.stringify(manifest,null,2)+'\n');
