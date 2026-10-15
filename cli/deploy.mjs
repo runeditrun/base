@@ -79,12 +79,12 @@ export function ownerDeploy(declarationPath, lifecycle) {
    const sent = supplied.filter(name => deployed.sentSecrets.includes(name));
    if (sent.length) store.report(`rer supplied ${sent.join(', ')} from the local setup owner and fresh generated values.`);
    step = 'health';
-   await owner('health');
+   await owner('health', [], env, {propagation:deployed.propagation});
    step = 'claim owner';
-   const { liveSecrets, retiredSecrets, ownerClaim } = await owner('inspect');
+   const { liveSecrets, retiredSecrets, ownerClaim } = await owner('inspect', [], env, {propagation:deployed.propagation});
    const linked = token => linkDependencies?.(deployed.origin, token);
-   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed: { ...deployed, liveSecrets, retiredSecrets, ownerClaim }, env, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },
-    secret: (extra, values) => owner('secret', extra, values), beforeClaim: linked, recordClaim: outcome => owner('record-owner', ['--outcome', outcome]), inspect: () => owner('inspect'), store, signal });
+   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed: { ...deployed, propagation:deployed.propagation, liveSecrets, retiredSecrets, ownerClaim }, env, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },
+    secret: (extra, values) => owner('secret', extra, values), beforeClaim: linked, recordClaim: outcome => owner('record-owner', ['--outcome', outcome]), inspect: () => owner('inspect', [], env, {propagation:deployed.propagation}), store, signal });
    // A seed that claims its owner its own way links with the token it was given.
    if (claimed === undefined) await linked(env[declared(claim?.tokenField ?? 'SETUP_TOKEN')?.environment]);
    step = 'verify hosted setup';

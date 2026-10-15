@@ -241,11 +241,12 @@ export async function verifyDoor(env, port) {
 
 async function verifyOnce(env, port) {
  const directory = doorDirectory(env), record = await runningDoor(env);
- const { listeners, processName } = await shared('process-diagnostics.mjs');
- const holders = (await listeners()).filter(row => row.names.some(name => portOf(name) === port));
+ const { listeners, processName, inspectionContext } = await shared('process-diagnostics.mjs');
+ const context = inspectionContext();
+ const holders = (await listeners(undefined,context,port)).filter(row => row.names.some(name => portOf(name) === port));
  const foreign = holders.find(row => row.pid !== record?.pid);
  const withheld = 'No sign-in link was printed.';
- if (foreign) throw refuse(`Port ${port} is held by PID ${foreign.pid} (${await processName(foreign.pid)}), which is not this account's front door${record ? ` (PID ${record.pid})` : ''}. ${withheld} Stop PID ${foreign.pid}, then run rer door restart.`);
+ if (foreign) throw refuse(`Port ${port} is held by PID ${foreign.pid} (${await processName(foreign.pid,context)}), which is not this account's front door${record ? ` (PID ${record.pid})` : ''}. ${withheld} Stop PID ${foreign.pid}, then run rer door restart.`);
  if (!record || record.port !== port) throw refuse(`The front door is not running on port ${port}. ${withheld} Start it with rer door start, then run this again.`);
  const token = (await readPrivate(join(directory, 'token')))?.trim();
  if (!token) throw refuse(`The front door's token is missing from ${directory}. ${withheld} Run rer door restart.`);

@@ -1,3 +1,5 @@
+import { readinessWindow, readinessAPI } from './readiness-window.mjs';
+import { uploadedWorker } from './uploaded-worker.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
 import { verifyServiceGrants } from './service-grants.mjs';
 import { assert, hash, validatePlan } from './validation.mjs';
@@ -42,8 +44,11 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,r
   const migrations = [];
   // A migration failure names its database, so the owner knows which one to inspect.
   for (const item of plan.d1) migrations.push({binding:item.binding,...await migrate(api,resources.d1.find(x => x.binding === item.binding).id,item.migrations,{apply:!unchanged,upgrade:true}).catch(error => { error.resource ??= `d1:${item.name}`; throw error; })});
-  if (!unchanged) await uploadWorker(api,{plan,artifact,bindings,secrets,migration,fingerprint});
-  const published = unchanged ? existing : await activeWorker(api,plan.worker); assert(published,'missing-deployed-worker');
+  const window = readiness.window ?? readinessWindow({...(healthOptions.now ? {clock:healthOptions.now} : {}), ...(healthOptions.sleep ? {sleep:healthOptions.sleep} : {}), ...readiness});
+  let upload;
+  if (!unchanged) { window.start(); upload = await uploadWorker(api,{plan,artifact,bindings,secrets,migration,fingerprint}); }
+  if (!unchanged) api = readinessAPI(api, window);
+  const published = unchanged ? existing : await uploadedWorker({api,worker:plan.worker,upload,previous:existing,fingerprint,window}); assert(published,'missing-deployed-worker');
   verifyBindings(published.settings.bindings,bindings);
   verifyScheduledHandler(published,plan);
   // Finish routing activation before applying schedules to this deployment.
@@ -61,7 +66,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,r
   const asset = publicAssetPaths(artifact.assets.map(x => x.path))[0];
   try {
     if (unchanged) await verifyHealth({...healthOptions,api,plan,receipt,fetch,asset});
-    else await firstHealth({api,plan,receipt,fetch,healthOptions,readiness,onHealth,asset});
+    else await firstHealth({api,plan,receipt,fetch,healthOptions,readiness:{...readiness,window,freshUpload:!existing},onHealth,asset});
   } catch (error) { throw recordDeployFailure(error,{step:'health',...(error.code ? {code:error.code,output:error.message} : {})}); }
   return receipt;
 }

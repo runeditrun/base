@@ -8,6 +8,7 @@ import { readDevKey } from './dev-identity.mjs';
 import { shared } from './shared.mjs';
 import { unpublishedIdentities } from './site-private.mjs';
 import { privateSitePaths } from './site-inputs.mjs';
+import { redactSiteText } from './site-diagnostics.mjs';
 
 // The run site: a seed's static marketing pages, /run and docs, built from
 // edition identity with no installation data. A seed opts in with
@@ -62,6 +63,10 @@ export async function buildSite(project, store, signal) {
    const code = await readFile(`${staging}.refusal`, 'utf8').catch(() => '');
    if (code === 'site_private_input') throw new RerError(code, 'Run site client imports a private installation file or a file outside the seed and its declared dependencies.', 4);
    if (code === 'site_client_server_import') throw new RerError(code, 'Run site client imports a server-only module. Use browser dependencies in every reachable island module.', 4);
+   // Command capture appends its absolute log path after the child output.
+   const { approvedFailure, commandFailure } = await shared('failures.mjs');
+   const diagnostic = approvedFailure(error);
+   if (diagnostic) throw commandFailure(redactSiteText(diagnostic.message), diagnostic);
    throw error;
   }
   const checked = await checkSite(staging, {root:project.root, ...await privateValues(project)});
