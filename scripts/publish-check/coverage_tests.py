@@ -3,10 +3,11 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from test_repo import ROOT, RepositoryFixture, LICENSE
+from test_repo import ROOT, RepositoryFixture, LICENSE, generic_credential
 
 
 class HygieneTests(RepositoryFixture, unittest.TestCase):
@@ -24,6 +25,42 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         self.write('personas.txt', 'admin' + '@' + 'dev.localhost owner' + '@' + 'example.com')
         self.commit()
         self.assertFalse(any(f['rule'] == 'hygiene.email' for f in self.report()['findings']))
+
+    def test_copied_auth_documentation_needs_no_publication_exceptions(self):
+        guide = (ROOT / 'modules/operator-auth/identity/oidc/README.md').read_text()
+        sources = {'CLOUDFLARE_API_TOKEN': 'Owner-account deployment instructions in OPERATIONS.md'}
+        self.write('docs/identity.md', guide)
+        self.write('OPERATIONS.json', json.dumps({'version': 2, 'environmentSources': sources}))
+        self.commit()
+
+        def publication():
+            result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
+                                    capture_output=True, text=True, timeout=30)
+            report = json.loads(result.stdout)
+            return result.returncode, report, result.stdout + result.stderr
+
+        code, report, _ = publication()
+        self.assertEqual(code, 0)
+        self.assertTrue(report['complete'])
+        self.assertEqual(report['findings'], [])
+        self.assertEqual(report['preExisting'], [])
+        self.assertEqual(report['reviewed'], [])
+
+        # Environment references and an OIDC method identifier are public
+        # configuration. Replacing a reference with a stored credential must
+        # still fail, even on the same line as the method identifier.
+        credential = generic_credential()
+        self.write('docs/identity.md', guide.replace('clientSecret: env.GOOGLE_CLIENT_SECRET',
+                                                    "clientSecret: '" + credential + "'"))
+        self.write('OPERATIONS.json', json.dumps({'version': 2, 'environmentSources': {
+            **sources, 'MAIL_API_KEY': credential}}))
+        self.commit()
+        code, report, output = publication()
+        self.assertEqual(code, 1)
+        self.assertTrue(report['complete'])
+        self.assertEqual({finding['path'] for finding in report['findings'] if finding['rule'] == 'secret.assignment'},
+                         {'docs/identity.md', 'OPERATIONS.json'})
+        self.assertNotIn(credential, output)
 
     def test_font_licence_notice_is_required_attribution_only_inside_the_licence_text(self):
         foundry = 'type' + '@' + 'foundry-fixture.com'
