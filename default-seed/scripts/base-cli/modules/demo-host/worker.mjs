@@ -7,7 +7,7 @@
 // container; nothing else on this host is reachable.
 import { operatorPage } from './operator.mjs';
 import { bounded, category, report } from './diagnostics.mjs';
-import { startPage, demoCookie } from './pages.mjs';
+import { startPage, demoCookie, clearCookie } from './pages.mjs';
 
 export { DemoContainer } from './container.mjs';
 export { DemoCapacity } from './capacity.mjs';
@@ -33,51 +33,94 @@ async function human(env, token, ip) {
   if (typeof token !== 'string' || !token || token.length > 2048) return false;
   const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET_KEY, response: token });
   if (ip) body.set('remoteip', ip);
-  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body });
+  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body, signal: AbortSignal.timeout(5000) });
   const result = response.ok ? await response.json() : {};
   if (result.success !== true) console.error('Turnstile refused a start:', response.status, JSON.stringify(result['error-codes'] ?? []));
   return result.success === true;
 }
 
-async function start(request, env) {
-  const json = request.headers.get('accept') === 'application/json';
-  const refuse = (status, notice, headers = {}) => json ? Response.json({ notice }, { status, headers: { 'cache-control': 'no-store', ...headers } }) : startPage(env, { status, notice, headers });
-  if (request.headers.get('origin') !== env.DEMO_ORIGIN) return refuse(403, 'Start the demo from this page.');
-  const ip = request.headers.get('cf-connecting-ip') ?? '';
-  if (!(await env.STARTS.limit({ key: ip })).success) return refuse(429, 'Too many demos started from your network. Try again in a minute.');
-  const form = await request.formData();
-  if (!await human(env, form.get('cf-turnstile-response'), ip)) return refuse(403, 'The check did not pass. Try again.');
-  const id = env.DEMO.newUniqueId(), ends = Date.now() + HOUR;
-  if (!await env.CAPACITY.get(env.CAPACITY.idFromName('capacity')).acquire(id.toString(), ends, Number(env.DEMO_MAX_INSTANCES))) {
-    return refuse(503, 'Every demo is in use right now. Try again in a few minutes.');
+const wantsJSON = request => request.headers.get('accept') === 'application/json';
+function refusal(request, env, status, notice, headers = {}) {
+  return wantsJSON(request) ? Response.json({ notice }, { status, headers: { 'cache-control': 'no-store', ...headers } }) : startPage(env, { status, notice, headers });
+}
+
+function progress(request, env, id, state) {
+  const headers = new Headers({ 'cache-control': 'no-store' });
+  if (state.correlation) headers.set('x-rer-demo-correlation', state.correlation);
+  if (state.phase === 'failed') return refusal(request, env, 502, 'The demo did not start. Try again.', { ...Object.fromEntries(headers), 'set-cookie': clearCookie(env) });
+  headers.append('set-cookie', demoCookie(env, id.toString()));
+  if (state.phase === 'starting') {
+    headers.set('retry-after', '1');
+    if (wantsJSON(request)) return Response.json({ pending: true }, { status: 202, headers });
+    // A plain form keeps the same visitor reservation while the copy starts.
+    return startPage(env, { status: 202, pending: true, headers: Object.fromEntries(headers) });
   }
-  const demo = env.DEMO.get(id), correlation = crypto.randomUUID(), started = Date.now();
+  for (const cookie of state.cookies) headers.append('set-cookie', cookie);
+  if (wantsJSON(request)) return Response.json({ location: state.location }, { headers });
+  headers.set('location', state.location);
+  return new Response(null, { status: 303, headers });
+}
+
+async function status(request, env) {
+  const id = demoId(request, env);
+  if (!id) return refusal(request, env, 410, 'This demo has ended. Start a new demo.');
+  try { return progress(request, env, id, await bounded(env.DEMO.get(id).status(), 2000)); }
+  catch { return refusal(request, env, 503, 'The demo could not be reached. Try again.'); }
+}
+
+async function start(request, env, ctx) {
+  const refuse = (status, notice, headers = {}) => refusal(request, env, status, notice, headers);
+  if (request.headers.get('origin') !== env.DEMO_ORIGIN) return refuse(403, 'Start the demo from this page.');
+  let demo, correlation;
+  const started = Date.now();
   try {
-    const signedIn = await bounded(demo.start({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) }), 121_000);
-    const headers = new Headers({ 'cache-control': 'no-store', 'x-rer-demo-correlation': correlation });
-    for (const cookie of [...signedIn.cookies, demoCookie(env, id.toString())]) headers.append('set-cookie', cookie);
-    if (json) return Response.json({ location: signedIn.location }, { headers });
-    headers.set('location', signedIn.location);
-    return new Response(null, { status: 303, headers });
+    const ip = request.headers.get('cf-connecting-ip') ?? '';
+    if (!(await bounded(env.STARTS.limit({ key: ip }), 1000)).success) return refuse(429, 'Too many demos started from your network. Try again in a minute.');
+    const form = await bounded(request.formData(), 1000);
+    if (!await bounded(human(env, form.get('cf-turnstile-response'), ip), 5000)) return refuse(403, 'The check did not pass. Try again.');
+    // A retry while the original start is pending resumes that copy, not a
+    // second reservation that the visitor can never use.
+    const prior = demoId(request, env);
+    if (prior) {
+      const state = await bounded(env.DEMO.get(prior).status(), 1000);
+      if (state.phase === 'starting') return progress(request, env, prior, state);
+    }
+    const id = env.DEMO.newUniqueId(), ends = Date.now() + HOUR;
+    const capacity = env.CAPACITY.get(env.CAPACITY.idFromName('capacity'));
+    // A lost handoff occupies a place for at most a minute. The object extends
+    // it to the demo's end only after health and owner admission succeed.
+    if (!await bounded(capacity.acquire(id.toString(), Date.now() + 60_000, Number(env.DEMO_MAX_INSTANCES)), 2000)) {
+      return refuse(503, 'Every demo is in use right now. Try again in a few minutes.');
+    }
+    demo = env.DEMO.get(id); correlation = crypto.randomUUID();
+    const state = await bounded(demo.begin({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) }), 2000);
+    return progress(request, env, id, { ...state, correlation });
   } catch (error) {
-    const failure = ['health-deadline', 'container-stopped'].includes(error.message) ? error.message : category(error);
-    report(correlation, started, 'failed', { error: failure });
-    try {
-      const diagnostic = { ...await bounded(demo.diagnostic(), 3000), failure };
-      await bounded(env.CAPACITY.get(env.CAPACITY.idFromName('diagnostics')).record(correlation, diagnostic), 3000);
-    } catch (capture) { report(correlation, started, 'diagnostic', { error: category(capture) }); }
-    try { await bounded(demo.end(), 6000); } catch (cleanup) { report(correlation, started, 'cleanup', { error: category(cleanup) }); }
-    return refuse(502, 'The demo did not start. Try again.', { 'x-rer-demo-correlation': correlation });
+    report(correlation, started, 'failed', { error: category(error) });
+    // Cleanup runs independently of the response: retries never wait on it.
+    if (demo) ctx.waitUntil(bounded(demo.end(), 6000).catch(cleanup => report(correlation, started, 'cleanup', { error: category(cleanup) })));
+    return refuse(502, 'The demo did not start. Try again.', correlation ? { 'x-rer-demo-correlation': correlation } : {});
   }
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/__demo/operator/')) return operatorPage(request, env, url.pathname.slice('/__demo/operator/'.length));
-    if (url.pathname === '/__demo/start') return request.method === 'POST' ? start(request, env) : home();
+    if (url.pathname === '/__demo/start') return request.method === 'POST' ? start(request, env, ctx) : home();
+    if (url.pathname === '/__demo/status') return request.method === 'GET' ? status(request, env) : home();
     const id = demoId(request, env);
-    if (id) return env.DEMO.get(id).fetch(request);
+    if (id) {
+      // The JSON start leaves the browser on /. Reloading it must keep the
+      // pending copy on the progress page until health and owner claim finish.
+      if (url.pathname === '/' && ['GET', 'HEAD'].includes(request.method)) {
+        try {
+          const state = await bounded(env.DEMO.get(id).status(), 2000);
+          if (state.phase === 'starting') return progress(request, env, id, state);
+        } catch { return refusal(request, env, 503, 'The demo could not be reached. Try again.'); }
+      }
+      return env.DEMO.get(id).fetch(request);
+    }
     if (!['GET', 'HEAD'].includes(request.method)) return new Response('Start a demo first.', { status: 403 });
     if (url.pathname !== '/') return home();
     return startPage(env);
