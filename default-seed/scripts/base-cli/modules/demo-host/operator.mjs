@@ -4,7 +4,8 @@ import { startPage } from './pages.mjs';
 // owner. It is supplied only as an Authorization header, never a URL/cookie.
 export async function operatorPage(request, env, correlation) {
   const expected = env.RER_DEMO_OPERATOR_TOKEN;
-  const supplied = request.headers.get('authorization')?.replace(/^Bearer /, '');
+  const authorization = request.headers.get('authorization') ?? '';
+  const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   if (!expected || expected.length < 32 || !supplied || supplied.length > 512) return new Response('Unauthorized', { status: 401 });
   const digest = value => crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   const [a, b] = await Promise.all([digest(expected), digest(supplied)]);

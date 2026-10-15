@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.7-dev.g4c758ea6",
+  "cliVersion": "0.2.7-dev.gbcae1497",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -891,7 +891,7 @@
     },
     "modules/demo-host/operator.mjs": {
       "source": "modules/demo-host/operator.mjs",
-      "sha256": "197d73f6e78fb99e3f0f348390b03a22a2db44b966955424e1c961bda958f911"
+      "sha256": "b09b77a3ca1843420185e0af069104c8ae47f6b17c1f572809a78128e963880e"
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
