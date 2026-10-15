@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { relative } from 'node:path';
 import { shared } from './shared.mjs';
 import { invalid } from './errors.mjs';
 import { readDeployEnvFile } from '../modules/deploy-kit/env-file.mjs';
@@ -54,5 +55,5 @@ export async function withDeployEnvironment(root, options, run) {
 
 export function deployAgain(options) {
  const quote = value => /^[a-zA-Z0-9_./-]+$/.test(value) ? value : `'${String(value).replaceAll("'", "'\"'\"'")}'`;
- return `rer deploy --environment ${quote(options.environment ?? 'production')}${options.envFile ? ` --env-file ${quote(options.envFile)}` : ''}${options.cwd ? ` --cwd ${quote(options.cwd)}` : ''}`;
+ return `rer deploy --environment ${quote(options.environment ?? 'production')}${options.envFile ? ` --env-file ${quote(options.envFile)}` : ''}${options.cwd ? ` --cwd ${quote(relative(process.cwd(), options.cwd) || '.')}` : ''}`;
 }

@@ -80,7 +80,7 @@ export const commandAdapter = { ...lifecycle, deployDeclaration: 'deploy.json', 
   assert.match(output, /setup.*required|requires.*setup/i);
   assert.match(output, /owner claim.*not confirmed/i);
   assert.match(output, /fix.*register.*native.*owner.*claim/i);
-  assert.ok(output.includes(`rer deploy --environment review --env-file 'owner credentials.env' --cwd '${root}'`), output);
+  assert.ok(output.includes("rer deploy --environment review --env-file 'owner credentials.env' --cwd ."), output);
   assert.doesNotMatch(output, /application is live|Sign in by email|--set-secret|enter.*token/i);
   for (const secret of [token, provider.token, provider.accountId]) assert.ok(!output.includes(secret), 'no credential in command output');
   const statePath = join(root, '.rer/deploy/review.json');

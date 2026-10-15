@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.24-dev.g0610b2a1",
+  "cliVersion": "0.2.24-dev.g1c8e648d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -435,7 +435,7 @@
     },
     "cli/deploy-inputs.mjs": {
       "source": "cli/deploy-inputs.mjs",
-      "sha256": "b3cfd50d5a28c83deb39610535f1c4cd4cdf63bc7e32243a4f853f4b0690f6df"
+      "sha256": "2b4f6793d2fd871e7ee9d802377fe20a5719ad2c338fc8482c5518a3b72e7dd1"
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",
@@ -967,7 +967,7 @@
     },
     "modules/delivery-producer/declarations.mjs": {
       "source": "modules/delivery-producer/declarations.mjs",
-      "sha256": "00924a1564e172d4d210a32936afe757870e226796465c11ac148e39d0ea0a85"
+      "sha256": "d8cf67d18fdc6ff027d323d0986a7815b52c71df01c4cbb3dde428cfc7f55a0c"
     },
     "modules/delivery-producer/mail.mjs": {
       "source": "modules/delivery-producer/mail.mjs",
