@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.22-dev.gc5c5ad5b",
+  "cliVersion": "0.2.22-dev.g1a5bb5f9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1055,11 +1055,11 @@
     },
     "modules/demo/label.mjs": {
       "source": "modules/demo/label.mjs",
-      "sha256": "05c208a184941cf4c8be04502e2918c0ce9372159978022f02fb35c219f74d4f"
+      "sha256": "e39cffea58d72eebacf6d587f539f1632dd7139bb8e851451877a5ef0a60f2e5"
     },
     "modules/demo/responses.mjs": {
       "source": "modules/demo/responses.mjs",
-      "sha256": "3194f1a6aaec1f84477c15cf22fd32b650e317a119cfca26f0529c7ec5cd0cc5"
+      "sha256": "f91b6cb14dfde5c30750e6d248820f7218a855353e43e2defbc10fcc25fedc5d"
     },
     "modules/demo/sockets.mjs": {
       "source": "modules/demo/sockets.mjs",
