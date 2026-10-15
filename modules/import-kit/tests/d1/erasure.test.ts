@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planD1Import, createD1ImportJob, resumeD1Import, undoD1Import, readD1PersistedImport, readD1ImportJob, readD1ImportOriginals, retireD1ImportCustody, planD1ImportStream, prepareD1ImportStream, publishD1ImportPreparation, readD1ImportFieldMatches, eraseD1ImportTarget, upgradeD1ImportErasureIndex, d1ErasureSchema, canonicalJson, sha256 } from '../../src/d1/index.ts';
+import { planD1Import, createD1ImportJob, resumeD1Import, undoD1Import, readD1PersistedImport, readD1ImportJob, readD1ImportOriginals, retireD1ImportCustody, readD1ErasureJournal, planD1ImportStream, prepareD1ImportStream, publishD1ImportPreparation, readD1ImportFieldMatches, eraseD1ImportTarget, upgradeD1ImportErasureIndex, d1ErasureSchema, canonicalJson, sha256 } from '../../src/d1/index.ts';
 import type { D1Database } from '../../src/d1/index.ts';
 import { runtime, source, mapping, targets } from './fixtures.ts';
+import { meter } from './meter.ts';
 import { personTargets, peopleSource, peopleMapping } from '../../../../default-seed/src/core/features/people/imports.server.ts';
 
 function normalized(large = false) {
@@ -421,4 +422,41 @@ test('real D1: a cancelled invitee sharing an active invitee\'s imported source 
   assert.equal((await undoD1Import(job.id, context())).state, 'undone', 'and undoes');
   assert.equal(await personTargets.read(r.db(), 'people', 'person', 'booking-1'), undefined);
   assert.ok(!(await census()).includes(cancelled));
+});
+
+test('real D1: a resumable redaction whose one import job is more than a request finishes in metered steps, each inside the request limit, and the job still undoes', { timeout: 10 * 60_000 }, async t => {
+  const r = await runtime(t), actor = 'U-ERASE-ONE-LARGE-JOB', people = 1100;
+  await r.db().batch(['CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT,email TEXT,details TEXT,created_at TEXT,import_revision TEXT)', 'CREATE TABLE privacy_epoch(epoch INTEGER)', 'INSERT INTO privacy_epoch VALUES(0)'].map(sql => r.db().prepare(sql)));
+  // The seed's own redaction scope, writing each redacted row with its own statement:
+  // erasing one person from 1,100 people's reactions in one upload needs more than one request.
+  const perRow = { ...personTargets, redaction: async (db: D1Database, destination: string, fields: any) => ({ ...await personTargets.redaction!(db, destination, fields), write: (rows: any[]) => rows.flatMap(row => personTargets.write(row)) }) };
+  const context = (database: D1Database = r.db()) => ({ ...r.context(), destination: 'people', namespace: 'people', storage: { database, targets: perRow } });
+  const census = async () => {
+    const { results } = await r.db().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%'").all<{ name: string }>();
+    return canonicalJson(await Promise.all(results.map(async ({ name }) => (await r.db().prepare(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all()).results)));
+  };
+  const reactions = [{ name: 'eyes', count: 2, users: [actor, 'U-KEPT'] }];
+  const plan = await planD1Import(peopleSource(Array.from({ length: people }, (_, i) => ({ ref: `reacted-${i}`, name: `Reacted ${i}`, email: `reacted-${i}@example.test`, details: { reactions } }))), peopleMapping, context());
+  const job = await createD1ImportJob(plan, { ...context(), operationKey: 'one-large-upload', reviewedFingerprint: plan.fingerprint });
+  while ((await resumeD1Import(job.id, { ...context(), batchSize: 100, maxBatches: 50 })).state !== 'completed');
+  const fields = [{ path: ['details', 'reactions', '*', 'users', '*'], value: actor }];
+  const steps: { statements: number; phase: string; jobsPending?: number }[] = [];
+  let continuation: string | undefined, result: any;
+  do {
+    // Each call is its own request; the meter refuses any request over D1's 1,000 statements.
+    const m = meter(r.db());
+    result = await m.request(`step-${steps.length + 1}`, () => retireD1ImportCustody({ values: [actor], related: { fields } }, [], context(m.database), [{ sql: 'UPDATE privacy_epoch SET epoch=epoch+1' }], { resumable: true, continuation }));
+    steps.push({ statements: m.snapshots[0].count, phase: result.phase, jobsPending: result.jobsPending });
+    continuation = result.continuation;
+    assert.ok(steps.length <= 10, `the erasure finishes: ${JSON.stringify(steps)}`);
+  } while (result.phase !== 'complete');
+  t.diagnostic(`one job, ${people} reacted people: ${JSON.stringify(steps)}`);
+  assert.ok(steps.filter(step => step.phase === 'redacting' && step.jobsPending === 1).length >= 1, 'the job was redacted in pages of its entries');
+  assert.deepEqual(result.fieldMatches, [{ path: fields[0].path, matches: people * 3 }], 'every source, effect and native copy counted once');
+  assert.ok((await readD1ErasureJournal(context())).length >= 2, 'each committed page and the final step leave a journal row');
+  assert.ok(!(await census()).includes(actor), 'no plan, provenance, before-image or native row keeps the person');
+  assert.equal((await r.db().prepare("SELECT count(*) AS n FROM people WHERE details LIKE '%U-KEPT%'").first<{ n: number }>())!.n, people, 'every peer keeps its other reactions');
+  let undo; do undo = await undoD1Import(job.id, { ...context(), batchSize: 100, maxBatches: 50 }); while (undo.state === 'undoing');
+  assert.equal(undo.state, 'undone', 'the redacted job still undoes');
+  assert.equal((await r.db().prepare('SELECT count(*) AS n FROM people').first<{ n: number }>())!.n, 0);
 });
