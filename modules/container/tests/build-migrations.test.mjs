@@ -5,8 +5,7 @@ import {join,resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {buildContainer} from '../build.mjs';
 import {deploymentSpec} from '../../delivery-producer/spec.mjs';
-import {D1} from '../adapters/d1.mjs';
-import {migrate} from '../migrations.mjs';
+import {startHost} from '../host.mjs';
 
 test('built container applies the same complete ordered migration inventory as delivery packaging and resumes it',async t=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'rer-container-migrations-')));
@@ -14,7 +13,7 @@ test('built container applies the same complete ordered migration inventory as d
  for(const path of ['src','migrations/core','migrations/base','migrations/import','migrations/updates'])await mkdir(join(root,path),{recursive:true});
  await symlink(resolve(import.meta.dirname,'../../../default-seed/node_modules'),join(root,'node_modules'));
  await writeFile(join(root,'package.json'),'{"type":"module"}');
- await writeFile(join(root,'src/server.ts'),"export default {fetch(){return new Response('ready');}};");
+ await writeFile(join(root,'src/server.ts'),"export default {async fetch(request,env){const {results}=await env.DB.prepare('SELECT value FROM notes ORDER BY id').all();return Response.json({status:'ok',notes:results.map(row=>row.value)});}};");
  await writeFile(join(root,'vite.config.mjs'),`
   import {cloudflare} from '@cloudflare/vite-plugin';
   export default {logLevel:'silent',plugins:[cloudflare({viteEnvironment:{name:'ssr'}})],
@@ -40,13 +39,16 @@ test('built container applies the same complete ordered migration inventory as d
  const manifest=JSON.parse(await readFile(join(result.output,'app/container.json'),'utf8'));
  const canonical=(await deploymentSpec(root,specInputs)).migrations;
  assert.deepEqual(manifest.migrations.DB.map(({statements,...entry})=>({binding:'DB',...entry})),canonical);
- const db=new D1(join(root,'data.sqlite'));
- try {
-  await migrate(db,manifest.migrations.DB);
-  assert.deepEqual((await db.prepare('SELECT value FROM notes ORDER BY id').all()).results.map(row=>row.value),['owner','updated']);
-  await migrate(db,manifest.migrations.DB);
-  assert.equal((await db.prepare('SELECT count(*) AS total FROM notes').first()).total,2);
-  await assert.rejects(migrate(db,[...manifest.migrations.DB].reverse()),/changed-or-uncertain/);
-  await assert.rejects(migrate(db,[...manifest.migrations.DB,manifest.migrations.DB[0]]),/migration-order-or-name/);
- }finally{await db.close();}
+ const data=join(root,'data');
+ await mkdir(join(result.output,'app/dist/client'),{recursive:true});
+ await mkdir(data);await writeFile(join(data,'host.lock'),'');
+ // Start the actual packaged Worker twice on the same volume and use its HTTP door.
+ for(let run=0;run<2;run++) {
+  const host=await startHost({root:join(result.output,'app'),data,port:0,settings:{},automaticTicks:false});
+  try {
+   const response=await fetch('http://127.0.0.1:'+host.server.address().port+'/health');
+   assert.equal(response.status,200);
+   assert.deepEqual((await response.json()).notes,['owner','updated']);
+  }finally{await host.close();}
+ }
 });
