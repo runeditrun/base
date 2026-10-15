@@ -1,5 +1,4 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { D1 } from './adapters/d1.mjs';
 import { Objects } from './adapters/objects.mjs';

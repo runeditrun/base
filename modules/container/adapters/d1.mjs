@@ -14,7 +14,7 @@ export class D1 {
    if(message.started){pending.timer=setTimeout(()=>{void this.worker.terminate();this.fail(new Error('D1_ERROR: query timed out: SQLITE_INTERRUPT'));},30000);return;}
    clearTimeout(pending.timer);this.pending.delete(message.id);message.error?pending.reject(new Error(message.error)):pending.resolve(message.result);
   });
-  this.worker.on('error',cause=>this.fail(cause));this.worker.on('exit',code=>{this.worker=null;if(this.pending.size)this.fail(new Error('D1_ERROR: database worker stopped'));});
+  this.worker.on('error',cause=>this.fail(cause));this.worker.on('exit',()=>{this.worker=null;if(this.pending.size)this.fail(new Error('D1_ERROR: database worker stopped'));});
  }
  fail(cause){for(const pending of this.pending.values()){clearTimeout(pending.timer);pending.reject(cause);}this.pending.clear();}
  call(operation,statements,sql){if(!this.worker)this.start();const id=++this.next;return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject});this.worker.postMessage({id,operation,statements,sql});});}

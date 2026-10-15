@@ -1,7 +1,7 @@
 import { mkdtemp,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { shared } from '../../cli/shared.mjs';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { realpathSync, existsSync, lstatSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, relative, isAbsolute } from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
