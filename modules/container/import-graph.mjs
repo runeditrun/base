@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseJsonc } from '../../cli/jsonc.mjs';
 import { tomlMain } from '../../cli/deploy-config.mjs';
 
@@ -13,7 +13,7 @@ const displayPath = (root, path) => relative(root, path).split(sep).join('/') ||
 const isDeclaration = path => /\.d\.(?:ts|mts|cts)$/i.test(path);
 const isCode = path => sourceExtensions.has(extname(path).toLowerCase()) && !isDeclaration(path);
 const isPackagePath = path => path.split(sep).includes('node_modules');
-const stripQuery = specifier => specifier.split(/[?#]/, 1)[0];
+const stripQuery = specifier => specifier.startsWith('#') ? specifier : specifier.split(/[?#]/, 1)[0];
 const isRelative = specifier => specifier.startsWith('./') || specifier.startsWith('../');
 const isScheme = specifier => /^[a-z][a-z\d+.-]*:/i.test(specifier);
 
@@ -33,10 +33,17 @@ function runtimeReexport(ts, declaration) {
  return !clause || !ts.isNamedExports(clause) || clause.elements.length === 0 || clause.elements.some(element => !element.isTypeOnly);
 }
 
-function runtimeEdges(ts, tree) {
+function runtimeEdges(ts, tree, options) {
  const edges = [];
  const add = (node, kind) => {
-  if (node && ts.isStringLiteralLike(node)) edges.push({ specifier: node.text, kind });
+  if (node && ts.isStringLiteralLike(node)) {
+   // Dynamic import keeps its ESM condition inside a CommonJS module; static
+   // TypeScript imports follow that file's emitted format instead.
+   const mode = kind === 'require' || kind === 'import-equals' ? ts.ModuleKind.CommonJS
+    : kind === 'dynamic-import' ? ts.ModuleKind.ESNext
+    : ts.getModeForUsageLocation(tree, node, options) ?? ts.ModuleKind.ESNext;
+   edges.push({ specifier: node.text, kind, mode });
+  }
  };
  function visit(node) {
   if (ts.isImportDeclaration(node) && runtimeImport(ts, node)) add(node.moduleSpecifier, 'import');
@@ -61,7 +68,7 @@ function matchesPathAlias(specifier, options) {
 }
 
 async function localAssetExists(from, specifier) {
- const target = resolve(dirname(from), stripQuery(specifier));
+ const target = resolve(dirname(from), specifier);
  try { return (await stat(target)).isFile() ? target : null; } catch (error) { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null; throw error; }
 }
 
@@ -112,9 +119,16 @@ function failure(path, api, extra = {}) {
  return { path, api, ...extra };
 }
 
-async function resolveSourceEdge(ts, specifier, importer, options) {
- const request = stripQuery(specifier);
- const local = isRelative(request) || isAbsolute(request) || matchesPathAlias(request, options);
+function runtimeRequest(specifier) {
+ return /^file:/i.test(specifier) ? fileURLToPath(specifier) : stripQuery(specifier);
+}
+
+async function resolveSourceEdge(ts, edge, importer, options) {
+ const { specifier, mode } = edge;
+ let request;
+ try { request = runtimeRequest(specifier); }
+ catch { return { unresolved: true, reason: 'invalid local file URL' }; }
+ const local = isRelative(request) || isAbsolute(request) || request.startsWith('#') || matchesPathAlias(request, options);
  if (isScheme(request)) return { external: true };
  const javascriptRequest = builtExtensions.includes(extname(request).toLowerCase());
  if (javascriptRequest && (isRelative(request) || isAbsolute(request))) {
@@ -128,8 +142,8 @@ async function resolveSourceEdge(ts, specifier, importer, options) {
  // that import ./module.js but author module.ts (including configured aliases).
  const implementationHost = { ...ts.sys, fileExists: path => !isDeclaration(path) && ts.sys.fileExists(path) };
  const javascriptHost = { ...ts.sys, fileExists: path => !/\.(?:ts|tsx|mts|cts)$/i.test(path) && ts.sys.fileExists(path) };
- const resolved = (javascriptRequest && ts.resolveModuleName(request, importer, options, javascriptHost).resolvedModule)
-  || ts.resolveModuleName(request, importer, options, implementationHost).resolvedModule;
+ const resolveModule = host => ts.resolveModuleName(request, importer, options, host, undefined, undefined, mode).resolvedModule;
+ const resolved = (javascriptRequest && resolveModule(javascriptHost)) || resolveModule(implementationHost);
  if (resolved) {
   const path = normalized(resolved.resolvedFileName);
   if (resolved.isExternalLibraryImport || isPackagePath(path)) return { external: true };
@@ -137,7 +151,7 @@ async function resolveSourceEdge(ts, specifier, importer, options) {
   return { external: true };
  }
  if (!local) return { external: true };
- const asset = await localAssetExists(importer, specifier);
+ const asset = await localAssetExists(importer, request);
  if (asset && !isCode(asset) && !isDeclaration(asset)) return { external: true };
  return { unresolved: true };
 }
@@ -148,9 +162,22 @@ async function builtCandidates(importer, request) {
  return [...builtExtensions.map(extension => target + extension), ...builtExtensions.map(extension => join(target, 'index' + extension))];
 }
 
-async function resolveBuiltEdge(importer, specifier, emittedFiles, outputRoot) {
- const request = stripQuery(specifier);
- if (isScheme(request) || (!isRelative(request) && !isAbsolute(request))) return { external: true };
+function emittedModule(path, emittedFiles, outputRoot) {
+ const canonical = normalized(path), rel = relative(outputRoot, canonical);
+ if (rel.startsWith('..') || isAbsolute(rel)) return { unresolved: true, reason: 'local import escapes the built server output' };
+ if (!emittedFiles.has(canonical)) return { unresolved: true, reason: 'local import was not emitted by this build' };
+ return { path: canonical };
+}
+
+async function resolveBuiltEdge(ts, importer, edge, options, emittedFiles, outputRoot) {
+ let request;
+ try { request = runtimeRequest(edge.specifier); }
+ catch { return { unresolved: true, reason: 'invalid local file URL' }; }
+ if (!isScheme(request) && !isRelative(request) && !isAbsolute(request)) {
+  const result = await resolveSourceEdge(ts, edge, importer, options);
+  return result.path ? emittedModule(result.path, emittedFiles, outputRoot) : result;
+ }
+ if (isScheme(request)) return { external: true };
  const requested = resolve(dirname(importer), request);
  const candidates = await builtCandidates(importer, request);
  for (const candidate of candidates) {
@@ -158,20 +185,18 @@ async function resolveBuiltEdge(importer, specifier, emittedFiles, outputRoot) {
    if (!(await stat(candidate)).isFile()) continue;
   } catch (error) { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') continue; throw error; }
   if (!isCode(candidate)) return { external: true };
-  const path = normalized(candidate), rel = relative(outputRoot, path);
-  if (rel.startsWith('..') || isAbsolute(rel)) return { unresolved: true, reason: 'local import escapes the built server output' };
-  if (!emittedFiles.has(path)) return { unresolved: true, reason: 'local import was not emitted by this build' };
-  return { path };
+  return emittedModule(candidate, emittedFiles, outputRoot);
  }
  if (extname(requested) && !sourceExtensions.has(extname(requested).toLowerCase())) {
-  const asset = await localAssetExists(importer, specifier);
+  const asset = await localAssetExists(importer, request);
   if (asset) return { external: true };
  }
  return { unresolved: true };
 }
 
 export async function walkImportGraph(root, { entries, emittedFiles, outputRoot, onFile }) {
- const ts = await loadTypeScript(root), options = await compilerOptions(root, ts);
+ // A package's `types` condition must not select a different runtime branch.
+ const ts = await loadTypeScript(root), options = { ...await compilerOptions(root, ts), noDtsResolution: true };
  const failures = [], visited = new Set(), pending = (await Promise.all(entries.map(async entry => {
   if (isAbsolute(entry)) return normalized(entry);
   return resolve(root, entry);
@@ -189,11 +214,14 @@ export async function walkImportGraph(root, { entries, emittedFiles, outputRoot,
   catch (error) { failures.push(failure(displayPath(root, canonical), 'Missing app entry or runtime module', { message: error.message })); continue; }
   if (!isCode(canonical)) { failures.push(failure(displayPath(root, canonical), 'App graph entry is not a JavaScript or TypeScript module')); continue; }
   const tree = ts.createSourceFile(canonical, source, ts.ScriptTarget.Latest, true);
+  tree.impliedNodeFormat = ts.getImpliedNodeFormatForFile(canonical, undefined, ts.sys, options);
   onFile?.({ ts, tree, path: canonical, source });
-  for (const edge of runtimeEdges(ts, tree)) {
+  // Emitted JavaScript already contains its runtime syntax; do not apply the
+  // source project's TypeScript module transform to it again.
+  for (const edge of runtimeEdges(ts, tree, built ? { ...options, module: ts.ModuleKind.Preserve } : options)) {
    const result = built
-    ? await resolveBuiltEdge(canonical, edge.specifier, emitted, builtRoot)
-    : await resolveSourceEdge(ts, edge.specifier, canonical, options);
+    ? await resolveBuiltEdge(ts, canonical, edge, options, emitted, builtRoot)
+    : await resolveSourceEdge(ts, edge, canonical, options);
    if (result.unresolved) {
     failures.push(failure(displayPath(root, canonical), 'Unresolved local runtime import', { specifier: edge.specifier, kind: edge.kind, ...(result.reason ? { message: result.reason } : {}) }));
    } else if (result.path) pending.push(result.path);

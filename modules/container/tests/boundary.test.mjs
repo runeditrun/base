@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,symlink,rm,access,realpath} from 'node:fs/promises';
 import {join,relative,resolve} from 'node:path';
 import {tmpdir} from 'node:os';
+import {pathToFileURL} from 'node:url';
 import {checkBoundary} from '../boundary.mjs';
 import {buildContainer} from '../build.mjs';
 
@@ -104,6 +105,50 @@ test('container boundary follows reachable source and fresh output graphs, leavi
   }
   await rm(join(root,stem+declaration));
  }
+ // Private package imports and self exports use the branch the runtime loads.
+ // The opposite branch stays dormant, including in a CommonJS importer using
+ // dynamic import, and file extensions override the enclosing package format.
+ await writeFile(join(root,'tsconfig.json'),JSON.stringify({compilerOptions:{module:'NodeNext',moduleResolution:'NodeNext'}}));
+ const forms={
+  import:specifier=>`import value from '${specifier}'; export {value};`,
+  reexport:specifier=>`export {default as value} from '${specifier}';`,
+  dynamic:specifier=>`void import('${specifier}');`,
+  require:specifier=>`const value=require('${specifier}');`,
+  equals:specifier=>`import value = require('${specifier}');`,
+ };
+ await writeFile(join(root,'src/conditional-types.ts'),'new WebSocketPair();');
+ for(const [type,extension,staticBranch] of [['module','.ts','import'],['commonjs','.ts','require'],['module','.cts','require'],['commonjs','.mts','import']]){
+  const entry=`src/conditional-entry${extension}`;
+  for(const mapping of ['imports','exports'])for(const forbidden of ['import','require']){
+   const specifier=mapping==='imports'?'#local':'boundary-app/conditional';
+   const branches={types:'./src/conditional-types.ts',import:'./src/import.cjs',require:'./src/require.cjs'};
+   await writeFile(join(root,'package.json'),JSON.stringify({name:'boundary-app',type,[mapping]:{[mapping==='imports'?'#local':'./conditional']:branches}}));
+   for(const branch of ['import','require'])await writeFile(join(root,`src/${branch}.cjs`),`module.exports={branch:'${branch}'};${branch===forbidden?' function pair() { return new WebSocketPair(); }':''}`);
+   for(const [kind,source] of Object.entries(forms)){
+    await writeFile(join(root,entry),source(specifier));
+    const selected=kind==='dynamic'?'import':kind==='require'||kind==='equals'?'require':staticBranch;
+    if(selected===forbidden)await assert.rejects(checkBoundary(root,{engine:'node',entries:[entry]}),error=>error.failures.some(failure=>failure.path===`src/${selected}.cjs`&&failure.api==='WebSocketPair'));
+    else assert.deepEqual(await checkBoundary(root,{engine:'node',entries:[entry]}),{engine:'node',ok:true});
+   }
+  }
+ }
+ await writeFile(join(root,'package.json'),JSON.stringify({type:'module',imports:{'#local/*':'./src/*'}}));
+ await writeFile(join(root,'src/forbidden.ts'),'new WebSocketPair();');
+ for(const specifier of ['#local/forbidden.ts',pathToFileURL(join(root,'src/forbidden.ts')).href+'?loaded#fragment']){
+  for(const source of [forms.import(specifier),forms.dynamic(specifier),forms.require(specifier),forms.equals(specifier)]){
+   await writeFile(join(root,'src/server.ts'),source);
+   await assert.rejects(checkBoundary(root,{engine:'node'}),error=>error.failures.some(failure=>failure.path==='src/forbidden.ts'&&failure.api==='WebSocketPair'));
+   assert.deepEqual(await checkBoundary(root,{engine:'workerd'}),{engine:'workerd',ok:true});
+  }
+ }
+ for(const specifier of ['#missing','#local/missing.ts',pathToFileURL(join(root,'src/missing.ts')).href]){
+  await writeFile(join(root,'src/server.ts'),forms.dynamic(specifier));
+  await assert.rejects(checkBoundary(root,{engine:'node'}),error=>error.failures.some(failure=>failure.api==='Unresolved local runtime import'&&failure.specifier===specifier));
+ }
+ await writeFile(join(root,'src/server.ts'),"import 'uninstalled-package';");
+ assert.deepEqual(await checkBoundary(root,{engine:'node'}),{engine:'node',ok:true});
+ await writeFile(join(root,'package.json'),'{"type":"module"}');
+ await writeFile(join(root,'tsconfig.json'),JSON.stringify({compilerOptions:{module:'ESNext',moduleResolution:'Bundler',baseUrl:'.',paths:{'@app/*':['src/*']}}}));
  await writeFile(join(root,'src/server.ts'),"import './type-only'; import {loop} from './cycle/a'; export {default as settings} from '@app/settings'; const runtime=require('./runtime'); void import('./lazy'); export const ready=loop+runtime;");
 
  const server=join(root,'dist/server'), chunks=join(server,'chunks');
@@ -126,6 +171,19 @@ test('container boundary follows reachable source and fresh output graphs, leavi
  await writeFile(join(server,'lazy.mjs'),output['lazy.mjs']);
  await writeFile(join(server,'index.mjs'),output['index.mjs'].replace("import './chunks/start.mjs';","import './stale.mjs'; import './chunks/start.mjs';"));
  await assert.rejects(checkBoundary(root,{engine:'node',entries:['dist/server/index.mjs'],emittedFiles:emitted,outputRoot:server}),error=>error.failures.some(failure=>failure.path==='dist/server/index.mjs'&&failure.message==='local import was not emitted by this build'));
+ await writeFile(join(server,'package.json'),JSON.stringify({name:'built-boundary-app',type:'module',imports:{'#fresh':'./lazy.mjs','#stale':'./stale.mjs','#outside':'../../src/forbidden.ts'},exports:{'./fresh':'./lazy.mjs','./stale':'./stale.mjs'}}));
+ for(const specifier of ['#fresh','built-boundary-app/fresh','uninstalled-package',pathToFileURL(join(server,'lazy.mjs')).href]){
+  await writeFile(join(server,'index.mjs'),forms.dynamic(specifier));
+  assert.deepEqual(await checkBoundary(root,{engine:'node',entries:['dist/server/index.mjs'],emittedFiles:emitted,outputRoot:server}),{engine:'node',ok:true});
+ }
+ for(const specifier of ['#stale','built-boundary-app/stale',pathToFileURL(join(server,'stale.mjs')).href]){
+  await writeFile(join(server,'index.mjs'),forms.dynamic(specifier));
+  await assert.rejects(checkBoundary(root,{engine:'node',entries:['dist/server/index.mjs'],emittedFiles:emitted,outputRoot:server}),error=>error.failures.some(failure=>failure.message==='local import was not emitted by this build'));
+ }
+ for(const specifier of ['#missing','#outside',pathToFileURL(join(root,'src/forbidden.ts')).href]){
+  await writeFile(join(server,'index.mjs'),forms.dynamic(specifier));
+  await assert.rejects(checkBoundary(root,{engine:'node',entries:['dist/server/index.mjs'],emittedFiles:emitted,outputRoot:server}),error=>error.failures.some(failure=>failure.api==='Unresolved local runtime import'&&failure.specifier===specifier));
+ }
 });
 
 test('ordinary calls with cloudflare strings are not module imports',async t=>{
