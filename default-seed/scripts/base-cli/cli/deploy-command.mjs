@@ -24,7 +24,7 @@ export function validateDeployOptions(options) {
 
 // An explicit adapter declaration wins. Older hooks use a conventional root
 // declaration; discover it by its schema, never by seed identity or hook source.
-async function declarationFor(root, adapter) {
+export async function declarationFor(root, adapter) {
  const declared = adapter.deployDeclaration ?? adapter.deploy?.declaration;
  const paths = declared ? [declared] : (await readdir(root)).filter(path => path.endsWith('.json') && path !== adapter.site?.declaration);
  const matches = [];
