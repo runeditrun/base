@@ -19,6 +19,7 @@ import { vendoredCalls } from './package-calls.mjs';
 import { doorProtocol } from './door.mjs';
 import { savedOrigin } from './door-mode.mjs';
 import { probePnpm } from './pnpm-probe.mjs';
+import { deliveryDeclarationClauses } from './delivery-declarations.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
 // too old to record one). defaults: what a server start applies when the person
@@ -71,6 +72,7 @@ async function localState(project) {
 
 export async function check(project, explicitProfile) {
  const clauses = [], add = (id, ok, message) => clauses.push({ id, ok: Boolean(ok), ...(!ok ? { message } : {}) });
+ clauses.push(...await deliveryDeclarationClauses(project.root));
  for (const command of project.commands) add('SC-10.inputs.' + command.name, command.available, `Restore the declared inputs for ${command.name}.`);
  for (const loop of project.descriptor.loops ?? []) add('SC-10.loop.' + loop.id, !loop.required || loop.enabled, `Enable the required ${loop.id} loop or correct its declaration.`);
  if (project.profile === 'first-party' || explicitProfile === 'first-party') {

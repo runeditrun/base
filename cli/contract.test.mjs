@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, cp, readFile, writeFile, rm, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdtemp, mkdir, cp, readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { exportCLI } from './export.mjs';
@@ -9,7 +9,7 @@ import { verbs, aliases, pins } from './contract.mjs';
 const base = resolve(import.meta.dirname, '..');
 const common = [...Object.keys(verbs), 'release'];
 
-test('check diagnoses a broken declaration, accepts its correction and refuses missing runtime code without effects', async t => {
+test('check diagnoses command and deployment declarations, accepts corrections and refuses missing runtime code without effects', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-structural-')); t.after(() => rm(root, { recursive: true, force: true }));
  await exportCLI(base, root); await cp(join(base, 'onboarding'), join(root, 'scripts/base-onboarding'), { recursive: true });
  await writeFile(join(root, '.node-version'), pins.node + '\n');
@@ -25,6 +25,28 @@ test('check diagnoses a broken declaration, accepts its correction and refuses m
  await save();
  const accepted = check();
  assert.equal(accepted.status, 0, accepted.stderr);
+ for (const [path, wrap] of [
+  ['rer-packaging.json', spec => ({ artifact: { specInputs: spec } })],
+  ['packaging.json', spec => ({ artifact: { specInputs: spec } })],
+  ['scripts/delivery/base/packaging.json', spec => ({ artifact: { specInputs: spec } })],
+  ['management/integration/deployment-spec.json', spec => spec],
+ ]) {
+  await mkdir(dirname(join(root, path)), { recursive: true });
+  for (const [first, second] of [['app', 'page'], ['app', 'websitePreview'], ['page', 'websitePreview']]) {
+   const spec = { surfaces: { app: { path: '/' }, [first]: { path: '/', originVariable: 'APP_URL' }, [second]: { path: '/preview', originVariable: 'APP_URL' } } };
+   await writeFile(join(root, path), JSON.stringify(wrap(spec)));
+   const duplicate = check();
+   assert.equal(duplicate.status, 1, `${path}: repeated origins must fail check`);
+   assert.ok(duplicate.report.clauses.some(clause => !clause.ok && ['APP_URL', `surfaces.${first}`, `surfaces.${second}`].every(name => clause.message?.includes(name))));
+   const deploy = spawnSync(process.execPath, [join(root, 'scripts/rer.mjs'), 'deploy', '--dry-run'], { cwd: root, encoding: 'utf8', timeout: 10000 });
+   assert.equal(deploy.status, 1);
+   for (const name of ['APP_URL', `surfaces.${first}`, `surfaces.${second}`]) assert.ok((deploy.stdout + deploy.stderr).includes(name));
+   spec.surfaces[second].originVariable = 'PREVIEW_URL';
+   await writeFile(join(root, path), JSON.stringify(wrap(spec)));
+   assert.equal(check().status, 0, `${path}: distinct origins must pass check`);
+  }
+  await rm(join(root, path));
+ }
  const broken = structuredClone(descriptor);
  delete broken.commands.dev;
  await save(broken);
