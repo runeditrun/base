@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Hosted demo image builds use the adapter's declared deploy file, including names other than `deploy.json`.
+- `rer deploy --remove --yes` empties small R2 buckets whose object listing omits pagination metadata. Ambiguous full pages and inconsistent cursors still stop removal.
+- Setup uses a mapped owner-name field and its declared default without requiring a second `displayName`. `--owner-name` supplies that mapped field.
+- Import-kit and portability encode mixed-script D1 bindings and count their UTF-8 and RPC sizes without splitting atomic transactions. Retained import plans are read in bounded pages. Source adopters must refresh both modules and include their shared `d1-transport` dependency before removing an edition's transport wrapper.
+
 ## 0.2.17
 
 - Container builds check the app's reachable runtime imports from Wrangler main and fresh server output. Dormant source files and ordinary calls containing cloudflare-looking strings no longer fail the boundary; reachable Node-engine restrictions remain.
