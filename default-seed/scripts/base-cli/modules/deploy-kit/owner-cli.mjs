@@ -46,7 +46,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   assert(typeof declaration?.project === 'string','missing-owner-project');
   // Removal reads identity before each object DELETE and may span many pages.
   // Bound each response, not the owner's bucket size; failures retain ownership.
-  let requestWindow = propagation?.freshUpload ? propagation.window : undefined;
+  let requestWindow = propagation?.uploaded ? propagation.window : undefined;
   const request = fetch;
   fetch = (input, init = {}) => {
     if (!requestWindow?.active) return request(input, init);
@@ -94,7 +94,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   if (command === 'health') {
     const readiness = {...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}),
       ...healthOptions?.readiness,single:true,totalMs:30000,
-      ...(propagation ? {window:propagation.window,freshUpload:propagation.freshUpload && propagation.versionId === state.receipt?.provider.versionId} : {})};
+      ...(propagation ? {window:propagation.window,freshUpload:propagation.uploaded && propagation.versionId === state.receipt?.provider.versionId} : {})};
     await ownerHealth({api,target,plan,statePath,fetch,healthOptions:{...healthOptions,readiness}}).catch(error=>{throw api.annotateFailure(error,'health');});
     return {ok:true,worker:target.worker,origin:target.origin};
   }
@@ -110,7 +110,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   });
   const result = {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,retiredSecrets,...(state.ownerClaim ? {ownerClaim:state.ownerClaim} : {}),state:statePath};
   const sentTokens = new Map(sentSecrets.map(binding => [binding,env[declaration.secrets.find(item => item.binding === binding)?.environment]]));
-  Object.defineProperty(result, 'propagation', {value: {window,freshUpload,sentSecrets,versionId:receipt.provider.versionId,
+  Object.defineProperty(result, 'propagation', {value: {window,uploaded:receipt.changed,freshUpload,sentSecrets,versionId:receipt.provider.versionId,
     matchesToken:(binding,token) => sentTokens.has(binding) && sentTokens.get(binding) === token}});
   rememberReadiness(result);
   return result;

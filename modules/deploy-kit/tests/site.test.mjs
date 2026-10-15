@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { cloudflare } from '../provider.mjs';
 import { collectFiles } from '../artifact.mjs';
-import { sitePlan, siteDeploy, siteDeclaration } from '../site.mjs';
+import { sitePlan, siteDeploy, siteDeclaration, siteReadbackSummary } from '../site.mjs';
 
 const app = { project: 'runeditrun/cradle', environment: 'production', compatibilityDate: '2026-09-08' };
 
@@ -87,4 +88,62 @@ test('site deploy refuses a Worker or domain it did not make, a rolled-back Work
     await assert.rejects(siteDeploy({ api, plan, files, receiptPath }), new RegExp(code), name);
     assert.equal(provider.state.writes.length, writes, `${name}: no provider write`);
   }
+});
+
+test('site upload waits for its own version through lagging provider reads without accepting replacements', async t => {
+  const { siteProvider } = await import('./site-provider.mjs');
+  for (const scenario of ['deployments', 'versions', 'missing deployments', 'missing version', 'fresh Worker missing', 'final readback', 'timeout', 'foreign version', 'foreign newest', 'foreign fingerprint', 'foreign owner', 'split deployment']) await t.test(scenario, async t => {
+    const provider = siteProvider({ domain: 'run-cradle.com' }), { files, folder, receiptPath } = await site(t);
+    t.after(() => provider.close());
+    const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
+    const plan = sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: folder });
+    const fresh = scenario === 'fresh Worker missing';
+    if (!fresh) await siteDeploy({ api, plan, files, receiptPath });
+    const priorDeployments = structuredClone(provider.state.deployments);
+    const priorVersions = structuredClone(provider.state.versions ?? []);
+    const receipt = fresh ? null : await readFile(receiptPath), writes = provider.state.writes.length;
+    let uploaded = false, reads = 0, elapsed = 0, sleeps = 0, final = false;
+    const observed = { ...api, async request(path, options) {
+      const result = await api.request(path, options);
+      if (path === `/workers/scripts/${plan.worker}` && options?.method === 'PUT') {
+        uploaded = true;
+        if (scenario === 'foreign version') {
+          provider.state.version.id = randomUUID();
+          provider.state.deployments[0].versions[0].version_id = provider.state.version.id;
+        }
+        if (scenario === 'foreign fingerprint') provider.state.version.annotations['workers/message'] = `rer-site:${'f'.repeat(64)}`;
+        if (scenario === 'foreign owner') provider.state.version.annotations['workers/message'] = 'Deploy from the dashboard';
+        if (scenario === 'foreign newest') provider.state.versions = [{ id: randomUUID() }, ...provider.state.versions];
+        if (scenario === 'split deployment') provider.state.deployments[0].versions.push({ version_id: priorVersions[0].id, percentage: 0 });
+      }
+      if (!uploaded) return result;
+      if (fresh && path.endsWith('/settings') && ++reads <= 2) throw Object.assign(new Error('provider-http-404'), { status: 404 });
+      if (path.endsWith('/subdomain')) final = true;
+      if (!fresh && path.endsWith('/deployments') && (scenario !== 'final readback' || final)) {
+        reads++;
+        if ((scenario === 'deployments' || scenario === 'final readback') && reads <= 2 || scenario === 'timeout') return { deployments: priorDeployments };
+        if (scenario === 'missing deployments' && reads <= 2) return { deployments: [] };
+      }
+      if (path.endsWith('/versions') && scenario === 'versions' && reads <= 2) return { items: priorVersions.map(({ id }) => ({ id })) };
+      if (path.includes('/versions/') && scenario === 'missing version' && reads <= 2) throw Object.assign(new Error('provider-http-404'), { status: 404 });
+      return result;
+    } };
+    const readiness = { totalMs: 9000, clock: () => elapsed, sleep: async ms => { sleeps++; elapsed += ms; } };
+    const run = () => siteDeploy({ api: observed, plan, files, receiptPath, readiness });
+    if (scenario.startsWith('foreign') || scenario === 'split deployment') {
+      await assert.rejects(run(), /owned-resource-replaced/);
+      assert.equal(sleeps, 0, 'a real replacement is refused without a retry');
+      assert.deepEqual(await readFile(receiptPath), receipt);
+    } else if (scenario === 'timeout') {
+      await assert.rejects(run(), error => error.message === 'site-upload-timeout' && error.lastSeen.versionId === priorVersions[0].id && siteReadbackSummary(error).includes(priorVersions[0].id));
+      assert.equal(elapsed, readiness.totalMs, 'readback shares the original upload deadline');
+      assert.deepEqual(await readFile(receiptPath), receipt);
+    } else {
+      assert.equal((await run()).origin, 'https://run-cradle.com');
+      assert.equal(reads >= 3, true, 'two lagging reads are followed by the uploaded version');
+      assert.equal(sleeps, 2);
+      assert.ok(elapsed > 0 && elapsed < readiness.totalMs);
+    }
+    assert.equal(provider.state.writes.slice(writes).filter(write => write.path === `/workers/scripts/${plan.worker}`).length, 1, 'only readback is retried');
+  });
 });

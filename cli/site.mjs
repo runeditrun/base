@@ -113,7 +113,7 @@ export async function siteCommand(project, options, store, signal, out) {
  if (!options.json) for (const line of human) out.human(line);
  const { cloudflare } = await import('../modules/deploy-kit/provider.mjs');
  const { collectFiles } = await import('../modules/deploy-kit/artifact.mjs');
- const { siteDeploy } = await import('../modules/deploy-kit/site.mjs');
+ const { siteDeploy, siteReadbackSummary } = await import('../modules/deploy-kit/site.mjs');
  const environment = options.environment ?? 'production';
  try {
   const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
@@ -122,7 +122,7 @@ export async function siteCommand(project, options, store, signal, out) {
   return { dryRun: false, deployed: true, origin: result.origin, site: summary };
  } catch (error) {
   if (error instanceof RerError) throw error;
-  throw new RerError('deploy_refused', `Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.`, 1);
+  throw new RerError('deploy_refused', `Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${siteReadbackSummary(error)}`, 1);
  }
 }
 
