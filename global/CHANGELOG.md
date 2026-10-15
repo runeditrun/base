@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.16
+
+- A hosted demo's container stays up until the visitor's 15 idle minutes or the demo's hour, however long the visitor goes without a request. Before, the platform stopped it about three minutes after the last request, the next request got a Cloudflare 500, and its place stayed held. A container that is gone anyway (stopped by the platform, or failing once stopped) now ends its demo, frees its place at once and answers the ended page (410, with "Start a new demo").
+- `deploy-demo.json` takes an optional `instanceType`, one of Cloudflare Containers' predefined types (`lite`, `basic`, `standard-1` to `standard-4`); `basic` unless set, so existing demos are unchanged. `rer deploy --demo --dry-run` prints the planned type and refuses any other value. DEMO.md notes what a larger type costs.
+
+### Upgrade notes
+
+- Update the exact rer package pin and redeploy hosted demos (`rer deploy --demo`, or run-demo) to receive the keepalive. Demos already running end as before. Set `instanceType` (for example `standard-1`) only where a faster start is worth the cost.
+
 ## 0.2.15
 
 - Demo pages show a slim strip pinned to the top, collapsed by default. Captured mail and blocked-send details open in a popover without moving the page.
