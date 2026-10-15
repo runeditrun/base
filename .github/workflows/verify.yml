@@ -126,6 +126,9 @@ jobs:
             printf 'Verification requires at least 15 GiB free after bootstrap; available: %s KiB\n' "$available_kib" >&2
             exit 1
           fi
+      - name: Strict typecheck of seed module copies
+        if: ${{ matrix.group == 'modules' }}
+        run: pnpm typecheck:modules
       - name: Run full-verify stages assigned to this job
         env:
           VERIFY_GROUP: ${{ matrix.group }}

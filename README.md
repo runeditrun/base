@@ -75,7 +75,11 @@ This repository contains an optional reference runtime, shared source and docume
 manifest/release schemas, edition-owned authoring tools and the family exporter.
 The foundation command creates a family authoring tree; it does not convert an
 existing edition. See [the exporter guide](composition/README.md) for its exact
-committed-input workflow. `pnpm verify` checks schemas, source
+committed-input workflow. The Verify workflow also runs `pnpm typecheck:modules`
+with strict unused-local, unused-parameter and switch-fallthrough checks over
+all reusable module TypeScript, excluding Base's tests and proof programs.
+The egress Worker uses its own Worker-only type environment in that same step.
+`pnpm verify` checks schemas, source
 integrity, export safety, deployment helpers, foundation assembly, operation
 inspection and the runtime reference. These checks do not certify every edition's
 product contract or deployment.
