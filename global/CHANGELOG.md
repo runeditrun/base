@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.23
+
+- Managed mail (`rer` provider) works from Cloudflare Workers. Mail transport always fetches with `redirect: 'manual'`, because Workers reject `redirect: 'error'`, which made every relay send end as `transport_uncertain` without a request. A relay 3xx is never followed and is reported as `rejected` (`provider_redirected`).
+- The `rer` relay adapter accepts `Auto-Submitted: auto-generated`, which Base's sign-in and invitation mail sets, and does not transmit it: the platform relay sets it on every message. It maps `List-Unsubscribe` and one-click `List-Unsubscribe-Post` to the relay's `listUnsubscribe` and `listUnsubscribePost` fields. Values the relay would refuse are refused before sending, and every other header is still refused.
+
+### Upgrade notes
+
+- Mail transport now passes `redirect: 'manual'` to an injected `fetch`. A seed that wrapped fetch for the `rer` relay to get around the Workers redirect error must remove that wrapper when it refreshes `modules/mail` or pins 0.2.23. A wrapper that insists on `redirect: 'error'` (as Spool's `src/auth/mail-fetch.server.mjs` does) would turn every send into `uncertain`. A seed that dropped `Auto-Submitted` for the relay can send it again.
+
 ## 0.2.21
 
 - Demo removal retries transient Cloudflare provider failures while preserving the resource ownership checks.
