@@ -11,6 +11,7 @@ import { cloudflare } from '../modules/deploy-kit/provider.mjs';
 import { ownerTarget, ownerPlan, ownerDeploy } from '../modules/deploy-kit/owner.mjs';
 import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { owner } from '../onboarding/adapter-auth.mjs';
+import { finalizingDeploy } from './fixtures/finalizing-deploy.mjs';
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
 // provider and hosted HTTP edge are faked. No seed source is modified.
@@ -116,10 +117,22 @@ test('declared minimal hook keeps an established owner and refuses provider repl
  assert.equal(f.provider.state.writes.length, writes);
 });
 
-test('custom deploy calling the shared owner helper claims once and shared finalization retires its token', async t => {
- const f = await fixture(t, { selfClaim: true });
- assert.equal((await f.run()).owner, 'claimed'); assert.equal(f.claims.length, 1);
- assert.ok(!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
+test('first custom deploy exits zero for late health, and wrong-commit health fails with the exact rerun', async t => {
+ const f = await finalizingDeploy(t);
+ const result = await f.run('late'), output = result.stdout + result.stderr;
+ assert.equal(result.code, 0, output);
+ const events = result.stdout.trim().split('\n').map(line => JSON.parse(line));
+ assert.equal(events.at(-1).ok, true); assert.equal(events.at(-1).owner, 'claimed');
+ const state = JSON.parse(await readFile(join(f.root, '.rer/deploy/review.json')));
+ assert.equal(state.ownerClaim.outcome, 'claimed');
+ assert.ok(state.retiredSecrets.includes('SETUP_TOKEN'));
+ // A fresh first deploy with a different edge commit must still fail clearly.
+ await rm(join(f.root, '.rer'), { recursive: true, force: true });
+ const wrong = await f.run('wrong'), failure = wrong.stdout + wrong.stderr;
+ assert.equal(wrong.code, 1, failure);
+ assert.match(failure, /still answers for commit 0123456789ab/);
+ assert.match(failure, /90-second finalization wait/);
+ assert.ok(failure.includes(f.again), failure);
 });
 
 test('claim and retirement failures fail the command with deployment state and same-input recovery', async t => {
@@ -178,7 +191,8 @@ test('a hook keeping its own record is claimed from its result once /health name
  f.provider.state.healthOverride = () => { elapsed += 90000; return Response.json({ ok: true, deployment: { sourceSha: '0123456789abcdef0123456789abcdef01234567' } }); };
  await assert.rejects(f.run(), error => {
   assert.equal(error.exitCode, 1);
-  assert.match(error.message, /never named this checkout's commit/); assert.match(error.message, /still answers for commit 0123456789ab/);
+  assert.match(error.message, /within the 90-second finalization wait/); assert.match(error.message, /still answers for commit 0123456789ab/);
+  assert.ok(error.message.includes('rer deploy --environment production --env-file owner.env'));
   assert.doesNotMatch(error.message, /receipt/);
   return true;
  });

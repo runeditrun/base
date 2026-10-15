@@ -1,6 +1,6 @@
 // Fake only the Container platform. Its process state survives a Durable Object
 // restart; a per-object inactivity timeout must be installed again on recovery.
-export function platform(ctx, app) {
+export function platform(ctx, app, failures = 0) {
   const id = ctx.id.toString(), sql = ctx.storage.sql;
   const read = () => {
     sql.exec('CREATE TABLE IF NOT EXISTS _test_container_platform(id INTEGER PRIMARY KEY, value TEXT)');
@@ -24,14 +24,21 @@ export function platform(ctx, app) {
   // default timeout. The real platform also requires it to be reconfigured.
   expire(); write({ timeout: null, inactiveAt: null });
   let exit;
-  const stopped = new Promise((_, reject) => { exit = reject; });
+  let stopped = new Promise((_, reject) => { exit = reject; });
   return {
     now,
     get running() { expire(); return read().running; },
     active() { expire(); write({ inactiveAt: null }); },
     inactive() { write({ inactiveAt: now() }); },
     advance(ms) { const time = now(); write({ inactiveAt: read().inactiveAt ?? time, time: time + ms }); },
-    start(options) { write({ running: true }); void tell('start', options); },
+    start(options) {
+      stopped = new Promise((_, reject) => { exit = reject; });
+      write({ running: true });
+      if (failures-- > 0) {
+        write({ running: false });
+        queueMicrotask(() => exit(new Error('There is no container instance that can be provided to this Durable Object, try again later')));
+      } else void tell('start', options);
+    },
     async setInactivityTimeout(timeout) { write({ timeout }); },
     monitor: () => stopped,
     async destroy() {

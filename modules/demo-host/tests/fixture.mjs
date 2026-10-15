@@ -11,7 +11,7 @@ export class DemoContainer extends Deployed {
   startTimeout = Number(this.env.TEST_START_MS ?? this.startTimeout);
   probeTimeout = Number(this.env.TEST_PROBE_MS ?? this.probeTimeout);
   idle = Number(this.env.TEST_IDLE_MS ?? this.idle);
-  get container() { return this.platform ??= platform(this.ctx, this.env.APP); }
+  get container() { return this.platform ??= platform(this.ctx, this.env.APP, Number(this.env.TEST_PLACEMENT_FAILURES)); }
   now() { return this.container.now(); }
   events = 0;
   async event(run) {
