@@ -20,7 +20,11 @@ test('large JSON reports drain through a full-reading pipe at both CLI entries',
  }));
  const consumer = join(root, 'consume.mjs');
  await writeFile(consumer, "const chunks = []; for await (const chunk of process.stdin) chunks.push(chunk); process.stdout.write(JSON.stringify(JSON.parse(Buffer.concat(chunks).toString('utf8'))) + '\\n');\n");
- const env = { PATH: process.env.PATH, HOME: root, RER_NO_UPDATE_CHECK: '1' };
+ // CI checks out as a different uid and trusts Base in its original HOME.
+ // Keep the isolated HOME while granting only this source checkout that trust:
+ // describe reads its Git version before it writes the document.
+ const env = { PATH: process.env.PATH, HOME: root, RER_NO_UPDATE_CHECK: '1',
+  GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: base };
  for (const entry of ['bin/rer.mjs', 'global/rer.mjs']) for (const [args, status] of [
   [['describe', '--json'], 0],
   [['check', '--json', '--profile', 'first-party'], 1],
@@ -30,8 +34,8 @@ test('large JSON reports drain through a full-reading pipe at both CLI entries',
   let file;
   try { file = spawnSync(process.execPath, [join(base, entry), ...args], { cwd: root, env, stdio: ['ignore', fd, 'pipe'], encoding: 'utf8', timeout: 20000 }); }
   finally { closeSync(fd); }
-  assert.equal(file.status, status, file.stderr);
   const expected = await readFile(destination, 'utf8');
+  assert.equal(file.status, status, `${entry} ${args.join(' ')}: ${file.stderr || expected.slice(0, 1000)}`);
   const report = JSON.parse(expected);
   if (args[0] === 'describe') assert.equal(report.verbs.verify.effects, effects);
   else if (args[0] === 'check') assert.ok(report.clauses.some(clause => !clause.ok));
