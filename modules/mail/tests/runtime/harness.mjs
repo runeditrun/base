@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { Miniflare } from 'miniflare';
 const root = new URL('../../', import.meta.url);
 
-export async function createWorker(entry, extra = []) {
+export async function createWorker(entry, extra = [], outbound) {
   const modules = {};
   async function add(path) { modules[path] = { type: 'esm', contents: await readFile(new URL(path, root), 'utf8') }; }
   async function source(directory) {
@@ -16,5 +16,5 @@ export async function createWorker(entry, extra = []) {
   for (const path of [entry, ...extra]) await add(path);
   return new Miniflare({ cf: false, resourcePersistencePath: fileURLToPath(new URL('tests/runtime/.state', root)), workers: [{ config: { type: 'worker', name: 'mail-conformance', compatibilityDate: '2026-09-01',
     manifest: { mainModule: entry, modulesRoot: fileURLToPath(root), modules },
-  } }] });
+  }, ...(outbound ? { dev: { outboundService: { type: 'fetcher', handler: outbound } } } : {}) }] });
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.22-dev.g1a5bb5f9",
+  "cliVersion": "0.2.22-dev.gada9f574",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1515,7 +1515,7 @@
     },
     "modules/mail/README.md": {
       "source": "modules/mail/README.md",
-      "sha256": "4eae21c84caf86429a0274e5dccb002a304915c74ff58f0c75279555d2cb16a0"
+      "sha256": "2067e03ab3f25fcf55d0ada52a19c44689839c6ca322853529d497430d4aa429"
     },
     "modules/mail/doctor.mjs": {
       "source": "modules/mail/doctor.mjs",
@@ -1587,11 +1587,11 @@
     },
     "modules/mail/src/adapters/rer/contract.mjs": {
       "source": "modules/mail/src/adapters/rer/contract.mjs",
-      "sha256": "b8ae90da173b40c7bde1a194ac35e9367802b9b608f050d63e2337a64e58454c"
+      "sha256": "3dba4b2c07367775768b5d1683cb859ffd000a6eefd2236308a33ebf7ecad1dd"
     },
     "modules/mail/src/adapters/rer/index.mjs": {
       "source": "modules/mail/src/adapters/rer/index.mjs",
-      "sha256": "2f27ff23d1182b4792b13b777e44fe1de9f7568474df11f3b60655415d2a6635"
+      "sha256": "23faa46d74aa987e7fc51e1a78d83760414a169e8bc0101e399bb4d685c4ce14"
     },
     "modules/mail/src/adapters/resend/README.md": {
       "source": "modules/mail/src/adapters/resend/README.md",
@@ -1631,7 +1631,7 @@
     },
     "modules/mail/src/core/transport.mjs": {
       "source": "modules/mail/src/core/transport.mjs",
-      "sha256": "aecc91b5b12c2f315a3154679bb6780518453d04516c750517f06f25548ebb18"
+      "sha256": "67b721f37bdde8a5f419ca88eda0e88650ffaca06bcbf91eab0e33c879d0e230"
     },
     "modules/mail/src/core/validation.mjs": {
       "source": "modules/mail/src/core/validation.mjs",

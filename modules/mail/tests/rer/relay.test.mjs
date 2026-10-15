@@ -27,7 +27,7 @@ async function relay(t, configuration) {
     respond: value => { status = value; },
     fetch: (url, init) => {
       assert.equal(url, configuration.relayUrl);
-      assert.equal(init.redirect, 'error');
+      assert.equal(init.redirect, 'manual');
       // Only the test network edge maps the assigned HTTPS relay to loopback.
       return fetch(`http://127.0.0.1:${server.address().port}/api/managed-mail/send`, init);
     },
@@ -71,15 +71,15 @@ test('relay errors preserve delivery policy without retrying or exposing the key
   assert.ok(!JSON.stringify(logs).includes(configuration.apiKey));
 });
 
-test('the public sender never follows a relay redirect', async t => {
+test('the public sender refuses a relay redirect without following it', async t => {
   const configuration = config(), edge = await relay(t, configuration);
   const sender = createMailSender(configuration, { fetch: edge.fetch });
   for (const status of [301, 302, 303, 307, 308]) {
     edge.respond(status);
     const before = edge.requests.length;
     const result = await sender.send(message());
-    assert.equal(result.status, 'uncertain');
-    assert.equal(result.code, 'transport_uncertain');
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.code, 'provider_redirected');
     assert.equal(edge.requests.length, before + 1);
   }
   assert.ok(edge.requests.every(request => request.path === '/api/managed-mail/send'));
@@ -94,7 +94,7 @@ test('unsupported relay messages and invalid credentials fail before network eff
     { to: ['first@example.test', 'second@example.test'] }, { subject: '' }, { subject: 'Sign in\nInjected' }, { subject: 'x'.repeat(201) },
     { text: undefined, html: '<p>HTML alone</p>' }, { text: 'x'.repeat(65_537) }, { html: 'x'.repeat(65_537) },
     { text: '界'.repeat(50_000) }, { cc: [] }, { bcc: [] }, { replyTo: 'reply@example.test' }, { headers: { 'Message-ID': '<sign-in@example.test>' } }, { attachments: [] },
-    { unsubscribe: { url: 'https://app.example.test/unsubscribe' } }, { customArgs: {} }, { subscriptionTracking: false },
+    { customArgs: {} }, { subscriptionTracking: false },
   ]) await assert.rejects(sender.send({ ...message(), ...change }), MailValidationError);
   for (const change of [
     { apiKey: undefined }, { apiKey: configuration.apiKey + '\n' }, { relayUrl: undefined },
