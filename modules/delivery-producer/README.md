@@ -63,6 +63,33 @@ KV, Analytics Engine and Durable Object storage have explicit incomplete
 portability via `capabilities.mjs`; packaging support does not claim export or
 restore support.
 
+## Managed mail
+
+Managed mail opts in through `artifact.specInputs.mail: {providers: ["rer"]}`.
+Declare `MAIL_PROVIDER`, `MAIL_FROM` and `MAIL_RELAY_URL` in
+`publicVariableNames` and the emitted Wrangler `vars` (empty strings are valid
+unconfigured defaults), and `MAIL_API_KEY` in either `secretNames` or
+`optionalSecretNames`. The producer preserves the mail declaration in the
+candidate deployment spec and rejects missing or incorrectly classified bindings.
+RER assigns the provider, sender and relay URL and provisions the private
+installation credential when Managed configuration is saved. No SendGrid key
+belongs in the app's configuration or build.
+
+To author the matching committed setup manifest, compose the exported
+`generateMailSetupFields({providers: ["rer"]})` from `mail.mjs` into its
+`fields`. It supplies the public provider selection, sender and relay URL and
+an entered secret key, required when `rer` is selected. Add `resend`, `sendgrid`
+or `cloudflare` to retain direct provider choices; the helper adds Cloudflare's
+account input when selected. These generated fields use the existing setup
+schema and conditional presentations. Packaging, artifact generation and runtime
+export validate any selected manifest against the managed mail declaration.
+Existing manifests can declare equivalent fields themselves. Unselected setup
+manifests and projects without a mail declaration keep their existing behavior.
+Managed Configure hides these inputs and supplies them itself; Assisted hosting
+uses the ordinary selected provider inputs. The adapter sends through
+`${MAIL_RELAY_URL}` with the private `MAIL_API_KEY`, following the managed mail
+relay contract; no sender or installation ID is sent in its JSON body.
+
 The output directory must be fresh and empty. Its layout is:
 
 ```text
