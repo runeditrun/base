@@ -13,8 +13,8 @@ export async function runtime(t,{existing=false,local=false}={}) {
  let now=NOW;
  const sqlite=new DatabaseSync(':memory:');t.after(()=>sqlite.close());
  for(const path of ['operator-auth/accounts/schema/operator-auth.sql','operator-auth/identity/oidc/schema/oidc.sql','owner-claim/schema/owner-claim.sql','owner-claim/schema/idp.sql','dependencies/schema/dependencies.sql','dependencies/schema/approval-attempt.sql'])sqlite.exec(await readFile(new URL('../../'+path,import.meta.url),'utf8'));
- // Real SQL with serial transaction semantics, just like D1.
- function statement(sql,args=[]) {return {bind:(...v)=>statement(sql,v),async first(){return sqlite.prepare(sql).get(...args)??null;},async all(){return {results:sqlite.prepare(sql).all(...args)};},run(){return Promise.resolve(this.execute());},execute(){const st=sqlite.prepare(sql),results=st.columns().length?st.all(...args):(st.run(...args),[]);return {results,meta:{changes:sqlite.prepare('SELECT changes() n').get().n}};}};}
+ // Real SQL with serial transactions and trigger-inclusive changes metadata, like D1.
+ function statement(sql,args=[]) {return {bind:(...v)=>statement(sql,v),async first(){return sqlite.prepare(sql).get(...args)??null;},async all(){return {results:sqlite.prepare(sql).all(...args)};},run(){return Promise.resolve(this.execute());},execute(){const before=sqlite.prepare('SELECT total_changes() n').get().n,st=sqlite.prepare(sql),results=st.columns().length?st.all(...args):(st.run(...args),[]);return {results,meta:{changes:sqlite.prepare('SELECT total_changes() n').get().n-before}};}};}
  const db={prepare:statement,async batch(items){sqlite.exec('BEGIN IMMEDIATE');try{const result=items.map(s=>s.execute());sqlite.exec('COMMIT');return result;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};
  const signing=await keys('ES256');
  const idp=await provider({now:()=>now,issuer:ISSUER,clientId:'app-client',redirectUri:appOrigin+'/auth/oidc/auth/callback',alg:'ES256',method:'private_key_jwt',clientKey:signing.public,rerInterfaces:['oidc-provider@1.0.0'],claims:{iat:now/1000,exp:now/1000+300,email_verified_at:now/1000,sid:'owner-sid'}});
