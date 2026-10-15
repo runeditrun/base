@@ -15,10 +15,13 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
  t.after(async () => { for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
  Object.assign(process.env, { CI: 'true', CLOUDFLARE_ACCOUNT_ID: account.accountId, CLOUDFLARE_API_TOKEN: account.token });
  let responseOverride = (_call, response) => response;
- const calls = [];
+ const calls = [], requests = [];
+ let interruptedDelete;
  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
   const call = `${init.method ?? 'GET'} ${new URL(input).pathname.replace(`/client/v4/accounts/${account.accountId}`, '')}`;
   calls.push(call);
+  requests.push(call + new URL(input).search);
+  if (call === interruptedDelete) return Response.json({ success: false, errors: [{ code: 10000, message: 'Deletion interrupted' }] }, { status: 503 });
   return responseOverride(call, await account.fetch(input, init));
  });
  const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN', platforms: ['workers', 'container'] };
@@ -137,4 +140,55 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
   assert.equal(snapshot(), kept, 'nothing was deleted');
   assert.deepEqual(account.state.writes, []);
  }
+
+ // The same public remove door handles every declared domain. Keep the
+ // single-host cases above to cover deployments made before secondary hosts.
+ const secondary = 'page.demo.test.run-fixture.test';
+ const multiApp = { ...app, container: { engine: 'workerd', hostVariables: ['PAGE_HOST', 'APP_HOST'] } };
+ const multiDeclaration = { ...declaration, settings: { APP_HOST: 'demo.test.run-fixture.test', PAGE_HOST: secondary } };
+ await writeFile(join(root, 'deploy.json'), JSON.stringify(multiApp));
+ await writeFile(join(root, 'deploy-demo.json'), JSON.stringify(multiDeclaration));
+ const multiPlan = demoPlan({ project: app.project, environment: 'demo-test', compatibilityDate: app.compatibilityDate,
+  originVar: app.originVar, hostVariables: multiApp.container.hostVariables, declaration: multiDeclaration });
+ account = demoAccount(); account.deploy(multiPlan); account.unrelated(); calls.length = 0; requests.length = 0;
+ assert.equal(await remove('--yes'), 0);
+ assert.deepEqual(account.state.domains.map(row => row.hostname), ['www.someone-else.test']);
+ const domainDeletes = calls.filter(call => call.startsWith('DELETE /workers/domains/'));
+ assert.equal(domainDeletes.length, multiPlan.hostnames.length);
+ const workerDelete = `DELETE /workers/scripts/${multiPlan.worker}`;
+ assert.equal(calls.filter(call => call.startsWith('DELETE ')).at(-1), workerDelete, 'the Worker is deleted last');
+ const readback = requests.slice(requests.indexOf(workerDelete) + 1);
+ for (const hostname of multiPlan.hostnames) assert.ok(readback.includes(`GET /workers/domains?hostname=${hostname}`), `read back ${hostname}`);
+ account.state.writes.length = 0;
+ assert.equal(await remove('--yes'), 0);
+ assert.deepEqual(account.state.writes, []);
+
+ // Collision, extra attachment, or a changed declared set cannot authorize
+ // any deletion, including deletion of the primary domain.
+ for (const change of [
+  () => { account.state.domains.find(row => row.hostname === secondary).service = 'someone-else'; },
+  () => account.domain(`extra.${multiPlan.hostname}`, multiPlan.worker),
+  async () => writeFile(join(root, 'deploy-demo.json'), JSON.stringify({ ...multiDeclaration, settings: { ...multiDeclaration.settings, PAGE_HOST: `other.${multiPlan.hostname}` } })),
+  () => account.state.workers.delete(multiPlan.worker),
+ ]) {
+  account = demoAccount(); account.deploy(multiPlan); account.unrelated(); await change();
+  const kept = snapshot();
+  assert.equal(await remove('--yes'), 1);
+  assert.equal(snapshot(), kept);
+  assert.deepEqual(account.state.writes, []);
+  await writeFile(join(root, 'deploy-demo.json'), JSON.stringify(multiDeclaration));
+ }
+
+ // A failed second-domain deletion leaves the Worker ownership record for a
+ // fresh invocation to finish removing the remaining domain and container.
+ account = demoAccount(); account.deploy(multiPlan); account.unrelated();
+ interruptedDelete = `DELETE /workers/domains/${account.state.domains.find(row => row.hostname === secondary).id}`;
+ assert.equal(await remove('--yes'), 1);
+ assert.ok(account.state.workers.has(multiPlan.worker));
+ assert.deepEqual(account.state.domains.filter(row => row.service === multiPlan.worker).map(row => row.hostname), [secondary]);
+ interruptedDelete = undefined;
+ assert.equal(await remove('--yes'), 0);
+ assert.deepEqual([...account.state.workers.keys()], ['someone-else']);
+ assert.deepEqual(account.state.domains.map(row => row.hostname), ['www.someone-else.test']);
+ assert.deepEqual(account.state.apps.map(row => row.name), ['someone-else']);
 });
