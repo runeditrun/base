@@ -11,7 +11,7 @@ import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { liveServers } from '../registry.mjs';
-import { LaunchFailure } from './failure.mjs';
+import { LaunchFailure, workerFailure } from './failure.mjs';
 import { prepare } from './prepare.mjs';
 import { claimLaunch, eventLog, launchDirectory, liveWorker, releaseLaunch, serverRecord, stopRequest } from './state.mjs';
 import { startServer } from './steps.mjs';
@@ -53,8 +53,8 @@ if (!await claimLaunch(directory, token)) {
   await events.write({ event: 'ready', ready: started.ready, pid, ...(ours ? { log: serverLog } : {}) });
  } catch (error) {
   log(String(error?.stack ?? error));
-  const failure = stopping.signal.aborted ? new LaunchFailure(1, 'rer dev --stop stopped this launch before the app was ready.') : error;
-  await events.write({ event: 'failed', exitCode: failure.exitCode ?? 1, message: failure.exitCode ? failure.message : `The launch failed unexpectedly; see ${join(directory, 'launch.log')}.`, ...(failure.event ? { error: failure.event } : {}) });
+  const failure = workerFailure(stopping.signal.aborted ? new LaunchFailure(1, 'rer dev --stop stopped this launch before the app was ready.') : error, { root });
+  await events.write({ event: 'failed', exitCode: failure.exitCode, message: failure.message, error: failure.event });
  } finally {
   await releaseLaunch(directory, token);
   logFile.end();

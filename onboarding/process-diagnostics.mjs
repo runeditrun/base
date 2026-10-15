@@ -4,13 +4,15 @@ import {lstat,realpath,readFile,readdir,readlink} from 'node:fs/promises';
 import {basename,join} from 'node:path';
 import {homedir} from 'node:os';
 import {isIP} from 'node:net';
-import {commandFailure} from './failures.mjs';
+import {setTimeout as delay} from 'node:timers/promises';
+import {commandFailure,approvedFailure} from './failures.mjs';
 const exec=promisify(execFile);
 // macOS supplies lsof in /usr/sbin, which a command PATH may omit.
 // Diagnose sockets with the system utility even when that PATH is constrained.
 const lsof=process.platform==='darwin'?'/usr/sbin/lsof':'lsof';
 // One monotonic budget covers every command in an ownership decision.
-export const inspectionContext=()=>({deadline:performance.now()+15000});
+export const inspectionContext=(details={})=>({deadline:performance.now()+15000,...details});
+export const uncheckedInspection=error=>approvedFailure(error)?.ownershipUnchecked===true;
 const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,noMatch=false}={})=>{
  const invocation=[command,...args].join(' ').replaceAll(homedir(),'~');
  let failure;
@@ -27,7 +29,9 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
    failure=error.killed ? `timed out after ${timeout} ms` : `failed (${error.code??error.signal??'unknown error'}${typeof error.stderr==='string'&&error.stderr.trim()?'; diagnostic output':''}; attempt bound ${timeout} ms)`;
   }
  }
- throw commandFailure(`ownership-unchecked: Listener ownership could not be checked: ${invocation} ${failure??'total inspection deadline exhausted'} (at most 2 attempts; shared total bound 15000 ms). Launch refused; no ownership conclusion was made.`,{});
+ const subject=context.port?`who uses port ${context.port}`:'local process ownership';
+ const cause=failure?.startsWith('timed out')||performance.now()>=context.deadline?'in time (system busy)':'because the system process check failed';
+ throw commandFailure(`Could not check ${subject} ${cause}. Run rer ${context.verb??'dev'} again. No other owner was identified.\nOwnership check: ${invocation} ${failure??'total inspection deadline exhausted'} (at most 2 attempts; shared total bound 15000 ms).`,{ownershipUnchecked:true});
 };
 
 export async function processName(pid,context=inspectionContext()){
@@ -126,12 +130,17 @@ function matchingListener(rows,port,host){
  const row=rows.find(row=>row.sockets.some(socket=>serves(socket,port,host)===true));
  if(row)return row;
  if(rows.some(row=>row.sockets.some(socket=>serves(socket,port,host)===undefined))){
-  throw commandFailure(`ownership-unchecked: Listener inspection found a wildcard socket on port ${port} whose address family does not prove it serves ${host}. No ownership conclusion was made. Bind the application to the health address explicitly, then retry.`,{});
+  throw commandFailure(`Could not check who uses port ${port}: a wildcard socket's address family does not prove it serves ${host}. No other owner was identified. Bind the application to the health address explicitly, then run rer dev again.`,{ownershipUnchecked:true});
  }
 }
 export async function portListener(port,host,context=inspectionContext()){
+ context.port=port;
  const row=matchingListener(await listeners(undefined,context,port),port,host);
- return row&&{pid:row.pid,command:await processName(row.pid,context),cwd:await processCwd(row.pid,context)};
+ if(!row)return;
+ // Labels improve the instruction, but a slow optional label cannot erase a
+ // positive PID/socket observation or turn it into an unchecked accusation.
+ const optional=async action=>{try{return await action();}catch(error){if(!uncheckedInspection(error))throw error;}};
+ return {pid:row.pid,command:await optional(()=>processName(row.pid,context))??'process',cwd:await optional(()=>processCwd(row.pid,context))};
 }
 async function descendants(pid,context){
  const rows=(await run('/bin/ps',['-axo','pid=,ppid='],context)).trim().split('\n').map(line=>line.trim().split(/\s+/).map(Number));
@@ -146,6 +155,8 @@ export async function listenerPorts(pid,context=inspectionContext()){
 // reach either loopback family, so it also needs a completed inspection with
 // no foreign listener on either address before owner/sign-in can proceed.
 export async function listenerOwnership(pid,port,host,context=inspectionContext()){
+ context.port=port;
+ do {
  const owned=await descendants(pid,context);
  const ownRows=await listeners([...owned],context);
  const own=ownRows.find(row=>owned.has(row.pid)&&row.sockets.some(socket=>serves(socket,port,host)===true));
@@ -157,7 +168,12 @@ export async function listenerOwnership(pid,port,host,context=inspectionContext(
   if(foreign)return {status:'other',pid:foreign.pid};
  }
  const row=matchingListener(rows,port,host);
- return row?{status:owned.has(row.pid)?'owned':'other',pid:row.pid}:{status:'none'};
+ if(row)return {status:owned.has(row.pid)?'owned':'other',pid:row.pid};
+ const remaining=context.deadline-performance.now();
+ if(remaining<=0)return {status:'none'};
+ await delay(Math.min(100,remaining));
+ }while(performance.now()<context.deadline);
+ return {status:'none'};
 }
 // The caller and the chain that launched it (an installer server running setup,
 // pnpm, a shell) act for this command, never against it.
@@ -168,7 +184,20 @@ async function callerLineage(context){
  return lineage;
 }
 export async function localProcessConflict(root,savedOrigin,context=inspectionContext()){
- root=await realpath(root);const all=await listeners(undefined,context),lineage=await callerLineage(context);
+ root=await realpath(root);const lineage=await callerLineage(context);
+ // Inspect canonical state before optional socket diagnostics spend the shared
+ // budget. This is file custody, not a claim that another process owns a port.
+ const state=join(root,'.wrangler/state');
+ let hasState=true;try{await lstat(state);}catch(error){if(error.code==='ENOENT')hasState=false;else throw error;}
+ let held;
+ if(hasState){
+  if(process.platform==='linux'){for(const pid of await linuxPids())if(!lineage.has(pid)&&(await descriptors(pid)).some(path=>path.startsWith(state+'/'))){held={pid};break;}}
+  else held=records(await run(lsof,['-nP','-b','-w','-Fpn'],context,{maxBuffer:16*1024*1024})).find(row=>!lineage.has(row.pid)&&row.names.some(path=>path.startsWith(state+'/')));
+  if(held)return {pid:held.pid,command:await processName(held.pid,context),reason:'the canonical local state'};
+ }
+ let all;
+ try{all=await listeners(undefined,context);}
+ catch(error){if(!uncheckedInspection(error)||context.verb==='reset')throw error;return;}
  const cwdRecords=process.platform!=='linux'&&all.length?records(await run(lsof,['-nP','-b','-w','-a','-p',all.map(row=>row.pid).join(','),'-d','cwd','-Fpn'],context)):[];
  let port;try{const url=new URL(savedOrigin);port=Number(url.port||80);}catch{}
  for(const row of all){
@@ -181,17 +210,4 @@ export async function localProcessConflict(root,savedOrigin,context=inspectionCo
   if(onSavedPort&&places.length&&!places.some(place=>place===root||place.startsWith(root+'/')))continue;
   if(onSavedPort||inCheckout)return {pid:row.pid,command:await processName(row.pid,context),reason:onSavedPort?`saved local port ${port}`:'this checkout'};
  }
- // A process may hold the canonical database without listening. Inspect only
- // actual state files, never broad checkout contents or a process environment.
- const state=join(root,'.wrangler/state');
- try{await lstat(state);}catch(error){if(error.code==='ENOENT')return;throw error;}
- let held;
- if(process.platform==='linux'){for(const pid of await linuxPids())if(!lineage.has(pid)&&(await descriptors(pid)).some(path=>path.startsWith(state+'/'))){held={pid};break;}}
- else {
-  // +D requires blocking pathname metadata even for a narrow directory. Read
-  // kernel-provided open paths instead, then match only canonical state files.
-  // This preflight protects data held by processes outside the app's tree.
-  held=records(await run(lsof,['-nP','-b','-w','-Fpn'],context,{maxBuffer:16*1024*1024})).find(row=>!lineage.has(row.pid)&&row.names.some(path=>path.startsWith(state+'/')));
- }
- if(held)return {pid:held.pid,command:await processName(held.pid,context),reason:'the canonical local state'};
 }

@@ -1,6 +1,5 @@
 import { lstat, readdir, rm } from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
-import { createServer } from 'node:net';
 import { createInterface } from 'node:readline/promises';
 import { contained } from './project.mjs';
 import { shared } from './shared.mjs';
@@ -39,19 +38,15 @@ export async function selectedOrigin(project, options, { setup = false } = {}) {
  return { url, host, port, vars, savedOrigin: previous?.origin, moved, explicitPort: options.port !== undefined, ...(taken ? { skipped: defaultPort } : {}) };
 }
 
-export async function availablePort(host, port, { root, saved = false } = {}) {
- const { portListener, inspectionContext } = await shared('process-diagnostics.mjs');
- const context = inspectionContext();
- const socket = createServer();
- try { await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(port, host, resolve); }); }
- catch (error) {
-  if (error.code !== 'EADDRINUSE') throw refuse(`Port ${port} cannot be used on ${host}: ${error.code ?? error.message}.`);
-  throw refuse(await busyPortMessage({ port, host, root, saved, context }));
- }
- finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
- // A server on every address (*:port) lets a bind to 127.0.0.1 succeed.
- const listener = await portListener(port, host, context);
- if (listener) throw refuse(await busyPortMessage({ port, host, root, saved, context, listener }));
+export async function availablePort(host, port, { root, saved = false, verb = 'dev' } = {}) {
+ const { inspectionContext } = await shared('process-diagnostics.mjs');
+ const { probePort } = await shared('port-probe.mjs');
+ const context = inspectionContext({port,verb});
+ const result = await probePort(host, port, { context });
+ if (result.available) return;
+ if (result.unchecked) throw result.unchecked;
+ if (result.code && result.code !== 'EADDRINUSE') throw refuse(`Port ${port} cannot be used on ${host}: ${result.code}. Check the address or use rer setup --port PORT with a free port, then run rer dev again.`);
+ throw refuse(await busyPortMessage({ port, host, root, saved, context, listener: result.listener ?? null }));
 }
 
 export {setupInput} from './setup-input.mjs';
@@ -72,7 +67,7 @@ async function safeTree(project, path) {
 
 export async function reset(project, options, out) {
  await stateSafety(project);
- await refuseLegacyProcess(project,{reset:true});
+ await refuseLegacyProcess(project,{reset:true,verb:'reset'});
  const { strandedOriginals } = await shared('local/recovery.mjs');
  if ((await strandedOriginals(project.root)).length) throw refuse('An interrupted build holds private settings. Run rer build to recover them before reviewing reset.');
  // The seed's own safety check (legacy data it still has to recover, for
@@ -104,12 +99,12 @@ export async function reset(project, options, out) {
  return { paths: inventory };
 }
 
-export async function refuseLegacyProcess(project,{reset=false}={}) {
+export async function refuseLegacyProcess(project,{reset=false,verb='dev'}={}) {
  let selected;try{selected=await selectedOrigin(project,{});}catch(error){if(!reset)throw error;}
  // Confirmed reset can recover malformed settings; checkout/state custody is
  // still checked even when there is no usable saved origin.
- const {localProcessConflict}=await shared('process-diagnostics.mjs');
+ const {localProcessConflict,inspectionContext}=await shared('process-diagnostics.mjs');
  // The front door holds a door origin's port, not this checkout.
- const conflict=await localProcessConflict(project.root,selected?.door?undefined:selected?.savedOrigin);
+ const conflict=await localProcessConflict(project.root,selected?.door?undefined:selected?.savedOrigin,inspectionContext({verb}));
  if(conflict)throw refuse(`A local process holds ${conflict.reason}: PID ${conflict.pid} (${conflict.command}). Stop it with kill -TERM ${conflict.pid}, then retry. Use rer dev --stop or rer preview --stop for a registered server.`);
 }
