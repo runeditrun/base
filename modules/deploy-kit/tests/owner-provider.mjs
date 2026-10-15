@@ -5,7 +5,7 @@ import { providerFixture } from './provider-fixture.mjs';
 /** Fake Cloudflare account for owner-account mode tests. It reuses the existing
  * SQLite-backed fixture unchanged and adds Workers KV namespaces, resources that
  * someone else created, and injected failures (an HTTP status or a lost response). */
-export function ownerProvider({creationDates = false} = {}) {
+export function ownerProvider({creationDates = true} = {}) {
   const fixture = providerFixture();
   let created = 0;
   const stamp = () => new Date(Date.UTC(2026,9,8,0,0,created++)).toISOString();
@@ -18,7 +18,8 @@ export function ownerProvider({creationDates = false} = {}) {
   const fetch = async (input, init = {}) => {
     const url = new URL(input);
     const method = init.method ?? 'GET';
-    const path = url.pathname.startsWith(prefix) ? url.pathname.slice(prefix.length) : null;
+    const rawPath = String(input).slice(url.origin.length).split('?')[0];
+    const path = rawPath.startsWith(prefix) ? rawPath.slice(prefix.length) : null;
     const index = failures.findIndex(x => x.method === method && path !== null && x.path.test(path));
     if (index < 0) return handle(input, init);
     const [failure] = failures.splice(index,1);
@@ -32,7 +33,8 @@ export function ownerProvider({creationDates = false} = {}) {
   const handle = async (input, init = {}) => {
     const url = new URL(input);
     const method = init.method ?? 'GET';
-    const path = url.pathname.startsWith(prefix) ? url.pathname.slice(prefix.length) : null;
+    const rawPath = String(input).slice(url.origin.length).split('?')[0];
+    const path = rawPath.startsWith(prefix) ? rawPath.slice(prefix.length) : null;
     if (url.origin === 'https://api.cloudflare.com' && path === '/storage/kv/namespaces') {
       if (init.headers?.Authorization !== `Bearer ${fixture.token}`) throw new Error('wrong test credential');
       state.calls.push({method,path,search:url.search});
@@ -60,6 +62,26 @@ export function ownerProvider({creationDates = false} = {}) {
       const rows = state.databases.map(({db,...x}) => x), shown = lag.shape === 'omit' ? rows.slice(0,lag.known) : rows;
       return ok(shown,{page:1,total_count:lag.shape === 'omit' ? shown.length : rows.length - 1,total_pages:1});
     }
+    const objects = path && /^\/r2\/buckets\/([^/]+)\/objects(?:\/(.+))?$/.exec(path);
+    if (url.origin === 'https://api.cloudflare.com' && objects) {
+      if (init.headers?.Authorization !== `Bearer ${fixture.token}`) throw new Error('wrong test credential');
+      state.calls.push({method,path,search:url.search});
+      if (!state.buckets.some(row => row.name === objects[1])) return Response.json({success:false,errors:[]},{status:404});
+      const values = state.objects.get(objects[1]) ?? new Map();
+      if (method === 'GET' && !objects[2]) {
+        const cursor = url.searchParams.get('cursor');
+        const after = cursor ? Buffer.from(cursor,'base64url').toString() : undefined;
+        const keys = [...values.keys()].sort().filter(key => after === undefined || key > after);
+        const limit = Number(url.searchParams.get('per_page') ?? 1000);
+        const page = keys.slice(0,limit), truncated = keys.length > page.length;
+        return ok(page.map(key => ({key})), {per_page:limit,is_truncated:truncated,...(truncated ? {cursor:Buffer.from(page.at(-1)).toString('base64url')} : {})});
+      }
+      if (method === 'DELETE' && objects[2]) {
+        const key = decodeURIComponent(objects[2]);
+        values.delete(key); state.writes.push({method,path}); return ok({key});
+      }
+      throw new Error('unexpected object operation');
+    }
     if (creationDates && url.origin === 'https://api.cloudflare.com' && path === '/r2/buckets' && method === 'POST') {
       // Real R2 bucket rows carry a creation_date; the shared fixture's rows do not.
       await (await fixture.fetch(input,init)).arrayBuffer();
@@ -68,7 +90,7 @@ export function ownerProvider({creationDates = false} = {}) {
     }
     return fixture.fetch(input,init);
   };
-  return {...fixture, fetch,
+  return {...fixture, fetch, objectDelete:(path, options) => fetch(`https://api.cloudflare.com${path}`, {...options,method:'DELETE'}),
     fail(method, path, options = {status:500}) { failures.push({method,path,...options}); },
     /** For its next `reads` listings, the D1 list does not yet show a database created after this call. */
     lagD1(reads, shape = 'count') { lag = {reads,shape,known:state.databases.length}; },

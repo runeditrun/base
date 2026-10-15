@@ -70,7 +70,7 @@ test('first deploy creates every declared resource under the owner account, migr
   assert(state.settings.bindings.some(x => x.type === 'plain_text' && x.name === 'APP_ORIGIN' && x.text === target.origin));
   assert.equal(receipt.origin,target.origin);
   const saved = await readOwnerState(statePath,target);
-  assert.deepEqual(saved.owned,{worker:{status:'created'},d1:{'penny-production-db':{status:'created',id:state.databases[0].uuid}},r2:{'penny-production-files':{status:'created'}},
+  assert.deepEqual(saved.owned,{worker:{status:'created'},d1:{'penny-production-db':{status:'created',id:state.databases[0].uuid}},r2:{'penny-production-files':{status:'created',id:state.buckets[0].creation_date}},
     kv:{'penny-production-cache':{status:'created',id:state.kv[0].id}},queues:Object.fromEntries(state.queues.map(x => [x.queue_name,{status:'created',id:x.queue_id}]))});
   assert.deepEqual(saved.receipt,receipt);
   assert.equal((await stat(statePath)).mode & 0o777,0o600);

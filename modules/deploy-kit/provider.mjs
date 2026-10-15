@@ -1,3 +1,5 @@
+import { deleteR2Object } from './r2-object-transport.mjs';
+import { isR2ObjectDelete } from './r2-objects.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
 import { importD1, importUploadURL } from './d1-import.mjs';
 import { assert, hexId } from './validation.mjs';
@@ -30,23 +32,23 @@ function transportOutput(error) {
   return lines.filter(Boolean).join('\n');
 }
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
-export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, timeoutMs = 30000, maxRequests = 500 }) {
+export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500 }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
   assert(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'invalid-cloudflare-api-token');
   let requests = 0;
   // `zone` scope: the zone-level API (/zones/...), for a run site's zone lookup and redirect rule.
   async function envelope(path, { method = 'GET', body, assetToken, zone = false } = {}) {
-    assert(typeof path === 'string' && /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%'), 'invalid-provider-path');
+    assert(typeof path === 'string' && (isR2ObjectDelete(path, method) || /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%')), 'invalid-provider-path');
     assert(!zone || /^\/zones(?:[/?]|$)/.test(path), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
     assert(!assetToken || path === '/workers/assets/upload?base64=true', 'invalid-asset-auth-target');
     // Asset-session credentials are discovered at runtime, outside the CLI env.
     // Preserve complete text for the CLI's remaining redaction before truncation.
-    const redactAuth = text => /\/d1\/database\/[^/]+\/import$/.test(path) ? '[D1 import details omitted]' : [accountId,token,assetToken].filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
+    const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? '[D1 import details omitted]' : [accountId,token,assetToken].filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
     const transportFailure = cause => recordDeployFailure(new Error('provider-transport-failed'),{output:redactAuth(transportOutput(cause))});
     const signal = AbortSignal.timeout(timeoutMs);
     let response;
-    try { response = await request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
+    try { response = isR2ObjectDelete(path, method) ? await objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : await request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     }); } catch (cause) { throw transportFailure(cause); }
@@ -62,7 +64,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       const bounded = text => redactAuth(text).replace(/[\x00-\x1f\x7f-\x9f]+/g,' ').trim().slice(0,300);
       const said = (Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code) || typeof x?.message === 'string').slice(0,3)
         .map(x => ({...(Number.isSafeInteger(x.code) ? {code:x.code} : {}),...(typeof x.message === 'string' ? {message:bounded(x.message)} : {})}));
-      error.providerRefusal = {operation:`${method} ${path.split('?')[0]}`,errors:said.length || payload !== undefined || !output.trim() ? said : [{message:bounded(output.trim().split('\n')[0])}]};
+      error.providerRefusal = {operation:`${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`,errors:said.length || payload !== undefined || !output.trim() ? said : [{message:bounded(output.trim().split('\n')[0])}]};
       throw recordDeployFailure(error,{providerCodes:(Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code)).map(x=>x.code).slice(0,8),
         output:redactAuth(Array.isArray(payload?.errors) ? payload.errors.filter(x=>typeof x?.message==='string').map(x=>x.message).join('\n') : output)});
     }

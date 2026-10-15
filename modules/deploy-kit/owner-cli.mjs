@@ -42,7 +42,9 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   try { declaration = JSON.parse(await regularBytes(resolve(root,values.declaration),256 * 1024)); }
   catch (error) { throw new Error(error.code === 'ENOENT' ? 'missing-owner-declaration' : 'invalid-owner-declaration'); }
   assert(typeof declaration?.project === 'string','missing-owner-project');
-  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch}),{onCreated});
+  // Removal reads identity before each object DELETE and may span many pages.
+  // Bound each response, not the owner's bucket size; failures retain ownership.
+  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch,...(command === 'remove' ? {maxRequests:Infinity} : {})}),{onCreated});
   const target = await ownerTarget(api,{project:declaration.project,environment:values.environment});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${target.environment}.json`);
   if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
