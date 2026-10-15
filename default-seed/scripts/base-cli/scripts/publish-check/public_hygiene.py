@@ -11,7 +11,8 @@ from trust_bundle import anchor_values
 from png_text import text_chunks
 from media import sample_spans
 from c2pa import certificate_spans
-URI_AUTHORITY = re.compile(r'''(?i)(?a:(?P<scheme>[a-z][a-z0-9+.-]*:))?//(?P<authority>[^/?#\s<>"']+)''')
+URI_AUTHORITY = re.compile(r'''//(?P<authority>[^/?#\s<>"']+)''')
+SCHEME_CHARACTERS = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+.-')
 # Match raw, complete commit trailer lines; decoded or embedded prose cannot
 # acquire trailer privileges. Only the address span is omitted from email checks.
 COAUTHOR = re.compile(
@@ -37,19 +38,39 @@ def without_public_coauthor_addresses(data):
     return bytes(result)
 
 
-def email_userinfo(match):
-    userinfo, _, host = match['authority'].rpartition('@')
-    # Without a scheme, arbitrary //text can also be a source comment.
-    if not match['scheme'] and host.lower().split(':', 1)[0] not in REPOSITORY_HOSTS:
-        return match.group()
-    # Keep actual email-valued userinfo, including a decoded %40, while
-    # excluding the host delimiter in an ordinary transport username@host.
-    return userinfo
+def without_transport_hosts(text):
+    pieces, offset = [], 0
+    for match in URI_AUTHORITY.finditer(text):
+        start = match.start()
+        colon = start - 1
+        if colon >= offset and text[colon] == ':':
+            # The optional scheme regex retried every suffix of a long run.
+            # Walk this gap once, stopping at the previous authority's end so
+            # matches keep the original substitution's non-overlapping bounds.
+            scheme = colon
+            while scheme > offset and text[scheme - 1] in SCHEME_CHARACTERS:
+                scheme -= 1
+            while scheme < colon and not text[scheme].isalpha():
+                scheme += 1
+            if scheme < colon:
+                start = scheme
+        userinfo, _, host = match['authority'].rpartition('@')
+        # Without a scheme, arbitrary //text can also be a source comment.
+        if start == match.start() and host.lower().split(':', 1)[0] not in REPOSITORY_HOSTS:
+            pieces.append(text[offset:match.end()])
+        else:
+            pieces.append(text[offset:start])
+            # Keep actual email-valued userinfo, including a decoded %40,
+            # while excluding an ordinary transport username@host delimiter.
+            pieces.append(userinfo)
+        offset = match.end()
+    pieces.append(text[offset:])
+    return ''.join(pieces)
 
 
 def private_emails(text, config):
     # URL paths, queries and fragments remain visible to email inspection.
-    email_text = URI_AUTHORITY.sub(email_userinfo, without_required_notices(text))
+    email_text = without_transport_hosts(without_required_notices(text))
     email_text = re.sub(r'(?i)\b(?a:git@github\.com:)(?=[A-Za-z0-9]|\$\{[A-Za-z_$][A-Za-z0-9_.$]*\})', '', email_text)
     # A package manager's patch filename joins the name and version with an at sign.
     version = r'(?:v?[0-9]+(?:\.[0-9]+)*(?:-[A-Za-z0-9-]+)?|[a-f0-9]{40})(?:\.patch)?(?![A-Za-z0-9_.-])'

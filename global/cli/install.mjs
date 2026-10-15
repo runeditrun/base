@@ -2,12 +2,11 @@
 // version directory, switch `current` atomically, keep the previous version,
 // prune older ones and write the launcher. Never edits shell profiles.
 import { randomUUID } from 'node:crypto';
-import { access, constants, chmod, cp, mkdir, readdir, readlink, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, readdir, readlink, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { ownManifest, ownRoot, packageDigest, packageFileList } from '../package-info.mjs';
 import { installRecord, launcherOwner, launcherScript, layout } from './layout.mjs';
-import { exposeLauncher } from './path-link.mjs';
-import { shellQuote } from '../../cli/node-runtime-cache.mjs';
+import { pathAdvice } from './path-link.mjs';
 import { runningDoor } from '../../cli/door.mjs';
 
 async function readLink(path) { try { return await readlink(path); } catch (error) { if (['ENOENT', 'EINVAL'].includes(error.code)) return undefined; throw error; } }
@@ -40,22 +39,6 @@ async function writeLauncher(paths) {
  await rename(temporary, paths.launcher);
 }
 
-export async function pathAdvice(paths, env = process.env) {
- const entries = (env.PATH ?? '').split(':').filter(Boolean).map(entry => resolve(entry));
- for (const directory of entries) {
-  if (directory === resolve(paths.bin)) return undefined;
-  const candidate = join(directory, 'rer');
-  try {
-   await access(candidate, constants.X_OK);
-   const found = await launcherOwner(await realpath(candidate));
-   if (found.state === 'ours' && found.root === paths.data) return undefined;
-   break; // This command shadows the canonical launcher, even if it is later on PATH.
-  } catch (error) { if (!['ENOENT', 'EACCES', 'ENOTDIR'].includes(error.code)) throw error; }
- }
- if (basename(env.SHELL ?? '') === 'fish') return `Activate rer in this shell:\n  set -gx PATH ${shellQuote(paths.bin)} $PATH`;
- return `Activate rer in this shell:\n  export PATH=${shellQuote(paths.bin)}:"$PATH"`;
-}
-
 export async function install() {
  const paths = layout(), manifest = ownManifest(), digest = await packageDigest(ownRoot);
  const name = `${manifest.version}-${digest.slice(0, 8)}`, channel = process.env.RER_INSTALL_CHANNEL === 'script' ? 'script' : 'npx';
@@ -69,7 +52,7 @@ export async function install() {
  let present = false;
  try { present = await packageDigest(join(paths.versions, name)) === digest; } catch (error) { if (error.code !== 'ENOENT') throw error; }
  if (present && current === join('versions', name) && launcher.text === script && record?.channel === channel) {
-  const advice = await activation(paths, record);
+  const advice = await pathAdvice(paths);
   process.stdout.write(`rer ${manifest.version} is already current (${join(paths.versions, name)}). Nothing changed.\n${advice ? advice + '\n' : ''}`);
   return 0;
  }
@@ -83,14 +66,7 @@ export async function install() {
  for (const entry of await readdir(paths.versions)) if (!keep.has(entry) && !entry.startsWith('.staging-')) await rm(join(paths.versions, entry), { recursive: true, force: true });
  await writeFile(paths.record, JSON.stringify({ channel, links: record?.links ?? [], previous: previousName && keep.has(previousName) ? previousName : null }, null, 2) + '\n', { mode: 0o644 });
  if (launcher.text !== script) await writeLauncher(paths);
- const advice = await activation(paths, await installRecord(paths));
+ const advice = await pathAdvice(paths);
  process.stdout.write(`Installed rer ${manifest.version} in ${join(paths.versions, name)}.\n${paths.launcher} runs it.${previousName ? ` The previous version (${previousName}) is kept.` : ''}\n${advice ? advice + '\n' : ''}`);
  return 0;
-}
-
-async function activation(paths, record) {
- const link = await exposeLauncher(paths);
- const links = [...new Set([...(record?.links ?? []), ...(link ? [link] : [])])];
- if (JSON.stringify(record?.links ?? []) !== JSON.stringify(links)) await writeFile(paths.record, JSON.stringify({ ...record, links }, null, 2) + '\n', { mode: 0o644 });
- return link ? undefined : await pathAdvice(paths);
 }

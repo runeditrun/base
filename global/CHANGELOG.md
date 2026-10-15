@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Concurrent checkout launches validate server registry state under its transaction lock, avoiding a false foreign-file refusal during atomic updates.
+- A checkout behind the front door serves its run-site preview above the app's assigned port instead of trying privileged ports.
+- Hosted demo image builds use the adapter's declared deploy file, including names other than `deploy.json`.
+- `rer deploy --remove --yes` empties small R2 buckets whose object listing omits pagination metadata. Ambiguous full pages and inconsistent cursors still stop removal.
+- Setup uses a mapped owner-name field and its declared default without requiring a second `displayName`. `--owner-name` supplies that mapped field.
+- Import-kit and portability encode mixed-script D1 bindings and count their UTF-8 and RPC sizes without splitting atomic transactions. Retained import plans are read in bounded pages. Source adopters must refresh both modules and include their shared `d1-transport` dependency before removing an edition's transport wrapper.
+
 ## 0.2.19
 
 - `rer signin [--environment NAME]` uses the credentials that deployed a seed to print a one-time owner sign-in link, valid for 15 minutes. It requires no email delivery, refuses non-owners and used or expired links, and records successful use in the auth audit log.

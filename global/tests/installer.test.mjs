@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { access, chmod, mkdir, mkdtemp, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
@@ -53,8 +53,11 @@ test('install.sh and rer update install verified registry releases and leave the
  const installed = await run('sh', [installer], env);
  assert.equal(installed.code, 0, installed.stderr);
  assert.equal(await selected(), manifest.version);
- assert.equal(await readlink(join(bin, 'rer')), rer);
- assert.equal((await run('sh', ['-c', 'rer --version'], env)).code, 0);
+ assert.deepEqual(await readdir(bin), ['node'], 'installation never writes into another writable PATH directory');
+ const activate = output => output.split('\n').find(line => line.includes('export PATH='))?.split('export PATH=')[1];
+ const hint = activate(installed.stdout);
+ assert.ok(hint, installed.stdout);
+ assert.equal((await run('sh', ['-c', `export PATH=${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
  const status = JSON.parse((await run(rer, ['cli', 'status', '--json'], env)).stdout);
  assert.equal(status.channel, 'script');
  assert.deepEqual(status.others, []);
@@ -99,10 +102,17 @@ test('install.sh and rer update install verified registry releases and leave the
  const isolated = { ...env, HOME: join(directory, 'activation-home'), PATH: `${foreignBin}:${join(directory, 'activation-home/.local/bin')}:${env.PATH}` };
  const activation = await run('sh', [installer], isolated);
  assert.equal(activation.code, 0, activation.stderr);
- const line = activation.stdout.split('\n').find(line => line.trimStart().startsWith('export PATH='));
+ const line = activate(activation.stdout);
  assert.ok(line, activation.stdout);
- assert.equal((await run('sh', ['-c', `${line}\nrer --version`], isolated)).stdout.trim(), release);
+ assert.ok(activation.stdout.includes(join(foreignBin, 'rer')), 'installation names the existing command it leaves alone');
+ assert.equal((await run('sh', ['-c', `export PATH=${line}\nrer --version`], isolated)).stdout.trim(), release);
  assert.equal((await run(join(foreignBin, 'rer'), [], isolated)).stdout.trim(), 'foreign');
+ const activeEnv = { ...isolated, PATH: `${join(isolated.HOME, '.local/bin')}:${isolated.PATH}` };
+ const active = await run('sh', [installer], activeEnv);
+ assert.equal(active.code, 0, active.stderr);
+ assert.equal(activate(active.stdout), undefined, 'no activation needed when the installed launcher is first');
+ assert.ok(active.stdout.includes(join(foreignBin, 'rer')), 'a later existing command is also named and preserved');
+ assert.deepEqual(await readdir(bin), ['node']);
  // Uninstall removes only recorded links still pointing at this canonical launcher.
  const removed = await run(rer, ['cli', 'uninstall'], env);
  assert.equal(removed.code, 0, removed.stderr);

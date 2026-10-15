@@ -292,6 +292,10 @@ by table name. Product-only staging keeps restore queries small even with long
 column names.
 Advance normalizes the durable snapshot, sorts archived keys and checks attachment
 references again before completing the archive.
+The shared D1 transport preserves mixed-script text through SQLite decoding and
+accounts for workerd's whole-call string width. Snapshot and archive-segment
+reads are bounded before crossing the provider boundary; staging and restore
+transactions remain atomic.
 `exports.advance(id,{expectedPart,maxParts})` commits durable bounded parts;
 `expectedPart` makes a lost-acknowledgement retry a no-op. Status reports progress;
 download streams completed jobs. Abort removes snapshots and stored parts.
@@ -417,6 +421,8 @@ executes the copied Worker and CLI. Tests and development fixtures are not copie
 
 ```text
 modules/portability/index.mjs
+modules/d1-transport/index.mjs
+modules/d1-transport/index.d.mts
 modules/portability/index.d.mts
 modules/portability/lines.mjs
 modules/portability/hash.mjs

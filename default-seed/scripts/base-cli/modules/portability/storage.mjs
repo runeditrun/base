@@ -36,7 +36,11 @@ export function partStatements(db,id,part) {
   return result;
 }
 export async function readPart(db,id,index) {
-  const rows=await all(db,'SELECT data FROM rer_portability_segments WHERE job=? AND part=? ORDER BY segment',id,index);
+  const rows=[];
+  for(let offset=0;;offset+=64) {
+    const page=await all(db,'SELECT data FROM rer_portability_segments WHERE job=? AND part=? ORDER BY segment LIMIT 64 OFFSET ?',id,index,offset);
+    rows.push(...page);if(page.length<64)break;
+  }
   insist(rows.length,'part_missing');
   return JSON.parse(rows.map(x=>x.data).join(''));
 }
