@@ -39,7 +39,10 @@ export async function withDeployEnvironment(root, options, run) {
  const { env } = await deployEnvironment({ root, options, declaration: {} });
  const { createRedaction, credentialValues } = await shared('redaction.mjs');
  const redaction = createRedaction();
- redaction.addSecrets([...credentialValues(env), ...Object.entries(env).filter(([key, value]) => saved[key] !== value).map(([, value]) => value)]);
+ // Provider names are public enum values. Masking "resend" would also hide
+ // RESEND_API_KEY in the preflight's instruction for the missing credential.
+ const publicProvider = (key, value) => key === 'MAIL_PROVIDER' && /^(resend|sendgrid|cloudflare|rer|later)$/.test(value);
+ redaction.addSecrets([...credentialValues(env), ...Object.entries(env).filter(([key, value]) => saved[key] !== value && !publicProvider(key, value)).map(([, value]) => value)]);
  Object.assign(process.env, env);
  try { return await run(redaction); }
  catch (error) { if (typeof error?.message === 'string') error.message = redaction.redact(error.message); throw error; }
