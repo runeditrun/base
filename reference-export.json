@@ -1,0 +1,600 @@
+{
+  "version": 1,
+  "sources": {
+    "scripts/install.mjs": {
+      "source": "default-seed/scripts/install.mjs",
+      "sha256": "5847bd4e2acf465780e6a1128bb0d954dc0e80a970485b131313f3d526c3b229",
+      "transformation": "Contained runtime import relocation"
+    },
+    "scripts/installer/local.mjs": {
+      "source": "default-seed/scripts/installer/local.mjs",
+      "sha256": "2ad69999cd60538f2b5b829b66bc0fa43389f48b8189f4b0c9316e2b699263c8",
+      "transformation": "Contained runtime import relocation"
+    },
+    "scripts/installer/seed.mjs": {
+      "source": "default-seed/scripts/installer/seed.mjs",
+      "sha256": "b395d239bea4c4b6d65be3d6cd8795de75d02f1e25aed6d115ea6618128743db",
+      "transformation": "Contained runtime import relocation"
+    },
+    "scripts/installer/ui/seed.mjs": {
+      "source": "default-seed/scripts/installer/ui/seed.mjs",
+      "sha256": "fa2dbe14f05db1fea6e56c620895833ea4fe5511649f9619e1bb985be4fa40bb",
+      "transformation": "Contained runtime import relocation"
+    },
+    "scripts/rer.mjs": {
+      "source": "default-seed/scripts/rer.mjs",
+      "sha256": "f9c2b4a931fd3075f1af5ae7ef5a048a0158a39757972cc263758266b4d13037",
+      "transformation": "Contained runtime import relocation"
+    },
+    "scripts/verify-app.mjs": {
+      "source": "default-seed/scripts/verify-app.mjs",
+      "sha256": "3ea1405288dee4aa50f8af196000d9f3f590780075ddb7485e5c37cba073efb2",
+      "transformation": "Contained runtime import relocation"
+    },
+    "scripts/verify-ci.mjs": {
+      "source": "default-seed/scripts/verify-ci.mjs",
+      "sha256": "8f248fba8173ab34bd9db3b9288e0d48205cbd61326839a16f368a4f0240a9c7",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/deployment-health.ts": {
+      "source": "default-seed/src/base/deployment-health.ts",
+      "sha256": "49f4dac80429ea7d9477b40799a6242f9af4870f3229df70d0ac1f635476b8b7",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/dispatch.ts": {
+      "source": "default-seed/src/base/dispatch.ts",
+      "sha256": "695ff1bf5bdcf65a429e3853eb80bcb477297c29e55221f6cad08dcff6ba610c",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/font-head.ts": {
+      "source": "default-seed/src/base/font-head.ts",
+      "sha256": "937fe339a397abee96e4279f2e310fa336eb30b2ec3aeb98f2c09ed0ba7d5dac",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/font-response.ts": {
+      "source": "default-seed/src/base/font-response.ts",
+      "sha256": "55abc935a78085735ae5b7f2d441ee7a5a67d9c797417f9b5ac3c2449f8c91a8",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/hydration/intro-guard.ts": {
+      "source": "default-seed/src/base/hydration/intro-guard.ts",
+      "sha256": "abc289d53537b631ad6de323b9123c843aea7498aa50d429a4786d7819194fcd",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/hydration/report.ts": {
+      "source": "default-seed/src/base/hydration/report.ts",
+      "sha256": "38792ad67dc33c9ccd9537bcfc41b7f21a57f0d6f6266d045cb71d70630cf3d7",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/hydration/unit.tsx": {
+      "source": "default-seed/src/base/hydration/unit.tsx",
+      "sha256": "932bf2aa40a05c76f3a2c25a121db282e17c7bc839f9c37cd102ffe7f4e7ceca",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/identity.ts": {
+      "source": "default-seed/src/base/identity.ts",
+      "sha256": "0ad0cad48af3e2c6a40d931e6065185e87208600bc99ab5f886d5d571d5be547",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/lobby.ts": {
+      "source": "default-seed/src/base/lobby.ts",
+      "sha256": "876f708136f0001b6e23871c54f4a1c7fc9c78f29882a55b9a9c7c793ad4466d",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/page-style.ts": {
+      "source": "default-seed/src/base/page-style.ts",
+      "sha256": "58211f173d3b6d9245e80f217c2f3e4e743d59a559e63817865644a991215111",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/rejected-response.ts": {
+      "source": "default-seed/src/base/rejected-response.ts",
+      "sha256": "4aa9861a20497b9dde6f95951dcbecf60cee69e8dad1923c1110ef35abc10686",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/run-site.ts": {
+      "source": "default-seed/src/base/run-site.ts",
+      "sha256": "b902f9421d902f73fac0fe50c874d1200f1dca33a811fb52c60a9bb76c95ea40",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/setup-state.ts": {
+      "source": "default-seed/src/base/setup-state.ts",
+      "sha256": "e4be71efeeec308d7a1ace213a2d58001cfdab2488140aac807bc71d70e47403",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/setup.ts": {
+      "source": "default-seed/src/base/setup.ts",
+      "sha256": "5599d7b1953d093e33c2d3cb8914b2b761547310d2ef0c40699573b439a33516",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/static-assets.ts": {
+      "source": "default-seed/src/base/static-assets.ts",
+      "sha256": "d6ed4098fbee2dc6d557eb1365e9a56b5f5435ad869357cb7d8472a8d0c70e76",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/base/theme-frame.ts": {
+      "source": "default-seed/src/base/theme-frame.ts",
+      "sha256": "adb66c1805f7683aa090e85e5881a8137342941e59e973ee264843bd57f7ba62",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/client.tsx": {
+      "source": "default-seed/src/client.tsx",
+      "sha256": "4fee14f6b63bceec0df77131ffd959fc4d02e3c501982a1f4b5b30c96c1d936a",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/app/auth-http.server.ts": {
+      "source": "default-seed/src/core/app/auth-http.server.ts",
+      "sha256": "12b5fb5dcc9677212df99f2e0c9e42e12e2ef7b24ab04f24de0a90d20e58562a",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/app/hono.ts": {
+      "source": "default-seed/src/core/app/hono.ts",
+      "sha256": "ff5189c7338db76569618d3fb19fd8ec1248fc5776c02f0c4b4a9383f83ac9c4",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/app/identity.ts": {
+      "source": "default-seed/src/core/app/identity.ts",
+      "sha256": "fc26fd089a75b7b0bfca8da2c6731487e831daa42e35d7d190ec926c0ffafd50",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/app/loaders.ts": {
+      "source": "default-seed/src/core/app/loaders.ts",
+      "sha256": "0124e0192bfc8a71274e8b9970620816782ca1cb295b25e92546667298f58adf",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/app/start-response.server.ts": {
+      "source": "default-seed/src/core/app/start-response.server.ts",
+      "sha256": "0aabc84d1592a4fc02cff3faf041e082d049986d0d4c7b4537c762b0b5bfe7f7",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/app/theme.ts": {
+      "source": "default-seed/src/core/app/theme.ts",
+      "sha256": "29fc8ab57de0b5af9abdd7bba9669e88a10f1f179b87e71159dcd4cb94b858d2",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/auth/access.tsx": {
+      "source": "default-seed/src/core/features/auth/access.tsx",
+      "sha256": "b067d873b453fbdbdbbd89f73be48db4d92c520b292c7f46330204d145178bd3",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/people/erasure.ts": {
+      "source": "default-seed/src/core/features/people/erasure.ts",
+      "sha256": "adbeed7a0c2921d1dd2d5456151078f79d17680a48990ff0d3ad699e373059a0",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/people/import-routes.ts": {
+      "source": "default-seed/src/core/features/people/import-routes.ts",
+      "sha256": "05fa0096ed4642d59c1354c9935f18e786c22b74c77760f8a39237efedfbcc71",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/people/imports.server.ts": {
+      "source": "default-seed/src/core/features/people/imports.server.ts",
+      "sha256": "def062f176226d17124bec5442c5414225e5bfce33739016b52a0f075bf98310",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/people/person-redaction.server.ts": {
+      "source": "default-seed/src/core/features/people/person-redaction.server.ts",
+      "sha256": "69d851186e337001819f291f95152dda94625e62692cd077407dcd380ed00ecf",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/people/repository.server.ts": {
+      "source": "default-seed/src/core/features/people/repository.server.ts",
+      "sha256": "8f469cf4f9347190a18ddbec17674b31a3c472a5aa20bbcb6c4d9d0ad59e73da",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/people/routes.ts": {
+      "source": "default-seed/src/core/features/people/routes.ts",
+      "sha256": "d118a03f7795a4775515378e91ac8234ec1a0d86bb74ce81a50877e109ef9149",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/reference/repository.server.ts": {
+      "source": "default-seed/src/core/features/reference/repository.server.ts",
+      "sha256": "eefdd84dd5f1139362aca1e25d018545235526c8ae05745660ba305d6ff98ec6",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/features/reference/service.ts": {
+      "source": "default-seed/src/core/features/reference/service.ts",
+      "sha256": "e0eef4cd41e6704ead9fda275b2ac867a677c719dbc8a4820a209bae77586461",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/config.server.ts": {
+      "source": "default-seed/src/core/platform/auth/config.server.ts",
+      "sha256": "fd0f03bf6e65d76ab65b9736bff180da459dea568f28613181cf42dfbbd037a9",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/dependencies.server.ts": {
+      "source": "default-seed/src/core/platform/auth/dependencies.server.ts",
+      "sha256": "de4cf85d089201bdb407a2ecf869ac7c200441eb3ef5f00317b9b9aee0e08a31",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/dev-personas.ts": {
+      "source": "default-seed/src/core/platform/auth/dev-personas.ts",
+      "sha256": "77df864341d3d6ff80a2de6ebdde77b53c2812c767c46bd5aaaaee4a64167b84",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/key.server.d.mts": {
+      "source": "default-seed/src/core/platform/auth/key.server.d.mts",
+      "sha256": "8a62cc0f5afe7af41806ad8abf031803718a1586c16e6a76e16420a0083bfc95",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/key.server.mjs": {
+      "source": "default-seed/src/core/platform/auth/key.server.mjs",
+      "sha256": "c461eaa068f0085a4626e8f8553e39e6c1048e070682f156b09cc386ddc01e5e",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/local.server.d.mts": {
+      "source": "default-seed/src/core/platform/auth/local.server.d.mts",
+      "sha256": "193f1fe5e872256428e2d51671322b6f20c3853378b848fdc24a2e1419a44e11",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/local.server.mjs": {
+      "source": "default-seed/src/core/platform/auth/local.server.mjs",
+      "sha256": "0bd0625335e5a7d1a46beabf8a41ccd71eed353a794c4df94071b8ad42f09be6",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/mail.server.d.mts": {
+      "source": "default-seed/src/core/platform/auth/mail.server.d.mts",
+      "sha256": "1bfca768bdcd161e015552678dc903f56fa887d4fb7236e6bc58e32919aa1148",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/mail.server.mjs": {
+      "source": "default-seed/src/core/platform/auth/mail.server.mjs",
+      "sha256": "e017b96c40fbd577c1188d4d791249d676afeb9d40e1889bba1839cd94c4b193",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/session.server.ts": {
+      "source": "default-seed/src/core/platform/auth/session.server.ts",
+      "sha256": "0582607096a65a27144eafc27f289f199d98fedfcfa245ad346ac8d583ab9aac",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/signin-options.server.d.mts": {
+      "source": "default-seed/src/core/platform/auth/signin-options.server.d.mts",
+      "sha256": "01a5fc1565a6d26951b986f97113d10ba9e4f9c5d763573546c869c827ca6e55",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/signin-options.server.mjs": {
+      "source": "default-seed/src/core/platform/auth/signin-options.server.mjs",
+      "sha256": "db8b768f275f6bd216e46e95ca9e2571b57dad0256cda88b303c64a59d9895e9",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/auth/start-session.server.ts": {
+      "source": "default-seed/src/core/platform/auth/start-session.server.ts",
+      "sha256": "ce3c463cc2ce54e6e86424e723ed82f63307838a7b090af99babd67b31f6f267",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/bindings.server.ts": {
+      "source": "default-seed/src/core/platform/bindings.server.ts",
+      "sha256": "acc6afec4ffae27dd564799f8b596775b46cdfd8a18a02911d9ef5c650780aad",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/db/schema.ts": {
+      "source": "default-seed/src/core/platform/db/schema.ts",
+      "sha256": "cd06b8c88dbab74a42d4797b6a81b10b8fe363064e38256e587447666231eff4",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/identifiers.server.ts": {
+      "source": "default-seed/src/core/platform/identifiers.server.ts",
+      "sha256": "50d31a6a46929bbd6853e7f846aecb29e5775e1155f137ecb76bb6f314f2798f",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/portability-policy.d.mts": {
+      "source": "default-seed/src/core/platform/portability-policy.d.mts",
+      "sha256": "eac6cdd0ec870807cc39407e5a726da62d917853b9ce0e4e6eba4d63770ecfdf",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/core/platform/portability-policy.mjs": {
+      "source": "default-seed/src/core/platform/portability-policy.mjs",
+      "sha256": "27a874d46336a74f1fe93d79813f6ee501760939e327a8e4409a89f189fd15dc",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/demo.ts": {
+      "source": "default-seed/src/demo.ts",
+      "sha256": "e37ace01fcba68f507ceebce4a1a5e425d0aed1495ef3510429747950cd983f9",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/routeTree.gen.ts": {
+      "source": "default-seed/src/routeTree.gen.ts",
+      "sha256": "7a385de0232b3cc4f842648870b790c75ffc949878a1b12423f2a4dca12c8e52",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/router.tsx": {
+      "source": "default-seed/src/router.tsx",
+      "sha256": "8e28d274af3e0490efcc0de2537d6808583814cc1f18298f2d9516f30cdc1af4",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/routes/__root.tsx": {
+      "source": "default-seed/src/routes/__root.tsx",
+      "sha256": "d8358bc405f09ffc664243dcf7b6a31192f724aa280a9700800b5cb580e49fb5",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/routes/app.index.tsx": {
+      "source": "default-seed/src/routes/app.index.tsx",
+      "sha256": "93eef68450dbda839e34f461ecb1308df89d80a828ff39813febe8eb2c959e0a",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/routes/app.tsx": {
+      "source": "default-seed/src/routes/app.tsx",
+      "sha256": "af2ef06b1b7aaada53667af0a549104b92d9576770cb0c1688b31a50e122456c",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/routes/records.tsx": {
+      "source": "default-seed/src/routes/records.tsx",
+      "sha256": "c5bbd92a40a3a9c28a63e38c6e54dc5089c0055756711339260703e3af8e1516",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/routes/reference.tsx": {
+      "source": "default-seed/src/routes/reference.tsx",
+      "sha256": "da475a2f2f170cd6a154554f779ed274283168a0939fdbe3afd3435b0edca256",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/server.dev.ts": {
+      "source": "default-seed/src/server.dev.ts",
+      "sha256": "949a1f52d87f68e209776ed889ce740afd859225bfc2bac94eca134f85b71c94",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/server.ts": {
+      "source": "default-seed/src/server.ts",
+      "sha256": "14431f44d089d558fe6b65d2b53420594070d42eafff5765494d247a77977f89",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/site/pages.ts": {
+      "source": "default-seed/src/site/pages.ts",
+      "sha256": "c63e165cb97e989615743079af80af5c13922cb612dbc86d6d286899275bc106",
+      "transformation": "Contained runtime import relocation"
+    },
+    "src/site/run.ts": {
+      "source": "default-seed/src/site/run.ts",
+      "sha256": "27e39e1ebdc1a1a4e58ea1b19ebc2c57fea54d03516dc1d99f55ab864cbeb742",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/cleanup-errors.mjs": {
+      "source": "default-seed/tests/cleanup-errors.mjs",
+      "sha256": "0f4813953e3ef1cc50befad1d45e013f15c9c49130bdd8c0c5f509304833e122",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/e2e/private-response-browser.mjs": {
+      "source": "default-seed/tests/e2e/private-response-browser.mjs",
+      "sha256": "3a84f44b8f7bf424fb84d7d2c5dfa170c3ab0b59af412bbc8dd9379c88d8d0b1",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/e2e/private-response.test.mjs": {
+      "source": "default-seed/tests/e2e/private-response.test.mjs",
+      "sha256": "79cbc69a458dc0193a9a376f50a96eff37370553504515dfb48e3dcbe592ac2e",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/e2e/reference-runtime.mjs": {
+      "source": "default-seed/tests/e2e/reference-runtime.mjs",
+      "sha256": "f84e6086da05047633f6cd5ee291248cf023c8cd320504b7edec8f77d1689f0b",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/e2e/start-response-stream.test.mjs": {
+      "source": "default-seed/tests/e2e/start-response-stream.test.mjs",
+      "sha256": "8f3600824a9c5ddd79a7179866c3ded45426c2776318561c1b7e9e1b9331b7ad",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/browser.mjs": {
+      "source": "default-seed/tests/local-journey/browser.mjs",
+      "sha256": "5f15d49a8b5fd79e0e6cb4675f49404331946f074be12a7f2bcfe3ba08a8ff6b",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/build-copy.mjs": {
+      "source": "default-seed/tests/local-journey/build-copy.mjs",
+      "sha256": "d75fb0ede417faf0ccd91a12f4a07a7d432229e3a1a93d4178f26c4657d57c2f",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/build-safety.test.mjs": {
+      "source": "default-seed/tests/local-journey/build-safety.test.mjs",
+      "sha256": "9f872f7bdb75767be8fd7058247da0804c554f58b9a2ee33c559e6cb1a4c7534",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/copy.mjs": {
+      "source": "default-seed/tests/local-journey/copy.mjs",
+      "sha256": "25eff5f364d2d640e207d6bca01fa3e70f395c938898226885394a10e803f998",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/demo.test.mjs": {
+      "source": "default-seed/tests/local-journey/demo.test.mjs",
+      "sha256": "9ff9bb058f22b323d605f7e8390487043536ada37dd1173e2ffe2fb90d0b12a8",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/erasure.test.mjs": {
+      "source": "default-seed/tests/local-journey/erasure.test.mjs",
+      "sha256": "f4a8966ef01315a2e18103b13507a76c5ec6d540b9e22c5127e7eb087c8cca6b",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/installer-browser.test.mjs": {
+      "source": "default-seed/tests/local-journey/installer-browser.test.mjs",
+      "sha256": "01c435f5e23fdba1a8ce2d743602459a165b9aefbfcc2ba388d87f69c4f05b3d",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/installer.test.mjs": {
+      "source": "default-seed/tests/local-journey/installer.test.mjs",
+      "sha256": "ef6f518c2041c0b4acb815e4cf1dc0154798fbb50850806c5d7f1531dea56a1a",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/journey.test.mjs": {
+      "source": "default-seed/tests/local-journey/journey.test.mjs",
+      "sha256": "789d0a01bba883e93a8621f358e2c817df4a26435ab8002e64c9e27a02754341",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/readme.mjs": {
+      "source": "default-seed/tests/local-journey/readme.mjs",
+      "sha256": "1a07b06dce517fcd9faaaf00448133b6fbdc33f79c51f73e4575323ccc2a6bce",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/runtime.mjs": {
+      "source": "default-seed/tests/local-journey/runtime.mjs",
+      "sha256": "2cd5f0bf484e374623603a29ceeca775ab3638882feda465f0d8016a19dac4a2",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-journey/security.test.mjs": {
+      "source": "default-seed/tests/local-journey/security.test.mjs",
+      "sha256": "58255c37b04db4525337f28b9253504845d3c4223de4c6ef089b6480e81f8ab5",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/cancellation.test.mjs": {
+      "source": "default-seed/tests/local-setup/cancellation.test.mjs",
+      "sha256": "2b6ad09bcaa0de1a50d52db52591b2421cb6b85a76a4db1b819773c635f96d69",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/cli.test.mjs": {
+      "source": "default-seed/tests/local-setup/cli.test.mjs",
+      "sha256": "22b782eb092ec0427c472f3c4540d42771c2e9b72e95ce80fc9e2b7470c497dc",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/fixtures/local-build.mjs": {
+      "source": "default-seed/tests/local-setup/fixtures/local-build.mjs",
+      "sha256": "316d30bcecd72aa592584424ca44274170fb81ff9118b8de8217a8288db39cbc",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/fixtures/local-dev.mjs": {
+      "source": "default-seed/tests/local-setup/fixtures/local-dev.mjs",
+      "sha256": "d72c5f80083be68897dba590ee9e42282ecdb3555858d3758dd8c8b6928aece5",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/fixtures/local-setup.mjs": {
+      "source": "default-seed/tests/local-setup/fixtures/local-setup.mjs",
+      "sha256": "22a181cb2ebb8008844d0176c066ce583e53dc859e61c6725df547afee4801ad",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/hard-kill.test.mjs": {
+      "source": "default-seed/tests/local-setup/hard-kill.test.mjs",
+      "sha256": "0809deaff53bb0ea0784818ca38d36797bec7bd4a1b3dd07a9e59e5dca12162b",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/native-bindings.test.mjs": {
+      "source": "default-seed/tests/local-setup/native-bindings.test.mjs",
+      "sha256": "c9d171556a91b4e5262fc7e6eeccaac0bf1d8500fc55e1d0e12abb6f0078969d",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/operation-lock.test.mjs": {
+      "source": "default-seed/tests/local-setup/operation-lock.test.mjs",
+      "sha256": "11acc9b912da7c3706642518d88006222b8c04481e3a09b65dfb12da5776479f",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/outbox-read.test.mjs": {
+      "source": "default-seed/tests/local-setup/outbox-read.test.mjs",
+      "sha256": "3ff1c8006bf919048401209c5a2fb07c73a143737bc92be0f6f309db3c11ddc8",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/process-liveness.mjs": {
+      "source": "default-seed/tests/local-setup/process-liveness.mjs",
+      "sha256": "93207960b66218229631a2cff58d1b490e49fb489b80c32a936fd025d2b3e2a5",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/script-fixture.mjs": {
+      "source": "default-seed/tests/local-setup/script-fixture.mjs",
+      "sha256": "f0979fd321f6475698fa19522040340b5bbdc55b12b78e17b72f6427243ae28a",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/local-setup/setup-rerun.test.mjs": {
+      "source": "default-seed/tests/local-setup/setup-rerun.test.mjs",
+      "sha256": "60cb3d6c23b86dcef4e4e023c4346293251eb05048465c57000447618bdf232d",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/browser.mjs": {
+      "source": "default-seed/tests/operator-auth/browser.mjs",
+      "sha256": "a58b30bb18d5079fe4f83626711e6dcd0e668ea26c17ef7ccc567df92dfe9711",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/conformance.test.mjs": {
+      "source": "default-seed/tests/operator-auth/conformance.test.mjs",
+      "sha256": "1b8ff7d6e1040c4075eb8607203f69d88353a5d1b1e7bc58ee9a5a1d3ff0174d",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/demo.test.mjs": {
+      "source": "default-seed/tests/operator-auth/demo.test.mjs",
+      "sha256": "bc310cc561f4d20798c5c06b6264f99500450ed8d982356bcff8761d9bc2e8b3",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/dev-browser.mjs": {
+      "source": "default-seed/tests/operator-auth/dev-browser.mjs",
+      "sha256": "cc408b2b00ffdda4e017897550895789bb302cd7b695afee3161a3d297a99a88",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/emitted-runtime.mjs": {
+      "source": "default-seed/tests/operator-auth/emitted-runtime.mjs",
+      "sha256": "8ef4e7f2d05629b516054f1377e3ff95b6a49062542f15bc4376dc5d8d4af0b6",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/emitted.test.mjs": {
+      "source": "default-seed/tests/operator-auth/emitted.test.mjs",
+      "sha256": "01a1893253c82ad0ca58b9b2059618bca2dc8f722fa340b88936554d3106c37d",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/first-run.mjs": {
+      "source": "default-seed/tests/operator-auth/first-run.mjs",
+      "sha256": "621dc684cb3346d78bae011bc7ff57c36346c25b108757865035ca953cf5bb73",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/lobby.test.mjs": {
+      "source": "default-seed/tests/operator-auth/lobby.test.mjs",
+      "sha256": "3e40f2635dcb56899901e1e2b45b28eb56cc6116afe86f250593e15943387445",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/native-wrangler.mjs": {
+      "source": "default-seed/tests/operator-auth/native-wrangler.mjs",
+      "sha256": "31caf922c5466134cf2cd5b02b9eede156592cc4cd0595326c7d1f33b6d35c5d",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/oidc-provider.mjs": {
+      "source": "default-seed/tests/operator-auth/oidc-provider.mjs",
+      "sha256": "ac4348c83b799acd6e18c9dd61858e64ccc77bf59c86ab5e925907c8945ea799",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/renderer-boundary.mjs": {
+      "source": "default-seed/tests/operator-auth/renderer-boundary.mjs",
+      "sha256": "8ad6e32a7a0daa689dd67faaebac2f0ba5a956f53c144330fec6e06b50a5f589",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/runtime.mjs": {
+      "source": "default-seed/tests/operator-auth/runtime.mjs",
+      "sha256": "54566333ae7de713a737edc7f2d29c04a188a4d56b35d170d35478ab7b22940b",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/vite-ready.mjs": {
+      "source": "default-seed/tests/operator-auth/vite-ready.mjs",
+      "sha256": "d914d6ab0c1723791707e14e4a8de1b2f2cfdfd71f772c357155e5dd7c94763b",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/worker.mjs": {
+      "source": "default-seed/tests/operator-auth/worker.mjs",
+      "sha256": "8a522e0d64e8c658e0025f51e5e1908d1ce81d1739c9f846bd27fca79c18b360",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/owned-process-group.mjs": {
+      "source": "default-seed/tests/owned-process-group.mjs",
+      "sha256": "8b7889c060b188ca8affa989d776bae1105a15c941eef074254d1215e91c9346",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/owned-process.mjs": {
+      "source": "default-seed/tests/owned-process.mjs",
+      "sha256": "a1724de25e36890ad3c4dc6530641523d934a75213e7446871213c66bc3e27e1",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/typecheck/incremental.test.mjs": {
+      "source": "foundation/template/tests/incremental-typecheck.test.mjs",
+      "sha256": "494f3e996479c0a5417cbae7000b45063f0f631d198ac62f769ccc901ccb8aef",
+      "transformation": "Contained reference typecheck root relocation"
+    },
+    "vite/exclude-local-variables.ts": {
+      "source": "default-seed/vite/exclude-local-variables.ts",
+      "sha256": "7b6b4be4551276e96b23156491334256d5b1a9fe4d0a62536e55c5bf561c93c2",
+      "transformation": "Contained runtime import relocation"
+    },
+    "vite.config.ts": {
+      "source": "default-seed/vite.config.ts",
+      "sha256": "0f52065727c3c6c7f778fe3b4ce2fcf4d3baa2b181f277125a53997212bb3302",
+      "transformation": "Contained runtime import relocation"
+    },
+    "tests/operator-auth/idp.mjs": {
+      "source": "modules/operator-auth/identity/oidc/tests/idp.mjs",
+      "sha256": "ab2e5d51f56f03b6c10010349a52c759e78482b95facae0c4b82d14635df87d8",
+      "transformation": "Contained test-provider import relocation"
+    },
+    "tests/typecheck/typecheck-checks.mjs": {
+      "source": "foundation/template/tests/typecheck-checks.mjs",
+      "sha256": "8f89c86aaff623fa8f105c0816a381bdc978e308e0c0b8ca189fd2b0798de417",
+      "transformation": "Contained reference typecheck root relocation"
+    }
+  }
+}

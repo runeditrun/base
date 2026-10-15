@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "title": "Default seed reference",
+  "groups": [
+    {
+      "id": "owner",
+      "label": "First owner"
+    }
+  ],
+  "fields": [
+    {
+      "name": "OWNER_EMAIL",
+      "label": "Owner email",
+      "help": "The account that owns this installation.",
+      "kind": "email",
+      "required": true,
+      "prefill": "account-email",
+      "group": "owner"
+    },
+    {
+      "name": "SESSION_SECRET",
+      "label": "Session secret",
+      "kind": "secret",
+      "required": true,
+      "ownerVisible": false,
+      "input": "managed",
+      "generate": "hex",
+      "group": "owner"
+    },
+    {
+      "name": "SETUP_TOKEN",
+      "label": "Setup token",
+      "kind": "secret",
+      "required": true,
+      "ownerVisible": true,
+      "generate": "hex",
+      "group": "owner"
+    },
+    {
+      "name": "IDENTITY_PROVIDER",
+      "label": "Identity provider",
+      "kind": "url",
+      "required": false,
+      "help": "Optional Auth install. Leave empty to use email links.",
+      "default": ""
+    }
+  ],
+  "steps": [
+    {
+      "type": "owner-claim",
+      "mode": "setup-token",
+      "emailField": "OWNER_EMAIL",
+      "tokenField": "SETUP_TOKEN"
+    }
+  ],
+  "dependencies": [
+    {
+      "interface": "oidc-provider@1",
+      "optional": true,
+      "cardinality": 1,
+      "address": "IDENTITY_PROVIDER",
+      "paths": [
+        "/auth/oidc/auth/callback",
+        "/auth/oidc/auth/logout"
+      ]
+    }
+  ]
+}
