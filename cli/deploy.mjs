@@ -13,6 +13,7 @@ import { checkHostedSetup, hostedSetupFailure } from './deploy-setup.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookState, forgetHookState } from './deploy-hook-record.mjs';
+import { deploymentRecord } from './deployment-record.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -29,6 +30,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const retry = options.remove ? `${again} --remove --yes` : options.setSecret ? `${again} --set-secret ${options.setSecret}` : options.unsetSecret ? `${again} --unset-secret ${options.unsetSecret}` : again;
   if (change.length > 1 || change.length && options.dryRun) throw invalid(`Use ${change.join(', ')}${options.dryRun ? ' and --dry-run' : ''} on separate runs.`);
   if (options.remove && !options.yes) throw invalid(`${again} --remove deletes this environment's Worker and every D1, R2, KV and queue rer created for it, with their data. Add --yes to confirm.`);
+  const recordedState = change.length ? await deploymentRecord(root, options) : undefined;
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
   if (!change.length) {
@@ -62,7 +64,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   let step = 'deploy', deployed;
   try {
    // A custom hook's own state file, when its deploy named one.
-   const state = await hookState(root, environment);
+   const state = change.length ? recordedState : await hookState(root, environment);
    if (options.remove) {
     step = 'remove';
     const result = await owner('remove', state ? ['--state', state] : []);
@@ -118,7 +120,7 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  const input = /^missing-secret-([A-Z][A-Z0-9_]*)$/.exec(code)?.[1];
  if (input) return `Deploy needs ${input}, which the deploy declaration lists as a secret and the Worker does not hold it. Set ${input} in the environment or in an --env-file file (an owned 0600 file of KEY=VALUE lines), then run the same command again. Nothing was uploaded.${created.length ? ` Resources created this attempt: ${created.join(', ')}.` : ''}`;
  if (code === 'remove-incomplete') return `Removal stopped with ${error.remaining.join(', ')} still present${error.failed.length ? ` (${error.failed.map(item => `${item.resource}: ${item.code}`).join('; ')})` : ''}. Removed: ${error.removed.join(', ') || 'nothing'}. Confirmed owned R2 buckets are emptied automatically; unproved buckets are never purged. Run ${again} --remove --yes again to finish.`;
- if (code === 'nothing-to-remove') return `This checkout has no rer deployment record for this environment, so --remove deletes nothing. Run it from the checkout that deployed it.`;
+ if (code === 'nothing-to-remove') return `The deployment record selected by ${again} has no resources that rer owns, so --remove deletes nothing.`;
  if (code === 'owner-token-retirement-failed') return `The application is deployed at ${deployed?.origin}; owner ${error.owner}; setup token retirement failed (${redact(String(error.cause))}). Run ${again} --unset-secret ${error.tokenKey ?? 'SETUP_TOKEN'} using the same environment credentials, or run ${again} again to finish.`;
  if (code === 'owner-claim-failed') return `The application is deployed at ${deployed?.origin}, but claiming its owner failed: ${redact(String(error.cause))}. Owner claim and setup token retirement are not confirmed; run ${again} again using the same environment credentials to finish.`;
  const resource = diagnostic?.resource ?? (error.resource ? redact(String(error.resource)) : undefined);
