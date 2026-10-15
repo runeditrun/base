@@ -50,7 +50,7 @@ export function demoAccount() {
     deploy(plan) {
       worker(plan.worker, plan.record);
       const container = namespace(plan.worker, 'DemoContainer'); namespace(plan.worker, 'DemoCapacity');
-      app(plan.container, container.id); domain(plan.hostname, plan.worker);
+      app(plan.container, container.id); for (const hostname of plan.hostnames) domain(hostname, plan.worker);
     },
     /** Someone else's Worker with its own Custom Domain, Durable Object and Container application. */
     unrelated() { worker('someone-else', 'Deploy from the dashboard'); app('someone-else', namespace('someone-else', 'Box').id); domain('www.someone-else.test', 'someone-else'); },

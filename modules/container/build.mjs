@@ -1,14 +1,13 @@
-import { readFile, writeFile, readdir, realpath, cp, mkdir, rm } from 'node:fs/promises';
+import { readFile, writeFile, realpath, cp, mkdir, rm } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { createHash } from 'node:crypto';
 import { parseJsonc } from '../../cli/jsonc.mjs';
 import { portabilityPlan } from './portability-schema.mjs';
 import { checkBoundary } from './boundary.mjs';
 import { localDurableObjects } from './durable-objects.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
-const hash = source => createHash('sha256').update(source).digest('hex');
+import { containerMigrationInventory } from './migration-inventory.mjs';
 export async function buildContainer(root, options={}) {
  const previous=process.cwd();process.chdir(root);
  try{return await buildImage(root,options);}finally{process.chdir(previous);}
@@ -67,14 +66,11 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  if (!freshServerFiles.has(serverEntry)) throw new Error('Container server entry was not emitted by this build');
  await checkBoundary(root,{engine,cacheContract,entries:[serverEntry],emittedFiles:freshServerFiles,outputRoot:serverOutput});
  const { unstable_splitSqlQuery:split } = require('wrangler');
- const migrations = {}, rewrites = await readMigrationRewrites(root);
- for (const db of workerConfig.d1_databases ?? []) {
-  let directory = resolve(root,db.migrations_dir ?? 'migrations');
-  try { await readdir(directory); } catch { directory = resolve(root,'dist/server',db.migrations_dir); }
-  migrations[db.binding] = [];
-  for (const name of (await readdir(directory)).filter(name => name.endsWith('.sql')).sort()) { const sql = await readFile(join(directory,name),'utf8'); migrations[db.binding].push({ name,sql,sha256:hash(sql),statements:split(sql) }); }
-  migrations[db.binding] = withRewrites(migrations[db.binding], rewrites, { partial:true });
- }
+ const configFile = engine === 'workerd' ? 'dist/server/wrangler.json' : 'wrangler.jsonc';
+ const rewrites = await readMigrationRewrites(root);
+ const inventory = withRewrites(await containerMigrationInventory(root,{config:workerConfig,configFile}),rewrites);
+ const migrations = Object.fromEntries((workerConfig.d1_databases ?? []).map(db => [db.binding,[]]));
+ for (const {binding,...migration} of inventory) migrations[binding].push({...migration,statements:split(migration.sql)});
  const entry = engine === 'workerd' ? 'dist/server/'+workerConfig.main : 'dist/server/index.mjs';
  await readFile(join(root,entry));
  if (engine === 'node' && workerConfig.kv_namespaces?.length) throw new Error('Node container does not support KV');

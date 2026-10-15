@@ -11,11 +11,9 @@ import { placeContainer } from './placement.mjs';
 // external effects; the engine also refuses direct mail/SMS transports. The
 // front signs the owner in through the existing signed owner claim. The demo ends at its hour or after
 // 15 idle minutes: the alarm destroys the container and deletes everything.
-// The platform stops a container about two minutes after its Durable Object's
-// last event, when the object is evicted, and the exit watcher goes with it.
-// So the alarm stays in flight until the demo's next check and then arms the
-// next at once, as the Containers class keeps its object alive; a container
-// that is gone anyway answers the ended page and frees its place.
+// Container lifetime is independent of the object's JS lifetime. Configure the
+// platform's inactivity grace on every object instance; persisted alarms and
+// request-time checks enforce the visitor's exact idle and absolute deadlines.
 const PORT = 8080, IDLE = 15 * 60_000, OWNER = 'owner@demo.invalid';
 // The container's port speaks plain HTTP; the app takes its public origin from RER_INGRESS_ORIGIN.
 const inside = url => `http://container${url.pathname}${url.search}`;
@@ -32,7 +30,10 @@ export class DemoContainer extends DurableObject {
         // resumed after object eviction. End it instead of polling forever.
         await ctx.storage.put('startup', { phase: 'failed' });
         ctx.waitUntil(this.end().catch(cause => report(this.correlation, this.started, 'cleanup', { error: category(cause) })));
-      } else if (this.container.running) this.watch();
+      } else if (this.container.running) {
+        await this.container.setInactivityTimeout(this.idle);
+        this.watch();
+      }
     });
   }
   watch() {
@@ -43,7 +44,7 @@ export class DemoContainer extends DurableObject {
   }
   records = [];
   record(event, detail = {}) {
-    const row = { event, at: new Date().toISOString(), elapsedMs: Date.now() - this.started, ...detail };
+    const row = { event, at: new Date().toISOString(), elapsedMs: this.now() - this.started, ...detail };
     this.records.push(row); if (this.records.length > 8) this.records.shift();
     report(this.correlation, this.started, event, detail);
   }
@@ -52,7 +53,7 @@ export class DemoContainer extends DurableObject {
   startTimeout = 45_000;
   probeTimeout = 5000;
   cleanupRetry = 30_000;
-  hold = 3 * 60_000;
+  now() { return Date.now(); }
   get container() { return this.ctx.container; }
   port() { return this.container.getTcpPort(PORT); }
 
@@ -71,40 +72,43 @@ export class DemoContainer extends DurableObject {
 
   /** Start the container, wait for /health, claim the owner; returns the claim's 303. */
   async start({ origin, originVar, ends, endsLocal, settings, correlation }) {
-    this.correlation = correlation; this.started = Date.now(); this.stopped = false; this.cancelled = false;
+    this.correlation = correlation; this.started = this.now(); this.stopped = false; this.cancelled = false;
     const deadline = this.started + this.startTimeout;
-    const id = this.ctx.id.toString(), keys = await claimKeys(), now = Date.now();
+    const id = this.ctx.id.toString(), keys = await claimKeys(), now = this.now();
     await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started, startDeadline: deadline });
     report(correlation, this.started, 'start');
     if (this.stopped) throw new Error('container-stopped');
-    await placeContainer(this, { enableInternet: true, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
+    await placeContainer(this, { enableInternet: true, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin, RER_INGRESS_ORIGINS: JSON.stringify([origin, ...JSON.parse(this.env.DEMO_SECONDARY_ORIGINS ?? '[]')]),
       SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: OWNER, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
       RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } }, deadline);
-    await this.ctx.storage.setAlarm(Date.now());
-    const token = await signClaim(keys, { origin, installationId: id, email: OWNER, now: Date.now() });
+    await this.container.setInactivityTimeout(this.idle);
+    await this.ctx.storage.setAlarm(deadline);
+    const token = await signClaim(keys, { origin, installationId: id, email: OWNER, now: this.now() });
     const claimed = await boundedFetch(this.port(), 'http://container/auth/owner-claim', { method: 'POST', redirect: 'manual',
-      headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }, Math.max(1, Math.min(10_000, deadline - Date.now())));
+      headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }, Math.max(1, Math.min(10_000, deadline - this.now())));
     void claimed.body?.cancel().catch(() => {});
     this.record('claim', { status: claimed.status });
     if (this.stopped) throw new Error('container-stopped');
     if (claimed.status !== 303) throw new Error(`owner claim answered ${claimed.status}`);
+    await this.ctx.storage.put('seen', this.now());
+    await this.ctx.storage.setAlarm(Math.min(ends, this.now() + this.idle));
     return { location: claimed.headers.get('location'), cookies: claimed.headers.getSetCookie() };
   }
 
   async healthy(deadline) {
     let attempt = 0;
-    while (Date.now() < deadline) {
+    while (this.now() < deadline) {
       if (this.stopped) throw new Error('container-stopped');
-      const probe = Date.now();
+      const probe = this.now();
       try {
-        const response = await boundedFetch(this.port(), 'http://container/health', {}, Math.min(this.probeTimeout, deadline - Date.now()));
+        const response = await boundedFetch(this.port(), 'http://container/health', {}, Math.min(this.probeTimeout, deadline - this.now()));
         void response.body?.cancel().catch(() => {});
-        this.record('health', { attempt: ++attempt, durationMs: Date.now() - probe, status: response.status });
+        this.record('health', { attempt: ++attempt, durationMs: this.now() - probe, status: response.status });
         if (response.ok && !this.stopped) return;
       } catch (error) {
-        this.record('health', { attempt: ++attempt, durationMs: Date.now() - probe, error: category(error) });
+        this.record('health', { attempt: ++attempt, durationMs: this.now() - probe, error: category(error) });
       }
-      await new Promise(resolve => setTimeout(resolve, Math.min(250, Math.max(0, deadline - Date.now()))));
+      await new Promise(resolve => setTimeout(resolve, Math.min(250, Math.max(0, deadline - this.now()))));
     }
     throw new Error('health-deadline');
   }
@@ -120,11 +124,20 @@ export class DemoContainer extends DurableObject {
 
   /** Every request carrying this demo's cookie: proxied while the demo lives, else the ended page. */
   async fetch(request) {
-    const state = await this.ctx.storage.get(['ends', 'seen']), now = Date.now();
-    if (!(state.get('ends') > now)) return this.ended();
+    const state = await this.ctx.storage.get(['ends', 'seen']), now = this.now();
+    if (!state.get('ends') || now >= Math.min(state.get('ends'), state.get('seen') + this.idle)) {
+      try { await this.end(); }
+      catch (cause) { report(this.correlation, this.started, 'cleanup', { error: category(cause) }); }
+      return this.ended();
+    }
     if (!this.container.running) return this.gone();
-    if (now - state.get('seen') > 60_000) await this.ctx.storage.put('seen', now);
-    try { return await this.port().fetch(new Request(inside(new URL(request.url)), request)); }
+    await this.ctx.storage.put('seen', now);
+    await this.ctx.storage.setAlarm(Math.min(state.get('ends'), now + this.idle));
+    const forwarded = new Request(inside(new URL(request.url)), request);
+    // The front admits only declared hosts. Never let a visitor choose the
+    // container's public origin through a transport header.
+    forwarded.headers.set('x-rer-ingress-origin', new URL(request.url).origin);
+    try { return await this.port().fetch(forwarded); }
     catch (error) { if (this.container.running && !this.stopped) throw error; return this.gone(); }
   }
 
@@ -138,7 +151,7 @@ export class DemoContainer extends DurableObject {
   }
 
   async alarm() {
-    const state = await this.ctx.storage.get(['ends', 'seen', 'startDeadline']), now = Date.now();
+    const state = await this.ctx.storage.get(['ends', 'seen', 'startDeadline']), now = this.now();
     if (await this.ctx.storage.get('stopping')) return this.end();
     if (!state.get('ends')) return this.ctx.storage.deleteAll();
     const due = Math.min(state.get('ends'), state.get('seen') + this.idle, state.get('startDeadline') ?? Infinity);
@@ -146,8 +159,7 @@ export class DemoContainer extends DurableObject {
       if ((await this.ctx.storage.get('startup'))?.phase === 'starting') { this.stopped = true; return; }
       return this.end();
     }
-    await new Promise(resolve => { this.wake = resolve; setTimeout(resolve, Math.min(due - now, this.hold)); });
-    if (!this.stopped) await this.ctx.storage.setAlarm(Date.now());
+    await this.ctx.storage.setAlarm(due);
   }
 
   /** Destroy the container and delete this demo's state and place; safe to repeat. */
@@ -158,13 +170,13 @@ export class DemoContainer extends DurableObject {
   }
 
   async cleanup() {
-    this.cancelled = true; this.stopped = true; this.wake?.();
+    this.cancelled = true; this.stopped = true;
     const startup = await this.ctx.storage.get('startup');
     // Keep the alarm and capacity reservation if destruction fails; retry cleanup.
     await this.ctx.storage.put('stopping', true);
-    await this.ctx.storage.setAlarm(Date.now() + this.cleanupRetry);
+    await this.ctx.storage.setAlarm(this.now() + this.cleanupRetry);
     if (this.container.running) {
-      try { await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).extend(this.ctx.id.toString(), Date.now() + 60_000), 2000); }
+      try { await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).extend(this.ctx.id.toString(), this.now() + 60_000), 2000); }
       catch (cause) { report(this.correlation, this.started, 'cleanup-reservation', { error: category(cause) }); }
       await bounded(this.container.destroy(), 5000);
     }
@@ -174,7 +186,7 @@ export class DemoContainer extends DurableObject {
     // Retain only the terminal answer briefly, so polling survives a fresh DO.
     if (startup?.phase === 'failed') {
       await this.ctx.storage.put({ startup, correlation: this.correlation, started: this.started });
-      await this.ctx.storage.setAlarm(Date.now() + 60_000);
+      await this.ctx.storage.setAlarm(this.now() + 60_000);
     }
     report(this.correlation, this.started, 'ended');
   }
