@@ -64,7 +64,7 @@ test('a visitor starts their own signed-in demo, and only their cookie reaches i
 test('a start is refused from another origin, without Turnstile, past 3 per IP a minute, and at capacity', async () => {
   const { mf, demos, start } = await front({ max: 1 });
   try {
-    const refused = async (response, status, notice) => { assert.equal(response.status, status); assert.equal(demoCookie(response), undefined); assert.match(await response.text(), notice); };
+    const refused = async (response, status, notice) => { assert.equal(response.status, status); assert.ok(response.headers.get('x-rer-demo-correlation')); assert.equal(demoCookie(response), undefined); assert.match(await response.text(), notice); };
     await refused(await start({ origin: 'https://elsewhere.example' }), 403, /Start the demo from this page/);
     await refused(await start({ token: 'failed' }), 403, /The check did not pass/);
     await refused(await start({ token: '' }), 403, /The check did not pass/);
@@ -83,6 +83,7 @@ test("the page's own start (Accept: application/json) answers the sign-in locati
   try {
     const notice = async (response, status) => {
       assert.equal(response.status, status);
+      assert.ok(response.headers.get('x-rer-demo-correlation'));
       assert.equal(demoCookie(response), undefined);
       const { notice } = await response.json();
       assert.ok(typeof notice === 'string' && notice.length > 0);
