@@ -181,6 +181,17 @@ secrets after the provider verifies the owned deployment. Local setup and demo
 do not require production mail credentials. Preview serves production output
 and prints its ready address without a captured-mail sign-in flow.
 
+The production preflight also reads the product's `artifact.specInputs` in
+`rer-packaging.json`, `packaging.json` or `scripts/delivery/base/packaging.json`,
+and `management/integration/deployment-spec.json`. Public inputs come from
+`publicVariableNames` or fixed `publicVariables`; credentials come from
+`secretNames` and `optionalSecretNames`. Native `SENDGRID_API_KEY` and
+`RESEND_API_KEY` satisfy their respective providers. When `MAIL_PROVIDER` is
+`later` or absent, a declared native provider key plus a declared `MAIL_FROM`
+resolves the deferred choice for preflight. An explicitly selected provider
+still requires its own credentials. Undeclared environment values do not count;
+the product's deploy adapter remains responsible for applying these settings.
+
 Idle timeout is `--idle-timeout SECONDS`, then `RER_SERVER_IDLE_SECONDS`, then
 43200 seconds (12 hours). Only positive integer seconds are accepted. HTTP requests,
 including assets, reset inactivity; a live request/stream prevents idle
