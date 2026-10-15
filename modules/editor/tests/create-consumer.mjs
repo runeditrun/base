@@ -8,7 +8,7 @@ const output=resolve(process.argv[2] || '');
 if(!process.argv[2] || existsSync(output))throw new Error('Pass a new empty consumer directory');
 mkdirSync(output,{recursive:true});
 const revision=execFileSync('git',['rev-parse','HEAD'],{cwd:base,encoding:'utf8'}).trim();
-execFileSync('tar',['-x','-C',output],{input:execFileSync('git',['archive','HEAD','default-seed','foundation/runtime','modules/operator-auth','modules/dependencies','modules/owner-claim','modules/demo','modules/mail','modules/ai','modules/portability','modules/erasure','modules/import-kit/src','modules/import-kit/schema','modules/editor/src','onboarding'],{cwd:base,maxBuffer:20e6})});
+execFileSync('tar',['-x','-C',output],{input:execFileSync('git',['archive','HEAD','default-seed','foundation/runtime','modules/operator-auth','modules/dependencies','modules/owner-claim','modules/demo','modules/mail','modules/ai','modules/portability','modules/d1-transport','modules/erasure','modules/import-kit/src','modules/import-kit/schema','modules/editor/src','onboarding'],{cwd:base,maxBuffer:20e6})});
 cpSync(join(output,'modules/editor/src'),join(output,'default-seed/src/editor'),{recursive:true});
 const seed=join(output,'default-seed');
 const change=(file,from,to)=>{const path=join(seed,file),text=readFileSync(path,'utf8');if(!text.includes(from))throw new Error(`Missing source marker: ${file}`);writeFileSync(path,text.replace(from,to));};

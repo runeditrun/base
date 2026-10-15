@@ -92,7 +92,7 @@ test('rer deploy --remove --yes empties its created bucket and refuses unproved 
 
 });
 
-test('rer deploy --remove accepts missing R2 object pagination only for an empty bucket', async t => {
+test('rer deploy --remove refuses ambiguous full pages and malformed R2 pagination, accepting terminal empty pages', async t => {
  for (const metadata of ['absent', 'null', 'malformed']) await t.test(metadata, async t => {
   const {root, provider, run} = await removalFixture(t);
   assert.equal(await run(), 0);
@@ -132,9 +132,10 @@ test('rer deploy --remove accepts missing R2 object pagination only for an empty
    // An empty result must not hide explicit invalid or contradictory metadata.
    for (info of [{}, false, {is_truncated:'false'}, {is_truncated:true,cursor:'next'}, {is_truncated:false,delimited:['prefix/']}]) await refuse();
   } else {
-   objects.set('keep-owned', Buffer.from('owned data'));
+   for (let index = 0; index < 1000; index++) objects.set(`keep-owned-${index}`, Buffer.from('owned data'));
+   const retained = [...objects];
    await refuse();
-   assert.deepEqual([...objects], [['keep-owned', Buffer.from('owned data')]], 'nonempty ambiguous page preserves its object');
+   assert.deepEqual([...objects], retained, 'a full ambiguous page preserves its objects');
    objects.clear();
    const writes = provider.state.writes.length;
    assert.equal(await run('--remove', '--yes'), 0, `${metadata} metadata completes empty removal`);
