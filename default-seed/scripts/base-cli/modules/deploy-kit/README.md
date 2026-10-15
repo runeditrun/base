@@ -186,7 +186,7 @@ No zone ruleset is read or written. Every request now invokes the Worker: one pa
 - the Worker is the kit's when its latest deployment serves, at 100%, the Worker's newest version, and that version's message annotation is the kit's `rer-site:<fingerprint>` (every site upload sets it);
 - a Custom Domain is the kit's when its service is the kit's Worker.
 
-A read-only preflight reads the zone (it must be in this account, else `site-zone-missing`), the Worker and the zone's Custom Domains, and refuses before any write: `resource-name-collision` for a Worker of the name whose live version the kit did not upload, or for a hostname attached to another service (or to a Worker that is not the kit's); `owned-resource-replaced` for a kit Worker whose latest deployment is not the kit's upload (a dashboard rollback or a split deployment). It then uploads the assets and the site Worker, checks that the new version is live, turns workers.dev off, attaches each missing hostname, and reads the Worker and both domains back. A repeat attaches nothing new. `.rer/deploy/site-<environment>.json` receives a receipt for the person; it is never read. The real path is tested only against the fake Cloudflare API in `tests/site-provider.mjs`, where every zone ruleset path answers 403; it has not run against a live account.
+A read-only preflight reads the zone (it must be in this account, else `site-zone-missing`), the Worker and the zone's Custom Domains, and refuses before any write: `resource-name-collision` for a Worker of the name whose live version the kit did not upload, or for a hostname attached to another service (or to a Worker that is not the kit's); `owned-resource-replaced` for a kit Worker whose latest deployment is not the kit's upload (a dashboard rollback or a split deployment). It then uploads the assets and the site Worker, checks that the new version is live, turns workers.dev off, attaches each missing hostname, and reads the Worker and both domains back. Both post-upload Worker checks share a 90-second upload window: missing visibility or the exact preflight version waits with backoff until the upload response's version serves alone as newest with its expected fingerprint. A foreign version, changed fingerprint or split deployment refuses immediately. A timeout names the last serving/newest versions and fingerprint. A repeat attaches nothing new. `.rer/deploy/site-<environment>.json` receives a receipt for the person; it is never read. Provider propagation cases are tested against the fake Cloudflare API in `tests/site-provider.mjs`, where every zone ruleset path answers 403.
 
 The token needs, beyond the owner-account permissions above:
 
@@ -290,7 +290,11 @@ budget, and no request starts at the deadline. An unchanged repeat uses the
 existing library window and does not record first-upload readiness attempts.
 The standalone CLI `health` command sends a single request; only an answer from
 another Worker version (an edge still converging after a secret change) is asked
-again, within 30 seconds. Library `verifyHealth`
+again, within 30 seconds. Immediate post-upload readback also waits through an
+HTTPS workers.dev 404 whose complete body is `error code: 1042`, including after
+a changed-source redeploy, within the original upload deadline and the health
+command's 30-second bound. This does not grant first-creation setup-token replay
+permission to a redeploy. Library `verifyHealth`
 retains the existing window, retrying only 404, 503 and network failures for
 30 seconds by default.
 

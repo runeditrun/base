@@ -167,4 +167,21 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
  finally { clearTimeout(hold); }
  assert.ok(aborted); assert.equal(reads, 1, 'an expired provider read is not retried');
 
+ // A changed-source upload can briefly lose its established route too.
+ await writeFile(join(root,'source.mjs'),'export const edition = "updated";');
+ await writeFile(join(root,'dist/server/index.js'),'export default {scheduled() {},fetch(){return new Response("updated vector")}};');
+ const git = (...args) => execFileSync('git',['-c','user.email=owner@example.test','-c','user.name=Owner','-c','commit.gpgsign=false',...args],{cwd:root,stdio:'pipe'});
+ git('add','source.mjs'); git('commit','-qm','update source');
+ provider.state.healthOverride = null;
+ const updated = await main(['deploy',...args], inputs(provider), options);
+ assert.equal(updated.changed, true);
+ assert.equal(updated.propagation.freshUpload, false, 'a redeploy does not gain first-creation token replay permission');
+ assert.notEqual(updated.versionId, first.versionId);
+ attempts = 0;
+ provider.state.healthOverride = () => ++attempts === 1 ? new Response('error code: 1042', {status:404}) : healthy();
+ const redeployDeadline = elapsed + updated.propagation.window.remaining();
+ assert.equal((await main(['health',...args], inputs(provider), {...options,propagation:updated.propagation})).ok, true);
+ assert.equal(attempts, 2);
+ assert.ok(elapsed < redeployDeadline, 'redeploy readback uses its own remaining upload budget');
+
 });
