@@ -1,16 +1,10 @@
 import { createMailSender } from '../../index.mjs';
-import { createD1DevelopmentOutbox, createDevelopmentOutboxHandler } from '../../src/development/index.mjs';
 
 export default {
-  async fetch(request, env) {
-    const outbox = createD1DevelopmentOutbox({ db: env.DB });
-    if (new URL(request.url).pathname === '/capture' && request.method === 'POST') {
-      const message = await request.json();
-      if (message.attachments) message.attachments = message.attachments.map(attachment => ({ ...attachment, content: Uint8Array.from(attachment.content) }));
-      const sender = createMailSender({ provider: 'development', mode: 'development' }, { outbox });
-      return Response.json(await sender.send(message));
+  async fetch(request) {
+    if (new URL(request.url).pathname === '/send' && request.method === 'POST') {
+      return Response.json(await createMailSender({ provider: 'development', mode: 'development' }).send(await request.json()));
     }
-    const viewer = createDevelopmentOutboxHandler({ local: request.headers.get('X-Test-Production') !== 'true', origin: env.LOCAL_ORIGIN, outbox });
-    return await viewer(request) ?? new Response('Not found', { status: 404 });
+    return new Response('Not found', { status: 404 });
   },
 };

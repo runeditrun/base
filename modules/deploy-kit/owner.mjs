@@ -101,8 +101,8 @@ function entries(declaration, key) {
   assert(Array.isArray(list) && list.every(item => item && typeof item === 'object' && !Array.isArray(item) && Object.keys(item).every(k => ENTRY_KEYS[key].includes(k))), 'invalid-owner-declaration');
   return list;
 }
-/* RER_DEV_KEY opens local dev identity and RER_DEMO turns on demo mode (nothing
- * sent, throwaway data); they and every key a seed adapter declares local-only
+/* RER_DEV_KEY opens local dev identity and RER_DEMO turns on demo mode (mocked
+ * third-party effects, throwaway data); they and every key a seed adapter declares local-only
  * never become a deployed binding, secret or secret source. */
 export const LOCAL_ONLY_KEYS = Object.freeze(['RER_DEV_KEY', 'RER_DEMO', 'RER_MODELS_KEY', 'RER_MODELS_SERVICE', '.rer/local/models.json']);
 export function localOnlyBinding(declaration, localOnlyKeys = []) {

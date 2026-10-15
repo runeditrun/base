@@ -30,11 +30,7 @@ test('rer build refuses a build that bundles the dev layer, naming the file; the
  await writeFile(entry, production);
  await seed.run(['build']);
  for (const file of await files(join(seed.root, 'dist'))) for (const marker of [DEV_LAYER_MARKER, DEV_AI_MARKER]) assert.equal((await readFile(file)).includes(marker), false, file);
- // rer check holds a devIdentity seed to its wiring and its email-link test.
  assert.ok((await seed.run(['check', '--profile', 'first-party'])).at(-1).clauses.every(clause => clause.ok));
- await rm(join(seed.root, 'tests/local-journey/journey.test.mjs'));
- const check = (await seed.run(['check', '--profile', 'first-party'], 1)).at(-1);
- assert.deepEqual(check.clauses.filter(clause => !clause.ok).map(clause => clause.id), ['SC-05.dev-identity.email-link-test']);
 });
 
 test('rer deploy and its dry run refuse RER_DEV_KEY, RER_DEMO and declared local-only keys before building', { timeout: 5 * 60_000 }, async t => {

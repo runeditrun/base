@@ -38,6 +38,7 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
       ...sourceRoots.map(source => ({ component: source.startsWith('modules/') ? source.split('/')[1] : 'base', repository: 'base', source, target: `scripts/base-cli/${source}` })),
       { component: 'operator-auth', repository: 'base', source: 'modules/operator-auth', target: 'src/modules/operator-auth' },
       { component: 'mail', repository: 'base', source: 'modules/mail', target: 'src/modules/mail' },
+      { component: 'demo', repository: 'base', source: 'modules/demo', target: 'src/modules/demo' },
       { component: 'ai', repository: 'base', source: 'modules/ai', target: 'src/modules/ai' },
       ...['dependencies','owner-claim'].map(name=>({component:name,repository:'base',source:`modules/${name}`,target:`src/modules/${name}`})),
       ...[['operator-auth','accounts/schema/provider-control.sql','0006_provider_control'],['dependencies','schema/dependencies.sql','0007_dependencies'],['owner-claim','schema/owner-claim.sql','0008_owner_claim'],['owner-claim','schema/idp.sql','0009_idp_owner'],['operator-auth','accounts/schema/provider-pins.sql','0010_provider_pins'],['operator-auth','accounts/schema/dependency-setup.sql','0011_dependency_setup'],['dependencies','schema/approval-attempt.sql','0012_dependency_approval'],['operator-auth','accounts/schema/owner-signin.sql','0014_owner_signin']].map(([component,file,name])=>({component,repository:'base',source:`modules/${component}/${file}`,target:`migrations/core/${name}.sql`})),

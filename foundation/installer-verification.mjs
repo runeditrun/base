@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 export async function verifyInstaller(root,answers={}) {
  await assert.rejects(access(join(root, 'node_modules')));
  const { startInstaller } = await import(pathToFileURL(join(root, 'scripts/base-onboarding/server.mjs')));
+ const { appFetch } = await import(pathToFileURL(join(root, 'scripts/base-onboarding/app-fetch.mjs')));
  const { createSeed } = await import(pathToFileURL(join(root, 'scripts/installer/seed.mjs')));
  const installer = await startInstaller(root, { seed: createSeed(root) });
  try {
@@ -39,12 +40,29 @@ export async function verifyInstaller(root,answers={}) {
   assert.equal(result.devOpen, true);
   const open = new URL((await (await fetch(installer.origin + '/api/open-app', { headers })).json()).url), fragment = new URLSearchParams(open.hash.slice(1));
   assert.ok(!JSON.stringify(result).includes(fragment.get('rer-dev')), 'installer state holds no dev key');
-  const traded = await fetch(new URL('/__dev/key', open.origin), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: fragment.get('rer-dev') }) });
+  const cookies = new Map();
+  const remember = response => {
+   for (const line of response.headers.getSetCookie()) {
+    const pair = line.split(';')[0], split = pair.indexOf('=');
+    cookies.set(pair.slice(0, split), pair.slice(split + 1));
+   }
+  };
+  const cookieHeader = () => [...cookies].map(([name, value]) => `${name}=${value}`).join('; ');
+  const traded = await appFetch(new URL('/__dev/key', open.origin), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: fragment.get('rer-dev') }) });
   assert.equal(traded.status, 204, 'the open link trades its key for the gate cookie');
-  const app = await fetch(new URL(fragment.get('next'), open.origin), { headers: { cookie: traded.headers.get('set-cookie').split(';')[0] } });
+  remember(traded);
+  const next = fragment.get('next') ?? `/auth/dev/enter?as=${encodeURIComponent(fragment.get('as') ?? 'owner')}`;
+  const entered = await appFetch(new URL(next, open.origin), { redirect: 'manual', headers: { cookie: cookieHeader() } });
+  assert.equal(entered.status, 303, 'the one-click link signs in the owner');
+  remember(entered);
+  const session = await appFetch(new URL('/auth/session', open.origin), { headers: { cookie: cookieHeader() } });
+  assert.equal(session.status, 200);
+  assert.equal((await session.json()).operator.email, 'foundation-owner@example.test');
+  const app = await appFetch(new URL('/setup', open.origin), { headers: { cookie: cookieHeader() } });
   assert.equal(app.status, 200);
-  assert.match(await app.text(), /Development outbox|Message|Sign.in/i);
-  assert.match(await (await fetch(new URL(result.appUrl).origin)).text(), /My first application/);
+  assert.match(await app.text(), /Foundation Owner/);
+  assert.equal((await appFetch(new URL('/__dev/outbox', open.origin), { headers: { cookie: cookieHeader() } })).status, 404);
+  assert.match(await (await appFetch(open.origin)).text(), /My first application/);
   assert.deepEqual(JSON.parse(await readFile(join(root, 'src/branding.json'))), { name: 'My first application', primaryColor: '#356c60' });
   console.log('Standalone predependency onboarding approved once, installed, built and served personalized real Worker');
  } finally { await installer.close(); }

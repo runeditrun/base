@@ -43,9 +43,7 @@ rer dev
 
 Use the setup prompt instead of `--owner-email` when entering the real owner
 mailbox. Open the `RER_OPEN` URL printed by `dev` on this computer; the app opens
-signed in as the owner. With `dev --login`, open the outbox it prints, choose
-the newest ordinary sign-in message and follow its link. No external email is
-sent. For a composed
+signed in as the owner, including with the legacy `dev --login` flag. For a composed
 foundation, run the same commands from the runnable edition checkout root.
 
 The other supported operations are:

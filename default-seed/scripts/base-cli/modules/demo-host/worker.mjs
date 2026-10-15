@@ -22,7 +22,7 @@ function demoId(request, env) {
   try { return env.DEMO.idFromString(value); } catch { return null; }
 }
 
-// The demo's end in the visitor's time zone, as the Demo bar shows it (HH:MM).
+// The demo's end in the visitor's time zone, retained in runtime settings.
 function localTime(time, timeZone = 'UTC') {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'longOffset' }).formatToParts(time).map(part => [part.type, part.value]));

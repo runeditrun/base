@@ -8,7 +8,7 @@
     "id": "foundation",
     "record": "No domain record selected"
   },
-  "description": "TanStack Start and Hono Worker with real owner authentication, D1 and local development mail.",
+  "description": "TanStack Start and Hono Worker with real owner authentication, D1 and silent development mail suppression.",
   "capabilities": [
     {
       "id": "http-dispatch",
@@ -40,7 +40,7 @@
       "/health",
       "/signin"
     ],
-    "notes": "Native owner sessions guard /app; unknown paths return real 404s; the development outbox is local-only."
+    "notes": "Native owner sessions guard /app; unknown paths return real 404s; development and demo mail is suppressed."
   },
   "extensionPoints": {
     "contributions": [],

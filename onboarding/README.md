@@ -3,7 +3,7 @@
 First-party seeds expose public operations through the RER dispatcher. From a
 runnable seed checkout, the supported local sequence begins with
 `rer install`, `rer setup` and
-`rer dev`; owner sign-in uses the printed local outbox. The
+`rer dev`; owner sign-in uses the one-click `RER_OPEN` link. The
 command contract and flags are documented in the runnable checkout's root
 `RUN-LOCALLY.md`.
 
@@ -48,9 +48,8 @@ A seed that declares `devIdentity` on its command adapter gets the key-gated way
 in from the installer without declaring anything more: before setup the installer
 creates the checkout's dev key (as `rer setup` does) and passes it to the hooks as
 `context.devKey`. The `start` hook must give it to the temporary app (an
-`RER_DEV_KEY` binding), because the `signIn` request reaches the key-gated outbox
-with it. When setup completes, the installer page offers the outbox through the
-key exchange (`RER_OPEN`); the key never enters saved state or logs. A seed
+`RER_DEV_KEY` binding). When setup completes, the installer page offers the app
+through the key exchange and dev owner entry (`RER_OPEN`); the key never enters saved state or logs. A seed
 without `devIdentity` gets no key and its installer is unchanged.
 
 `rer-setup.json` is the only setup schema. Its fields, groups, defaults,
@@ -104,8 +103,7 @@ Declare the theme in two places that name the same file:
   and `firstRunResponse(request, bindings, auth, { theme: { href:
   '/rer-theme.css', productName, accentColor? } })` from `src/base/setup` for
   `/setup`; the foundation sign-in uses `themeFrame` from
-  `src/base/theme-frame` the same way, and the development outbox takes
-  `createDevelopmentOutboxHandler({ ..., theme: '/rer-theme.css' })`.
+  `src/base/theme-frame` the same way.
   `accentColor` colours buttons when the theme declares no accent. A seed's own
   pages may read the same tokens by linking the file.
 
@@ -116,12 +114,11 @@ and the foundation template's `public/rer-theme.css` are worked examples.
 
 Setup validates answers before effects, then uses the declared lifecycle to
 prepare local state, private settings, build and migrations, start the real
-application briefly, prepare the first owner and verify ordinary sign-in via
-the loopback development outbox. It stops the temporary app before returning.
+application briefly and prepare the first owner. It stops the temporary app before returning.
 Reruns preserve an existing owner, data and exact settings bytes; setup does
 not create a second owner or rotate secrets. Dev and preview use the saved
-owner and canonical durable state. A normal sign-in uses the same local
-outbox; no external email is sent by local commands.
+owner and canonical durable state. Dev opens through the local identity entry;
+application mail is silently suppressed in development and demo.
 
 Adapters use the shared captured command store for child work. It redacts
 registered credential values from terminal output and private logs, records
@@ -145,7 +142,7 @@ exports and deployment receipts.
 Each first-party adapter declares which resources local export/import supports.
 Every first-party seed verifies a complete local export/import/export round
 trip across those resources. Archives are private and integrity-checked;
-owner/auth, outbox, private settings and transient runtime state remain
+owner/auth, historical development mail, private settings and transient runtime state remain
 excluded. Import validates and restores atomically into an empty destination.
 Remote transfer is supported only when every required resource has a complete
 adapter implementation; unsupported targets fail visibly.

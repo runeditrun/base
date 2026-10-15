@@ -33,6 +33,7 @@ function Root() {
       <HydrationUnit>
         <header>
           <nav aria-label="Reference navigation">
+            <a href="/" data-rer-name>Default seed</a>{' '}
             <Link to="/records">Public record</Link>{' '}
             <Link to="/reference">Prerendered reference</Link>{' '}
             <Link to="/app">Operator app</Link>

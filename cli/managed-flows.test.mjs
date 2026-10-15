@@ -26,7 +26,7 @@ before(async () => {
 }, {timeout: 20 * 60_000});
 after(async () => {for (const cleanup of cleanups.reverse()) await cleanup();});
 const events = child => child.stdoutText.trim().split('\n').filter(Boolean).map(JSON.parse);
-// The reference's outbox answers only behind the checkout's key gate.
+// Present the checkout key when probing local-only routes.
 const gated = async () => ({headers: {'x-rer-dev-key': /^RER_DEV_KEY=(.+)$/m.exec(await readFile(join(f.root, '.rer/local/dev-key.env'), 'utf8'))[1]}});
 async function ready(child, {root = f.root, origin = url} = {}) {
  const before = await startupResources(root);
@@ -48,15 +48,15 @@ async function ready(child, {root = f.root, origin = url} = {}) {
    ['sign-in throttling', /HTTP 429 \(rate_limited\)/],
    ['runtime startup', /Starting your application/],
   ].filter(([, pattern]) => pattern.test(output)).map(([name]) => name);
-  assert.fail('actual application health and ordinary outbox precede ready: ' + JSON.stringify({
+  assert.fail('actual application health precedes ready: ' + JSON.stringify({
    exitCode: child.exitCode, signal: child.signalCode, errorCode: codes.has(error?.code) ? error.code : 'unclassified',
    resultExit: Number.isInteger(result?.exitCode) ? result.exitCode : null, reasons,
    resources: {before, after: await startupResources(root)},
   }));
  }
- assert.ok(events(child).some(row => row.event === 'ready'), 'actual application health and ordinary outbox precede ready');
+ assert.ok(events(child).some(row => row.event === 'ready'), 'actual application health precedes ready');
  const row = events(child).find(row => row.event === 'ready');
- assert.equal(row.url, origin); assert.equal(row.signInUrl, origin + '/__dev/outbox');
+ assert.equal(row.url, origin); assert.equal(row.signInUrl, undefined);
  return child;
 }
 async function startupResources(root = f.root) {
@@ -155,13 +155,14 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
 
  const dev = await ready(f.start(['dev', '--port', String(port), '--json']));
  const original = await processTree(dev.pid);
- const outbox = await (await fetch(url + '/__dev/outbox', await gated())).text();
  const alias = f.root + '-alias'; await symlink(f.root, alias);
  try {
   const duplicate = await f.run(['dev', '--cwd', alias, '--json']);
   assert.equal(events(duplicate).find(row => row.event === 'ready').url, url);
  } finally {await rm(alias);}
- assert.ok(outbox === await (await fetch(url + '/__dev/outbox', await gated())).text(), 'reuse issues no additional sign-in');
+ const legacy=events(await f.run(['dev','--login','--json'])).find(row=>row.event==='ready');
+ assert.equal(legacy.signedInAs,'managed-owner@example.test');
+ assert.equal(legacy.signInUrl,undefined);
  const runtime = tree => tree.filter(row => row.executable === 'workerd').map(row => [row.pid,row.start]);
  assert.deepEqual(runtime(await processTree(dev.pid)), runtime(original), 'reuse keeps the actual runtime lifetime');
  assert.equal((await fetch(url + '/@vite/client')).status, 200, 'dev retains real Vite');
@@ -213,7 +214,7 @@ test('rer dev caches font bytes without changing document or module policies', {
   const lifetime=value=>Number(/max-age=(\d+)/.exec(value??'')?.[1]??0);
   assert.ok(lifetime(policy)>0&&!/no-cache|no-store/.test(policy),'source fonts remain fresh across page loads');
   assert.ok(lifetime(immutable)>lifetime(policy)&&/immutable/.test(immutable),'versioned fonts can be cached longer');
-  const document=await fetch(url+'/'),module=await fetch(url+path+'?import'),outbox=await fetch(url+'/__dev/outbox',await gated());
+  const document=await fetch(url+'/'),module=await fetch(url+path+'?import'),session=await fetch(url+'/auth/session',await gated());
   assert.match(document.headers.get('cache-control'),/no-store/,'private document policy survives');
   assert.ok(!/immutable|max-age/.test(module.headers.get('cache-control')??''),'Vite font-import JavaScript keeps its policy');
   const validator=module.headers.get('etag');
@@ -221,33 +222,23 @@ test('rer dev caches font bytes without changing document or module policies', {
   const unchangedModule=await fetch(url+path+'?import',{headers:{'if-none-match':validator}});
   assert.equal(unchangedModule.status,304,'the public door serves a real conditional module response');
   assert.ok(!/immutable|max-age/.test(unchangedModule.headers.get('cache-control')??''),'conditional JavaScript font imports keep their policy too');
-  assert.match(outbox.headers.get('cache-control'),/no-store/,'ordinary outbox remains private');
-  await Promise.all([versioned.arrayBuffer(),document.arrayBuffer(),module.arrayBuffer(),outbox.arrayBuffer()]);
+  assert.match(session.headers.get('cache-control'),/no-store/,'session response remains private');
+  await Promise.all([versioned.arrayBuffer(),document.arrayBuffer(),module.arrayBuffer(),session.arrayBuffer()]);
  } finally {
   if(child){await f.run(['dev','--stop','--json']);if(processLifetime)await stopped(child,processLifetime);else await f.stop(child);}
   await rm(join(f.root,'public',hashed),{force:true});
  }
 });
 
-test('rer dev prints its sign-in link for a seed whose outbox does not answer HEAD', {timeout: 300000}, async () => {
- const route = join(f.root, 'src/core/platform/auth/outbox.server.mjs'), original = await readFile(route, 'utf8');
- const guarded = original.replace("if (url.pathname !== '/__dev/outbox'", "if (request.method === 'HEAD' && url.pathname === '/__dev/outbox') return new Response(null, {status: 404})\n  if (url.pathname !== '/__dev/outbox'");
- assert.notEqual(guarded, original);
- let child, processLifetime;
+test('legacy rer dev --login opens automatically as owner without a mail route', {timeout: 300000}, async () => {
+ const child = await ready(f.start(['dev', '--login', '--port', String(port), '--json']));
  try {
-  await writeFile(route, guarded);
-  child = f.start(['dev', '--login', '--port', String(port)]);
-  const deadline = Date.now() + 180000;
-  while (!child.stdoutText.includes('RER_READY') && child.exitCode === null && Date.now() < deadline) await pause(100);
-  await pause(500);
-  processLifetime = await processTree(child.pid);
-  assert.equal((await fetch(url + '/__dev/outbox', {method: 'HEAD', ...await gated()})).status, 404, 'the seed outbox refuses HEAD');
-  assert.equal((await fetch(url + '/__dev/outbox', await gated())).status, 200, 'the seed outbox answers GET');
-  assert.ok(child.stdoutText.split('\n').includes(`RER_SIGN_IN ${url}/__dev/outbox`), 'the sign-in link is printed whatever HEAD does');
- } finally {
-  await writeFile(route, original);
-  if (child) {await f.run(['dev', '--stop', '--json']); if (processLifetime) await stopped(child, processLifetime); else await f.stop(child);}
- }
+  const info = events(child).find(event => event.event === 'ready');
+  assert.equal(info.signedInAs, 'managed-owner@example.test');
+  assert.equal(new URLSearchParams(new URL(info.openUrl).hash.slice(1)).get('as'), 'owner');
+  assert.equal(info.signInUrl, undefined);
+  assert.equal((await fetch(url + '/__dev/outbox', await gated())).status, 404);
+ } finally { await f.run(['dev', '--stop', '--json']); await f.stop(child); }
 });
 
 test('managed startup reports a real misbound application port and stops its descendants', {timeout: 300000}, async t => {
@@ -336,10 +327,9 @@ test('rer preview serves one fixed production workerd at the saved origin and ke
  assert.equal(refreshed.status,200,'an old validator cannot hide changed assets');
  assert.equal(refreshed.text,'changed preview asset');
  assert.notEqual(refreshed.etag,validator);
- const outbox = await (await fetch(url + '/__dev/outbox', await gated())).text();
  const duplicate = await f.run(['preview', '--json']);
  assert.equal(events(duplicate).find(row => row.event === 'ready').url, url);
- assert.ok(outbox.includes('Development outbox') && outbox === await (await fetch(url + '/__dev/outbox', await gated())).text(), 'preview reuse issues no additional sign-in');
+ assert.equal(events(duplicate).find(row=>row.event==='ready').signInUrl,undefined);
  await f.run(['dev', '--json'], 4);
  await f.run(['reset', '--yes', '--json'], 4);
  const source = join(f.root, 'src/routes/reference.tsx'), saved = await readFile(source, 'utf8');

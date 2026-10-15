@@ -17,7 +17,7 @@ export const personErasure = defineErasure({
     { table: 'audit_events', column: 'entity_id', of: 'person_notes', where: "entity_type='note'", clear: { details: '{}' } },
     { table: 'audit_events', column: 'entity_id', of: 'person_files', where: "entity_type='file'", clear: { details: '{}' } },
   ],
-  // Mail captured by the local development outbox is addressed to the person.
+  // Historical development mail is addressed to the person.
   async statements({ db, subject }) {
     const person = await db.prepare('SELECT email FROM people WHERE id=?').bind(subject.id).first<{ email: string }>()
     return person ? [db.prepare("DELETE FROM rer_mail_development_outbox WHERE EXISTS(SELECT 1 FROM json_each(json_extract(message,'$.to')) WHERE lower(value)=lower(?))").bind(person.email)] : []

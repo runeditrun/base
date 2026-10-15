@@ -98,7 +98,7 @@ export async function startInstaller(root,{seed,port=0,answers,secretInput,noPre
     if(req.method==='GET'&&path==='/api/open-app'){
      const key=store.state.phase==='complete'&&store.state.devOpen?/^RER_DEV_KEY=([A-Za-z0-9_-]{43,256})$/m.exec(await readFile(join(root,'.rer/local/dev-key.env'),'utf8').catch(()=>''))?.[1]:undefined;
      if(!key)return json(404,{error:'No dev key for this installation.'});
-     const app=new URL(store.state.appUrl);return json(200,{url:`${app.origin}/__dev/key#${new URLSearchParams({'rer-dev':key,next:'/__dev/outbox'})}`});
+     const app=new URL(store.state.appUrl);return json(200,{url:`${app.origin}/__dev/key#${new URLSearchParams({'rer-dev':key,as:'owner',next:'/auth/dev/enter?as=owner&returnTo='+encodeURIComponent(app.pathname+app.search)})}`});
     }
     if(req.method==='GET'&&path==='/api/agent-handoff')return json(200,(seed.handoff||agentHandoff)(root,origin,store.state.sessionId,seed));
     if(req.method==='GET'&&path==='/api/state'){await workspaceArt?.refresh();store.state.known.secretReadiness=vault.readiness(store.state.draft);return json(200,store.state);}

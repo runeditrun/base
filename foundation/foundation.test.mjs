@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, cp, readFile, writeFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { initialize } from './initialize.mjs'
@@ -56,6 +57,24 @@ test('public foundation CLI keeps author identity private from Run data and comp
     git(family, 'init'); git(family, 'add', '.'); git(family, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'starter')
     const output = resolve(tmp, 'edition')
     await assemble({ familyRepo: family, baseRepo: base, edition: 'first', output, toolCommit: ref })
+    // Exercise the composed mail facade with the real selected mail module.
+    // Network is the only fake: local/demo must never reach a provider, even
+    // when the installation already has hosted mail credentials configured.
+    const { operatorMail } = await import(pathToFileURL(resolve(output, 'src/mail.server.mjs')))
+    const message = { deliveryId: 'foundation-sign-in', from: 'auth@example.test', to: ['owner@example.test'], subject: 'Sign in', text: 'Your sign-in link' }
+    const liveFetch = globalThis.fetch
+    let providerCalls = 0
+    globalThis.fetch = async () => { providerCalls++; return Response.json({ id: 'test-delivery' }) }
+    try {
+      for (const mode of [{ AUTH_LOCAL: 'true' }, { RER_DEMO: '1' }]) {
+        const env = { ...mode, MAIL_PROVIDER: 'resend', get MAIL_API_KEY() { throw Error('suppressed mail read provider credentials') }, get DB() { throw Error('suppressed mail used the database') } }
+        assert.equal((await operatorMail(env).send(message)).status, 'development')
+      }
+      assert.equal(providerCalls, 0)
+      assert.equal(operatorMail({ MAIL_PROVIDER: 'development' }), undefined)
+      assert.equal((await operatorMail({ MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-only-provider-key' }).send(message)).status, 'accepted')
+      assert.equal(providerCalls, 1)
+    } finally { globalThis.fetch = liveFetch }
     const seed = JSON.parse(await readFile(resolve(output, 'seed.json')))
     assert.deepEqual(validate(JSON.parse(await readFile(resolve(root, 'schema/SEED.schema.json'))), seed), [])
     assert.match(await readFile(resolve(output, 'src/identity.ts'), 'utf8'), /branding.name/)

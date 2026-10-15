@@ -85,7 +85,7 @@ included authority generation, so archive hashes may differ even when retained
 domain and identity rows are equal. The technical foundation currently has no
 product domain or background jobs; default-seed retains its durable jobs and
 schedule records while omitting transient queue delivery state, local runtime
-caches and logs, local outbox, transfer bookkeeping, provider credentials,
+caches and logs, transfer bookkeeping, provider credentials,
 provider link keys and transient provider sessions. People, external identity
 bindings, the installation sector and the original owner claim are retained.
 Retained dependency links are marked as needing re-link, and provider sign-in
@@ -116,8 +116,8 @@ lockfiles, tool versions and output bytes in a nonsecret `.rer/local` receipt;
 changed or incomplete output is rebuilt. Changes made while serving do not
 rebuild preview. A build that regenerates its own files declares them as
 `generatedOutputs` on the command adapter (see the seed command contract); those
-paths are not inputs, while any other file touched during the build is refused by name. Both use the same `.wrangler/state`, saved owner and ordinary
-fresh sign-in through the development outbox. Stop before changing modes.
+paths are not inputs, while any other file touched during the build is refused by name. Both use the same `.wrangler/state` and saved owner. Dev opens signed in through `RER_OPEN`, including with the legacy
+`--login` flag. Stop before changing modes.
 Stop dev or preview before build, verification or data transfer; use the
 documented `--stop` flag or Ctrl-C.
 
@@ -137,7 +137,7 @@ Both are managed servers. `--detach` returns after readiness, leaving the server
 running; `--foreground` keeps the invocation active while serving. Preview
 refreshes changed built assets and their ETags; source edits need a restart and
 rebuild. A compatible repeated invocation verifies the registered application,
-prints its safe ready/outbox URLs and exits without a new build or sign-in.
+prints its readiness and automatic sign-in URLs and exits without a new build or sign-in.
 Explicit conflicting host, port or timeout, or the other mode, refuses with
 exit 4 and the correct stop command. `--stop` is idempotent;
 start-only flags cannot accompany it. It requires no setup or tool versions.
@@ -160,24 +160,23 @@ idle timeout, and they stop with `dev` (explicit stop, idle timeout, Ctrl-C or
 an application exit). `preview` does not run schedules. A seed that does not
 want this declares one adapter option: `commandAdapter(lifecycle, { scheduled: false, ... })`.
 
-### The CLI's own sign-in requests
+### Local and production sign-in
 
-`setup` and every `dev` start ask the local application for one ordinary
-sign-in message (and `setup` claims the first owner) so the outbox is ready.
-Those requests carry `x-rer-local-cli`, an HMAC-SHA256 of `local-cli\0sign-in`
-keyed by the installation's private session secret (the setting the adapter
-declares as `sessionSecretKey`, default `SESSION_SECRET`)
-(`onboarding/adapter-auth.mjs`; checked in
-`modules/operator-auth/local-cli.mjs`). A server in local (loopback) mode skips
-the sign-in and owner-claim rate limit for a request with a valid proof, so
-restarting `dev` any number of times never spends the owner's sign-in budget; a
-person's own sign-in requests, and every request to a non-local server, still
-count exactly as before. Seeds receive the change by refreshing their copies as
-described above.
+`setup` claims the local owner and stops its temporary runtime. `dev` prints
+`RER_OPEN` to open automatically as that owner. It does not capture email or
+request a sign-in message. Legacy `--login` uses this same automatic entry.
+
+Production deployment requires outbound email configured in the actual declared
+bindings (`MAIL_PROVIDER`, `MAIL_FROM`, `MAIL_API_KEY`, and `MAIL_ACCOUNT_ID` for
+Cloudflare), or an Auth SSO dependency selected through the setup manifest and
+approved through the existing link flow. A redeploy can retain existing mail
+secrets after the provider verifies the owned deployment. Local setup and demo
+do not require production mail credentials. Preview serves production output
+and prints its ready address without a captured-mail sign-in flow.
 
 Idle timeout is `--idle-timeout SECONDS`, then `RER_SERVER_IDLE_SECONDS`, then
 43200 seconds (12 hours). Only positive integer seconds are accepted. HTTP requests,
-including assets/outbox, reset inactivity; a live request/stream prevents idle
+including assets, reset inactivity; a live request/stream prevents idle
 shutdown. Internal health probes and Vite HMR control traffic do not prolong
 serving; application WebSocket data messages count. Explicit stop and idle
 expiry clean up owned descendants before releasing state and capacity.
@@ -220,7 +219,7 @@ membership and actual process ancestry before sharing the admitted slot.
 Direct documented browser/runtime entrypoints and indirect package scripts join
 the same executor. Original-caller `CI=true` skips admission; `CI=false` and unset CI queue.
 Heavy verbs alone accept `--no-queue`, only with `CI=true`. Synthesized install
-child CI does not change the original decision. Inspection/help/outbox URL,
+child CI does not change the original decision. Inspection/help,
 stop and reset inventory/removal do not start a heavy job or application.
 
 After the seed's verification target, `verify` runs two checks on the production

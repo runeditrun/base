@@ -123,11 +123,10 @@ Help, check, describe, doctor and stop do not select or acquire Node.
 After `RER_READY`, `dev` prints `RER_SIGNED_IN EMAIL` and `RER_OPEN URL`.
 Open that URL on this computer: the app opens signed in as the owner and
 finishes first-run setup at `/setup`. Treat the line as a credential.
-`dev --as PERSONA` starts as a persona or signed out; `dev --login` prints
-the outbox instead: follow its newest ordinary sign-in link. Until first-run
-completion is stored durably, app routes return the signed-in owner to `/setup`;
-a signed-out owner returns there after signing in. Once setup is complete, `/setup` opens the app or
-its settings. The local outbox sends no email.
+`dev --as PERSONA` starts as a persona or signed out. Legacy `dev --login`
+uses the same automatic sign-in. Until first-run completion is stored durably,
+app routes return the signed-in owner to `/setup`; a signed-out owner returns
+there after signing in. Once setup is complete, `/setup` opens the app or settings.
 
 The saved local port is used; a first setup saves the first free port from 8787. Explicit ports must be decimal
 integers from 1 to 65535 and free; only `127.0.0.1`, `localhost` and `::1` are
@@ -169,7 +168,7 @@ Every first-party seed uses the maintained `rer` command path.
 `rer-setup.json` manifest, validates answers and delegates real build,
 migrations, owner and sign-in work to the seed's declared adapter. Owner choices
 remain authoritative, private inputs stay out of command arguments and logs, and
-the local development outbox sends no external mail. HappyToHelp and Slate
+local dev opens automatically through `RER_OPEN`. HappyToHelp and Slate
 retain their approved auth overrides. The [local operations guide](export/RUN-LOCALLY.md)
 and [command contract](export/SEED-COMMAND-CONTRACT.md) define the current
 commands, flags, state and safety requirements. Every seed has two homepages:
@@ -186,7 +185,7 @@ serializer and nullable provider receipt, with uncertain outcomes kept explicit.
 
 ## Public commands
 
-The shared `rer` dispatcher provides install, setup, dev, preview, build, verify, reset, deploy, export, import, outbox, doctor, describe and check; release keeps its existing producer and flags. This maintained path is required for every first-party seed. See [run it on your computer](export/RUN-LOCALLY.md) for exact flags, Node 22.20.0/pnpm 10.12.4 pins, readiness/sign-in lines, JSON, exits and the independent-project boundary. Local transfer covers declared supported resources; remote transfer requires complete adapter coverage. [CLI sources and export inventory](cli/README.md) documents the one runner and portable source boundary.
+The shared `rer` dispatcher provides install, setup, dev, preview, build, verify, reset, deploy, export, import, doctor, describe and check; release keeps its existing producer and flags. This maintained path is required for every first-party seed. See [run it on your computer](export/RUN-LOCALLY.md) for exact flags, Node 22.20.0/pnpm 10.12.4 pins, readiness/sign-in lines, JSON, exits and the independent-project boundary. Local transfer covers declared supported resources; remote transfer requires complete adapter coverage. [CLI sources and export inventory](cli/README.md) documents the one runner and portable source boundary.
 
 From `default-seed` or a composed first-party edition, use
 `rer preview` for fixed production output or
@@ -195,8 +194,8 @@ In a terminal the first invocation stays in the foreground (without one,
 `rer dev` returns once the app is ready); compatible repeats verify and
 reuse the running server, print readiness and exit. Stop with
 `rer preview --stop` or `rer dev --stop`
-before build, verification, reset or data transfer. Both retain the owner,
-outbox and canonical local state; the default idle timeout is 12 hours and
+before build, verification, reset or data transfer. Both retain the owner
+and canonical local state; the default idle timeout is 12 hours and
 the combined machine cap is 10. Bounded preparation uses the shared heavy-job
 queue. See the exported RUN-LOCALLY guide for timeout, reuse, capacity, sign-in
 and CI policy.

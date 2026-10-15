@@ -4,7 +4,7 @@ import { freshLocalProject } from './runtime.mjs'
 import { journey } from './browser.mjs'
 
 for (const width of [1440, 390]) {
-  test(`fresh-copy local owner and outbox journey at ${width}px`, { timeout: 30 * 60_000 }, async () => {
+  test(`fresh-copy one-click local owner journey at ${width}px`, { timeout: 30 * 60_000 }, async () => {
     let runtime, browser
     const oldTemporary = Object.fromEntries(['TMPDIR', 'TMP', 'TEMP'].map((key) => [key, process.env[key]]))
     try {

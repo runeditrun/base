@@ -1,34 +1,36 @@
 # Demo mode: adopting `rer demo`
 
-`rer demo` (the same as `rer dev --demo`) runs this checkout as a throwaway demo:
-signed in as the saved owner, filled with the seed's demo data, marked by a
-"Demo · nothing is sent · ends HH:MM" bar on every page, and unable to send
-anything. It needs `rer setup` first; it reuses the saved owner and private
-settings (`.dev.vars`) and nothing else.
+`rer demo` (the same as `rer dev --demo`) runs a throwaway copy, signed in
+as the saved owner with realistic data. Its title and marked nav label read
+`<Seed> Demo`; local dev reads `<Seed> Dev`. There is no injected bar or outbox.
 
 ```sh
 rer demo            # prints RER_READY, RER_OPEN and RER_DEMO_ENDS_ON_STOP
 rer demo --stop
 ```
 
-Its data lives in `.rer/demo/<start time>/` and is deleted when it stops:
-`rer demo --stop`, Ctrl-C, or its end (one hour after it starts; `--idle-timeout
-SECONDS` sets another). The checkout's own `.wrangler/state` is never written.
-Only one server runs per checkout, so stop `rer dev` before `rer demo` and the
-other way round.
+Data lives in `.rer/demo/<start time>/` and is deleted on stop, Ctrl-C or
+expiry. The checkout's `.wrangler/state` is never written. Stop `rer dev`
+before starting a demo in the same checkout.
 
-## What it guarantees
+## Effects
 
-Base's `modules/demo` (`withDemo`) does nothing unless the runtime has
-`RER_DEMO=1`. With it, global `fetch` answers loopback hosts only, for the whole
-isolate (routes, cron, queue consumers, Durable Objects); any other request
-throws `TypeError: fetch failed`, the error a failed delivery already raises,
-and is listed in the bar by method and host. A loopback answer's redirects are
-followed through the same check, hop by hop. `new WebSocket`, `navigator.sendBeacon`, `new EventSource`, `node:net` (and
-so `node:tls`) and `cloudflare:sockets` `connect` answer loopback only too, and
-their refusals are listed the same way. Mail stays in the development outbox
-and is listed too. `rer deploy` refuses a deploy declaration or
-`--env-file` that carries `RER_DEMO`.
+Public internet reads and checks run for real, including monitor probes,
+feeds, link previews and fetching a page. External writes that reach other
+people or third-party accounts are **mocked**: email, SMS, chat posts,
+web/social publishing, webhooks, payments and OAuth provider writes return
+success without sending. This exception for mocks applies only under
+`RER_DEMO`, never to a production installation. Mail in dev/demo is silently
+suppressed; one-click sign-in has no email step.
+
+The guard covers global fetch for routes, cron, queues and Durable Objects.
+GET/HEAD/OPTIONS use real networking; external write methods and message or
+webhook URLs use provider success responses. Use `fetchDemoRead(url, init)`
+for a read/check that uses POST. For non-HTTP effects or a provider-specific
+response, use `demoEffect(() => realSend(), () => providerSuccess)`; outside
+demo mode the real send runs. No payload is retained or shown. Public sockets
+remain open for probes; direct mail/SMS transports have a small denylist.
+Production build/deploy refuses `RER_DEMO` in declarations or settings.
 
 ## Adopting it in a seed
 
@@ -63,20 +65,23 @@ and is listed too. `rer deploy` refuses a deploy declaration or
    plugins: [demoSockets(), cloudflare({ /* ... */ }), /* ... */],
    ```
 
-Add `.rer/demo/` to `.gitignore`. Then run `rer setup` (once), `rer demo`, open
-`RER_OPEN`, and check the bar, the data, and a send the seed makes (it must
-appear under "Blocked sends").
+4. **The nav label.** Mark the product text with `data-rer-name`, for example
+   `<span data-rer-name>Uptime</span>`. Base adds the Demo/Dev suffix and sets
+   the document title suffix itself, including after client navigation.
+
+Add `.rer/demo/` to `.gitignore`. Run `rer demo`, open `RER_OPEN`, and try a
+real public fetch and a send: both flows complete, and only the fetch leaves.
 
 ## Hosting the demo
 
 `rer deploy --demo` puts the demo on the web at `demo.<domain>` (the run site's
 apex), so a visitor gets their own throwaway copy: the start page runs a
 Turnstile check and starts it, and they land signed in as the owner, with the
-seed's demo data and the Demo bar. Each visitor gets their own Cloudflare
+seed's demo data and its Demo name. Each visitor gets their own Cloudflare
 Container running this seed's image (`rer build --platform container`, workerd
-engine) with `RER_DEMO=1` and no internet, behind one front Worker
-(`<project>-<environment>--demo`). The engine's egress worker refuses every
-request too, so a send fails three ways. Only the visitor's random `rer_demo`
+engine) with `RER_DEMO=1` and public internet access, behind one front Worker
+(`<project>-<environment>--demo`). The guard mocks account effects; egress
+retains a small direct mail/SMS transport denylist. Only the visitor's random `rer_demo`
 cookie (HttpOnly, Secure, SameSite=Lax, one hour) reaches their container. A
 demo ends after 60 minutes, or 15 minutes with no requests; its container is
 destroyed and its state deleted, and the visitor sees "This demo has ended".
@@ -91,9 +96,7 @@ A retry while it is starting resumes that copy without taking a second place.
 
 At most `maxInstances` demos (10 unless set) run at once, and one IP starts at
 most 3 a minute.
-Mail lands in the outbox (and the bar) only where the seed's development
-outbox accepts the demo's https origin; otherwise the seed's mail is simply
-unconfigured. Nothing is sent either way.
+Mail is suppressed silently; all other effects follow the real/mocked policy above.
 
 The seed needs, beyond the adoption above:
 

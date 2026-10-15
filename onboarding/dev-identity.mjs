@@ -17,7 +17,7 @@ export async function declaresDevIdentity(root) {
 
 // The checkout's dev key for a devIdentity seed's installer, created as rer setup
 // does, or null for any other seed. The temporary app must receive it (the start
-// hook's context.devKey) so its key-gated outbox answers the installer's sign-in.
+// hook's context.devKey) for its one-click development sign-in.
 export async function installerDevKey(root) {
  return await declaresDevIdentity(root) ? (await keys()).ensureDevKey(root) : null;
 }

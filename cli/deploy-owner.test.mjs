@@ -24,7 +24,7 @@ async function checkout(t, declaration) {
  await writeFile(join(root, 'dist/server/index.js'), 'export default {scheduled(){},fetch(){}}');
  await writeFile(join(root, 'dist/client/index.html'), 'app');
  await writeFile(join(root, 'migrations/core/0001_owner.sql'), 'CREATE TABLE owner(id TEXT PRIMARY KEY);');
- await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', d1: [{ binding: 'DB' }], ...declaration }));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', d1: [{ binding: 'DB' }], vars:{MAIL_PROVIDER:'resend',MAIL_FROM:'owner@example.test',...(!declaration.secrets?.some(item=>item.binding==='MAIL_API_KEY')?{MAIL_API_KEY:'test-only-outbound-key'}:{})}, ...declaration }));
  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.dev.vars\ndeploy.env\n');
  // The local setup's private settings: the owner rer deploy reuses.
  await writeFile(join(root, '.dev.vars'), 'OWNER_EMAIL=owner@example.test\nSESSION_SECRET=local-only-session\n', { mode: 0o600 });
@@ -109,7 +109,7 @@ test('rer deploy claims the setup owner on the hosted app, retires the setup tok
  const deploy = ownerDeploy('deploy.json', localInstaller({ owner: lifecycle.hooks.owner, secrets: { file: '.dev.vars' } })), linked = [];
  const run = (options = {}, out = store()) => deploy({ root, options: { environment: 'production', ...options }, store: out, setupManifest: manifest, linkDependencies: async (origin, token) => linked.push(Boolean(origin && token)) });
  // A missing input is named, and nothing is created.
- await assert.rejects(run(), error => /Deploy needs MAIL_API_KEY/.test(error.message) && /--env-file/.test(error.message));
+ await assert.rejects(run(), error => /Production sign-in is not configured/.test(error.message));
  assert.equal(provider.state.writes.length, 0);
  await writeFile(join(root, 'deploy.env'), 'MAIL_API_KEY="from-the-env-file"\n', { mode: 0o600 });
  // A gateway answer after retirement must still complete the claim and save its new version.

@@ -1,8 +1,10 @@
+import { createHmac } from 'node:crypto';
+import { localVariables } from '../onboarding/local/environment.mjs';
 import { personaLinks } from './fixtures/persona-links.mjs';
 import { commandDiagnostic } from './fixtures/command-diagnostic.mjs';
 import { originalArchiveIdentity, recoverArchiveIdentity } from './fixtures/archive-identity.mjs';
 import { archiveRecords, archiveRows, archiveItems, remakeArchive } from './fixtures/archive-records.mjs';
-import { signedOutSetup, nonOwnerSetup, ownerSetup } from './fixtures/setup-journey.mjs';
+import { signedOutSetup, ownerSetup } from './fixtures/setup-journey.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, readFile, readdir, writeFile, rm, stat, access, symlink } from 'node:fs/promises';
@@ -17,7 +19,7 @@ import { initialize } from '../foundation/initialize.mjs';
 import { assemble } from '../composition/assemble.mjs';
 import { sourceRoots } from './export.mjs';
 import {fixture,freePort,hostStatus,pause,chromium,forwardingProxy,documentedCommand} from './fixtures/reference.mjs';
-import { signInAs, readDevKey } from '../modules/operator-auth/dev/sign-in-as.mjs';
+import { readDevKey } from '../modules/operator-auth/dev/sign-in-as.mjs';
 import { privateRuntime } from './fixtures/private-runtime.mjs';
 for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real Worker install/setup/dev/sign-in/build/reset and teardown`,{timeout:20*60_000},async t=>{
  const f=await fixture(kind,t),port=await freePort(),url=`http://127.0.0.1:${port}`;let setupPort=await freePort();while(setupPort===port)setupPort=await freePort();
@@ -69,16 +71,15 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  assert.ok(repeatedSetup.stdoutText.includes(`http://127.0.0.1:${setupPort}/setup`),'terminal setup identifies first-run route');
  const prior=await f.data('SELECT value FROM cli_reset_probe');assert.deepEqual(prior[0].results,[{value:'prior owner content'}],'setup kept previous domain data');assert.ok(settings.equals(await readFile(join(f.root,'.dev.vars'))),'setup keeps exact private bytes');
  await f.run(['build','--json']);assert.ok(settings.equals(await readFile(join(f.root,'.dev.vars'))),'build restores exact private bytes');
- await f.data("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('outbox-other','different@example.test','Other operator','admin','active',1)");
  // An archive holds the installation's data: export refuses a name rer dev
  // would serve, and saves into the documented exports/ folder.
  await f.run(['export','--output','journey.json','--json'],4);
  await f.run(['export','--output','exports/journey.rer','--json']);await cp(join(f.root,'exports/journey.rer'),join(f.root,'journey.rer'));
  const dev=f.start(['dev','--port',String(port),'--json','--non-interactive']);local.after(()=>f.stop(dev));
  const deadline=Date.now()+120000;while(!dev.stdoutText.includes('"event":"ready"')&&dev.exitCode===null&&Date.now()<deadline)await pause(100);
- assert.ok(dev.stdoutText.includes('"event":"ready"'),'actual dev health and fresh outbox must precede ready');
+ assert.ok(dev.stdoutText.includes('"event":"ready"'),'actual dev health must precede ready');
  await privateRuntime(url,f.root,{kind,runtime:'dev'});
- const ready=events(dev).find(e=>e.event==='ready');assert.equal(ready.url,url);assert.equal(ready.signInUrl,url+'/__dev/outbox');
+ const ready=events(dev).find(e=>e.event==='ready');assert.equal(ready.url,url);assert.equal(ready.signInUrl,undefined);
  // The installed instance answers its claim state publicly and shows the Lobby at /;
  // RER_SITE serves the static run site on its own loopback port.
  const claimState=async()=>{const response=await fetch(url+'/setup/state');assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);assert.equal(response.headers.get('set-cookie'),null);return response.json();};
@@ -96,7 +97,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const proxy=await forwardingProxy(url);
  try{
   for(const path of ['/__dev/outbox','/auth/dev/enter?as=owner','/__dev/personas'])assert.equal((await fetch(proxy.url+path,{redirect:'manual'})).status,404,`${path} through the proxy`);
-  assert.equal((await fetch(proxy.url+'/__dev/outbox',gated)).status,200,'the key, not the network, opens the outbox');
+  assert.equal((await fetch(proxy.url+'/__dev/outbox',gated)).status,404,'captured mail is retired even with the key');
   // Nor do the runtime's Local Explorer (raw SQL on the store), its trigger
   // handlers, the key file itself or an export archive, directly or through the proxy.
   for(const path of ['/cdn-cgi/local/explorer/api/d1/database','/cdn-cgi/handler/scheduled?cron=*/10+*+*+*+*','/.rer/local/dev-key.env',`/@fs${f.root}/.rer/local/dev-key.env`,'/exports/journey.rer',`/@fs${f.root}/exports/journey.rer`,'/journey.rer','/package.json'])for(const origin of [url,proxy.url])assert.equal((await fetch(origin+path,{redirect:'manual'})).status,404,`${path} at ${origin}`);
@@ -108,14 +109,6 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  await writeFile(livePath,kind==='default-seed'?originalSource.replace('Reference snapshot',marker):JSON.stringify({...JSON.parse(originalSource),name:marker}));
  try {let updated=false;for(let attempt=0;attempt<100&&!updated;attempt++){updated=(await (await fetch(url+(kind==='default-seed'?'/reference':'/'))).text()).includes(marker);if(!updated)await pause(100);}assert.ok(updated,'actual source update is served while dev remains running');}finally{await writeFile(livePath,originalSource);}
  await f.run(['reset','--yes','--non-interactive','--json'],4);
- await f.run(['outbox','--port',String(port),'--json']);
- await f.run(['outbox','--owner-email','different@example.test','--port',String(port),'--json']);
- assert.equal((await fetch(url+'/health')).status,200,'outbox commands preserve healthy foreground dev');
- assert.equal(dev.exitCode,null,'outbox commands keep dev running');
- const outbox=await (await fetch(ready.signInUrl,gated)).text();assert.ok(outbox.includes('To: different@example.test'),'explicit outbox address receives a fresh ordinary message');
- assert.ok(settings.equals(await readFile(join(f.root,'.dev.vars'))),'outbox does not rewrite saved owner settings');
- await f.run(['outbox','--owner-email','cli-owner@example.test','--port',String(port),'--json']);
- await pause(1000);assert.equal(dev.exitCode,null);assert.equal((await fetch(url+'/health')).status,200);
  await signedOutSetup(url);
  assert.equal(await hostStatus(url+'/setup','example.invalid'),421,'setup rejects a forged Host before revealing its document');
  const browser=await chromium.launch();
@@ -127,44 +120,26 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
   const devSession=await (await opened.request.get(url+'/auth/session')).json();
   assert.deepEqual([devSession.kind,devSession.operator.email],['dev','cli-owner@example.test']);
   await personaLinks({fixture:f,browser,context:opened,page:openedPage,origin:url,ownerLink:ready.openUrl});
-  await openedPage.locator('#rer-dev-badge summary').click();
-  await openedPage.getByRole('link',{name:'Switch to admin',exact:true}).click();
-  assert.equal((await (await opened.request.get(url+'/auth/session')).json()).operator.role,'admin','the real persona switch works with the gate cookie');
-  await openedPage.locator('#rer-dev-badge summary').click();
-  await openedPage.getByRole('link',{name:'Switch to owner',exact:true}).click();
-  assert.equal((await (await opened.request.get(url+'/auth/session')).json()).operator.email,'cli-owner@example.test');
   await opened.close();
-  // The outbox sign-in: RER_OPEN's exchange with next=/__dev/outbox, as --login prints.
-  const other=await browser.newContext(),otherPage=await other.newPage();
-  await otherPage.goto(`${url}/__dev/key#rer-dev=${key}&next=%2F__dev%2Foutbox`);await otherPage.waitForURL(ready.signInUrl);await otherPage.locator('article').filter({hasText:'To: different@example.test'}).getByRole('link',{name:'Read message'}).first().click();await otherPage.getByRole('link',{name:'Open this link'}).click();
-  await otherPage.getByRole('button',{name:'Confirm',exact:true}).click();await otherPage.waitForURL(url+'/app');
-  assert.equal((await (await other.request.get(url+'/auth/session')).json()).operator.email,'different@example.test','explicit outbox identity signs in as requested');await nonOwnerSetup(other,url);await other.close();
   const context=await browser.newContext({javaScriptEnabled:false}),page=await context.newPage();
-  // Without JavaScript a test harness presents the key (signInAs) for the gate cookie.
-  const gate=(await signInAs({origin:url,key,as:'signed-out'})).cookies.filter(cookie=>cookie.name===`rer_dev_gate_${port}`);
-  await context.addCookies(gate.map(cookie=>({...cookie,url})));
-  await page.goto(ready.signInUrl);await page.getByRole('link',{name:'Read message'}).first().click();await page.getByRole('link',{name:'Open this link'}).click();
-  const oneUseURL=page.url();assert.ok(new URL(oneUseURL).pathname==='/auth/confirm','ordinary auth confirmation');
-  const confirming=page.waitForResponse(response=>new URL(response.url()).pathname==='/auth/confirm'&&response.request().method()==='POST');
-  await page.getByRole('button',{name:'Confirm',exact:true}).click();const confirmed=await confirming;
-  assert.equal(confirmed.status(),303);assert.equal(confirmed.headers().location,'/setup','ordinary POST confirmation returns to first-run setup');
+  // Local owner tooling exercises a real native session without capturing mail.
+  const secret=localVariables(settings.toString()).SESSION_SECRET;
+  const signed=await context.request.post(url+'/auth/local/cli-session',{headers:{Origin:url,'x-rer-local-cli':createHmac('sha256',secret).update('local-cli\0sign-in').digest('hex')},data:{returnTo:'/setup'},maxRedirects:0});
+  assert.equal(signed.status(),303);await page.goto(url+'/setup');
   await ownerSetup(context,page,url);
   assert.deepEqual(await claimState(),{state:'claimed'},'the owner\'s confirmation claims the installation');
   assert.deepEqual(await lobbyLinks(),['/','/signin'],'the claimed Lobby offers only sign-in');
   const session=await context.request.get(url+'/auth/session');assert.equal(session.status(),200);const principal=await session.json();assert.equal(principal.operator.email,'cli-owner@example.test');
-  assert.equal((await context.request.get(oneUseURL)).status(),400,'one-use link refuses replay');
  } finally {await browser.close();}
  await f.stop(dev);assert.equal(dev.exitCode,143);assert.ok(await fetch(ready.siteUrl).then(()=>false,()=>true),'the run site preview stops with dev');assert.equal(events(dev).filter(e=>e.event==='ready').length,1);assert.equal(events(dev).at(-1).event,'result');
  const login=f.start(['dev','--login','--port',String(port),'--json','--non-interactive']);
  const loginDeadline=Date.now()+120000;while(!login.stdoutText.includes('"event":"ready"')&&login.exitCode===null&&Date.now()<loginDeadline)await pause(100);
- assert.ok(login.stdoutText.includes('"event":"ready"'),JSON.stringify({requirement:'rer dev --login starts the real email-link mode',...commandDiagnostic(login)}));
+ assert.ok(login.stdoutText.includes('"event":"ready"'),JSON.stringify({requirement:'legacy rer dev --login starts automatic owner entry',...commandDiagnostic(login)}));
  const loginReady=events(login).find(e=>e.event==='ready'),loginBrowser=await chromium.launch();
  try {
   const context=await loginBrowser.newContext(),page=await context.newPage();
-  await page.goto(loginReady.openUrl);await page.waitForURL(url+'/__dev/outbox');
-  await page.locator('article').filter({hasText:'To: cli-owner@example.test'}).getByRole('link',{name:'Read message'}).first().click();
-  await page.getByRole('link',{name:'Open this link'}).click();await page.getByRole('button',{name:'Confirm',exact:true}).click();await page.waitForURL(url+'/app');
-  const session=await (await context.request.get(url+'/auth/session')).json();assert.equal(session.kind,'native');assert.equal(session.operator.email,'cli-owner@example.test');
+  await page.goto(loginReady.openUrl);await page.waitForURL(url+'/app');
+  const session=await (await context.request.get(url+'/auth/session')).json();assert.equal(session.kind,'dev');assert.equal(session.operator.email,'cli-owner@example.test');
  } finally {await loginBrowser.close();await f.stop(login);}
  const preview=f.start(['preview','--port',String(port),'--json','--non-interactive']);
  const previewDeadline=Date.now()+120000;while(!preview.stdoutText.includes('"event":"ready"')&&preview.exitCode===null&&Date.now()<previewDeadline)await pause(100);
@@ -183,7 +158,8 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--port',String(port),'--non-interactive','--json']);await rm(answers);
  const tables=await f.data("SELECT name FROM sqlite_master WHERE name='cli_reset_probe'");assert.equal(tables[0].results.length,0,'confirmed reset removed prior domain rows');
  const ownerRows=await f.data('SELECT email FROM oa_operators');assert.deepEqual(ownerRows[0].results,[{email:'fresh-owner@example.test'}],'fresh setup has only the new real owner');
- const dry=await f.run(['deploy','--dry-run','--json']);assert.equal(events(dry).at(-1).deployed,false);assert.equal(events(dry).at(-1).dryRun,true);
+ const deploySettings=join(f.root,'.seed/installer/dry-run.env');await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
+ const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json']);await rm(deploySettings);assert.equal(events(dry).at(-1).deployed,false);assert.equal(events(dry).at(-1).dryRun,true);
  // The run site builds from edition identity alone, even in a set-up checkout.
  const site=events(await f.run(['build','--site','--json'])).at(-1).site,siteRoot=join(f.root,site.path);
  const siteFiles=(await readdir(siteRoot,{recursive:true,withFileTypes:true})).filter(entry=>entry.isFile()).map(entry=>join(entry.parentPath,entry.name));

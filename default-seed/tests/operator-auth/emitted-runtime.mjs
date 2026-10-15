@@ -33,19 +33,21 @@ export async function emittedRuntime({ prior = false, noMail = false, oidc = fal
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort()
-  const origin = `http://127.0.0.1:${port}`
+  // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
+  const production = !noMail
+  const origin = `${production ? 'https' : 'http'}://127.0.0.1:${port}`
   const mails = []
   const networkRequests = []
   const provider = oidc ? await testProvider(origin, owner) : undefined
   const options = convertV4MiniflareOptions({
-    host: '127.0.0.1', port, modulesRoot: join(root, 'dist/server'),
+    host: '127.0.0.1', port, https: production, modulesRoot: join(root, 'dist/server'),
     modules: [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter((file) => file.endsWith('.js')).map((file) => `assets/${file}`)].map((file) => ({ type: 'ESModule', path: join(root, 'dist/server', file) })),
     compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
     assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
     d1Databases: { DB: 'default-seed-emitted' },
     queueProducers: { JOBS: 'reference-jobs' }, queueConsumers: { 'reference-jobs': { maxBatchTimeout: 0 } },
     bindings: {
-      AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: owner, SETUP_TOKEN: setupToken,
+      AUTH_ORIGIN: origin, AUTH_LOCAL: production ? 'false' : 'true', OWNER_EMAIL: owner, SETUP_TOKEN: setupToken,
       SESSION_SECRET: 'disposable-test-only-session-secret-00001',
       AUTH_REVIEW_ENABLED: 'true',
       ...(devKey ? { RER_DEV_KEY: devKey } : {}),
@@ -73,7 +75,7 @@ export async function emittedRuntime({ prior = false, noMail = false, oidc = fal
       await db.prepare("INSERT INTO articles VALUES ('old-article','previous','Previous data','Preserved body','2026-09-08T00:00:00Z')").run()
     }
     for (const file of (await readdir(join(root, 'migrations/core'))).filter((file) => file.endsWith('.sql') && file !== '0001_reference.sql').sort()) await migrate(db, file)
-    const call = (path, { method = 'GET', input, cookie, headers = {} } = {}) => fetch(`${origin}${path}`, {
+    const call = (path, { method = 'GET', input, cookie, headers = {} } = {}) => mf.dispatchFetch(`${origin}${path}`, {
       method, redirect: 'manual', headers: {
         ...(method === 'POST' ? { origin, 'content-type': 'application/json' } : {}),
         ...(cookie ? { cookie } : {}), ...headers,

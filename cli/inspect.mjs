@@ -46,7 +46,7 @@ export async function describe(project) {
    // rer signin is rer's own: any seed it can deploy, it can sign the owner in to.
    .concat(capabilities.deploy ? [['signin', { flags: signinVerb.flags, effects: signinVerb.effects }]] : [])),
   aliases: Object.fromEntries(Object.entries(aliases).filter(([alias, verb]) => pkg.scripts?.[alias] === commandLine(verb, declaredPackage(pkg) !== undefined))),
-  local: { state: project.adapter?.state, settings: project.adapter?.settings ?? [], installerState: '.seed/installer', outbox: '/__dev/outbox', ...await localState(project), origin: await savedOrigin(project), ...(project.adapter?.devIdentity ? { devIdentity: true, devKey: '.rer/local/dev-key.env' } : {}) },
+  local: { state: project.adapter?.state, settings: project.adapter?.settings ?? [], installerState: '.seed/installer', ...await localState(project), origin: await savedOrigin(project), ...(project.adapter?.devIdentity ? { devIdentity: true, devKey: '.rer/local/dev-key.env' } : {}) },
   // This pin serves a checkout through the machine's front door (rer door).
   door: { protocol: doorProtocol },
  };
@@ -200,7 +200,7 @@ export async function doctor(project, store, signal) {
 
 // SC-05: a seed declaring devIdentity loads the dev layer only from a local-only
 // entry that its dev configuration names, never from the deployed main, lets
-// rer build scan its output, and keeps one end-to-end email-link test.
+// rer build scan its output.
 async function devIdentityClauses(root, adapter) {
  const declaration = adapter.devIdentity;
  const text = async path => { try { return await readFile(await contained(root, path), 'utf8'); } catch { return null; } };
@@ -208,10 +208,8 @@ async function devIdentityClauses(root, adapter) {
  const main = await deployedMain(root, adapter);
  const production = main ? await text(main) : null;
  const configs = (await Promise.all(['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs', 'wrangler.local.jsonc', 'wrangler.local.json', 'wrangler.local.toml'].map(text))).filter(Boolean);
- const test = typeof declaration.emailLinkTest === 'string' ? await text(declaration.emailLinkTest) : null;
  return [
   ['SC-05.dev-identity.entry', entry && await text(entry) !== null && entry !== main && configs.some(config => config.includes(entry)), 'Declare devIdentity.entry as an existing local-only Worker entry that the local Vite or wrangler configuration loads and that is not the deployed main.'],
   ['SC-05.dev-identity.exclusion', production !== null && !/operator-auth\/dev\//.test(production) && !production.includes(entry.replace(/\.[a-z]+$/, '')) && Array.isArray(declaration.output) && declaration.output.length > 0, 'Keep the deployed main free of the dev layer and its local entry, and declare devIdentity.output so rer build refuses output containing the dev layer.'],
-  ['SC-05.dev-identity.email-link-test', test !== null && /outbox/i.test(test), 'Keep one end-to-end email-link test through the outbox and declare it as devIdentity.emailLinkTest.'],
  ];
 }

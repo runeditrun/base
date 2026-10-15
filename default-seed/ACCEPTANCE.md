@@ -1,6 +1,6 @@
 # Local acceptance
 
-Frozen installation, real build and migrations, ordinary development outbox
+Frozen installation, real build and migrations, one-click development
 sign-in, native session admission, private-response rules, HMR and confirmed
 reset are checked with the actual shared modules and local Worker runtime.
 The first-party command gate remains red until complete archive transfer can

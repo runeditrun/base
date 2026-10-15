@@ -16,8 +16,7 @@ rer dev
   email, port, password or answers file.
 - Give the owner the `RER_READY` address and the `RER_OPEN` link, and ask
   nothing. `RER_OPEN` is a credential: share it only with the owner, in this
-  chat. A seed without dev identity prints `RER_SIGN_IN` (its local outbox)
-  instead.
+  chat. Independently authored apps use their own declared sign-in flow.
 - Stop the app with `rer dev --stop`. If a start is refused, the message names
   the cause and the next command: run that command.
 
@@ -54,13 +53,11 @@ explicit repair command in this form:
 Use the setup prompt instead of `--owner-email` when entering the real owner
 mailbox. With dev identity, `dev` prints `RER_OPEN`: open it on this computer
 and the app opens signed in as the owner at `/setup` (`dev --as PERSONA` and
-`dev --login` change that; treat the line as a credential). Otherwise open the
-`/__dev/outbox` URL printed by `dev`, choose the newest ordinary sign-in message
-and follow its link to finish setup at `/setup`. Until
+`dev --login` keeps automatic entry; treat the line as a credential). Mail is
+silently suppressed in local dev and demo. Until
 first-run completion is stored durably, app routes return the signed-in owner
 to `/setup`; a signed-out owner returns there after signing in. Once complete,
-`/setup` opens the app or its settings. The local outbox sends no external
-email. Stop `dev` with `rer dev --stop` or Ctrl-C, and stop `preview` with
+`/setup` opens the app or its settings. Local dev and demo silently suppress mail. Stop `dev` with `rer dev --stop` or Ctrl-C, and stop `preview` with
 `rer preview --stop` before build or verification.
 
 Queue waits report immediately with a reason and numeric one-based position,

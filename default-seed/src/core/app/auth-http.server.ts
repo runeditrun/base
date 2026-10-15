@@ -24,6 +24,5 @@ export async function signInResponse(request: Request, bindings: Bindings, waitU
       if (!bindings.SETUP_TOKEN || await bindings.DB.prepare('SELECT singleton FROM oa_bootstrap LIMIT 1').first()) return null
       return { instructions: presentation.setupInstructions }
     },
-    links: () => presentation.developmentOutbox ? [{ href: '/__dev/outbox', label: 'Open the local development outbox' }] : [],
   })(request))
 }

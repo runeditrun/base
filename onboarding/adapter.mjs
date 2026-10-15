@@ -34,11 +34,10 @@ const hookNames = ['node', 'tools', 'prepare', 'prepareData', 'dependencies', 'o
 
 // Feature flags shown by the shared browser flow must describe what this
 // adapter really does. localTrialWithoutEmail claims that sign-in works with no
-// mail provider, which holds only when the adapter ends at the development
-// outbox; hosting needs a hosting hook.
+// mail provider; hosting needs a hosting hook.
 export function adapterFeatures(hooks, features = {}) {
  const result = { hosting: false, github: false, artwork: false, ...features };
- if (result.localTrialWithoutEmail === true && !hooks.signIn) throw new TypeError('localTrialWithoutEmail needs a signIn hook that ends at the development outbox.');
+ if (result.localTrialWithoutEmail === true && !hooks.signIn) throw new TypeError('localTrialWithoutEmail needs a signIn hook.');
  if (result.hosting === true && !hooks.hosting) throw new TypeError('features.hosting needs a hosting hook.');
  if (hooks.hosting && result.hosting !== true) throw new TypeError('A hosting hook must be declared with features.hosting.');
  return Object.freeze(result);
@@ -57,7 +56,7 @@ export function localInstaller(hooks = {}) {
   context.ownerClaim=context.manifest?.steps.find(step=>step.type==='owner-claim');
   options.onContext?.(context);
   const verb = options.verb ?? 'installer';
-  if(verb!=='outbox')await store.configureQueue?.({verb});
+  await store.configureQueue?.({verb});
   await requirements(context, hooks);
   if (['installer', 'setup'].includes(verb) && hooks.prepare) await hooks.prepare(context);
   if (verb === 'installer' && hooks.dependencies !== false) await phase(context, hooks, 'dependencies', hooks.dependencies ?? ['pnpm', ['install', '--frozen-lockfile']]);
@@ -76,9 +75,7 @@ export function localInstaller(hooks = {}) {
    if (typeof hooks.owner === 'function' || Array.isArray(hooks.owner)) await phase(context, hooks, 'owner', hooks.owner);
    else await owner(context, hooks.owner);
   }
-  // Dev identity opens dev signed in; --login (devLogin) keeps the outbox sign-in.
-  const devIdentity = verb === 'dev' && options.devKey && !options.devLogin;
-  if ((['installer', 'setup', 'dev', 'preview'].includes(verb) || (verb === 'outbox' && options.requestSignIn)) && hooks.signIn && !devIdentity) await signIn(context, hooks.signIn);
+  if (['installer', 'setup', 'dev', 'preview'].includes(verb) && hooks.signIn) await signIn(context, hooks.signIn);
   if (verb === 'installer' && hooks.hosting) await hosting(context, hooks.hosting);
   store.state.appUrl = context.appUrl ?? (context.app ? context.origin : context.hostedUrl ?? context.origin);
   if (context.hostedUrl) store.state.hostedUrl = context.hostedUrl;
@@ -91,7 +88,7 @@ export function localInstaller(hooks = {}) {
   try {
    let operation;
    if(store.ownCleanup){operation=await recoverInterrupted(root)??await localOperation(root);let released=false;release=async()=>{if(!released){released=true;await operation.release();}};store.ownCleanup(signal,release);}
-   // A devIdentity seed's outbox is behind the dev key: the temporary app gets it and the installer page offers the key exchange (RER_OPEN) once setup completes.
+   // The installer page offers the checkout's one-click dev entry after setup.
    const devKey = await installerDevKey(root);
    if (devKey) store.addSecrets?.([devKey]);
    await run(root, input, store, child => { app = child; onApp(child); }, signal, { operationToken:operation?.token,devKey:devKey??undefined,onContext(value) { context = value; } });

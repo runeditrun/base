@@ -59,4 +59,3 @@ test('an unresponsive human-check service returns the retry state without reserv
     assert.equal(demos.size, 0);
   } finally { await mf.dispose(); }
 });
-

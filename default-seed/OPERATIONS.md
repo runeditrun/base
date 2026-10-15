@@ -15,9 +15,8 @@ rer dev
 
 Use the setup prompt instead of the owner-email flag when entering the real
 mailbox. Open the `RER_OPEN` URL printed by `dev` on this computer; the app opens
-signed in as the owner. With `dev --login`, open the outbox it prints, choose
-the newest ordinary sign-in message and follow its link. No external email is
-sent. Stop `dev` with
+signed in as the owner. Application mail is silently suppressed in development
+and demo. Stop `dev` with
 `rer dev --stop` or Ctrl-C, and stop `preview` with
 `rer preview --stop` before build or verification.
 
@@ -42,7 +41,7 @@ health.
 
 Local installation archives use the shared portability module. All supported
 D1 domain rows, including durable jobs and schedule records, are included;
-owner/auth, outbox, bookkeeping, private settings, queue delivery attempts and
+owner/auth, historical development mail, bookkeeping, private settings, queue delivery attempts and
 runtime caches are excluded. Import verifies the archive and restores
 atomically into an empty destination. Confirmed reset preserves exports. Run
 setup after restore to establish a fresh owner and local configuration. Every
@@ -51,9 +50,8 @@ resources. Remote transfer is supported only where the adapter declares
 complete resource coverage.
 
 Canonical local data is `.wrangler/state`; generated settings are private and
-remain outside source control. The development provider and outbox are local
-only. Any user or process with access to the machine can read that outbox and
-sign in as the owner. Setup and dev preserve existing owner/data and exact
+remain outside source control. Development sign-in is local only. A process with access to the private
+settings and checkout key can sign in as the owner. Setup and dev preserve existing owner/data and exact
 private settings; they do not rotate secrets implicitly.
 
 Preserve applied migration history. Schema changes require forward migrations

@@ -1,9 +1,11 @@
-import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import { createRequire, registerHooks } from 'node:module';
 import { realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
 // Network-only replacement: both the real CLI and emitted Worker's outgoing
 // provider requests reach a controlled local Auth server. Application code,
 // local D1, lifecycle commands and authorization remain unchanged.
+export let ProviderRuntime;
 const original=globalThis.fetch;
 const issuer='https://idp.example.test';
 globalThis.fetch=async(input,init)=>{
@@ -19,5 +21,16 @@ globalThis.fetch=async(input,init)=>{
 try {
  const require=createRequire(await realpath(resolve(process.cwd(),'node_modules/wrangler/package.json')));
  const path=require.resolve('miniflare'),mod=require(path),Real=mod.Miniflare;
- require.cache[path].exports=new Proxy(mod,{get(target,key){if(key!=='Miniflare')return Reflect.get(target,key);return class extends Real {constructor(options){super({...options,workers:options.workers?.map(worker=>({...worker,dev:{...worker.dev,outboundService:{type:'fetcher',handler:async request=>{const r=await globalThis.fetch(request);return Response.json(await r.json(),{status:r.status});}}}}))});}};}});
+ // Vite discovers Worker exports and calls setOptions during initial startup.
+ // Keep the controlled network edge across that update as well as construction.
+ const controlled = options => ({...options,workers:options.workers?.map(worker=>({...worker,dev:{...worker.dev,outboundService:{type:'fetcher',handler:async request=>{const r=await globalThis.fetch(request);return Response.json(await r.json(),{status:r.status});}}}}))});
+ ProviderRuntime = class extends Real {
+  constructor(options){super(controlled(options));}
+  setOptions(options){return super.setOptions(controlled(options));}
+ };
+ require.cache[path].exports=new Proxy(mod,{get(target,key){return key==='Miniflare'?ProviderRuntime:Reflect.get(target,key);}});
+ // Vite's ESM graph can already hold Miniflare's synthetic named export. Use
+ // an import facade so that graph receives the same controlled runtime as CJS.
+ const facade = 'data:text/javascript,'+encodeURIComponent(`export * from ${JSON.stringify(pathToFileURL(path).href)};export {ProviderRuntime as Miniflare} from ${JSON.stringify(import.meta.url)};`);
+ registerHooks({resolve(specifier,context,next){return specifier==='miniflare'&&!context.conditions.includes('require')?{url:facade,shortCircuit:true}:next(specifier,context);}});
 } catch(error) { if(error.code!=='MODULE_NOT_FOUND')throw error; }

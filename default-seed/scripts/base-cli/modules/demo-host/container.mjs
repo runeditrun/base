@@ -6,9 +6,9 @@ import { finishStart } from './startup.mjs';
 
 // One visitor's demo: a Durable Object (newUniqueId) and its container, the
 // seed's image from `rer build --platform container` on the workerd engine.
-// The container starts with no internet and in demo mode, so withDemo and the
-// engine's egress worker refuse every send. The front signs the owner in
-// through the existing signed owner claim. The demo ends at its hour or after
+// The container starts with public internet in demo mode. withDemo simulates
+// external effects; the engine also refuses direct mail/SMS transports. The
+// front signs the owner in through the existing signed owner claim. The demo ends at its hour or after
 // 15 idle minutes: the alarm destroys the container and deletes everything.
 // The platform stops a container about two minutes after its Durable Object's
 // last event, when the object is evicted, and the exit watcher goes with it.
@@ -76,7 +76,7 @@ export class DemoContainer extends DurableObject {
     await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started, startDeadline: deadline });
     report(correlation, this.started, 'start');
     if (this.stopped) throw new Error('container-stopped');
-    this.container.start({ enableInternet: false, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
+    this.container.start({ enableInternet: true, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
       SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: OWNER, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
       RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } });
     // A container that stops by itself ends the demo too.

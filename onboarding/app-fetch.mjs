@@ -1,5 +1,5 @@
 // Requests rer itself makes to a local app's own origin (health, sign-in,
-// outbox, dev identity). A directly served origin uses fetch. A front-door
+// dev identity). A directly served origin uses fetch. A front-door
 // origin (http://NAME.localhost:PORT) is never resolved and never goes through
 // the door: rer connects with node:http to that checkout's own proxy on
 // 127.0.0.1, which keeps the Host header (fetch drops a Host override, and musl

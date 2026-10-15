@@ -43,7 +43,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
  await writeFile(join(root, 'dist/client/index.html'), 'Application');
  await writeFile(join(root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@10.12.4' }));
  const declarationPath = declared ? 'owner-deployment.json' : 'deploy.json';
- const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', secrets: ['OWNER_EMAIL', 'SETUP_TOKEN', 'SESSION_SECRET', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name })) };
+ const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', vars: {MAIL_PROVIDER:'resend',MAIL_FROM:'owner@example.test'}, secrets: ['OWNER_EMAIL', 'SETUP_TOKEN', 'SESSION_SECRET', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name })) };
  await writeFile(join(root, declarationPath), JSON.stringify(declaration));
  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\nowner.env\n');
  await writeFile(join(root, 'owner.env'), `CLOUDFLARE_ACCOUNT_ID=${provider.accountId}\nCLOUDFLARE_API_TOKEN=${provider.token}\nOWNER_EMAIL=owner@example.test\nMAIL_API_KEY=synthetic-mail-value\n`, { mode: 0o600 });

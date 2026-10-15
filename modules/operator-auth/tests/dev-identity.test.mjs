@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { runtime, read, cookies, DEV_KEY, OWNER } from './dev-runtime.mjs';
+import { createHmac } from 'node:crypto';
+import { runtime, read, cookies, DEV_KEY, OWNER, SECRET } from './dev-runtime.mjs';
 
 async function fresh() {
   const r = await runtime([await read('../accounts/schema/operator-auth.sql')]);
@@ -10,7 +11,7 @@ async function fresh() {
 const gateOnly = cookie => cookie.split('; ').filter(pair => pair.startsWith('rer_dev_gate_8787=')).join('; ');
 const sessionOnly = cookie => cookie.split('; ').filter(pair => !pair.startsWith('rer_dev_gate_8787=')).join('; ');
 
-test('dev sign-in, personas and the badge answer only behind the key gate, and a dev session counts only there', async () => {
+test('dev sign-in and personas answer only behind the key gate, and a dev session counts only there', async () => {
   const r = await fresh();
   try {
     for (const path of ['/auth/dev/enter?as=owner', '/__dev/personas']) {
@@ -28,16 +29,13 @@ test('dev sign-in, personas and the badge answer only behind the key gate, and a
     const both = cookies(entered);
     assert.equal((await r.call('/auth/session', { cookie: both })).status, 200);
     assert.equal((await r.call('/auth/session', { cookie: sessionOnly(both) })).status, 401, 'a dev session without the gate is refused');
+    const signin = await (await r.call('/signin', { cookie: gateOnly(both) })).text();
+    assert.match(signin, /href="\/auth\/dev\/enter\?as=owner/);
+    assert.doesNotMatch(signin, /type="email"/);
     // The browser cookie alone passes the gate; reuse keeps the same session row.
     assert.equal((await r.call('/auth/dev/enter?as=owner', { cookie: both })).status, 303);
     assert.equal((await r.db.prepare("SELECT count(*) AS n FROM oa_sessions WHERE kind='dev'").first()).n, 1, 'reused');
-    // The badge appears only with the gate, under the document's own CSP.
-    const page = await r.call('/somewhere', { cookie: both });
-    const html = await page.text();
-    assert.match(html, /id="rer-dev-badge"/);
-    assert.match(html, /Switch to admin/);
-    assert.match(page.headers.get('content-security-policy'), /style-src 'sha256-/);
-    assert.doesNotMatch(await (await r.call('/somewhere', { cookie: sessionOnly(both) })).text(), /rer-dev-badge/);
+    assert.equal((await r.call('/auth/email', { method: 'POST', cookie: both, input: { email: OWNER } })).status, 200, 'local entry supplies fresh proof without mail');
     // Persona: a real operator, created only here, behind version fences.
     const admin = await r.call('/auth/dev/enter?as=admin&returnTo=/app/team', { cookie: gateOnly(both) });
     assert.equal(admin.headers.get('location'), '/app/team');
@@ -108,5 +106,31 @@ test('dev sign-in obeys domain provider rules on issue and reuse, with an active
     const remaining = await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY });
     assert.equal(remaining.status, 303);
     assert.equal((await (await r.call('/auth/session', { cookie: cookies(remaining) })).json()).operator.email, 'backup@example.com');
+  } finally { await r.close(); }
+});
+
+
+test('owner-side CLI proof signs into the local dev entry without mail and fences that proof to the owner version', async () => {
+  const r = await runtime([await read('../accounts/schema/operator-auth.sql')]);
+  const headers = { 'x-rer-local-cli': createHmac('sha256', SECRET).update('local-cli\0sign-in').digest('hex') };
+  try {
+    assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers })).status, 403);
+    await r.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('owner',?,'Owner','owner','active',1)").bind(OWNER).run();
+    for (const presented of [{}, { 'x-rer-local-cli': 'forged' }, { 'x-rer-dev-key': DEV_KEY }]) {
+      assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers: presented })).status, 404);
+    }
+    assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers: { ...headers, Origin: 'https://elsewhere.example' } })).status, 403);
+    const entered = await r.call('/auth/local/cli-session', { method: 'POST', input: { returnTo: '/setup', email: 'admin@dev.localhost' }, headers });
+    assert.equal(entered.status, 303);
+    assert.equal(entered.headers.get('location'), '/setup');
+    const cookie = cookies(entered);
+    const session = await (await r.call('/auth/session', { cookie })).json();
+    assert.equal(session.kind, 'native');
+    assert.equal(session.operator.email, OWNER);
+    assert.equal((await r.db.prepare('SELECT count(*) AS n FROM test_mail').first()).n, 0);
+    assert.equal((await r.call('/auth/settings/identity', { method: 'POST', cookie, input: { idpSignIn: false } })).status, 200, 'the private local proof authorizes an owner control without mail');
+    await r.db.prepare("UPDATE oa_operators SET version=version+1 WHERE id='owner'").run();
+    assert.equal((await r.call('/auth/session', { cookie })).status, 401);
+    assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers })).status, 303);
   } finally { await r.close(); }
 });

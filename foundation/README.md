@@ -27,11 +27,10 @@ Help, check, describe, doctor and stop do not select or acquire Node.
 After `RER_READY`, `dev` prints `RER_SIGNED_IN EMAIL` and `RER_OPEN URL`.
 Open that URL on this computer: the app opens signed in as the owner and
 finishes first-run setup at `/setup`. Treat the line as a credential.
-`dev --as PERSONA` starts as a persona or signed out; `dev --login` prints
-the outbox instead: follow its newest ordinary sign-in link. Until first-run
-completion is stored durably, app routes send the signed-in owner to `/setup`;
+`dev --as PERSONA` starts as a persona or signed out. Legacy `dev --login`
+uses the same automatic sign-in. Until first-run completion is stored durably, app routes send the signed-in owner to `/setup`;
 signed-out visitors sign in and return there. Once complete, `/setup` opens the
-app or settings. The local outbox sends no external email.
+app or settings. Development and demo mail is silently suppressed.
 
 The saved local port is used; a first setup saves the first free port from 8787. Explicit ports are decimal
 integers from 1 through 65535 and must be free; a busy requested port fails
@@ -56,9 +55,8 @@ root, inspect the live queue with
 
 Use the setup prompt instead of `--owner-email` to enter the real owner
 mailbox. Open the `RER_OPEN` URL printed by `dev` on this computer; the app opens
-signed in as the owner. With `dev --login`, open the outbox it prints, choose
-the newest ordinary sign-in message and follow its link. No external email is
-sent. Run the same
+signed in as the owner, including with legacy `dev --login`. No external
+email is sent in development or demo mode. Run the same
 commands from a composed foundation edition's root.
 
 Stop `dev` with `node scripts/rer.mjs dev --stop` or Ctrl-C, and stop
@@ -89,7 +87,7 @@ This is an optional Base convenience path: a technical starting point, not a
 catalogue edition or completed product. It carries the real TanStack
 Start/Vite/React/Hono/Cloudflare stack, locked dependencies, a document, health
 endpoint and real 404s. It includes minimal real owner/operator auth, D1 and
-development outbox mail, with no precreated owner or speculative domain.
+silent development mail suppression, with no precreated owner or speculative domain.
 `default-seed/` remains the richer executable reference for native sessions,
 direct private server functions, D1 SSR and Worker events.
 
@@ -130,9 +128,8 @@ examples, not claims of a useful finished product. Replace them with agreed
 product scope and measured evidence as work proceeds.
 
 The template declares D1 and real auth migrations. Local `setup` builds,
-migrates, prepares the real first owner and verifies ordinary sign-in through
-the local outbox. `deploy --dry-run` validates and builds locally without
-provider requests; real deploy uses the owner-account kit, applies declared D1
+migrates and prepares the real first owner for automatic local sign-in.
+`deploy --dry-run` validates and builds locally without provider requests; real deploy uses the owner-account kit, applies declared D1
 migrations and checks health. Local checks do not establish hosted acceptance.
 
 Fresh foundation generation assigns distinct migration ordinals, including

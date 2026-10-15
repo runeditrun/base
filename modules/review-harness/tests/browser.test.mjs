@@ -4,8 +4,8 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { journey, signInThroughOutbox, ReviewError, VIEWPORTS, settle } from '../index.mjs';
-import { consumer, fixture, requestSignIn, syntheticSecret } from './helpers.mjs';
+import { journey, signIn, ReviewError, VIEWPORTS, settle } from '../index.mjs';
+import { consumer, fixture, openSignIn, syntheticSecret } from './helpers.mjs';
 
 async function reviewed(runtime, run, extra = {}) {
   try { return await journey({ cwd: consumer, origin: runtime.origin, evidence: runtime.evidence, secrets: [syntheticSecret], run, ...extra }); }
@@ -31,7 +31,7 @@ async function verifyFiles(result) {
     assert.equal(Object.values(entry.axe.counts).reduce((a, b) => a + b, 0), entry.axe.violations.length);
   }
 }
-test('clean sign-in, outbox confirmation and app pass in fresh contexts at both default viewports', async t => {
+test('oneclick sign-in and app pass in fresh contexts at both default viewports', async t => {
   const runtime = await fixture(t);
   let firstContext;
   const result = await reviewed(runtime, async ({ page, context, viewport, capture }) => {
@@ -40,7 +40,7 @@ test('clean sign-in, outbox confirmation and app pass in fresh contexts at both 
     await page.goto('/app');
     assert.equal(new URL(page.url()).pathname, '/signin', 'a new width has no prior session');
     await capture('sign in');
-    await signInThroughOutbox(page, { origin: runtime.origin, email: 'reviewer@example.test', request: requestSignIn });
+    await signIn(page, { origin: runtime.origin, open: viewport.width === 390 ? openSignIn : async page => { await page.goto('/auth/oneclick'); } });
     assert.equal(new URL(page.url()).pathname, '/app');
     assert.equal(new URL(page.url()).search, '');
     await page.getByText('You are signed in.', { exact: true }).waitFor();

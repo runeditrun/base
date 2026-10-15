@@ -11,7 +11,7 @@
     {
       "name": "OWNER_EMAIL",
       "label": "Owner email",
-      "help": "Sign-in links for this address appear in the local development outbox; no email is sent.",
+      "help": "The account that owns this installation.",
       "kind": "email",
       "required": true,
       "prefill": "account-email",

@@ -1,5 +1,4 @@
 import { createRequire } from 'node:module';
-import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
@@ -16,9 +15,6 @@ async function stop() { return closing ??= (async () => { await mf.dispose(); pr
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => { stop().catch(() => { process.exitCode = 1; }); });
 try {
   const db = await mf.getD1Database('DB');
-  const schema = await readFile(new URL('../../../mail/src/development/schema.sql', import.meta.url), 'utf8');
-  for (const statement of schema.replace(/^--.*$/gm, '').split(';').filter(value => value.trim())) await db.prepare(statement).run();
-  await db.prepare('CREATE TABLE fixture_links(token TEXT PRIMARY KEY, email TEXT)').run();
   await db.prepare('CREATE TABLE fixture_setup(value TEXT)').run();
   await mf.ready;
   console.log('Synthetic Worker ready');
