@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.9-dev.gc3c09680",
+  "cliVersion": "0.2.9-dev.gf798342d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -61,7 +61,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "df5a57414ad18470bd8c64bc32489bfe4400a9c51275b319c615e36686cf9d66"
+      "sha256": "e96a6db3bd890ff41acf2167abfb62473c0abdb6d2d458614c013523e386ae4b"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -213,11 +213,11 @@
     },
     "queue.mjs": {
       "source": "onboarding/queue.mjs",
-      "sha256": "c6f8ba7e20a3338895166d2bc8a4f6f56aa69afa93ac54f40494a752d7fbf328"
+      "sha256": "512262dab5f7294ccef686289045a11e69ebeb222bb7712803108645b42042b7"
     },
     "queued-entry.mjs": {
       "source": "onboarding/queued-entry.mjs",
-      "sha256": "50fcb4a556b71d938225d60cd932bab8a6a86637e8cd308b26e311be1434f59b"
+      "sha256": "55c2f6b272bd973faa1973d50146847665ec672b9124fcb9e5813f8f740f8a75"
     },
     "readiness.mjs": {
       "source": "onboarding/readiness.mjs",
@@ -347,7 +347,7 @@
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
-      "sha256": "408eef54317f04b184016e6b92c2d90876c12fc2bf5d6b9950080be1d556fd9e"
+      "sha256": "2a9e23c6cfc667575194962ca98c4003bda964e6122ca51e51bb0c1376ce5da0"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
@@ -1284,6 +1284,10 @@
     "modules/job-queue/index.mjs": {
       "source": "modules/job-queue/index.mjs",
       "sha256": "57075271ca17c3ce6ee3233cc67afe6d5cebc2c2ba95dc6870ef699371794089"
+    },
+    "modules/job-queue/load-admission.mjs": {
+      "source": "modules/job-queue/load-admission.mjs",
+      "sha256": "80bb4be685ead3a8cc205ffcf1eca97d7da4fa07501310a99845470c828c7cf1"
     },
     "modules/job-queue/membership.mjs": {
       "source": "modules/job-queue/membership.mjs",

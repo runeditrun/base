@@ -12,6 +12,19 @@ software at near-zero development cost. The base reduces the total effort of
 reaching and keeping the owner's desired product: refined behaviour, useful
 reuse, straightforward deployment, and updates that preserve intent.
 
+Verification (`verify` and `verify:*`) and release source commands wait before
+starting a command when the machine's 1-minute load exceeds the existing job
+queue `RER_JOBS_LOAD_THRESHOLD` (or `loadThreshold` in its config file). Original
+CI callers and descendants sharing a live queue membership use the same load
+admission without acquiring another slot. The wait is asynchronous and
+cancellable; command-store cancellation and SIGINT/SIGTERM stop the wait before
+a child starts. Normal queue admission retains its operational maximum wait.
+Running units finish uninterrupted, with their existing deadlines and thresholds.
+Fleet supervisors must replace external SIGSTOP/SIGCONT suspension with this
+cooperative admission at command boundaries. The observed signal suspension was
+external to Base; this mechanism does not guarantee arbitrary signal pauses are
+safe, nor does it insert load waits into server spawn or readiness probes.
+
 The maintained path is a complete edition with tested source selections, UI,
 infrastructure, commands and guarantees. It should save implementation and
 adaptation time. Base and headless families supply reusable source; shared

@@ -141,7 +141,8 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   async run(label,command,args=[],options={}) {
    if(queuePolicy && options.heavy !== false) {
     let queuedChild;
-    const result = await queuedCommand(command,args,{...options,originalCI:policy.ci,
+    const commandSignal=signal&&options.signal?AbortSignal.any([signal,options.signal]):options.signal||signal;
+    const result = await queuedCommand(command,args,{...options,verb:queuePolicy.verb,signal:commandSignal,originalCI:policy.ci,
      label:await queueLabel(options.cwd??process.cwd(),queuePolicy.verb,options.phase??'command'),report,onWaiting,
      spawn:(program,argv,native)=>(queuedChild=spawnCommand(label,program,argv,{...native,onChild:options.onChild})),cleanup:async(child,result)=>{await stopCommand(child);await options.afterCommand?.(result);}});
     if(result){if(result.code!==0)throw failure(label,result,captures.get(queuedChild));return result;}

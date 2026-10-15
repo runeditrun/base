@@ -5,6 +5,7 @@ import { readFile, realpath } from 'node:fs/promises';
 const portable = basename(dirname(fileURLToPath(import.meta.url))) === 'base-onboarding';
 const queueURL = new URL(portable ? '../base-cli/modules/job-queue/' : '../modules/job-queue/', import.meta.url);
 export const heavyVerbs = new Set(['install', 'setup', 'build', 'verify', 'dev', 'preview', 'deploy', 'release', 'export', 'import', 'installer']);
+export const verificationBoundary = verb => verb === 'release' || verb === 'verify' || verb?.startsWith('verify:');
 export async function queueLabel(root, verb, phase) {
  root = await realpath(root);
  let project='project';
@@ -35,7 +36,13 @@ export async function queuedCommand(command, args, options) {
  // Keep the human recipe relative while retaining the executable argv for tools.
  const statusCommandText = [basename(process.execPath), relative(options.cwd ?? process.cwd(), statusCommand[1]), ...statusCommand.slice(2)].map(shellQuote).join(' ');
  // Read the original caller's decision before an install synthesizes CI=true.
- if (options.originalCI === true || await liveMembership()) return null;
+ if (options.originalCI === true || await liveMembership()) {
+  if (verificationBoundary(options.verb)) {
+   const { waitForLoad } = await import(new URL('load-admission.mjs', queueURL));
+   return waitForLoad(options);
+  }
+  return null;
+ }
  const queue = await createQueue();
  try {
   const result = await queue.run([command, ...args], { ...options, kind: 'heavy', maxWait: 1200,

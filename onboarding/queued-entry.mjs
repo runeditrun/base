@@ -16,7 +16,7 @@ export async function queuedEntrypoint(url,verb='verify') {
   const policy=await commandPolicy();
   try{
    const result=await queuedCommand(process.execPath,[...process.execArgv,fileURLToPath(url),...process.argv.slice(2)],{
-    cwd:process.cwd(),originalCI:policy.ci,label:await queueLabel(process.cwd(),verb,'suite'),report:text=>store.report(text),env:{...process.env,...policy.environment},
+    cwd:process.cwd(),verb,originalCI:policy.ci,label:await queueLabel(process.cwd(),verb,'suite'),report:text=>store.report(text),env:{...process.env,...policy.environment},
     spawn:(command,args,options)=>store.spawn(verb,command,args,options),cleanup:child=>store.stop(child)});
    return result?.code??null;
   }finally{await policy.close();}

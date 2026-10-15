@@ -24,7 +24,7 @@ export async function boundedCommand(project,options,argv,out){
   const {createCommands}=await shared('commands.mjs');
   store=await createCommands(directory,{logs:[]},{terminal:()=>{}});
   result=await queuedCommand(process.execPath,[fileURLToPath(new URL('../bin/rer.mjs',import.meta.url)),...childArgs],{
-   cwd:project.root,signal:cancellation.signal,stdio:[!options.json&&!options.nonInteractive?'inherit':'ignore','pipe','pipe'],originalCI:policy.ci,env:{...process.env,...policy.environment,RER_BOUNDED_OUTPUT:'1'},
+   cwd:project.root,verb:options.verb,signal:cancellation.signal,stdio:[!options.json&&!options.nonInteractive?'inherit':'ignore','pipe','pipe'],originalCI:policy.ci,env:{...process.env,...policy.environment,RER_BOUNDED_OUTPUT:'1'},
    label:await queueLabel(project.root,options.verb,'workflow'),report:text=>out.progress(store.redact(text)+'\n'),onWaiting:options.json?details=>out.event('waiting',details):undefined,
    spawn:(command,args,native)=>{
     const child=store.spawn('Running bounded workflow',command,args,native);
