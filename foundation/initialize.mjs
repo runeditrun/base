@@ -25,8 +25,10 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
   const json = (path, data) => put(path, JSON.stringify(data, null, 2) + '\n')
   try {
     for (const file of files) await put(`editions/${edition}/${file.relative}`, file.bytes, file.path)
-    const workflow = select(baseRepo, revision, 'export/verify.yml')[0]
-    await put(`editions/${edition}/.github/workflows/verify.yml`, workflow.bytes, workflow.path)
+    for (const name of ['verify.yml', 'verify-nightly.yml']) {
+      const workflow = select(baseRepo, revision, `export/${name}`)[0]
+      await put(`editions/${edition}/.github/workflows/${name}`, workflow.bytes, workflow.path)
+    }
     await json('family.json', { schemaVersion: 1, id: family, repository, base: { repository: 'runeditrun/base', commit: revision } })
     await put('core/README.md', '# Headless family core\n\nAdd domain source only when every edition needs it. No domain is preselected.\n')
     await put('modules/README.md', '# Optional family capabilities\n\nAdd modules when an edition needs them. Promote to Base only for actual cross-family reuse.\n')
