@@ -98,12 +98,20 @@ export async function reset(project, options, out) {
  return { paths: inventory };
 }
 
-export async function refuseLegacyProcess(project,{reset=false,verb='dev'}={}) {
+export async function refuseLegacyProcess(project,{reset=false,verb='dev',operation}={}) {
  let selected;try{selected=await selectedOrigin(project,{});}catch(error){if(!reset)throw error;}
  // Confirmed reset can recover malformed settings; checkout/state custody is
  // still checked even when there is no usable saved origin.
- const {localProcessConflict,inspectionContext}=await shared('process-diagnostics.mjs');
+ const {localProcessConflict,inspectionContext,uncheckedInspection}=await shared('process-diagnostics.mjs');
  // The front door holds a door origin's port, not this checkout.
- const conflict=await localProcessConflict(project.root,selected?.door?undefined:selected?.savedOrigin,inspectionContext({verb}));
+ let conflict;
+ try{conflict=await localProcessConflict(project.root,selected?.door?undefined:selected?.savedOrigin,inspectionContext({verb}));}
+ catch(error){
+  // Startup already holds the exclusive checkout operation through teardown.
+  // An unanswered observation must not defeat that cooperating-launch proof.
+  // Setup/reset retain their destructive-operation inspection requirement.
+  if(operation?.token&&verb==='dev'&&uncheckedInspection(error))return {lockProof:true};
+  throw error;
+ }
  if(conflict)throw refuse(`A local process holds ${conflict.reason}: PID ${conflict.pid} (${conflict.command}). Stop it with kill -TERM ${conflict.pid}, then retry. Use rer dev --stop or rer preview --stop for a registered server.`);
 }
