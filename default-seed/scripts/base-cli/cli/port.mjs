@@ -1,5 +1,6 @@
 import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createServer } from 'node:net';
 import { readJson } from '../modules/job-queue/storage.mjs';
 import { serversDirectory, stopInstruction } from './server-registry.mjs';
 import { shared } from './shared.mjs';
@@ -34,18 +35,25 @@ export async function portHolder(port, host, root, env = process.env, context, o
 // The refusal for a busy port. For a checkout that wants to move, it names the
 // holder and gives the exact command that moves this checkout to a free port.
 export async function busyPortMessage({ port, host, root, saved, env = process.env, context, listener }) {
- const { inspectionContext } = await shared('process-diagnostics.mjs');
+ const { inspectionContext, uncheckedInspection } = await shared('process-diagnostics.mjs');
  context ??= inspectionContext();
- const holder = await portHolder(port, host, root, env, context, listener);
+ const holder = await portHolder(port, host, root, env, context, listener).catch(error => { if (!uncheckedInspection(error)) throw error; });
+ // Let the OS select and prove the recovery port by binding it. Optional
+ // ownership inspection must never consume the budget for this instruction.
+ const socket = createServer();
+ let next;
+ try {
+  await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen({ host, port: 0, exclusive: true }, resolve); });
+  next = socket.address().port;
+ } finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
+ const move = `\nTo move this checkout to a free port and keep its data, run this in its folder:\n  rer setup --port ${next}`;
 
  const kind = saved ? `Port ${port} is saved for this checkout but is` : `Port ${port} is`;
- if (!holder) return `${kind} still unavailable for binding on ${host} after retrying; no listener was identified. Run rer dev or rer setup again; if it persists, use rer setup --port PORT with a free port.`;
- if (holder.own) return `${kind} held by this checkout's own ${holder.server.mode} server (PID ${holder.pid}). Stop it with: ${stopInstruction(holder.server)}`;
- const next = await firstFreePort(host, port + 1, context).catch(() => undefined);
+ if (!holder) return `${kind} still unavailable for binding on ${host} after retrying; no listener was identified. Run rer dev or rer setup again.${move}`;
+ if (holder.own) return `${kind} held by this checkout's own ${holder.server.mode} server for ${holder.checkout} (PID ${holder.pid}). Stop it with: ${stopInstruction(holder.server)}${move}`;
  const who = holder.server
   ? `the ${holder.server.mode} server for ${holder.checkout} (PID ${holder.pid})`
   : `PID ${holder.pid} (${holder.command})${holder.cwd ? ` running in ${holder.cwd}` : ''}`;
- const move = next ? `\nTo move this checkout to a free port and keep its data, run this in its folder:\n  rer setup --port ${next}` : '';
  const stop = holder.server ? `\nOr stop that server first: ${stopInstruction(holder.server)}` : `\nOr stop it with: kill -TERM ${holder.pid}`;
  return `${kind} in use by ${who}.${move}${stop}`;
 }

@@ -44,7 +44,6 @@ export async function availablePort(host, port, { root, saved = false, verb = 'd
  const context = inspectionContext({port,verb});
  const result = await probePort(host, port, { context });
  if (result.available) return;
- if (result.unchecked) throw result.unchecked;
  if (result.code && result.code !== 'EADDRINUSE') throw refuse(`Port ${port} cannot be used on ${host}: ${result.code}. Check the address or use rer setup --port PORT with a free port, then run rer dev again.`);
  throw refuse(await busyPortMessage({ port, host, root, saved, context, listener: result.listener ?? null }));
 }
