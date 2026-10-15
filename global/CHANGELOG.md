@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Hosted demo image builds use the adapter's declared deploy file, including names other than `deploy.json`.
+- `rer deploy --remove --yes` empties small R2 buckets whose object listing omits pagination metadata. Ambiguous full pages and inconsistent cursors still stop removal.
+- Setup uses a mapped owner-name field and its declared default without requiring a second `displayName`. `--owner-name` supplies that mapped field.
+- Import-kit and portability encode mixed-script D1 bindings and count their UTF-8 and RPC sizes without splitting atomic transactions. Retained import plans are read in bounded pages. Source adopters must refresh both modules and include their shared `d1-transport` dependency before removing an edition's transport wrapper.
+
 ## 0.2.16
 
 - A hosted demo's container stays up until the visitor's 15 idle minutes or the demo's hour, however long the visitor goes without a request. Before, the platform stopped it about three minutes after the last request, the next request got a Cloudflare 500, and its place stayed held. A container that is gone anyway (stopped by the platform, or failing once stopped) now ends its demo, frees its place at once and answers the ended page (410, with "Start a new demo").

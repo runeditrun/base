@@ -25,7 +25,7 @@ export async function imageFolder(project,operation,config,{output,engine}={}) {
  const declared=Array.isArray(declaration.env)?declaration.env.map(item=>item.name):Object.keys(declaration.env??{});
  await withoutLocalVariables(root,async()=>{
   const builder=fileURLToPath(new URL('../modules/container/build.mjs',import.meta.url));
-  await run(process.execPath,[builder,root,JSON.stringify({output,engine})],{cwd:root,env:buildEnvironment([...declared,...(config.secrets??[]).flatMap(item=>[item.binding,item.environment])])});
+  await run(process.execPath,[builder,root,JSON.stringify({output,engine,declaration:config})],{cwd:root,env:buildEnvironment([...declared,...(config.secrets??[]).flatMap(item=>[item.binding,item.environment])])});
  },{nested:operation.token,settings:[...(project.adapter?.settings??[]),...(project.privateInputs??[])]});
 }
 export async function containerCommand(project,options,out) {
