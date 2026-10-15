@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.22-dev.g8b402e6b",
+  "cliVersion": "0.2.22-dev.g7bc87eb2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2343,7 +2343,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "47f918b689eba371f98c562c10ed6bf424a54896b61e4a706299a1e7ed0898c8"
+      "sha256": "ec4ee0717d14455d10f9db6a99c0edf8812ba22a4474aecf69e2f2e1bb080eb7"
     },
     "scripts/publish-check/c2pa.py": {
       "source": "scripts/publish-check/c2pa.py",
@@ -2371,7 +2371,7 @@
     },
     "scripts/publish-check/content_identities.py": {
       "source": "scripts/publish-check/content_identities.py",
-      "sha256": "8df2b9bf77cecdf0aeca10157a1fd12f943693611a249e15047b977d3d6ed717"
+      "sha256": "208e548f63ebcca742c8dcb0f8cc2acf65706d1722eb4840cc1cbdd41b899b44"
     },
     "scripts/publish-check/controller_metadata.py": {
       "source": "scripts/publish-check/controller_metadata.py",
@@ -2435,7 +2435,7 @@
     },
     "scripts/publish-check/json_identity.py": {
       "source": "scripts/publish-check/json_identity.py",
-      "sha256": "6da083788a0a5c67b1b7fbe7d17f8eb1e19c89e3c66f180f5f35d2b91bf4b9d3"
+      "sha256": "655a0104e470babca83d2afcc7891c3a9358751226156c37130a9cf66acbedcc"
     },
     "scripts/publish-check/license-exceptions.json": {
       "source": "scripts/publish-check/license-exceptions.json",
