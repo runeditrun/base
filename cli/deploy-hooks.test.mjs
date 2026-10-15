@@ -214,7 +214,12 @@ test('custom deploy retries a queue create only when its connection failed befor
 
 test('missing or ambiguous ownership records refuse success, and denied bootstrap is never retried', async t => {
  const f = await fixture(t);
- f.deny(); await assert.rejects(f.run(), /owner claim is not confirmed/);
+ f.deny(); await assert.rejects(f.run(), error => {
+  assert.match(error.message, /owner claim is not confirmed/);
+  assert.match(error.message, /POST \/auth\/bootstrap returned HTTP 403 \(owner_claim_denied\)/);
+  assert.match(error.message, /run rer deploy/);
+  return true;
+ });
  assert.equal(f.claims.length, 1); assert.ok(f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
  await f.run({ unsetSecret: 'SETUP_TOKEN' });
  f.deny(false);
@@ -346,4 +351,20 @@ for (const declared of [false, true]) test(`hook finalization (${declared ? 'dec
   assert.equal(f.provider.state.secrets.some(item => item.name === 'SESSION_SECRET'), Boolean(options.setSecret));
  }
  assert.equal(f.builds(), builds);
+});
+
+
+test('a function owner hook failing after bootstrap names its last hosted call', async t => {
+ const f = await fixture(t);
+ const fetch = globalThis.fetch;
+ t.mock.method(globalThis, 'fetch', (input,init) => {
+  const url = new URL(input);
+  if (url.hostname.endsWith('.workers.dev') && url.pathname === '/setup') return Response.json({error:'setup_unavailable'},{status:503});
+  return fetch(input,init);
+ });
+ await assert.rejects(f.run(), error => {
+  assert.match(error.message,/GET \/setup returned HTTP 503 \(setup_unavailable\)/);
+  assert.match(error.message,/run rer deploy/);
+  return true;
+ });
 });

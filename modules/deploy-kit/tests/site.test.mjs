@@ -40,9 +40,21 @@ test('site deploy uploads the generated site Worker, attaches the apex and www, 
   const { siteProvider } = await import('./site-provider.mjs');
   const provider = siteProvider({ domain: 'run-cradle.com' }), { root, files, folder, receiptPath } = await site(t);
   t.after(() => provider.close());
-  const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
+  const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: async (input,init) => {
+    const response = await provider.fetch(input,init), url = new URL(input);
+    if (init.method !== 'GET' || !/\/(zones|domains|versions|deployments)$/.test(url.pathname)) return response;
+    const body = await response.json(), second = url.searchParams.get('page') === '2';
+    const field = url.pathname.endsWith('/versions') ? 'items' : url.pathname.endsWith('/deployments') ? 'deployments' : undefined;
+    const rows = field ? body.result[field] : body.result;
+    if (!Array.isArray(rows)) return Response.json(body);
+    if (!second) { if (field) body.result[field] = []; else body.result = []; }
+    body.result_info = {page:second ? 2 : 1,total_pages:2};
+    return Response.json(body);
+  }});
   const plan = sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: folder });
   const first = await siteDeploy({ api, plan, files, receiptPath });
+  assert.ok(provider.state.calls.some(call => call.path === '/zones' && call.search.includes('page=2')), 'zone filters survive continuation');
+  assert.ok(provider.state.calls.some(call => call.path.endsWith('/versions') && call.search.includes('page=2')), 'versions are completely read');
   assert.equal(first.origin, 'https://run-cradle.com');
   assert.equal(provider.state.settings.main_module, 'site-worker.mjs');
   assert.deepEqual(provider.state.settings.bindings, [{ type: 'assets', name: 'ASSETS' }]);
