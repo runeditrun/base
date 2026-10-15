@@ -111,7 +111,10 @@ The seed needs, beyond the adoption above:
    is run by hand. Run by hand with `test_only`, it deploys a separate test
    host instead: environment `demo-test` at `demo.test.<domain>`, with
    Cloudflare's Turnstile test keys, which let every visitor start a demo
-   (the 10-demo cap and the rate limit still apply).
+   (the 10-demo cap and the rate limit still apply). After a deploy it waits
+   for the new hostname to resolve in public DNS (10 minutes at most) and for
+   the start page to answer 200 (5 minutes more), then checks it sets no
+   cookie; either wait ends with an error naming what did not happen.
 
 `rer deploy --demo --dry-run` builds everything into `.rer/demo-host/` (add it
 to `.gitignore`) with no provider request. To try it locally with Docker, add
