@@ -78,7 +78,7 @@ export async function linkedSetup(kind,t) {
  const first=f.launch(args,process.execPath,env),firstCode=await first.done;
  if(firstCode!==0){
   const paths=new Set(['/.well-known/rer-dependencies','/.well-known/rer-provider','/link','/redeem','/remove','/.well-known/openid-configuration','/jwks']);
-  const codes=new Set(['invalid_token','invalid_code','invalid_proof','local_owner_proof_required','untrusted_link_issuer','owner_claim_unavailable','owner_claim_refused','invalid_link_grant']);
+  const codes=new Set(['invalid_token','invalid_code','invalid_proof','local_owner_proof_required','untrusted_link_issuer','owner_claim_unavailable','owner_claim_refused','invalid_link_grant','oidc_provider_unavailable']);
   t.diagnostic(JSON.stringify({...setupDiagnostic(first),edge:edge.map(row=>({path:paths.has(row.path)?row.path:'other',...(Number.isInteger(row.status)?{status:row.status}:{}),...(codes.has(row.error?.error)?{error:row.error.error}:{})}))}));
  }
  assert.equal(firstCode,0,'first setup command has the expected outcome');assert.deepEqual([...used].sort(),contracts.slice().sort());state.expectedClaim=false;for(const file of Object.values(approvalFiles))await assert.rejects(access(join(f.root,file)));
