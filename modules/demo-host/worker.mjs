@@ -5,7 +5,7 @@
 // rer_demo cookie. Every request with that cookie goes to the visitor's
 // container; nothing else on this host is reachable.
 import { operatorPage } from './operator.mjs';
-import { category, report } from './diagnostics.mjs';
+import { bounded, category, report } from './diagnostics.mjs';
 import { startPage, demoCookie } from './pages.mjs';
 
 export { DemoContainer } from './container.mjs';
@@ -50,17 +50,18 @@ async function start(request, env) {
   }
   const demo = env.DEMO.get(id), correlation = crypto.randomUUID(), started = Date.now();
   try {
-    const signedIn = await demo.start({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
+    const signedIn = await bounded(demo.start({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) }), 121_000);
     const headers = new Headers({ location: signedIn.location, 'cache-control': 'no-store', 'x-rer-demo-correlation': correlation });
     for (const cookie of [...signedIn.cookies, demoCookie(env, id.toString())]) headers.append('set-cookie', cookie);
     return new Response(null, { status: 303, headers });
   } catch (error) {
-    report(correlation, started, 'failed', { error: ['health-deadline', 'container-stopped'].includes(error.message) ? error.message : category(error) });
+    const failure = ['health-deadline', 'container-stopped'].includes(error.message) ? error.message : category(error);
+    report(correlation, started, 'failed', { error: failure });
     try {
-      const diagnostic = await demo.diagnostic();
-      await env.CAPACITY.get(env.CAPACITY.idFromName('diagnostics')).record(correlation, diagnostic);
+      const diagnostic = { ...await bounded(demo.diagnostic(), 3000), failure };
+      await bounded(env.CAPACITY.get(env.CAPACITY.idFromName('diagnostics')).record(correlation, diagnostic), 3000);
     } catch (capture) { report(correlation, started, 'diagnostic', { error: category(capture) }); }
-    try { await demo.end(); } catch (cleanup) { report(correlation, started, 'cleanup', { error: category(cleanup) }); }
+    try { await bounded(demo.end(), 6000); } catch (cleanup) { report(correlation, started, 'cleanup', { error: category(cleanup) }); }
     return startPage(env, { status: 502, headers: { 'x-rer-demo-correlation': correlation }, notice: 'The demo did not start. Try again.' });
   }
 }

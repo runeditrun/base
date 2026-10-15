@@ -5,6 +5,7 @@ export { default, DemoCapacity } from '../worker.mjs';
 import { DemoContainer as Deployed } from '../container.mjs';
 
 export class DemoContainer extends Deployed {
+  cleanupRetry = Number(this.env.TEST_CLEANUP_MS ?? this.cleanupRetry);
   startTimeout = Number(this.env.TEST_START_MS ?? this.startTimeout);
   probeTimeout = Number(this.env.TEST_PROBE_MS ?? this.probeTimeout);
   idle = Number(this.env.TEST_IDLE_MS ?? this.idle);
@@ -19,7 +20,7 @@ function platform(app, id) {
     get running() { return running; },
     start(options) { running = true; void tell('start', options); },
     monitor: () => stopped,
-    async destroy() { running = false; await tell('destroy', {}); },
+    async destroy() { const response = await tell('destroy', {}); if (!response.ok) throw new Error('SECRET destroy'); running = false; },
     // As on the platform, a container's port speaks plain HTTP only.
     getTcpPort: () => ({ async fetch(input, init) {
       const request = new Request(input, init);

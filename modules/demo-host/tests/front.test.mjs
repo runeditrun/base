@@ -12,13 +12,13 @@ import { DEMO_FILES } from '../plan.mjs';
 // owner-claim's real verifier, as the seed does.
 const ORIGIN = 'https://demo.run-test.example';
 
-async function front({ max = 10, idle, health, startMs, probeMs } = {}) {
+async function front({ max = 10, idle, health, startMs, probeMs, destroyFailures = 0, cleanupMs } = {}) {
   const demos = new Map();
   async function app(request) {
     const url = new URL(request.url), id = request.headers.get('x-demo');
     if (url.hostname === 'platform') {
       if (url.pathname === '/start') demos.set(id, { ...await request.json(), destroyed: false, requests: [] });
-      else demos.get(id).destroyed = true;
+      else { if (destroyFailures-- > 0) return new Response(null, { status: 503 }); demos.get(id).destroyed = true; }
       return new Response(null, { status: 204 });
     }
     const demo = demos.get(id);
@@ -42,7 +42,7 @@ async function front({ max = 10, idle, health, startMs, probeMs } = {}) {
     durableObjects: { DEMO: { className: 'DemoContainer', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
     ratelimits: { STARTS: { namespace_id: '1001', simple: { limit: 3, period: 60 } } },
     bindings: { DEMO_ORIGIN: ORIGIN, DEMO_SITE: 'https://run-test.example', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: String(max),
-      DEMO_SETTINGS: JSON.stringify({ MAIL_FROM: 'demo@demo.invalid' }), TURNSTILE_SITE_KEY: 'site-key', TURNSTILE_SECRET_KEY: 'secret-key', RER_DEMO_OPERATOR_TOKEN: 'operator-only-test-credential-123456789', ...(idle ? { TEST_IDLE_MS: String(idle) } : {}), ...(startMs ? { TEST_START_MS: String(startMs), TEST_PROBE_MS: String(probeMs ?? startMs) } : {}) },
+      DEMO_SETTINGS: JSON.stringify({ MAIL_FROM: 'demo@demo.invalid' }), TURNSTILE_SITE_KEY: 'site-key', TURNSTILE_SECRET_KEY: 'secret-key', RER_DEMO_OPERATOR_TOKEN: 'operator-only-test-credential-123456789', ...(idle ? { TEST_IDLE_MS: String(idle) } : {}), ...(cleanupMs ? { TEST_CLEANUP_MS: String(cleanupMs) } : {}), ...(startMs ? { TEST_START_MS: String(startMs), TEST_PROBE_MS: String(probeMs ?? startMs) } : {}) },
     serviceBindings: { APP: app },
     outboundService: async request => {
       assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify');
@@ -194,5 +194,22 @@ test('a platform exit during startup fails promptly and releases the reservation
     assert.doesNotMatch(html, /SECRET/);
     exit = false;
     assert.equal((await start({ ip: '203.0.113.11' })).status, 303);
+  } finally { await mf.dispose(); }
+});
+
+
+test('failed cleanup preserves the startup failure and holds capacity until destruction succeeds', async () => {
+  let healthy = false;
+  const { mf, start, demos } = await front({ max: 1, startMs: 80, cleanupMs: 500, destroyFailures: 1,
+    health: () => new Response(null, { status: healthy ? 200 : 503 }) });
+  try {
+    const failed = await start();
+    assert.equal(failed.status, 502);
+    assert.doesNotMatch(await failed.text(), /SECRET/);
+    healthy = true;
+    assert.equal((await start({ ip: '203.0.113.12' })).status, 503);
+    for (let i = 0; i < 100 && ![...demos.values()].every(demo => demo.destroyed); i++) await new Promise(resolve => setTimeout(resolve, 50));
+    assert.ok([...demos.values()].every(demo => demo.destroyed));
+    assert.equal((await start({ ip: '203.0.113.13' })).status, 303);
   } finally { await mf.dispose(); }
 });

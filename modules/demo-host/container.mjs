@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { claimKeys, signClaim } from './claim.mjs';
-import { boundedFetch, category, report } from './diagnostics.mjs';
+import { bounded, boundedFetch, category, report } from './diagnostics.mjs';
 import { endedPage, clearCookie } from './pages.mjs';
 
 // One visitor's demo: a Durable Object (newUniqueId) and its container, the
@@ -39,6 +39,7 @@ export class DemoContainer extends DurableObject {
   idle = IDLE;
   startTimeout = 120_000;
   probeTimeout = 5000;
+  cleanupRetry = 30_000;
   get container() { return this.ctx.container; }
   port() { return this.container.getTcpPort(PORT); }
 
@@ -60,7 +61,7 @@ export class DemoContainer extends DurableObject {
     const claimed = await boundedFetch(this.port(), 'http://container/auth/owner-claim', { method: 'POST', redirect: 'manual',
       headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }, Math.max(1, Math.min(10_000, deadline - Date.now())));
     void claimed.body?.cancel().catch(() => {});
-    report(correlation, this.started, 'claim', { status: claimed.status });
+    this.record('claim', { status: claimed.status });
     if (this.stopped) throw new Error('container-stopped');
     if (claimed.status !== 303) throw new Error(`owner claim answered ${claimed.status}`);
     return { location: claimed.headers.get('location'), cookies: claimed.headers.getSetCookie() };
@@ -117,8 +118,8 @@ export class DemoContainer extends DurableObject {
     this.stopped = true;
     // Keep the alarm and capacity reservation if destruction fails; retry cleanup.
     await this.ctx.storage.put('stopping', true);
-    await this.ctx.storage.setAlarm(Date.now() + 30_000);
-    if (this.container.running) await this.container.destroy();
+    await this.ctx.storage.setAlarm(Date.now() + this.cleanupRetry);
+    if (this.container.running) await bounded(this.container.destroy(), 5000);
     await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(this.ctx.id.toString());
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();

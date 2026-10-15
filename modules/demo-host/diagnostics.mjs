@@ -15,6 +15,21 @@ export async function boundedFetch(port, url, init, milliseconds) {
   const controller = new AbortController();
   let timer;
   const timeout = new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new DOMException('probe deadline', 'TimeoutError')); }, milliseconds); });
-  try { return await Promise.race([port.fetch(url, { ...init, signal: controller.signal }), timeout]); }
+  try {
+    const request = port.fetch(url, { ...init, signal: controller.signal }).then(response => {
+      if (controller.signal.aborted) void response.body?.cancel().catch(() => {});
+      return response;
+    });
+    return await Promise.race([request, timeout]);
+  }
   finally { clearTimeout(timer); }
+}
+
+export async function bounded(operation, milliseconds) {
+  let timer;
+  try {
+    return await Promise.race([operation, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new DOMException('operation deadline', 'TimeoutError')), milliseconds);
+    })]);
+  } finally { clearTimeout(timer); }
 }
