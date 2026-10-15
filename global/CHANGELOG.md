@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.23
+
+- A migration whose D1 import failed and rolled back is retried by the next deploy of the same migration bytes. rer first proves none of it applied: every effect that would make a second run fail (a CREATE without IF NOT EXISTS, ADD COLUMN, RENAME) and lasts to the end of the file must be absent. A migration with no such effect, or with any of them present, stays refused as `uncertain-migration-claim`, and `rer deploy` names the migration, what is present and the exact recovery step. rer never marks a migration applied by itself and never re-runs one whose effects may be present.
+- A failed D1 import keeps Cloudflare's codes and messages (credentials and URLs removed, 300 characters each) on the error as `providerRefusal` and in the deploy output, and names the migration it was running.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes. A deployment stuck at `changed-or-uncertain-migration-history` because its last migration stayed `applying` after a failed import recovers with a plain `rer deploy` of the same build; no D1 edit is needed when the migration's effects are absent.
+
 ## 0.2.21
 
 - Demo removal retries transient Cloudflare provider failures while preserving the resource ownership checks.
