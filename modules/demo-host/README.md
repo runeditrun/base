@@ -9,8 +9,11 @@ it with these files and the seed's container image folder (workerd engine) to
 
 - `worker.mjs`: `GET /` is the start page; `POST /__demo/start` checks the
   exact Origin, the `STARTS` rate limit (3 per IP per 60 s), Turnstile's
-  siteverify and capacity, then starts the visitor's demo and answers with the
-  owner claim's 303, its session cookie and the `rer_demo` cookie. A request
+  siteverify and capacity, then starts the visitor's demo. It answers with
+  202 progress and a `rer_demo` cookie; `GET /__demo/status` polls that same
+  copy until it can relay the owner claim's 303 (JSON `{ location }` for the
+  page script) and session cookie. Every external admission step is bounded:
+  the start answers within 12 seconds, and status within two seconds. A request
   with that cookie goes to the visitor's Durable Object; nothing else reaches
   a container.
 - `container.mjs`: `DemoContainer`, one per visitor (`newUniqueId`, checked
@@ -28,11 +31,23 @@ it with these files and the seed's container image folder (workerd engine) to
   minutes, and arms the next at once, as the Containers class keeps its own
   object alive. A request or alarm that finds the container gone ends the demo
   and answers the ended page (410), never a 5xx.
-- `capacity.mjs`: `DemoCapacity` admits at most `max_instances` live demos.
+- `capacity.mjs`: `DemoCapacity` counts unexpired reservation rows inside a
+  storage transaction, excluding diagnostics and expired rows. A lost start
+  handoff expires after one minute; a successful claim extends the reservation
+  to the demo's end. Refusals log the held ids as SHA-256 fingerprints (also
+  logged with each start's correlation), never visitor bearer cookies.
+- `image.mjs`, `prepare.mjs`, `template.mjs`, `entrypoint.sh`: the demo image
+  build migrates fresh workerd persistence with the packaged engine and closes
+  it into `/template`, with no network and no app requests. The entrypoint
+  copies that state into a fresh `/data` under the host's existing flock;
+  partial or foreign volumes are refused. Startup validates the existing
+  migration hashes instead of replaying SQL. Owners, sessions and the seed's
+  owner-dependent sample data are still created separately for each visitor.
 - `pages.mjs`: the start and ended pages (12ui designs), strict CSP.
   `start-script.mjs` is the start page's script: once Turnstile passes it
   posts the form with `Accept: application/json` (the Worker then answers
-  `{ location }` with the cookies, or `{ notice }` with the refusal's status)
+  202 `{ pending: true }`, `{ location }` with the cookies, or `{ notice }`
+  with the refusal's status)
   and shows each step: the check, the private copy starting, the sign-in. A
   refusal, a network failure or a start past 25 seconds is shown with Try
   again, which runs a new check; progress is announced through a
@@ -55,8 +70,12 @@ Chromium (default-seed's Playwright) through waiting, failure, Try again,
 working and the signed-in landing. The end-to-end proof (`wrangler dev` with Docker)
 is in DEMO.md.
 
-Startup probes keep the existing 120-second budget, with a separate five-second
-HTTP probe limit. Every attempt logs its timestamp, elapsed time, duration and
+Startup has a 45-second budget, with a separate five-second HTTP probe limit.
+The Durable Object owns that work and cleanup while the page polls; a browser
+that leaves cannot abandon it. Retrying a pending copy resumes the same
+reservation. Failed starts retain the bounded operator diagnostic and destroy
+the container; cleanup retries keep a reservation only while destruction is
+unconfirmed. Every attempt logs its timestamp, elapsed time, duration and
 HTTP status or fixed error category, including successful probes. Exit records
 include the numeric platform exit code when supplied. A separate random
 `x-rer-demo-correlation` response header joins these events without disclosing
