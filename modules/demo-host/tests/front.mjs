@@ -11,17 +11,19 @@ import { DEMO_FILES } from '../plan.mjs';
 // owner-claim's real verifier, as the seed does.
 export const ORIGIN = 'https://demo.run-test.example';
 
-export async function front({ max = 10, idle, health, startMs, probeMs, destroyFailures = 0, cleanupMs, siteKey = 'site-key', siteverify } = {}) {
+export async function front({ max = 10, idle, evictMs, health, startMs, probeMs, destroyFailures = 0, cleanupMs, siteKey = 'site-key', siteverify } = {}) {
   const demos = new Map();
   async function app(request) {
     const url = new URL(request.url), id = request.headers.get('x-demo');
     if (url.hostname === 'platform') {
       if (url.pathname === '/start') demos.set(id, { ...await request.json(), destroyed: false, requests: [] });
+      else if (url.pathname === '/stopped') demos.get(id).evicted = true;
       else { if (destroyFailures-- > 0) return new Response(null, { status: 503 }); demos.get(id).destroyed = true; }
       return new Response(null, { status: 204 });
     }
     const demo = demos.get(id);
     if (!demo || demo.destroyed) return new Response('no container', { status: 502 });
+    if (demo.stop) return new Response(null, { status: 598 });
     demo.requests.push(`${request.method} ${url.pathname}`);
     if (url.pathname === '/health') return health ? health(demo) : Response.json({ ok: true });
     if (url.pathname === '/auth/owner-claim') {
@@ -41,7 +43,7 @@ export async function front({ max = 10, idle, health, startMs, probeMs, destroyF
     durableObjects: { DEMO: { className: 'DemoContainer', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
     ratelimits: { STARTS: { namespace_id: '1001', simple: { limit: 3, period: 60 } } },
     bindings: { DEMO_ORIGIN: ORIGIN, DEMO_SITE: 'https://run-test.example', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: String(max),
-      DEMO_SETTINGS: JSON.stringify({ MAIL_FROM: 'demo@demo.invalid' }), TURNSTILE_SITE_KEY: siteKey, TURNSTILE_SECRET_KEY: 'secret-key', RER_DEMO_OPERATOR_TOKEN: 'operator-only-test-credential-123456789', ...(idle ? { TEST_IDLE_MS: String(idle) } : {}), ...(cleanupMs ? { TEST_CLEANUP_MS: String(cleanupMs) } : {}), ...(startMs ? { TEST_START_MS: String(startMs), TEST_PROBE_MS: String(probeMs ?? startMs) } : {}) },
+      DEMO_SETTINGS: JSON.stringify({ MAIL_FROM: 'demo@demo.invalid' }), TURNSTILE_SITE_KEY: siteKey, TURNSTILE_SECRET_KEY: 'secret-key', RER_DEMO_OPERATOR_TOKEN: 'operator-only-test-credential-123456789', ...(idle ? { TEST_IDLE_MS: String(idle) } : {}), ...(evictMs ? { TEST_EVICT_MS: String(evictMs) } : {}), ...(cleanupMs ? { TEST_CLEANUP_MS: String(cleanupMs) } : {}), ...(startMs ? { TEST_START_MS: String(startMs), TEST_PROBE_MS: String(probeMs ?? startMs) } : {}) },
     serviceBindings: { APP: app },
     outboundService: async request => {
       assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify');

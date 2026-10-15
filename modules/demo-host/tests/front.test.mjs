@@ -114,8 +114,23 @@ test("the page's own start reports a failed startup as a notice and frees its pl
   } finally { await mf.dispose(); }
 });
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+test('an idle visitor keeps their demo past the point where the platform evicts a quiet object', async () => {
+  // 3 s idle stands for 15 minutes; eviction after 0.3 s of no event, for the platform's two to three minutes.
+  const { mf, demos, fetch, start } = await front({ idle: 3000, evictMs: 300 });
+  try {
+    const started = await start(), id = /^rer_demo=([0-9a-f]{64});/.exec(demoCookie(started))[1];
+    await sleep(1500);
+    const later = await fetch('/app', { headers: { cookie: cookieHeader(started) } });
+    assert.equal(later.status, 200);
+    assert.equal(await later.text(), `${id} /app`);
+    assert.equal(demos.get(id).evicted, undefined, 'the container was never stopped');
+  } finally { await mf.dispose(); }
+});
+
 test('an idle demo ends: its container is destroyed, its place freed, and its visitor sees the ended page', async () => {
-  const { mf, demos, fetch, start } = await front({ max: 1, idle: 1500 });
+  const { mf, demos, fetch, start } = await front({ max: 1, idle: 1500, evictMs: 300 });
   try {
     const started = await start(), id = /^rer_demo=([0-9a-f]{64});/.exec(demoCookie(started))[1];
     for (let i = 0; i < 100 && !demos.get(id).destroyed; i++) await new Promise(resolve => setTimeout(resolve, 100));
@@ -130,6 +145,18 @@ test('an idle demo ends: its container is destroyed, its place freed, and its vi
   } finally { await mf.dispose(); }
 });
 
+test('a container the platform stopped answers the ended page, not an error, and frees its place', async () => {
+  const { mf, demos, fetch, start } = await front({ max: 1 });
+  try {
+    const started = await start(), id = /^rer_demo=([0-9a-f]{64});/.exec(demoCookie(started))[1];
+    demos.get(id).stop = true;
+    const ended = await fetch('/app', { headers: { cookie: cookieHeader(started) } });
+    assert.equal(ended.status, 410);
+    assert.match(await ended.text(), /This demo has ended[\s\S]*href="\/">Start a new demo/);
+    assert.ok(ended.headers.getSetCookie().some(cookie => cookie.startsWith('rer_demo=;') && cookie.includes('Max-Age=0')));
+    assert.equal((await start({ ip: '203.0.113.4' })).status, 303);
+  } finally { await mf.dispose(); }
+});
 
 test('bounded readiness failures are private, clean up capacity, and permit a later healthy start', async () => {
   let failure = true;
