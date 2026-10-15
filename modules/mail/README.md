@@ -41,6 +41,8 @@ modules/mail/src/adapters/resend/serialize.mjs
 modules/mail/src/adapters/resend/size.mjs
 modules/mail/src/adapters/sendgrid/index.mjs
 modules/mail/src/adapters/sendgrid/serialize.mjs
+modules/mail/src/adapters/rer/contract.mjs
+modules/mail/src/adapters/rer/index.mjs
 modules/mail/src/adapters/messaging/contract.mjs
 modules/mail/src/adapters/messaging/event-schema.mjs
 modules/mail/src/adapters/messaging/index.mjs
@@ -116,10 +118,50 @@ These are for developing the module itself or documentation. A seed may keep any
 - `modules/mail/package.json`, `modules/mail/pnpm-lock.yaml`, `modules/mail/.gitignore`
 - `modules/mail/README.md` and every `README.md` under `modules/mail/src/`
 
-The provider is explicit: `sendgrid`, `resend`, `cloudflare`, or `development`.
+The provider is explicit: `sendgrid`, `resend`, `cloudflare`, `rer`, `messaging`, or `development`.
 `mode` is required (`production`, `development`, or `test`). Remote providers require `apiKey`; Cloudflare additionally requires a 32-hex `accountId`. A remote provider in test/development mode still makes a real provider request unless the caller explicitly supplies a test fetch. Missing credentials, validation errors, or provider failure never select another provider. Config and messages reject unknown fields so requested features cannot silently disappear.
 
-`createMailSender(config, dependencies?)` returns `{send(message)}`. Dependencies are optional standard `fetch`, an explicit asynchronous `outbox.put(message)`, `clock: () => epochMilliseconds`, and `timeoutMilliseconds` (a positive safe integer bounding each remote attempt; the default is 15,000). Production normally uses global fetch. No configurable provider endpoint, retry, or automatic replay exists. The sender snapshots configuration at construction and the message at submission.
+`createMailSender(config, dependencies?)` returns `{send(message)}`. Dependencies are optional standard `fetch`, an explicit asynchronous `outbox.put(message)`, `clock: () => epochMilliseconds`, and `timeoutMilliseconds` (a positive safe integer bounding each remote attempt; the default is 15,000). Production normally uses global fetch. Direct provider endpoints are fixed; `rer` uses its assigned relay URL. No retry or automatic replay exists. The sender snapshots configuration at construction and the message at submission.
+
+### Managed mail through RER
+
+Seeds opt into Managed mail with `mail: {providers: ["rer"]}` in their candidate
+deployment spec. The [delivery producer](../delivery-producer/README.md#managed-mail)
+can generate the matching setup fields. RER assigns public `MAIL_PROVIDER`,
+`MAIL_FROM`, `MAIL_RELAY_URL` and private `MAIL_API_KEY`; Managed owners do not
+enter them. Wire those settings into the shared sender:
+
+```js
+const sender = createMailSender({
+  provider: env.MAIL_PROVIDER, // rer
+  mode: 'production',
+  apiKey: env.MAIL_API_KEY,
+  relayUrl: env.MAIL_RELAY_URL,
+});
+await sender.send({
+  deliveryId: durableCommand.id,
+  from: env.MAIL_FROM,
+  to: ['recipient@example.net'],
+  subject: 'Your requested sign-in link',
+  text: 'Open the link you requested.',
+});
+```
+
+Pass `relayUrl` only for `rer`. It must be the assigned HTTPS URL, without URL
+credentials, query or fragment. The adapter sends one POST with Bearer
+authentication and `redirect: 'error'`. Its JSON contains one mailbox `to`,
+`subject`, `text` and optional nonempty `html`. RER owns the sender and
+installation identity; `from` and `deliveryId` are not transmitted. Subjects
+must be nonempty, without newlines and at most 200 characters. Plain text is
+required; each body is limited to 65,536 characters and the JSON to 128 KiB.
+Other recipients, attachments, reply-to, headers and unsubscribe features are
+unsupported and fail before dispatch.
+
+HTTP 202 returns `accepted` with no provider message ID. HTTP 400, 401, 402,
+403 and 413 return `rejected`; 429 returns `rate_limited`; 502 and 503 return
+`uncertain`. Network failures and refused redirects are also `uncertain`.
+The usual application delivery policy decides whether to retry or stop; the
+adapter makes no retries and never reads or logs provider error bodies.
 
 ## Message and results
 

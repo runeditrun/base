@@ -11,7 +11,7 @@ const root = new URL('../../', import.meta.url);
 async function createRuntime(path) {
   const modules = {};
   async function add(path) { modules[path] = { type: 'esm', contents: await readFile(new URL(path, root), 'utf8') }; }
-  for (const dir of ['src/events', 'src/core', 'src/adapters/messaging']) {
+  for (const dir of ['src/events', 'src/core', 'src/adapters/messaging', 'src/adapters/rer']) {
     for (const file of await readdir(new URL(dir, root))) if (file.endsWith('.mjs')) await add(`${dir}/${file}`);
   }
   await add('tests/events/worker.mjs');
