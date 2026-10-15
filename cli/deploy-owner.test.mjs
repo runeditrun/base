@@ -372,11 +372,15 @@ for (const options of [{ setSecret: 'SESSION_SECRET' }, { unsetSecret: 'SESSION_
 });
 
 test('fresh deploy propagation reaches the owner once through object and observed function hooks', async t => {
- for (const kind of ['object', 'function', 'custom-observed', 'upload-and-secret-lag', 'persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function']) await t.test(kind, async t => {
+ for (const kind of ['object', 'function', 'custom-observed', 'custom-source-expired', 'custom-source-version', 'custom-source-request', 'custom-source-body', 'upload-and-secret-lag', 'persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function']) await t.test(kind, async t => {
   const { root } = await checkout(t, { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] });
   const { provider, claims } = account(t);
   const inner = globalThis.fetch;
   let attempts = 0, hookCalls = 0, elapsed = 0, uploaded = false, staleWorker = 0, staleSecrets = 0;
+  const sourceFailure = kind.startsWith('custom-source-'), statePath = join(root, '.rer/deploy/production.json');
+  // Recovery uses the same caller-supplied token that this hook uploaded.
+  if (sourceFailure) process.env.SETUP_TOKEN = 'test-only-recovery-token';
+  let failReadback = sourceFailure, sourceReadback = false, sourceRequests = 0, sourceAborted = false, sourceState, sourceWrites, sourceWindow;
   const clock = performance.now.bind(performance);
   t.mock.method(performance, 'now', () => clock() + elapsed);
   const hook = ['function', 'unproven-function'].includes(kind) ? async context => {
@@ -384,13 +388,20 @@ test('fresh deploy propagation reaches the owner once through object and observe
    const response = await fetch(new URL('/auth/bootstrap', context.origin), { method: 'POST', headers: { Origin: context.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: context.vars.SETUP_TOKEN }) });
    assert.equal(response.status, 303);
   } : lifecycle.hooks.owner;
-  const run = () => kind === 'custom-observed' ? deployCommand({root,options:{},store:store(),setupManifest:manifest,
+  const run = () => kind.startsWith('custom-') ? deployCommand({root,options:{},store:store(),setupManifest:manifest,
    adapter:{...lifecycle,deployDeclaration:'deploy.json',deploy:async () => {
+    sourceReadback = false;
     const deployed = await ownerKit(['deploy','--declaration','deploy.json','--environment','production'],process.env,{cwd:root});
     if (!deployed.ownerClaim) {
      hookCalls++;
      const response = await fetch(new URL('/auth/bootstrap',deployed.origin),{method:'POST',headers:{Origin:deployed.origin},body:JSON.stringify({token:process.env.SETUP_TOKEN})});
-     assert.equal(response.status,303);
+     assert.equal(response.status, sourceFailure && !failReadback ? 409 : 303);
+    }
+    if (failReadback) {
+     sourceState = await readFile(statePath); sourceWrites = provider.state.writes.length;
+     sourceReadback = true;
+     sourceWindow = deployed.propagation.window;
+     elapsed += kind === 'custom-source-expired' ? sourceWindow.remaining() : kind === 'custom-source-version' ? 0 : Math.max(0, sourceWindow.remaining() - 200);
     }
     return {origin:deployed.origin,deployed:true};
    }}}) : ownerDeploy('deploy.json', { ...lifecycle, hooks: { owner: hook } })({ root, options: {}, store: store(), setupManifest: manifest });
@@ -401,6 +412,29 @@ test('fresh deploy propagation reaches the owner once through object and observe
   const writes = provider.state.writes.length;
   t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
    const url = new URL(input);
+   if (sourceReadback && url.pathname === '/health') {
+    sourceRequests++;
+    if (kind === 'custom-source-version') {
+     const body = await (await inner(input, init)).json();
+     body.deployment.versionId = 'previous-version-of-the-same-commit'; elapsed += sourceWindow.remaining();
+     return Response.json(body);
+    }
+    if (['custom-source-request', 'custom-source-body'].includes(kind)) {
+     const body = await (await inner(input, init)).json();
+     let timer;
+     const bytes = new Promise((resolve, reject) => {
+      const abort = () => { sourceAborted = true; clearTimeout(timer); reject(init.signal.reason); };
+      timer = setTimeout(() => { init.signal.removeEventListener('abort', abort); resolve(Buffer.from(JSON.stringify(body))); }, 400);
+      init.signal.addEventListener('abort', abort, { once: true });
+      if (init.signal.aborted) abort();
+     });
+     t.after(() => clearTimeout(timer));
+     if (kind === 'custom-source-request') return new Response(await bytes);
+     return new Response(new ReadableStream({ async start(controller) {
+      try { controller.enqueue(await bytes); controller.close(); } catch (error) { controller.error(error); }
+     } }));
+    }
+   }
    if (kind === 'upload-and-secret-lag') {
     if (init.method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') { const result = await inner(input, init); uploaded = true; const body = await result.json(); body.result.deployment_id = body.result.deployment_id.replaceAll('-', '').toUpperCase(); return Response.json(body); }
     if (uploaded && url.pathname.endsWith('/settings') && staleWorker++ === 0) return Response.json({success:false,errors:[]}, {status:404});
@@ -413,11 +447,24 @@ test('fresh deploy propagation reaches the owner once through object and observe
     if (kind === 'denied') return Response.json({ error: 'owner_claim_denied' }, { status: 403 });
     if (kind === 'cross-origin') return new Response(null, { status: 303, headers: { Location: 'https://elsewhere.invalid/auth/bootstrap' } });
     if (kind === 'redirect') return new Response(null, { status: 307, headers: { Location: 'https://elsewhere.invalid/auth/bootstrap' } });
-    if (attempts === 1 || ['persistent','existing-wrong'].includes(kind)) return Response.json({ error: 'invalid_setup_token' }, { status: 403 });
+    if (!sourceFailure && attempts === 1 || ['persistent','existing-wrong'].includes(kind)) return Response.json({ error: 'invalid_setup_token' }, { status: 403 });
    }
    return inner(input, init);
   });
-  if (['persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function'].includes(kind)) {
+  if (sourceFailure) {
+   const failure = await run().then(() => assert.fail('source readback must fail within the original upload window'), error => error);
+   assert.equal(sourceRequests, kind === 'custom-source-expired' ? 0 : 1, 'no source request starts after the upload deadline');
+   assert.match(failure.message, /upload.*readiness deadline/);
+   if (['custom-source-request', 'custom-source-body'].includes(kind)) assert.ok(sourceAborted, 'the remaining upload time bounds both the request and its body');
+   assert.equal(hookCalls, 1); assert.equal(claims.length, 1, 'source readback never repeats hook effects');
+   assert.deepEqual(await readFile(statePath), sourceState, 'failed source readback preserves the owner record');
+   assert.equal(provider.state.writes.length, sourceWrites, 'failed source readback never retires or rotates a secret');
+   assert.equal(provider.state.databases[0].db.prepare('SELECT id FROM owner').get().id, 'owner@example.test');
+   assert.ok(secretNames(provider).includes('SETUP_TOKEN'));
+   failReadback = false;
+   assert.equal((await run()).owner, 'kept', 'the same-input recovery keeps the owner already claimed by the hook');
+   assert.equal(claims.length, 2); assert.ok(!secretNames(provider).includes('SETUP_TOKEN'));
+  } else if (['persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function'].includes(kind)) {
    await assert.rejects(run(), /claiming its owner failed/);
    assert.equal(attempts, kind === 'persistent' ? 2 : 1);
    assert.equal(claims.length, 0);

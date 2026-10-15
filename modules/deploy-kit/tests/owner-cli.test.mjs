@@ -118,13 +118,14 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
  const options = {fetch:provider.fetch,cwd:root,notice:()=>{},healthOptions};
  const args = ['--declaration','deploy.json','--environment','production'];
  const first = await main(['deploy',...args], inputs(provider), options);
+ const budget = first.propagation.window.remaining(), deadline = elapsed + budget;
  const healthy = () => {
   const vars = Object.fromEntries(provider.state.settings.bindings.filter(x => x.type === 'plain_text').map(x => [x.name,x.text]));
   return Response.json({ok:true,deployment:{sourceSha:vars.RER_DEPLOY_SOURCE,fingerprint:vars.RER_DEPLOY_FINGERPRINT,versionId:provider.state.version.id}});
  };
  provider.state.healthOverride = () => ++attempts === 1 ? new Response('error code: 1042', {status:404}) : healthy();
  assert.equal((await main(['health',...args], inputs(provider), {...options,propagation:first.propagation})).ok, true);
- assert.equal(attempts, 2); assert.equal(elapsed, 2000);
+ assert.equal(attempts, 2); assert.ok(elapsed > 0 && elapsed < deadline, 'a transient response waits within the upload budget');
  for (const [name, response, fresh] of [
   ['established', () => new Response('error code: 1042', {status:404}), false],
   ['other 404', () => new Response('not found', {status:404}), true],
@@ -138,11 +139,12 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
   await assert.rejects(main(['health',...args], inputs(provider), {...options,...(fresh ? {propagation:first.propagation} : {})}), undefined, name);
   assert.equal(attempts, 1, name);
  }
- elapsed = 89000; attempts = 0;
+ elapsed += first.propagation.window.remaining() - Math.min(1, budget / 2); attempts = 0;
  provider.state.healthOverride = () => { attempts++; return new Response('error code: 1042', {status:404}); };
  await assert.rejects(main(['health',...args], inputs(provider), {...options,propagation:first.propagation}), /last-status-404/);
  assert.equal(attempts, 1, 'no probe starts after the original upload deadline');
- assert.equal(elapsed, 90000, 'postdeploy readback cannot add a new 30-second window');
+ assert.ok(elapsed <= deadline, 'postdeploy readback stops by the original upload deadline');
+ assert.equal(first.propagation.window.remaining(), 0, 'persistent propagation exhausts only the original budget');
  // The same deadline also aborts a provider response, not just the next poll.
  const slow = ownerProvider(); t.after(() => slow.close());
  const slowRoot = await seed(t); let uploaded = false, aborted = false, reads = 0;

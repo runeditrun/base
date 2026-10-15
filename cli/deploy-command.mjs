@@ -87,8 +87,9 @@ export async function deployCommand(context) {
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
    const origin = hookOrigin(deployed, deployAgain(options));
+   const uploaded = observedReadiness(origin);
    step = 'wait for the deployed source';
-   await waitForSource({ origin, sourceSha, again: deployAgain(options) });
+   await waitForSource({ origin, sourceSha, uploaded, again: deployAgain(options) });
    step = 'verify recorded deployment';
    const state = await inspect();
    if ((state?.origin ?? origin) !== origin || claims.some(item => item.origin !== origin)) throw new Error('owner-claim-origin-mismatch');
@@ -96,7 +97,6 @@ export async function deployCommand(context) {
    claimed = claims.at(-1)?.outcome;
    step = 'claim owner';
    if (typeof deployed.setupToken === 'string' && deployed.setupToken) addSecret(deployed.setupToken);
-   const uploaded = observedReadiness(origin);
    const sentSecrets = (uploaded?.sentSecrets ?? []).filter(binding => uploaded.propagation.matchesToken(binding, env[declaration.secrets.find(item => item.binding === binding)?.environment]));
    const kit = state ? { secret: (extra, values) => command('secret', extra, values), recordClaim: outcome => command('record-owner', ['--outcome', outcome]) } : { token: deployed.setupToken || undefined };
    claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, sentSecrets, propagation:deployed.propagation ?? uploaded?.propagation, origin, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, supplied, ...kit, addSecret, beforeClaim: token => link(token, origin), store, signal: context.signal });
