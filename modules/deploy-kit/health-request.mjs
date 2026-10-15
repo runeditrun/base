@@ -64,7 +64,8 @@ export async function healthRequest({origin, expected, request, timeoutMs, offse
     attempt.errorClass = 'health-identity-mismatch';
     // Right after an upload the edge can still answer from another version: that
     // settles within the bound. Final source observation also waits out healthy
-    // identity mismatches; other callers reject a wrong expected version at once.
+    // identity mismatches; other callers reject a wrong identity from the
+    // expected version at once.
     const key = expected.versionId ? 'versionId' : 'sourceSha';
     const other = body?.ok === true && typeof body.deployment?.[key] === 'string' && body.deployment[key] !== expected[key];
     return {attempt,transient:other || retryIdentityMismatch && body?.ok === true};
