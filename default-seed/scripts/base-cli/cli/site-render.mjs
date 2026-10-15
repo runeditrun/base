@@ -14,6 +14,9 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { buildClients, writeSiteAsset } from './site-client.mjs';
+import { redactSiteOutput, siteBuildDiagnostic } from './site-diagnostics.mjs';
+
+redactSiteOutput();
 
 const [root, entry, output, config, clientJSON] = process.argv.slice(2);
 const fail = message => { process.stderr.write(`${message}\n`); process.exit(2); };
@@ -38,7 +41,7 @@ try {
    ssr: resolve(root, entry), outDir: server, emptyOutDir: true, copyPublicDir: false, ssrEmitAssets: true,
    cssCodeSplit: false, assetsDir: ASSETS, sourcemap: false, minify: false, reportCompressedSize: false, watch: null,
   },
- }).catch(error => fail(`The run site entry ${entry} did not build: ${error.message.split('\n')[0]}${config ? '' : ' If its pages need Vite plugins (a docs virtual module, a CSS toolchain), name a site Vite config: site: { config } in the command adapter.'}`));
+ }).catch(error => fail(`The run site entry ${entry} did not build: ${siteBuildDiagnostic(error)}${config ? '' : '\nIf its pages need Vite plugins (a docs virtual module, a CSS toolchain), name a site Vite config: site: { config } in the command adapter.'}`));
  const outputs = (Array.isArray(built) ? built : [built]).flatMap(result => result.output ?? []);
  const chunk = outputs.find(item => item.type === 'chunk' && item.isEntry);
  if (!chunk) fail(`The run site entry ${entry} produced no module.`);

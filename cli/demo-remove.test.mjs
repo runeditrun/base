@@ -14,7 +14,13 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
  let account = demoAccount(); const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
  Object.assign(process.env, { CI: 'true', CLOUDFLARE_ACCOUNT_ID: account.accountId, CLOUDFLARE_API_TOKEN: account.token });
- t.mock.method(globalThis, 'fetch', (...args) => account.fetch(...args));
+ let responseOverride = (_call, response) => response;
+ const calls = [];
+ t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+  const call = `${init.method ?? 'GET'} ${new URL(input).pathname.replace(`/client/v4/accounts/${account.accountId}`, '')}`;
+  calls.push(call);
+  return responseOverride(call, await account.fetch(input, init));
+ });
  const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN', platforms: ['workers', 'container'] };
  const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture' };
  await writeFile(join(root, 'deploy.json'), JSON.stringify(app));
@@ -48,6 +54,52 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
  account.state.writes.length = 0;
  assert.equal(await remove('--yes'), 0);
  assert.deepEqual(account.state.writes, []);
+
+ // Cloudflare can confirm a DELETE with no JSON envelope. Each first invocation
+ // must finish all three deletes and the readback, even with empty HTTP 200.
+ for (const [status, body] of [[200, null], [200, ''], [202, null], [204, null]]) {
+  account = demoAccount(); account.deploy(plan); account.unrelated(); calls.length = 0;
+  responseOverride = (call, response) => call.startsWith('DELETE ') ? new Response(body, { status }) : response;
+  assert.equal(await remove('--yes'), 0, `empty ${status} DELETE completes on its first run`);
+  assert.deepEqual([...account.state.workers.keys()], ['someone-else']);
+  assert.deepEqual(account.state.namespaces.map(row => row.script), ['someone-else']);
+  assert.deepEqual(account.state.domains.map(row => row.hostname), ['www.someone-else.test']);
+  assert.deepEqual(account.state.apps.map(row => row.name), ['someone-else']);
+  const deletes = calls.filter(call => call.startsWith('DELETE '));
+  assert.equal(deletes.length, 3, 'each owned resource is deleted once');
+  assert.equal(new Set(deletes).size, 3, 'no DELETE is retried');
+  const readback = calls.slice(calls.indexOf(`DELETE /workers/scripts/${plan.worker}`) + 1);
+  for (const path of [`/workers/scripts/${plan.worker}/settings`, '/workers/durable_objects/namespaces', '/workers/domains', '/containers/applications']) {
+   assert.ok(readback.includes(`GET ${path}`), `removal reads back ${path}`);
+  }
+  account.state.writes.length = 0;
+  assert.equal(await remove('--yes'), 0, 'a repeat is a no-op');
+  assert.deepEqual(account.state.writes, []);
+ }
+
+ // Only an actually empty successful DELETE has this meaning. Fail closed on
+ // malformed bodies, refusals, HTTP errors and empty reads or schedule writes.
+ for (const [method, status, body] of [
+  ['DELETE', 200, 'not-json'], ['DELETE', 200, ' '], ['DELETE', 200, '{}'],
+  ['DELETE', 200, '{"success":false,"errors":[]}'],
+  ['DELETE', 202, '{"success":false,"errors":[]}'],
+  ['DELETE', 200, '{"success":true,"result":null,"errors":[{"code":10000}]}'],
+  ['DELETE', 403, null], ['DELETE', 500, null],
+  ['GET', 200, null], ['GET', 204, null], ['PUT', 200, null], ['PUT', 204, null],
+ ]) {
+  account = demoAccount(); account.deploy(plan); account.unrelated(); calls.length = 0;
+  const target = method === 'DELETE' ? `DELETE /workers/domains/${account.state.domains[0].id}`
+   : method === 'PUT' ? `PUT /workers/scripts/${plan.worker}/schedules` : 'GET /workers/domains';
+  responseOverride = (call, response) => call === target ? new Response(body, { status }) : response;
+  assert.equal(await remove('--yes'), 1, `${method} ${status} with ${JSON.stringify(body)} fails`);
+  assert.equal(calls.at(-1), target, 'removal stops at the rejected response');
+  assert.equal(calls.filter(call => call === target).length, 1, 'the rejected request is not retried');
+  assert.ok(account.state.workers.has(plan.worker), 'the demo Worker is retained after failure');
+  assert.ok(account.state.workers.has('someone-else'), 'the unrelated Worker is retained');
+  if (method === 'GET') assert.deepEqual(account.state.writes, [], 'empty inventory cannot authorize deletion');
+  if (method === 'DELETE') assert.ok(account.state.apps.some(row => row.name === plan.container), 'no subsequent resource is deleted');
+ }
+ responseOverride = (_call, response) => response;
 
  // Anything the record does not cover is refused before the first delete.
  for (const extra of [

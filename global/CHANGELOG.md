@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.17
+
+- Container builds check the app's reachable runtime imports from Wrangler main and fresh server output. Dormant source files and ordinary calls containing cloudflare-looking strings no longer fail the boundary; reachable Node-engine restrictions remain.
+- Site builds preserve complete plugin diagnostics and source locations while redacting absolute home paths.
+- Fresh Worker deploys wait for the uploaded version and secrets before the owner claim. A matching fresh setup token that has not propagated and a fresh workers.dev 1042/404 readback retry inside the existing upload deadline; wrong tokens and unrelated 404s still fail.
+- Demo removal accepts empty successful DELETE responses, so removing a recorded demo with its Custom Domain completes in one command.
+- Local dev, setup and demo inspect the started process tree with nonblocking macOS socket queries. Slow or failed diagnostics retry within one 15-second bound; unresolved ownership refuses with the command and bound instead of falsely naming another owner.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes. Rebuild container images for the import-graph boundary. Existing local data and seed-owned application source are unchanged.
+
 ## 0.2.16
 
 - A hosted demo's container stays up until the visitor's 15 idle minutes or the demo's hour, however long the visitor goes without a request. Before, the platform stopped it about three minutes after the last request, the next request got a Cloudflare 500, and its place stayed held. A container that is gone anyway (stopped by the platform, or failing once stopped) now ends its demo, frees its place at once and answers the ended page (410, with "Start a new demo").
