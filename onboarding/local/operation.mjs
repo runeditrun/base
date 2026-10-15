@@ -3,12 +3,14 @@ import { link, lstat, open, readFile, rename, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { privateDirectory } from './files.mjs'
 import { processStart } from './process-table.mjs'
-import {processName} from '../process-diagnostics.mjs'
+import {processName,inspectionContext,uncheckedInspection} from '../process-diagnostics.mjs'
 
 const busy = async (path) => {
  let owner;try{owner=JSON.parse(await readFile(path,'utf8'));}catch{}
  const pid=Number.isSafeInteger(owner?.pid)&&owner.pid>0?owner.pid:undefined;
- const identity=pid?`PID ${pid} (${await processName(pid)})`:'an unidentified process';
+ let command='process';
+ if(pid)try{command=await processName(pid,inspectionContext({budgetMs:1000}));}catch(error){if(!uncheckedInspection(error))throw error;}
+ const identity=pid?`PID ${pid} (${command})`:'an unidentified process';
  return Object.assign(new Error(`An active local operation owns the state: ${identity}. Stop it with rer dev --stop or rer preview --stop; for an unmanaged process, stop PID ${pid ?? 'shown in the lock'} before retrying.`), {code: 'LOCAL_OPERATION_BUSY', ownerPid: pid});
 }
 const graceMs = 10000
