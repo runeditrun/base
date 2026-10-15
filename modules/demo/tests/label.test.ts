@@ -10,7 +10,8 @@ const { chromium } = require('@playwright/test');
 test('demo and dev titles stay singular through empty titles, mode switches and head mutations', async () => {
   const server = createServer(async (request, response) => {
     const url = new URL(request.url!, 'http://localhost');
-    const decorated = await decorateLabel(new Response(`<head><title>${url.searchParams.get('title') ?? ''}</title></head><body></body>`, {
+    const title = url.searchParams.has('title') ? `<title>${url.searchParams.get('title')}</title>` : '';
+    const decorated = await decorateLabel(new Response(`<head>${title}</head><body></body>`, {
       headers: { 'content-type': 'text/html', 'content-security-policy': "default-src 'none'; script-src 'none'; style-src 'none'" },
     }), url.searchParams.get('mode'));
     response.writeHead(decorated.status, Object.fromEntries(decorated.headers));
@@ -22,16 +23,21 @@ test('demo and dev titles stay singular through empty titles, mode switches and 
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const origin = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`;
-    const cases = [['', ''], ['Demo', ''], ['Dev', ''], [' Demo', ''], ['\tDev', ''], ['Workspace', 'Workspace'], ['Workspace\tDemo', 'Workspace'], ['Workspace\nDev', 'Workspace']];
+    const cases: [string | null, string][] = [[null, ''], ['', ''], ['Demo', ''], ['Dev', ''], [' Demo', ''], ['\tDev', ''], ['Workspace', 'Workspace'], ['Workspace\tDemo', 'Workspace'], ['Workspace\nDev', 'Workspace']];
     for (const mode of ['Demo', 'Dev']) {
       for (const [input, base] of cases) {
         const expected = base ? `${base} ${mode}` : mode;
-        const url = `${origin}/?${new URLSearchParams({ mode, title: input })}`;
+        const params = new URLSearchParams({ mode });
+        if (input !== null) params.set('title', input);
+        const url = `${origin}/?${params}`;
         const html = await (await fetch(url)).text();
-        assert.equal(html.match(/<title>(.*?)<\/title>/s)?.[1], expected, 'server title has one suffix and no empty-name separator');
+        assert.equal(html.match(/<title>(.*?)<\/title>/s)?.[1], input === null ? undefined : expected, 'server title has one suffix and no empty-name separator');
         await page.goto(url);
         assert.equal(await page.title(), expected);
-        await page.evaluate(title => { document.title = title; }, input);
+        await page.evaluate(title => {
+          if (title === null) document.querySelector('title')?.remove();
+          else document.title = title;
+        }, input);
         await page.waitForFunction(title => document.title === title, expected);
         // A head manager may mutate unrelated elements after setting a title.
         // Allow both the observer and another browser turn to run before checking.
