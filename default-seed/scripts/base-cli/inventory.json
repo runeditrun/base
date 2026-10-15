@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.19-dev.g4e97d58f",
+  "cliVersion": "0.2.19-dev.gf4c1f17e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -903,11 +903,11 @@
     },
     "modules/d1-transport/index.d.mts": {
       "source": "modules/d1-transport/index.d.mts",
-      "sha256": "4047987672cdadf428273cbebe9cb47eb44eb254bea26cac00ff31d60c88d13c"
+      "sha256": "b1dcfba529210c9237fa257faa0da8c9062bef946961ba8edeb8af7e171611f3"
     },
     "modules/d1-transport/index.mjs": {
       "source": "modules/d1-transport/index.mjs",
-      "sha256": "6c0aa423aa5c2c332617b01fb799af81ba19ae3c6683cd643b29e58bffc3a2d0"
+      "sha256": "a8a79a0c2673536e221facd892e688000bfae71485d864b4fff9801eb7aaf4a9"
     },
     "modules/delivery-producer/bindings.mjs": {
       "source": "modules/delivery-producer/bindings.mjs",
