@@ -167,7 +167,7 @@ test('bounded readiness failures are private, clean up capacity, and permit a la
     assert.ok(Date.now() - before < 3000, 'the start is bounded even when probes are slow');
     const correlation = refused.headers.get('x-rer-demo-correlation');
     assert.ok(correlation);
-    assert.equal(refused.headers.getSetCookie().length, 0);
+    assert.ok(refused.headers.getSetCookie().every(cookie => cookie.startsWith('rer_demo=;')));
     assert.doesNotMatch(await refused.text(), /SECRET|probe-timeout|health-deadline|platform-error/);
     assert.ok([...demos.values()].every(demo => demo.destroyed));
     // The public correlation is not an instance bearer or a diagnostics capability.

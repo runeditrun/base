@@ -87,6 +87,13 @@ demo ends after 60 minutes, or 15 minutes with no requests; its container is
 destroyed and its state deleted, and the visitor sees "This demo has ended".
 Until then the container stays up however quiet the visitor is, and one that
 stops early anyway also ends its demo and frees its place.
+The demo image carries its databases already migrated. Each visitor copies that
+prepared state, then gets a fresh owner, session and owner-dependent sample data.
+The start page polls progress on the same copy; a slow start does not leave a
+request waiting for minutes. Admission answers within 12 seconds, each progress
+poll within two seconds, and a copy that cannot start within 45 seconds is ended.
+A retry while it is starting resumes that copy without taking a second place.
+
 At most `maxInstances` demos (10 unless set) run at once, and one IP starts at
 most 3 a minute.
 Mail is suppressed silently; all other effects follow the real/mocked policy above.

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { contained } from './project.mjs';
 import { invalid, missing, refuse, RerError } from './errors.mjs';
 import { imageFolder } from './container.mjs';
+import { prepareDemoImage } from '../modules/demo-host/image.mjs';
 import { DEMO_FILES, INSTANCE_TYPES, demoPlan } from '../modules/demo-host/plan.mjs';
 
 // `rer deploy --demo [--dry-run]`: the seed's hosted demo at demo.<domain>
@@ -27,6 +28,7 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  await mkdir(folder, { recursive: true, mode: 0o700 });
  await store.step('Building the demo container image (workerd engine)');
  await imageFolder(project, operation, { ...app, secrets: [...(app.secrets ?? []), { binding: 'RER_DEMO_OPERATOR_TOKEN' }, { binding: 'TURNSTILE_SECRET_KEY' }] }, { output: join(folder, 'image'), engine: 'workerd' });
+ await prepareDemoImage(join(folder, 'image'));
  for (const file of DEMO_FILES) await cp(new URL(`../modules/demo-host/${file}`, import.meta.url), join(folder, file));
  await writeFile(join(folder, 'wrangler.json'), JSON.stringify(plan.wrangler, null, 2) + '\n');
  const summary = { worker: plan.worker, origin: plan.origin, hostname: plan.hostname, folder: '.rer/demo-host', maxInstances: plan.maxInstances, settings: plan.settings, instanceType: plan.instanceType, startsPerIpPerMinute: 3, minutes: 60, idleMinutes: 15, enableInternet: true };
