@@ -21,7 +21,7 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, hostVariables: app.container?.hostVariables, declaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }
  catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds {"version": 1, "domain": "<run site apex>", "name": "<product name>"}, optionally "maxInstances", "instanceType" (${INSTANCE_TYPES.join(', ')}; default basic) and plain "settings".`); }
- if (options.remove) return removeDemo(plan, store);
+ if (options.remove) return removeDemo(plan, store, signal);
  if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const folder = join(project.root, '.rer', 'demo-host');
  await rm(folder, { recursive: true, force: true });
@@ -54,15 +54,16 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  return { dryRun: false, deployed: true, origin: plan.origin, demo: summary };
 }
 
-async function removeDemo(plan, store) {
+async function removeDemo(plan, store, signal) {
  const names = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
  if (names.some(name => !process.env[name]?.trim())) throw missing(`${names.join(' and ')} are required to remove the demo; see DEMO.md "Removing a hosted demo".`);
  const { cloudflare } = await import('../modules/deploy-kit/provider.mjs');
  const { providerRefusal } = await import('../modules/deploy-kit/diagnostics.mjs');
  const { demoRemove } = await import('../modules/demo-host/remove.mjs');
+ const { demoRemovalFetch } = await import('./demo-removal-provider.mjs');
  await store.step(`Removing the demo Worker ${plan.worker} on ${plan.hostnames.join(', ')}`);
  let result;
- try { result = await demoRemove({ api: cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN }), plan }); }
+ try { result = await demoRemove({ api: cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN, fetch: demoRemovalFetch(signal) }), plan }); }
  catch (error) {
   if (error instanceof RerError) throw error;
   const code = /^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'demo-remove-failed';

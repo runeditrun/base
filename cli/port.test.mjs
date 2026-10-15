@@ -15,15 +15,16 @@ async function wildcardListener(t,host='0.0.0.0'){
  const holder=spawn(process.execPath,['-e',`
  const {createServer}=require('node:net'),host=${JSON.stringify(host)};
  function start(){
-  const server=createServer().listen(0,host,()=>{
+  let next;
+  const server=createServer(connection=>next.close(()=>connection.end('released'))).listen(0,host,()=>{
    const port=server.address().port;
-   if(host==='0.0.0.0')return console.log(port);
    // Also hold the next port: an expired shared search budget must not erase
-   // the instruction just because its first candidate is occupied too.
+   // the instruction just because its first candidate is occupied too. The
+   // selection case releases this reserved candidate at the inspection edge.
    if(port===65535)return server.close(start);
-   const next=createServer();
+   next=createServer();
    next.once('error',error=>{if(error.code!=='EADDRINUSE')throw error;server.close(start);});
-   next.listen(port+1,host,()=>console.log(port));
+   next.listen(port+1,'127.0.0.1',()=>console.log(port));
   });
  }
  start();`],{stdio:['ignore','pipe','inherit']});
@@ -34,7 +35,7 @@ async function directory(t){const root=await realpath(await mkdtemp(join(tmpdir(
 
 test('setup picks a free port and never one another process listens on, even on every address',async t=>{
  const holder=await wildcardListener(t),root=await directory(t);
- const {stdout}=await promisify(execFile)(process.execPath,[join(import.meta.dirname,'fixtures/port-inspection.mjs'),'identified','select',String(holder.pid),String(holder.port),root]);
+ const {stdout}=await promisify(execFile)(process.execPath,[join(import.meta.dirname,'fixtures/port-inspection.mjs'),'identified','select',String(holder.pid),String(holder.port),root],{timeout:30000});
  assert.notEqual(Number(stdout.trim()),holder.port);
 });
 
@@ -55,7 +56,7 @@ test('a busy port held by another checkout names that checkout and the command t
  for(const mode of ['late','identified','inconclusive','own'])for(const entry of ['preflight','listen']){
   const checkout=mode==='own'?root:'/work/other-checkout';
   await writeFile(join(servers,'state.json'),JSON.stringify({version:1,sequence:0,queued:[],running:[{checkout,mode:'dev',port:holder.port,owner:{pid:holder.pid}}]}));
-  const {stdout:message}=await promisify(execFile)(process.execPath,[join(import.meta.dirname,'fixtures/port-inspection.mjs'),mode,entry,String(holder.pid),String(holder.port),root],{env:{...process.env,RER_SERVERS_DIR:servers},cwd:root});
+  const {stdout:message}=await promisify(execFile)(process.execPath,[join(import.meta.dirname,'fixtures/port-inspection.mjs'),mode,entry,String(holder.pid),String(holder.port),root],{env:{...process.env,RER_SERVERS_DIR:servers},cwd:root,timeout:30000});
   assert.match(message,/rer setup --port \d+/,`${mode} ${entry}: ${message}`);
   if(mode==='inconclusive')assert.doesNotMatch(message,/other-checkout|kill -TERM/);
   else {
