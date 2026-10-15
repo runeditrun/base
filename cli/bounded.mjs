@@ -66,7 +66,11 @@ export async function boundedCommand(project,options,argv,out){
   out.error(new RerError('cancelled',`Stopped by ${termination} after owned children were stopped.`,exitCode));
   out.result(false,exitCode);
  }else if(finalEvent&&finalEvent.exitCode===exitCode){
-  if(errorEvent)out.error(new RerError(errorEvent.code,store.redact(errorEvent.message),exitCode));
+  if(errorEvent){
+   let deployment={};
+   try{deployment=JSON.parse(store.redact(JSON.stringify({environment:errorEvent.environment,availableDeployments:errorEvent.availableDeployments})));}catch{}
+   out.error(new RerError(errorEvent.code,store.redact(errorEvent.message),exitCode,deployment));
+  }
   const {version,verb,event,ok,exitCode:childExit,...details}=finalEvent;
   // Redaction can cut through a value that matches a credential; the outcome stands without its details.
   let shown;try{shown=JSON.parse(store.redact(JSON.stringify(details)));}catch{shown={};}
