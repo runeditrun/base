@@ -35,6 +35,7 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     // The browser cookie alone passes the gate; reuse keeps the same session row.
     assert.equal((await r.call('/auth/dev/enter?as=owner', { cookie: both })).status, 303);
     assert.equal((await r.db.prepare("SELECT count(*) AS n FROM oa_sessions WHERE kind='dev'").first()).n, 1, 'reused');
+    assert.equal((await r.call('/auth/email', { method: 'POST', cookie: both, input: { email: OWNER } })).status, 200, 'local entry supplies fresh proof without mail');
     // Persona: a real operator, created only here, behind version fences.
     const admin = await r.call('/auth/dev/enter?as=admin&returnTo=/app/team', { cookie: gateOnly(both) });
     assert.equal(admin.headers.get('location'), '/app/team');

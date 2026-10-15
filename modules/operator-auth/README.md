@@ -494,7 +494,8 @@ the seed's Worker and serves, behind the gate only:
 `personas()` returns the seed's `devPersonas()`: `[{as, role, displayName?}]`,
 real operators at `<as>@dev.localhost` created only by dev sign-in. Dev
 sessions pass the same version fences, revocation, deactivation and allow-list
-as every other session. The core admits a `dev` session, and any credential
+as every other session. An admitted local dev session also confirms sensitive
+actions directly, so dev never waits for an email step-up link. The core admits a `dev` session, and any credential
 minted while using one (`oa_dev_credentials`, today an invitation link, whose
 confirmation then yields a `dev` session), only when the dev layer's
 registered check passes for that request; a production Worker never registers
