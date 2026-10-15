@@ -8,6 +8,7 @@ import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
+import { checkHostedSetup, hostedSetupFailure } from './deploy-setup.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookState, forgetHookState } from './deploy-hook-record.mjs';
@@ -79,7 +80,6 @@ export function ownerDeploy(declarationPath, lifecycle) {
    if (sent.length) store.report(`rer supplied ${sent.join(', ')} from the local setup owner and fresh generated values.`);
    step = 'health';
    await owner('health');
-   store.report(`Your application is live on your Cloudflare account at ${deployed.origin}.`);
    step = 'claim owner';
    const { liveSecrets, retiredSecrets, ownerClaim } = await owner('inspect');
    const linked = token => linkDependencies?.(deployed.origin, token);
@@ -87,6 +87,9 @@ export function ownerDeploy(declarationPath, lifecycle) {
     secret: (extra, values) => owner('secret', extra, values), beforeClaim: linked, recordClaim: outcome => owner('record-owner', ['--outcome', outcome]), inspect: () => owner('inspect'), store, signal });
    // A seed that claims its owner its own way links with the token it was given.
    if (claimed === undefined) await linked(env[declared(claim?.tokenField ?? 'SETUP_TOKEN')?.environment]);
+   step = 'verify hosted setup';
+   await checkHostedSetup({ origin: deployed.origin, claimed: claimed ?? ownerClaim?.outcome, signal });
+   store.report(`Your application is live on your Cloudflare account at ${deployed.origin}.`);
    // The app claims the OWNER_EMAIL the Worker holds: the local one only when this run uploaded it.
    const email = declared(claim?.emailField);
    const named = !email ? '' : deployed.sentSecrets.includes(email.binding) && env[email.environment] ? ` (${env[email.environment]})` : ` (the ${email.binding} already set on the Worker)`;
@@ -102,6 +105,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
 
 // The failing step, its redacted cause, what this run created and the command that continues.
 function failureText({ error, step, created, again, retry, secretChange, deployed, redact }) {
+ const setup = hostedSetupFailure(error, { origin: deployed?.origin, again });
+ if (setup) return redact(setup);
  const readiness = mutationReadinessFailure(error, { again, redact });
  if (readiness) return readiness;
  const diagnostic = deployDiagnostic(error, redact);
