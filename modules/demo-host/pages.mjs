@@ -49,7 +49,7 @@ export function endedPage(env, { status = 410, headers = {} } = {}) {
   const name = escape(env.DEMO_NAME);
   return html(env, { page: 'ended', title: 'This demo has ended', status, headers, body: `<h1 id="title">This demo has ended</h1>
 <p class="intro">Demos last an hour, or until 15 minutes pass with nothing happening. Its copy of ${name} and everything in it have been deleted.</p>
-<a class="button" href="/">Start a new demo</a><p class="secondary"><a href="${escape(new URL(env.DEMO_SITE).origin)}/run">Run ${name} yourself</a></p>` });
+<a class="button" href="${escape(env.DEMO_ORIGIN)}/">Start a new demo</a><p class="secondary"><a href="${escape(new URL(env.DEMO_SITE).origin)}/run">Run ${name} yourself</a></p>` });
 }
 
 const cookie = (env, value, seconds) => `rer_demo=${value}; Domain=${new URL(env.DEMO_ORIGIN).hostname}; Path=/; Max-Age=${seconds}; HttpOnly; Secure; SameSite=Lax`;
