@@ -1,3 +1,4 @@
+import { nameAssetFailure } from './diagnostics.mjs';
 import { extname } from 'node:path';
 import { assert, hash, hexId, uuid } from './validation.mjs';
 import { moduleType, assetType } from './artifact.mjs';
@@ -61,7 +62,8 @@ export async function uploadAssets(api, worker, files) {
     manifest[`/${file.path}`] = {hash:digest,size:Buffer.from(file.base64,'base64').length};
     byHash.set(digest,file);
   }
-  const session = await api.request(`/workers/scripts/${worker}/assets-upload-session`,{method:'POST',body:{manifest}});
+  const session = await api.request(`/workers/scripts/${worker}/assets-upload-session`,{method:'POST',body:{manifest}})
+    .catch(error => { throw nameAssetFailure(error,files.map(file => file.path)); });
   assert(typeof session.jwt === 'string' && session.jwt && Array.isArray(session.buckets),'invalid-asset-session');
   let completion = session.buckets.length ? null : session.jwt;
   const seen = new Set();
@@ -72,7 +74,8 @@ export async function uploadAssets(api, worker, files) {
       assert(byHash.has(key) && !seen.has(key),'invalid-asset-request'); seen.add(key);
       const file = byHash.get(key); data.set(key,new Blob([file.base64],{type:assetType(file.path)}),file.path.split('/').at(-1));
     }
-    const uploaded = await api.request('/workers/assets/upload?base64=true',{method:'POST',body:data,assetToken:session.jwt});
+    const uploaded = await api.request('/workers/assets/upload?base64=true',{method:'POST',body:data,assetToken:session.jwt})
+      .catch(error => { throw nameAssetFailure(error,bucket.map(key => byHash.get(key).path)); });
     if (uploaded.jwt) completion = uploaded.jwt;
   }
   assert(typeof completion === 'string' && completion,'incomplete-asset-upload');

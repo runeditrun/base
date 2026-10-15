@@ -80,3 +80,16 @@ export function deploymentDiagnostics(api, {onCreated} = {}) {
       return error;
     }};
 }
+
+
+// Asset paths are build inputs; the CLI still redacts them before display.
+export function nameAssetFailure(error, paths, status = error.status ?? error.providerTransport?.status) {
+  error.assetFailure = {paths, status};
+  return error;
+}
+export function assetFailure(error, redact = String) {
+  const detail = error?.assetFailure;
+  if (!Array.isArray(detail?.paths)) return undefined;
+  const names = detail.paths.slice(0,8).map(path => redact(String(path)).replace(/[\x00-\x1f\x7f-\x9f]+/g,' ').slice(0,300));
+  return `Asset ${names.join(', ')}${detail.paths.length > 8 ? ` (+${detail.paths.length - 8} more)` : ''}: ${Number.isInteger(detail.status) ? `HTTP ${detail.status}` : 'no HTTP status (transport failure)'}`;
+}

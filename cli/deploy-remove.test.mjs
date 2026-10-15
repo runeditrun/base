@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { main } from './main.mjs';
 import { ownerProvider } from '../modules/deploy-kit/tests/owner-provider.mjs';
 
-async function removalFixture(t) {
+async function removalFixture(t, { allResources = false } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-remove-')));
  const provider = ownerProvider({ creationDates: true });
  const saved = { ...process.env };
@@ -21,7 +21,7 @@ async function removalFixture(t) {
  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }] }));
  await writeFile(join(root, 'dist/server/index.js'), 'export default {fetch(){}}');
  await writeFile(join(root, 'dist/client/index.html'), 'app');
- await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', r2: [{ binding: 'FILES' }] }));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', r2: [{ binding: 'FILES' }], ...(allResources ? {d1:[{binding:'DB'}],kv:[{binding:'CACHE'}],queues:[{binding:'JOBS'}]} : {}) }));
  await writeFile(join(root, '.node-version'), process.versions.node + '\n');
  await writeFile(join(root, 'package.json'), JSON.stringify({engines:{node:process.versions.node},packageManager:'pnpm@10.12.4'}));
  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\n');
@@ -145,6 +145,68 @@ test('rer deploy --remove refuses ambiguous full pages and malformed R2 paginati
    assert.equal(objects.size, 0);
    await assert.rejects(access(path), {code:'ENOENT'});
    assertUnrelated();
+  }
+ });
+});
+
+
+test('standard removal retries safe gateway failures and reports only unconfirmed resources through the CLI', async t => {
+ for (const scenario of ['read-once','delete-applied','preflight-gateway','preflight-forbidden','worker-delete','partial-delete','readback']) await t.test(scenario, async t => {
+  const {root,provider,run} = await removalFixture(t,{allResources:true});
+  assert.equal(await run(),0);
+  const path = join(root,'.rer/deploy/production.json');
+  const original = JSON.parse(await readFile(path,'utf8'));
+  const all = ['worker:fixture-production','d1:fixture-production-db','r2:fixture-production-files','kv:fixture-production-cache','queues:fixture-production-jobs'];
+  let hits = 0, deleted = false;
+  t.mock.method(globalThis,'fetch',async (input,init = {}) => {
+   const url = new URL(input), method = init.method ?? 'GET';
+   const workerSettings = method === 'GET' && url.pathname.endsWith('/workers/scripts/fixture-production/settings');
+   const workerDelete = method === 'DELETE' && url.pathname.endsWith('/workers/scripts/fixture-production');
+   const bucketDelete = method === 'DELETE' && url.pathname.endsWith('/r2/buckets/fixture-production-files');
+   const databaseList = method === 'GET' && url.pathname.endsWith('/d1/database');
+   const selected = scenario === 'read-once' || scenario.startsWith('preflight-') ? workerSettings
+    : scenario === 'worker-delete' ? workerDelete
+    : scenario === 'partial-delete' || scenario === 'delete-applied' ? bucketDelete
+    : scenario === 'readback' && deleted && databaseList;
+   if (selected) {
+    hits++;
+    if (scenario === 'delete-applied' && hits === 1) await provider.fetch(input,init);
+    if (!['read-once','delete-applied'].includes(scenario) || hits === 1) return new Response('provider unavailable',{status:scenario === 'preflight-forbidden' ? 403 : 502});
+   }
+   const response = await provider.fetch(input,init);
+   if (method === 'DELETE') deleted = true;
+   return response;
+  });
+  const output = [];
+  const capture = t.mock.method(process.stdout,'write',chunk => { output.push(String(chunk)); return true; });
+  const result = await run('--remove','--yes');
+  capture.mock.restore();
+  if (['read-once','delete-applied'].includes(scenario)) {
+   assert.equal(result,0);
+   assert.equal(hits,scenario === 'read-once' ? 4 : 2); // preflight retry, identity check, final settings read
+   await assert.rejects(access(path),{code:'ENOENT'});
+   assert.equal(provider.state.settings,null);
+   assert.deepEqual([provider.state.databases.length,provider.state.buckets.length,provider.state.kv.length,provider.state.queues.length],[0,0,0,0]);
+  } else {
+   assert.equal(result,1);
+   assert.equal(hits,scenario === 'preflight-forbidden' ? 1 : 3);
+   const message = output.flatMap(text => text.trim().split('\n')).map(text => JSON.parse(text)).find(event => event.event === 'error').message;
+   const remaining = scenario === 'partial-delete' ? [all[2]] : scenario === 'readback' ? [all[1]] : all;
+   assert.match(message,new RegExp(`${remaining.length} resources remain`));
+   for (const name of remaining) assert.ok(message.includes(name),message);
+   assert.match(message,/run rer deploy .*--remove --yes again/);
+   assert.doesNotMatch(message,/Deploy failed|Resources created this attempt/);
+   const saved = JSON.parse(await readFile(path,'utf8'));
+   for (const kind of ['d1','r2','kv','queues']) {
+    const expected = Object.fromEntries(Object.entries(original.owned[kind]).filter(([name]) => remaining.includes(`${kind}:${name}`)));
+    assert.deepEqual(saved.owned[kind],expected,'retain exactly the unconfirmed ownership proofs');
+   }
+   assert.equal(Boolean(saved.owned.worker),remaining.includes(all[0]));
+   if (scenario.startsWith('preflight-')) assert.equal(provider.state.settings !== null,true);
+   // An actual later command finishes with the saved proof and no recreation.
+   t.mock.method(globalThis,'fetch',provider.fetch);
+   assert.equal(await run('--remove','--yes'),0);
+   await assert.rejects(access(path),{code:'ENOENT'});
   }
  });
 });

@@ -8,7 +8,7 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
-import { ownerTarget, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState } from './owner.mjs';
+import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState } from './owner.mjs';
 import { activeWorker } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
@@ -55,8 +55,11 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     const deadline = AbortSignal.timeout(Math.max(1, Math.ceil(remaining)));
     return request(input, {...init,signal:init.signal ? AbortSignal.any([init.signal,deadline]) : deadline});
   };
-  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch,...(command === 'remove' ? {maxRequests:Infinity} : {})}),{onCreated});
-  const target = await ownerTarget(api,{project:declaration.project,environment:values.environment});
+  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch,...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
+  // Removal needs the recorded account/name identity, not a workers.dev route.
+  const target = command === 'remove'
+    ? {accountId:api.accountId,project:declaration.project,environment:values.environment,worker:ownerWorkerName(declaration.project,values.environment)}
+    : await ownerTarget(api,{project:declaration.project,environment:values.environment});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${target.environment}.json`);
   if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
   if (command === 'secret') {

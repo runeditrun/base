@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { ownerDeploy } from './deploy.mjs';
+import { main as cli } from './main.mjs';
 import { deployCommand } from './deploy-command.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 import { localInstaller } from '../onboarding/adapter.mjs';
@@ -226,12 +227,12 @@ test('rer deploy --remove deletes only what this environment created, reads back
  await run({});
  const statePath = join(root, '.rer/deploy/production.json');
  const before = JSON.parse(await readFile(statePath, 'utf8'));
- provider.fail('DELETE', /^\/workers\/scripts\/fixture-production$/);
+ for (let attempt = 0; attempt < 3; attempt++) provider.fail('DELETE', /^\/workers\/scripts\/fixture-production$/);
  await assert.rejects(run({ remove: true, yes: true }), /provider-http-500/);
  assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), before, 'a Worker that remains keeps its resources and ownership proof');
  const oldDatabase = provider.state.databases[0].uuid, cache = provider.state.kv[0].id;
- provider.fail('DELETE', /^\/storage\/kv\/namespaces\//);
- await assert.rejects(run({ remove: true, yes: true }), /still present/);
+ for (let attempt = 0; attempt < 3; attempt++) provider.fail('DELETE', /^\/storage\/kv\/namespaces\//);
+ await assert.rejects(run({ remove: true, yes: true }), /1 resources remain \(kv:fixture-production-cache\)/);
  assert.equal(provider.state.settings, null); assert.equal(provider.state.databases.length, 0);
  const partial = JSON.parse(await readFile(statePath, 'utf8'));
  assert.equal(partial.receipt, null); assert.equal(partial.owned.worker, null);
@@ -430,6 +431,7 @@ test('fresh deploy propagation reaches the owner once through object and observe
     if (kind === 'denied') return Response.json({ error: 'owner_claim_denied' }, { status: 403 });
     if (kind === 'cross-origin') return new Response(null, { status: 303, headers: { Location: 'https://elsewhere.invalid/auth/bootstrap' } });
     if (kind === 'redirect') return new Response(null, { status: 307, headers: { Location: 'https://elsewhere.invalid/auth/bootstrap' } });
+    if (['object','function','custom-observed'].includes(kind) && attempts === 1) return new Response('error code: 1042', { status: 404 });
     if (!sourceFailure && attempts === 1 || ['persistent','existing-wrong'].includes(kind)) return Response.json({ error: 'invalid_setup_token' }, { status: 403 });
    }
    return inner(input, init);
@@ -464,5 +466,51 @@ test('fresh deploy propagation reaches the owner once through object and observe
    assert.equal((await run()).owner, 'kept');
    assert.equal(provider.state.writes.length, writes); assert.deepEqual(await readFile(statePath), state);
   }
+ });
+});
+
+
+test('first deploy survives transient asset upload and serving failures, and names a persistent asset failure', async t => {
+ for (const mode of ['upload-502', 'upload-reset', 'upload-body-reset', 'serve-502', 'serve-reset', 'persistent-upload', 'persistent-serve']) await t.test(mode, async t => {
+  const { root, git } = await checkout(t, {});
+  await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('./deploy.mjs', import.meta.url).href)};
+const lifecycle = {run:async()=>{},settings:{},hooks:{}};
+export const commandAdapter = {...lifecycle,deploy:ownerDeploy('deploy.json',lifecycle)};`);
+  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({version:2,project:'tests/fixture',runtime:{requirements:[]},requiredEnvironment:[],seedContract:{version:1,profile:'first-party',adapter:'adapter.mjs'},commands:{deploy:{argv:['node','adapter.mjs'],inputs:['adapter.mjs','deploy.json'],effects:'Deploy to the fake provider.'}}}));
+  await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+  await writeFile(join(root, 'package.json'), JSON.stringify({engines:{node:process.versions.node},packageManager:'pnpm@10.12.4'}));
+  git('add', '.'); git('commit', '-qm', 'deploy door');
+  await mkdir(join(root, 'dist/client/assets'));
+  await writeFile(join(root, 'dist/client/assets/app.js'), 'console.log("ready");');
+  const { provider } = account(t), inner = globalThis.fetch;
+  const previousCI = process.env.CI; process.env.CI = 'true';
+  t.after(() => { if (previousCI === undefined) delete process.env.CI; else process.env.CI = previousCI; });
+  let attempts = 0;
+  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+   const url = new URL(input);
+   const upload = url.pathname.endsWith('/workers/assets/upload');
+   const served = url.hostname.endsWith('.workers.dev') && url.pathname === '/assets/app.js';
+   if ((mode.includes('upload') && upload) || (mode.includes('serve') && served)) {
+    attempts++;
+    if (mode.startsWith('persistent') || attempts === 1) {
+     if (mode === 'upload-body-reset') return new Response(new ReadableStream({ start(controller) { controller.error(new TypeError('terminated', { cause: Object.assign(new Error('test-only reset'), { code: 'ECONNRESET' }) })); } }), {status:200});
+     if (mode.endsWith('reset')) throw new TypeError('fetch failed', { cause: Object.assign(new Error('test-only reset'), { code: 'ECONNRESET' }) });
+     return new Response('test-only gateway failure', {status:502});
+    }
+   }
+   return inner(input, init);
+  });
+  const output = [];
+  const capture = t.mock.method(process.stdout, 'write', chunk => { output.push(String(chunk)); return true; });
+  const result = await cli(['deploy', '--cwd', root, '--json']);
+  capture.mock.restore();
+  if (mode.startsWith('persistent')) {
+   assert.equal(result, 1);
+   const message = output.flatMap(text => text.trim().split('\n')).map(text => JSON.parse(text)).find(event => event.event === 'error').message;
+   assert.match(message, /assets\/app\.js/);
+   assert.match(message, /HTTP 502/);
+  } else assert.equal(result, 0, output.join(''));
+  assert.equal(attempts, 2, 'one transient replay, within the original bound');
+  if (!mode.startsWith('persistent')) assert.ok(provider.state.settings);
  });
 });
