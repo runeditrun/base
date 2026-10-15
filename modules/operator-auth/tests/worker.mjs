@@ -19,6 +19,8 @@ export default {
     });
     try {
       const path = new URL(request.url).pathname;
+      if (path === '/test/credentials') return Response.json(await auth.mintCredential(request, await request.json()), { status: 201 });
+      if (path === '/test/credential-use') return new Response(null, { status: await auth.authenticateCredential(request) ? 200 : 401 });
       if (path === '/test/external') {
         const input = await request.json();
         const result = await auth.admitVerifiedIdentity(request, input.identity, { returnTo: input.returnTo });

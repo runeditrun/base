@@ -3,12 +3,15 @@ import { test } from 'node:test';
 import { runtime, SETUP, SECRET } from './runtime.mjs';
 import { AuthStore } from '../accounts/store.mjs';
 import { hashToken } from '../crypto.mjs';
+import { readFile } from 'node:fs/promises';
+import { applySql } from './apply-sql.mjs';
 const post = (input, cookie) => ({ method: 'POST', input, cookie });
 
-test('D1 failures roll back owner claim and invitation consumption without partial authority', async () => {
+test('D1 auth writes survive audit triggers and storage failures without partial authority', async () => {
   const r = await runtime();
   try {
     const db = await r.db;
+    await applySql(db, await readFile(new URL('./fixtures/trigger-writes.sql', import.meta.url), 'utf8'));
     await db.prepare("CREATE TRIGGER test_reject_session BEFORE INSERT ON oa_sessions BEGIN SELECT RAISE(ABORT,'test_storage_failure'); END").run();
     assert.equal((await r.call('/auth/bootstrap', post({ token: SETUP, displayName: 'Owner' }))).status, 503);
     for (const table of ['oa_bootstrap', 'oa_operators', 'oa_sessions']) assert.equal((await db.prepare(`SELECT count(*) AS n FROM ${table}`).first()).n, 0);
@@ -22,6 +25,32 @@ test('D1 failures roll back owner claim and invitation consumption without parti
     assert.equal((await db.prepare('SELECT consumed_at FROM oa_tokens').first()).consumed_at, null);
     await db.exec('DROP TRIGGER test_reject_session');
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 303);
+    assert.equal((await r.call('/auth/magic-link', post({ email: 'owner@example.com' }))).status, 202);
+    const confirmed = await r.call('/auth/confirm', post({ token: (await r.link()).searchParams.get('token') }));
+    assert.equal(confirmed.status, 303);
+    const proofOwner = confirmed.headers.get('set-cookie').split(';')[0];
+    assert.equal((await r.call('/auth/invite', post({ email: 'member@example.com', displayName: 'Member' }, proofOwner))).status, 202);
+    const invited = (await r.link()).searchParams.get('token');
+    assert.equal((await r.call('/auth/confirm', post({ token: invited }))).status, 303);
+    assert.equal((await r.call('/auth/confirm', post({ token: invited }))).status, 400, 'a trigger does not permit replay');
+    assert.equal((await r.call('/auth/step-up', post({ action: 'owner:transfer' }, proofOwner))).status, 202);
+    assert.equal((await r.call('/auth/confirm', post({ token: (await r.link()).searchParams.get('token') }, proofOwner))).status, 303);
+    const minted = await r.call('/test/credentials', post({}, proofOwner));
+    assert.equal(minted.status, 201);
+    const credential = await minted.json();
+    assert.equal((await r.call('/test/credential-use', { headers: { Authorization: `Bearer ${credential.token}` } })).status, 200);
+    assert.ok(await db.prepare("SELECT 1 FROM test_auth_writes WHERE table_name='oa_credentials' AND row_key=?").bind(credential.id).first());
+    for (const idpSignIn of [true, true, false]) {
+      assert.equal((await r.call('/auth/settings/identity', post({ idpSignIn }, proofOwner))).status, 200);
+    }
+    const audit = (await db.prepare("SELECT value FROM oa_auth_audit WHERE action='idpSignIn' ORDER BY rowid").all()).results;
+    assert.deepEqual(audit.map(row => row.value), ['true', 'false'], 'unchanged settings create no audit event even with audit triggers');
+    assert.equal((await r.call('/auth/email', post({ email: 'next@example.com' }, proofOwner))).status, 200);
+    assert.equal((await (await r.call('/auth/session', { cookie: proofOwner })).json()).operator.email, 'next@example.com');
+    const conflict = await r.call('/auth/email', post({ email: 'member@example.com' }, proofOwner));
+    assert.equal(conflict.status, 409);
+    assert.deepEqual(await conflict.json(), { error: 'email_in_use' });
+    assert.equal((await (await r.call('/auth/session', { cookie: proofOwner })).json()).operator.email, 'next@example.com');
   } finally { await r.close(); }
 });
 

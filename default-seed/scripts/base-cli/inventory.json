@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.21-dev.g59d54b33",
+  "cliVersion": "0.2.21-dev.ga2e8d9ea",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -407,7 +407,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "a6b3cd17a7be3040e758edea182cd679a971530ef28d3235a7ccfde56b026f6d"
+      "sha256": "6308998f911966816abb26b9ca784df8d07495cef3c3d3ac5cd099a698e9db07"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -447,7 +447,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "47cbb51f2baf89a0cbfda0aa5ad01b42196ac6ed76bbcf342d641f017c5bccf3"
+      "sha256": "44e82a82f84e808592e0602a2833ba2891fd4d269149a905e532a31a8e66434e"
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
@@ -1051,7 +1051,7 @@
     },
     "modules/dependencies/approval.mjs": {
       "source": "modules/dependencies/approval.mjs",
-      "sha256": "41599909a5a8d5c2b31db98a06d7fbcc3ea47564c9643c9dd8e20062eaebafbd"
+      "sha256": "7398c2f5ec6c8505f7fa24d5fab7848967dfb3f61720892d1f31494a68237a69"
     },
     "modules/dependencies/auth.mjs": {
       "source": "modules/dependencies/auth.mjs",
@@ -1071,7 +1071,7 @@
     },
     "modules/dependencies/index.mjs": {
       "source": "modules/dependencies/index.mjs",
-      "sha256": "403205efea3e027bfead18c93912275f9aa38471e13796b01481f8286dbf1597"
+      "sha256": "05bd5e88ebd246cc495c3245cfffe030b83fc31d34f80bc86ff7571816faaac6"
     },
     "modules/dependencies/logout.mjs": {
       "source": "modules/dependencies/logout.mjs",
@@ -1099,7 +1099,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "97c0bcdd8045f73a52f98be0ffb3156546b191dd6be069ca7f9f8f553cc96881"
+      "sha256": "b8413f91288d320cbed64a1568039306a307ce59bcd7ba2f918de4e2d71e7c33"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1135,7 +1135,7 @@
     },
     "modules/deploy-kit/diagnostics.mjs": {
       "source": "modules/deploy-kit/diagnostics.mjs",
-      "sha256": "fc16e8cb07c8702f5f89219f1ebcfad8bb9f4ad0ec1be4fe4a59a39076b1028e"
+      "sha256": "00b7ab0fa12be66f188c369492090549f9d2f412b3a10c22d9a38a14fab1ab5d"
     },
     "modules/deploy-kit/env-file.mjs": {
       "source": "modules/deploy-kit/env-file.mjs",
@@ -1193,9 +1193,13 @@
       "source": "modules/deploy-kit/prepare.mjs",
       "sha256": "b8fa8b17c8de2e552bda4cde6e04d412c77833320c426b9eb83d3c7828330c67"
     },
+    "modules/deploy-kit/provider-transport.mjs": {
+      "source": "modules/deploy-kit/provider-transport.mjs",
+      "sha256": "16f3cb003bf7453527017f92ece2cf8e83583af73620678c943495410e24cbe4"
+    },
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",
-      "sha256": "8aa1b9cbe2eca066e88b2461d30b9dac6c503ec88ba3cea7918fe7ab6905186d"
+      "sha256": "97b3b66fade42ad4e3b09fb263c74432fac2e085755bf3f2d2d0e17650c00168"
     },
     "modules/deploy-kit/queue-consumer.mjs": {
       "source": "modules/deploy-kit/queue-consumer.mjs",
@@ -1743,7 +1747,7 @@
     },
     "modules/operator-auth/accounts/credentials.mjs": {
       "source": "modules/operator-auth/accounts/credentials.mjs",
-      "sha256": "da7b4825fd3ec58fd0310083762fdad67a094b407629fe76406f7f8ce11c1517"
+      "sha256": "2f3d762e2e16145d56d45ab1ce53797a2a05fa818f2a796f086effe4c49f3e02"
     },
     "modules/operator-auth/accounts/editor-owner.mjs": {
       "source": "modules/operator-auth/accounts/editor-owner.mjs",
@@ -1751,7 +1755,7 @@
     },
     "modules/operator-auth/accounts/email-change.mjs": {
       "source": "modules/operator-auth/accounts/email-change.mjs",
-      "sha256": "32e60c1e7cfc5041edfb1456ff4a4f7e629410925e42fa694ad380af67983a66"
+      "sha256": "882d20980978bdb739d5d335d250feedb98cc393b91f121bad7bf806f649ce4b"
     },
     "modules/operator-auth/accounts/index.d.mts": {
       "source": "modules/operator-auth/accounts/index.d.mts",
@@ -1779,7 +1783,7 @@
     },
     "modules/operator-auth/accounts/provider-control.mjs": {
       "source": "modules/operator-auth/accounts/provider-control.mjs",
-      "sha256": "753a21fd66170fb3bfac89a1aa0af3a47e881be53cbcb346696c8ec8a4facb5a"
+      "sha256": "2fcd981aff97943e71d29a10ab09dfa879dc4707261df9953c7b25a0f22b9650"
     },
     "modules/operator-auth/accounts/provider-pin.mjs": {
       "source": "modules/operator-auth/accounts/provider-pin.mjs",
@@ -1827,7 +1831,7 @@
     },
     "modules/operator-auth/accounts/store.mjs": {
       "source": "modules/operator-auth/accounts/store.mjs",
-      "sha256": "c6ea4f85cc62bbe9c4d0827a99df1051755be5c1a11498f2017534d37e43ad4a"
+      "sha256": "535a6fcbad898c48133b30a294ff9e2a51dc633b56c58c37aa50942063023ad8"
     },
     "modules/operator-auth/branding.mjs": {
       "source": "modules/operator-auth/branding.mjs",
@@ -1875,7 +1879,7 @@
     },
     "modules/operator-auth/dev/cli-session.mjs": {
       "source": "modules/operator-auth/dev/cli-session.mjs",
-      "sha256": "d7feb7f56c2db591495502d2da95735b4050edacd610090c6608cc7fc96dd227"
+      "sha256": "dcce619ef8984d0cb10a629123a560602f870dcbefac6e4542effc5d377b9162"
     },
     "modules/operator-auth/dev/index.d.mts": {
       "source": "modules/operator-auth/dev/index.d.mts",
@@ -1883,7 +1887,7 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "75a8189aff8cc8310819d14c47f9addb5bc2fa8ecfc099d361fdd99a761538fa"
+      "sha256": "19fb6e69087159df9b21d4439bb27ef1205a2c9cffa489044bfa41e14e8ea301"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
