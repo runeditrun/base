@@ -79,6 +79,12 @@ test('declarations reject malformed effects, readiness, surface address conflict
   const root = await fixture(t);
   const policy = config().artifact.specInputs;
   for (const mutation of [{providerEffects:['outbound-mail','outbound-mail']},{providerEffects:['bad effect']},{surfaces:{app:{path:'//bad',originVariable:'APP_ORIGIN',hostnameVariable:'APP_HOST'}}},{surfaces:{page:{path:'/'}}},{surfaces:{app:{path:'/',readiness:[{path:'/',statuses:[999]}]}}},{initialSetup:{path:'/status',pendingStatus:200,completeStatus:200}},{initialSetup:{path:'/status',pendingStatus:409,completeStatus:'200'}}]) await assert.rejects(deploymentSpec(root,{...policy,...mutation}));
+  const surfaces = {app:{path:'/',originVariable:'APP_ORIGIN'},page:{path:'/page',originVariable:'APP_ORIGIN'}};
+  const duplicate = config(); duplicate.artifact.specInputs.surfaces = surfaces;
+  assert.throws(() => packagingConfig(duplicate), error => ['APP_ORIGIN','surfaces.app','surfaces.page'].every(name => error.message.includes(name)));
+  await assert.rejects(deploymentSpec(root,{...policy,surfaces}), error => ['APP_ORIGIN','surfaces.app','surfaces.page'].every(name => error.message.includes(name)));
+  surfaces.page.originVariable = 'PAGE_ORIGIN';
+  await deploymentSpec(root,{...policy,surfaces});
 });
 test('workflow profiles are explicit and require full as the default', () => {
   const input = {workflowRef,artifactFile:'app.json',verificationProfiles:['full']};
