@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -77,6 +77,28 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
   assert.deepEqual(account.state.writes, []);
  }
 
+ // A 5xx can arrive on inventory, after a successful DELETE, or on the final
+ // settings read after every delete succeeded (Pier's observed failure).
+ for (const stage of ['readback', 'inventory', 'domain', 'container', 'worker']) {
+  account = demoAccount(); account.deploy(plan); account.unrelated(); calls.length = 0;
+  const target = stage === 'domain' ? `DELETE /workers/domains/${account.state.domains[0].id}`
+   : stage === 'container' ? `DELETE /containers/applications/${account.state.apps[0].id}`
+   : stage === 'worker' ? `DELETE /workers/scripts/${plan.worker}`
+   : stage === 'inventory' ? 'GET /workers/domains' : `GET /workers/scripts/${plan.worker}/settings`;
+  let failures = 0;
+  responseOverride = (call, response) => call === target && (stage !== 'readback' || !account.state.workers.has(plan.worker)) && failures++ === 0
+   ? Response.json({ success: false, errors: [{ code: 10002, message: 'Unknown error' }] }, { status: 500 }) : response;
+  assert.equal(await remove('--yes'), 0, `one provider 500 during ${stage} completes in the same removal`);
+  assert.ok(failures >= 2, 'the failed request is retried, including DELETEs now answering 404');
+  for (const path of [`/workers/scripts/${plan.worker}/settings`, '/workers/durable_objects/namespaces', '/workers/domains', '/containers/applications']) {
+   assert.ok(calls.slice(calls.lastIndexOf(`DELETE /workers/scripts/${plan.worker}`) + 1).includes(`GET ${path}`), `removal reads back ${path}`);
+  }
+  assert.deepEqual([...account.state.workers.keys()], ['someone-else']);
+  assert.deepEqual(account.state.namespaces.map(row => row.script), ['someone-else']);
+  assert.deepEqual(account.state.domains.map(row => row.hostname), ['www.someone-else.test']);
+  assert.deepEqual(account.state.apps.map(row => row.name), ['someone-else']);
+ }
+
  // Only an actually empty successful DELETE has this meaning. Fail closed on
  // malformed bodies, refusals, HTTP errors and empty reads or schedule writes.
  for (const [method, status, body] of [
@@ -84,7 +106,7 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
   ['DELETE', 200, '{"success":false,"errors":[]}'],
   ['DELETE', 202, '{"success":false,"errors":[]}'],
   ['DELETE', 200, '{"success":true,"result":null,"errors":[{"code":10000}]}'],
-  ['DELETE', 403, null], ['DELETE', 500, null],
+  ['DELETE', 403, '{"success":false,"errors":[{"code":10000,"message":"Removal is not permitted"}]}'], ['DELETE', 500, null],
   ['GET', 200, null], ['GET', 204, null], ['PUT', 200, null], ['PUT', 204, null],
  ]) {
   account = demoAccount(); account.deploy(plan); account.unrelated(); calls.length = 0;
@@ -93,7 +115,9 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
   responseOverride = (call, response) => call === target ? new Response(body, { status }) : response;
   assert.equal(await remove('--yes'), 1, `${method} ${status} with ${JSON.stringify(body)} fails`);
   assert.equal(calls.at(-1), target, 'removal stops at the rejected response');
-  assert.equal(calls.filter(call => call === target).length, 1, 'the rejected request is not retried');
+  const attempts = calls.filter(call => call === target).length;
+  if (status >= 500) assert.ok(attempts > 1, 'persistent 5xx fails after retrying');
+  else assert.equal(attempts, 1, 'other rejections stop immediately');
   assert.ok(account.state.workers.has(plan.worker), 'the demo Worker is retained after failure');
   assert.ok(account.state.workers.has('someone-else'), 'the unrelated Worker is retained');
   if (method === 'GET') assert.deepEqual(account.state.writes, [], 'empty inventory cannot authorize deletion');
