@@ -47,6 +47,13 @@ owner/sign-in hooks. The reference hook declaration is
 internal build/dev/verify targets and deployment policy. The CLI owns flags,
 pins, containment, cancellation, capture, output and sequencing.
 
+`rer dev` runs the local migration hook before starting the app and checking its
+owner prerequisites. The shared operator hook reads every SQL file in the seed's
+canonical `migrations/core` inventory, including changes pulled since the last
+build, and prints the applied names. A failed migration stops startup with its
+captured error and `rer setup` guidance. `rer demo` uses the same inventory in
+its isolated state directory.
+
 Successful terminal setup saves declared nonsecret installer answers in owned
 0600 storage under `.seed/installer`. A non-interactive repeat reuses those
 answers, with explicit flags or an answers file taking precedence. Runtime

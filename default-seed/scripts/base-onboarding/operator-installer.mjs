@@ -3,6 +3,7 @@ import { privateDirectory } from './private-files.mjs';
 import { localInstaller } from './adapter.mjs';
 import { selectLocalState, LocalStateSafetyError } from './local/state.mjs';
 import {operatorPrerequisites} from './operator-prerequisites.mjs';
+import { migrateOperator } from './operator-migrations.mjs';
 import { installOperator } from './operator-install.mjs';
 import { projectViteBinary } from './project-vite.mjs';
 import { join, delimiter } from 'node:path';
@@ -19,8 +20,7 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
    values: ({ origin }) => ({ AUTH_LOCAL: 'true', AUTH_ORIGIN: origin, MAIL_PROVIDER: 'development', MAIL_FROM: 'auth@localhost.test' }),
   },
   build: ['pnpm', ['run', 'build:app']],
-  // A demo migrates its own fresh state folder, never the checkout's.
-  migrate: ({ demo }) => ['pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', demo?.state ?? '.wrangler/state', '--config', 'dist/server/wrangler.json']],
+  migrate: context => migrateOperator(context, database),
   // Setup uses the local entry for owner-side dependency approval without mail.
   start: developmentTarget,
   owner: { existingOwnerViaSignIn: true, displayName: input => input.displayName || 'Owner' },

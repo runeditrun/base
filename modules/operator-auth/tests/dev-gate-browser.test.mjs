@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { browserRuntime, chromium, DEV_KEY, OWNER } from './dev-gate-browser-runtime.mjs';
+
+test('RER_OPEN enters as owner on initial load and same-path fragment navigation from the waiting gate', async () => {
+  const r = await browserRuntime();
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const waitingGate of [false, true]) {
+      const context = await browser.newContext();
+      try {
+        const page = await context.newPage();
+        const requests = [];
+        page.on('request', request => requests.push(request));
+        if (waitingGate) {
+          await page.goto(`${r.origin}/signin`);
+          assert.equal(page.url(), `${r.origin}/__dev/key`);
+          assert.deepEqual(await context.cookies(), []);
+          assert.equal((await context.request.get(`${r.origin}/auth/session`)).status(), 401);
+        }
+        const exchanged = page.waitForResponse(response =>
+          response.request().method() === 'POST' && new URL(response.url()).pathname === '/__dev/key');
+        const entered = page.waitForResponse(response => new URL(response.url()).pathname === '/auth/dev/enter');
+        await page.goto(`${r.origin}/__dev/key#rer-dev=${DEV_KEY}&as=owner`);
+        const exchange = await exchanged;
+        assert.equal(exchange.status(), 204);
+        assert.deepEqual(exchange.request().postDataJSON(), { key: DEV_KEY });
+        assert.equal((await exchange.request().allHeaders())['sec-fetch-site'], 'same-origin');
+        assert.equal((await entered).status(), 303);
+        await page.waitForURL(`${r.origin}/app`);
+        assert.equal(new URL(page.url()).hash, '');
+        const session = await context.request.get(`${r.origin}/auth/session`);
+        assert.equal(session.status(), 200);
+        const identity = await session.json();
+        assert.equal(identity.operator.email, OWNER);
+        assert.equal(identity.kind, 'dev');
+        const cookies = await context.cookies();
+        const gate = cookies.find(cookie => cookie.name.startsWith('rer_dev_gate_'));
+        assert.ok(gate);
+        assert.equal(gate.httpOnly, true);
+        assert.equal(gate.sameSite, 'Strict');
+        const gateGets = requests.filter(request => request.method() === 'GET' && new URL(request.url()).pathname === '/__dev/key');
+        assert.equal(gateGets.length, 1, 'same-path navigation must work without reloading the waiting document');
+        for (const request of requests) {
+          assert.ok(!request.url().includes(DEV_KEY), 'the key stays out of HTTP URLs');
+          assert.ok(!(await request.allHeaders()).referer?.includes(DEV_KEY), 'the key stays out of Referer');
+        }
+      } finally { await context.close(); }
+    }
+  } finally { await browser?.close(); await r.close(); }
+});
