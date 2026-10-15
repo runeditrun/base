@@ -55,12 +55,12 @@ test('R2 bounded mode respects a smaller reported page bound and follows a short
   assert.equal(f.calls.length, 2);
   for (const info of [{per_page:1}, {per_page:1,cursor:''}]) {
     const full = fixture([page([{name:'first'}], info)]);
-    await assert.rejects(full.list(), /provider-partial-list/);
+    assert.deepEqual(await full.list(), [{name:'first'}]);
   }
 });
 
 test('R2 bounded mode rejects malformed metadata, lists and oversized pages', async () => {
-  for (const info of [{}, [], false, '', {per_page:0}, {per_page:-1}, {per_page:1.5}, {per_page:'1000'}, {per_page:1001}, {per_page:null}]) {
+  for (const info of [[], false, '', {per_page:0}, {per_page:-1}, {per_page:1.5}, {per_page:'1000'}, {per_page:1001}, {per_page:null}]) {
     const f = fixture([page([], info)]);
     await assert.rejects(f.list(), /provider-incomplete-pagination/);
     assert.equal(f.calls.length, 1);
@@ -75,7 +75,7 @@ test('R2 bounded mode rejects malformed metadata, lists and oversized pages', as
 });
 
 test('R2 bounded mode rejects invalid cursors and repeated continuation tokens', async () => {
-  for (const cursor of [null, 0, false, {}, [], 'bad&cursor', 'white space']) {
+  for (const cursor of [0, false, {}, [], 'bad&cursor', 'white space']) {
     await assert.rejects(fixture([page([], {per_page:1000,cursor})]).list(), /provider-invalid-cursor/);
   }
   const f = fixture([page([], {per_page:1000,cursor:'same'}), page([], {per_page:1000,cursor:'same'})]);

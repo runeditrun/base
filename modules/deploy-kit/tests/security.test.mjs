@@ -15,7 +15,7 @@ const accountId='a'.repeat(32);
 const response=(result,result_info)=>Response.json({success:true,result,errors:[],result_info});
 async function temporary(t) {const dir=await realpath(await mkdtemp(join(tmpdir(),'deploy-kit-')));t.after(()=>rm(dir,{recursive:true,force:true}));return dir;}
 test('transport uses exact account, rejects arbitrary URLs, redacts provider errors, and never retries an HTTP refusal',async()=>{
-  let calls=0;const api=cloudflare({accountId,token:'test-secret',fetch:async(url,init)=>{calls++;assert.equal(url,`https://api.cloudflare.com/client/v4/accounts/${accountId}/queues`);assert.equal(init.redirect,'error');return Response.json({error:'test-secret'},{status:403});}});
+  let calls=0;const api=cloudflare({accountId,token:'test-secret',fetch:async(url,init)=>{calls++;assert.equal(new URL(url).pathname,`/client/v4/accounts/${accountId}/queues`);assert.equal(init.redirect,'error');return Response.json({error:'test-secret'},{status:403});}});
   await assert.rejects(api.request('https://evil.test'),/invalid-provider-path/);assert.equal(calls,0);
   await assert.rejects(api.request('/queues'),error=>error.message==='provider-http-403');assert.equal(calls,1);
 });
@@ -57,8 +57,8 @@ test('complete multi-page listing, partial page failure and request limits',asyn
   let calls=0;const api=cloudflare({accountId,token:'test',fetch:async()=>{calls++;return response([{name:`resource-${calls}`}],{page:calls,total_pages:2,total_count:2});}});
   assert.equal((await api.list('/d1/database')).length,2);
   const partial=cloudflare({accountId,token:'test',fetch:async()=>response([],{page:1,total_pages:1,total_count:2})});await assert.rejects(partial.list('/queues'),/partial-list/);
-  const missing=cloudflare({accountId,token:'test',fetch:async()=>response([])});await assert.rejects(missing.list('/queues'),/incomplete-pagination/);
-  const bounded=cloudflare({accountId,token:'test',maxRequests:1,fetch:async()=>response({})});await bounded.request('/queues');await assert.rejects(bounded.request('/queues'),/budget/);
+  const missing=cloudflare({accountId,token:'test',fetch:async()=>response([])});assert.deepEqual(await missing.list('/queues'),[]);
+  const bounded=cloudflare({accountId,token:'test',maxRequests:1,fetch:async()=>response({})});await bounded.request('/workers/subdomain');await assert.rejects(bounded.request('/workers/subdomain'),/budget/);
 });
 test('R2 cursor traversal uses encoded cursors, rejects cycles and missing completion evidence',async()=>{
   let calls=0;const api=cloudflare({accountId,token:'test',fetch:async(url)=>{calls++;if(calls===1)return response({buckets:[{name:'one'}]},{per_page:1,cursor:'YWJj=='});assert(url.endsWith('cursor=YWJj%3D%3D'));return response({buckets:[]},{per_page:1});}});

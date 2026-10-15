@@ -22,7 +22,12 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
   calls.push(call);
   requests.push(call + new URL(input).search);
   if (call === interruptedDelete) return Response.json({ success: false, errors: [{ code: 10000, message: 'Deletion interrupted' }] }, { status: 503 });
-  return responseOverride(call, await account.fetch(input, init));
+  const response = await responseOverride(call, await account.fetch(input, init));
+  if (call !== 'GET /containers/applications' || !response.ok) return response;
+  const body = await response.json(), second = new URL(input).searchParams.get('page') === '2';
+  if (!second) body.result = [];
+  body.result_info = {page:second ? 2 : 1,total_pages:2};
+  return Response.json(body);
  });
  const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN', platforms: ['workers', 'container'] };
  const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture' };
@@ -158,7 +163,10 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
  const workerDelete = `DELETE /workers/scripts/${multiPlan.worker}`;
  assert.equal(calls.filter(call => call.startsWith('DELETE ')).at(-1), workerDelete, 'the Worker is deleted last');
  const readback = requests.slice(requests.indexOf(workerDelete) + 1);
- for (const hostname of multiPlan.hostnames) assert.ok(readback.includes(`GET /workers/domains?hostname=${hostname}`), `read back ${hostname}`);
+ for (const hostname of multiPlan.hostnames) assert.ok(readback.some(request => {
+  const [method,path] = request.split(' '), url = new URL(path,'https://example.test');
+  return method === 'GET' && url.pathname === '/workers/domains' && url.searchParams.get('hostname') === hostname;
+ }), `read back ${hostname}`);
  account.state.writes.length = 0;
  assert.equal(await remove('--yes'), 0);
  assert.deepEqual(account.state.writes, []);
