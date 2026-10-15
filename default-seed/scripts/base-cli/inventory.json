@@ -899,7 +899,7 @@
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "c16b87e60e6f61e3dac775f27e4f9a86831da807dab094f41eefeafecfdfe7e0"
+      "sha256": "aadb03bf0bb3b3fb21e94e9a74fb4db289b3ac87746c0c71f86bcc0c5bd8f1bb"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
@@ -911,7 +911,7 @@
     },
     "modules/demo-host/start-script.mjs": {
       "source": "modules/demo-host/start-script.mjs",
-      "sha256": "d6475099847a795b6d02619ff2a353958953724a1646f9c11e1d4a8327713782"
+      "sha256": "f1be36b5c81268b3f24a0580c780f315014a21b5ff87ee1f18bd4cf749e4ca24"
     },
     "modules/demo-host/worker.mjs": {
       "source": "modules/demo-host/worker.mjs",

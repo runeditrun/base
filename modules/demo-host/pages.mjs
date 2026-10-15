@@ -41,7 +41,7 @@ export function startPage(env, { status = 200, notice, headers = {} } = {}) {
 <p class="notice" id="notice" role="alert"${notice ? '' : ' hidden'}>${notice ? escape(notice) : ''}</p><form id="start" method="post" action="/__demo/start" data-auto="${notice ? '0' : '1'}"><div class="cf-turnstile" data-sitekey="${escape(env.TURNSTILE_SITE_KEY)}" data-size="flexible" data-callback="rerDemoVerified" data-before-interactive-callback="rerDemoInteractive" data-after-interactive-callback="rerDemoChecking" data-expired-callback="rerDemoExpired" data-error-callback="rerDemoCheckFailed"></div>
 <button class="button" type="submit"><span class="spinner" aria-hidden="true"></span><span class="label">Start the demo</span></button>
 <ol class="steps" aria-hidden="true"><li data-at="done">Checking you're human</li><li data-at="now">Starting a private copy</li><li data-at="next">Signing you in</li></ol>
-<p class="note" id="note">Starts once the check passes. Usually under 10 seconds.</p><noscript><p class="note">The human check needs JavaScript. Turn it on to start the demo.</p></noscript><p class="visually-hidden" id="status" role="status"></p></form>` });
+<p class="note" id="note">Complete the human check to start your demo.</p><noscript><p class="note">The human check needs JavaScript. Turn it on to start the demo.</p></noscript><p class="visually-hidden" id="status" role="status"></p></form>` });
 }
 
 /** A demo whose hour or idle time is up: its container and data are gone. */
