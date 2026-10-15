@@ -85,7 +85,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const claimState=async()=>{const response=await fetch(url+'/setup/state');assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);assert.equal(response.headers.get('set-cookie'),null);return response.json();};
  const lobbyLinks=async()=>{const response=await fetch(url+'/');assert.equal(response.status,200);return [...(await response.text()).matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].map(match=>match[1]).filter(href=>href.startsWith('/'));};
  assert.deepEqual(await claimState(),{state:'claimed'},'setup claims the owner before first-run confirmation');
- assert.deepEqual(await lobbyLinks(),['/','/signin'],'the claimed Lobby offers sign-in before first-run confirmation');
+ assert.deepEqual(await lobbyLinks(),['/','/signin?login_hint=cli-owner%40example.test'],'the claimed Lobby offers sign-in before first-run confirmation');
  assert.equal((await fetch(url+'/setup/state',{method:'POST'})).status,405);
  assert.match(ready.siteUrl,/^http:\/\/127\.0\.0\.1:\d+$/,'rer dev names the run site preview');assert.notEqual(ready.siteUrl,url);
  for(const path of ['/','/run'])assert.equal((await fetch(ready.siteUrl+path)).status,200,`run site preview ${path}`);
@@ -128,7 +128,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
   assert.equal(signed.status(),303);await page.goto(url+'/setup');
   await ownerSetup(context,page,url);
   assert.deepEqual(await claimState(),{state:'claimed'},'the owner\'s confirmation claims the installation');
-  assert.deepEqual(await lobbyLinks(),['/','/signin'],'the claimed Lobby offers only sign-in');
+  assert.deepEqual(await lobbyLinks(),['/','/signin?login_hint=cli-owner%40example.test'],'the claimed Lobby offers only sign-in');
   const session=await context.request.get(url+'/auth/session');assert.equal(session.status(),200);const principal=await session.json();assert.equal(principal.operator.email,'cli-owner@example.test');
  } finally {await browser.close();}
  await f.stop(dev);assert.equal(dev.exitCode,143);assert.ok(await fetch(ready.siteUrl).then(()=>false,()=>true),'the run site preview stops with dev');assert.equal(events(dev).filter(e=>e.event==='ready').length,1);assert.equal(events(dev).at(-1).event,'result');
