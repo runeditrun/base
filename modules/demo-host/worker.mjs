@@ -110,7 +110,17 @@ export default {
     if (url.pathname === '/__demo/start') return request.method === 'POST' ? start(request, env, ctx) : home();
     if (url.pathname === '/__demo/status') return request.method === 'GET' ? status(request, env) : home();
     const id = demoId(request, env);
-    if (id) return env.DEMO.get(id).fetch(request);
+    if (id) {
+      // The JSON start leaves the browser on /. Reloading it must keep the
+      // pending copy on the progress page until health and owner claim finish.
+      if (url.pathname === '/' && ['GET', 'HEAD'].includes(request.method)) {
+        try {
+          const state = await bounded(env.DEMO.get(id).status(), 2000);
+          if (state.phase === 'starting') return progress(request, env, id, state);
+        } catch { return refusal(request, env, 503, 'The demo could not be reached. Try again.'); }
+      }
+      return env.DEMO.get(id).fetch(request);
+    }
     if (!['GET', 'HEAD'].includes(request.method)) return new Response('Start a demo first.', { status: 403 });
     if (url.pathname !== '/') return home();
     return startPage(env);

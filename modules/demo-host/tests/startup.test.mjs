@@ -13,6 +13,9 @@ test('a slow start answers progress, a retry resumes it, and a stuck copy frees 
     assert.deepEqual(await pending.json(), { pending: true });
     const cookie = cookieHeader(pending);
     assert.ok(!cookie.includes('operator_session'));
+    const refreshed = await fetch('/', { headers: { cookie } });
+    assert.equal(refreshed.status, 202);
+    assert.equal(cookieHeader(refreshed), cookie);
     const retry = await begin({ headers: { accept: 'application/json', cookie } });
     assert.equal(retry.status, 202);
     assert.equal(cookieHeader(retry), cookie);
