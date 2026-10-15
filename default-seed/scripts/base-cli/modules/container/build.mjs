@@ -18,9 +18,11 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  declaration ??= JSON.parse(await readFile(join(root,'deploy.json'),'utf8'));
  engine ??= declaration.container?.engine ?? 'workerd'; cacheContract ??= declaration.container?.cacheContract; runner ??= declaration.container?.runner;
  if (!['workerd','node'].includes(engine)) throw new Error('Unsupported container engine');
- await checkBoundary(root,{engine,cacheContract});
  const vite = await import(pathToFileURL(require.resolve('vite'))), loaded = await vite.loadConfigFromFile({ command:'build',mode:'production' },undefined,root);
  if (!loaded) throw new Error('Vite configuration missing');
+ // Config loading may prepare the seed's root Wrangler configuration. Inspect
+ // its declared entry after that preparation, still before compiling the app.
+ await checkBoundary(root,{engine,cacheContract});
  const config = loaded.config;
  const outputExports = new Map();
  const freshServerFiles = new Set(), serverOutput = resolve(root,'dist/server');

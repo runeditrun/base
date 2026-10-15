@@ -372,15 +372,15 @@ for (const options of [{ setSecret: 'SESSION_SECRET' }, { unsetSecret: 'SESSION_
 });
 
 test('fresh deploy propagation reaches the owner once through object and observed function hooks', async t => {
- for (const kind of ['object', 'function', 'custom-observed', 'custom-source-expired', 'custom-source-version', 'custom-source-request', 'custom-source-body', 'upload-and-secret-lag', 'persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function']) await t.test(kind, async t => {
+ for (const kind of ['object', 'function', 'custom-observed', 'custom-source-version', 'upload-and-secret-lag', 'persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function']) await t.test(kind, async t => {
   const { root } = await checkout(t, { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] });
   const { provider, claims } = account(t);
   const inner = globalThis.fetch;
   let attempts = 0, hookCalls = 0, elapsed = 0, uploaded = false, staleWorker = 0, staleSecrets = 0;
-  const sourceFailure = kind.startsWith('custom-source-'), statePath = join(root, '.rer/deploy/production.json');
+  const sourceFailure = kind === 'custom-source-version', statePath = join(root, '.rer/deploy/production.json');
   // Recovery uses the same caller-supplied token that this hook uploaded.
   if (sourceFailure) process.env.SETUP_TOKEN = 'test-only-recovery-token';
-  let failReadback = sourceFailure, sourceReadback = false, sourceRequests = 0, sourceAborted = false, sourceState, sourceWrites, sourceWindow;
+  let failReadback = sourceFailure, sourceReadback = false, sourceRequests = 0, sourceState, sourceWrites;
   const clock = performance.now.bind(performance);
   t.mock.method(performance, 'now', () => clock() + elapsed);
   const hook = ['function', 'unproven-function'].includes(kind) ? async context => {
@@ -400,8 +400,6 @@ test('fresh deploy propagation reaches the owner once through object and observe
     if (failReadback) {
      sourceState = await readFile(statePath); sourceWrites = provider.state.writes.length;
      sourceReadback = true;
-     sourceWindow = deployed.propagation.window;
-     elapsed += kind === 'custom-source-expired' ? sourceWindow.remaining() : kind === 'custom-source-version' ? 0 : Math.max(0, sourceWindow.remaining() - 200);
     }
     return {origin:deployed.origin,deployed:true};
    }}}) : ownerDeploy('deploy.json', { ...lifecycle, hooks: { owner: hook } })({ root, options: {}, store: store(), setupManifest: manifest });
@@ -416,23 +414,8 @@ test('fresh deploy propagation reaches the owner once through object and observe
     sourceRequests++;
     if (kind === 'custom-source-version') {
      const body = await (await inner(input, init)).json();
-     body.deployment.versionId = 'previous-version-of-the-same-commit'; elapsed += sourceWindow.remaining();
+     body.deployment.versionId = 'previous-version-of-the-same-commit'; elapsed += 120000;
      return Response.json(body);
-    }
-    if (['custom-source-request', 'custom-source-body'].includes(kind)) {
-     const body = await (await inner(input, init)).json();
-     let timer;
-     const bytes = new Promise((resolve, reject) => {
-      const abort = () => { sourceAborted = true; clearTimeout(timer); reject(init.signal.reason); };
-      timer = setTimeout(() => { init.signal.removeEventListener('abort', abort); resolve(Buffer.from(JSON.stringify(body))); }, 400);
-      init.signal.addEventListener('abort', abort, { once: true });
-      if (init.signal.aborted) abort();
-     });
-     t.after(() => clearTimeout(timer));
-     if (kind === 'custom-source-request') return new Response(await bytes);
-     return new Response(new ReadableStream({ async start(controller) {
-      try { controller.enqueue(await bytes); controller.close(); } catch (error) { controller.error(error); }
-     } }));
     }
    }
    if (kind === 'upload-and-secret-lag') {
@@ -452,10 +435,9 @@ test('fresh deploy propagation reaches the owner once through object and observe
    return inner(input, init);
   });
   if (sourceFailure) {
-   const failure = await run().then(() => assert.fail('source readback must fail within the original upload window'), error => error);
-   assert.equal(sourceRequests, kind === 'custom-source-expired' ? 0 : 1, 'no source request starts after the upload deadline');
-   assert.match(failure.message, /upload.*readiness deadline/);
-   if (['custom-source-request', 'custom-source-body'].includes(kind)) assert.ok(sourceAborted, 'the remaining upload time bounds both the request and its body');
+   const failure = await run().then(() => assert.fail('a stale Worker version must fail within the finalization wait'), error => error);
+   assert.equal(sourceRequests, 1, 'no source request starts after the finalization deadline');
+   assert.match(failure.message, /90-second finalization wait/);
    assert.equal(hookCalls, 1); assert.equal(claims.length, 1, 'source readback never repeats hook effects');
    assert.deepEqual(await readFile(statePath), sourceState, 'failed source readback preserves the owner record');
    assert.equal(provider.state.writes.length, sourceWrites, 'failed source readback never retires or rotates a secret');

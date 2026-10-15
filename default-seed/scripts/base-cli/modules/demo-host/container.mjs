@@ -3,6 +3,7 @@ import { claimKeys, signClaim } from './claim.mjs';
 import { bounded, boundedFetch, category, report } from './diagnostics.mjs';
 import { endedPage, clearCookie } from './pages.mjs';
 import { finishStart } from './startup.mjs';
+import { placeContainer } from './placement.mjs';
 
 // One visitor's demo: a Durable Object (newUniqueId) and its container, the
 // seed's image from `rer build --platform container` on the workerd engine.
@@ -70,19 +71,16 @@ export class DemoContainer extends DurableObject {
 
   /** Start the container, wait for /health, claim the owner; returns the claim's 303. */
   async start({ origin, originVar, ends, endsLocal, settings, correlation }) {
-    this.correlation = correlation; this.started = Date.now(); this.stopped = false;
+    this.correlation = correlation; this.started = Date.now(); this.stopped = false; this.cancelled = false;
     const deadline = this.started + this.startTimeout;
     const id = this.ctx.id.toString(), keys = await claimKeys(), now = Date.now();
     await this.ctx.storage.put({ ends, seen: now, correlation, started: this.started, startDeadline: deadline });
     report(correlation, this.started, 'start');
     if (this.stopped) throw new Error('container-stopped');
-    this.container.start({ enableInternet: true, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
+    await placeContainer(this, { enableInternet: true, env: { ...settings, RER_DEMO: '1', [originVar]: origin, RER_INGRESS_ORIGIN: origin,
       SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: OWNER, RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
-      RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } });
-    // A container that stops by itself ends the demo too.
-    this.watch();
+      RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal } }, deadline);
     await this.ctx.storage.setAlarm(Date.now());
-    await this.healthy(deadline);
     const token = await signClaim(keys, { origin, installationId: id, email: OWNER, now: Date.now() });
     const claimed = await boundedFetch(this.port(), 'http://container/auth/owner-claim', { method: 'POST', redirect: 'manual',
       headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }, Math.max(1, Math.min(10_000, deadline - Date.now())));
@@ -112,6 +110,8 @@ export class DemoContainer extends DurableObject {
   }
 
   async exited(error) {
+    this.watching = false;
+    this.stopReason = error ? category(error) : 'container-stopped';
     this.stopped = true;
     this.record('exit', { outcome: error ? category(error) : 'exited', ...(Number.isInteger(error?.exitCode) ? { exitCode: error.exitCode } : {}) });
     if ((await this.ctx.storage.get('startup'))?.phase === 'starting') return;
@@ -140,7 +140,7 @@ export class DemoContainer extends DurableObject {
   async alarm() {
     const state = await this.ctx.storage.get(['ends', 'seen', 'startDeadline']), now = Date.now();
     if (await this.ctx.storage.get('stopping')) return this.end();
-    if (!state.get('ends')) return;
+    if (!state.get('ends')) return this.ctx.storage.deleteAll();
     const due = Math.min(state.get('ends'), state.get('seen') + this.idle, state.get('startDeadline') ?? Infinity);
     if (now >= due || !this.container.running) {
       if ((await this.ctx.storage.get('startup'))?.phase === 'starting') { this.stopped = true; return; }
@@ -158,7 +158,8 @@ export class DemoContainer extends DurableObject {
   }
 
   async cleanup() {
-    this.stopped = true; this.wake?.();
+    this.cancelled = true; this.stopped = true; this.wake?.();
+    const startup = await this.ctx.storage.get('startup');
     // Keep the alarm and capacity reservation if destruction fails; retry cleanup.
     await this.ctx.storage.put('stopping', true);
     await this.ctx.storage.setAlarm(Date.now() + this.cleanupRetry);
@@ -170,6 +171,11 @@ export class DemoContainer extends DurableObject {
     await bounded(this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')).release(this.ctx.id.toString()), 2000);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+    // Retain only the terminal answer briefly, so polling survives a fresh DO.
+    if (startup?.phase === 'failed') {
+      await this.ctx.storage.put({ startup, correlation: this.correlation, started: this.started });
+      await this.ctx.storage.setAlarm(Date.now() + 60_000);
+    }
     report(this.correlation, this.started, 'ended');
   }
 }
