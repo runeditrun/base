@@ -15,7 +15,9 @@ async function login(r,claims={}) {
  return result;
 }
 test('pull linking uses public keys, fixed origin and pinned issuer; concurrent code has one winner; a second interface shares the protocol',async t=>{
- const r=await runtime(t);await r.bootstrap();
+ const r=await runtime(t);
+ r.sqlite.exec(await readFile(new URL('./fixtures/trigger-writes.sql',import.meta.url),'utf8'));
+ await r.bootstrap();
  const doc=await (await r.call('/.well-known/rer-dependencies')).json();
  const jwks=await (await r.call(new URL(doc.jwks_uri).pathname)).json();assert.equal(jwks.keys[0].d,undefined);
  assert.equal((await r.call('/.well-known/rer-link/callback',{origin:'https://other.example',body:{issuer:ISSUER,code:await r.code()}})).status,403);
@@ -26,6 +28,8 @@ test('pull linking uses public keys, fixed origin and pinned issuer; concurrent 
  const binding=r.sqlite.prepare('SELECT * FROM oa_external_identities').all();
  assert.equal((await r.link()).status,200);
  assert.equal((await r.dependencies().document()).sector_id,doc.sector_id);assert.deepEqual(r.sqlite.prepare('SELECT * FROM oa_external_identities').all(),binding);
+ assert.ok(r.sqlite.prepare("SELECT 1 FROM test_dependency_writes WHERE table_name='rer_dependency_pending'").get(), 'owner approval ran its product trigger');
+ assert.ok(r.sqlite.prepare("SELECT 1 FROM test_dependency_writes WHERE table_name='rer_dependency_codes'").get(), 'code consumption ran its product trigger');
  assert.equal((await r.link('error-sink@1')).status,200);assert.equal(r.sqlite.prepare('SELECT count(*) n FROM rer_dependency_link').get().n,2);
  r.metadata.deregister=ISSUER+'/new-remove';assert.equal((await r.rawLink()).status,403);
  const owner=await r.proof();assert.equal((await r.call('/auth/dependencies/relink',{cookie:owner,body:{interface:'oidc-provider@1',issuer:ISSUER}})).status,200);r.identityPaths.push('/new-callback');r.restart();assert.equal((await r.link()).status,403);r.identityPaths.pop();r.restart();assert.equal((await r.link()).status,200);

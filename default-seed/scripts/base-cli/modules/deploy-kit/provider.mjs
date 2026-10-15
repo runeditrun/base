@@ -3,6 +3,7 @@ import { isR2ObjectDelete } from './r2-objects.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
 import { importD1, importUploadURL } from './d1-import.mjs';
 import { assert, hexId } from './validation.mjs';
+import { providerResponse, transportOutput, transportReason } from './provider-transport.mjs';
 
 // A gateway/server error can arrive after a write. An explicit API refusal cannot.
 export const definiteProviderRefusal = error => error.status === 200 || error.status >= 400 && error.status < 500;
@@ -23,14 +24,6 @@ async function boundedText(response, limit = 4 * 1024 * 1024, onReadError) {
 export async function boundedJSON(response, limit) {
   try { return JSON.parse(await boundedText(response,limit)); } catch (error) { if (error instanceof SyntaxError) throw new Error('malformed-response'); throw error; }
 }
-function transportOutput(error) {
-  const lines = []; const seen = new Set();
-  for (let cause = error; cause && !seen.has(cause) && seen.size < 4; cause = cause.cause) {
-    seen.add(cause);
-    lines.push([typeof cause.code === 'string' ? cause.code : '', typeof cause.message === 'string' ? cause.message : ''].filter(Boolean).join(': '));
-  }
-  return lines.filter(Boolean).join('\n');
-}
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
 export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500 }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
@@ -44,16 +37,24 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     assert(!assetToken || path === '/workers/assets/upload?base64=true', 'invalid-asset-auth-target');
     // Asset-session credentials are discovered at runtime, outside the CLI env.
     // Preserve complete text for the CLI's remaining redaction before truncation.
-    const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? '[D1 import details omitted]' : [accountId,token,assetToken].filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
-    const transportFailure = cause => recordDeployFailure(new Error('provider-transport-failed'),{output:redactAuth(transportOutput(cause))});
-    const timeout = AbortSignal.timeout(timeoutMs);
-    const signal = callerSignal ? AbortSignal.any([callerSignal,timeout]) : timeout;
-    let response;
-    try { response = isR2ObjectDelete(path, method) ? await objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : await request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
+    const redactCredentials = text => [accountId,token,assetToken].filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
+    const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? '[D1 import details omitted]' : redactCredentials(text);
+    const operation = `${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`;
+    const endpoint = redactCredentials(`https://api.cloudflare.com/client/v4${zone ? '' : '/accounts/[REDACTED]'}${operation.slice(method.length + 1)}`);
+    const transportFailure = (cause, attempts, status = null) => {
+      const error = new Error('provider-transport-failed');
+      // Portable across vendored kit copies used by custom deploy hooks. Raw
+      // network messages stay private until the CLI applies its redactor.
+      error.providerTransport = {operation:redactCredentials(operation),endpoint,attempts,status,reason:transportReason(cause)};
+      return recordDeployFailure(error,{output:redactAuth(transportOutput(cause))});
+    };
+    const {response,attempts} = await providerResponse({method,timeoutMs,callerSignal,
+      reserveRetry:() => requests < maxRequests && (++requests, true),failure:transportFailure,
+      send:signal => isR2ObjectDelete(path, method) ? objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
-    }); } catch (cause) { throw transportFailure(cause); }
-    const output = response.body ? await boundedText(response,undefined,transportFailure) : '';
+    })});
+    const output = response.body ? await boundedText(response,undefined,cause => transportFailure(cause,attempts,response.status)) : '';
     // A successful DELETE may have no response body (including HTTP 200).
     // Nonempty replies and all other methods still require the API envelope.
     if (method === 'DELETE' && response.ok && output === '') return { success: true, result: null };
@@ -156,10 +157,11 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
   async function upload(url, bytes, etag) {
     const destination = importUploadURL(url);
     assert(++requests <= maxRequests, 'provider-request-budget');
-    let response;
-    try {
-      response = await request(destination, { method:'PUT', redirect:'error', signal:AbortSignal.timeout(timeoutMs), headers:{'Content-Length':String(bytes.length)}, body:bytes });
-    } catch { throw new Error('d1-import-upload-transport-failed'); }
+    const {response} = await providerResponse({method:'PUT',timeoutMs,
+      reserveRetry:() => requests < maxRequests && (++requests, true),
+      send:signal => request(destination, { method:'PUT', redirect:'error', signal, headers:{'Content-Length':String(bytes.length)}, body:bytes }),
+      failure:(cause,attempts) => Object.assign(new Error('d1-import-upload-transport-failed'), {providerTransport:{operation:'PUT D1 import upload',endpoint:'https://[REDACTED].r2.cloudflarestorage.com/[D1 import upload]',attempts,status:null,reason:transportReason(cause)}}),
+    });
     // Upload bodies and signed URLs are never diagnostics, including on failure.
     await response.body?.cancel().catch(() => {});
     assert(response.status === 200, 'd1-import-upload-failed');
