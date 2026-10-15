@@ -879,7 +879,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "8e31954307d330a3a442319c311911fbce5dd47ebc389c32469018c08828858d"
+      "sha256": "fdc5fe8fe2eba07b29d8b0d9c2d0cf40a6c2bdcd1dbb48e093aa6ff00458684e"
     },
     "modules/demo-host/capacity.mjs": {
       "source": "modules/demo-host/capacity.mjs",
@@ -903,19 +903,23 @@
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "5735482b673ab6abea1eb6947317750aa37613810fedaae05a44ea57aed176bb"
+      "sha256": "c16b87e60e6f61e3dac775f27e4f9a86831da807dab094f41eefeafecfdfe7e0"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
-      "sha256": "fca23e1b24a172417d7f74dfb3f559e263b1dce256625c5bdeb15b99bd18a619"
+      "sha256": "c6c47298d664e3ac0663182484c7ea2c54a00efb3eea16068dcf497615ff6163"
     },
     "modules/demo-host/remove.mjs": {
       "source": "modules/demo-host/remove.mjs",
       "sha256": "1a0a06f6e322b763cdc3095ee2e6f1b2468e053d097a9bb148c29528d9c83e1e"
     },
+    "modules/demo-host/start-script.mjs": {
+      "source": "modules/demo-host/start-script.mjs",
+      "sha256": "d6475099847a795b6d02619ff2a353958953724a1646f9c11e1d4a8327713782"
+    },
     "modules/demo-host/worker.mjs": {
       "source": "modules/demo-host/worker.mjs",
-      "sha256": "3bc2b527f26e7fac3b2a2f11998037b062c796225e97c08e35b961bd27821221"
+      "sha256": "85f4cb737f9a1237b0f7d8f5491efac733251d4386cadc49aad0507aa0f81256"
     },
     "modules/dependencies/README.md": {
       "source": "modules/dependencies/README.md",

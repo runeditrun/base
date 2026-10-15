@@ -23,6 +23,14 @@ it with these files and the seed's container image folder (workerd engine) to
   container that stops by itself ends its demo too.
 - `capacity.mjs`: `DemoCapacity` admits at most `max_instances` live demos.
 - `pages.mjs`: the start and ended pages (12ui designs), strict CSP.
+  `start-script.mjs` is the start page's script: once Turnstile passes it
+  posts the form with `Accept: application/json` (the Worker then answers
+  `{ location }` with the cookies, or `{ notice }` with the refusal's status)
+  and shows each step: the check, the private copy starting, the sign-in. A
+  refusal, a network failure or a start past 25 seconds is shown with Try
+  again, which runs a new check; progress is announced through a
+  `role="status"` region and failures through `role="alert"`. Without
+  JavaScript the form posts as before and gets the 303 or the page.
 - `remove.mjs`: `rer deploy --demo --remove --yes`. The deploy passes the
   demo's record (`plan.record`) to `wrangler deploy --message`; removal takes
   the Worker for the demo's only while it serves that version, the Custom
@@ -35,7 +43,9 @@ it with these files and the seed's container image folder (workerd engine) to
 
 `node --test modules/demo-host/tests/*.test.mjs` runs the Worker in workerd
 with its real Durable Objects and rate limit; Turnstile and the container
-platform are the only fakes. The end-to-end proof (`wrangler dev` with Docker)
+platform are the only fakes. `start-page.test.mjs` drives the start page in
+Chromium (default-seed's Playwright) through waiting, failure, Try again,
+working and the signed-in landing. The end-to-end proof (`wrangler dev` with Docker)
 is in DEMO.md.
 
 Startup probes keep the existing 120-second budget, with a separate five-second
