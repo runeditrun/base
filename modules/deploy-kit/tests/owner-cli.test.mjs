@@ -110,3 +110,59 @@ test('owner CLI reports refusal codes and resource names, never other error text
   assert.deepEqual(report(new Error('Unexpected token test-only-session-value in JSON')),{ok:false,code:'owner-deploy-failed'});
   assert.deepEqual(report(Object.assign(new Error('missing-input'),{inputs:['CLOUDFLARE_API_TOKEN']})),{ok:false,code:'missing-input',inputs:['CLOUDFLARE_API_TOKEN']});
 });
+
+test('postdeploy readback waits only for fresh workers.dev 1042 within the upload deadline', async t => {
+ const provider = ownerProvider(); t.after(() => provider.close());
+ const root = await seed(t); let elapsed = 0, attempts = 0;
+ const healthOptions = { now: () => elapsed, sleep: async ms => { elapsed += ms; } };
+ const options = {fetch:provider.fetch,cwd:root,notice:()=>{},healthOptions};
+ const args = ['--declaration','deploy.json','--environment','production'];
+ const first = await main(['deploy',...args], inputs(provider), options);
+ const healthy = () => {
+  const vars = Object.fromEntries(provider.state.settings.bindings.filter(x => x.type === 'plain_text').map(x => [x.name,x.text]));
+  return Response.json({ok:true,deployment:{sourceSha:vars.RER_DEPLOY_SOURCE,fingerprint:vars.RER_DEPLOY_FINGERPRINT,versionId:provider.state.version.id}});
+ };
+ provider.state.healthOverride = () => ++attempts === 1 ? new Response('error code: 1042', {status:404}) : healthy();
+ assert.equal((await main(['health',...args], inputs(provider), {...options,propagation:first.propagation})).ok, true);
+ assert.equal(attempts, 2); assert.equal(elapsed, 2000);
+ for (const [name, response, fresh] of [
+  ['established', () => new Response('error code: 1042', {status:404}), false],
+  ['other 404', () => new Response('not found', {status:404}), true],
+  ['truncated 1042 prefix', () => new Response('error code: 1042' + ' '.repeat(300) + 'unrelated error', {status:404}), true],
+  ['authentication', () => new Response('error code: 1042', {status:403}), true],
+  ['redirect', () => new Response(null, {status:302,headers:{location:'https://elsewhere.invalid/health'}}), true],
+  ['malformed', () => new Response('not json', {status:200}), true],
+ ]) {
+  attempts = 0;
+  provider.state.healthOverride = () => { attempts++; return response(); };
+  await assert.rejects(main(['health',...args], inputs(provider), {...options,...(fresh ? {propagation:first.propagation} : {})}), undefined, name);
+  assert.equal(attempts, 1, name);
+ }
+ elapsed = 89000; attempts = 0;
+ provider.state.healthOverride = () => { attempts++; return new Response('error code: 1042', {status:404}); };
+ await assert.rejects(main(['health',...args], inputs(provider), {...options,propagation:first.propagation}), /last-status-404/);
+ assert.equal(attempts, 1, 'no probe starts after the original upload deadline');
+ assert.equal(elapsed, 90000, 'postdeploy readback cannot add a new 30-second window');
+ // The same deadline also aborts a provider response, not just the next poll.
+ const slow = ownerProvider(); t.after(() => slow.close());
+ const slowRoot = await seed(t); let uploaded = false, aborted = false, reads = 0;
+ const fetch = async (input, init = {}) => {
+  const url = new URL(input);
+  if (uploaded && url.pathname.endsWith('/settings')) {
+   reads++;
+   await new Promise((resolve, reject) => {
+    const abort = () => { aborted = true; reject(init.signal.reason); };
+    if (init.signal.aborted) abort(); else init.signal.addEventListener('abort', abort, {once:true});
+   });
+  }
+  const result = await slow.fetch(input, init);
+  if (init.method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') uploaded = true;
+  return result;
+ };
+ // Keep the test process alive while the production timeout (an unref timer) fires.
+ const hold = setTimeout(() => {}, 1000);
+ try { await assert.rejects(main(['deploy',...args], inputs(slow), {cwd:slowRoot,fetch,notice:()=>{},healthOptions:{readiness:{totalMs:50}}}), /provider-transport-failed/); }
+ finally { clearTimeout(hold); }
+ assert.ok(aborted); assert.equal(reads, 1, 'an expired provider read is not retried');
+
+});

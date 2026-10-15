@@ -1,3 +1,5 @@
+import { readinessWindow } from './readiness-window.mjs';
+import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
 import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -373,6 +375,8 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     await listedAfterCreate(api,kind,item,settle);
   }
   if (!exists && !state.owned.worker) { state.owned.worker = {status:'pending'}; await save(); }
+  const window = readiness.window ?? readinessWindow({...(healthOptions.now ? {clock:healthOptions.now} : {}), ...(healthOptions.sleep ? {sleep:healthOptions.sleep} : {}), ...readiness});
+  readiness = {...readiness,window};
   const upload = `/workers/scripts/${plan.worker}?bindings_inherit=strict`;
   const observed = {...api, async request(path, options) {
     const sending = path === upload && options?.method === 'PUT';
@@ -387,8 +391,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
       // A successful upload creates a Worker only when ownership preflight found
       // it absent. Record it before readback, which can fail after creation.
       if (!exists) api.recordCreated?.(`Worker:${plan.worker}`);
-      const active = await activeWorker(api, plan.worker);
-      assert(active && deployedFingerprint(active.settings) === state.pendingUpload.fingerprint, 'uploaded-worker-drift');
+      const active = await uploadedWorker({api,worker:plan.worker,upload:result,previous:priorWorker,fingerprint:state.pendingUpload.fingerprint,window});
       state.pendingUpload.provider = {versionId:active.versionId,deploymentId:active.deploymentId,etag:active.etag};
       state.owned.worker = {status:'created'}; await save();
     }
@@ -399,7 +402,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; delete state.pendingSecret; await save(); } },
     // Keep each first-health attempt beside the identity it belongs to.
     onHealth: async candidate => { if (candidate.changed) { state.receipt = candidate; await save(); } }});
-  return {receipt, created:create.map(({kind,item}) => `${kind}:${item.name}`), sentSecrets};
+  return {receipt, created:create.map(({kind,item}) => `${kind}:${item.name}`), sentSecrets, freshUpload:!exists && receipt.changed};
 }
 
 /** Independent read-only health of the last owner deployment recorded in the state file. */

@@ -1,3 +1,4 @@
+import { readinessAPI } from './readiness-window.mjs';
 import { verifyServiceGrants } from './service-grants.mjs';
 import { assert, stable } from './validation.mjs';
 import { boundedJSON } from './provider.mjs';
@@ -49,11 +50,13 @@ export async function waitForDeploymentHealth(url, {
 /** An unauthenticated GET of a built file; anything but 200 means the browser gets no assets.
  * After an upload (`windowMs`), an edge still serving the previous version answers 404 for
  * the new build's hashed files: 404, 5xx and transport failures are retried within the window. */
-async function servedAsset(origin, path, request, timeoutMs, {windowMs = 0, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
+async function servedAsset(origin, path, request, timeoutMs, {window, windowMs = 0, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
   const start = clock();
   for (;;) {
     let response, failure;
-    try { response = await request(`${origin}/${path.split('/').map(encodeURIComponent).join('/')}`,{redirect:'manual',signal:AbortSignal.timeout(timeoutMs),headers:{'Cache-Control':'no-cache'}}); }
+    const remaining = window?.remaining() ?? timeoutMs;
+    assert(remaining > 0, 'asset-readiness-timeout');
+    try { response = await request(`${origin}/${path.split('/').map(encodeURIComponent).join('/')}`,{redirect:'manual',signal:AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(timeoutMs,remaining)))),headers:{'Cache-Control':'no-cache'}}); }
     catch { failure = 'asset-transport-failed'; }
     if (response) {
       await response.body?.cancel().catch(() => {});
@@ -62,7 +65,7 @@ async function servedAsset(origin, path, request, timeoutMs, {windowMs = 0, cloc
       if (response.redirected || response.status !== 404 && response.status < 500) throw new Error(failure);
     }
     if (clock() - start + 2000 > windowMs) throw new Error(failure);
-    await sleep(2000);
+    await sleep(Math.min(2000,window?.remaining() ?? 2000));
   }
 }
 
@@ -71,6 +74,7 @@ async function servedAsset(origin, path, request, timeoutMs, {windowMs = 0, cloc
  * With `readiness` (deploy after an upload) it gets the recorded 90-second wait of health-request.mjs.
  * `asset`, a built file's path, is then requested once and must answer 200. */
 export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fetch,timeoutMs=30000,intervalMs=2000,now,sleep,readiness,asset}) {
+  if (readiness?.window) api = readinessAPI(api, readiness.window);
   assert(receipt?.version === 1 && receipt.accountId === api.accountId && receipt.worker === plan.worker,'receipt-target-mismatch');
   await verifyServiceGrants(api, plan);
   const current = await activeWorker(api,plan.worker);
@@ -85,8 +89,14 @@ export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fe
   const namespaces = await durableNamespaces(api,plan,{requireAll:true});
   assert(stable(namespaces) === stable(receipt.durableObjects),'durable-object-identity-drift');
   for (const item of plan.d1) await migrate(api,resources.d1.find(x => x.binding === item.binding).id,item.migrations,{apply:false});
-  const secrets = await api.request(`/workers/scripts/${plan.worker}/secrets`);
-  assert(Array.isArray(secrets) && plan.secrets.every(x => secrets.some(y => y.name === x.binding && y.type === 'secret_text')),'missing-deployed-secret');
+  for (;;) {
+    assert(!readiness?.window || readiness.window.remaining() > 0, 'missing-deployed-secret');
+    const secrets = await api.request(`/workers/scripts/${plan.worker}/secrets`);
+    assert(Array.isArray(secrets) && secrets.every(row => typeof row?.name === 'string' && row.type === 'secret_text'), 'invalid-secret-list');
+    if (plan.secrets.every(x => secrets.some(y => y.name === x.binding && y.type === 'secret_text'))) break;
+    assert(readiness?.freshUpload && readiness.window?.remaining() > 0, 'missing-deployed-secret');
+    await readiness.window.pause();
+  }
   let health;
   // A Worker without a public route (reached only through service bindings) has no /health to request.
   if (plan.workersDev === false) health = {ok:true,versionId:current.versionId,route:'none'};
@@ -111,7 +121,7 @@ export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fe
     assert(body?.ok === true && body.deployment?.sourceSha === receipt.source.sha && body.deployment?.fingerprint === receipt.fingerprint && body.deployment?.versionId === current.versionId,'health-identity-mismatch');
     health = {ok:true,versionId:current.versionId};
   }
-  if (asset && origin) health.asset = await servedAsset(origin,asset,request,timeoutMs,readiness ? {windowMs:60000,...(readiness.clock ? {clock:readiness.clock} : {}),...(readiness.sleep ? {sleep:readiness.sleep} : {})} : {});
+  if (asset && origin) health.asset = await servedAsset(origin,asset,request,timeoutMs,readiness ? {window:readiness.window,windowMs:60000,...(readiness.clock ? {clock:readiness.clock} : {}),...(readiness.sleep ? {sleep:readiness.sleep} : {})} : {});
   const after = await activeWorker(api,plan.worker);
   assert(after.versionId === current.versionId && after.deploymentId === current.deploymentId && after.etag === current.etag,'deployment-changed-during-health');
   await verifyServiceGrants(api, plan);

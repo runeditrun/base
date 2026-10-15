@@ -1,8 +1,10 @@
+import { observeReadiness, observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
+import { ownerClaimRequest } from './deploy-claim-request.mjs';
 // Observe the actual bootstrap exchange of a custom hook, including hooks that
 // call the shared owner helper themselves. Never issue a second claim after it.
 // The kit's deployment record, when the hook keeps one there, is checked before
 // linking with its live setup token; rer checks the origin the hook returns too.
-export async function observeOwner({ paths, inspect, beforeClaim, addSecret }, run) {
+export async function observeOwner({ paths, inspect, beforeClaim, addSecret, deployed: knownDeployment, tokenKey }, run) {
  const fetch = globalThis.fetch, claims = [];
  globalThis.fetch = async (input, init = {}) => {
   const url = new URL(input instanceof Request ? input.url : input);
@@ -12,10 +14,11 @@ export async function observeOwner({ paths, inspect, beforeClaim, addSecret }, r
   }
   if (typeof body?.token !== 'string' || !body.token) return fetch(input, init);
   addSecret(body.token);
-  const deployed = await inspect();
+  const deployed = await inspect(url.origin);
   if (deployed && url.origin !== deployed.origin) throw new Error('owner-claim-origin-mismatch');
   await beforeClaim?.(body.token, url.origin);
-  const response = await fetch(input, init);
+  const known = knownDeployment?.() ?? observedReadiness(url.origin);
+  const response = await ownerClaimRequest(fetch, input, init, {deployed:known ?? deployed, tokenKey});
   let code;
   if (response.status !== 303) {
    try { code = (await response.clone().json()).error; } catch {}
@@ -24,6 +27,6 @@ export async function observeOwner({ paths, inspect, beforeClaim, addSecret }, r
   claims.push({ origin: url.origin, outcome, status: response.status });
   return response;
  };
- try { return await run(claims); }
+ try { return await observeReadiness(() => run(claims)); }
  finally { globalThis.fetch = fetch; }
 }

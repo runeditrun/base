@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { ownerDeploy } from './deploy.mjs';
+import { deployCommand } from './deploy-command.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 import { localInstaller } from '../onboarding/adapter.mjs';
 import { ownerProvider } from '../modules/deploy-kit/tests/owner-provider.mjs';
@@ -368,4 +369,71 @@ for (const options of [{ setSecret: 'SESSION_SECRET' }, { unsetSecret: 'SESSION_
  assert.equal(state.pendingSecret, undefined);
  assert.equal(state.receipt.health.ok, false);
  assert.ok(!JSON.stringify(state).includes('secret-that-must-be-redacted'));
+});
+
+test('fresh deploy propagation reaches the owner once through object and observed function hooks', async t => {
+ for (const kind of ['object', 'function', 'custom-observed', 'upload-and-secret-lag', 'persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function']) await t.test(kind, async t => {
+  const { root } = await checkout(t, { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] });
+  const { provider, claims } = account(t);
+  const inner = globalThis.fetch;
+  let attempts = 0, hookCalls = 0, elapsed = 0, uploaded = false, staleWorker = 0, staleSecrets = 0;
+  const clock = performance.now.bind(performance);
+  t.mock.method(performance, 'now', () => clock() + elapsed);
+  const hook = ['function', 'unproven-function'].includes(kind) ? async context => {
+   hookCalls++;
+   const response = await fetch(new URL('/auth/bootstrap', context.origin), { method: 'POST', headers: { Origin: context.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: context.vars.SETUP_TOKEN }) });
+   assert.equal(response.status, 303);
+  } : lifecycle.hooks.owner;
+  const run = () => kind === 'custom-observed' ? deployCommand({root,options:{},store:store(),setupManifest:manifest,
+   adapter:{...lifecycle,deployDeclaration:'deploy.json',deploy:async () => {
+    const deployed = await ownerKit(['deploy','--declaration','deploy.json','--environment','production'],process.env,{cwd:root});
+    if (!deployed.ownerClaim) {
+     hookCalls++;
+     const response = await fetch(new URL('/auth/bootstrap',deployed.origin),{method:'POST',headers:{Origin:deployed.origin},body:JSON.stringify({token:process.env.SETUP_TOKEN})});
+     assert.equal(response.status,303);
+    }
+    return {origin:deployed.origin,deployed:true};
+   }}}) : ownerDeploy('deploy.json', { ...lifecycle, hooks: { owner: hook } })({ root, options: {}, store: store(), setupManifest: manifest });
+  if (['existing-wrong', 'unproven-function'].includes(kind)) {
+   await ownerKit(['deploy', '--declaration', 'deploy.json', '--environment', 'production'], { ...process.env, SETUP_TOKEN: 'previous-test-token' }, { cwd: root });
+   process.env.SETUP_TOKEN = kind === 'existing-wrong' ? 'wrong-test-token' : 'previous-test-token';
+  }
+  const writes = provider.state.writes.length;
+  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+   const url = new URL(input);
+   if (kind === 'upload-and-secret-lag') {
+    if (init.method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') { const result = await inner(input, init); uploaded = true; const body = await result.json(); body.result.deployment_id = body.result.deployment_id.replaceAll('-', '').toUpperCase(); return Response.json(body); }
+    if (uploaded && url.pathname.endsWith('/settings') && staleWorker++ === 0) return Response.json({success:false,errors:[]}, {status:404});
+    if (uploaded && url.pathname.endsWith('/secrets') && (!init.method || init.method === 'GET') && staleSecrets++ === 0) return Response.json({success:true,result:[]});
+   }
+   if (url.pathname === '/auth/bootstrap') {
+    if (kind === 'upload-and-secret-lag') { assert.ok(staleWorker > 1); assert.ok(staleSecrets > 1); }
+    attempts++;
+    if (kind === 'persistent') elapsed += 45000;
+    if (kind === 'denied') return Response.json({ error: 'owner_claim_denied' }, { status: 403 });
+    if (kind === 'cross-origin') return new Response(null, { status: 303, headers: { Location: 'https://elsewhere.invalid/auth/bootstrap' } });
+    if (kind === 'redirect') return new Response(null, { status: 307, headers: { Location: 'https://elsewhere.invalid/auth/bootstrap' } });
+    if (attempts === 1 || ['persistent','existing-wrong'].includes(kind)) return Response.json({ error: 'invalid_setup_token' }, { status: 403 });
+   }
+   return inner(input, init);
+  });
+  if (['persistent', 'denied', 'redirect', 'cross-origin', 'existing-wrong', 'unproven-function'].includes(kind)) {
+   await assert.rejects(run(), /claiming its owner failed/);
+   assert.equal(attempts, kind === 'persistent' ? 2 : 1);
+   assert.equal(claims.length, 0);
+   assert.ok(secretNames(provider).includes('SETUP_TOKEN'));
+   const state = JSON.parse(await readFile(join(root, '.rer/deploy/production.json'), 'utf8'));
+   assert.equal(state.ownerClaim, undefined);
+   if (kind === 'existing-wrong') assert.equal(provider.state.writes.length, writes, 'a supplied wrong token is never rotated');
+  } else {
+   assert.equal((await run()).owner, 'claimed');
+   assert.equal(attempts, 2); assert.equal(claims.length, 1);
+   if (['function','custom-observed'].includes(kind)) assert.equal(hookCalls, 1, 'retry the exchange, never arbitrary hook effects');
+   const statePath = join(root, '.rer/deploy/production.json'), state = await readFile(statePath), writes = provider.state.writes.length;
+   assert.equal(JSON.parse(state).receipt.provider.versionId, provider.state.version.id);
+   assert.ok(!secretNames(provider).includes('SETUP_TOKEN'));
+   assert.equal((await run()).owner, 'kept');
+   assert.equal(provider.state.writes.length, writes); assert.deepEqual(await readFile(statePath), state);
+  }
+ });
 });
