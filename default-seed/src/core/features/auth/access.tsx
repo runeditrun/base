@@ -42,9 +42,29 @@ export function OperatorAccess() {
     const form = new FormData(event.currentTarget)
     await mutate('invite', { email: form.get('email'), displayName: form.get('displayName'), role: form.get('role'), returnTo: '/app' })
   }
+  // A wrong sign-in email is corrected here: after a fresh proof (rer signin, a
+  // recent email-link sign-in, or the step-up link sent to the current address).
+  async function changeEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const email = new FormData(event.currentTarget).get('email')
+    try { await request('email', { email }); setMessage('Saved.'); await refresh(selected) }
+    catch (error) {
+      if ((error as Error).message !== 'step_up_required') { setMessage((error as Error).message); return }
+      try {
+        const sent = await request('step-up', { action: 'email:change', returnTo: '/app' }) as { captured?: string }
+        if (sent.captured) { window.location.href = sent.captured; return }
+        setMessage('To confirm it is you, open the link just sent to your current email, then save again.')
+      }
+      catch (inner) { setMessage((inner as Error).message) }
+    }
+  }
   return <section className="auth-panel">
     <h2>Operator access</h2>
     {session ? <p>{session.operator.email} · {session.operator.role}</p> : null}
+    {session ? <form key={session.operator.email} onSubmit={changeEmail}>
+      <label>Your sign-in email <input name="email" type="email" required defaultValue={session.operator.email} /></label>
+      <button type="submit">Save email</button>
+    </form> : null}
     <button onClick={() => { void request('signout', {}).then(() => { window.location.href = '/signin' }).catch((error: Error) => setMessage(error.message)) }}>Sign out</button>
     {message ? <p role="status">{message}</p> : null}
     {session && session.operator.role !== 'member' ? <>
