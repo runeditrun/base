@@ -25,6 +25,8 @@ test('rer demo refuses incomplete settings and serves isolated data without invo
  const f = await fixture('default-seed', t), port = await freePort();
  await f.run(['install', '--json']);
  await f.run(['setup', '--owner-email', 'demo-owner@example.test', '--port', String(port), '--non-interactive', '--json']);
+ // A pulled migration is absent from setup's old build but belongs in the demo.
+ await writeFile(join(f.root, 'migrations/core/9998_demo_upgrade.sql'), 'CREATE TABLE demo_upgrade(value TEXT);\n');
  await f.sql("CREATE TABLE owner_saved(value TEXT); INSERT INTO owner_saved VALUES('owner content')");
  const settings = join(f.root, '.dev.vars'), privateBytes = await readFile(settings), privateMode = (await stat(settings)).mode;
  const ownerState = join(f.root, '.wrangler/state');
@@ -84,6 +86,7 @@ commandAdapter.localPrerequisites = async ({root, email}) => {
    try {
     if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name='rer_demo'").get()) continue;
     isolated = true;
+    assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name='demo_upgrade'").get(), 'demo applies the complete current source inventory');
     assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE name='owner_saved'").get(), undefined, 'owner content is absent from the demo');
     assert.equal(db.prepare("SELECT email FROM oa_operators WHERE role='owner'").get().email, 'demo-owner@example.test');
    } finally { db.close(); }
