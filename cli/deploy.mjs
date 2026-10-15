@@ -1,6 +1,6 @@
 import { requireProductionAuth } from './production-auth.mjs';
 import { readFile } from 'node:fs/promises';
-import { deployDiagnostic } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, providerTransport } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { contained } from './project.mjs';
 import { missing, invalid, refuse, RerError } from './errors.mjs';
@@ -124,6 +124,8 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  const resource = diagnostic?.resource ?? (error.resource ? redact(String(error.resource)) : undefined);
  if (code === 'resource-not-listed') return `Deploy stopped at ${at}: ${resource} was created, but Cloudflare's account listing still does not show it after two minutes. Nothing was uploaded.\nResources created this attempt: ${created.join(', ') || 'none'}.\nRun ${again} again once the listing catches up: it reuses ${resource}. To delete what this environment created instead: ${again} --remove --yes.`;
  const lines = [`Deploy failed at ${at}: ${code}${resource ? ` (${resource})` : ''}${diagnostic?.providerCodes?.length ? ` (provider ${diagnostic.providerCodes.join(', ')})` : ''}.`];
+ const transport = providerTransport(error, redact);
+ if (transport) lines.push(`${transport}.`);
  if (diagnostic?.output && diagnostic.output !== '(no provider output)') lines.push(`First redacted output lines:\n${diagnostic.output}`);
  lines.push(`Resources created this attempt: ${created.join(', ') || 'none'}.`);
  lines.push(recovery({ code, at, resource, again, retry, secretChange }));
