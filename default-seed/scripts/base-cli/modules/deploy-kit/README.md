@@ -292,6 +292,18 @@ again, within 30 seconds. Library `verifyHealth`
 retains the existing window, retrying only 404, 503 and network failures for
 30 seconds by default.
 
+Custom-hook `rer deploy` finalization gets a separate 90-second `/health` wait
+after the hook returns, using the current recorded Worker version when available.
+The hook can already have claimed the owner and retired its token, which creates
+another version and can exhaust the original upload window. First hosted Slate
+and Pencil deploys on 15 October 2026 failed this final gate even though health
+named the right commit seconds later. Reusing the existing 90-second propagation
+budget gives this final observation the same bounded allowance, without spending
+it on the hook's earlier work. Transport failures and healthy identity mismatches wait;
+permanent HTTP or malformed responses still fail. The deadline includes request
+time and backoff; each request is capped at 30 seconds. Failure names the last
+observed answer and the exact same-environment rerun.
+
 The returned receipt carries `health: {ok, versionId, attempts}`. Each attempt is
 `{offsetMs, status, cfRay, contentType, errorClass}`: `status` is null for
 a transport failure and `errorClass` is null for the passing attempt. The receipt

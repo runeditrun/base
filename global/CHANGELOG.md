@@ -2,6 +2,8 @@
 
 ## 0.2.21
 
+- Demo removal retries transient Cloudflare provider failures while preserving the resource ownership checks.
+- Deployment finalization lets health and source identity settle before refusing a successful rollout.
 - Hosted demos keep the same visitor reservation while Cloudflare prepares an available container, within the existing startup budget. Placement exhaustion returns a clean capacity refusal.
 - Status polling retains a failed start's terminal answer briefly after cleanup, including after Durable Object recovery.
 - Demo image builds load Vite configuration preparation before checking the root Wrangler Worker entry.
