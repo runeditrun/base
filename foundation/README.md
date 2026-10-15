@@ -114,6 +114,12 @@ assembly:
 pnpm edition example-edition --family-repo /tmp/new-family --base-repo /path/to/base --output /tmp/new-edition --install --verify
 ```
 
+`--repository` records the author family repository in `family.json`. The public
+Run page uses the edition's `just-every/run-<edition>` repository convention,
+with its clone command and folder generated from the edition name. The generated
+setup manifest also uses the edition name for its title and `APP_NAME` default;
+an owner's explicit setup answer still takes precedence.
+
 The composition copies the pinned Base dispatcher into `src/base`; the exported
 Worker needs no Base checkout. The author edition folder is composition input.
 Its `core/`, `modules/` and `editions/` layout is the implemented authoring
@@ -128,6 +134,16 @@ migrates, prepares the real first owner and verifies ordinary sign-in through
 the local outbox. `deploy --dry-run` validates and builds locally without
 provider requests; real deploy uses the owner-account kit, applies declared D1
 migrations and checks health. Local checks do not establish hosted acceptance.
+
+Fresh foundation generation assigns distinct migration ordinals, including
+`0011_dependency_setup.sql`, `0012_dependency_approval.sql` and
+`0013_erasure.sql`. This only defines the generated starting history; existing
+owner and edition checkouts keep their already-applied migration names.
+
+The default foundation leaves optional import-kit out because the module exposes
+no single canonical complete D1 migration schema for generating a numbered
+migration. Defer module selection until that schema API exists; a product
+importer still needs its own authorized target adapter and product integration.
 
 For private Start handlers, enforce native session authorization in every
 server function, including direct transport calls; route guards alone are

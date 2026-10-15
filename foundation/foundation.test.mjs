@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, cp, readFile, writeFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto'
 import {sourceRoots} from '../cli/export.mjs'
 
 const root = resolve(import.meta.dirname, '..')
-test('committed starter exports a deterministic editable foundation without reference fixtures', async () => {
+test('public foundation CLI keeps author identity private from Run data and composes clean migrations', async () => {
   const tmp = await mkdtemp(resolve(tmpdir(), 'rer-foundation-test-'))
   const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
   try {
@@ -22,13 +22,37 @@ test('committed starter exports a deterministic editable foundation without refe
     await cp(resolve(root, 'LICENSE'), resolve(base, 'LICENSE'))
     git(base, 'add', 'LICENSE'); git(base, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'license')
     const ref = git(base, 'rev-parse', 'HEAD')
-    const options = { baseRepo: base, ref, family: 'future', edition: 'first', repository: 'just-every/run-orbit' }
+    const authorRepository = `author-${process.pid}/family-${Date.now()}`
+    const editionName = 'first'
+    const options = { baseRepo: base, ref, family: 'future', edition: editionName, repository: authorRepository }
+    const initializeFromCLI = supplied => execFileSync(process.execPath, [
+      resolve(base, 'foundation/cli.mjs'),
+      '--base-repo', supplied.baseRepo,
+      '--ref', supplied.ref,
+      '--output', supplied.output,
+      '--family', supplied.family,
+      '--edition', supplied.edition,
+      '--repository', supplied.repository,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
+    const publicRepository = edition => new URL(['just-every', `run-${edition}`].join('/'), 'https://github.com/').href
     await writeFile(resolve(base, 'foundation/template/src/identity.ts'), 'DIRTY')
     const family = resolve(tmp, 'family')
-    await initialize({ ...options, output: family })
-    await initialize({ ...options, output: resolve(tmp, 'second') })
-    assert.equal(await readFile(resolve(family, 'foundation.lock.json'), 'utf8'), await readFile(resolve(tmp, 'second/foundation.lock.json'), 'utf8'))
+    assert.equal(JSON.parse(initializeFromCLI({ ...options, output: family })).baseCommit, ref)
+    const repeated = resolve(tmp, 'repeated')
+    initializeFromCLI({ ...options, output: repeated })
+    assert.equal(await readFile(resolve(family, 'foundation.lock.json'), 'utf8'), await readFile(resolve(repeated, 'foundation.lock.json'), 'utf8'))
     await assert.rejects(initialize({ ...options, output: family }), /EEXIST/)
+    const secondEditionName = 'second'
+    const secondEdition = resolve(tmp, 'second-edition')
+    initializeFromCLI({ ...options, edition: secondEditionName, output: secondEdition, repository: `author-${process.pid}/other-${Date.now()}` })
+    const secondRun = JSON.parse(await readFile(resolve(secondEdition, `editions/${secondEditionName}/src/site/run.json`)))
+    const secondRepository = publicRepository(secondEditionName)
+    assert.equal(secondRun.repository, secondRepository)
+    assert.equal(secondRun.clone, `git clone ${secondRepository}.git`)
+    assert.equal(secondRun.folder, `run-${secondEditionName}`)
+    const secondSetup = JSON.parse(await readFile(resolve(secondEdition, `editions/${secondEditionName}/rer-setup.json`)))
+    assert.equal(secondSetup.title, secondEditionName)
+    assert.equal(secondSetup.fields.find(field => field.name === 'APP_NAME').default, secondEditionName)
     git(family, 'init'); git(family, 'add', '.'); git(family, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'starter')
     const output = resolve(tmp, 'edition')
     await assemble({ familyRepo: family, baseRepo: base, edition: 'first', output, toolCommit: ref })
@@ -39,6 +63,27 @@ test('committed starter exports a deterministic editable foundation without refe
     assert.equal(lock.files['src/base/dispatch.ts'].repository, 'base')
     assert.equal(lock.files['scripts/base-onboarding/server.mjs'].repository, 'base')
     assert.equal(JSON.parse(await readFile(resolve(output, 'src/branding.json'))).name, 'first')
+    const authorManifest = JSON.parse(await readFile(resolve(family, 'family.json')))
+    assert.equal(authorManifest.repository, authorRepository)
+    const run = JSON.parse(await readFile(resolve(family, `editions/${editionName}/src/site/run.json`)))
+    const firstRepository = publicRepository(editionName)
+    assert.equal(run.repository, firstRepository)
+    assert.equal(run.clone, `git clone ${firstRepository}.git`)
+    assert.equal(run.folder, `run-${editionName}`)
+    assert.doesNotMatch(JSON.stringify(run), new RegExp(authorRepository.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    const setup = JSON.parse(await readFile(resolve(family, `editions/${editionName}/rer-setup.json`)))
+    assert.equal(setup.title, editionName)
+    assert.equal(setup.fields.find(field => field.name === 'APP_NAME').default, editionName)
+    const migrations = await Promise.all((await readdir(resolve(output, 'migrations/core')))
+      .filter(name => name.endsWith('.sql'))
+      .map(async name => ({ name, sql: await readFile(resolve(output, 'migrations/core', name), 'utf8') })))
+    const ordinals = migrations.map(({ name }) => /^(\d+)_/.exec(name)?.[1]).filter(Boolean)
+    assert.equal(new Set(ordinals).size, ordinals.length)
+    const dependencySetup = migrations.find(({ sql }) => /CREATE TABLE(?: IF NOT EXISTS)?\s+oa_setup_links\b/.test(sql))
+    const erasure = migrations.find(({ sql }) => /CREATE TABLE(?: IF NOT EXISTS)?\s+rer_erasure_operations\b/.test(sql))
+    assert.ok(dependencySetup, 'generated SQL retains the provider dependency setup table')
+    assert.ok(erasure, 'generated SQL retains the erasure operations table')
+    assert.notEqual(/^(\d+)_/.exec(dependencySetup.name)?.[1], /^(\d+)_/.exec(erasure.name)?.[1])
     const origin = JSON.parse(await readFile(resolve(family, 'foundation.lock.json')))
     assert.ok(origin.runtime['onboarding/server.mjs'])
     assert.ok(!Object.keys(lock.files).some(p => p.startsWith('src/core/features/reference/')))

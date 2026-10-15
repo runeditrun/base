@@ -45,7 +45,7 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
       { component: 'operator-auth', repository: 'base', source: 'modules/operator-auth/identity/oidc/schema/oidc.sql', target: 'migrations/core/0005_identity_providers.sql' },
       { component: 'mail', repository: 'base', source: 'modules/mail/src/development/schema.sql', target: 'migrations/core/0002_outbox.sql' },
       { component: 'portability', repository: 'base', source: 'modules/portability/schema/portability.sql', target: 'migrations/core/0003_portability.sql' },
-      { component: 'erasure', repository: 'base', source: 'modules/erasure/schema/erasure.sql', target: 'migrations/core/0011_erasure.sql' },
+      { component: 'erasure', repository: 'base', source: 'modules/erasure/schema/erasure.sql', target: 'migrations/core/0013_erasure.sql' },
       { component: 'base', repository: 'base', source: 'export/SEED-COMMAND-CONTRACT.md', target: 'SEED-COMMAND-CONTRACT.md' },
       { component: 'base', repository: 'base', source: 'export/RUN-LOCALLY.md', target: 'RUN-LOCALLY.md' },
       { component: 'base', repository: 'base', source: 'export/HOMEPAGE-VARIANTS.md', target: 'HOMEPAGE-VARIANTS.md' },
@@ -61,14 +61,21 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     pkg.name = `@${family}/${edition}`
     await json(`editions/${edition}/package.json`, pkg)
     await json(`editions/${edition}/src/branding.json`, { name: edition, primaryColor: '#356c60' })
-    // The run site: its Run page data names the family repository until the
-    // product has its own public one, and its deploy declaration names its domain.
+    // Authoring metadata remains attached to the family repository. Public Run
+    // instructions name the edition's product repository by convention.
     const run = JSON.parse(files.find(f => f.relative === 'src/site/run.json').bytes)
-    Object.assign(run, { name: edition, repository: `https://github.com/${repository}`, clone: `git clone https://github.com/${repository}.git`, folder: repository.split('/')[1] })
+    const publicRepository = `just-every/run-${edition}`
+    Object.assign(run, { name: edition, repository: `https://github.com/${publicRepository}`, clone: `git clone https://github.com/${publicRepository}.git`, folder: `run-${edition}` })
     await json(`editions/${edition}/src/site/run.json`, run)
     await json(`editions/${edition}/deploy-site.json`, { version: 1, domain: siteDomain })
     const browserSeed = files.find(f => f.relative === 'scripts/installer/ui/seed.mjs')
     await put(`editions/${edition}/scripts/installer/ui/seed.mjs`, browserSeed.bytes.toString().replace("name: 'Foundation'", `name: ${JSON.stringify(edition)}`), browserSeed.path)
+    const setup = JSON.parse(files.find(f => f.relative === 'rer-setup.json').bytes)
+    const appName = setup.fields.find(field => field.name === 'APP_NAME')
+    if (!appName) throw new Error('Foundation setup manifest must declare APP_NAME')
+    setup.title = edition
+    appName.default = edition
+    await json(`editions/${edition}/rer-setup.json`, setup)
     const config = JSON.parse(files.find(f => f.relative === 'wrangler.jsonc').bytes)
     config.name = `${family}-${edition}`
     await json(`editions/${edition}/wrangler.jsonc`, config)
