@@ -2,7 +2,8 @@
 
 The front Worker `rer deploy --demo` deploys at `demo.<domain>` for a seed
 that adopted demo mode (`withDemo`, export/DEMO.md). `plan.mjs` turns `deploy-demo.json`
-into the Worker's Wrangler configuration; the CLI (`cli/demo-host.mjs`) writes
+(optionally `instanceType`, one of Cloudflare's predefined Container instance
+types, `basic` unless set) into the Worker's Wrangler configuration; the CLI (`cli/demo-host.mjs`) writes
 it with these files and the seed's container image folder (workerd engine) to
 `.rer/demo-host/` and runs `wrangler deploy` there.
 
