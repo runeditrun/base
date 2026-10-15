@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.21-dev.g27e1444d",
+  "cliVersion": "0.2.22-dev.g275921b6",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -355,7 +355,7 @@
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
-      "sha256": "2a9e23c6cfc667575194962ca98c4003bda964e6122ca51e51bb0c1376ce5da0"
+      "sha256": "db32464546f03f713f75dfb278d1783ef1c193b9309802a46a0c296f2bd69d48"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
@@ -451,7 +451,11 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "44e82a82f84e808592e0602a2833ba2891fd4d269149a905e532a31a8e66434e"
+      "sha256": "006aa36832d8e7c584afbe4685bb39330a8715bf8ef3c9f9aed9cfe6c804f31a"
+    },
+    "cli/deployment-record.mjs": {
+      "source": "cli/deployment-record.mjs",
+      "sha256": "f87398cef16e62eac85abf8813f54bd84175f5856833d47899ec7589e2fd8023"
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
@@ -559,7 +563,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "eb9ef2cbe67c933934d9ed8e0cd54bec4e9e8135cae923b2a4ea6fa29dcfa0df"
+      "sha256": "39c70becafb88162bc75c5b1019a863db990d49576f77fb5ae0b85766b8ae7fa"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
@@ -659,7 +663,7 @@
     },
     "cli/signin.mjs": {
       "source": "cli/signin.mjs",
-      "sha256": "55eaa0e1027ef175b2363290313920adfd74b97cf1e3726110b3e8cc98e9707d"
+      "sha256": "d5028d2f7efef985d54a5af62b20f6d007ec9ffd5bd14026e41ad76907a24dde"
     },
     "cli/site-bindings.mjs": {
       "source": "cli/site-bindings.mjs",
@@ -1195,7 +1199,7 @@
     },
     "modules/deploy-kit/owner-signin.mjs": {
       "source": "modules/deploy-kit/owner-signin.mjs",
-      "sha256": "9bd3c3c790f877129c242da20c39b55cab2c800f23231094c89e8f27d9d7b810"
+      "sha256": "b7139d02f4090292ac4f40cf47a8dfe4b0f4052fa539529dc043346ed945fa17"
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",

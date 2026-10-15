@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { signinCommand } from './signin.mjs';
+import { main } from './main.mjs';
 import { ownerProvider } from '../modules/deploy-kit/tests/owner-provider.mjs';
 import { main as ownerKit } from '../modules/deploy-kit/owner-cli.mjs';
 import { runtime } from '../modules/operator-auth/tests/runtime.mjs';
@@ -57,7 +58,7 @@ async function hosted(t) {
  };
  const token = lines => new URL(lines.join('\n').match(/https:\/\/\S+/)[0]).searchParams.get('token');
  const use = value => app.call('/auth/owner-signin', { method: 'POST', input: { token: value } });
- return { root, app, db, calls, signin, token, use, ownerCookie };
+ return { root, app, db, calls, signin, token, use, ownerCookie, fetch, credentials };
 }
 
 async function files(directory) {
@@ -129,4 +130,33 @@ test('an owner link is refused when expired, minted for a non-owner, or without 
  await assert.rejects(h.signin({ CLOUDFLARE_ACCOUNT_ID: 'b'.repeat(32), CLOUDFLARE_API_TOKEN: 'another-account' }), error => error.exitCode !== 0);
  assert.equal(h.calls.length, before);
  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n, 3);
+});
+
+test('rer signin directs native-auth owners to their declared page or setup recovery without issuing a link', async t => {
+ const saved = { ...process.env };
+ t.after(() => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); });
+ for (const signInPath of ['/login', undefined]) {
+  const h = await hosted(t);
+  await h.db.prepare('DROP TABLE oa_owner_signins').run();
+  await writeFile(join(h.root, '.node-version'), process.versions.node);
+  await writeFile(join(h.root, 'adapter.mjs'), `export const commandAdapter = {deploy: Object.assign(async()=>{}, {declaration:'deploy.json'}), ...${JSON.stringify({ signInPath })}};`);
+  await writeFile(join(h.root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: 'Manage the test deployment.' } } }));
+  Object.assign(process.env, h.credentials);
+  const network = t.mock.method(globalThis, 'fetch', h.fetch), lines = [];
+  const stdout = t.mock.method(process.stdout, 'write', text => { lines.push(String(text)); return true; });
+  let exit;
+  try { exit = await main(['signin', '--cwd', h.root, '--json']); }
+  finally { stdout.mock.restore(); network.mock.restore(); }
+  assert.equal(exit, 4, lines.join(''));
+  const events = lines.join('').trim().split('\n').map(line => JSON.parse(line));
+  const failure = events.find(event => event.event === 'error');
+  assert.match(failure.message, /seed's own sign-in/i);
+  const destination = new URL(failure.message.match(/https:\/\/\S+/)[0]);
+  const record = JSON.parse(await readFile(join(h.root, '.rer/deploy/production.json'), 'utf8'));
+  assert.equal(destination.origin, record.receipt.origin);
+  assert.equal(destination.pathname, signInPath ?? '/setup');
+  assert.ok(h.calls.length > 0 && h.calls.every(sql => /^SELECT\b/.test(sql)), 'native sign-in refuses without writing an owner grant');
+  assert.equal(events.at(-1).ok, false);
+  t.diagnostic(failure.message);
+ }
 });
