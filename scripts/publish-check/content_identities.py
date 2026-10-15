@@ -24,7 +24,7 @@ class ContentIdentities:
             pointers = set(module_pins(path, document.value))
             pointers.update(source_pointers(path, document.value))
             pointers.update(controller_pointers(document.value))
-            if path in ('base-copies.json', 'base/PROVENANCE.json') and read_regular is not None:
+            if read_regular is not None:
                 pointers.update(copy_pointers(document.value, read_regular))
             self.allowed[path] = pointers
 
