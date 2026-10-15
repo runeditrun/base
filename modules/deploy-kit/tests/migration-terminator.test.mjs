@@ -66,32 +66,62 @@ test('claim failure prevents migration execution and completion', async t => {
   assert.equal(db.prepare("SELECT count(*) AS total FROM sqlite_master WHERE name='source'").get().total, 0);
 });
 
-test('SQL failure retains applying claim and refuses uncertain-history replay', async t => {
+test('an import D1 rolled back keeps its reason and is retried by the next run of the same bytes', async t => {
   const { fixture, api, id, db } = await setup(t);
-  const migration = entry(`${schema}\nINSERT INTO missing_table VALUES (1);\n-- final comment`);
-  await assert.rejects(migrate(api, id, [migration]), /d1-import-failed/);
+  const migration = entry(`${schema}\nINSERT INTO source SELECT value FROM lookup;\n-- final comment`);
+  await assert.rejects(migrate(api, id, [migration]), error => error.message === 'd1-import-failed' && error.migration === migration.name
+    && /no such table: lookup/.test(error.providerRefusal.errors[0].message));
   assert.deepEqual({ ...db.prepare('SELECT name,sha256,state FROM d1_migrations').get() },
     { name: migration.name, sha256: migration.sha256, state: 'applying' });
-  assert.equal(fixture.state.writes.filter(write => write.body?.sql?.startsWith(schema)).length, 1);
   assert.equal(db.prepare("SELECT count(*) AS total FROM sqlite_master WHERE name='source'").get().total, 0);
-  const writes = fixture.state.writes.length;
-  await assert.rejects(migrate(api, id, [migration]), /changed-or-uncertain-migration-history/);
-  assert.equal(fixture.state.writes.length, writes);
+  db.exec("CREATE TABLE lookup(value TEXT); INSERT INTO lookup VALUES ('looked up')");
+  assert.deepEqual((await migrate(api, id, [migration])).applied, [migration.name]);
+  assert.deepEqual(db.prepare('SELECT name,sha256,state FROM d1_migrations').all().map(row => ({ ...row })),
+    [{ name: migration.name, sha256: migration.sha256, state: 'applied' }]);
+  assert.deepEqual(db.prepare('SELECT value FROM source ORDER BY value').all().map(row => row.value), ['looked up', 'retained']);
+  assert.equal(fixture.state.writes.filter(write => write.body?.sql?.startsWith('INSERT INTO d1_migrations')).length, 1, 'the claim is made once');
+  assert.equal(fixture.state.writes.filter(write => write.body?.sql?.startsWith(schema)).length, 2);
 });
 
-test('a lost ingestion response leaves the claim uncertain and blocks automatic SQL replay', async t => {
-  const { fixture, id, db } = await setup(t);
-  const migration = entry(schema);
-  const api = cloudflare({...fixture, fetch:async (url, init) => {
-    if (url.endsWith('/import') && JSON.parse(init.body).action === 'ingest') throw new Error('connection lost');
-    return fixture.fetch(url, init);
-  }});
-  await assert.rejects(migrate(api, id, [migration]), /provider-transport-failed/);
-  assert.equal(db.prepare('SELECT state FROM d1_migrations').get().state, 'applying');
-  assert.equal(db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='source'").get().n, 0);
+test('a lost ingestion response is retried only while the migration provably did not apply', async t => {
+  for (const committed of [false, true]) {
+    const { fixture, id, db } = await setup(t);
+    const migration = entry(schema);
+    const api = cloudflare({...fixture, fetch:async (url, init) => {
+      if (url.endsWith('/import') && JSON.parse(init.body).action === 'ingest') {
+        if (committed) await fixture.fetch(url, init);
+        throw new Error('connection lost');
+      }
+      return fixture.fetch(url, init);
+    }});
+    await assert.rejects(migrate(api, id, [migration]), /provider-transport-failed/);
+    assert.equal(db.prepare('SELECT state FROM d1_migrations').get().state, committed ? 'applied' : 'applying');
+    const writes = fixture.state.writes.length;
+    assert.deepEqual((await migrate(cloudflare(fixture), id, [migration])).applied, committed ? [] : [migration.name]);
+    assert.equal(fixture.state.writes.length, writes + (committed ? 0 : 1), 'an applied import is never run again');
+    assert.equal(db.prepare("SELECT count(*) n FROM source").get().n, 1);
+    assert.equal(db.prepare('SELECT state FROM d1_migrations').get().state, 'applied');
+  }
+});
+
+test('a claimed migration whose effects are partly present, or cannot be checked, stays refused and names itself', async t => {
+  const { fixture, api, id, db } = await setup(t);
+  const named = (name, sql) => ({ name, sql, sha256: hash(sql) });
+  const first = named('0001_schema.sql', schema);
+  await migrate(api, id, [first]);
+  const second = named('0002_lookup.sql', 'CREATE TABLE IF NOT EXISTS seen(value TEXT);\nCREATE INDEX source_value ON source(value);\nALTER TABLE source ADD COLUMN looked TEXT;\nUPDATE source SET looked = (SELECT value FROM lookup);');
+  await assert.rejects(migrate(api, id, [first, second]), /d1-import-failed/);
+  db.exec('CREATE INDEX source_value ON source(value)');
   const writes = fixture.state.writes.length;
-  await assert.rejects(migrate(cloudflare(fixture), id, [migration]), /uncertain-migration-history/);
-  assert.equal(fixture.state.writes.length, writes);
+  await assert.rejects(migrate(api, id, [first, second]), error => error.message === 'uncertain-migration-claim'
+    && JSON.stringify(error.migrationClaim) === JSON.stringify({ name: '0002_lookup.sql', present: ['index source_value'] }));
+  assert.equal(fixture.state.writes.length, writes, 'a refusal writes nothing');
+  assert.equal(db.prepare("SELECT state FROM d1_migrations WHERE name='0002_lookup.sql'").get().state, 'applying');
+  db.exec('DROP INDEX source_value; CREATE TABLE lookup(value TEXT);');
+  assert.deepEqual((await migrate(api, id, [first, second])).applied, ['0002_lookup.sql'], 'with its effects undone it runs again');
+  const third = named('0003_backfill.sql', "UPDATE source SET looked = 'yes' WHERE value = (SELECT value FROM missing);");
+  await assert.rejects(migrate(api, id, [first, second, third]), /d1-import-failed/);
+  await assert.rejects(migrate(api, id, [first, second, third]), error => error.message === 'uncertain-migration-claim' && error.migrationClaim.present.length === 0);
 });
 
 test('a seed-declared reviewed rewrite lets upgrades past a released migration proceed; undeclared changes stay refused', async t => {
