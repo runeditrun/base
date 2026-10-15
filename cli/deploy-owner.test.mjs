@@ -286,6 +286,36 @@ test('a secret change settles after its response is lost; one the provider refus
  await assert.rejects(run({}), /owned-resource-replaced/);
 });
 
+test('rer deploy runs a migration again after D1 rolled its import back, and refuses one whose effects are partly present', async t => {
+ const { root, git } = await checkout(t, { secrets: [{ binding: 'SESSION_SECRET', environment: 'SESSION_SECRET' }] });
+ await writeFile(join(root, 'migrations/core/0002_notes.sql'), "CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY, body TEXT);\nCREATE INDEX notes_body ON notes(body);\nINSERT INTO notes SELECT id, 'imported' FROM lookup;\n");
+ git('add', '.'); git('commit', '-qm', 'notes');
+ const { provider } = account(t);
+ const run = () => ownerDeploy('deploy.json', { ...lifecycle, hooks: {} })({ root, options: { environment: 'production' }, store: store(), setupManifest: manifest });
+ const db = () => provider.state.databases[0].db;
+ const ledger = () => db().prepare('SELECT name, state FROM d1_migrations ORDER BY id').all().map(row => `${row.name} ${row.state}`);
+ await assert.rejects(run(), error => {
+  assert.match(error.message, /d1-import-failed/); assert.match(error.message, /no such table: lookup/);
+  assert.match(error.message, /Migration 0002_notes\.sql did not apply/); assert.ok(!error.message.includes(provider.token));
+  return true;
+ });
+ assert.deepEqual(ledger(), ['0001_owner.sql applied', '0002_notes.sql applying']);
+ // Part of it present (made by hand here): refused before any write, naming the migration and the step.
+ db().exec('CREATE TABLE notes(id TEXT PRIMARY KEY, body TEXT); CREATE INDEX notes_body ON notes(body);');
+ const writes = provider.state.writes.length;
+ await assert.rejects(run(), error => {
+  assert.match(error.message, /Migration 0002_notes\.sql in D1 \S+ was started but never confirmed/);
+  assert.match(error.message, /Some of its changes are present \(index notes_body\)\. Undo them/);
+  return true;
+ });
+ assert.equal(provider.state.writes.length, writes);
+ // Undone and its cause fixed, the same unchanged deploy runs it and records it applied.
+ db().exec("DROP TABLE notes; CREATE TABLE lookup(id TEXT); INSERT INTO lookup VALUES ('first')");
+ assert.equal((await run()).deployed, true);
+ assert.deepEqual(ledger(), ['0001_owner.sql applied', '0002_notes.sql applied']);
+ assert.deepEqual({ ...db().prepare('SELECT id, body FROM notes').get() }, { id: 'first', body: 'imported' });
+});
+
 // A failed hosted response exhausts virtual readiness time; normal timers are untouched.
 function virtualReadiness(t) {
  let elapsed = 0;

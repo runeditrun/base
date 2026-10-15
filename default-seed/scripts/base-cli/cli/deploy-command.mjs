@@ -15,7 +15,7 @@ import { rememberHookState, hookState } from './deploy-hook-record.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
-import { providerRefusal, providerTransport } from '../modules/deploy-kit/diagnostics.mjs';
+import { migrationFailure, providerRefusal, providerTransport } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 
 export function validateDeployOptions(options) {
@@ -136,7 +136,7 @@ export async function deployCommand(context) {
   if (setup) throw commandFailure(redact(setup));
   const readiness = mutationReadinessFailure(error, { again, redact });
   if (readiness) throw commandFailure(readiness);
-  const refused = providerRefusal(error) ?? providerTransport(error);
-  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${error.cause ? ` (${error.cause})` : ''}. Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
+  const refused = providerRefusal(error) ?? providerTransport(error), migration = migrationFailure(error, again);
+  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${error.cause ? ` (${error.cause})` : ''}.${migration ? ` ${migration}` : ''} Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
  }
 }

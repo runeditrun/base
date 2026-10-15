@@ -68,9 +68,10 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
           if (state.failSql && entry.sql.includes(state.failSql)) throw Error('failure');
           row.db.exec('BEGIN'); row.db.exec(entry.sql); row.db.exec('COMMIT');
           return ok({success:true,type:'import',status:'complete',messages:[],result:{num_queries:1,final_bookmark:'fixture-bookmark'}});
-        } catch {
+        } catch (error) {
+          // D1 rolls the whole file back and reports SQLite's reason, as Wrangler reads it.
           if (row.db.isTransaction) row.db.exec('ROLLBACK');
-          return ok({success:true,type:'import',status:'error',errors:['failure'],messages:[]});
+          return ok({success:true,type:'import',status:'error',errors:[error.message],messages:[]});
         }
       }
       const sql = body.sql;
