@@ -122,6 +122,8 @@ A refused provider call also carries `providerRefusal` on the thrown error: the 
 
   Removal reads back that no recorded resource remains before deleting the state file. On partial failure, the state file retains the remaining resources so a later `--remove --yes` can finish. Resources rer did not create are never touched.
 
+- **Owner sign-in without mail.** `rer signin [--environment NAME] [--env-file FILE]` (owner CLI `signin`) needs only `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (with D1 edit). It refuses unless the state file holds a completed deploy and the live Worker is the one it recorded. It finds the one recorded D1 that holds `oa_owner_signins` and writes a single-use grant for the claimed owner there: the token's SHA-256, never the token. It returns the link once, to the terminal only. The state file is not changed. See operator-auth's "Owner sign-in without mail".
+
 ### If the state file is lost
 
 A fresh clone or CI runner has no `.rer/` directory, so the kit can no longer tell its own resources from anyone else's and refuses every later deploy as `resource-name-collision`. It is correct to refuse: the kit never adopts what it cannot prove it created. To recover, do one of these.
