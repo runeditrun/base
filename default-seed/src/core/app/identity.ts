@@ -9,6 +9,8 @@ export const identity: EditionIdentity = {
   purpose: '{deployment} keeps public records, background jobs and an operator app on one Cloudflare Worker.',
   tagline: 'Public records, background jobs and a signed-in operator app on one Cloudflare Worker.',
   signInPath: '/signin',
+  // RER uses the private setup token to claim this owner automatically.
+  manualSetupTokenClaim: false,
   // The run site this seed's `rer deploy --site` publishes (deploy-site.json).
   runSite: `https://${site.domain}`,
   // An installed instance serves the Lobby at /.

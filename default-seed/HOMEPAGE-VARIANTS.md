@@ -68,13 +68,16 @@ Add one `EditionIdentity` value next to the seed's config (most seeds:
 | `signInPath` | the seed's sign-in route | `/signin` (HappyToHelp `/login`, Uptime `/login`, Spool `/sign-in`) |
 | `runSite` | `https://` + the domain in `deploy-site.json` | `https://run-cradle.com` |
 | `installedHome` | `lobby`, or `page` for the seeds below | `lobby` |
+| `manualSetupTokenClaim` | `true` only when a person must claim the owner with the setup token | `false` or omitted when RER claims the owner automatically |
 | `theme`, `mark`, `band` | served paths | `/rer-theme.css`, `/brand/mark.svg`, `/brand/band.svg` |
 | `fonts` | the served stylesheet with your `@font-face` rules; omit it when `theme` declares them | `/fonts/fonts.css` |
 
 The Lobby's line is `purpose` with the installation's name; before the claim it
-reads "This <Seed> is waiting for its owner." and the hint "You’ll need the setup
-token from your install." A signed-in owner sees the same Lobby (it never
-varies by session) and uses Sign in or goes to the app.
+reads "This <Seed> is waiting for its owner." It shows "You’ll need the setup
+token from your install." only when `manualSetupTokenClaim` is true. Leave it
+false or omit it when RER claims the owner automatically; the token is handled
+by RER and the visitor does not need it. A signed-in owner sees the same Lobby
+(it never varies by session) and uses Sign in or goes to the app.
 
 A deployment name read from D1 at request time (Cradle's workspace name) is
 installation data: the Lobby may read it on the server, the run site never does.
