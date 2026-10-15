@@ -1,6 +1,6 @@
 import { requireProductionAuth } from './production-auth.mjs';
 import { readFile } from 'node:fs/promises';
-import { deployDiagnostic, providerTransport, providerRefusal, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { contained } from './project.mjs';
 import { missing, invalid, refuse, RerError } from './errors.mjs';
@@ -115,8 +115,8 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
   if (error.message === 'nothing-to-remove') return `There are no recorded resources to remove; nothing was removed.`;
   const cause = deployDiagnostic(error, redact)?.code ?? error.message;
   const count = Array.isArray(remaining) ? `${remaining.length} resources remain (${remaining.join(', ') || 'none'})` : 'the remaining resource count could not be read';
-  const detail = providerTransport(error, redact) ?? providerRefusal(error, redact);
-  const failed = error.failed?.map(item => `${item.resource}: ${item.code}`).join('; ');
+  const detail = providerFailure(error, redact);
+  const failed = error.failed?.map(item => `${item.resource}: ${providerFailure(item.error, redact) ?? item.code}`).join('; ');
   return redact(`Removal failed: ${count}; run ${retry} again. Cause: ${cause}${detail ? ` (${detail})` : ''}${failed ? `; ${failed}` : ''}.`);
  }
  const setup = hostedSetupFailure(error, { origin: deployed?.origin, again });
@@ -129,14 +129,14 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  const input = /^missing-secret-([A-Z][A-Z0-9_]*)$/.exec(code)?.[1];
  if (input) return `Deploy needs ${input}, which the deploy declaration lists as a secret and the Worker does not hold it. Set ${input} in the environment or in an --env-file file (an owned 0600 file of KEY=VALUE lines), then run the same command again. Nothing was uploaded.${created.length ? ` Resources created this attempt: ${created.join(', ')}.` : ''}`;
  if (code === 'nothing-to-remove') return `The deployment record selected by ${again} has no resources that rer owns, so --remove deletes nothing.`;
- if (code === 'owner-token-retirement-failed') return `The application is deployed at ${deployed?.origin}; owner ${error.owner}; setup token retirement failed (${redact(String(error.cause))}). Run ${again} --unset-secret ${error.tokenKey ?? 'SETUP_TOKEN'} using the same environment credentials, or run ${again} again to finish.`;
+ if (code === 'owner-token-retirement-failed') return `The application is deployed at ${deployed?.origin}; owner ${error.owner}; setup token retirement failed (${redact(String(error.cause))}${providerFailure(error,redact) ? `; ${providerFailure(error,redact)}` : ''}). Run ${again} --unset-secret ${error.tokenKey ?? 'SETUP_TOKEN'} using the same environment credentials, or run ${again} again to finish.`;
  if (code === 'owner-claim-failed') return `The application is deployed at ${deployed?.origin}, but claiming its owner failed: ${redact(String(error.cause))}. Owner claim and setup token retirement are not confirmed; run ${again} again using the same environment credentials to finish.`;
  const resource = diagnostic?.resource ?? (error.resource ? redact(String(error.resource)) : undefined);
  if (code === 'resource-not-listed') return `Deploy stopped at ${at}: ${resource} was created, but Cloudflare's account listing still does not show it after two minutes. Nothing was uploaded.\nResources created this attempt: ${created.join(', ') || 'none'}.\nRun ${again} again once the listing catches up: it reuses ${resource}. To delete what this environment created instead: ${again} --remove --yes.`;
  const lines = [`Deploy failed at ${at}: ${code}${resource ? ` (${resource})` : ''}${diagnostic?.providerCodes?.length ? ` (provider ${diagnostic.providerCodes.join(', ')})` : ''}.`];
  const asset = assetFailure(error, redact);
  if (asset) lines.push(`${asset}.`);
- const transport = providerTransport(error, redact);
+ const transport = providerFailure(error, redact);
  if (transport) lines.push(`${transport}.`);
  if (diagnostic?.output && diagnostic.output !== '(no provider output)') lines.push(`First redacted output lines:\n${diagnostic.output}`);
  lines.push(`Resources created this attempt: ${created.join(', ') || 'none'}.`);
@@ -146,6 +146,7 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
 
 function recovery({ code, at, resource, again, retry, secretChange }) {
  const remove = `${again} --remove --yes`, removing = retry === remove;
+ if (code === 'provider-incomplete-pagination') return `Cloudflare did not supply a complete list. Inspect the named GET call in Cloudflare, resolve its missing continuation, then run ${retry} again with the same account and environment. Keep the deployment record so rer can reuse its resources.`;
  if (code === 'owned-resource-replaced' || code === 'resource-name-collision') return `rer refuses to change a resource it did not create or that was replaced after it did; nothing was changed. Choose another --environment name, or remove the other resource yourself.`;
  // A lost create answer: the resource may exist, and rer cannot prove it made it.
  if (resource && (code === 'uncertain-resource-create' || code === 'provider-transport-failed' && at.startsWith('create '))) {

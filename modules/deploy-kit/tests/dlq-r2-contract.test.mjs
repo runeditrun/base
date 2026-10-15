@@ -18,7 +18,7 @@ test('R2 explicit null pagination is terminal only for a short requested-limit p
   const full = cloudflare({accountId,token:'fixture',fetch:async () => Response.json({success:true,result:{buckets:Array.from({length:1000},(_,i)=>({name:`bucket-${i}`}))},result_info:null})});
   await assert.rejects(full.list('/r2/buckets',{field:'buckets',pagination:'cursor'}),/incomplete-pagination/);
   const missing = cloudflare({accountId,token:'fixture',fetch:async () => Response.json({success:true,result:{buckets:[]}})});
-  await assert.rejects(missing.list('/r2/buckets',{field:'buckets',pagination:'cursor'}),/incomplete-pagination/);
+  assert.deepEqual(await missing.list('/r2/buckets',{field:'buckets',pagination:'cursor'}),[]);
 });
 
 test('declared DLQ is provisioned as a queue and reconciled at consumer top level, including no-write health', async () => {

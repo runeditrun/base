@@ -1,10 +1,9 @@
 import { r2ObjectPages, r2ObjectPath } from './r2-objects.mjs';
 import { rm } from 'node:fs/promises';
-import { assert } from './validation.mjs';
+import { assert, hexId } from './validation.mjs';
 import { resourceKinds, findResource } from './resources.mjs';
 import { activeWorker } from './worker.mjs';
 import { deleteWorker } from './teardown.mjs';
-import { workerConsumerScript } from './queue-consumer.mjs';
 import { query } from './migrations.mjs';
 import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, sameDeployment, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
 
@@ -77,17 +76,21 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
       // A Worker that consumes one of these queues is released first.
       for (const queue of doomed.filter(item => item.kind === 'queues')) {
         for (const consumer of await api.list(`/queues/${queue.id}/consumers`, {pagination:'single'})) {
-          if (workerConsumerScript(consumer) === target.worker) await api.request(`/queues/${queue.id}/consumers/${consumer.consumer_id}`, {method:'DELETE'});
+          assert(hexId(consumer.consumer_id), 'invalid-consumer-id');
+          await api.request(`/queues/${queue.id}/consumers/${consumer.consumer_id}`, {method:'DELETE'});
         }
       }
       if (worker) { await deleteWorker({api, worker, ...(clock ? {clock} : {}), ...(sleep ? {sleep} : {})}); removed.push(`worker:${worker}`); }
       for (const item of doomed) {
         try {
           if (item.kind === 'r2') await removeBucket(api, item);
-          else await remove[item.kind](api, item.id, item.name);
+          else {
+            await remove[item.kind](api, item.id, item.name);
+            if (item.kind === 'queues') await waitForQueueRemoval(api,item,{clock,sleep});
+          }
           removed.push(`${item.kind}:${item.name}`);
         }
-        catch (error) { failed.push({resource:`${item.kind}:${item.name}`, code:error.message}); }
+        catch (error) { failed.push({resource:`${item.kind}:${item.name}`, code:error.message, error}); }
       }
       // Only complete, successful reads prove absence. Keep every unverified
       // resource recorded even when its DELETE returned success.
@@ -158,4 +161,19 @@ async function removeBucket(api, {name, entry}) {
   }
   await checkBucket(api, name, entry);
   await api.request(`/r2/buckets/${name}`, {method:'DELETE'});
+}
+
+// Queue deletion and its account listing can settle separately. Finish the
+// readback within this removal invocation, without replaying the DELETE.
+async function waitForQueueRemoval(api, item, {clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve,ms))}) {
+  const start = clock();
+  for (;;) {
+    if (!(await resourceKinds.queues.list(api)).some(row => row.queue_id === item.id)) return;
+    if (clock() - start >= 60000) {
+      const error = new Error('queue-removal-not-confirmed');
+      error.providerCall = {operation:'GET /queues',reason:'Cloudflare still lists the deleted queue after 60 seconds'};
+      throw error;
+    }
+    await sleep(500);
+  }
 }

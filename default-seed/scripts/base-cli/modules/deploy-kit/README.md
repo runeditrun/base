@@ -411,3 +411,32 @@ narrowing where Cloudflare omits service-binding `props` from settings/version
 readback. Ordinary `allowedHosts` still maps to `props` and retains strict
 readback; missing props are never silently accepted. See the
 [egress service guide](../egress-service/README.md).
+
+### List completion and deployment failures
+
+Every Cloudflare list read uses `pagination.mjs`, including reads through
+`request` (Worker versions, deployments, secrets and schedules, consumers,
+domains, zones, routes and Container applications), account inventories and streaming R2 object pages.
+The endpoint's strategy chooses request parameters; the shared reader decides
+completion. Missing/null `result_info` on a short requested-limit page is
+terminal. Missing/empty cursors and reached `total_pages` are terminal unless
+other metadata explicitly advertises unread rows. Continuation cursors and page
+counts are followed. Contradictory totals, repeated cursors, malformed metadata,
+request limits and a truncated reply with no continuation still refuse.
+
+`provider-incomplete-pagination` identifies a list with insufficient continuation
+information, rather than a Cloudflare error code. CLI failures name its GET path;
+Cloudflare error codes/messages are printed when the provider supplied them, and
+otherwise explicitly identified as unavailable. Resolve the named call's cause
+and rerun the printed command with the same account and environment; preserve
+the ownership record. Removal detaches all consumers of an owned queue before
+queue deletion and polls its listing for absence without repeating the DELETE.
+
+`owner-claim-failed` is the hosted bootstrap failure, after an app may already
+have been deployed. The CLI retains the observed POST path, HTTP status and
+application error code even when a function hook throws a generic failure.
+Correct owner authorization or token inputs and rerun deploy; unknown supplied
+tokens should be left unset so rer issues a fresh one. The existing owner is
+kept, and a successful claim retires the one-time token. A hook that fails
+without an HTTP exchange can only supply its own cause. Seeds copy this guide
+and `RUN-LOCALLY.md` for these recovery instructions.

@@ -40,7 +40,7 @@ test('owned R2 removal retains proof on interrupted purge and refuses replacemen
     return response;
    }
    if (scenario === 'bucket-remains' && method === 'DELETE' && url.pathname.endsWith(`/r2/buckets/${f.name}`)) return Response.json({success:true,result:{}});
-   if (scenario === 'incomplete-pagination' && url.pathname.endsWith('/objects')) return Response.json({success:true,result:[{key:'a first'}],result_info:{cursor:'next'}});
+   if (scenario === 'incomplete-pagination' && url.pathname.endsWith('/objects')) return Response.json({success:true,result:[{key:'a first'}],result_info:{is_truncated:true}});
   });
   if (scenario === 'partial-delete') f.fail('DELETE', /\/objects\/z%20last$/, {status:403});
   await assert.rejects(f.remove(), error => {
@@ -104,7 +104,7 @@ test('owned R2 removal purges short object listings without metadata and refuses
    await assert.rejects(f.remove(), error => {
     assert.equal(error.message,'remove-incomplete');
     assert.deepEqual(error.remaining,[`r2:${f.name}`]);
-    assert.equal(error.failed[0].code,scenario.startsWith('full-') ? 'provider-incomplete-pagination' : scenario === 'duplicate' ? 'invalid-r2-object-list' : 'provider-invalid-cursor');
+    assert.equal(error.failed[0].code,scenario.startsWith('full-') ? 'provider-incomplete-pagination' : scenario === 'duplicate' ? 'invalid-r2-object-list' : scenario === 'missing-cursor' ? 'provider-incomplete-pagination' : 'provider-invalid-cursor');
     return true;
    });
    assert.deepEqual([...f.objects.keys()],keys);

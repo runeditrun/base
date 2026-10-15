@@ -45,7 +45,7 @@ async function main() {
     let result;
     if (verb === 'run') {
       const statusCommand = [process.execPath, fileURLToPath(import.meta.url), 'status', '--json'].map(shellQuote).join(' ');
-      result = await queue.run(command, { ...options, onWaiting: (reason, details) => {
+      result = await queue.run(command, { ...options, onWaiting: (_reason, details) => {
         if (!options.json) console.error(`${waitingMessage(details)}\nInspect the queue with: ${statusCommand}`);
       } });
       if (result.timedOut) console.error(`Job queue max-wait expired: ${result.reason} (exit ${result.code})`);

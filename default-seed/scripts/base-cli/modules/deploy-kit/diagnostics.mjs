@@ -14,6 +14,7 @@ export function deployDiagnostic(error, redact) {
   return {code,step:detail.step ?? 'deploy',created:(detail.created ?? []).map(clean),
     ...(typeof error.resource==='string' && /^(?:d1|r2|kv|queues|worker|service):[a-z0-9-]+$/.test(error.resource) ? {resource:clean(error.resource)} : {}),
     ...(detail.providerCodes?.length ? {providerCodes:detail.providerCodes} : {}),
+    ...(redact && providerFailure(error,redact) ? {provider:providerFailure(error,redact)} : {}),
     output:(detail.output ? (redact ? clean(detail.output) : '(provider output withheld; rer deploy provides redacted details)') : '(no provider output)').split(/\r?\n/).slice(0,8).map(line=>line.slice(0,500)).join('\n')};
 }
 /** One line naming the provider call that was refused and what Cloudflare said, from
@@ -50,10 +51,11 @@ const CREATED_KINDS = {D1:'d1',R2:'r2',KV:'kv',queue:'queues'};
 export function deploymentDiagnostics(api, {onCreated} = {}) {
   const created = [];
   const recordCreated = resource => { created.push(resource); onCreated?.(resource); };
-  let currentStep = 'prepare deploy';
+  let currentStep = 'prepare deploy', currentCall;
   const guard = method => async (path, options) => {
     const step = operation(path,options);
     currentStep = step;
+    currentCall = `${method === 'list' ? 'GET' : options?.method ?? 'GET'} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`;
     try {
       const result = await api[method](path,options);
       if (step.startsWith('create ')) recordCreated(`${step.slice(7)}:${options.body.name ?? options.body.queue_name ?? options.body.title}`);
@@ -61,6 +63,7 @@ export function deploymentDiagnostics(api, {onCreated} = {}) {
     } catch (error) {
       // A failed create names the resource it asked for: a lost answer may still have created it.
       if (step.startsWith('create ') && error.resource === undefined) error.resource = `${CREATED_KINDS[step.slice(7)]}:${options.body.name ?? options.body.queue_name ?? options.body.title}`;
+      error.providerCall ??= {operation:currentCall,reason:error.message};
       throw recordDeployFailure(error,{step,created:[...created]});
     }
   };
@@ -72,6 +75,7 @@ export function deploymentDiagnostics(api, {onCreated} = {}) {
     },
     annotateFailure(error, step = currentStep) {
       const prior = failures.get(error);
+      if (currentCall) error.providerCall ??= {operation:currentCall,reason:error.message};
       // Node filesystem/CLI codes are structural; their messages can hold paths
       // and inputs, so retain them privately for the caller's redaction boundary.
       const cliCode = typeof error.code === 'string' && /^(?:E[A-Z0-9_]{1,63}|health-[a-z-]+)$/.test(error.code) ? error.code : undefined;
@@ -81,6 +85,16 @@ export function deploymentDiagnostics(api, {onCreated} = {}) {
     }};
 }
 
+/** All provider failure paths share the same safe, portable rendering. */
+export function providerFailure(error, redact = String) {
+  const specific = providerRefusal(error,redact) ?? providerTransport(error,redact);
+  if (!specific && error?.cause instanceof Error) return providerFailure(error.cause,redact);
+  if (specific) return specific;
+  const call = error?.providerCall;
+  if (typeof call?.operation !== 'string') return undefined;
+  const clean = value => redact(String(value)).replace(/[\x00-\x1f\x7f-\x9f]+/g,' ').replace(/\b[a-f0-9]{32}\b/gi,'[REDACTED]').slice(0,300);
+  return `Cloudflare call ${clean(call.operation)}: ${clean(call.reason ?? error.message)} (no Cloudflare error code or message supplied)`;
+}
 
 // Asset paths are build inputs; the CLI still redacts them before display.
 export function nameAssetFailure(error, paths, status = error.status ?? error.providerTransport?.status) {
