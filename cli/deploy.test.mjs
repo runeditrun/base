@@ -92,7 +92,7 @@ test('owner deploy reports the failed provider step and completed creates withou
     return true;
    });
    assert.equal((await lifecycleError(failure,store)).message,failure.message,'approved deploy cause survives lifecycle completion');
-   assert.equal(failures,1,'the failed provider request is never retried');
+   assert.equal(failures,path.test('/workers/assets/upload') && kind.endsWith('transport') ? 2 : 1,'only content-addressed asset transport failures are replayed');
    assert.equal(provider.state.databases.length,1);
    assert.equal(provider.state.buckets.length,step==='create R2'?0:1);
    assert.equal(provider.state.settings,null,'the failed attempt did not publish a Worker');

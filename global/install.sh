@@ -12,8 +12,8 @@
 # `npx -y @runeditrun/rer cli install`. A failure leaves any previous install
 # selected and working. It never edits shell profiles.
 #
-# Needs curl, tar and Node (the package's minimum). macOS or Linux on x64 or
-# arm64; on Windows, run it inside WSL2.
+# Needs curl and tar. If Node 22 or later is absent, installs the pinned official
+# Node release in rer's own data directory. macOS/Linux x64/arm64; Windows: WSL2.
 
 # Everything runs from main, so a partly downloaded script does nothing.
 main() {
@@ -29,7 +29,7 @@ main() {
   x86_64 | amd64 | arm64 | aarch64) ;;
   *) fail "this processor ($(uname -m)) is not supported; rer runs on x64 and arm64." ;;
  esac
- for tool in curl tar node; do
+ for tool in curl tar; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required. Install it, then run this again."
  done
 
@@ -38,6 +38,11 @@ main() {
  work=$(mktemp -d "${TMPDIR:-/tmp}/rer-install.XXXXXX")
  trap 'rm -rf "$work"' EXIT
  trap 'exit 130' INT TERM
+
+ # Bootstrap before reading npm metadata; no npm global install or PATH links.
+ if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+  install_node
+ fi
 
  curl -fsSL --proto '=http,https' -H 'Accept: application/json' "$registry/@runeditrun%2frer" -o "$work/metadata.json" \
   || fail "could not read $package from $registry."
@@ -134,6 +139,54 @@ NODE
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
  RER_INSTALL_CHANNEL=script node "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
+}
+
+install_node() {
+ node_version=22.20.0
+ case "$(uname -s)" in Darwin) node_os=darwin ;; Linux) node_os=linux ;; esac
+ case "$(uname -m)" in x86_64 | amd64) node_arch=x64 ;; arm64 | aarch64) node_arch=arm64 ;; esac
+ node_name="node-v$node_version-$node_os-$node_arch"
+ data="${XDG_DATA_HOME:-$HOME/.local/share}/rer"
+ node_home="$data/runtimes/$node_name"
+ if [ ! -x "$node_home/bin/node" ] || [ "$("$node_home/bin/node" --version 2>/dev/null)" != "v$node_version" ]; then
+  printf 'Installing Node %s in %s from the checksum-verified nodejs.org release.\n' "$node_version" "$node_home"
+  archive="$node_name.tar.gz"
+  release="https://nodejs.org/dist/v$node_version"
+  curl -fsSL --proto '=https' "$release/SHASUMS256.txt" -o "$work/SHASUMS256.txt" \
+   || fail "could not download Node $node_version checksums from nodejs.org."
+  curl -fL --proto '=https' "$release/$archive" -o "$work/$archive" \
+   || fail "could not download Node $node_version from nodejs.org."
+  expected=$(awk -v file="$archive" '$2 == file { print $1 }' "$work/SHASUMS256.txt")
+  [ "${#expected}" -eq 64 ] || fail "nodejs.org gives no unique SHA-256 for $archive."
+  case "$expected" in *[!0-9a-f]*) fail "nodejs.org gives an invalid SHA-256 for $archive." ;; esac
+  if command -v shasum >/dev/null 2>&1; then
+   actual=$(shasum -a 256 "$work/$archive")
+  elif command -v sha256sum >/dev/null 2>&1; then
+   actual=$(sha256sum "$work/$archive")
+  else
+   fail 'SHA-256 verification needs shasum or sha256sum. Install one, then run this again.'
+  fi
+  [ "${actual%% *}" = "$expected" ] || fail "Node $node_version does not match nodejs.org's SHA-256; nothing was installed."
+  mkdir "$work/node"
+  tar -xzf "$work/$archive" -C "$work/node" || fail "could not unpack Node $node_version."
+  [ "$("$work/node/$node_name/bin/node" --version)" = "v$node_version" ] || fail "Node $node_version cannot run on this system."
+  mkdir -p "$data/runtimes"
+  # Move only into our prefix, and never overlay an existing runtime.
+  [ ! -e "$node_home" ] || fail "the private Node runtime at $node_home is damaged; remove that directory and run this again."
+  mv "$work/node/$node_name" "$node_home"
+ fi
+ # A private link lets future launchers and updates find the managed runtime.
+ # Node's rename replaces an existing symlink atomically on macOS and Linux.
+ "$node_home/bin/node" - "$data" "$node_name" <<'NODE' || exit 1
+var fs = require('fs'), path = require('path');
+var root = process.argv[2], temporary = path.join(root, '.node-' + process.pid);
+try {
+ fs.symlinkSync(path.join('runtimes', process.argv[3]), temporary);
+ fs.renameSync(temporary, path.join(root, 'node'));
+} finally { try { fs.unlinkSync(temporary); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
+NODE
+ PATH="$node_home/bin:$PATH"
+ export PATH
 }
 
 fail() {

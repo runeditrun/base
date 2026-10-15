@@ -6,7 +6,7 @@ import { securityHeaders } from '../http.mjs';
 const post = (input, cookie) => ({ method: 'POST', input, cookie });
 
 test('real D1 preview and multipart mail preserve expiry, branding and single-use semantics', async () => {
-  const r = await runtime({ branding: { productName: 'A <B> & Friends', accentColor: '#ffffff', signInPath: '/signin' }, linkSeconds: 1200 });
+  const r = await runtime({ branding: { productName: 'A <B> & Friends', accentColor: '#ffffff', signInPath: '/signin' }, linkSeconds: 1200, invitationSeconds: 1200 });
   try {
     const owner = await r.bootstrap();
     for (const kind of ['magic', 'invite']) {

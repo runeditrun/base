@@ -3,7 +3,7 @@ import { ownerProvider } from '../../modules/deploy-kit/tests/owner-provider.mjs
 // Only the provider and hosted HTTP edge are fake. The dispatcher, hook, owner
 // claim, token retirement and finalization run in the real CLI child process.
 const provider = ownerProvider();
-let elapsed = 0, finalizing = false, probes = 0, claims = 0;
+let elapsed = 0, finalizing = false, probes = 0, claims = 0, claimRoutes = 0;
 performance.now = () => elapsed;
 process.once('exit', () => provider.close());
 export function hookReturned() { elapsed += 90000; finalizing = true; }
@@ -13,6 +13,7 @@ globalThis.fetch = async (input, init = {}) => {
  if (url.pathname === '/auth/bootstrap') {
   const token = JSON.parse(init.body).token;
   if (token !== provider.state.secrets.find(item => item.name === 'SETUP_TOKEN')?.value) return Response.json({ error: 'invalid_setup_token' }, { status: 403 });
+  if (++claimRoutes === 1) return new Response('error code: 1042', {status:404});
   if (++claims !== 1) throw Error('The first deploy must claim only once');
   return new Response(null, { status: 303 });
  }

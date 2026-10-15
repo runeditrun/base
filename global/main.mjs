@@ -36,7 +36,7 @@ import, doctor, describe, check, release. Run rer VERB --help in a checkout for 
 
 // The checkout verbs that install the pinned package before they run when
 // node_modules holds another version or none (dev installs it in its launch).
-const installsFirst = new Set([...Object.keys(verbs), 'signin', 'release'].filter(verb => verb !== 'dev'));
+const installsFirst = new Set([...Object.keys(verbs), 'signin', 'release'].filter(verb => !['dev', 'doctor'].includes(verb)));
 
 export async function main(argv) {
  handleBrokenPipes();
@@ -51,7 +51,7 @@ export async function main(argv) {
  delete process.env[localDefaults];
  if (verb === 'update') return (await import('./update/command.mjs')).update(argv.slice(1));
  const notice = await import('./update/notice.mjs');
- if (notice.wantsNotice(argv)) await notice.updateNotice();
+ if (verb !== 'doctor' && notice.wantsNotice(argv)) await notice.updateNotice();
  if (!verb || verb === '--help' || verb === '-h' || verb === 'help') { process.stdout.write(help); return 0; }
  if (verb === 'cli') return (await import('./cli/command.mjs')).cliCommand(argv.slice(1));
  if (verb === 'list') return (await import('./list.mjs')).listCommand(argv.slice(1));
@@ -65,6 +65,13 @@ export async function main(argv) {
   const { jobsDirectory } = await import('../modules/job-queue/config.mjs');
   process.env.RER_SERVERS_DIR = serversDirectory(process.env);
   process.env.RER_JOBS_DIR = jobsDirectory(process.env);
+  if ((mode !== 'bundled' || pinnedPackage(target.root)) && verb === 'doctor' && !argv.includes('--help')) {
+   const { parse } = await import('../cli/parse.mjs');
+   try { parse(target.args, target.root); }
+   catch (error) { process.stderr.write(error.message + '\n'); return error.exitCode ?? 2; }
+   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
+   if (code !== undefined) return code;
+  }
   const bootstrap = pinnedPackage(target.root)?.ready === false && installsFirst.has(verb);
   if ((bootstrap || ['install', 'setup', 'dev', 'preview', 'build', 'verify'].includes(verb)) && !argv.includes('--help') && !argv.includes('--stop')) {
    const { parse } = await import('../cli/parse.mjs');
@@ -98,9 +105,12 @@ export async function main(argv) {
   const { installPinned } = await import('./launch/install-pinned.mjs'), { LaunchFailure } = await import('./launch/failure.mjs');
   try { await installPinned(target.root); }
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
-  return delegate(target, target.args);
  }
  if (mode === 'package' && installsFirst.has(verb)) await (await import('./launch/install-pinned.mjs')).settledPin(target.root);
+ if (first && dispatcher(target.root).mode !== 'bundled' && ['install', 'verify'].includes(verb) && !argv.includes('--help') && !argv.includes('--site')) {
+  const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
+  if (code !== undefined) return code;
+ }
  if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target);
  // Every other server start or queued job on a vendored pin gets the person
  // defaults too (a pinned package applies its own).

@@ -26,7 +26,7 @@ export async function boundedJSON(response, limit) {
   try { return JSON.parse(await boundedText(response,limit)); } catch (error) { if (error instanceof SyntaxError) throw new Error('malformed-response'); throw error; }
 }
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
-export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500 }) {
+export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500, removal = false }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
   assert(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'invalid-cloudflare-api-token');
   let requests = 0;
@@ -49,13 +49,14 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       error.providerTransport = {operation:redactCredentials(operation),endpoint,attempts,status,reason:transportReason(cause)};
       return recordDeployFailure(error,{output:redactAuth(transportOutput(cause))});
     };
-    const {response,attempts} = await providerResponse({method,timeoutMs,callerSignal,
+    const {response,output = ''} = await providerResponse({method,timeoutMs,callerSignal,removal,
+      replayableAsset:method === 'POST' && (/^\/workers\/scripts\/[^/]+\/assets-upload-session$/.test(path) || path === '/workers/assets/upload?base64=true'),
       reserveRetry:() => requests < maxRequests && (++requests, true),failure:transportFailure,
+      consume:(response,attempts) => response.body ? boundedText(response,undefined,cause => transportFailure(cause,attempts,response.status)) : '',
       send:signal => isR2ObjectDelete(path, method) ? objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     })});
-    const output = response.body ? await boundedText(response,undefined,cause => transportFailure(cause,attempts,response.status)) : '';
     // A successful DELETE may have no response body (including HTTP 200).
     // Nonempty replies and all other methods still require the API envelope.
     if (method === 'DELETE' && response.ok && output === '') return { success: true, result: null };

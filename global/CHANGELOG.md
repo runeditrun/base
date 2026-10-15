@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The shell installer acquires checksum-verified Node 22 in rer's private prefix when needed, leaving system tools alone. The launcher keeps using it without Node on PATH. `rer install` and `rer verify` acquire the checkout's Playwright Chromium and headless shell; `rer doctor` reports missing browser files with `rer install` as the fix, including through the global command for older checkout pins.
+
 ## 0.2.24
 
 - Hosted demos stay up through redeploys. The demo's Container application keeps a live demo's instance for an hour (`rollout_active_grace_period`), so a deploy that changes the image, instance type or limit no longer ends idle visitors' demos ("This demo has ended" within two minutes before).
