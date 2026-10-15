@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.10
+
+- First-owner bootstrap and signed owner claims use a client-IP rate budget, so junk setup-token requests from another client cannot block the correct claim. Repeated wrong tokens from one client remain limited.
+
+### Upgrade notes
+
+- Seeds receive this auth runtime fix with their next Base refresh. Updating the rer package alone does not replace seed-owned runtime copies.
+
 ## 0.2.9
 
 - `rer deploy --remove --yes` empties each R2 bucket whose saved creation identity proves rer owns it, deletes the bucket, and verifies removal. Buckets with uncertain or replaced ownership are refused; interrupted deletion retains the deployment record so removal can resume.
