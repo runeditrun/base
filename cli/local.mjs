@@ -40,16 +40,18 @@ export async function selectedOrigin(project, options, { setup = false } = {}) {
 }
 
 export async function availablePort(host, port, { root, saved = false } = {}) {
+ const { portListener, inspectionContext } = await shared('process-diagnostics.mjs');
+ const context = inspectionContext();
  const socket = createServer();
  try { await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(port, host, resolve); }); }
  catch (error) {
   if (error.code !== 'EADDRINUSE') throw refuse(`Port ${port} cannot be used on ${host}: ${error.code ?? error.message}.`);
-  throw refuse(await busyPortMessage({ port, host, root, saved }));
+  throw refuse(await busyPortMessage({ port, host, root, saved, context }));
  }
  finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
  // A server on every address (*:port) lets a bind to 127.0.0.1 succeed.
- const { portListener } = await shared('process-diagnostics.mjs');
- if (await portListener(port, host)) throw refuse(await busyPortMessage({ port, host, root, saved }));
+ const listener = await portListener(port, host, context);
+ if (listener) throw refuse(await busyPortMessage({ port, host, root, saved, context, listener }));
 }
 
 export {setupInput} from './setup-input.mjs';

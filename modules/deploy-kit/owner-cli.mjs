@@ -1,3 +1,4 @@
+import { readinessWindow, rememberReadiness } from './readiness-window.mjs';
 import { deploymentDiagnostics, deployDiagnostic } from './diagnostics.mjs';
 import { execFileSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
@@ -25,7 +26,7 @@ async function ownerArtifact(root, product) {
 }
 
 /** Inputs: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, plus the secrets the declaration names on first deploy. */
-export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, settle, localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
+export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, propagation, settle, localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
   let parsed;
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string'},unset:{type:'string'},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
@@ -44,6 +45,15 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   assert(typeof declaration?.project === 'string','missing-owner-project');
   // Removal reads identity before each object DELETE and may span many pages.
   // Bound each response, not the owner's bucket size; failures retain ownership.
+  let requestWindow = propagation?.freshUpload ? propagation.window : undefined;
+  const request = fetch;
+  fetch = (input, init = {}) => {
+    if (!requestWindow?.active) return request(input, init);
+    const remaining = requestWindow.remaining();
+    assert(remaining > 0, 'deployment-readiness-timeout');
+    const deadline = AbortSignal.timeout(Math.max(1, Math.ceil(remaining)));
+    return request(input, {...init,signal:init.signal ? AbortSignal.any([init.signal,deadline]) : deadline});
+  };
   const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch,...(command === 'remove' ? {maxRequests:Infinity} : {})}),{onCreated});
   const target = await ownerTarget(api,{project:declaration.project,environment:values.environment});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${target.environment}.json`);
@@ -79,18 +89,28 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   const artifact = await ownerArtifact(root,values.product);
   const plan = ownerPlan(target,current,artifact,{localOnlyKeys});
   if (command === 'health') {
-    await ownerHealth({api,target,plan,statePath,fetch,healthOptions:{...healthOptions,readiness:{single:true,totalMs:30000}}}).catch(error=>{throw api.annotateFailure(error,'health');});
+    const readiness = {...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}),
+      ...healthOptions?.readiness,single:true,totalMs:30000,
+      ...(propagation ? {window:propagation.window,freshUpload:propagation.freshUpload && propagation.versionId === state.receipt?.provider.versionId} : {})};
+    await ownerHealth({api,target,plan,statePath,fetch,healthOptions:{...healthOptions,readiness}}).catch(error=>{throw api.annotateFailure(error,'health');});
     return {ok:true,worker:target.worker,origin:target.origin};
   }
   // Dispatch is the provider's: on some accounts a new Cron starts only at the account scheduler's next refresh.
   if (plan.crons.length) notice(cronNotice);
   // The fingerprint names every declared secret, retired ones too: an untouched repeat after the claim is a no-op.
   const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys}).secrets;
-  const {receipt,created,sentSecrets} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,settle,declaredSecrets}).catch(error => {
+  const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness});
+  requestWindow = window;
+  const {receipt,created,sentSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });
-  return {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,retiredSecrets,...(state.ownerClaim ? {ownerClaim:state.ownerClaim} : {}),state:statePath};
+  const result = {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,retiredSecrets,...(state.ownerClaim ? {ownerClaim:state.ownerClaim} : {}),state:statePath};
+  const sentTokens = new Map(sentSecrets.map(binding => [binding,env[declaration.secrets.find(item => item.binding === binding)?.environment]]));
+  Object.defineProperty(result, 'propagation', {value: {window,freshUpload,sentSecrets,versionId:receipt.provider.versionId,
+    matchesToken:(binding,token) => sentTokens.has(binding) && sentTokens.get(binding) === token}});
+  rememberReadiness(result);
+  return result;
 }
 
 /** Prints refusal codes and resource names only; never inputs, tokens or provider bodies. */
