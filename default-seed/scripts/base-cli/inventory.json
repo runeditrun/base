@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.9-dev.gf798342d",
+  "cliVersion": "0.2.11-dev.gb96dff50",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1707,7 +1707,7 @@
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
-      "sha256": "efff8220a192d8def2a9642fa14429958a103c9c887b052882c621a5ca343c54"
+      "sha256": "c42b4bb9f335a4645d523a5547690bc1f20c3286a6c9a546adc2d139e1045340"
     },
     "modules/operator-auth/dev/badge.mjs": {
       "source": "modules/operator-auth/dev/badge.mjs",
@@ -1719,7 +1719,7 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "e9882a4a3c4cc75246f29a98d8e3fc251208875c0e31e0e5f32b5715717e289c"
+      "sha256": "ae8199a60f7017cdb830f7760cf1e8804d136fcbce7c8ecbd3110fc1b94992bc"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
@@ -1815,7 +1815,7 @@
     },
     "modules/operator-auth/identity/oidc/index.mjs": {
       "source": "modules/operator-auth/identity/oidc/index.mjs",
-      "sha256": "c8de8f8fd8672e0f7d44cd062d05ea8074a8ce900a423437713973fa169af90b"
+      "sha256": "18cd11dd1cdf57b207491a6b8d2f4ba9c9b74ca7f7ba6126ad2145c5d3389144"
     },
     "modules/operator-auth/identity/oidc/jwt.mjs": {
       "source": "modules/operator-auth/identity/oidc/jwt.mjs",
@@ -1869,9 +1869,13 @@
       "source": "modules/operator-auth/policy.mjs",
       "sha256": "d535aba35621d333cd6faae49fc3c6cb72e1d5718741f02d363cbe3e8eaf153c"
     },
+    "modules/operator-auth/rejected-response.mjs": {
+      "source": "modules/operator-auth/rejected-response.mjs",
+      "sha256": "38c4e7621901173d0bca9bc62587486951ce24d2e0e31e97f26e1dfe406c9726"
+    },
     "modules/operator-auth/routes.mjs": {
       "source": "modules/operator-auth/routes.mjs",
-      "sha256": "5337330fca02e8862e42750232967ef084f0d7b5bf0c01cb3f3a6e844c4f6cf3"
+      "sha256": "060f5514244a228acb7aebac60658217a87745b18a0f76e8332a0dec2a3db3dc"
     },
     "modules/operator-auth/service.mjs": {
       "source": "modules/operator-auth/service.mjs",

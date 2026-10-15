@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.11
+
+- New Base foundations generate public Run instructions for the edition's planned product repository, distinct migration ordinals, and setup names matching the edition.
+- Owned early auth, OIDC, local dev and template refusals finish ordinary request bodies before responding. Oversized or stalled uploads are bounded while privacy headers are retained.
+
+### Upgrade notes
+
+- Seeds receive these source changes with their next Base refresh; changing the npm pin alone does not refresh seed-owned runtime copies. Existing applied migration histories keep their names.
+- Optional import-kit selection remains deferred until a canonical complete migration schema can drive generation; product import flows still need their own authorized adapter.
+
 ## 0.2.10
 
 - First-owner bootstrap and signed owner claims use a client-IP rate budget, so junk setup-token requests from another client cannot block the correct claim. Repeated wrong tokens from one client remain limited.

@@ -1,3 +1,4 @@
+import { rejectedResponse } from './rejected-response.mjs';
 import { identitySettingsPage } from './accounts/settings-page.mjs';
 import { confirmationResponse } from './identity/email-link/confirmation.mjs';
 import { createOidcHandler } from './identity/oidc/index.mjs';
@@ -20,7 +21,7 @@ function notice(auth, code, extra = {}) {
 /** Fetch-compatible optional HTTP adapter. Returns null for paths it does not own. */
 export function createAuthHandler(auth) {
   const oidc = auth.providers ? createOidcHandler(auth.providers, { signInPath: auth.presentation.signInPath }) : null;
-  return async function handleAuth(request) {
+  const handleAuth = async function(request) {
     const url = new URL(request.url);
     const path = url.pathname;
     let form = false;
@@ -87,5 +88,9 @@ export function createAuthHandler(auth) {
       // Do not put SQL, email addresses, setup tokens or provider exceptions on the wire.
       return json({ error: 'auth_unavailable' }, 503);
     }
+  };
+  return async function(request) {
+    const response = await handleAuth(request);
+    return response ? rejectedResponse(request, response) : response;
   };
 }
