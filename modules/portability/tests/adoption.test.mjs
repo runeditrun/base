@@ -10,14 +10,15 @@ test('README runtime list copies a self-contained module into a fixture seed wit
   const listed=section.match(/```text\n([\s\S]*?)\n```/)[1].split('\n');assert.ok(listed.length>10);
   const directory=await mkdtemp(join(tmpdir(),'portable-seed-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const root=new URL('../../../',import.meta.url).pathname,copied=join(directory,'vendor/base/modules/portability');
-  for(const file of listed){assert.ok(file.startsWith('modules/portability/') && !file.includes('/tests/'));const target=join(directory,'vendor/base',file);await mkdir(dirname(target),{recursive:true});await cp(join(root,file),target);assert.deepEqual(await readFile(target),await readFile(join(root,file)));}
+  for(const file of listed){assert.ok(['modules/portability/','modules/d1-transport/'].some(prefix=>file.startsWith(prefix)) && !file.includes('/tests/'));const target=join(directory,'vendor/base',file);await mkdir(dirname(target),{recursive:true});await cp(join(root,file),target);assert.deepEqual(await readFile(target),await readFile(join(root,file)));}
   for(const file of listed.filter(x=>x.endsWith('.mjs'))) {
     const text=await readFile(join(directory,'vendor/base',file),'utf8');
     for(const match of text.matchAll(/(?:^\s*(?:import|export)\b[^\n]*?\bfrom\s*|\bimport\s*\()\s*['"]([^'"]+)['"]/gm)) {
       const dependency=match[1];if(dependency.startsWith('node:')){assert.ok(file.includes('/cli'));continue;}
       assert.ok(dependency.startsWith('.'),'runtime has no package dependency');const path=resolve(dirname(join(directory,'vendor/base',file)),dependency);
-      assert.ok(path.startsWith(copied+'/'),'import stays inside copied module');await readFile(path);
-      assert.ok(listed.includes('modules/portability/'+path.slice(copied.length+1)),'needed runtime is listed');
+      const vendor=join(directory,'vendor/base');
+      assert.ok(path.startsWith(vendor+'/modules/'),'import stays inside copied runtime');await readFile(path);
+      assert.ok(listed.includes(path.slice(vendor.length+1)),'needed runtime is listed');
     }
   }
   const worker=join(directory,'worker.mjs'),policy=JSON.stringify({...fixturePolicy,exportRow:undefined});
