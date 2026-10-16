@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { identifier } from './api.mjs';
-import { assertOutbound } from './outbound.mjs';
+import { assertSignals } from './outbound.mjs';
 import { scan } from './scan.mjs';
 
 const PAGE_BYTES = 128 * 1024, QUOTA_BYTES = 2 * 1024 * 1024;
@@ -38,7 +38,7 @@ function validateDocument(document) {
  for (const item of document.signals) {
   if (!object(item) || Object.keys(item).some(key => !allowed.includes(key)) || ['kind', 'value', 'locator', 'repo', 'observedAt'].some(key => typeof item[key] !== 'string') || !['live-use', 'trace'].includes(item.class) || item.size !== undefined && !integer(item.size) || item.mtime !== undefined && typeof item.mtime !== 'string') fail('snapshot signal is invalid');
  }
- assertOutbound(document);
+ assertSignals(document);
 }
 
 const pageDocument = (document, start, end) => ({ schema: document.schema, source: document.source, signals: document.signals.slice(start, end), withheld: start === 0 ? document.withheld : 0 });
@@ -158,7 +158,7 @@ export async function runDiscovery({ task, grant, checkpoint = task?.checkpoint 
   const digest = hash(JSON.stringify([identity, grant.id, grant.fence, index, pages[index].document]));
   const eventId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-${digest.slice(12, 16)}-${digest.slice(16, 20)}-${digest.slice(20, 32)}`;
   const payload = { client_event_id: eventId, consent_id: grant.consent.id, document: pages[index].document };
-  assertOutbound(payload.document);
+  assertSignals(payload.document);
   if (Buffer.byteLength(JSON.stringify({ ...payload, fence: grant.fence, grant_id: grant.id })) > QUOTA_BYTES) fail('upload request exceeds the protocol bound');
   await send(grant.destination, payload);
   await saveCheckpoint(counts(pages, index + 1));

@@ -122,6 +122,8 @@ test('packed CLI pairs only after number approval and keeps keys and untrusted t
  remote.state.root = join(home, 'canary-tree');
  await mkdir(join(remote.state.root, 'secrets'), { recursive: true });
  await writeFile(join(remote.state.root, 'package.json'), JSON.stringify({ dependencies: { 'fixture-library': 'fixture-private-version-never-export' } }));
+ await mkdir(join(remote.state.root, '.github/workflows'), { recursive: true });
+ await writeFile(join(remote.state.root, '.github/workflows/deploy-stage.yml'), 'jobs:\n  deploy:\n    env:\n      TOKEN: ${{ secrets.FIXTURE_CI_API_TOKEN }}\n');
  await writeFile(join(remote.state.root, '.env'), 'FIXTURE_PROVIDER_KEY=fixture-env-never-export');
  await writeFile(join(remote.state.root, 'secrets/credential.json'), 'fixture-denied-value-never-export');
  remote.state.tasks = [{ task_id: 'discover1', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
@@ -130,6 +132,7 @@ test('packed CLI pairs only after number approval and keeps keys and untrusted t
  const outbound = JSON.stringify(remote.state.requests) + discovered.stdout + discovered.stderr;
  for (const canary of ['fixture-private-version-never-export','fixture-env-never-export','fixture-denied-value-never-export']) assert.ok(!outbound.includes(canary), 'private canary values stay out of uploads, events and both output streams');
  assert.ok(remote.state.uploads.some(document => document.signals.some(signal => signal.value === 'fixture-library')));
+ assert.ok(remote.state.uploads.some(document => document.signals.some(signal => signal.value === 'FIXTURE_CI_API_TOKEN')), 'ordinary workflow paths survive scanner and upload detection');
  const key = 'fixture-vendor-secret-never-output';
  const added = await cli(home, ['business','vendor-key','add','sentry'], { input: key + '\n' });
  assert.equal(added.code, 0); assert.ok(added.stdout.includes('sentry:read'));

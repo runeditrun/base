@@ -1,4 +1,4 @@
-import { sensitive } from './detector.mjs';
+import { sensitive, blockedSignal } from './detector.mjs';
 
 export function assertOutbound(value, knownSecrets = []) {
  function visit(item) {
@@ -18,4 +18,12 @@ export function assertChunk(bytes, knownSecrets) {
  // Chunks may be fragments of a JSON document. The detector sees the complete
  // UTF-8 text before any network write, including names and record values.
  assertOutbound(Buffer.from(bytes).toString('utf8'), knownSecrets);
+}
+
+// Names-only signals share the scanner's field-aware path policy. A locator
+// joins ordinary directory names; credential shapes still apply across its
+// entire spelling, and entropy is checked within each path segment.
+export function assertSignals(document) {
+ assertOutbound({ schema: document.schema, source: document.source, withheld: document.withheld });
+ if (document.signals.some(blockedSignal)) throw Error('Business outbound detector refused secret-shaped content.');
 }

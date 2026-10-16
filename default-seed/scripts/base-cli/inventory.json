@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g575cbe38",
+  "cliVersion": "0.2.28-dev.g428d0082",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -387,7 +387,7 @@
     },
     "cli/business/discovery-task.mjs": {
       "source": "cli/business/discovery-task.mjs",
-      "sha256": "ff6959392a1a1c11df179965a43cfe3718d5f3b2527ff0ceb1527a8e0f656608"
+      "sha256": "15c0e2bcbb26654b8b6770dc05ea20197183942d566bf26cb6fc375460f443be"
     },
     "cli/business/keychain.mjs": {
       "source": "cli/business/keychain.mjs",
@@ -403,7 +403,7 @@
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
-      "sha256": "bed06cfeb5b0c21ca351b4726bea886ac7deb68eeb8d64e98e254ced95e38e67"
+      "sha256": "191f2274d47adfa706bfe4a258c7ab50a37a3569edb20837b317a5279460825f"
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
