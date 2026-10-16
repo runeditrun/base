@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g01b782a6",
+  "cliVersion": "0.2.28-dev.g2ab260eb",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2176,6 +2176,10 @@
     "modules/owner-claim/transaction.mjs": {
       "source": "modules/owner-claim/transaction.mjs",
       "sha256": "56f9cf605a5a4afae2be22012e84035e661fb38c07612ec7d4f8cdc39526aa54"
+    },
+    "modules/owner-claim/verify.d.mts": {
+      "source": "modules/owner-claim/verify.d.mts",
+      "sha256": "2af3697c67421d2105e2f45cedcced5b1ed562978b7007003189f93d0dd597c5"
     },
     "modules/owner-claim/verify.mjs": {
       "source": "modules/owner-claim/verify.mjs",
