@@ -352,17 +352,22 @@ denied file keeps its own path, size and modification time.
 
 A nested checkout with its own `.git` directory starts a new repository: its
 signals use that directory's basename and locators relative to it. Gitdir files
-for submodules also start repository boundaries; linked-worktree gitdir files
-are skipped without following their pointers. Agent and editor folders such as
+for submodules also start repository boundaries; below each scan root,
+linked worktrees are skipped without following their gitdir pointers. Agent
+and editor folders such as
 `.claude/`, `.codex/`, `.cursor/`, `.worktrees/`, `.idea/`, `.vscode/`,
-`.windsurf/` and `.continue/` are skipped, including when named explicitly.
+`.windsurf/` and `.continue/` are also skipped below each scan root. A
+caller-named linked worktree or tool directory is scanned, as is a root beneath
+tool directories.
 The document's `skipped` object counts pruned boundaries by kind:
 `linkedWorktrees`, `toolDirectories`, `generatedDirectories` (including
 dependencies), and `gitDirectories`. These counts contain no paths and count
-only the skipped boundary, not anything inside it. Git metadata, including
-`.git/worktrees/`, is never walked. Generated and vendored trees are excluded
-relative to each scan root, so an explicitly named ordinary root remains
-scannable even below a directory named `build` or `vendor`.
+only the skipped boundary, not anything inside it. Git metadata below a scan
+root, including `.git/worktrees/`, is never walked. A root that is itself a
+`.git` directory is refused with a nonzero exit status and no paths in the
+output. Generated and vendored trees are excluded relative to each scan root,
+so an explicitly named ordinary root remains scannable even below a directory
+named `build` or `vendor`.
 
 `config-key` observations come only from JSON (including JSONC), YAML and TOML
 files in configuration directories (such as

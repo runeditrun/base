@@ -33,21 +33,24 @@ export async function scan(directories) {
  for (const requested of roots) {
   const root = await realpath(requested);
   const rootInfo = await lstat(root), base = rootInfo.isDirectory() ? root : dirname(root);
+  if (rootInfo.isDirectory() && (gitDirectory(basename(root)) || gitDirectory(basename(requested)))) {
+   throw Error('Git metadata cannot be a scan root');
+  }
   async function walk(path, repository, pulumi = false) {
    if (seen.has(path)) return;
-   seen.add(path);
    const info = await lstat(path);
    if (info.isSymbolicLink()) return;
-   const requestedPath = join(requested, relative(root, path));
-   const skip = toolDirectory(path) || toolDirectory(requestedPath) ? 'toolDirectories' :
-    gitDirectory(path) || gitDirectory(requestedPath) ? 'gitDirectories' : skipped(relative(root, path));
+   const rootRelative = relative(root, path), requestedPath = join(requested, rootRelative);
+   const skip = toolDirectory(rootRelative) ? 'toolDirectories' :
+    gitDirectory(rootRelative) ? 'gitDirectories' : skipped(rootRelative);
    if (skip) {
     if (info.isDirectory()) result.skipped[skip]++;
     return;
    }
+   const boundary = info.isDirectory() && rootRelative ? await repositoryBoundary(path, denied(path) || denied(requestedPath)) : null;
+   if (boundary === 'linkedWorktree') { result.skipped.linkedWorktrees++; return; }
+   seen.add(path);
    if (info.isDirectory()) {
-    const boundary = await repositoryBoundary(path, denied(path) || denied(requestedPath));
-    if (boundary === 'linkedWorktree') { result.skipped.linkedWorktrees++; return; }
     if (boundary === 'repository') { repository = path; pulumi = false; }
     const names = (await readdir(path)).sort();
     pulumi ||= names.some(name => /^Pulumi\.ya?ml$/i.test(name));

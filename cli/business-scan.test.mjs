@@ -27,9 +27,8 @@ async function copyFixture(name) {
  return target;
 }
 
-async function scan(cwd, args = []) {
- const started = Date.now();
- const result = await new Promise((resolveRun, reject) => {
+async function runScan(cwd, args = []) {
+ return new Promise((resolveRun, reject) => {
   // Do not inherit provider credentials, NODE_OPTIONS, a registry or shell hooks.
   const child = spawn(process.execPath, [launcher, 'business', 'scan', ...args], {
    cwd, env: { PATH: process.env.PATH, HOME: directory, CI: 'true', RER_NO_UPDATE_CHECK: '1' },
@@ -42,6 +41,11 @@ async function scan(cwd, args = []) {
   child.once('error', error => { clearTimeout(deadline); reject(error); });
   child.once('close', code => { clearTimeout(deadline); resolveRun({ code, stdout, stderr }); });
  });
+}
+
+async function scan(cwd, args = []) {
+ const started = Date.now();
+ const result = await runScan(cwd, args);
  // Failure messages never echo an output stream that could have leaked a fixture.
  assert.equal(result.code, 0, 'packed business scan exits successfully');
  assert.equal(result.stderr, '', 'successful local scan has no diagnostic stream');
@@ -306,21 +310,32 @@ test('packed business scan treats instructions as data, respects repository boun
  const nestedOnly = await scan(root, [nested, '--json']);
  const observations = signals => signals.map(({ observedAt, ...signal }) => signal);
  assert.deepEqual(observations(nestedOnly.report.signals), observations(nestedSignals), 'nested repository has the same relative signals when scanned directly');
- for (const target of [worktree, join(root, '.claude/worktrees/agent-synthetic'), join(root, '.codex')]) {
-  const duplicate = await scan(root, [target, '--json']);
-  assert.equal(duplicate.report.signals.length, 0, 'explicit duplicate roots remain skipped');
-  assert.equal(duplicate.report.skipped.linkedWorktrees + duplicate.report.skipped.toolDirectories, 1, 'explicit duplicate root is counted without paths');
+ const worktreeCwd = await scan(worktree);
+ assert.ok(has(worktreeCwd.report, 'package.json', 'synthetic-nested-library'), 'default cwd scans a real linked worktree');
+ for (const target of [worktree, ...tools.flatMap(tool => [join(root, tool), join(root, tool, 'worktrees/agent-synthetic')])]) {
+  const explicit = await scan(root, [target, '--json']);
+  const dependency = target === worktree ? 'synthetic-nested-library' : 'synthetic-tool-copy-library';
+  assert.ok(explicit.report.signals.some(signal => signal.kind === 'package' && signal.value === dependency), 'a caller-named worktree or tool root is scanned');
+  assert.equal(explicit.report.skipped.linkedWorktrees + explicit.report.skipped.toolDirectories, 0, 'root ancestors do not count as skipped descendants');
+  const alongsideParent = await scan(root, [root, target, '--json']);
+  const repositories = new Set(explicit.report.signals.map(signal => signal.repo));
+  assert.deepEqual(observations(alongsideParent.report.signals.filter(signal => repositories.has(signal.repo))),
+   observations(explicit.report.signals), 'an explicit root remains scannable after its parent skipped it');
  }
- for (const target of [join(nested, '.git'), join(nested, '.git/worktrees')]) {
-  const metadata = await scan(root, [target, '--json']);
-  assert.equal(metadata.report.signals.length, 0, 'explicit Git metadata roots are never walked');
-  assert.equal(metadata.report.skipped.gitDirectories, 1, 'explicit Git metadata root is counted without paths');
+ const metadataAlias = join(root, 'git-metadata-alias');
+ await symlink(join(nested, '.git'), metadataAlias, 'dir');
+ for (const target of [join(nested, '.git'), metadataAlias]) {
+  const metadata = await runScan(root, [target, '--json']);
+  assert.equal(metadata.code, 1, 'an explicit .git directory is refused');
+  assert.equal(metadata.stdout, '', 'a refused root emits no scan document');
+  assert.ok(metadata.stderr.trim().length > 0, 'a refused root has a diagnostic');
+  absent(metadata.stderr, [root, target, nested]);
  }
  const linked = await scan(root, [join(root, 'linked-directory'), '--json']);
  assert.ok(has(linked.report, 'package.json', 'synthetic-secondary-library'), 'a caller-named symlink root is scanned');
  const belowLink = await scan(root, [join(root, 'linked-directory', 'package.json'), '--json']);
  assert.ok(has(belowLink.report, 'package.json', 'synthetic-secondary-library'), 'a caller-named path under a symlink is scanned');
- for (const path of ['build/app', 'target/svc', 'vault-ui', 'platform/zookeeper', 'platform/gatekeeper',
+ for (const path of ['build/app', 'target/svc', '.git/worktrees/caller-named', 'vault-ui', 'platform/zookeeper', 'platform/gatekeeper',
   'profiles', 'vault', 'passwords', 'logins', 'passwords-ui', 'logins-api', '1password-integration', 'browsers/chromium']) {
   const target = join(root, path);
   await mkdir(target, { recursive: true });
