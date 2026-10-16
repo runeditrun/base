@@ -58,20 +58,18 @@ async function d1(operation, code = 'D1_ERROR') {
     throw /^D1_[A-Z_]+:/.test(message) ? error : failure(code, message, error);
   }
 }
-// D1 methods this facade lacks fail where the caller awaits. A missing method
-// would be undefined, and a seed calling it inside its own queueMicrotask
-// (Slate's read batching) throws where nothing settles its request: a hang.
+// An unknown property reads undefined, as on real D1, so feature detection
+// takes its fallback. The first read of each unknown name per isolate warns in
+// the Worker tail: a seed calling a method this facade lacks inside its own
+// queueMicrotask (Slate's read batching) otherwise hangs with no trace.
+const warned = new Set();
 function strict(target, kind) {
   return new Proxy(target, { get(object, key, receiver) {
-    if (typeof key === 'symbol' || key in object || key === 'then' || key === 'toJSON') return Reflect.get(object, key, receiver);
-    return unsupported(new Error(`D1_UNSUPPORTED: ${kind}.${key}() is not available in hosted demos`));
+    const name = `${kind}.${String(key)}`;
+    if (typeof key === 'string' && !(key in object) && key !== 'then' && key !== 'toJSON' && !warned.has(name)) {
+      warned.add(name);
+      console.warn(`D1_UNSUPPORTED: ${name} is not available in hosted demos`);
+    }
+    return Reflect.get(object, key, receiver);
   } });
-}
-// Every call or property of the failure is the failure; awaiting it rejects.
-function unsupported(error) {
-  const chain = new Proxy(() => {}, {
-    apply: () => chain,
-    get: (_, key) => ['then', 'catch', 'finally'].includes(key) ? (...args) => Promise.reject(error)[key](...args) : typeof key === 'symbol' ? undefined : chain,
-  });
-  return chain;
 }
