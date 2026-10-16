@@ -4,10 +4,17 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ['**']
+  schedule:
+    - cron: '17 14 * * *'
   workflow_dispatch:
     inputs:
       clean_bootstrap:
         description: Run without restoring dependency or browser caches
+        type: boolean
+        default: false
+      journeys:
+        description: Include slow installer and README journeys
         type: boolean
         default: false
 
@@ -34,12 +41,14 @@ jobs:
           node-version: '22.20.0'
       - id: stages
         name: Assign every full-verify stage exactly once
+        env:
+          CI_INCLUDE_JOURNEYS: ${{ github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/') || inputs.journeys }}
         run: |
           matrix=$(node scripts/ci/verify.mjs --matrix)
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
   verify:
-    name: Verify (${{ matrix.group }}${{ matrix.shard && format(' {0}/3', matrix.shard) || '' }})
+    name: Verify (${{ matrix.group }}${{ matrix.shard && format(' {0}/{1}', matrix.shard, matrix.total) || '' }})
     needs: plan
     strategy:
       fail-fast: false
@@ -57,7 +66,7 @@ jobs:
       options: --init
       volumes:
         - /usr/local/lib/android:/runner-preinstalled/android
-    timeout-minutes: 25
+    timeout-minutes: ${{ matrix.group == 'journeys' && 60 || 25 }}
     env:
       TZ: UTC
       RER_VERIFY_WORKERS: '1'
@@ -127,12 +136,14 @@ jobs:
             exit 1
           fi
       - name: Strict checks of seed module copies
-        if: ${{ matrix.group == 'modules' }}
+        if: ${{ matrix.group == 'modules' && matrix.shard == 1 }}
         run: pnpm typecheck:modules
       - name: Run full-verify stages assigned to this job
         env:
           VERIFY_GROUP: ${{ matrix.group }}
           CLI_SHARD: ${{ matrix.shard }}
+          MODULE_SHARD: ${{ matrix.shard }}
+          REFERENCE_SHARD: ${{ matrix.shard }}
         run: node scripts/ci/verify.mjs "$VERIFY_GROUP"
       - name: Fetch pinned active HappyToHelp source without credentials
         if: ${{ !cancelled() && matrix.group == 'launcher' }}

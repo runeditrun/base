@@ -1,17 +1,38 @@
-// Node partitions the complete CLI file set; every assertion stays unchanged.
+// Push shards and scheduled installer journeys together cover the CLI suite.
 import assert from 'node:assert/strict';
 import { readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 
-export async function verifyCLIShard(shard) {
-  assert.match(shard ?? '', /^[123]$/, 'CLI_SHARD must be one of the three matrix shards');
-  const files = (await readdir('cli')).filter(name => name.endsWith('.test.mjs')).sort().map(name => `cli/${name}`);
+const journeys = new Set(['reference-journey.test.mjs']);
+const isolated = ['cli/dependency-setup.test.mjs', 'cli/package-mode.test.mjs'];
+export const CLI_SHARDS = 5;
+
+export async function cliTestFiles({ journey = false } = {}) {
+  const files = (await readdir('cli')).filter(name => name.endsWith('.test.mjs')).sort();
+  for (const name of journeys) assert.ok(files.includes(name), `Missing CLI journey: ${name}`);
+  return files.filter(name => journeys.has(name) === journey).map(name => `cli/${name}`);
+}
+
+export async function cliShardPlan() {
+  const files = await cliTestFiles();
+  for (const file of isolated) assert.ok(files.includes(file), `Missing CLI suite: ${file}`);
+  const regular = files.filter(file => !isolated.includes(file));
+  const groups = Object.fromEntries([1, 2, 3].map(shard => [String(shard), regular.filter((_, index) => index % 3 === shard - 1)]));
+  isolated.forEach((file, index) => { groups[String(index + 4)] = [file]; });
+  assert.deepEqual(Object.values(groups).flat().sort(), files, 'CLI CI must cover every push file exactly once');
+  return groups;
+}
+
+export async function verifyCLIShard(shard, { journey = false } = {}) {
+  if (!journey) assert.match(shard ?? '', /^[1-5]$/, `CLI_SHARD must be one of the ${CLI_SHARDS} matrix shards`);
+  const files = journey ? await cliTestFiles({ journey }) : (await cliShardPlan())[shard];
   assert.ok(files.length, 'No CLI test files found');
   const started = performance.now();
-  console.log(`VERIFY_STAGE start verify:cli shard=${shard}/3`);
+  const label = journey ? 'journeys' : `shard=${shard}/${CLI_SHARDS}`;
+  console.log(`VERIFY_STAGE start verify:cli ${label}`);
   const child = spawn(process.execPath, [
     'onboarding/queued-entry.mjs', 'verify:cli', '--', process.execPath,
-    '--test', '--test-concurrency=2', `--test-shard=${shard}/3`, ...files,
+    '--test', '--test-concurrency=2', ...files,
   ], { stdio: 'inherit' });
   const onTerm = () => child.kill('SIGTERM'), onInt = () => child.kill('SIGINT');
   process.on('SIGTERM', onTerm); process.on('SIGINT', onInt);
@@ -20,7 +41,7 @@ export async function verifyCLIShard(shard) {
       child.once('error', error => { console.error(error.message); resolve(1); });
       child.once('close', code => resolve(code ?? 1));
     });
-    console.log(`VERIFY_STAGE end verify:cli shard=${shard}/3 exit=${code} seconds=${((performance.now() - started) / 1000).toFixed(3)}`);
+    console.log(`VERIFY_STAGE end verify:cli ${label} exit=${code} seconds=${((performance.now() - started) / 1000).toFixed(3)}`);
     return code;
   } finally {
     process.off('SIGTERM', onTerm); process.off('SIGINT', onInt);

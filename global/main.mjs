@@ -17,8 +17,8 @@ pins (installed first by any verb when node_modules holds another), else its ven
                        to 10 minutes on a first launch, or rerun it to reattach. rer dev --stop stops it.
   rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether rer dev can
                        launch them, whether they are set up, and their running URL. --json for data.
-  rer business scan [DIR...] [--json]
-                       Discover local package, config and infrastructure names without secret values.
+  rer business ...     Pair a Business device, store local vendor keys, inspect tasks and disconnect.
+                       rer business --help lists the commands and current protocol limitations.
   rer door ...         The opt-in front door: every checkout at http://NAME.localhost:PORT, started
                        on its first visit and stopped when idle. rer door --help for its verbs.
   rer cli status       This rer: version, contents digest, install channel, launcher and other rer

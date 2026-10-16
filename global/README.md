@@ -323,3 +323,68 @@ Only names leave the scanner. Secret files are never opened and contribute
 Sensitive-looking outbound names are dropped and counted in `withheld`.
 Symlinks, generated outputs and dependency trees are skipped; unsupported
 formats and syntax may yield no signals.
+
+## Business device commands
+
+`rer business connect --code ABCD-1234 [--origin https://app.runeditrun.com]`
+redeems a browser-created code, prints a six-digit confirmation number and waits
+for approval in the browser that created it. Device credentials stay in macOS
+Keychain or Linux Secret Service. A missing or locked Secret Service refuses;
+there is no plaintext credential store. Linux needs `secret-tool` and an
+unlocked desktop Secret Service session.
+
+In a terminal, connect asks separately before adding Claude Code user Read deny
+rules, allowing export-scoped macOS wake prevention, and installing a launchd
+or systemd user service. Only the exact answer `yes` opts in. Noninteractive
+connect pairs but leaves those optional changes off. Background services use
+absolute Node and CLI paths. No model process is started.
+
+`rer business vendor-key add sentry` requires hidden credential entry in a
+terminal, stores it in the OS keychain and prints only `sentry:read`.
+`remove` deletes it. The same commands support `uptimerobot`, `pagerduty` and
+`calendly`. Never put a key in command arguments, chat or a URL.
+
+`rer business next` returns one locally templated classification or owner link,
+or `Nothing yet`, within 60 seconds. It never reflects server instructions or
+raw evidence. Owner items cannot be answered from this CLI.
+`rer business answer ID VENDOR uses|sells|both|product-dependency [CONFIDENCE]`
+submits a task-scoped classification through MCP. Choose a vendor ID from the
+question's displayed answer schema, or `none`; the suggested vendor can be
+corrected. Confidence is a number from 0 to 1, defaulting to 1. The completion
+sends exactly `{vendor_id, usage, confidence}`. Free text is refused locally.
+The owner confirms the inventory in the browser.
+`rer business token` emits an MCP Authorization header object for direct use as
+a headers helper. That output is a short-lived credential: connect it directly
+to the MCP client and do not paste it into an agent transcript.
+
+`rer business status` shows local pairing, service state and progress without
+printing checkpoints or vendor data. `rer business disconnect` removes the
+service, device and vendor credentials, state and introduced Claude rules,
+preserving preexisting settings and unrelated edits. Revocation in the browser
+removes remote authority; disconnect removes the local installation's additions.
+
+`rer business run` performs consented `discover.local` tasks through claims,
+short-lived task bearers, quota-bound uploads, 60-second heartbeats and server
+completion checks. Only the browser consent's paths are scanned. Names-only
+snapshots and page boundaries are saved privately so a killed supervisor can
+resume from its server checkpoint without rescanning a changed tree. Snapshots
+are removed after completion. A missing snapshot for an acknowledged page is
+an explicit error. Revocation stops the supervisor on its next 401.
+
+**Remaining export blockers:** grants for linked, configured targets now resolve
+to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare
+`upload_authorization: seed_import_grant_required` but supply no signed seed
+import authority. Vendor task inputs, adapter resume checkpoints and the chunk
+assembly/upload contract are also absent. The CLI releases these tasks before
+reading a vendor key; background mode parks them, and `run --once` reports the
+dependency as a command failure. An unavailable destination reports its reason
+and releases with `paused` after a `connected_runner_required` event.
+Vendor export remains blocked.
+
+The current MCP `next_question` filters out owner items. When an owner summary
+is supplied, the CLI displays its browser link and refuses to answer it.
+
+The four deterministic adapter implementations and their native output formats
+are described in [the adapter guide](cli/business/vendors/README.md). Their
+presence does not enable export until the seed import authority and remaining
+transport contracts are connected.
