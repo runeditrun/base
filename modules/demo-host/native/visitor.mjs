@@ -84,7 +84,10 @@ export class NativeDemo extends DurableObject {
   async alarm() {
     try { await this.active(); } catch { return; }
     try {
-      if (this.state.phase === 'ready') for (const cron of bundle.crons) await application(this.env, this.ctx, this.ctx.id.toString(), this.state.runtime).runScheduled(Date.now(), cron);
+      if (this.state.phase === 'ready') for (const cron of bundle.crons) {
+        await application(this.env, this.ctx, this.ctx.id.toString(), this.state.runtime).runScheduled(Date.now(), cron);
+        console.log(JSON.stringify({ event: 'native-demo-scheduled', correlation: this.state.correlation, at: new Date().toISOString() }));
+      }
     } finally {
       if (this.state) await this.ctx.storage.setAlarm(Math.min(this.state.ends, this.state.seen + IDLE, Date.now() + 60_000));
     }
