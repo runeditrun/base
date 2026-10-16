@@ -99,6 +99,18 @@ Local setup and demo are exempt from production mail requirements.
 
 **Dev identity** (`commandAdapter.devIdentity`). The operator-auth `dev` layer, server-only in its own directory, serves `/auth/dev/enter?as=PERSONA`, which creates or reuses a real `oa_sessions` row of kind `dev` for the owner `rer setup` claimed, or for a persona, so version fences, revocation and deactivation behave exactly as in production. A dev session, and any credential minted while using one, is admitted only on a request that passes the key gate. Until first-run is finished the owner lands on `/setup`. The `owner` persona is the owner `rer setup` claimed while that owner is active; once that owner has left, it is the earliest-created active owner, and `rer dev` names that owner in `RER_SIGNED_IN`; with no active owner left, `rer dev` says so plainly and prints no `RER_SIGNED_IN`. `rer dev` also keeps its `RER_OPEN` link in `.rer/local/open-url` (mode 0600, inside the private `.rer/local`), which `rer reset --yes` removes with the rest of `.rer/local`; stdout, the JSON ready event and `RER_READY` are unchanged. `rer dev --as PERSONA` selects `owner`, `signed-out` or one of the seed's `devPersonas()`: real operators at `<as>@dev.localhost`, created only by local dev sign-in. The app name and browser title identify Dev mode. Export drops dev sessions and dev-minted credentials and marks personas suspended; import refuses an archive that holds either. Dev identity refuses to start when `RER_INSTALLATION_ID` is set beside a non-loopback `RER_MANAGEMENT_ORIGIN`. There is still no static session, sample owner or mail fallback: every dev session belongs to a real operator in the app's own database.
 
+**Invited people in dev and demo.** Every invited or active person appears as
+**Sign in as <name>** at `/signin` and, in Base's default app, beside their
+operator record. `/auth/one-click?as=EMAIL&returnTo=/app` accepts a live invitation
+and opens the app with that person's role. Local entry always needs the checkout's
+key cookie or header, including after the invitation is accepted; hosted demos
+use the visitor's isolated accounts and the installed demo guard. A local
+`/__dev/personas` list also includes these people by email, so
+`rer dev --as person@example.com` prints their one-click entry. Expiry,
+cancellation, current inviter authority, allow-list and domain restrictions
+still apply. Mail is silently suppressed and there is no mail-reading step.
+Production retains its normal email-link flow and refuses this one-click route.
+
 The seed loads the layer only through a local-only entry, never from the
 deployed main, and declares `devIdentity: {entry, output}`. `rer build` scans
 `output` and refuses any file containing the dev layer marker, naming the file.

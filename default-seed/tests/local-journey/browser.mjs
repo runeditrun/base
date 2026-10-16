@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import AxeBuilder from '@axe-core/playwright'
 import { writeFile, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { invitedPerson } from './invitation.mjs'
 
 export async function journey(browser, runtime, width, owner) {
   const context = await browser.newContext({ viewport: { width, height: 900 } })
@@ -32,6 +33,7 @@ export async function journey(browser, runtime, width, owner) {
     await page.waitForURL('**/app')
     await page.getByText(`${owner} · owner`, { exact: true }).waitFor()
     await audit('first-owner signed in')
+    await invitedPerson(page, runtime)
     await page.getByRole('button', { name: 'Sign out', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/signin')
     assert.equal(await page.getByRole('heading', { name: 'Set up the first owner' }).count(), 0)

@@ -2,9 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { Operator, Session } from '../../../../../modules/operator-auth/index.mjs'
 
 type SessionRow = { id: string; kind: string; createdAt: number; expiresAt: number; active: boolean }
+type OperatorRow = Operator & { signInUrl?: string }
 export function OperatorAccess() {
   const [session, setSession] = useState<Session>()
-  const [operators, setOperators] = useState<Operator[]>([])
+  const [operators, setOperators] = useState<OperatorRow[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [message, setMessage] = useState('')
   const [selected, setSelected] = useState<string>()
@@ -22,7 +23,7 @@ export function OperatorAccess() {
   async function refresh(operatorId?: string) {
     const current = await request('session') as Session
     setSession(current)
-    if (current.operator.role !== 'member') setOperators(await request('operators') as Operator[])
+    if (current.operator.role !== 'member') setOperators(await request('operators') as OperatorRow[])
     setSessions(await request(`sessions${operatorId ? `?operatorId=${encodeURIComponent(operatorId)}` : ''}`) as SessionRow[])
   }
   useEffect(() => { void refresh().catch((error: Error) => setMessage(error.message)) }, [])
@@ -77,6 +78,7 @@ export function OperatorAccess() {
       <h3>Operators</h3>
       <ul>{operators.map((operator) => <li key={operator.id}>
         <p>{operator.email} · {operator.role} · {operator.status}</p>
+        {operator.signInUrl ? <a href={operator.signInUrl}>Sign in as {operator.displayName}</a> : null}{' '}
         <button onClick={() => { setSelected(operator.id); void refresh(operator.id).catch((error: Error) => setMessage(error.message)) }}>Show sessions</button>{' '}
         {operator.status !== 'invited' ? <button onClick={() => void mutate('operator/status', { operatorId: operator.id, status: operator.status === 'active' ? 'inactive' : 'active' })}>{operator.status === 'active' ? 'Deactivate' : 'Reactivate'}</button> : null}
         {session.operator.role === 'owner' ? <label> Role <select aria-label={`Role for ${operator.email}`} value={operator.role} onChange={(event) => void mutate('operator/role', { operatorId: operator.id, role: event.target.value })}><option value="member">Member</option><option value="admin">Admin</option><option value="owner">Owner</option></select></label> : null}
