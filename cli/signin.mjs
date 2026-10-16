@@ -3,6 +3,7 @@ import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { deploymentRecord } from './deployment-record.mjs';
 import { invalid, missing, refuse, RerError } from './errors.mjs';
 import { shared } from './shared.mjs';
+import { settingKinds } from './deploy-settings.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { deployDiagnostic, providerRefusal } from '../modules/deploy-kit/diagnostics.mjs';
 
@@ -18,9 +19,9 @@ export async function signinCommand(project, options, out, { fetch } = {}) {
  const state = await deploymentRecord(root, { ...options, verb: 'signin' });
  const { env } = await deployEnvironment({ root, options, declaration, localOnlyKeys: project.adapter.localOnlyKeys ?? [] });
  if (['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'].some(name => !env[name]?.trim())) throw missing('rer signin uses the Cloudflare credentials that deployed this environment: set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in the environment or an --env-file, then run it again.');
- const { createRedaction, credentialValues } = await shared('redaction.mjs');
+ const { createRedaction } = await shared('redaction.mjs');
  const redaction = createRedaction();
- redaction.addSecrets([...credentialValues(env), env.CLOUDFLARE_ACCOUNT_ID]);
+ redaction.addSecrets([...(await settingKinds({ declaration, setupManifest: project.setupManifest })).privateValues(env), env.CLOUDFLARE_ACCOUNT_ID]);
  let result;
  try { result = await owner(['signin', '--declaration', path, '--environment', environment, ...(state ? ['--state', state] : [])], env, { cwd: root, localOnlyKeys: project.adapter.localOnlyKeys ?? [], ...(fetch ? { fetch } : {}) }); }
  catch (error) { throw failure(error, { environment, again, adapter: project.adapter, redact: redaction.redact }); }

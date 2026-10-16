@@ -53,16 +53,28 @@ export async function deployEnvironment({ root, options, declaration, setupManif
 }
 
 // Hooks and their child builds read process.env. Install the private file for
-// this command only, and restore even keys changed by a failing hook.
-export async function withDeployEnvironment(root, options, run) {
+// this command only, and restore even keys changed by a failing hook. Output
+// redaction follows what the deploy declaration says each value is: declared
+// secrets and credentials stay redacted, declared non-secret settings print in
+// full, and an undeclared --env-file value stays redacted with a note on how to
+// declare it.
+export async function withDeployEnvironment(project, options, out, run) {
  const saved = { ...process.env };
- const { env } = await deployEnvironment({ root, options, declaration: {} });
- const { createRedaction, credentialValues } = await shared('redaction.mjs');
+ const { env } = await deployEnvironment({ root: project.root, options, declaration: {} });
+ const { createRedaction } = await shared('redaction.mjs');
+ const { declaredSettings, settingKinds, undeclaredNotice } = await import('./deploy-settings.mjs');
+ const declared = await declaredSettings(project), kinds = await settingKinds(declared);
  const redaction = createRedaction();
  // Provider names are public enum values. Masking "resend" would also hide
  // RESEND_API_KEY in the preflight's instruction for the missing credential.
  const publicProvider = (key, value) => key === 'MAIL_PROVIDER' && /^(resend|sendgrid|cloudflare|rer|later)$/.test(value);
- redaction.addSecrets([...credentialValues(env), ...Object.entries(env).filter(([key, value]) => saved[key] !== value && !publicProvider(key, value)).map(([, value]) => value)]);
+ const supplied = Object.entries(env).filter(([key, value]) => saved[key] !== value);
+ redaction.addSecrets([...kinds.privateValues(env), ...supplied.filter(([key, value]) => !kinds.shown(key, value) && !publicProvider(key, value)).map(([, value]) => value)]);
+ const undeclared = declared.declaration ? kinds.undeclared(supplied.map(([key]) => key)) : [];
+ if (undeclared.length) {
+  const message = undeclaredNotice(undeclared, declared.path);
+  if (options.json) out.event('warning', { code: 'undeclared_env_setting', names: undeclared, message }); else out.progress(`${message}\n`);
+ }
  Object.assign(process.env, env);
  try { return await run(redaction); }
  catch (error) { if (typeof error?.message === 'string') error.message = redaction.redact(error.message); throw error; }

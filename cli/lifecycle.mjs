@@ -23,7 +23,7 @@ export async function runCommand(project, options, out) {
   const { validateDeployOptions } = await import('./deploy-command.mjs');
   validateDeployOptions(options);
   const { withDeployEnvironment } = await import('./deploy-inputs.mjs');
-  return withDeployEnvironment(project.root, options, redaction => runLifecycle(project, options, out, redaction));
+  return withDeployEnvironment(project, options, out, redaction => runLifecycle(project, options, out, redaction));
  }
  return runLifecycle(project, options, out);
 }
