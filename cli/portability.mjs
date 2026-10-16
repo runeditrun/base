@@ -68,14 +68,14 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
 async function nativeWorker(store,direction,input,signal) {
   const worker = fileURLToPath(new URL('./portability-worker.mjs', import.meta.url));
   const child = store.spawn(`${direction === 'policy-preflight' ? 'Checking archive policy' : direction === 'legacy-preflight' ? 'Checking empty recovery destination' : direction === 'export' ? 'Exporting' : 'Restoring'} local installation data`, process.execPath,
-   [worker, direction, JSON.stringify(input)], { cwd: input.root, signal, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' } });
-  let output = '';
-  child.stdout.on('data', chunk => { output += chunk; });
+   [worker, direction, JSON.stringify(input)], { cwd: input.root, signal, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+  let receipt;
+  child.once('message', message => { receipt = message; });
   const closed = new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));
   await new Promise(resolve => { child.once('exit', resolve); child.once('error', resolve); });
   await store.stop(child);
   const status = await closed;
-  let receipt; try { receipt = JSON.parse(output.trim().split('\n').at(-1)); } catch { throw new RerError('transfer_failed', 'Local portability did not return a complete receipt.', 1); }
+  if (!receipt || typeof receipt !== 'object') throw new RerError('transfer_failed', 'Local portability did not return a complete receipt.', 1);
   if (status.code !== 0 || !receipt.ok) throw new RerError(receipt.code ?? 'transfer_failed', receipt.reason==='legacy_restored_export_failed'
    ? 'Legacy data was restored and audited, but its v2 export failed. Preserve this installation, resolve the output problem, then run rer export --output FILE. Do not reset it to retry recovery.'
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`

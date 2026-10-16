@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createRedaction, credentialValues } from './redaction.mjs';
 import { openPrivateLog } from './private-files.mjs';
 import { commandFailure } from './failures.mjs';
+import { checkoutPath, stepDiagnostic } from './step-failure.mjs';
 import { waitForReadiness } from './readiness.mjs';
 import { commandCustody } from './command-custody.mjs';
 import { createProcessBaseline, createProcessScope, inheritedScopeTokens, processScopeEnvironment } from './process-scope.mjs';
@@ -48,7 +49,9 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   const outcome=`exit ${detail.code??'none'}, signal ${detail.signal??'none'}`;
   const status=detail.reason==='cancel'?`cancelled (${outcome})`:detail.reason==='deadline'?`readiness deadline exceeded (${outcome})`:detail.error?`could not start${detail.errorCode?` (${detail.errorCode})`:''} (${outcome})`:outcome;
   const lines=(capture?.snapshot()||'').split('\n');if(lines.at(-1)==='')lines.pop();
-  return Object.assign(commandFailure(`${redaction.redact(String(label))}: ${status}.${detail.lastHealth?` Last health: ${redaction.redact(String(detail.lastHealth))}.`:''}\nLast output (up to 40 lines):\n${lines.length?lines.slice(-40).join('\n'):'(no output)'}\nLog: ${redaction.redact(logPath)}`,{childExitCode:detail.code,signal:detail.signal}),{childExitCode:detail.code,signal:detail.signal});
+  // The step, its command, exit code, last output and log, for callers that name a failed step.
+  const step=stepDiagnostic({name:redaction.redact(String(label)),command:capture?.display,exitCode:detail.code,signal:detail.signal,output:lines,log:redaction.redact(checkoutPath(capture?.cwd,logPath))});
+  return Object.assign(commandFailure(`${redaction.redact(String(label))}: ${status}.${detail.lastHealth?` Last health: ${redaction.redact(String(detail.lastHealth))}.`:''}\nLast output (up to 40 lines):\n${lines.length?lines.slice(-40).join('\n'):'(no output)'}\nLog: ${redaction.redact(logPath)}`,{childExitCode:detail.code,signal:detail.signal,step}),{childExitCode:detail.code,signal:detail.signal});
  };
  const track=(label,child,ownershipScope)=>{
   if(captures.has(child))return child;
@@ -116,7 +119,8 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   // label must not show that label twice.
   const announced=redaction.redact(String(label)),repeated=state.step===announced;
   state.step=announced;if(!repeated)report(label);
-  const {signal:providedSignal,afterCommand,onChild,heavy,phase,...native}=options;
+  // display: the command line a caller names in its failure; argv itself is never shown.
+  const {signal:providedSignal,afterCommand,onChild,heavy,phase,display,...native}=options;
   const commandSignal=signal&&providedSignal?AbortSignal.any([signal,providedSignal]):providedSignal||signal;
   if(commandSignal?.aborted)throw failure(label,{reason:'cancel'});
   const ownershipScope=createProcessScope(custodyBaseline);redaction.addSecrets([ownershipScope.token,...inheritedScopeTokens(process.env),...inheritedScopeTokens(native.env)]);
@@ -124,6 +128,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   onChild?.(child);
   ownershipRecords.set(child,{pid:child.pid,token:ownershipScope.token});
   track(label,child,ownershipScope);
+  Object.assign(captures.get(child),{cwd:native.cwd??process.cwd(),display:display===undefined?undefined:redaction.redact(String(display))});
   const cancel=()=>{void stopCommand(child);};
   commandSignal?.addEventListener('abort',cancel,{once:true});if(commandSignal?.aborted)cancel();
   const capture=captures.get(child);capture.removeCancellation=()=>commandSignal?.removeEventListener('abort',cancel);
@@ -144,7 +149,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
     const commandSignal=signal&&options.signal?AbortSignal.any([signal,options.signal]):options.signal||signal;
     const result = await queuedCommand(command,args,{...options,verb:queuePolicy.verb,signal:commandSignal,originalCI:policy.ci,
      label:await queueLabel(options.cwd??process.cwd(),queuePolicy.verb,options.phase??'command'),report,onWaiting,
-     spawn:(program,argv,native)=>(queuedChild=spawnCommand(label,program,argv,{...native,onChild:options.onChild})),cleanup:async(child,result)=>{await stopCommand(child);await options.afterCommand?.(result);}});
+     spawn:(program,argv,native)=>(queuedChild=spawnCommand(label,program,argv,{...native,onChild:options.onChild,display:options.display})),cleanup:async(child,result)=>{await stopCommand(child);await options.afterCommand?.(result);}});
     if(result){if(result.code!==0)throw failure(label,result,captures.get(queuedChild));return result;}
    }
    let child;try{child=spawnCommand(label,command,args,options);}catch{throw failure(label,options.signal?.aborted||signal?.aborted?{reason:'cancel'}:{error:true});}

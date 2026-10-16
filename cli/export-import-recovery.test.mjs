@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, copyFile, link, stat } from 'node:fs/promises';
+import { chmod, copyFile, link, readFile, stat, writeFile } from 'node:fs/promises';
+import { parseJsonc } from './jsonc.mjs';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
 import {createServer} from 'node:net';
@@ -10,8 +11,18 @@ import {localOperation} from '../onboarding/local/operation.mjs';
 // produced, and export again. The same file must always be accepted in place.
 test('a file rer just exported imports in place after reset, repeatedly; shared or group-readable input is still refused', { timeout: 15 * 60_000 }, async t => {
  const seed = await portabilityFixture(t);
+ // The app's Durable Object binding, as HappyToHelp declares one: the transfer never needs it.
+ const wrangler = join(seed.root, 'wrangler.jsonc');
+ await writeFile(wrangler, JSON.stringify({ ...parseJsonc(await readFile(wrangler, 'utf8')), durable_objects: { bindings: [{ name: 'CONVERSATIONS', class_name: 'ConversationSocket' }] }, migrations: [{ tag: 'v1', new_sqlite_classes: ['ConversationSocket'] }] }, null, 2));
  await seed.run(['export', '--output', 'exports/empty.rer']);
  await seed.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('first',3,125,'café'),('second',2,75,NULL)");
+ // A person's export prints no workerd warning and no receipt, and ends with one line naming the archive.
+ const shown = await seed.text(['export', '--output', 'exports/shown.rer']);
+ assert.doesNotMatch(shown.stdout + shown.stderr, /DurableObjectNamespace|ConversationSocket|contentHash|"tables"/);
+ const receipt = (await seed.run(['export', '--output', 'exports/shown-data.rer'])).at(-1);
+ const rowCount = receipt.tables.reduce((sum, table) => sum + table.count, 0);
+ assert.ok(receipt.contentHash && rowCount >= 2, 'the receipt stays --json data');
+ assert.match(shown.stdout.trimEnd().split('\n').at(-1), new RegExp(`^Exported exports/shown\\.rer \\(\\d+(\\.\\d)? (B|KB|MB)\\): ${receipt.tables.length} tables, ${rowCount.toLocaleString('en-US')} rows$`));
  const query = 'SELECT * FROM computed_entries ORDER BY id', rows = (await seed.data(query))[0].results;
  let previous;
  for (const round of [1, 2, 3]) {

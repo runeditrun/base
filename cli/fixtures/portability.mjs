@@ -35,9 +35,11 @@ export async function portabilityFixture(t,{generated=true}={}) {
   child.done=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
   const code=await child.done;
   assert.equal(code,expected,`Fixture command ${args[0]} exited ${code}: ${stdout}\n${stderr}`);
-  return stdout;
+  return {stdout,stderr};
  }
- const run=async(args,expected=0,{slow=false}={})=>(await command([...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json'],expected)).trim().split('\n').map(JSON.parse);
- const data=async sql=>JSON.parse(await command(['node_modules/wrangler/bin/wrangler.js','d1','execute','default-seed-reference','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--command',sql,'--json']));
- return {root,run,data};
+ const run=async(args,expected=0,{slow=false}={})=>(await command([...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json'],expected)).stdout.trim().split('\n').map(JSON.parse);
+ // A command as a person runs it, without --json: its terminal output.
+ const text=(args,expected=0)=>command(['scripts/rer.mjs',...args],expected);
+ const data=async sql=>JSON.parse((await command(['node_modules/wrangler/bin/wrangler.js','d1','execute','default-seed-reference','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--command',sql,'--json'])).stdout);
+ return {root,run,text,data};
 }

@@ -3,7 +3,7 @@
 // launches a browser or downloads anything.
 import { access, constants } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { RerError } from './errors.mjs';
 import { shared } from './shared.mjs';
 
@@ -59,7 +59,7 @@ export async function ensureChromium(root, store, signal, { required = true } = 
  const { dependencyEnvironment } = await shared('dependency-environment.mjs');
  const env = dependencyEnvironment();
  if (process.env.PLAYWRIGHT_BROWSERS_PATH !== undefined) env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH;
- await store.run('Installing Chromium and its headless shell from the checkout’s Playwright', 'pnpm', ['exec', 'node', cli, 'install', 'chromium'], { cwd: root, signal, env });
+ await store.run('Installing Chromium and its headless shell from the checkout’s Playwright', 'pnpm', ['exec', 'node', cli, 'install', 'chromium'], { cwd: root, signal, env, display: `pnpm exec node ${relative(root, cli)} install chromium` });
  const after = await browserDoctor(root);
  if (!after.ok) throw new RerError('browser_install_incomplete', after.issue, 3);
 }

@@ -19,7 +19,6 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  const unconfigured=error(await seed.run(['deploy'],4)).message;
  assert.match(unconfigured,/Production sign-in is not configured/);
  assert.match(unconfigured,/MAIL_API_KEY/);
- assert.match(error(await seed.run(['deploy','--dry-run'],4)).message,/Production sign-in is not configured/);
  // Removing both integrations does not erase an auth installation's contract.
  const manifestPath=join(seed.root,'rer-setup.json'),manifest=await readFile(manifestPath,'utf8');
  const declarationPath=join(seed.root,'deploy.json'),originalDeclaration=await readFile(declarationPath,'utf8');
@@ -72,6 +71,25 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  const declaration=JSON.parse(await readFile(join(seed.root,'deploy.json'),'utf8'));
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,vars:{...declaration.vars,RER_DEMO:'1'}}));
  for(const flags of [[],['--dry-run']])assert.match(error(await seed.run(['deploy','--env-file','production.env',...flags],4)).message,/local-only key RER_DEMO/);
+ await writeFile(join(seed.root,'deploy.json'),JSON.stringify(declaration));
+ // A dry run goes ahead without production mail, OWNER_EMAIL and Cloudflare values, and lists them.
+ const dry=(await seed.text(['deploy','--dry-run'])).stderr;
+ assert.match(dry,/dry run complete/);
+ const needed=dry.slice(dry.indexOf('Needed for a real deploy'));
+ for(const name of ['CLOUDFLARE_ACCOUNT_ID','OWNER_EMAIL','MAIL_API_KEY','https://dash.cloudflare.com/profile/api-tokens','Workers Scripts: Edit','D1: Edit','Queues: Edit'])assert.ok(needed.includes(name),dry);
+ // Without Cloudflare values a real deploy says where to get them: the token
+ // page and the permissions this declaration needs, or the project's own guide.
+ git('checkout','package.json');
+ const noAccount=(await seed.text(['deploy','--env-file','production.env'],3)).stderr;
+ assert.match(noAccount,/CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required/);
+ for(const text of ['https://dash.cloudflare.com/profile/api-tokens','Workers Scripts: Edit','D1: Edit','Queues: Edit'])assert.ok(noAccount.includes(text),noAccount);
+ const guide='https://guide.example.test/docs/operations#what-you-need-first';
+ await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,deployGuide:guide}));
+ const guided=(await seed.text(['deploy','--env-file','production.env'],3)).stderr;
+ assert.ok(guided.includes(guide),guided);
+ assert.doesNotMatch(guided,/profile\/api-tokens/);
+ await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,deployGuide:'http://guide.example.test'}));
+ assert.match(error(await seed.run(['deploy','--dry-run'],2)).message,/deployGuide must be an https URL/);
 });
 
 test('rer deploy resolves deferred mail from the product packaging contract before its custom deploy hook', async t => {
