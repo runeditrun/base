@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPortability,readArchive,excludedTable } from '../index.mjs';
-import { migrate } from '../../deploy-kit/local-migrations.mjs';
+import { migrate } from '../../container/migrations.mjs';
 import { runtime,seed,archive,collect,rows } from './helpers.mjs';
 import { fixturePolicy } from './fixture-policy.mjs';
 test('snapshot stays consistent while writes land between create and advance',async t=>{

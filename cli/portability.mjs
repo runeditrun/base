@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 // Seeds declare their real bindings and data policy. The shared module owns the
 // archive format and atomic restore; the shared runner owns its native children.
 export function localPortability({ database, binding = 'DB', buckets = {}, policy, policyModule, transient = [] }) {
- async function run({ root, path, journal, store, signal, operationToken, legacyRecovery }, direction) {
+ async function run({ root, path, journal, store, signal, operationToken, platform, legacyRecovery }, direction) {
   if (direction === 'export') {
    if (await lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) throw refuse('Export requires a new archive path.');
   }
@@ -38,12 +38,14 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   try {
    if (policyModule !== undefined) {
     if (policy !== undefined) throw new PortabilityError('ambiguous_policy', 409);
+    if (platform === 'container') throw new PortabilityError('container_policy_module_unsupported', 409);
     declaration = { policyModule: await policyModuleURL(root, policyModule) };
    } else declaration = { policy: serializablePolicy(policy) };
   } catch (error) {
    if (!(error instanceof PortabilityError)) throw error;
    throw refuse(`Local portability policy refused (${error.code}). Executable policies require a seed-owned policyModule with a valid default policy export; policyModule requires native local transport.`);
   }
+  if(platform==='container') return (await import('./container-transfer.mjs')).containerTransfer({root,path,journal,store,signal,direction,binding,buckets,policy:declaration.policy,transient});
   const input={ root, path, journal, binding, buckets, ...declaration, transient, legacyRecovery };
   // Check the executable policy before migrations; the transfer worker imports
   // it again in its own process so module closures are retained during restore.

@@ -1,4 +1,4 @@
-import { portabilityPlan, ensurePortabilitySchema } from '../modules/portability/schema.mjs';
+import { portabilityPlan, ensurePortabilitySchema } from '../modules/container/portability-schema.mjs';
 import { exportArchive, importArchive, fileRecords } from '../modules/portability/files.mjs';
 import { readLegacyArchive } from '../modules/portability/format.mjs';
 import { recoverLegacyArchive } from '../modules/portability/legacy-files.mjs';

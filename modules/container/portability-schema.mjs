@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { migrate } from '../deploy-kit/local-migrations.mjs';
+import { migrate } from './migrations.mjs';
 export async function portabilityPlan(split) {
- const sql = await readFile(new URL('./schema/portability.sql', import.meta.url), 'utf8');
+ const sql = await readFile(new URL('../portability/schema/portability.sql', import.meta.url), 'utf8');
  return [{ name:'0001_portability.sql', sql, sha256:createHash('sha256').update(sql).digest('hex'), statements:split(sql) }];
 }
 // Existing product-owned bookkeeping remains under its original migrations.

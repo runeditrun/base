@@ -73,6 +73,13 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  assert.deepEqual(summary.hostnames, hostnames);
  assert.deepEqual(summary.routes, config.routes);
 
+ const workerConfig = JSON.parse(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
+ await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ ...workerConfig, durable_objects: { bindings: [{ name: 'COUNTER', class_name: 'MissingCounter' }] } }));
+ const missingClass = await rer();
+ assert.equal(missingClass.code, 1, missingClass.stdout + missingClass.stderr);
+ assert.match(missingClass.stdout + missingClass.stderr, /configured Durable Object class: MissingCounter/);
+ await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify(workerConfig));
+
  for (const value of [undefined, '', 'Page.' + primary, 'outside.example.test', primary + '.outside.test', 'other' + primary,
   'https://' + page, page + ':443', 'a'.repeat(64) + '.' + primary, 'bad..' + primary]) {
   await configure({ ...declaration, settings: { ...declaration.settings, PAGE_HOST: value } });

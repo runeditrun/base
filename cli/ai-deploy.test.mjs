@@ -10,7 +10,7 @@ test('deploy, dry run and artifact/plan preparation refuse a local Models dev ke
   const seed = await portabilityFixture(t, { generated: false });
   await mkdir(join(seed.root, '.rer/local'), { recursive: true, mode: 0o700 });
   await writeFile(join(seed.root, '.rer/local/models.json'), '{}\n', { mode: 0o600 });
-  for (const flags of [[], ['--dry-run']]) {
+  for (const flags of [[], ['--dry-run'], ['--platform', 'container'], ['--platform', 'container', '--dry-run']]) {
     const result = await seed.run(['deploy', ...flags], 4);
     assert.match(result.find(x => x.event === 'error').message, /local-only key file/);
   }
