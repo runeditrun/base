@@ -9,8 +9,8 @@ function execute(command, args, input, env) {
  return new Promise((resolve, reject) => {
   const child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
   const out = [], err = []; let size = 0, failed = false;
-  const timer = setTimeout(() => { failed = true; child.kill(); }, 30000);
-  const collect = list => chunk => { size += chunk.length; if (size > 262144) { failed = true; child.kill(); } else list.push(chunk); };
+  const timer = setTimeout(() => { failed = true; child.kill('SIGKILL'); }, 30000);
+  const collect = list => chunk => { size += chunk.length; if (size > 262144) { failed = true; child.kill('SIGKILL'); } else list.push(chunk); };
   child.stdout.on('data', collect(out)); child.stderr.on('data', collect(err));
   child.stdin.on('error', () => {});
   child.on('error', () => { clearTimeout(timer); reject(unavailable()); });

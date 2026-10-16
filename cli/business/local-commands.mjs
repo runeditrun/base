@@ -5,6 +5,7 @@ import { createCredentialStore, readSecret } from './keychain.mjs';
 import { removeService, serviceStatus } from './service.mjs';
 import { removePermissions } from './permissions.mjs';
 import { pause } from './api.mjs';
+import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
 
 export async function paired() {
@@ -70,7 +71,7 @@ export async function status({ json = false } = {}) {
  }
  const stored = state.origin && await createCredentialStore().get(credentialHandle(state.origin));
  const service = await serviceStatus();
- const active = state.current;
+ const active = (await loadProgress()).current;
  if (json) {
   process.stdout.write(JSON.stringify({ paired: Boolean(stored), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: ['discover.local', 'export.vendor'].includes(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
   return;

@@ -38,8 +38,9 @@ const ownerKinds = new Set(['signup.checkout','connect.cloudflare','connect.gith
 export const ownerLink = state => `${state.origin}/business/${encodeURIComponent(identifier(state.businessId))}`;
 
 export async function next() {
+ const signal = AbortSignal.timeout(55_000);
  const { state, credential } = await paired();
- const tasks = await nextQuestions(new Api(state.origin, credential), AbortSignal.timeout(55_000));
+ const tasks = await nextQuestions(new Api(state.origin, credential), signal);
  const item = tasks.find(task => task.kind === 'classify.row' || task.runner === 'owner' || ownerKinds.has(task.kind));
  if (!item) { process.stdout.write('Nothing yet.\n'); return; }
  const id = identifier(item.task_id);
@@ -61,7 +62,12 @@ export async function answer(id, choice) {
  let lease = summary;
  if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });
  if (typeof lease.grant_id !== 'string') throw Error('Business did not return a grant for this question.');
- await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { decision: choice } });
+ try {
+  await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { decision: choice } });
+ } catch (error) {
+  try { await tool('answer', { task_id: id, action: 'release', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, reason: 'failed' }); } catch { /* Expiry/revocation still fences the lease. */ }
+  throw error;
+ }
  process.stdout.write('Business answer submitted for server validation.\n');
 }
 

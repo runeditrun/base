@@ -8,7 +8,7 @@ const usage = `Usage: rer business VERB
   scan [DIR...] [--json]          Names-only local discovery
   connect --code CODE [--origin URL]
                                  Pair, compare a number in your browser, then opt in to a service
-  run [--once]                   Work supported deterministic tasks (protocol integration pending)
+  run [--once]                   Run consented local discovery; vendor upload integration pending
   next                           Return one templated question or nothing yet within 60 seconds
   answer ID ENUM                 Submit an agent classification: uses, sells, unknown
   vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage

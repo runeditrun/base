@@ -348,16 +348,24 @@ service, device and vendor credentials, state and introduced Claude rules,
 preserving preexisting settings and unrelated edits. Revocation in the browser
 removes remote authority; disconnect removes the local installation's additions.
 
-**Current integration blocker:** the executor route contract currently returns
-only a model-facing task summary. It does not supply the scanner's consent ID
-and approved roots, vendor inputs or full resume checkpoint. Vendor grants
-currently have zero quota and an unavailable import destination. The MCP
-classification schema also accepts enum outputs that completion currently
-rejects. Consequently `run` returns such leases with their checkpoint and a
-configuration-required event before accessing local files or vendor keys. A
-background supervisor parks those tasks; `run --once` reports the dependency
-as a command failure. Scanning, export uploading and enum completion are not
-claimed to work end to end until those server contracts are connected.
+`rer business run` performs consented `discover.local` tasks through claims,
+short-lived task bearers, quota-bound uploads, 60-second heartbeats and server
+completion checks. Only the browser consent's paths are scanned. Names-only
+snapshots and page boundaries are saved privately so a killed supervisor can
+resume from its server checkpoint without rescanning a changed tree. Snapshots
+are removed after completion. A missing snapshot for an acknowledged page is
+an explicit error. Revocation stops the supervisor on its next 401.
+
+**Remaining integration blockers:** vendor grants currently have zero quota and
+an unavailable seed destination; the protocol does not yet supply vendor inputs
+or adapter resume state. Such tasks receive a connected-runner-required event
+and are released before a vendor key is read. Background mode parks those tasks;
+`run --once` reports the dependency as a command failure. MCP classification enum
+outputs are advertised by its schema but completion rejects nonempty outputs;
+a refused answer is released. The current server also filters owner items out
+of `next_question`; the CLI can render owner links when supplied, and always
+refuses owner answers. Vendor uploading and enum completion are not claimed to
+work end to end until those server contracts are connected.
 
 The four deterministic adapter implementations and their native output formats
 are described in [the adapter guide](cli/business/vendors/README.md). Their
