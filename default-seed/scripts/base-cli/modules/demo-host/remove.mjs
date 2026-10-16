@@ -1,3 +1,4 @@
+import { ownedBucket, removeBucket } from './native/deploy-r2.mjs';
 import { assert } from '../deploy-kit/validation.mjs';
 import { workerSettings } from '../deploy-kit/owner.mjs';
 import { servedVersion } from '../deploy-kit/site.mjs';
@@ -29,7 +30,7 @@ async function inventory(api, plan) {
   const attached = rows(await api.request(`/workers/domains?service=${plan.worker}`)).filter(row => row?.service === plan.worker);
   const apps = rows(await api.request('/containers/applications')).filter(row => row?.name === plan.container);
   const namespaces = rows(await api.list('/workers/durable_objects/namespaces')).filter(row => row?.script === plan.worker);
-  const worker = await workerSettings(api, plan.worker) !== null;
+  const settings = await workerSettings(api, plan.worker), worker = settings !== null;
   for (const row of named) if (row.service !== plan.worker) throw refuse('resource-name-collision', `domain:${row.hostname}`);
   if (worker) {
     const served = await servedVersion(api, plan.worker);
@@ -42,7 +43,7 @@ async function inventory(api, plan) {
   }
   const container = namespaces.find(row => row.class === 'DemoContainer')?.id;
   for (const app of apps) if (!container || app.durable_objects?.namespace_id !== container) throw refuse('resource-name-collision', `container:${plan.container}`);
-  return { worker, domains: named, apps };
+  return { worker, domains: named, apps, bucket: worker ? await ownedBucket(api, plan, settings) : null };
 }
 
 export async function demoRemove({ api, plan, sleep }) {
@@ -54,6 +55,7 @@ export async function demoRemove({ api, plan, sleep }) {
     removed.push(`domain:${domain.hostname}`);
   }
   for (const app of found.apps) { await api.request(`/containers/applications/${app.id}`, { method: 'DELETE' }); removed.push(`container:${plan.container}`); }
+  if (found.bucket) { await removeBucket(api, found.bucket); removed.push(`r2:${found.bucket.name}`); }
   await deleteWorker({ api, worker: plan.worker, ...sleep ? { sleep } : {} });
   removed.push(`worker:${plan.worker}`);
   // Read back: nothing of the demo is listed any more.

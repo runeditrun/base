@@ -8,7 +8,7 @@ const assets = new Set(bundle.assetPaths);
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.origin !== env.DEMO_ORIGIN) return new Response('Not found.', { status: 404 });
+    if (url.origin !== env.DEMO_ORIGIN && !JSON.parse(env.DEMO_SECONDARY_ORIGINS ?? '[]').includes(url.origin)) return new Response('Not found.', { status: 404 });
     if (['GET', 'HEAD'].includes(request.method) && assets.has(url.pathname)) {
       const response = await env.ASSETS.fetch(request);
       const headers = new Headers(response.headers);

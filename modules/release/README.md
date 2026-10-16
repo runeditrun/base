@@ -48,8 +48,12 @@ accept independent project and repository inputs, retain strict reference checks
 and cannot receive this INFO classification.
 
 It installs frozen dependencies and runs `pnpm run verify` in a disposable clone
-of the exact selected commit, then scans the original repository's complete
-local-ref history with publish-check. A verify that mutates tracked source fails.
+of the exact selected commit, then scans source history with publish-check.
+When the checkout's origin is a confirmed public repository, the scanner uses
+that source repository's advertised default branch and published tags as its public
+base. Already-public findings are classified pre-existing; unpublished content
+still blocks. Other sources retain complete local-ref history inspection.
+A verify that mutates tracked source fails.
 When declared in the committed package, it runs `pnpm run verify:release` after
 default verification succeeds. Keep capacity, maximum-size memory and load cases
 in that release-only script. Both dry runs and releases require it to pass;
@@ -119,6 +123,25 @@ exact final annotation in a disposable checkout for inspection before creating
 the source tag. Release notes pass the same content rules as the public tree.
 
 ## Releasing a seed that is already public
+
+Release the exact green source commit with the ordinary command:
+
+```sh
+pnpm rer release --repo /path/to/public-seed --ref GREEN_COMMIT \
+  --project "$PUBLIC_PROJECT" --repository "$PUBLIC_REPOSITORY" \
+  --tag v1.2.3 --output /path/to/new-release-directory
+```
+
+Both source-history and staged-annotation scans receive the repository's public
+base. Public annotated tags, including the previous release, are fetched into
+the scanner's isolated namespace and recognized by their exact object identity.
+The selected source commit and final tag target are preserved.
+
+Use `--public-base GIT_URL#BRANCH` to select public history explicitly, including
+when the checkout has no public origin. The scanner fetches that remote branch
+and its public tags; local refs and commit IDs cannot establish public history.
+This option applies to exact-source releases and cannot be combined with
+`--onto` or `--clean-history`.
 
 Use `--onto` to create one public child of the destination's current branch from
 an independently developed private source tree:
