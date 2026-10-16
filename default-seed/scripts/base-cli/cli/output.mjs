@@ -1,4 +1,5 @@
 import { handleBrokenPipes } from './stdio.mjs';
+import { exportSummary } from './export-summary.mjs';
 export function output(options) {
  handleBrokenPipes();
  let finished = false;
@@ -16,10 +17,12 @@ export function output(options) {
   result(ok, exitCode, details = {}) {
    if (finished) throw Error('Duplicate CLI result'); finished = true;
    if (structuredResult) this.event('result', { ok, exitCode, ...details });
+   // A finished export ends with one line naming its archive; the receipt is --json data.
+   else if (ok && options.verb === 'export' && exportSummary(details)) this.human(exportSummary(details));
    else if (!['describe', 'check', 'dev', 'preview', 'setup'].includes(options.verb) || !ok) this.human(`${options.verb}: ${ok ? 'complete' : 'failed'} (exit ${exitCode})`);
   },
   error(error) {
-   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}) });
+   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}), ...(error.step ? { step: error.step } : {}) });
    else write(2, error.message + '\n');
   },
  };

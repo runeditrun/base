@@ -1,3 +1,5 @@
+import { stat } from 'node:fs/promises';
+import { relative } from 'node:path';
 import {localDependencyLinks} from './dependency-doctor.mjs';
 import { contained } from './project.mjs';
 import { missing, refuse } from './errors.mjs';
@@ -26,6 +28,8 @@ export async function transfer(project, options, signal, custody) {
  // Only now can the seed's Vite configuration load in a checkout that never built.
  await located.unserved(); await legacyOutput?.unserved();
  const result=await api[direction]({ root: project.root, target, path, journal, origin: options.origin, sessionFile, signal, platform:options.platform, legacyRecovery, ...custody });
+ // The archive's size, for the line a finished export ends with.
+ if(direction==='export')return {...result,output:result.output??relative(project.root,path),bytes:(await stat(path)).size};
  if(direction==='import' && target==='local' && (await localDependencyLinks(project.root)).some(link=>link.needs_relink)) {
   custody.store.report('Imported provider links need fresh approval. Run rer setup with RER_LINK_TOKEN_FILE to re-link this installation.');
   return {...result,needsRelink:true,nextCommand:'rer setup'};

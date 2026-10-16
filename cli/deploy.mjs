@@ -14,6 +14,7 @@ import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookState, forgetHookState } from './deploy-hook-record.mjs';
 import { deploymentRecord } from './deployment-record.mjs';
+import { cloudflareCredentials, missingCredentialsMessage } from './deploy-needs.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -53,8 +54,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    return { dryRun: true, deployed: false };
   }
   const { env, supplied } = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
-  const names = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
-  if (names.some(name => !env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required. See the deploy-kit owner-account instructions.');
+  if (cloudflareCredentials.some(name => !env[name]?.trim())) throw missing(missingCredentialsMessage(declaration, env));
   const { main } = await import('../modules/deploy-kit/owner-cli.mjs');
   const { createRedaction, credentialValues } = await shared('redaction.mjs');
   const redaction = createRedaction();

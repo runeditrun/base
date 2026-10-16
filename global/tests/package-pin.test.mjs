@@ -74,7 +74,8 @@ async function seed(name, version) {
  await mkdir(records);
  const record = kind => `require('node:fs').writeFileSync(require('node:path').join(${JSON.stringify(records)}, '${kind}-' + process.pid + '.json'), JSON.stringify(process.env))`;
  await writeFile(join(root, 'probe/package.json'), JSON.stringify({ name: 'probe', version: '1.0.0', scripts: { install: 'node record.cjs' } }));
- await writeFile(join(root, 'probe/record.cjs'), record('install') + ';\n');
+ // A fail-install marker makes the dependency's script print 25 lines and fail.
+ await writeFile(join(root, 'probe/record.cjs'), record('install') + `;\nif (require('node:fs').existsSync(${JSON.stringify(join(root, 'fail-install'))})) { for (let i = 1; i <= 25; i++) console.error('probe line ' + i); process.exit(7); }\n`);
  await writeFile(join(root, 'adapter.mjs'), `import { createRequire } from 'node:module';
 import { localInstaller } from '@runeditrun/rer/local-installer';
 import { commandAdapter } from '@runeditrun/rer/adapter';
@@ -141,4 +142,39 @@ test('after a pulled pin change, two verbs started at once share one install of 
  assert.ok(builds.some(({ code }) => code === 0), 'one build ran');
  assert.equal(await installedVersion(root), versions.next, 'node_modules holds the new pin');
  assert.equal((await recorded(records, 'install')).length, before + 1, 'the new pin was installed once');
+});
+
+test('a failed install step names its step, command, exit code, last 20 lines and full log, in human and --json output', { timeout: 240_000 }, async () => {
+ const { root } = await seed('failing', versions.first);
+ // The launcher's first install of the pinned package: a dependency script fails.
+ await writeFile(join(root, 'fail-install'), '');
+ const failed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment() });
+ assert.notEqual(failed.code, 0);
+ assert.match(failed.stderr, /Install step failed: Installing the pinned @runeditrun\/rer and the checkout's frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: [1-9]\d*\nLast 20 lines of output:\n/);
+ const shown = failed.stderr.slice(failed.stderr.lastIndexOf('Last 20 lines of output:'));
+ assert.match(shown, /probe line 25/);
+ assert.doesNotMatch(shown, /probe line 1\n/, 'only the last 20 lines are shown');
+ const log = /\nFull log: (\S+)/.exec(shown)?.[1];
+ assert.ok(log, failed.stderr);
+ assert.match(await readFile(join(root, log), 'utf8'), /probe line 1\n[\s\S]*probe line 25/, 'the full log holds every line');
+ const json = await run(process.execPath, [launcher, 'install', '--json', '--non-interactive'], { cwd: root, env: environment() });
+ const error = json.stdout.trim().split('\n').map(line => JSON.parse(line)).find(event => event.event === 'error');
+ assert.equal(error.step.command, 'pnpm install --frozen-lockfile');
+ assert.ok(error.step.exitCode > 0 && error.step.output.length <= 20 && error.step.output.some(line => line.includes('probe line 25')));
+ assert.match(await readFile(join(root, error.step.log), 'utf8'), /probe line 1\n[\s\S]*probe line 25/);
+
+ // The checkout's own rer install: its frozen dependency install fails on a lockfile that no longer matches.
+ await rm(join(root, 'fail-install'));
+ const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment() });
+ assert.equal(installed.code, 0, installed.stderr);
+ const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+ await writeFile(join(root, 'package.json'), JSON.stringify({ ...manifest, dependencies: { 'left-pad': '1.3.0' } }));
+ const outdated = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment() });
+ assert.equal(outdated.code, 1);
+ assert.match(outdated.stderr, /Install step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*ERR_PNPM_OUTDATED_LOCKFILE[\s\S]*\nFull log: \.seed\/installer\/\S+install\.log\n/);
+ const checkout = await run(process.execPath, [launcher, 'install', '--json', '--non-interactive'], { cwd: root, env: environment() });
+ const event = checkout.stdout.trim().split('\n').map(line => JSON.parse(line)).find(item => item.event === 'error');
+ assert.deepEqual([event.step.name, event.step.command, event.step.exitCode], ['Installing frozen dependencies', 'pnpm install --frozen-lockfile', 1]);
+ assert.ok(event.step.output.some(line => line.includes('ERR_PNPM_OUTDATED_LOCKFILE')) && event.step.output.length <= 20);
+ assert.match(await readFile(join(root, event.step.log), 'utf8'), /ERR_PNPM_OUTDATED_LOCKFILE/);
 });

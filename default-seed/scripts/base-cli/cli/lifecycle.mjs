@@ -89,9 +89,13 @@ async function runLifecycle(project, options, out, deployRedaction) {
   // The hosted demo: a native Worker Loader host on demo.<domain>.
   if (options.verb === 'deploy' && options.demo) return await (await import('./demo-host.mjs')).demoHostCommand(project, options, store, signal, out, operation);
   if (options.verb === 'install') {
-   const { dependencyEnvironment } = await shared('dependency-environment.mjs');
-   await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...dependencyEnvironment(), CI: 'true' } });
-   await ensureChromium(project.root, store, signal, { required: false }); return {};
+   try {
+    const { dependencyEnvironment } = await shared('dependency-environment.mjs');
+    await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...dependencyEnvironment(), CI: 'true' }, display: 'pnpm install --frozen-lockfile' });
+    // Inspecting the checkout's Playwright is its own step, before any download command.
+    state.step = 'Checking the checkout’s Playwright browsers';
+    await ensureChromium(project.root, store, signal, { required: false }); return {};
+   } catch (error) { if (signal.aborted) throw error; throw await installStepError(error, store, project.root); }
   }
   if (options.verb === 'verify') {
    const target = adapter.verify;
@@ -155,6 +159,17 @@ async function runLifecycle(project, options, out, deployRedaction) {
   for (const [name, handler] of handlers) process.removeListener(name, handler);
   if (termination) throw new RerError('cancelled', `Stopped by ${termination} after owned children were stopped.`, termination === 'SIGINT' ? 130 : 143);
  }
+}
+
+// A failed install step names itself: its command, exit code, last output and
+// full log. A step that stopped outside a command still names the step and log.
+async function installStepError(error, store, root) {
+ const { approvedFailure } = await shared('failures.mjs');
+ const { checkoutPath, stepDiagnostic, stepFailureText } = await shared('step-failure.mjs');
+ const step = approvedFailure(error)?.step ?? stepDiagnostic({ name: store.state.step, output: store.state.logs, log: store.redact(checkoutPath(root, store.logPath)) });
+ // Only a RerError's message or a symbolic error code is safe to show; a native message can hold private data.
+ const cause = error instanceof RerError ? `\n${error.message}` : /^[A-Z][A-Z0-9_]{1,63}$/.test(error?.code ?? '') ? `\nCause: ${error.code}` : '';
+ return new RerError(error instanceof RerError ? error.code : 'install_step_failed', `${stepFailureText(step)}${cause}`, error instanceof RerError ? error.exitCode : 1, { step, ...(Number.isInteger(step.exitCode) ? { childExitCode: step.exitCode, signal: step.signal } : {}) });
 }
 
 // Under the local operation, before the app starts: the zero-setup owner's

@@ -126,7 +126,13 @@ export async function main(argv) {
  if (pinned && !pinned.ready && !argv.includes('--help') && installsFirst.has(verb)) {
   const { installPinned } = await import('./launch/install-pinned.mjs'), { LaunchFailure } = await import('./launch/failure.mjs');
   try { await installPinned(target.root); }
-  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
+  catch (failure) {
+   if (!(failure instanceof LaunchFailure)) throw failure;
+   // A --json caller gets the failed step as data, as the checkout's own verbs report it.
+   if (failure.event && target.args.includes('--json')) for (const event of [{ ...failure.event, verb }, { version: 1, verb, event: 'result', ok: false, exitCode: failure.exitCode }]) process.stdout.write(JSON.stringify(event) + '\n');
+   else process.stderr.write(failure.message + '\n');
+   return failure.exitCode;
+  }
  }
  if (mode === 'package' && installsFirst.has(verb)) await (await import('./launch/install-pinned.mjs')).settledPin(target.root);
  if (verb === 'describe' && !argv.includes('--help')) return (await import('./cli/describe.mjs')).describeCommand(target);
