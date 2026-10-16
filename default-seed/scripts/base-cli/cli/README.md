@@ -126,13 +126,20 @@ rebuild preview. A build that regenerates its own files declares them as
 paths are not inputs, while any other file touched during the build is refused by name. Both use the same `.wrangler/state` and saved owner. Dev opens signed in through `RER_OPEN`, including with the legacy
 `--login` flag. Stop before changing modes.
 
-Local startup holds the checkout's exclusive operation lock until serving stops.
+Setup, local import/restore, reset and local startup hold the checkout's exclusive
+operation lock through completion (or until serving stops).
 Its state-holder inspection selects only regular files under `.wrangler/state`,
-including SQLite sidecars. Dev and demo give `lsof` three seconds to answer. A confirmed
+including SQLite sidecars. Each local custody check gives inspection three seconds to answer. A confirmed
 holder is refused with its PID and process name. If inspection cannot answer,
-dev (including demo) continues under the held checkout lock; another
-cooperating launch cannot acquire it. This lock does not inventory unmanaged
-processes. Setup, reset and preview still require their state inspection to complete.
+canonical-state commands probe existing SQLite databases with an immediate exclusive transaction,
+then continue under the held checkout lock; another cooperating operation cannot
+acquire it. A conflicting SQLite transaction is refused even when its PID could not
+be inspected. The probe rolls back without changing rows. Neither proof inventories
+idle unmanaged file handles or WAL readers. Keep the bounded inspection even when
+the launch lock is free: skipping it would miss unmanaged state holders and saved
+origin listeners that a completed inspection currently detects.
+Demo uses the launch lock without opening canonical SQLite: probes can checkpoint
+idle WAL or change read marks, and demo preserves every owner state byte.
 Stop dev or preview before build, verification or data transfer; use the
 documented `--stop` flag or Ctrl-C.
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26-dev.g45cca770",
+  "cliVersion": "0.2.26-dev.gdeb139c2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -127,6 +127,10 @@
       "source": "onboarding/local/recovery.mjs",
       "sha256": "bb1c3d1f842a8c03796376100b7e3c7112671c37f47ac8b54ec0bb92ee5c6ec1"
     },
+    "local/sqlite-custody.mjs": {
+      "source": "onboarding/local/sqlite-custody.mjs",
+      "sha256": "20c8e57786938ae7d63dcf3318c6b92479620e3b02c0b60107b6b873472710ed"
+    },
     "local/state-files.mjs": {
       "source": "onboarding/local/state-files.mjs",
       "sha256": "ac00a918b350265d395ba3b4dba8ecde0c73e66ebb41cde7037246235552e56e"
@@ -177,19 +181,19 @@
     },
     "process-cleanup.mjs": {
       "source": "onboarding/process-cleanup.mjs",
-      "sha256": "b82c3706fb801c4a0b81fbf92be8e117ec4a530567e872993b545a134958be33"
+      "sha256": "659c04cfd8f1b84bda4234c74140b33b9b275a53f8801ccd8c2226cc49a44c39"
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "b3fe50dce223a767b48ea846d552ef7dbeb9934c5d9d59b5d2050714517144eb"
+      "sha256": "f3f572e71884d5a6c62d5804c34b79d685be2157c0e4f3650be5ffa7336e59f0"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "14906360603414b95a1d3d5beded2115a9fa9613e01655740016954f777268ed"
+      "sha256": "b4f08012191dc13ede6d85c928a9782553aa2d61224359a51851e181a54297bd"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "cb674f29143a788c6ec02c4b7d0ee888465bf31e73595239aca64388093c8056"
+      "sha256": "4a1977ec6f153bda36b194e9ec5a7ad38c26702987ea520a6072d285109aa812"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
@@ -331,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "dd8d3cc9e3b6a73a4dcd499249d59b65d805cf8d2a0327d629a7ae2317f32aa8"
+      "sha256": "3d7d2fee14bfd05008c028dda48b7c26967ea3aa501987c73a555d1b3c21e37f"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -371,7 +375,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "b71befe387541e7e017296060f616280e683b7bc14566b8e1ca739aeadb6e859"
+      "sha256": "6a69799965ce95b50fe1cf6ce25fa64acc26ec7de28703cc5b5c55c94e7c8474"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -539,7 +543,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "095f8c3694069428f60d456553ecf98da46d4f7158e2400423200835e53ea5e7"
+      "sha256": "7a94ea9efc313d0f4404998c9ccf8586c8f81fdf9222401369b115d7be541db1"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -547,7 +551,7 @@
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
-      "sha256": "24e1ca85371bb485d12f3efb39e74a1c4c069659ab674f98566beb3f31c62b01"
+      "sha256": "4b9449738ec9e6d93152168b84350c4211375ad5a7656f8a729d490ea816e364"
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
@@ -555,7 +559,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "0f393e10f93f5d6c2391be418c0c7588c8e44d72bf476eb8e533e4b8be5e3a3d"
+      "sha256": "5ae0a5dc460674800869ea40ccfab5dd020399c3606e84b8013ed31179176880"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -635,7 +639,7 @@
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "3f1d1d855490844aff5f4e2d8ef320e5a4a582c09627eae8f3469be7399fa43e"
+      "sha256": "ee5c1d7dfeb0980e79d5b048fd1384d7a04710a4c153b5659a79ea72f86dba75"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -1993,6 +1997,10 @@
       "source": "modules/operator-auth/page.mjs",
       "sha256": "5a6e74e3e1861dbe6906ab2e0219b498f1943c11e9c88a779819563ec32e7322"
     },
+    "modules/operator-auth/policy.d.mts": {
+      "source": "modules/operator-auth/policy.d.mts",
+      "sha256": "c0e46fcab9ce8626b8da53f88561eb00a1e83e9460fd91407a32a2daf605c4cf"
+    },
     "modules/operator-auth/policy.mjs": {
       "source": "modules/operator-auth/policy.mjs",
       "sha256": "d535aba35621d333cd6faae49fc3c6cb72e1d5718741f02d363cbe3e8eaf153c"
@@ -2179,7 +2187,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "5262e34eed668a52b93fb74762c4d6d577960a9e125103a683285b3be1ddb31c"
+      "sha256": "717608d5e24c64c09b281b0dd1785fa738a041cb05cfa55070999fb90cff1f3f"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -2195,7 +2203,11 @@
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "ee8553008cb5add4978a87c4546cb5d58459a7d98d7ee3740e19881e233ab08c"
+      "sha256": "ee09e60bd5bebef62117ef3ccd2f0105ffa12a438388e2d90bae8f1a8bc28610"
+    },
+    "modules/release/public-base.mjs": {
+      "source": "modules/release/public-base.mjs",
+      "sha256": "37556d03b4b36ff49831ba02311046816a6872c011bdb815c1c0d3b006926c43"
     },
     "modules/release/public-child-transport-state.cjs": {
       "source": "modules/release/public-child-transport-state.cjs",
@@ -2335,7 +2347,7 @@
     },
     "scripts/publish-check/git_history.py": {
       "source": "scripts/publish-check/git_history.py",
-      "sha256": "2ce104cd5a052d6e37189404157b6cd3c1ca37ead8a3f004c69e476f7fdfcb7d"
+      "sha256": "3dff349d0ec166450a14364ac9dad5b760276f61d9501784781d52787a2cb507"
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
@@ -2351,7 +2363,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "be45c5ff02e94cd6aa591f360a06f19bb545879b5200e0f6ad33c605fbeb12ce"
+      "sha256": "ab84993ab7159b8728212d51d02bf5c538f24c752d9ccabbf7eb23a637c58bfd"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",

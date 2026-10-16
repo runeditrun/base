@@ -7,14 +7,16 @@ import { publicExport, cleanHistory, annotate, releaseMessage } from './export.m
 import { publicationScan, validatePublicationDestination } from './publication-scan.mjs';
 import { publicDestination, requirePublicDestination, remotePublicHead, publicChild, assertPublicTree } from './public-child.mjs';
 import { writePublishHandoff } from './publish-handoff.mjs';
+import { releasePublicBase } from './public-base.mjs';
 
 // Failure output belongs to the private receipt, not the site preview.
 const withoutOutput = gates => JSON.parse(JSON.stringify(gates, (key, value) => key === 'output' ? undefined : value));
 
-export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto }) {
+export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase }) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(project ?? '')) throw Error('--project must be publisher/name');
   if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?$/i.test(repository ?? '')) throw Error('--repository must be a credential-free GitHub repository URL');
   if (onto !== undefined && clean) throw Error('--onto and --clean-history are mutually exclusive');
+  if (publicBase !== undefined && (onto !== undefined || clean)) throw Error('--public-base selects exact-source history; cannot combine with export history modes');
   const preview = dryRun || !tag;
   const source = inspectSource(repo, ref);
   validatePublicationDestination(source, project, repository);
@@ -25,6 +27,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
   // Validate metadata before installs or output writes.
   catalogue(source, project, repository, { verify: { status: 'PENDING' }, publishCheck: { status: 'PENDING' } }, preview);
   const destination = onto !== undefined ? publicDestination(onto, repository, source.repo) : null;
+  const scanBase = destination?.spec ?? (clean ? undefined : releasePublicBase(source, publicBase));
   let publicParent = null;
   if (destination) {
     requirePublicDestination(destination);
@@ -54,12 +57,13 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       verify.status = 'FAIL'; verify.reason = 'verify-changed-tracked-source';
     }
     // Explicit clean-history publication scans every byte and ref of the actual
-    // parentless export. Ordinary releases retain the private full-history gate.
+    // parentless export. Exact-source releases classify against public history
+    // when available, retaining the selected source commit and tag identity.
     const exported = destination ? publicChild(source, temporary, destination, publicParent, Boolean(tag))
       : clean ? cleanHistory(source, temporary, Boolean(tag)) : null;
     const scanRepo = exported?.repo ?? source.repo;
     const scanRef = exported?.commit ?? source.commit;
-    let report = publicationScan(scanRepo, scanRef, envFile, project, repository, destination?.spec);
+    let report = publicationScan(scanRepo, scanRef, envFile, project, repository, scanBase);
     if (!exported && tag && report.status === 'PASS') {
       // Stage the exact final annotation before any source tag or distributable
       // artifact exists, in a fresh clone of the selected commit: verification
@@ -70,7 +74,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       git(candidate, 'checkout', '--detach', source.commit);
       const staged = git(candidate, 'tag', '--list', source.tag).toString().trim();
       annotate(candidate, source, source.commit, staged ? `${source.tag}-publication-candidate` : source.tag);
-      const annotations = publicationScan(candidate, source.commit, envFile, project, repository);
+      const annotations = publicationScan(candidate, source.commit, envFile, project, repository, scanBase);
       report.annotationInspection = annotations;
       if (annotations.status !== 'PASS') {
         report.status = annotations.status;

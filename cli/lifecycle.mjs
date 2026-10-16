@@ -49,16 +49,19 @@ async function runLifecycle(project, options, out, deployRedaction) {
    if (!project.adapter?.run) throw refuse('The first-party command adapter is unavailable. Restore the shared lifecycle adapter.');
    if (options.forwarded.length) throw refuse('First-party commands do not accept arbitrary forwarded arguments. Run rer VERB --help.');
    await stateSafety(project);
-   if(options.verb==='setup')await refuseLegacyProcess(project,{verb:options.verb});
+   const { localOperation } = await shared('local/operation.mjs');
+   // The run site reads no local state: it builds beside a running rer dev.
+   if (!options.site) try { operation = await localOperation(project.root, process.env.RER_LOCAL_OPERATION); } catch (error) { throw refuse(error.message); }
+   if(options.verb==='setup'||options.verb==='import'&&(options.target??'local')==='local'){
+    const ownership=await refuseLegacyProcess(project,{verb:options.verb,operation});
+    if(ownership?.lockProof)out.progress('Local process inspection did not answer; continuing with the exclusive checkout launch lock.\n');
+   }
    if (options.verb === 'setup') {
     selected = await selectedOrigin(project, options, { setup: options.verb === 'setup' });
     if (options.verb === 'setup') {input = await setupInput(project, options, selected.vars, signal, { origin: selected.url });await dependencyInputs({project,input,origin:selected.url});}
     if (!selected.door) await availablePort(selected.host, selected.port, { root: project.root, saved: !selected.explicitPort && selected.savedOrigin !== undefined, verb:options.verb });
     if (options.verb === 'setup') announcePort(out, options, selected);
    }
-   const { localOperation } = await shared('local/operation.mjs');
-   // The run site reads no local state: it builds beside a running rer dev.
-   if (!options.site) try { operation = await localOperation(project.root, process.env.RER_LOCAL_OPERATION); } catch (error) { throw refuse(error.message); }
    const { recoverInterrupted } = await shared('local/recovery.mjs');
    if (operation) await recoverInterrupted(project.root, operation);
    if (project.ownerReplacement) await replaceOwner(project, options, out);

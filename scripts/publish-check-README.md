@@ -136,8 +136,11 @@ compressed PNG text, other image metadata, C2PA, CBOR, COSE, JUMBF and exotic Gi
 parity are not covered.
 
 An explicit `--public-base` is fetched with system Git into
-`refs/publish-check/public/base`; it scopes the history scan to the selected
-release and public ancestry. Historical already-public findings move to
+`refs/publish-check/public/base`, with published tags fetched into
+`refs/publish-check/public/tags/`. It scopes the history scan to the selected
+release and public branch/tag ancestry. Exact public tag annotations and
+already-public commit messages, including the selected commit's message, move to
+`preExisting`. Historical already-public findings move to
 `preExisting`, and so does a selected-tree or working-tree file byte-identical
 to the same path at the public base's tip; other selected-tree and working-tree
 findings and every known environment match still block. A newly public historical missing licence is a warning only when

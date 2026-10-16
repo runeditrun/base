@@ -32,19 +32,19 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const stopped = new Map()
   let lastGroup = []
 
-  const snapshot = async (limit = deadline) => {
-    const current = await inspect(Math.min(inspectionMs, limit - Date.now()))
-    if (Date.now() >= limit) throw new Error('Process inspection deadline expired.')
+  // Every inspection gets its full bound (and process-table's extension): a
+  // slow but complete read is still a valid observation. The cleanup deadline
+  // ends the loop below, and only processes observed alive at it fail cleanup.
+  const snapshot = async () => {
+    const current = await inspect(inspectionMs)
     lastGroup = current
     return current
   }
-  const send = async (member, name, requireLeaf = true, limit = deadline) => {
+  const send = async (member, name, requireLeaf = true) => {
     // Recheck both identity and children immediately before each numeric PID
     // signal. Never send a negative/group signal that can kill parents first.
-    const timeout = Math.min(inspectionMs, limit - Date.now())
-    const current = requireLeaf ? await readProcessTable(timeout) : []
-    const target = await readProcessIdentity(member.pid, Math.min(inspectionMs, limit - Date.now()))
-    if (Date.now() >= limit) throw new Error('Process inspection deadline expired.')
+    const current = requireLeaf ? await readProcessTable(inspectionMs) : []
+    const target = await readProcessIdentity(member.pid, inspectionMs)
     if (!sameProcess(member, target) || isZombie(target)) return false
     if (requireLeaf && !isLeaf(target, current)) return false
     if (name === 'SIGKILL' && !isStopped(target)) return false
@@ -122,9 +122,8 @@ export async function stopOwnedGroup(child, signal, ownership) {
   } finally {
     // Inspection/signalling failures must not leave a process suspended.
     const errors = []
-    const resumeDeadline = Math.min(deadline + 1000, Date.now() + 1000)
     for (const member of stopped.values()) {
-      try { await send(member, 'SIGCONT', false, resumeDeadline) } catch (error) { errors.push(error) }
+      try { await send(member, 'SIGCONT', false) } catch (error) { errors.push(error) }
     }
     // Preserve the original failure while reporting a failure to resume an owned process.
     // eslint-disable-next-line no-unsafe-finally

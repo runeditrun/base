@@ -8,6 +8,6 @@
     "isolatedModules": true,
     "moduleDetection": "force"
   },
-  "include": ["../modules/**/*.ts", "../modules/**/*.tsx", "../modules/**/*.mts"],
+  "include": ["../modules/**/*.ts", "../modules/**/*.tsx", "../modules/**/*.mts", "../scripts/ci/seed-copy-policy.tsx"],
   "exclude": ["../modules/**/tests", "../modules/**/proof", "../modules/**/live-proof", "../modules/egress-service"]
 }

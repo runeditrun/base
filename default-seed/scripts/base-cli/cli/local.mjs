@@ -66,7 +66,15 @@ async function safeTree(project, path) {
 
 export async function reset(project, options, out) {
  await stateSafety(project);
- await refuseLegacyProcess(project,{reset:true,verb:'reset'});
+ const { localOperation } = await shared('local/operation.mjs');
+ let operation;
+ try { operation = await localOperation(project.root); } catch (error) { throw refuse(error.message); }
+ try { return await resetHeld(project,options,out,operation); }
+ finally { await operation.release(); }
+}
+
+async function resetHeld(project,options,out,operation) {
+ await refuseLegacyProcess(project,{reset:true,verb:'reset',operation});
  const { strandedOriginals } = await shared('local/recovery.mjs');
  if ((await strandedOriginals(project.root)).length) throw refuse('An interrupted build holds private settings. Run rer build to recover them before reviewing reset.');
  // The seed's own safety check (legacy data it still has to recover, for
@@ -89,29 +97,32 @@ export async function reset(project, options, out) {
  }
  if (!confirmed) throw refuse('Reset requires explicit confirmation. Review the inventory, then pass --yes.');
  // The shared lock lives outside every removal path and remains held throughout.
- const { localOperation } = await shared('local/operation.mjs');
- let operation;
- try { operation = await localOperation(project.root); } catch (error) { throw refuse(error.message); }
- try {
-  for (const path of inventory) { const absolute = await safeTree(project, path); if (absolute) await rm(absolute, { recursive: true, force: true }); }
- } finally { await operation.release(); }
+ for (const path of inventory) { const absolute = await safeTree(project, path); if (absolute) await rm(absolute, { recursive: true, force: true }); }
  return { paths: inventory };
 }
 
-export async function refuseLegacyProcess(project,{reset=false,verb='dev',operation}={}) {
+export async function refuseLegacyProcess(project,{reset=false,verb='dev',operation,isolated=false}={}) {
+ // Every caller must keep this exclusive checkout proof through its operation.
+ const {localOperation}=await shared('local/operation.mjs');
+ if(!operation?.token)throw refuse('Local ownership inspection requires the checkout operation lock.');
+ await localOperation(project.root,operation.token);
  let selected;try{selected=await selectedOrigin(project,{});}catch(error){if(!reset)throw error;}
  // Confirmed reset can recover malformed settings; checkout/state custody is
  // still checked even when there is no usable saved origin.
  const {localProcessConflict,inspectionContext,uncheckedInspection}=await shared('process-diagnostics.mjs');
  // The front door holds a door origin's port, not this checkout.
  let conflict;
- try{conflict=await localProcessConflict(project.root,selected?.door?undefined:selected?.savedOrigin,inspectionContext({verb}));}
+ try{conflict=await localProcessConflict(project.root,selected?.door?undefined:selected?.savedOrigin,inspectionContext({verb,budgetMs:3000}));}
  catch(error){
-  // Startup already holds the exclusive checkout operation through teardown.
-  // An unanswered observation must not defeat that cooperating-launch proof.
-  // Setup/reset retain their destructive-operation inspection requirement.
-  if(operation?.token&&verb==='dev'&&uncheckedInspection(error))return {lockProof:true};
-  throw error;
+  if(!uncheckedInspection(error))throw error;
+  // Demo serves isolated data. Even a read-only SQLite connection can update
+  // canonical WAL read marks, so its owner-state byte preservation forbids it.
+  if(!isolated){
+   const {sqliteCustody}=await shared('local/sqlite-custody.mjs');
+   const database=await sqliteCustody(project.root);
+   if(database)throw refuse(`Another process holds an active SQLite lock on ${database}. Process inspection did not identify its PID. Stop unmanaged local servers (including Wrangler), then retry. Use rer dev --stop or rer preview --stop for a registered server.`);
+  }
+  return {lockProof:true};
  }
  if(conflict)throw refuse(`A local process holds ${conflict.reason}: PID ${conflict.pid} (${conflict.command}). Stop it with kill -TERM ${conflict.pid}, then retry. Use rer dev --stop or rer preview --stop for a registered server.`);
 }

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { chmod, copyFile, link, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
+import {createServer} from 'node:net';
+import {localOperation} from '../onboarding/local/operation.mjs';
 
 // The documented recovery path: export, reset, import the very file that export
 // produced, and export again. The same file must always be accepted in place.
@@ -33,4 +35,29 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
  await copyFile(join(seed.root, 'exports/round-1.rer'), join(seed.root, 'group.rer'));
  await chmod(join(seed.root, 'group.rer'), 0o640);
  await seed.run(['import', '--input', 'group.rer', '--yes'], 4);
+});
+
+test('local import and setup after import finish with a slow inspection and retain restored data', {timeout:10*60_000}, async t=>{
+ const seed=await portabilityFixture(t,{generated:false}),slow={slow:true};
+ await seed.run(['export','--output','exports/empty.rer']);
+ await seed.data("INSERT INTO articles VALUES('retained','retained','Restored title','Owner content','2026-10-16')");
+ await seed.run(['export','--output','exports/saved.rer']);
+ await seed.run(['reset','--yes'],0,slow);
+ // An empty, migrated destination still has state files for the injected
+ // lsof timeout; importing into absent state would skip that query entirely.
+ await seed.run(['export','--output','exports/destination-empty.rer']);
+ const operation=await localOperation(seed.root);
+ try{
+  for(const args of [['import','--input','exports/saved.rer','--yes'],['setup','--owner-email','restored@example.test','--non-interactive']]){
+   const refused=await seed.run(args,4,slow);
+   assert.match(refused.find(row=>row.event==='error').message,new RegExp(`PID ${process.pid}`));
+  }
+ }finally{await operation.release();}
+ await seed.run(['import','--input','exports/saved.rer','--yes'],0,slow);
+ const socket=createServer();await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));
+ const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));
+ const setup=await seed.run(['setup','--owner-email','restored@example.test','--port',String(port),'--non-interactive'],0,slow);
+ assert.ok(setup.some(row=>row.event==='setup-ready'));
+ assert.deepEqual((await seed.data("SELECT title,body FROM articles WHERE id='retained'"))[0].results,[{title:'Restored title',body:'Owner content'}]);
+ assert.deepEqual((await seed.data("SELECT email FROM oa_operators WHERE role='owner' AND status='active'"))[0].results,[{email:'restored@example.test'}]);
 });
