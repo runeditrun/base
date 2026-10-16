@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g9d06ce78",
+  "cliVersion": "0.2.28-dev.gc7d1dea3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -471,7 +471,7 @@
     },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
-      "sha256": "5471887e8f1a0111b08ae3d3038a46a70659b5e0eb69138098f2416f0d17fe20"
+      "sha256": "1a67a574027b6c0320bbef5002c2b0a552343338597262563edbe708f5dffba0"
     },
     "cli/business/service.mjs": {
       "source": "cli/business/service.mjs",
@@ -483,7 +483,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "7ea9bf470c84e20bc3e80af1415c643f44ccffc0b6b3d16eb969de37decdb8dc"
+      "sha256": "aba5214e581d25e50bc25b6b6588ef4f6a575873c86e877e449ada53d69a892b"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

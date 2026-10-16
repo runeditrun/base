@@ -90,6 +90,9 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
  for (const extension of ['js', 'ts', 'mjs', 'cjs', 'mts', 'cts']) {
   await writeFile(join(root, `regex.config.${extension}`), 'module.exports = { a: /"/, NOTE: "staging, leakednine: primary", b: /"/ };');
  }
+ await mkdir(join(root, 'infra'));
+ await writeFile(join(root, 'infra/Pulumi.yaml'), 'name: acme-infra\nruntime: nodejs\n');
+ await writeFile(join(root, 'infra/index.ts'), 'import * as aws from "@pulumi/aws"; new aws.s3.Bucket("assets");');
  await writeFile(join(root, '.github/workflows/deploy-stage.yml'), 'jobs:\n  deploy:\n    env:\n      TOKEN: ${{ secrets.CF_THROWAWAY_API_TOKEN }}\n      EVIDENCE: ${{ secrets.EVIDENCE_WRITE_TOKEN }}\n');
  await mkdir(join(root, 'services/payments'), { recursive: true });
  await writeFile(join(root, 'services/payments/package.json'), '{"dependencies":{"@stripe/stripe-js":"1.0.0"}}');
@@ -114,6 +117,7 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   ['.github/workflows/deploy-stage.yml', 'EVIDENCE_WRITE_TOKEN', 'live-use'],
   ['infrastructure/main.tf', 'cloudflare/cloudflare'],
   ['infrastructure/template.yaml', 'AWS::S3::Bucket', 'live-use'],
+  ['index.ts', 'aws', 'live-use'],
   ['index.ts', 'aws.s3.Bucket', 'live-use'],
   ['infrastructure/Pulumi.yaml', 'aws:s3/bucket:Bucket', 'live-use'],
   ['chart/templates/deployment.yaml', 'Deployment', 'live-use'],
@@ -132,6 +136,11 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
  assert.equal(livePackage.count, 2, 'the same package in two files is counted once');
  assert.equal(livePackage.locator, 'package.json', 'the first locator represents the group');
  assert.equal(packages.find(signal => signal.class === 'trace').count, 1);
+ for (const [kind, value] of [['iac-provider', 'aws'], ['iac-resource', 'aws.s3.Bucket']]) {
+  const signals = report.signals.filter(signal => signal.kind === kind && signal.value === value);
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].count, 2, 'root and infra Pulumi programs both contribute vendor signals');
+ }
  for (const [kind, value] of [['iac-resource', 'Deployment'], ['iac-provider', 'synthetic.invalid'], ['config-key', 'mail.transport']]) {
   const signals = report.signals.filter(signal => signal.kind === kind && signal.value === value);
   assert.equal(signals.length, 1, 'identical configuration and infrastructure names are grouped');

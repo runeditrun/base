@@ -35,9 +35,9 @@ export async function run({ once = false } = {}) {
    try { claimed = await api.post('/api/business/executors/claim', { ...progress.pendingClaim, wait_seconds: 25 }, { signal: stop.signal }); }
    catch (error) {
     if (error.status !== 409) throw error;
-    parked.add(progress.pendingClaim.task_id);
     progress = {}; await saveProgress(progress);
-    if (once) throw error; continue;
+    if (once) throw error;
+    await pause(25_000, stop.signal); continue;
    }
    if (!claimed.task || claimed.task.state !== 'leased' || claimed.task.fence !== claimed.fence || Date.parse(claimed.lease_expires_at) <= Date.now()) {
     progress = {}; await saveProgress(progress);
