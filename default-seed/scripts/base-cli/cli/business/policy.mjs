@@ -4,17 +4,33 @@ const outputs = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', 'tar
 
 export const skipped = path => path.split('/').some(part => outputs.has(part.toLowerCase()));
 
-// Applies to every ancestor, including ancestors of an explicitly supplied root.
-// Directories on this list are enumerated for metadata only, never file content.
+const stores = new Set(['secrets', '.ssh', '.aws', '.gnupg', 'keychains', 'keychain', 'browser profiles', 'browser-profiles', '.mozilla', '.password-store', '.1password']);
+
+function browserStore(path) {
+ // Recognize browser data locations, rather than projects or arbitrary
+ // directories named profiles, Firefox, Chromium or Safari.
+ return /(?:^|\/)\.config\/(?:google-chrome(?:-[^/]+)?|chromium|brave-browser|bravesoftware\/brave-browser|microsoft-edge(?:-[^/]+)?)(?:\/|$)/.test(path) ||
+  /(?:^|\/)library\/application support\/(?:google\/chrome(?: [^/]+)?|chromium|bravesoftware\/brave-browser|microsoft edge(?: [^/]+)?|firefox)(?:\/|$)/.test(path) ||
+  /(?:^|\/)appdata\/(?:local\/(?:google\/chrome|chromium|bravesoftware\/brave-browser|microsoft\/edge)\/user data|roaming\/mozilla\/firefox)(?:\/|$)/.test(path) ||
+  /(?:^|\/)library\/(?:safari|containers\/com\.apple\.safari|group containers\/[^/]*\.com\.apple\.safari)(?:\/|$)/.test(path);
+}
+
+function passwordExport(name) {
+ return /^(?:1password|bitwarden|lastpass|dashlane|keeper|enpass|nordpass|keepass)(?:[._ -](?:exports?|backups?|credentials?|passwords?|logins?).*)?\.(?:csv|json|zip|txt|xml)$/.test(name) ||
+  /^(?:password-manager|passwords?|vault|logins)[._ -](?:exports?|backups?)(?:[._ -].*)?\.(?:csv|json|zip|txt|xml)$/.test(name) ||
+  /^(?:passwords?|logins)\.csv$/.test(name);
+}
+
+// Specific stores apply to absolute ancestors, including those of explicit
+// roots. Filename rules apply only to the file, never to its parent projects.
+// Denied directories are enumerated for metadata only, never file content.
 export function denied(path) {
- const parts = path.toLowerCase().split('/');
- return parts.some(part => ['secrets', '.ssh', '.aws', '.gnupg', 'keychains', 'keychain', 'browser profiles', 'browser-profiles', 'profiles', '.mozilla', '.password-store'].includes(part) ||
-  /\.(?:pem|key|p12|pfx|keychain|keychain-db|kdbx|kdb|1pux|1pif|opvault|agilekeychain)$/.test(part) ||
-  /^id_/.test(part) || /^credentials/.test(part) || /^service-account.*\.json$/.test(part) ||
-  /^\.env/.test(part) && !/\.(?:example|sample)$/.test(part) ||
-  /^\.dev\.vars(?:$|\.)/.test(part) || /\.tfvars(?:\.json)?$/.test(part) || /kubeconfig/.test(part) ||
-  /^(?:passwords?|vault|logins)(?:[._ -]|$)/.test(part) || /(?:1password|bitwarden|lastpass|dashlane|keeper|enpass|nordpass|keepass)/.test(part)) ||
-  /(?:^|\/)(?:google\/chrome|google-chrome|chromium|brave-browser|bravesoftware|microsoft edge|firefox|safari)(?:\/|$)/.test(path.toLowerCase());
+ const lower = path.toLowerCase(), name = basename(lower);
+ return lower.split('/').some(part => stores.has(part) || /\.(?:opvault|agilekeychain)$/.test(part)) || browserStore(lower) ||
+  /\.(?:pem|key|p12|pfx|keychain|keychain-db|kdbx|kdb|1pux|1pif|opvault|agilekeychain)$/.test(name) ||
+  /^id_/.test(name) || /^credentials/.test(name) || /^service-account.*\.json$/.test(name) ||
+  /^\.env/.test(name) && !/\.(?:example|sample)$/.test(name) ||
+  /^\.dev\.vars(?:$|\.)/.test(name) || /\.tfvars(?:\.json)?$/.test(name) || /kubeconfig/.test(name) || passwordExport(name);
 }
 
 export const example = path => /(?:^|[./_-])(?:examples?|samples?|templates?)(?:[./_-]|$)/i.test(path);
