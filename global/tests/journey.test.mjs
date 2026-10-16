@@ -18,8 +18,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { parseEnv } from 'node:util';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { delimiter, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { checkoutPlaywright } from '../../cli/browser-runtime.mjs';
 import { packageReference } from '../../scripts/rer-package/reference.mjs';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 import { freePort, run, sweep } from './harness.mjs';
@@ -66,7 +67,10 @@ test('an installed rer launches the package-mode default-seed reference with one
  const rer = join(home, '.local/bin/rer');
  await access(rer);
 
- const queued = await isolatedQueue(t, { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_SERVERS_DIR: join(directory, 'servers'), ...Object.fromEntries(['TMPDIR', 'PLAYWRIGHT_BROWSERS_PATH', 'COREPACK_HOME', 'npm_config_store_dir'].filter(name => process.env[name]).map(name => [name, process.env[name]])) });
+ // Only rer's children use the scratch HOME. The browser driver keeps the
+ // real HOME and shares its downloaded browsers without changing its profile.
+ const browserCache = dirname(checkoutPlaywright(join(base, 'default-seed')).registry.findExecutable('chromium').directory);
+ const queued = await isolatedQueue(t, { PATH: process.env.PATH, HOME: home, PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? browserCache, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_SERVERS_DIR: join(directory, 'servers'), ...Object.fromEntries(['TMPDIR', 'COREPACK_HOME', 'npm_config_store_dir'].filter(name => process.env[name]).map(name => [name, process.env[name]])) });
  const reference = await packageReference(base, root, tarball, { directory, env: queued });
  ({ registry } = reference);
  const { env } = reference;
