@@ -4,6 +4,13 @@
 as the saved owner with realistic data. Its title and marked nav label read
 `<Seed> Demo`; local dev reads `<Seed> Dev`. There is no injected bar or outbox.
 
+Invite another person through the app, then choose **Sign in as <name>** in
+operator access or at `/signin`. Owners and invited people use the same one-click
+path to `/app`, with their assigned roles. Local demos require the checkout's
+key cookie (open `RER_OPEN` in each browser profile); hosted demos use only that
+visitor's isolated accounts. Mail is silently suppressed. Cancelled or expired
+invitations and inactive people cannot sign in this way.
+
 ```sh
 rer demo            # prints RER_READY, RER_OPEN and RER_DEMO_ENDS_ON_STOP
 rer demo --stop

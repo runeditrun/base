@@ -142,6 +142,11 @@ export interface IdentityProviders {
 }
 export interface DomainRule { domain: string; providerId: string; createdAt: number }
 export interface OperatorAuth<R extends string = Role> {
+  /** Key-gated local development or an isolated hosted demo; unavailable in production. */
+  readonly oneClick?: {
+    people(request: Request): Promise<Array<{ email: string; displayName: string; role: R; href: string }> | null>;
+    enter(request: Request, input: { as?: string; returnTo?: string }): Promise<CompletedSession<R>>;
+  };
   mintCredential(request:Request,input?:{expiresInSeconds?:number}):Promise<{id:string;token:string;expiresAt:number}>;
   authenticateCredential(request:Request):Promise<{id:string;personId:string;fence:number;kind:SessionKind}|null>;
   authorizeDependencySetup(request: Request, input: { token?: string }): Promise<boolean>;

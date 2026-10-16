@@ -29,19 +29,29 @@ export async function migrate(db, filename) {
   const sql = await readFile(join(root, 'migrations/core', filename), 'utf8')
   for (const statement of splitSql(sql)) await db.prepare(statement).run()
 }
-export async function emittedRuntime({ prior = false, noMail = false, oidc = false, devKey } = {}) {
+export async function emittedRuntime({ prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort()
   // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
   const production = !noMail
-  const origin = `${production ? 'https' : 'http'}://127.0.0.1:${port}`
+  const origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://127.0.0.1:${port}`
   const mails = []
   const networkRequests = []
   const provider = oidc ? await testProvider(origin, owner) : undefined
+  const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter((file) => file.endsWith('.js')).map((file) => `assets/${file}`)]
+    .map((file) => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
+  // Preserve the hosted URL and Host through Miniflare's loopback proxy, as the
+  // demo front does when forwarding into this visitor's container.
+  if (demoHost) modules.unshift({ type: 'ESModule', path: join(root, 'dist/server/test-demo-entry.mjs'),
+    contents: `import worker from ${JSON.stringify('./' + config.main)};
+      export default { ...worker, async fetch(envelope, env, execution) {
+        const { url, ...init } = await envelope.json();
+        return worker.fetch(new Request(url, init), env, execution);
+      } };` })
   const options = convertV4MiniflareOptions({
     host: '127.0.0.1', port, https: production, modulesRoot: join(root, 'dist/server'),
-    modules: [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter((file) => file.endsWith('.js')).map((file) => `assets/${file}`)].map((file) => ({ type: 'ESModule', path: join(root, 'dist/server', file) })),
+    modules,
     compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
     assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
     d1Databases: { DB: 'default-seed-emitted' },
@@ -51,6 +61,8 @@ export async function emittedRuntime({ prior = false, noMail = false, oidc = fal
       SESSION_SECRET: 'disposable-test-only-session-secret-00001',
       AUTH_REVIEW_ENABLED: 'true',
       ...(devKey ? { RER_DEV_KEY: devKey } : {}),
+      ...(demo ? { RER_DEMO: '1' } : {}),
+      ...(demo ? { MAIL_FROM: 'Auth <auth@example.test>' } : {}),
       ...provider?.configuration,
       ...(!noMail ? { MAIL_PROVIDER: 'resend', MAIL_FROM: 'Auth <auth@example.test>', MAIL_API_KEY: 'test-only-key' } : {}),
     },
@@ -75,12 +87,16 @@ export async function emittedRuntime({ prior = false, noMail = false, oidc = fal
       await db.prepare("INSERT INTO articles VALUES ('old-article','previous','Previous data','Preserved body','2026-09-08T00:00:00Z')").run()
     }
     for (const file of (await readdir(join(root, 'migrations/core'))).filter((file) => file.endsWith('.sql') && file !== '0001_reference.sql').sort()) await migrate(db, file)
-    const call = (path, { method = 'GET', input, cookie, headers = {} } = {}) => mf.dispatchFetch(`${origin}${path}`, {
-      method, redirect: 'manual', headers: {
+    const call = (path, { method = 'GET', input, body, cookie, headers = {} } = {}) => {
+      const init = { method, headers: {
+        ...(demoHost ? { host: new URL(origin).host, 'CF-Connecting-IP': '192.0.2.1' } : {}),
         ...(method === 'POST' ? { origin, 'content-type': 'application/json' } : {}),
         ...(cookie ? { cookie } : {}), ...headers,
-      }, ...(input === undefined ? {} : { body: JSON.stringify(input) }),
-    })
+      }, ...(body !== undefined ? { body } : input === undefined ? {} : { body: JSON.stringify(input) }) }
+      return demoHost ? mf.dispatchFetch(`https://127.0.0.1:${port}/test-dispatch`, {
+        method: 'POST', redirect: 'manual', body: JSON.stringify({ url: origin + path, ...init }),
+      }) : mf.dispatchFetch(origin + path, { ...init, redirect: 'manual' })
+    }
     return { origin, call, db, mails, mf, provider, networkRequests, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
   } catch (error) { await mf.dispose(); await rm(directory, { recursive: true, force: true }); throw error }
 }

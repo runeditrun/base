@@ -5,6 +5,22 @@ including Base's default seed and composed foundation editions. Independently
 authored projects may use this CLI and installer, but RER does not require
 either; owners keep their own supported operations and integration choices.
 
+## Browser-free agent check
+
+After the pinned `pnpm install --frozen-lockfile`, run `pnpm run verify:agent`.
+The default seed and foundation export template run, in order: `build` (generates
+route/build inputs before checking types), `typecheck`, `source:check` (offline,
+frozen dependency-lock validation, with install scripts disabled), then
+`verify:base-source` (`rer check --profile first-party`: the command contract,
+recorded CLI/onboarding source inventory and recorded auth-copy custody).
+These templates have no edition-authoring source lock to refresh. An edition
+that adds one must declare `source:lock` and refresh it after its build and
+before checking it in `source:check`; never refresh custody records to hide drift.
+Platform recognizes `verify:agent` ahead of `verify:fast`, and also runs declared
+source/custody checks separately. No browser or external network is needed after
+the pinned install. This is not runtime, browser, migration, deployment or full
+product verification: full `rer verify` stays in trusted CI.
+
 ## Commands and flags
 
 Run from the project root, or use `--cwd PATH`. Every new verb accepts `--help`, `--cwd PATH`, `--non-interactive` and `--json`. Help exits before tools, configuration, adapters or effects run. Unknown flags, missing flag values and invalid values fail before effects. A single `--` separator is accepted for package-script forwarding. Flags belong only to the verbs listed below; there is no catch-all pass-through in the first-party profile.
@@ -98,6 +114,18 @@ Local setup and demo are exempt from production mail requirements.
 **The key gate** (a `devIdentity` seed). A tunnel or local reverse proxy makes remote requests look local, so the loopback origin is not a guard. For a `devIdentity` seed, `rer setup` writes a random `RER_DEV_KEY` (32 random bytes) per checkout to `.rer/local/dev-key.env` (directory 0700, file 0600); a repeat setup keeps its bytes, `rer reset --yes` removes it and the next setup makes a new one. Only local runtimes receive it: Vite's dev server, setup's temporary app and preview. Opening `RER_OPEN` trades it for the gate cookie. Dev sign-in, persona switching, `/__dev/personas` and tests' `signInAs` need that cookie (or, for the CLI and test harnesses, the key in an `x-rer-dev-key` header); without it each answers 404, through any proxy. A cookie from before a reset is refused. A runtime without the key binding serves none of them.
 
 **Dev identity** (`commandAdapter.devIdentity`). The operator-auth `dev` layer, server-only in its own directory, serves `/auth/dev/enter?as=PERSONA`, which creates or reuses a real `oa_sessions` row of kind `dev` for the owner `rer setup` claimed, or for a persona, so version fences, revocation and deactivation behave exactly as in production. A dev session, and any credential minted while using one, is admitted only on a request that passes the key gate. Until first-run is finished the owner lands on `/setup`. The `owner` persona is the owner `rer setup` claimed while that owner is active; once that owner has left, it is the earliest-created active owner, and `rer dev` names that owner in `RER_SIGNED_IN`; with no active owner left, `rer dev` says so plainly and prints no `RER_SIGNED_IN`. `rer dev` also keeps its `RER_OPEN` link in `.rer/local/open-url` (mode 0600, inside the private `.rer/local`), which `rer reset --yes` removes with the rest of `.rer/local`; stdout, the JSON ready event and `RER_READY` are unchanged. `rer dev --as PERSONA` selects `owner`, `signed-out` or one of the seed's `devPersonas()`: real operators at `<as>@dev.localhost`, created only by local dev sign-in. The app name and browser title identify Dev mode. Export drops dev sessions and dev-minted credentials and marks personas suspended; import refuses an archive that holds either. Dev identity refuses to start when `RER_INSTALLATION_ID` is set beside a non-loopback `RER_MANAGEMENT_ORIGIN`. There is still no static session, sample owner or mail fallback: every dev session belongs to a real operator in the app's own database.
+
+**Invited people in dev and demo.** Every invited or active person appears as
+**Sign in as <name>** at `/signin` and, in Base's default app, beside their
+operator record. `/auth/one-click?as=EMAIL&returnTo=/app` accepts a live invitation
+and opens the app with that person's role. Local entry always needs the checkout's
+key cookie or header, including after the invitation is accepted; hosted demos
+use the visitor's isolated accounts and the installed demo guard. A local
+`/__dev/personas` list also includes these people by email, so
+`rer dev --as person@example.com` prints their one-click entry. Expiry,
+cancellation, current inviter authority, allow-list and domain restrictions
+still apply. Mail is silently suppressed and there is no mail-reading step.
+Production retains its normal email-link flow and refuses this one-click route.
 
 The seed loads the layer only through a local-only entry, never from the
 deployed main, and declares `devIdentity: {entry, output}`. `rer build` scans
@@ -309,6 +337,58 @@ vendored `mail` package), run `pnpm install`, and run the seed's suites. Base's
 own suites showed no behaviour change from undici 7.29.1; Mango's one red
 move-in journey on it did not reproduce.
 
+## Seed mark, readable actors and refresh-safe forms
+
+Three shared rules from the seed quality report. Each arrives with a Base refresh
+(vendored copies; `src/base` for the two runtime files) or the rer pin that
+contains it; Base's `default-seed` shows each one in use.
+
+**The seed's own mark (SC-14).** While a seed's logo, favicon or app mark is
+byte-equal to Base's placeholder "F" (`foundation/template/public/brand/mark.svg`),
+`rer check --profile first-party`, `rer build --site` and `rer deploy --site`
+print one warning line naming the files ("Base's placeholder mark is still in
+<files>; replace with the seed's own mark."; a `warning` event with code
+`placeholder_mark` under `--json`) and do not fail, so a live run site keeps
+redeploying. `rer release` refuses it unless `--allow-placeholder-mark` is
+given; the receipt then records `placeholderMark: { allowed: true, files }`.
+Base's own projects (`example/foundation`, `runeditrun/default-seed-reference`)
+are exempt. Adopt: when the seed's brand round comes, draw its mark, replace
+`public/brand/mark.svg` and every copy the warning names (favicons, site assets),
+and the warning stops; until then, release with `--allow-placeholder-mark`.
+
+**Names, times and labelled evidence.** `src/base/actor.ts`
+(`foundation/runtime/actor.ts`) turns an actor id and a timestamp into
+`actorLine(directory, id, at, timeZone)`: "Maya Chen · 16 Oct 2026, 3:04 pm
+AEDT". An id the directory does not hold (an erased, removed or unrestored
+person) reads "Former member", never the UUID. `evidenceHtml(details, {
+directory, timeZone })` renders an evidence, details or snapshot object (or its
+JSON text) as a labelled `<dl>`: nested fields read "Decision › Reviewed at",
+actor-shaped fields (`actor`, `approvedBy`, `operatorId`…) resolve to names,
+timestamps render in the business time zone, and nothing renders as raw JSON or
+`[object Object]` (`evidenceFields` returns the same as text for other
+renderers). `operatorDirectory(db)` reads operator-auth's display names; add the
+seed's own people (members, staff, agents) to that map. Declare the business
+time zone as `timeZone` in the seed's identity (`EditionIdentity`), or pass the
+installation's own setting. Adopt: replace every place a screen prints an actor
+id, `JSON.stringify` of evidence, a raw journal or a UTC timestamp with these.
+
+**Refresh-safe writes.** `src/base/command-receipts.ts`
+(`foundation/runtime/command-receipts.ts`) with its table
+`command-receipts.sql`. A create form carries `commandKeyInput()` (a fresh key
+each render); its handler runs the create through `runOnce(db, { actor, command,
+key: commandKey(form) }, create)` and answers `seeOther(location)` (303 to a
+GET), so a refresh reads the result and a resubmitted form (Back, a retried
+request, a double click) returns the first result instead of creating a second
+credential, publication or key. A key in flight answers 409; a failed create
+releases its key. `create` may return `once`, a part shown only to the first
+`readReceipt` (a new credential's token): redirect to `?done=<key>` and read it
+there, never in the POST's own response. JSON creates take the same key as an
+`Idempotency-Key` header (default seed: `POST /api/people`). Archives never
+carry `rer_command_receipts`. Adopt: apply `command-receipts.sql` as the seed's
+next numbered migration (new foundations get `0015_command_receipts.sql`), then
+route every create form through `runOnce` and 303, removing any branch that
+renders a result page from the POST itself.
+
 ## Hydration units
 
 A mismatch between the server HTML and what React hydrates (an extension linking an address, a translator, a proxy rewrite) makes React client-render the nearest Suspense boundary; under TanStack Router that is everything under the root route, and the root route's own chrome is in no boundary at all. Seeds wrap every page section and the root chrome in `HydrationUnit`, mark one-time entrance animations with `data-intro` under the root's intro guard, hydrate through a `src/client.tsx` that passes `createRecoverableErrorHandler()`, keep addresses as lone text and send `no-transform` on documents. The convention and the adoption steps are in Base's `foundation/runtime/hydration/README.md` (in an edition, `src/base/hydration/README.md`).
@@ -451,6 +531,7 @@ exact grant fields, request bodies and recovery rules.
 - SC-08: complete local export/import, integrity, empty-destination/confirmation and credential exclusions.
 - SC-09: structural check rejects omissions, doctor names missing inputs, stable JSON and exits.
 - SC-10: optional independent execution uses only declared argv, preserves child outcomes and forces no stack.
+- SC-14: the seed carries its own mark; check and run site builds and deploys warn on Base's placeholder mark, and releases refuse it unless `--allow-placeholder-mark` is given, which the receipt records.
 
 ## Managed servers and bounded work
 

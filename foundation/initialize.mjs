@@ -49,6 +49,7 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
       { component: 'mail', repository: 'base', source: 'modules/mail/src/development/schema.sql', target: 'migrations/core/0002_outbox.sql' },
       { component: 'portability', repository: 'base', source: 'modules/portability/schema/portability.sql', target: 'migrations/core/0003_portability.sql' },
       { component: 'erasure', repository: 'base', source: 'modules/erasure/schema/erasure.sql', target: 'migrations/core/0013_erasure.sql' },
+      { component: 'base', repository: 'base', source: 'foundation/runtime/command-receipts.sql', target: 'migrations/core/0015_command_receipts.sql' },
       { component: 'base', repository: 'base', source: 'export/SEED-COMMAND-CONTRACT.md', target: 'SEED-COMMAND-CONTRACT.md' },
       { component: 'base', repository: 'base', source: 'export/RUN-LOCALLY.md', target: 'RUN-LOCALLY.md' },
       { component: 'base', repository: 'base', source: 'export/HOMEPAGE-VARIANTS.md', target: 'HOMEPAGE-VARIANTS.md' },
