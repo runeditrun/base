@@ -46,14 +46,17 @@ export async function secretBindings(api, worker, plan, env, exists) {
   const present = exists ? await api.request(`/workers/scripts/${worker}/secrets`) : [];
   assert(Array.isArray(present) && present.every(x => typeof x.name === 'string' && x.type === 'secret_text'),'invalid-secret-list');
   const bindings = []; const names = present.map(x => x.name);
+  const supplied = item => typeof env[item.environment] === 'string' && env[item.environment].trim();
+  // An optional secret neither held nor supplied stays unbound; the app treats it as not connected.
+  const unset = plan.secrets.filter(item => item.optional && !names.includes(item.binding) && !supplied(item)).map(item => item.binding);
   for (const item of plan.secrets) {
     if (names.includes(item.binding)) bindings.push({type:'inherit',name:item.binding});
-    else {
-      assert(typeof env[item.environment] === 'string' && env[item.environment].trim(), `missing-secret-${item.environment}`);
+    else if (!unset.includes(item.binding)) {
+      assert(supplied(item), `missing-secret-${item.environment}`);
       bindings.push({type:'secret_text',name:item.binding,text:env[item.environment]});
     }
   }
-  return {bindings,names,missing:plan.secrets.filter(x => !names.includes(x.binding)).map(x => x.binding)};
+  return {bindings,names,unset,missing:plan.secrets.filter(x => !names.includes(x.binding) && !unset.includes(x.binding)).map(x => x.binding)};
 }
 export async function uploadAssets(api, worker, files) {
   const manifest = {}; const byHash = new Map();

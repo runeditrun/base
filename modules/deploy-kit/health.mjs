@@ -72,7 +72,7 @@ export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fe
     assert(!readiness?.window || readiness.window.remaining() > 0, 'missing-deployed-secret');
     const secrets = await api.request(`/workers/scripts/${plan.worker}/secrets`);
     assert(Array.isArray(secrets) && secrets.every(row => typeof row?.name === 'string' && row.type === 'secret_text'), 'invalid-secret-list');
-    if (plan.secrets.every(x => secrets.some(y => y.name === x.binding && y.type === 'secret_text'))) break;
+    if (plan.secrets.every(x => x.optional || secrets.some(y => y.name === x.binding && y.type === 'secret_text'))) break;
     assert(readiness?.freshUpload && readiness.window?.remaining() > 0, 'missing-deployed-secret');
     await readiness.window.pause();
   }
