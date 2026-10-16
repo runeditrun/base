@@ -37,7 +37,7 @@ export async function portabilityFixture(t,{generated=true}={}) {
   assert.equal(code,expected,`Fixture command ${args[0]} exited ${code}: ${stdout}\n${stderr}`);
   return stdout;
  }
- const run=async(args,expected=0)=>(await command(['scripts/rer.mjs',...args,'--json'],expected)).trim().split('\n').map(JSON.parse);
+ const run=async(args,expected=0,{slow=false}={})=>(await command([...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json'],expected)).trim().split('\n').map(JSON.parse);
  const data=async sql=>JSON.parse(await command(['node_modules/wrangler/bin/wrangler.js','d1','execute','default-seed-reference','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--command',sql,'--json']));
  return {root,run,data};
 }

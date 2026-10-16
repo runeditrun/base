@@ -15,7 +15,7 @@ async function seed(t){
  const root=await mkdtemp(join(tmpdir(),'rer-public-preflight-'));t.after(()=>rm(root,{recursive:true,force:true}));
  await cp(join(base,'default-seed'),root,{recursive:true,filter:path=>!path.split('/').some(part=>['node_modules','.wrangler','.seed','.rer','dist','.cache'].includes(part))});
  await exportCLI(base,root);await cp(join(base,'onboarding'),join(root,'scripts/base-onboarding'),{recursive:true,filter:path=>!path.endsWith('.test.mjs')});
- const run=async (args,{slow=false}={})=>{const child=spawn(process.execPath,[...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json','--non-interactive'],{cwd:root,env:{...process.env,CI:'true',RER_SERVERS_DIR:join(root,'.test-servers')},stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});return {code,stdout,stderr,events:stdout.trim().split('\n').filter(Boolean).map(JSON.parse)};};
+ const run=async (args,{slow=false,failed=false}={})=>{const child=spawn(process.execPath,[...(slow||failed?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json','--non-interactive'],{cwd:root,env:{...process.env,CI:'true',RER_TEST_INSPECTION_FAILURE:failed?'1':'0',RER_SERVERS_DIR:join(root,'.test-servers')},stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});return {code,stdout,stderr,events:stdout.trim().split('\n').filter(Boolean).map(JSON.parse)};};
  return {root,run};
 }
 test('public setup enumerates active missing fields and private answer shape without prompting or echoing answers',async t=>{
@@ -77,20 +77,34 @@ test('public lifecycle refuses legacy saved-origin listeners despite overrides a
  const database=join(state,'held.sqlite'),db=new DatabaseSync(database);db.exec('CREATE TABLE retained(value TEXT)');db.close();
  const holderOfState=spawn(process.execPath,['-e',"require('node:fs').openSync(process.argv[1],'r');console.log('held');setInterval(()=>{},1000)",database],{cwd:tmpdir(),stdio:['ignore','pipe','inherit']});
  t.after(()=>holderOfState.kill());await once(holderOfState.stdout,'data');
- for(const verb of ['dev','demo']){
-  const result=await run([verb]);assert.equal(result.code,4,result.stdout);
+ for(const verb of ['setup','import','reset','dev','demo','preview']){
+  const result=await run([verb,...(verb==='reset'?['--yes']:[])]);assert.equal(result.code,4,result.stdout);
   assert.match(result.stdout,new RegExp(`PID ${holderOfState.pid} \\(node`));
  }
  holderOfState.kill();await once(holderOfState,'exit');
- for(const verb of ['dev','demo']){
+ await writeFile(join(root,'.dev.vars'),`AUTH_ORIGIN="http://127.0.0.1:${unused}"\n`);
+ for(const verb of ['setup','import','dev','demo','preview'])for(const edge of [{slow:true},{failed:true}]){
   // No setup was done: reaching the real missing-prerequisites outcome proves
   // the unanswered check did not refuse startup. Serving is covered separately.
-  const result=await run([verb],{slow:true});assert.equal(result.code,3,result.stdout);
+  const result=await run([verb],edge);assert.equal(result.code,3,result.stdout);
   assert.equal(result.events.find(event=>event.event==='error').code,'missing_input');
  }
  const launch=await localOperation(root);
- try{const result=await run(['dev'],{slow:true});assert.equal(result.code,4,result.stdout);assert.match(result.stdout,new RegExp(`PID ${process.pid}`));}
+ try{for(const verb of ['setup','import','reset','dev','demo','preview']){
+  const result=await run([verb,...(verb==='reset'?['--yes']:[])],{slow:true});assert.equal(result.code,4,result.stdout);assert.match(result.stdout,new RegExp(`PID ${process.pid}`));
+ }}
  finally{await launch.release();}
+ // Canonical-state operations detect a real SQLite writer when lsof cannot
+ // answer. Demo's isolated copy must not open/probe canonical SQLite at all.
+ const writer=spawn(process.execPath,['-e',"const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(process.argv[1]);db.exec('PRAGMA journal_mode=WAL; BEGIN IMMEDIATE');console.log('held');setInterval(()=>{},1000)",database],{stdio:['ignore','pipe','ignore']});
+ t.after(()=>writer.kill());await once(writer.stdout,'data');
+ for(const verb of ['setup','import','reset','dev','preview']){
+  const result=await run([verb,...(verb==='reset'?['--yes']:[])],{slow:true});assert.equal(result.code,4,result.stdout);assert.match(result.stdout,/active SQLite lock/);
+ }
+ writer.kill();await once(writer,'exit');
+ // The last destructive path also proceeds under a free launch lock.
+ const reset=await run(['reset','--yes'],{slow:true});assert.equal(reset.code,0,reset.stdout);
+ await assert.rejects(stat(database),{code:'ENOENT'});
 });
 test('public reset awaits the seed reset preflight before showing or deleting anything, even with --yes',async t=>{
  // The adapter refuses while a legacy data directory still holds data, as a seed

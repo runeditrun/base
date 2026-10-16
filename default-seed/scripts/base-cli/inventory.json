@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26-dev.g902f1110",
+  "cliVersion": "0.2.26-dev.gca68d2e7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -127,6 +127,10 @@
       "source": "onboarding/local/recovery.mjs",
       "sha256": "bb1c3d1f842a8c03796376100b7e3c7112671c37f47ac8b54ec0bb92ee5c6ec1"
     },
+    "local/sqlite-custody.mjs": {
+      "source": "onboarding/local/sqlite-custody.mjs",
+      "sha256": "20c8e57786938ae7d63dcf3318c6b92479620e3b02c0b60107b6b873472710ed"
+    },
     "local/state-files.mjs": {
       "source": "onboarding/local/state-files.mjs",
       "sha256": "ac00a918b350265d395ba3b4dba8ecde0c73e66ebb41cde7037246235552e56e"
@@ -181,7 +185,7 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "b3fe50dce223a767b48ea846d552ef7dbeb9934c5d9d59b5d2050714517144eb"
+      "sha256": "f3f572e71884d5a6c62d5804c34b79d685be2157c0e4f3650be5ffa7336e59f0"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
@@ -331,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "aecf29365a9b15b976c6a368f73b30783faa3b184fde166713ebee9ca3b5ff1a"
+      "sha256": "d992f6e7af592f6b7600772884c4eb692f06e136bb6d2f57320cc51ffb8abd11"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -539,7 +543,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "8636b57c8bd62719582e1a2de14df45119748b67f2e2bc8c609f8dfc85c16bbd"
+      "sha256": "bc2b853e920d39d48f9a8deed6226f270e3855669f0f6ee7859dcd3bc70bc775"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -547,7 +551,7 @@
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
-      "sha256": "24e1ca85371bb485d12f3efb39e74a1c4c069659ab674f98566beb3f31c62b01"
+      "sha256": "4b9449738ec9e6d93152168b84350c4211375ad5a7656f8a729d490ea816e364"
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
@@ -555,7 +559,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "0f393e10f93f5d6c2391be418c0c7588c8e44d72bf476eb8e533e4b8be5e3a3d"
+      "sha256": "5ae0a5dc460674800869ea40ccfab5dd020399c3606e84b8013ed31179176880"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
