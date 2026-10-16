@@ -23,7 +23,7 @@ export async function providerResponse({send, method, timeoutMs, callerSignal, r
     // remain authoritative and are never reset by a retry.
     const firstRead = read && attempt === 1 ? new AbortController() : undefined;
     const timer = firstRead ? setTimeout(() => firstRead.abort(new DOMException('Provider read timed out','TimeoutError')), Math.max(1, Math.ceil(timeoutMs / 2))) : undefined;
-    timer?.unref();
+    timer?.unref?.();
     const attemptSignal = firstRead ? AbortSignal.any([signal, firstRead.signal]) : signal;
     let readingBody = false;
     try {
