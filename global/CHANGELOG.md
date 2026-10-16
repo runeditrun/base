@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.34
+
+- **Optional deploy secrets.** A deploy declaration's secret entry may add `"optional": true` for an integration's credential (Pier, Stripe). When neither the Worker nor the deploy inputs hold it, the first deploy succeeds without binding it and reports `Optional secrets not set: NAME`, and a dry run names optional secrets that were not supplied. Health waits only for required secrets, and a missing required secret still refuses before any write. `rer deploy --set-secret NAME` and `--unset-secret NAME` record the Worker version they make, so the next deploy accepts that Worker and an unchanged repeat writes nothing. A declaration without `optional` plans and fingerprints exactly as before.
+- **A redeploy waits out a version-readback 404 and resumes on its own fingerprint.** After an upload, a 404 with Cloudflare code 100146 on the read of the version just uploaded is waited out within the existing 90 s readiness window; any other error still fails. If an earlier run lost that readback, the next deploy accepts the live version when it carries the pending upload's fingerprint as both its `RER_DEPLOY_FINGERPRINT` binding and its `rer-deploy:<fingerprint>` annotation, records its ids, and continues, with or without a receipt. Any other live version is still refused. New state files no longer save the pending build hash, and older ones that have it still load.
+- **The Run page leads with the one-line start.** The shared /run page, SEED-COMMAND-CONTRACT, RUN-LOCALLY and HOMEPAGE-VARIANTS lead with `npx -y @runeditrun/rer dev <owner>/<repo>`, then `cd <folder> && rer dev` to start again; the curl and npm global installs stay as the alternative. `foundation initialize` and the template write that line into `run.json`.
+- **Install, export and deploy tell a stranger what happened or is needed.** A failed install step prints `Install step failed: <step>`, its command, exit code, the last 20 lines of output and the checkout path of its full log (`--json`: `error.step`). This covers a pinned `@runeditrun/rer` install, the frozen dependency install and the Playwright browser download. `rer export` no longer prints Durable Object warnings and ends with `Exported <path> (<size>): <n> tables, <rows> rows`; the receipt is the `--json` result. Without Cloudflare values, deploy names deploy.json's new optional `deployGuide` (an https URL), or else the API token page and the account permissions the declaration needs. `--dry-run` goes ahead without mail inputs and OWNER_EMAIL, and lists them under "Needed for a real deploy" (`--json`: `neededForRealDeploy`).
+- **Native demos load WebAssembly and data modules.** A native hosted demo now carries every Worker build module that deploy-kit uploads: `.js`/`.mjs` as JS, `.txt`/`.html`/`.sql` as text, `.wasm` as WebAssembly and `.bin` as data. A type with no Loader kind is refused at `rer deploy --demo`, and the message names the type and the file. A failed demo build prints its reason (the build's exit, its last 40 lines of output and the log path, or the bundle-preparation error naming the file) in the output and in the capture log.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes.
+- A seed whose integration works without its credential (Barrow and Stall without Pier or Stripe) marks that secret `"optional": true` in its deploy declaration.
+- A project with its own deploy instructions can add `"deployGuide": "https://…"` to deploy.json.
+- A seed refreshes its copy of the /run page and docs from Base to get the one-line start.
+- A hosted demo that kept WebAssembly or data modules out of its Worker build can put them back; they ship on the next `rer deploy --demo`.
+
 ## 0.2.33
 
 - **CodeQL-clean mail and logout copies.** mail's `parseAddress`, `parseHeaders` and `messageIds` now parse in linear time, without backtracking regular expressions. Results and error codes are unchanged, and U+2028/U+2029 in a display name or header line is still refused. In dependencies' back-channel logout, the session fence is read from the exact `events` key with `Object.hasOwn`. Seeds that patched these files in their recorded Base copies can now refresh to Base's bytes.
