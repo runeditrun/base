@@ -13,14 +13,26 @@ export const inspectionMs = 5000
 // launch whose own processes are accounted for.
 const transient = (message) => Object.assign(new Error(message), { transient: true })
 const retryMs = 10
-async function withinBound(timeout, attempt) {
-  const deadline = Date.now() + timeout
-  for (;;) {
-    try { return await attempt(Math.max(1, deadline - Date.now())) } catch (error) {
-      if (!error.transient || Date.now() + retryMs >= deadline) throw error
-      await delay(retryMs)
+// A busy machine can starve ps, or this process, past the ordinary bound while
+// the read itself is healthy; its finished output can even be queued behind
+// the deadline timer. Such a read is not a failure of the caller's work: the
+// same in-flight read is awaited for a bounded extension, with a warning, and
+// only an inspection that also outlives the extension fails.
+export const extensionMs = 25000
+async function withinBound(timeout, attempt, extension = extensionMs) {
+  const deadline = Date.now() + timeout + extension
+  const slow = setTimeout(() => process.emitWarning(
+    `Process inspection is taking longer than ${timeout} ms on a busy machine; waiting up to ${extension} ms more.`,
+    { code: 'RER_PROCESS_INSPECTION_SLOW' }), timeout)
+  slow.unref()
+  try {
+    for (;;) {
+      try { return await attempt(Math.max(1, deadline - Date.now())) } catch (error) {
+        if (!error.transient || Date.now() + retryMs >= deadline) throw error
+        await delay(retryMs)
+      }
     }
-  }
+  } finally { clearTimeout(slow) }
 }
 export const validPid = (pid) => Number.isSafeInteger(pid) && pid > 0 && pid <= 0x7fffffff
 
@@ -103,7 +115,7 @@ async function processGroup(pgid, signal) {
 // cleanup slower than the existing bounded shutdown contract.
 export async function readProcessIdentity(pid, timeout = inspectionMs) {
   if (!validPid(pid) || !(timeout > 0)) throw new Error('Invalid process identity deadline.')
-  if (process.platform === 'linux') return linuxProcess(pid, undefined, AbortSignal.timeout(timeout))
+  if (process.platform === 'linux') return withinBound(timeout, (remaining) => linuxProcess(pid, undefined, AbortSignal.timeout(remaining)))
   return withinBound(timeout, (remaining) => psIdentity(pid, remaining))
 }
 
@@ -122,7 +134,7 @@ async function psIdentity(pid, timeout) {
 
 // `read` is the process edge: it returns the table or throws; tests supply a
 // failing one.
-export async function readProcessTable(timeout = inspectionMs, pgid, read = processGroup) {
+export async function readProcessTable(timeout = inspectionMs, pgid, read = processGroup, extension = extensionMs) {
   if (!(timeout > 0)) throw new Error('Process inspection deadline expired.')
   return withinBound(timeout, async (remaining) => {
     const controller = new AbortController()
@@ -135,7 +147,7 @@ export async function readProcessTable(timeout = inspectionMs, pgid, read = proc
         }, remaining)
       })])
     } finally { clearTimeout(timer) }
-  })
+  }, extension)
 }
 
 export const sameBirth = (left, right) => validPid(left?.pid) && left.pid === right?.pid && left.birth === right?.birth
