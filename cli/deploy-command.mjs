@@ -18,9 +18,11 @@ import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { deployGuide, neededForRealDeploy, reportNeeded } from './deploy-needs.mjs';
+import { keepHookSecrets } from './deploy-secrets.mjs';
+import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 
 export function validateDeployOptions(options) {
- const changes = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret'].filter(Boolean);
+ const changes = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret', options.rotateSecret && '--rotate-secret'].filter(Boolean);
  if (changes.length > 1 || changes.length && options.dryRun) throw invalid(`Use ${changes.join(', ')}${options.dryRun ? ' and --dry-run' : ''} on separate runs.`);
  if (options.remove && !options.yes) throw invalid(`${deployAgain(options)} --remove deletes this environment's Worker and every D1, R2, KV and queue rer created for it, with their data. Add --yes to confirm.`);
 }
@@ -73,16 +75,20 @@ export async function deployCommand(context) {
  // Custom hooks historically ignored these flags. Only the ownership controller
  // may perform them; neither a build nor a custom upload runs here.
  if (options.remove || options.setSecret || options.unsetSecret) return ownerDeploy(path, adapter)(context);
+ // A hook that deployed through the kit keeps what its Worker holds: rotate there as a secret change.
+ if (options.rotateSecret && !adapter.deploy.managesHostedOwner && await hookState(root, options.environment ?? 'production')) return ownerDeploy(path, adapter)(context);
  if (adapter.deploy.managesHostedOwner) { const result = await adapter.deploy(context); return options.dryRun ? dryRun(result) : result; }
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
  const sourceSha = options.dryRun ? undefined : committedSource(root, options);
- const { env, supplied } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
+ const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  const { createRedaction, credentialValues } = await shared('redaction.mjs');
  const redaction = createRedaction();
  const addSecret = value => { redaction.addSecrets([value]); store.addSecrets?.([value]); };
  for (const value of [...credentialValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment])].filter(Boolean)) addSecret(value);
  const environment = options.environment ?? 'production';
+ // The hook uploads every value it is given: a generated secret it gets is the one the Worker keeps.
+ if (!options.dryRun) await keepHookSecrets({ root, environment, declaration, setupManifest, env, generated, reused, rotated, again: deployAgain(options), report: line => store.report(line) });
  // A hook keeping the kit's record in its own state file named it; every kit
  // step after the hook (inspect, secret, record-owner) reads that record.
  let hookRecord = await hookState(root, environment);
@@ -103,12 +109,15 @@ export async function deployCommand(context) {
    const saved = { ...process.env };
    try {
     Object.assign(process.env, env);
-    deployed = await adapter.deploy({ ...context, linkDependencies: async (origin, token) => link(token, origin) });
+    // The hook builds and uploads by itself: it never sees the checkout's local settings.
+    deployed = await withoutLocalSettings(root, { settings: [...(Array.isArray(adapter.settings) ? adapter.settings : []), adapter.hooks?.secrets?.file], operationToken: context.operationToken },
+     () => adapter.deploy({ ...context, linkDependencies: async (origin, token) => link(token, origin) }));
    } finally {
     for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
     Object.assign(process.env, saved);
    }
    hookReturned = true;
+   await refuseLocalEnvOutput(root, adapter.devIdentity?.output, { uploaded: !options.dryRun });
    if (options.dryRun) return dryRun(deployed);
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);

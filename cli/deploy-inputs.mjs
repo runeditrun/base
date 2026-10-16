@@ -4,12 +4,14 @@ import { shared } from './shared.mjs';
 import { invalid } from './errors.mjs';
 import { readDeployEnvFile } from '../modules/deploy-kit/env-file.mjs';
 import { publicOrigin } from '../modules/deploy-kit/public-origin.mjs';
+import { keptSecrets, rotations, savedSecrets } from './deploy-secrets.mjs';
 
 // The values a Workers deploy reads for its declared secrets: this process's
 // environment, then the --env-file (which wins), then what rer supplies itself:
-// the local setup owner's email, and a fresh value for each secret the setup
-// manifest generates (a session secret, the one-time setup token). A value only
-// reaches a Worker that lacks that secret; an existing one is kept unchanged.
+// the local setup owner's email, and for each secret the setup manifest generates
+// the value kept for this environment (deploy-secrets.mjs), else a fresh one
+// (`generated`; always fresh for the one-time setup token and --rotate-secret).
+// The owner kit sends a value only to a Worker that lacks that secret.
 export async function deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys = [] }) {
  const env = { ...process.env }, supplied = [];
  if (options.envFile) {
@@ -35,11 +37,19 @@ export async function deployEnvironment({ root, options, declaration, setupManif
   const owner = (await readSettings(root, settings)).values[emailField];
   if (typeof owner === 'string' && owner.includes('@')) { env[email.environment] = owner; supplied.push(email.binding); }
  }
+ // withDeployEnvironment reads only the --env-file, with no declaration to rotate in.
+ const kept = keptSecrets(declaration, setupManifest), rotate = setupManifest || declaration.project ? rotations(options, kept, env) : [];
+ const saved = kept.some(absent) ? await savedSecrets(root, options.environment ?? 'production') : {};
+ const generated = [], reused = [];
  for (const field of setupManifest?.fields ?? []) {
   const item = field.kind === 'secret' && field.generate ? secrets.find(entry => entry?.binding === field.name) : undefined;
-  if (absent(item)) { env[item.environment] = randomBytes(32).toString(field.generate); supplied.push(item.binding); }
+  if (!absent(item)) continue;
+  const keep = kept.includes(item), value = keep && !rotate.includes(item.binding) ? saved[item.binding] : undefined;
+  env[item.environment] = value ?? randomBytes(32).toString(field.generate);
+  supplied.push(item.binding);
+  if (value) reused.push(item.binding); else if (keep) generated.push(item.binding);
  }
- return { env, supplied };
+ return { env, supplied, generated, reused, rotated: rotate };
 }
 
 // Hooks and their child builds read process.env. Install the private file for

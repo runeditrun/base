@@ -15,6 +15,7 @@ import { runtimeFrontDoor } from './runtime-front-door.mjs';
 import { localCliSessionProof, localSettingKeys } from './settings.mjs';
 import { rememberSetupAnswers } from './setup-answers.mjs';
 import { ensureDevKey, refuseDevLayerOutput } from './dev-identity.mjs';
+import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 import { announceDoorRoute } from './door-mode.mjs';
 
 export async function runCommand(project, options, out) {
@@ -120,10 +121,15 @@ async function runLifecycle(project, options, out, deployRedaction) {
   if (options.verb === 'setup') { proxy = await runtimeFrontDoor({ ...selected, devKey: devKey ?? undefined, origin: selected.url }); if (selected.door) await announceDoorRoute(selected, proxy); }
   const { appFetch } = await shared('app-fetch.mjs');
   const emailKey = localSettingKeys(project).email;
-  await adapter.run(project.root, input ?? { [emailKey]: options.ownerEmail ?? selected?.vars[emailKey] }, store,
+  const privateSettings = [...adapter.settings, '.rer/local/models.json', ...(project.privateInputs??[])];
+  const run = () => adapter.run(project.root, input ?? { [emailKey]: options.ownerEmail ?? selected?.vars[emailKey] }, store,
    child => { app = child; }, signal,
-   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, privateSettings: [...adapter.settings, '.rer/local/models.json', ...(project.privateInputs??[])], devKey: devKey ?? undefined });
+   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, privateSettings, devKey: devKey ?? undefined });
+  // A production build never sees the checkout's local settings, whatever the seed's build runs.
+  if (options.verb === 'build') await withoutLocalSettings(project.root, { settings: privateSettings, operationToken: operation?.token }, run);
+  else await run();
   if (['setup', 'build'].includes(options.verb)) await refuseDevLayerOutput(project.root, adapter.devIdentity);
+  if (options.verb === 'build') await refuseLocalEnvOutput(project.root, adapter.devIdentity?.output);
   const url = selected?.url;
   if (options.verb === 'setup') {
    // Only a connected provider leaves first setup open; a native claim with

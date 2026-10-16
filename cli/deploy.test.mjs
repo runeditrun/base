@@ -15,9 +15,11 @@ test('owner deploy dry run validates the kit artifact and declaration with zero 
  const declaration={version:1,project:'tests/fixture',compatibilityDate:'2026-09-08',d1:[{binding:'DB'}]};
  await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
  let builds=0,requests=0;const store={report:()=>{}};
+ // The caller's local operation: the build runs nested under it.
+ const {localOperation}=await import('../onboarding/local/operation.mjs');const lock=await localOperation(root);t.after(()=>lock.release());
  t.mock.method(globalThis,'fetch',()=>{requests++;throw Error('Provider request forbidden in dry run');});
- const deploy=ownerDeploy('deploy.json',{run:async(...args)=>{builds++;assert.equal(args.at(-1).verb,'build');assert.equal(args.at(-1).operationToken,'library-lock');}});
- const args={root,options:{dryRun:true},store,signal:new AbortController().signal,operationToken:'library-lock'};
+ const deploy=ownerDeploy('deploy.json',{run:async(...args)=>{builds++;assert.equal(args.at(-1).verb,'build');assert.equal(args.at(-1).operationToken,lock.token);}});
+ const args={root,options:{dryRun:true},store,signal:new AbortController().signal,operationToken:lock.token};
  assert.deepEqual(await deploy(args),{dryRun:true,deployed:false});assert.equal(builds,1);assert.equal(requests,0);
  await writeFile(join(root,'deploy.json'),JSON.stringify({...declaration,d1:[]}));
  await assert.rejects(deploy(args),/undeclared-migration-binding/);assert.equal(requests,0);

@@ -2,7 +2,7 @@ import { cloudflare } from '@cloudflare/vite-plugin'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { excludeLocalVariables } from './vite/exclude-local-variables.ts'
+import { excludeLocalVariables } from './scripts/base-onboarding/local-variables-output.mjs'
 import { archiveOutputGuard } from './scripts/base-onboarding/archive-output.mjs'
 import { demoSockets } from '../modules/demo/vite.mjs'
 

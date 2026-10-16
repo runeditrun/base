@@ -26,7 +26,6 @@
   },
   "include": [
     "src",
-    "vite",
     "vite.config.ts"
   ],
   "exclude": [
