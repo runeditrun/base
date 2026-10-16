@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g01b782a6",
+  "cliVersion": "0.2.28-dev.geb6e5ae6",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -335,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "d992f6e7af592f6b7600772884c4eb692f06e136bb6d2f57320cc51ffb8abd11"
+      "sha256": "a7eea29491561c936835bab0b1ec633472f11bdf309c14e459b11e5a42a429da"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -368,6 +368,50 @@
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
       "sha256": "5cafb40696ae245b5c9629f14405c97f4948cdc0ffe7268821589afe13d60f79"
+    },
+    "cli/business/command.mjs": {
+      "source": "cli/business/command.mjs",
+      "sha256": "acec00c15932695ef08344f1109980fd8c4dc5b21a3d31104731223f86a8adf2"
+    },
+    "cli/business/detector.mjs": {
+      "source": "cli/business/detector.mjs",
+      "sha256": "03b1207efcaf692cb341356951964503078a3ee3b006c58f7ced05d722c6306b"
+    },
+    "cli/business/parsers-config.mjs": {
+      "source": "cli/business/parsers-config.mjs",
+      "sha256": "6158ff18391f7d83535555ad4005be51e5670ced14d3381eadf0c494300375b0"
+    },
+    "cli/business/parsers-infrastructure.mjs": {
+      "source": "cli/business/parsers-infrastructure.mjs",
+      "sha256": "33888716ecdc378af714c5a1da223ce3dffa7bede26e4b79081cc441252f465e"
+    },
+    "cli/business/parsers-packages.mjs": {
+      "source": "cli/business/parsers-packages.mjs",
+      "sha256": "135174ab6d520e124fa7bec5ea5ff9211bf6173b817e91e829471ba61cb67605"
+    },
+    "cli/business/parsers-pulumi.mjs": {
+      "source": "cli/business/parsers-pulumi.mjs",
+      "sha256": "c0b8cfbc2ec0d352ce63ba3a9e2a1215fd682db91158a3e23b26b9a917c72713"
+    },
+    "cli/business/parsers-syntax.mjs": {
+      "source": "cli/business/parsers-syntax.mjs",
+      "sha256": "d6cc67dae8ac92329cb86a059bcd7d8cccd4d4e38875c58c978d3ed3a955be7d"
+    },
+    "cli/business/parsers-terraform.mjs": {
+      "source": "cli/business/parsers-terraform.mjs",
+      "sha256": "257ec7b8812870c12ebe239a91b8993c1515351d788fbed1223be6e3ccd35a01"
+    },
+    "cli/business/parsers.mjs": {
+      "source": "cli/business/parsers.mjs",
+      "sha256": "c42161a609b2775bcc820fdbebd4cc92e5606998ce4cdf769a5d203fe0e14c3d"
+    },
+    "cli/business/policy.mjs": {
+      "source": "cli/business/policy.mjs",
+      "sha256": "f239a476aa36f6a612722181e8d790e37c4b9a37b7e5f9398c26588bb9b88f8d"
+    },
+    "cli/business/scan.mjs": {
+      "source": "cli/business/scan.mjs",
+      "sha256": "0d5cc830c3d7e19de5d3892b44db77322106ce91147a071cccc8748330107da1"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
@@ -555,7 +599,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "84c1c31e9d4e0a04bd0c6b9d71c12f58e31e29db3c4469da203233a693d5adee"
+      "sha256": "b59195615687c973ec2b3b89bed5ae2df9cebcbf856d4495bd38ab31b8665831"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
