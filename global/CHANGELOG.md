@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.36
+
+- **A native demo keeps each visitor's R2 files in that visitor's own storage.** A native hosted demo now stores R2 objects, their metadata and multipart uploads per binding in the visitor's own Durable Object storage, next to the app. Before, every visitor shared one demo-owned bucket, often far from the visitor. File reads and writes now answer from where the visitor is. Measured from Queensland on Beam: opening a file took 55 ms instead of 256 ms, uploading 207 ms instead of 1543 ms, and starting the demo 1.64 s instead of 2.65 s. One visitor's objects may total 256 MiB; a write past that fails with R2's error for an oversized upload. Expiry erases a visitor's objects along with the rest of their storage. A new demo creates no R2 bucket.
+- **Paired-runtime tests survive a port clash.** When a loopback port is taken, the seed's paired-runtime test helpers retry on a fresh port. When one of a pair fails to start, they close the one that did start, so a clash fails within seconds and leaves nothing running.
+
+### Upgrade notes
+
+- On the next `rer deploy --demo`, a host deployed by rer 0.2.30 to 0.2.35 has its shared demo R2 bucket emptied and deleted, and the command reports this. The bucket is removed only while the deployed Worker still proves it owns it; a bucket it does not own is left alone. `rer deploy --demo --remove` still removes a bucket left by an older host.
+- Visitors' files from the shared bucket are not carried over: each demo visitor already starts from seed data.
+- Seeds that worked around a distant bucket (for example, by putting objects in parallel) can drop the workaround.
+
 ## 0.2.35
 
 - **The Run page starts a seed without Node.** The shared /run page has two steps. Step 1 is `curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node and changes no shell settings. Step 2 is `rer dev <owner>/<repo>`, with `cd <folder> && rer dev` to start it again later. `npx -y @runeditrun/rer dev <owner>/<repo>` remains only as the alternative under "Already have Node 22 or later?". Before this, a newcomer without Node got `sh: npx: command not found` at step 2, because the installer keeps its Node private. Step 2 is built from Run data's existing `clone` line, so seeds need no edits. RUN-LOCALLY, HOMEPAGE-VARIANTS, SEED-COMMAND-CONTRACT and the READMEs describe the two steps, and the default and foundation Run requirements no longer say "Needs Node 22".
