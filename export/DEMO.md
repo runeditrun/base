@@ -105,9 +105,10 @@ that no instance is available, never after an application boot or health
 failure. If placement remains unavailable, the visitor gets the failed-start
 page with Try again and the reservation is released.
 
-A redeploy leaves live demos running: Cloudflare replaces a container only
-after it has served its demo for an hour, so new visitors get the new version
-and current visitors keep theirs until their demo ends.
+A redeploy protects live demos during the rollout, so current visitors keep
+their version until their demo ends. New visitors may get the previous version
+for several minutes after deployment (about 7–9 minutes measured). Wait about
+10 minutes after a demo deploy before measuring.
 
 At most `maxInstances` demos (10 unless set) run at once, and one IP starts at
 most 3 a minute.
