@@ -6,6 +6,24 @@ checkout always gets the behaviour it was built and tested with.
 
 ## Install
 
+Start a seed from an empty folder with one command:
+
+```sh
+npx -y @runeditrun/rer dev just-every/run-inkwell
+curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell
+```
+
+Both install the user CLI, clone into `./run-inkwell`, install dependencies, set
+up a local owner and start the app. Open the printed `RER_OPEN` link to sign in.
+Use `setup <repo>` to stop after setup, or `install <repo>` to stop after
+dependency installation; each prints the next command. The repo can be
+`<owner>/<repo>`, a GitHub HTTPS URL (with or without `.git`), or a git URL.
+`--dir DIR` chooses another folder. An existing clone with the same origin is
+reused; any other non-empty folder is refused. Inside a checkout, the commands
+without a repository work as before. Dev follows the usual terminal behaviour:
+Ctrl-C stops a foreground app; without a terminal it returns once ready and
+leaves the app running. The restart command includes `cd` into the checkout.
+
 Install `rer` with one of these commands:
 
 ```sh

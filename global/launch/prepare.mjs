@@ -24,7 +24,7 @@ export const flagValue = (args, flag) => { const index = args.indexOf(flag); ret
 // step running then is signalled through `children`. `doorStart`: the front
 // door is starting this checkout on a visit, which never installs or sets up;
 // an unprepared checkout is refused with the reason.
-export async function prepare({ root, args, env, report, directory, log, children, signal, doorStart = false }) {
+export async function prepare({ root, args, setupArgs = [], env, report, directory, log, children, signal, doorStart = false }) {
  // A checkout pinning the rer package whose node_modules lacks that version
  // installs it first (after the same quick server-limit check: a pin with
  // package mode has the person defaults); every step after this runs the
@@ -53,6 +53,9 @@ export async function prepare({ root, args, env, report, directory, log, childre
  const step = (record, args, fields, env = childEnv) => recorded(directory, record, () => runVerb(entry, args, { root, env, note, log, children, signal }), fields);
  // Only this setup fills the seed's declared local defaults.
  const setupEnv = { ...childEnv, [localDefaults]: '1' };
+ // Repository setup can supply the same owner/answer inputs as checkout setup.
+ const extraSetup = setupArgs.filter((arg, i) => !['--json', '--non-interactive', '--port', '--host', '--door', '--owner-email'].includes(arg) && !['--port', '--host', '--owner-email'].includes(setupArgs[i - 1]));
+ const ownerArgs = flagValue(setupArgs, '--owner-email') ? ['--owner-email', flagValue(setupArgs, '--owner-email')] : [];
  const unprepared = what => new LaunchFailure(3, `${checkout} is not ${what}, and the front door starts only prepared checkouts. Run rer dev in it once.`);
  if (!installed && await needsInstall(root, await installState.read(directory))) {
   if (doorStart) throw unprepared('installed');
@@ -65,25 +68,25 @@ export async function prepare({ root, args, env, report, directory, log, childre
  if (setup === 'resume') {
   // Saved settings hold an owner and origin; setup keeps them.
   report({ phase: 'setup', message: 'finishing this checkout\'s setup, keeping its saved owner and port' });
-  await step(setupState, ['setup', ...hostArgs], {}, setupEnv);
+  await step(setupState, ['setup', ...hostArgs, ...ownerArgs, ...extraSetup], {}, setupEnv);
  } else if (setup === 'fresh' && plan.freshAtDoor) {
   // With the door enabled, a fresh checkout is set up at its door origin.
-  const owner = zeroSetupOwner(checkout);
+  const owner = flagValue(setupArgs, '--owner-email') ?? zeroSetupOwner(checkout);
   report({ phase: 'setup', message: `setting up a local owner (${owner}) at its front-door address` });
-  await step(setupState, ['setup', '--owner-email', owner, '--door'], { owner, door: true }, setupEnv);
+  await step(setupState, ['setup', '--owner-email', owner, '--door', ...extraSetup], { owner, door: true }, setupEnv);
   await bringBackDoor({ ...plan, atDoor: true }, env, report);
   return { entry, added };
  } else if (setup === 'fresh') {
   // An interrupted setup resumes on the port it chose while that port is free.
   // A port another process takes between choosing it and setup refusing it is
   // passed over for the next free one; a port the person passed is kept.
-  const owner = zeroSetupOwner(checkout), explicit = flagValue(args, '--port');
+  const owner = flagValue(setupArgs, '--owner-email') ?? zeroSetupOwner(checkout), explicit = flagValue(args, '--port');
   let from = last?.port;
   for (let attempt = 1; ; attempt++) {
    const held = explicit ? [] : [...(await liveServers(childEnv)).map(record => record.port), ...await savedPorts(checkout, childEnv)];
    const { port, release } = explicit ? { port: Number(explicit) } : await freePort(held, port => claimPort(port, childEnv), from ? { ...childEnv, RER_DEV_PORT_FROM: String(from) } : childEnv);
    report({ phase: 'setup', message: `setting up a local owner (${owner}) on port ${port}` });
-   try { await step(setupState, ['setup', '--owner-email', owner, '--port', String(port), ...hostArgs], { port, owner }, setupEnv); }
+   try { await step(setupState, ['setup', '--owner-email', owner, '--port', String(port), ...hostArgs, ...extraSetup], { port, owner }, setupEnv); }
    catch (failure) {
     await release?.();
     if (explicit || attempt === 3 || failure.exitCode !== 4 || !await portTaken(port)) throw failure;

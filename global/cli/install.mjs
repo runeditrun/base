@@ -39,7 +39,7 @@ async function writeLauncher(paths) {
  await rename(temporary, paths.launcher);
 }
 
-export async function install() {
+export async function install({ quiet = false } = {}) {
  const paths = layout(), manifest = ownManifest(), digest = await packageDigest(ownRoot);
  const name = `${manifest.version}-${digest.slice(0, 8)}`, channel = process.env.RER_INSTALL_CHANNEL === 'script' ? 'script' : 'npx';
  const launcher = await launcherOwner(paths.launcher);
@@ -53,7 +53,7 @@ export async function install() {
  try { present = await packageDigest(join(paths.versions, name)) === digest; } catch (error) { if (error.code !== 'ENOENT') throw error; }
  if (present && current === join('versions', name) && launcher.text === script && record?.channel === channel) {
   const advice = await pathAdvice(paths);
-  process.stdout.write(`rer ${manifest.version} is already current (${join(paths.versions, name)}). Nothing changed.\n${advice ? advice + '\n' : ''}`);
+  if (!quiet) process.stdout.write(`rer ${manifest.version} is already current (${join(paths.versions, name)}). Nothing changed.\n${advice ? advice + '\n' : ''}`);
   return 0;
  }
  if (!present) { await rm(join(paths.versions, name), { recursive: true, force: true }); await copyVersion(paths, name); }
@@ -67,6 +67,6 @@ export async function install() {
  await writeFile(paths.record, JSON.stringify({ channel, links: record?.links ?? [], previous: previousName && keep.has(previousName) ? previousName : null }, null, 2) + '\n', { mode: 0o644 });
  if (launcher.text !== script) await writeLauncher(paths);
  const advice = await pathAdvice(paths);
- process.stdout.write(`Installed rer ${manifest.version} in ${join(paths.versions, name)}.\n${paths.launcher} runs it.${previousName ? ` The previous version (${previousName}) is kept.` : ''}\n${advice ? advice + '\n' : ''}`);
+ if (!quiet) process.stdout.write(`Installed rer ${manifest.version} in ${join(paths.versions, name)}.\n${paths.launcher} runs it.${previousName ? ` The previous version (${previousName}) is kept.` : ''}\n${advice ? advice + '\n' : ''}`);
  return 0;
 }

@@ -19,6 +19,7 @@ import { parseEnv } from 'node:util';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { packageReference } from '../../scripts/rer-package/reference.mjs';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 import { freePort, run, sweep } from './harness.mjs';
@@ -96,9 +97,21 @@ test('an installed rer launches the package-mode default-seed reference with one
  assert.ok(report.clauses.some(clause => clause.id === 'SC-13.package.lockfile' && clause.ok), 'check ran the pinned package');
  const prepared = async () => JSON.parse((await run(rer, ['describe', '--json'], { cwd: root, env })).stdout).local.prepared;
 
+ // Turn the real exported app into a local bare remote. The public repository
+ // form must clone it from outside a checkout, then reuse that clone on resume.
+ const remote = join(directory, 'reference.git'), repo = pathToFileURL(remote).href;
+ for (const args of [['init'], ['add', '--', '.', ':!node_modules'], ['-c', 'user.name=Journey', '-c', 'user.email=journey@example.test', 'commit', '-m', 'Reference fixture']]) {
+  const result = await run('git', args, { cwd: root, env });
+  assert.equal(result.code, 0, result.stderr);
+ }
+ const bare = await run('git', ['clone', '--bare', root, remote], { cwd: directory, env });
+ assert.equal(bare.code, 0, bare.stderr);
+ await rm(root, { recursive: true, force: true });
+ const fromRepo = args => run(rer, ['dev', repo, '--dir', root, ...args], { cwd: directory, env });
+
  // A required field with no value and no localDefault: exit 3 naming it, and
  // no settings, owner, dev key or server.
- const stopped3 = await run(rer, ['dev', '--port', String(port)], { cwd: root, env });
+ const stopped3 = await fromRepo(['--port', String(port)]);
  assert.equal(stopped3.code, 3, stopped3.stderr + stopped3.stdout);
  assert.match(stopped3.stderr, /OWNER_PASSWORD/);
  for (const path of ['.dev.vars', '.seed/installer/setup-answers.json', '.rer/local/dev-key.env', '.wrangler/state']) await assert.rejects(access(join(root, path)), `${path} is not written`);
@@ -109,15 +122,15 @@ test('an installed rer launches the package-mode default-seed reference with one
  password.localDefault = { generate: 'hex' };
  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
  await requireSavedOwnerInput(root);
- const interrupted = await run(rer, ['dev', '--port', String(port)], { cwd: root, env });
+ const interrupted = await fromRepo(['--port', String(port)]);
  assert.equal(interrupted.code, 1, 'the first setup fails before claiming the owner');
- await access(join(root, 'owner-hook-reached'));
+ await access(join(root, 'owner-hook-reached')).catch(error => { t.diagnostic(interrupted.stderr); throw error; });
  const retained = await readFile(join(root, '.dev.vars'), 'utf8');
  assert.ok(parseEnv(retained).OWNER_PASSWORD, 'failed setup saved its generated owner password');
  assert.deepEqual(localData(root).owners, [], 'failed setup has not claimed an owner');
  await rm(join(root, 'fail-before-owner'));
  // Not a terminal: the one command prepares, starts, prints and returns.
- const launched = await run(rer, ['dev', '--port', String(port)], { cwd: root, env });
+ const launched = await fromRepo(['--port', String(port)]);
  assert.equal(launched.code, 0, 'rer dev resumes the saved owner claim: ' + launched.stderr + launched.stdout);
  assert.ok(retained === await readFile(join(root, '.dev.vars'), 'utf8'), 'resume preserves every private setting byte');
  assert.deepEqual(localData(root).owners.map(owner => owner.email), [parseEnv(retained).OWNER_EMAIL], 'resume claims the saved owner');
@@ -140,7 +153,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  assert.equal(repeated.code, 0, repeated.stderr + repeated.stdout);
  assert.ok(repeated.stdout.split('\n').includes(`RER_SITE ${lines.RER_SITE}`), 'a repeated rer dev reprints RER_SITE');
 
- const browser = await chromium.launch();
+ const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
  try {
   const context = await browser.newContext(), page = await context.newPage();
   await page.goto(lines.RER_OPEN);

@@ -3,8 +3,15 @@ import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkou
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
 import { handleBrokenPipes } from './output.mjs';
+import { repositoryCommands, repositoryHelp } from '../cli/repository-contract.mjs';
+import { repoArguments } from './cli/repository.mjs';
 
 const help = `Usage: rer VERB [FLAGS]
+
+  rer dev <repo> [--dir DIR]      Clone, install, set up a local owner and start the app.
+  rer setup <repo> [--dir DIR]    Clone, install and set up, then stop.
+  rer install <repo> [--dir DIR]  Clone and install dependencies, then stop.
+${repositoryHelp}
 
 Inside a project (the nearest OPERATIONS.json at or above this folder, or --cwd DIR),
 every verb runs that checkout's own pinned rer: the @runeditrun/rer version its package.json
@@ -56,6 +63,18 @@ export async function main(argv) {
  if (verb === 'cli') return (await import('./cli/command.mjs')).cliCommand(argv.slice(1));
  if (verb === 'list') return (await import('./list.mjs')).listCommand(argv.slice(1));
  if (verb === 'door') return (await import('./door/command.mjs')).doorCommand(argv.slice(1));
+ if (repositoryCommands[verb] && argv.includes('--help')) {
+  const { help } = await import('../cli/parse.mjs');
+  process.stdout.write(`${help(verb)}\n${repositoryCommands[verb].usage}\n${repositoryCommands[verb].effects}\n${repositoryHelp}`);
+  return 0;
+ }
+ try {
+  const repository = repoArguments(argv);
+  if (repository) return await (await import('./cli/repo-command.mjs')).repoCommand(repository);
+ } catch (error) {
+  process.stderr.write(error.message + '\n');
+  return typeof error.exitCode === 'number' ? error.exitCode : 1;
+ }
  const target = locate(argv);
  if (target.profile === 'unsupported') { process.stderr.write(unsupportedMessage(target.root, target.version) + '\n'); return 2; }
  const first = target.profile === 'first-party', mode = first ? dispatcher(target.root).mode : undefined;
@@ -107,6 +126,7 @@ export async function main(argv) {
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
  }
  if (mode === 'package' && installsFirst.has(verb)) await (await import('./launch/install-pinned.mjs')).settledPin(target.root);
+ if (verb === 'describe' && !argv.includes('--help')) return (await import('./cli/describe.mjs')).describeCommand(target);
  if (first && dispatcher(target.root).mode !== 'bundled' && ['install', 'verify'].includes(verb) && !argv.includes('--help') && !argv.includes('--site')) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
   if (code !== undefined) return code;
