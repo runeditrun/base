@@ -6,8 +6,10 @@ forces a full check, while `pnpm run build` builds the real Worker and assets.
 
 ## Run it locally
 
-Install the `rer` command once with `npx -y @runeditrun/rer cli install`, or the
-installer script on the RER site (`curl -fsSL https://runeditrun.com/install.sh | sh`).
+Install the `rer` command once with the installer script on the RER site
+(`curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node
+when there is none), or with `npx -y @runeditrun/rer cli install` when Node 22
+or later is on PATH.
 From this seed's root, `rer dev` alone launches it: it installs dependencies,
 sets up a local owner on a free port, starts the app and prints `RER_READY` and
 a sign-in link. To install for a real owner, run the verbs yourself:

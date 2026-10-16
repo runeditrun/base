@@ -141,11 +141,14 @@ NODE
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
  RER_INSTALL_CHANNEL=script node "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
- if [ "$#" -gt 0 ]; then
-  PATH="$HOME/.local/bin:$PATH"
-  export PATH
-  "$HOME/.local/bin/rer" "$@"
+ if [ "$#" -eq 0 ]; then
+  # The same next step a Run page gives; no npx, since Node may be rer's own.
+  printf 'Next, start a seed: rer dev <owner>/<repo>\n'
+  return
  fi
+ PATH="$HOME/.local/bin:$PATH"
+ export PATH
+ "$HOME/.local/bin/rer" "$@"
 }
 
 install_node() {

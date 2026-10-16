@@ -90,9 +90,10 @@ Default-seed and exported foundation typechecks in `verify` use checkout-local, 
 
 ## Run the default reference locally
 
-Install the `rer` command once with `npx -y @runeditrun/rer cli install`, or
-the installer script on the RER site
-(`curl -fsSL https://runeditrun.com/install.sh | sh`). Activate it in the current
+Install the `rer` command once with the installer script on the RER site
+(`curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node
+when there is none), or with `npx -y @runeditrun/rer cli install` when Node 22
+or later is on PATH. Activate it in the current
 shell with `export PATH="$HOME/.local/bin:$PATH"`. From the Base root, one
 command launches the maintained reference seed: it installs dependencies, sets
 up a local owner on a free port, starts the app and prints `RER_READY` and a

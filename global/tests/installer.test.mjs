@@ -4,8 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
 import { tarball } from '../../scripts/rer-package/tarball.mjs';
 import { integrity, localRegistry } from '../../scripts/rer-package/registry.mjs';
@@ -24,13 +25,23 @@ function run(program, args, env) {
  });
 }
 
+// The default seed's Run page as `rer build --site` renders it, and the commands in its code blocks.
+async function runPageCommands() {
+ const seed = createRequire(join(base, 'default-seed/package.json')), { build } = createRequire(seed.resolve('wrangler/package.json'))('esbuild');
+ const bundle = await build({ entryPoints: [join(base, 'default-seed/src/site/pages.ts')], bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent' });
+ const { sitePages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+ const html = sitePages({ styles: [], clients: {} }).pages.find(page => page.path === '/run').html;
+ const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+ return [...html.matchAll(/<pre[^>]*><code>([^<]*)<\/code><\/pre>/g)].map(match => match[1].replace(/&(amp|lt|gt|quot|#39);/g, entity => entities[entity]));
+}
+
 // The built package again under another version, optionally with extra raw entries.
 function repack(entries, version, extra = []) {
  const files = entries.map(entry => ({ path: `package/${entry.path}`, data: entry.path === 'package.json' ? Buffer.from(JSON.stringify({ ...JSON.parse(entry.data), version }, null, 2) + '\n') : entry.data, executable: entry.executable }));
  return tarball([...files, ...extra], 0);
 }
 
-test('install.sh and rer update install verified registry releases and leave the current one on any bad download', { timeout: 5 * 60_000 }, async t => {
+test('install.sh and rer update install verified registry releases, the Run page starts a seed on what install.sh installed, and a bad download leaves the current one', { timeout: 5 * 60_000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-installer-')), home = join(directory, 'home');
  const registry = await localRegistry();
  t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true }); });
@@ -58,6 +69,21 @@ test('install.sh and rer update install verified registry releases and leave the
  const hint = activate(installed.stdout);
  assert.ok(hint, installed.stdout);
  assert.equal((await run('sh', ['-c', `export PATH=${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
+
+ // The Run page's step 2 runs on what install.sh put on PATH and nothing else:
+ // no npx and no Node on PATH. The private Node install.sh downloads when there
+ // is none stands in as its runtime link.
+ const commands = await runPageCommands(), installLine = commands.findIndex(command => /\| *sh$/.test(command));
+ assert.ok(installLine >= 0 && commands.length > installLine + 1, `the Run page installs rer, then starts the seed: ${commands.join(' / ')}`);
+ const runtime = join(home, '.local/share/rer/node'), installedOnly = { ...env, PATH: join(home, '.local/bin') };
+ await symlink(dirname(dirname(process.execPath)), runtime);
+ for (const command of commands.slice(installLine + 1)) {
+  const program = command.split(/\s+/)[0], found = await run('/bin/sh', ['-c', `command -v '${program}'`], installedOnly);
+  assert.equal(found.code, 0, `${program} (from "${command}") is not on the PATH install.sh gives`);
+  const started = await run(found.stdout.trim(), ['--version'], installedOnly);
+  assert.equal(started.code, 0, `${program} does not run on the PATH install.sh gives: ${started.stderr}`);
+ }
+ await rm(runtime);
  const status = JSON.parse((await run(rer, ['cli', 'status', '--json'], env)).stdout);
  assert.equal(status.channel, 'script');
  assert.deepEqual(status.others, []);

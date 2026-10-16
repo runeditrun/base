@@ -6,14 +6,25 @@ checkout always gets the behaviour it was built and tested with.
 
 ## Install
 
-Start a seed from an empty folder with one command:
+Start a seed from an empty folder, with or without Node:
 
 ```sh
-npx -y @runeditrun/rer dev just-every/run-inkwell
-curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell
+curl -fsSL https://runeditrun.com/install.sh | sh
+rer dev just-every/run-inkwell
 ```
 
-Both install the user CLI, clone into `./run-inkwell`, install dependencies, set
+The installer needs no Node: without Node 22 or later on PATH it installs a
+private one for `rer` (see below). It edits no shell profile, so when
+`~/.local/bin` is not on PATH, run the `export PATH=…` line it prints before
+`rer dev`. Its last line names that next command. The same start also fits on
+one line:
+
+```sh
+curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell
+npx -y @runeditrun/rer dev just-every/run-inkwell   # only with Node 22 or later on PATH
+```
+
+Each of these installs the user CLI, clones into `./run-inkwell`, install dependencies, set
 up a local owner and start the app. Open the printed `RER_OPEN` link to sign in.
 Use `setup <repo>` to stop after setup, or `install <repo>` to stop after
 dependency installation; each prints the next command. The repo can be
@@ -27,9 +38,9 @@ leaves the app running. The restart command includes `cd` into the checkout.
 Install `rer` with one of these commands:
 
 ```sh
-npx -y @runeditrun/rer cli install                # user install in ~/.local/share/rer, launcher ~/.local/bin/rer
-curl -fsSL https://runeditrun.com/install.sh | sh  # the same user install, without npm
-npm install -g @runeditrun/rer                    # npm's own global layout
+curl -fsSL https://runeditrun.com/install.sh | sh  # user install in ~/.local/share/rer, launcher ~/.local/bin/rer; no Node needed
+npx -y @runeditrun/rer cli install                # the same user install, with Node 22 or later on PATH
+npm install -g @runeditrun/rer                    # npm's own global layout, with Node 22 or later on PATH
 ```
 
 `install.sh` is the file at the root of this package. It reads the version, the
@@ -44,7 +55,10 @@ With no Node 22 or later on PATH, the script installs Node 22.20.0 from
 `nodejs.org` into `~/.local/share/rer/runtimes` (under `XDG_DATA_HOME` when set),
 verifies the tarball against that release's published `SHASUMS256.txt`, and
 prints its location. The launcher uses this private runtime on later runs.
-System Node and other PATH directories are left alone.
+System Node and other PATH directories are left alone: the private runtime's
+`node`, `npm` and `npx` are not put on PATH, because `rer` is the one command
+the installer provides. With no arguments the script ends by naming the next
+command, `rer dev <owner>/<repo>`.
 
 No installer edits shell profiles. The canonical launcher is `~/.local/bin/rer`.
 Installation creates that directory if needed and never writes into another
