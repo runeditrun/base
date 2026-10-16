@@ -66,19 +66,17 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   if (!/^\d+$/.test(options.port) || Number(options.port) < 1 || Number(options.port) > 65535) throw invalid('Port must be a decimal integer from 1 to 65535.');
   options.port = Number(options.port);
  }
- for(const key of ['httpPort','httpsPort'])if(options[key]!==undefined){if(!/^[0-9]+$/.test(options[key])||Number(options[key])<1||Number(options[key])>65535)throw invalid('Ingress port must be an integer from 1 to 65535.');options[key]=Number(options[key]);}
- if(options.site&&['platform','image','bindAddress','httpPort','httpsPort','envFile','host'].some(key=>options[key]!==undefined))throw invalid('--site takes no platform, container or host flags: the run site is static files on an assets-only Worker.');
- if(['image','bindAddress','httpPort','httpsPort'].some(key=>options[key]!==undefined)&&options.platform!=='container')throw invalid('Container image and ingress flags require --platform container.');
- if(options.platform !== undefined && !['workers','container'].includes(options.platform))throw invalid('Platform must be workers or container.');
- if (options.host !== undefined && !(verb === 'deploy' && options.platform === 'container') && !listenHost(options.host)) throw refuse('Host must be exactly 127.0.0.1, localhost or ::1.');
+ if(options.site&&['platform','envFile','host'].some(key=>options[key]!==undefined))throw invalid('--site takes no platform or host flags: the run site is static files on an assets-only Worker.');
+ if(options.platform !== undefined && options.platform !== 'workers')throw invalid('Platform must be workers.');
+ if (options.host !== undefined && !listenHost(options.host)) throw refuse('Host must be exactly 127.0.0.1, localhost or ::1.');
  if (options.ownerEmail !== undefined) { if (!mailbox(options.ownerEmail)) throw invalid('Provide a valid plain owner mailbox.'); options.ownerEmail = options.ownerEmail.toLowerCase(); }
  if (options.ownerName !== undefined && (options.ownerName.length > 200 || /[\p{Cc}\p{Cf}]/u.test(options.ownerName))) throw invalid('Provide a valid owner name.');
  if (options.target !== undefined && !['local', 'remote'].includes(options.target)) throw invalid('Target must be local or remote.');
  if (options.profile !== undefined && options.profile !== 'first-party') throw invalid('The supported explicit profile is first-party.');
  if (options.environment !== undefined && !/^[a-z][a-z0-9-]{0,39}$/.test(options.environment)) throw invalid('Provide a valid deployment environment name.');
  for (const key of ['setSecret', 'unsetSecret']) if (options[key] !== undefined && !/^[A-Z][A-Z0-9_]{0,63}$/.test(options[key])) throw invalid('Name a declared secret binding, such as SESSION_SECRET.');
- if(verb==='deploy'&&options.demo&&(options.site||['platform','image','bindAddress','httpPort','httpsPort','envFile','host','setSecret','unsetSecret'].some(key=>options[key]!==undefined)))throw invalid('--demo takes only --environment, --dry-run and --remove --yes: the hosted demo is its own Worker on demo.<domain>.');
- if(verb==='deploy'&&options.demo&&options.remove&&(options.dryRun||!options.yes))throw invalid(options.dryRun?'Use --remove and --dry-run on separate runs.':'deploy --demo --remove deletes the hosted demo\'s Worker, its demo.<domain> Custom Domain and its Container application. Add --yes to confirm.');
+ if(verb==='deploy'&&options.demo&&(options.site||['platform','envFile','host','setSecret','unsetSecret'].some(key=>options[key]!==undefined)))throw invalid('--demo takes only --environment, --dry-run and --remove --yes: the hosted demo is its own Worker on demo.<domain>.');
+ if(verb==='deploy'&&options.demo&&options.remove&&(options.dryRun||!options.yes))throw invalid(options.dryRun?'Use --remove and --dry-run on separate runs.':'deploy --demo --remove deletes the hosted demo\'s Worker, its demo.<domain> Custom Domain. Add --yes to confirm.');
  if ((options.remove || options.setSecret || options.unsetSecret) && options.site) throw invalid('--remove, --set-secret and --unset-secret act on the application Worker, not the run site.');
  if (options.origin !== undefined) {
   let url; try { url = new URL(options.origin); } catch { throw invalid('Provide a valid credential-free origin.'); }

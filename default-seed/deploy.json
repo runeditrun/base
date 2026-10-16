@@ -47,10 +47,6 @@
     "*/10 * * * *"
   ],
   "platforms": [
-    "workers",
-    "container"
-  ],
-  "container": {
-    "engine": "node"
-  }
+    "workers"
+  ]
 }

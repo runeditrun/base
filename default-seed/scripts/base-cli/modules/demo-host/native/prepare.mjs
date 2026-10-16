@@ -7,8 +7,8 @@ import { collectFiles } from '../../deploy-kit/artifact.mjs';
 // Reuse the normal production build and its migration inventory, without
 // building or running a container. The bundle is stored once in the front.
 export async function prepareNative(folder) {
-  const app = join(folder, 'image/app');
-  const manifest = JSON.parse(await readFile(join(app, 'container.json'), 'utf8'));
+  const app = join(folder, 'bundle/app');
+  const manifest = JSON.parse(await readFile(join(app, 'demo.json'), 'utf8'));
   const config = manifest.config, root = join(app, 'dist/server');
   if (config.d1_databases?.length !== 1) throw new Error('Loader demo currently requires exactly one D1 binding');
   if ((config.triggers?.crons ?? []).some(cron => cron !== '* * * * *')) throw new Error('Loader demo currently supports only once-per-minute cron');

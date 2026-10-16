@@ -164,7 +164,7 @@ archive's tables restore with their archived columns, later columns take their
 defaults, and later tables stay empty (they must be empty, like every restored
 table). This applies to normal v2 import and to backup-only v1 recovery.
 
-The Base CLI runners (local Workers and container) pass `createPortability` a
+The Base CLI runner (local Workers) passes `createPortability` a
 `migrations` replayer (`migration-history.mjs`, Node only) built from the
 destination's applied migration ledger and migration files. Import replays them
 into a scratch database to find the archive's place in that history:
@@ -220,7 +220,7 @@ differs only by [later additive migrations](#archives-across-later-additive-migr
 and the same portability policy. Keep its writers stopped. Do not run setup or claim an owner first:
 recovery also refuses populated identity, excluded and normally replaceable
 tables, and any objects in the declared buckets. It does not merge or overwrite
-existing installation data. Remote and container recovery are not supported.
+existing installation data. Remote recovery is not supported.
 
 1. Keep the original v1 backup untouched. Obtain a fresh runnable checkout of
    your product with this CLI, install its dependencies with `rer install`, and

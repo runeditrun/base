@@ -30,7 +30,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     await writeFile(join(folder, 'modules/demo-host/native/bundle.mjs'), `export default ${JSON.stringify(bundle)};`);
     const origin = 'https://demo.example.test', measurement = 'fixture-measurement-token-1234567890123456';
     const files = ['modules/demo-host/native/worker.mjs', ...['visitor', 'loader', 'd1', 'sql', 'bundle'].map(file => `modules/demo-host/native/${file}.mjs`),
-      ...DEMO_FILES.map(file => `modules/demo-host/${file}`), 'modules/container/migrations.mjs', ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
+      ...DEMO_FILES.map(file => `modules/demo-host/${file}`), 'modules/deploy-kit/local-migrations.mjs', ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
     mf = new Miniflare(convertV4MiniflareOptions({ modulesRoot: folder, modules: files.map(path => ({ type: 'ESModule', path: join(folder, path) })),
       compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
       durableObjects: { DEMO: { className: 'NativeDemo', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
@@ -52,6 +52,11 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       assert.equal(response.status, 303, await response.text());
       return [...jar].map(([k,v]) => `${k}=${v}`).join('; ');
     };
+    // A full old demo host can leave reservations for a retired namespace.
+    // New visitors must still enter through the public start door immediately.
+    const capacityNamespace = await mf.getDurableObjectNamespace('CAPACITY');
+    const capacity = capacityNamespace.get(capacityNamespace.idFromName('capacity'));
+    for (let i = 0; i < 10; i++) await capacity.acquire(capacityNamespace.newUniqueId().toString(), Date.now() + 60_000, 100, 'retired-visitor');
     assert.equal((await fetch('/')).status, 200);
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);

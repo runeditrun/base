@@ -44,7 +44,7 @@ export function startPage(env, { status = 200, notice, pending = false, headers 
 <p class="note" id="note">${pending ? 'Your demo will open automatically when ready.' : 'Complete the human check to start your demo.'}</p><noscript><p class="note">The human check needs JavaScript. Turn it on to start the demo.</p></noscript><p class="visually-hidden" id="status" role="status"></p></form>` });
 }
 
-/** A demo whose hour or idle time is up: its container and data are gone. */
+/** A demo whose hour or idle time is up: its isolate and data are gone. */
 export function endedPage(env, { status = 410, headers = {} } = {}) {
   const name = escape(env.DEMO_NAME);
   return html(env, { page: 'ended', title: 'This demo has ended', status, headers, body: `<h1 id="title">This demo has ended</h1>
