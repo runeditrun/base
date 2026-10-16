@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.33-dev.g0d3f4a72",
+  "cliVersion": "0.2.33",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -535,7 +535,7 @@
     },
     "cli/demo-build.mjs": {
       "source": "cli/demo-build.mjs",
-      "sha256": "09f1c8ea1de1c9e9b994d947f477efe27bc8aed185b157ea7ebc95cbbc831e22"
+      "sha256": "c5f65956a44a2e9662a352c1d03a8b4130a4500381f15a7befa952715e032921"
     },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
@@ -543,7 +543,7 @@
     },
     "cli/demo-native.mjs": {
       "source": "cli/demo-native.mjs",
-      "sha256": "f8f83b0b6cd9ab779bde00c04d931383814fd96647b46aaa7bd74e2e7c8dc522"
+      "sha256": "d7cd67aa2710bcee9feab8e6e1fa74791bc2a55b423401dfcc370f5596f76c7c"
     },
     "cli/demo-removal-provider.mjs": {
       "source": "cli/demo-removal-provider.mjs",
@@ -1203,7 +1203,7 @@
     },
     "modules/demo-host/native/loader.mjs": {
       "source": "modules/demo-host/native/loader.mjs",
-      "sha256": "f820a5b9f13624ad02aa4aee2c9d35d6ac47677135e939771ffda9965a90fbf6"
+      "sha256": "8733328499a1b33ec97285ca8293678b7be1b87b722db385e488c063245f151a"
     },
     "modules/demo-host/native/namespace.mjs": {
       "source": "modules/demo-host/native/namespace.mjs",
@@ -1211,7 +1211,7 @@
     },
     "modules/demo-host/native/prepare.mjs": {
       "source": "modules/demo-host/native/prepare.mjs",
-      "sha256": "9b6026306dbf4524d57dd70a3bc0179a944293628008e66d401d0b0c370ae46c"
+      "sha256": "0c1416e00a40cde7cc4dd0f4e716a07474e1f559bfa8adf39fd71e46d4c80a08"
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
