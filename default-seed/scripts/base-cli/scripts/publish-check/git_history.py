@@ -20,6 +20,7 @@ class History:
         self.repo = str(Path(repo).resolve())
         self.env = git_environment()
         self.public_commit = self.public_label = None
+        self.public_tags = set()
         self.reader = None
         self.commit = self.run('rev-parse', '--verify', '--end-of-options', ref + '^{commit}').decode().strip()
         if self.run('rev-parse', '--is-shallow-repository').strip() != b'false':
@@ -27,15 +28,19 @@ class History:
         if public_base is not None:
             url, branch = parse(public_base, self.repo)
             try:
-                self.run('fetch', '--quiet', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', '--',
-                         url, 'refs/heads/' + branch + ':refs/publish-check/public/base')
+                self.run('fetch', '--quiet', '--prune', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', '--',
+                         url, 'refs/heads/' + branch + ':refs/publish-check/public/base',
+                         'refs/tags/*:refs/publish-check/public/tags/*')
                 self.public_commit = self.run('rev-parse', 'refs/publish-check/public/base^{commit}').decode().strip()
                 self.public_label = display(url) + '#' + branch
+                self.public_tags = set(self.run('for-each-ref', '--format=%(objectname)',
+                                               'refs/publish-check/public/tags').decode().splitlines())
             except InspectionError:
                 raise PublicBaseError('public-base.fetch-failed') from None
-        self.revisions = [self.commit, self.public_commit] if public_base else ['--all', self.commit]
+        public_revisions = [self.public_commit, *sorted(self.public_tags)] if public_base else []
+        self.revisions = [self.commit, *public_revisions] if public_base else ['--all', self.commit]
         self.commits = self.run('rev-list', *self.revisions).decode().splitlines()
-        self.public_commits = set(self.run('rev-list', self.public_commit).decode().splitlines()) if self.public_commit else set()
+        self.public_commits = set(self.run('rev-list', *public_revisions).decode().splitlines()) if public_base else set()
         self.trees = {}
         self.tree_ids = dict(line.split() for line in self.run('log', '--format=%H %T', *self.revisions).decode().splitlines())
         self.reader = subprocess.Popen(['git', '-C', self.repo, 'cat-file', '--batch'],
@@ -97,9 +102,12 @@ class History:
         for index in range(0, len(records) - 1, 2):
             if records[index]:
                 yield 'commit', records[index].decode().strip(), records[index + 1]
-        for record in self.run('for-each-ref', '--format=%(objecttype) %(objectname)', 'refs/tags').splitlines():
+        seen = set()
+        for record in self.run('for-each-ref', '--format=%(objecttype) %(objectname)', 'refs/tags',
+                               'refs/publish-check/public/tags').splitlines():
             kind, oid = record.decode().split()
-            if kind == 'tag':
+            if kind == 'tag' and oid not in seen:
+                seen.add(oid)
                 raw = self.run('cat-file', 'tag', oid)
                 yield 'tag', oid, raw.partition(b'\n\n')[2]
 

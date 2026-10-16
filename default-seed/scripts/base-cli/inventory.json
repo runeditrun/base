@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26-dev.g271b4768",
+  "cliVersion": "0.2.26",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -379,7 +379,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "1d39ed96fd69cc5d7a05303c5a77a2e4916869398e8c93dd4ddd8a4a0f416552"
+      "sha256": "2ba3a3393c9efb25bfcb5fd1f7f295b750474bd49f46fd505fda5da2beab71e7"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -635,7 +635,7 @@
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "3f1d1d855490844aff5f4e2d8ef320e5a4a582c09627eae8f3469be7399fa43e"
+      "sha256": "ee5c1d7dfeb0980e79d5b048fd1384d7a04710a4c153b5659a79ea72f86dba75"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -2295,7 +2295,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "5262e34eed668a52b93fb74762c4d6d577960a9e125103a683285b3be1ddb31c"
+      "sha256": "717608d5e24c64c09b281b0dd1785fa738a041cb05cfa55070999fb90cff1f3f"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -2311,7 +2311,11 @@
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "ee8553008cb5add4978a87c4546cb5d58459a7d98d7ee3740e19881e233ab08c"
+      "sha256": "ee09e60bd5bebef62117ef3ccd2f0105ffa12a438388e2d90bae8f1a8bc28610"
+    },
+    "modules/release/public-base.mjs": {
+      "source": "modules/release/public-base.mjs",
+      "sha256": "37556d03b4b36ff49831ba02311046816a6872c011bdb815c1c0d3b006926c43"
     },
     "modules/release/public-child-transport-state.cjs": {
       "source": "modules/release/public-child-transport-state.cjs",
@@ -2451,7 +2455,7 @@
     },
     "scripts/publish-check/git_history.py": {
       "source": "scripts/publish-check/git_history.py",
-      "sha256": "2ce104cd5a052d6e37189404157b6cd3c1ca37ead8a3f004c69e476f7fdfcb7d"
+      "sha256": "3dff349d0ec166450a14364ac9dad5b760276f61d9501784781d52787a2cb507"
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
@@ -2467,7 +2471,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "be45c5ff02e94cd6aa591f360a06f19bb545879b5200e0f6ad33c605fbeb12ce"
+      "sha256": "ab84993ab7159b8728212d51d02bf5c538f24c752d9ccabbf7eb23a637c58bfd"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",

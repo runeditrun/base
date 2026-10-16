@@ -161,7 +161,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             report['history']['tagMessages' if message_type == 'tag' else 'commitMessages'] += 1
             rules, _ = text_rules(data, path, selected_context, resolver, hashes,
                                   commit_message=message_type == 'commit')
-            scope = 'release-tree' if commit == history.commit else 'pre-existing' if commit in history.public_commits else 'newly-public'
+            scope = 'pre-existing' if commit in history.public_commits or commit in history.public_tags else 'release-tree' if commit == history.commit else 'newly-public'
             for rule in rules:
                 add(rule, path, commit, scope=scope)
             messages.append(data + b'\n')

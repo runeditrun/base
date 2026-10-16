@@ -11,6 +11,8 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
                          Credential-free https://github.com/<owner>/<repository> destination.
   --output NEW_DIR       New output directory outside the source repository.
   --ref REF              Selected committed source (default: HEAD).
+  --public-base REF      Public history as GIT_URL#BRANCH for exact-source scans;
+                         defaults to this public repository's default branch.
   --tag [vVERSION]       Prepare source artifacts and create a local annotated tag;
                          an explicit tag must match the committed release version.
   --dry-run              Run the real gates and suppress local tag creation.
@@ -43,8 +45,8 @@ export async function dispatchRelease(args) {
    else if (args[index] === '--tag') options.tag = args[index + 1]?.startsWith('v') ? args[++index] : true;
    else if (args[index] === '--clean-history') options.cleanHistory = true;
    else if (args[index] === '--dry-run') options.dryRun = true;
-   else if (['--repo', '--project', '--repository', '--output', '--ref', '--env-file', '--onto'].includes(args[index]) && args[index + 1] && !args[index + 1].startsWith('--'))
-    options[args[index] === '--env-file' ? 'envFile' : args[index].slice(2)] = args[++index];
+   else if (['--repo', '--project', '--repository', '--output', '--ref', '--env-file', '--onto', '--public-base'].includes(args[index]) && args[index + 1] && !args[index + 1].startsWith('--'))
+    options[args[index] === '--env-file' ? 'envFile' : args[index] === '--public-base' ? 'publicBase' : args[index].slice(2)] = args[++index];
    else throw Error('Invalid release arguments');
   }
   if(args.includes('--no-queue')){const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw Error('Original CI required');}finally{await policy.close();}}
