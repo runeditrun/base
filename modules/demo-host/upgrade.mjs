@@ -1,4 +1,5 @@
 import { demoInventory } from './remove.mjs';
+import { removeBucket } from './native/deploy-r2.mjs';
 
 // Keep the Worker and custom domains throughout the transition. Container apps
 // must go before deleting their backing class; Wrangler then applies the class
@@ -21,6 +22,9 @@ export async function upgradeDemo({ api, plan }) {
     const remaining = await api.request('/containers/applications');
     if (remaining.some(row => found.apps.some(app => app.id === row.id))) throw new Error('demo-upgrade-container-remove-incomplete');
   }
+  // The retired shared R2 bucket goes while its binding still proves ownership;
+  // the new code binds no bucket. A rerun after a partial removal resumes.
+  if (found.bucket) await removeBucket(api, found.bucket);
   if (classes.includes('DemoContainer')) {
     // The API checks the currently deployed bindings before class deletion.
     // Detach the retired binding first; inherit every other value by name,
