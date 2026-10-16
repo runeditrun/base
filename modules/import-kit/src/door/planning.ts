@@ -52,7 +52,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
   const mapping = {version:options.mapping.version,map(record:typeof source.records[number]):MappingResult {
     const key = recordKey(record), old = prior.get(key);
     let result: MappingResult;
-    if (old?.targets.length && old.sourceHash === record.payloadHash && previous?.plan.mappingVersion === options.mapping.version) {
+    if (old && (old.targets.length || old.explanation) && old.sourceHash === record.payloadHash && previous?.plan.mappingVersion === options.mapping.version) {
       result = {effects:[],unmapped:[{reason:'Unchanged source; previous imported targets retained.'}]};
       snapshot.differences.unchanged.push(key);
     } else {
@@ -79,7 +79,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     const record: DoorRecord = {kind:entry.source.kind,sourceId:entry.source.sourceId,
       sourceHash:entry.rejection && old ? old.sourceHash : entry.source.payloadHash,
       targets:entry.effects.length?entry.effects.map(e=>({kind:e.targetKind,id:e.targetId,ownerPlanId:snapshot.id,sourceIdentity:entry.identity})):(old?.targets ?? [])};
-    const reason = entry.rejection ?? (!unchanged && entry.unmapped.length ? entry.unmapped.map(u=>u.reason).join('; ') : undefined);
+    const reason = unchanged ? old?.explanation : entry.rejection ?? (entry.unmapped.length ? entry.unmapped.map(u=>u.reason).join('; ') : undefined);
     if (reason) record.explanation = reason;
     snapshot.records.push(record);
   }
@@ -95,7 +95,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
 export function assertBounded(snapshot: DoorSnapshot, previous: DoorSnapshot): void {
   const d = snapshot.differences, changed = d.additions.length + d.replacements.length;
   const refused = !previous.sourceCount ? 'empty_baseline' : d.gone.length ? 'source_records_gone' : d.conflicts.length ? 'native_or_mapping_conflict'
-    : snapshot.plan.counts.rejected || snapshot.records.some(r=>!r.targets.length) ? 'rejected_or_unmapped_records'
+    : snapshot.plan.counts.rejected || snapshot.records.some(r=>!r.targets.length && !d.unchanged.includes(recordKey(r))) ? 'rejected_or_unmapped_records'
     : changed * 100 >= previous.sourceCount * 5 ? 'change_must_be_under_five_percent' : null;
   if (refused) throw new DoorError('catchup_requires_proposal:' + refused,409);
 }

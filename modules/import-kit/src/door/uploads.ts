@@ -28,7 +28,9 @@ export async function uploadRow(request: DoorRequest, id: string): Promise<Uploa
 async function progress(request: DoorRequest, row: UploadRow) {
   const chunks = await request.options.database.prepare('SELECT ordinal,sha256,size FROM ik_door_chunks WHERE upload_id=? ORDER BY ordinal').bind(row.id).all();
   const bytes = chunks.results.reduce((n, c) => n + c.size, 0);
-  return {uploadId:row.id, bundleSha256:row.bundle_sha256, received:chunks.results, complete:chunks.results.length === row.total_chunks && bytes === row.total_bytes};
+  const complete = chunks.results.length === row.total_chunks && bytes === row.total_bytes;
+  if (complete) await bundleBytes(request,row);
+  return {uploadId:row.id, bundleSha256:row.bundle_sha256, received:chunks.results, complete};
 }
 export async function uploads(request: DoorRequest, input: Record<string, unknown>) {
   const id = input.uploadId === undefined ? randomUUID() : text(input.uploadId, 'upload_id');
@@ -48,9 +50,7 @@ export async function uploads(request: DoorRequest, input: Record<string, unknow
     sql('INSERT OR IGNORE INTO ik_door_chunks(upload_id,ordinal,sha256,size,base64) VALUES(?,?,?,?,?)', id, index, chunkHash, bytes.length, input.base64),
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_chunks WHERE upload_id=? AND ordinal=? AND sha256=? AND size=? AND base64=?)', id, index, chunkHash, bytes.length, input.base64)),
   ]);
-  const row = await uploadRow(request,id), result = await progress(request,row);
-  if (result.complete) await bundleBytes(request,row);
-  return result;
+  return progress(request,await uploadRow(request,id));
 }
 export async function bundleBytes(request: DoorRequest, row: UploadRow): Promise<Uint8Array> {
   const chunks = await request.options.database.prepare('SELECT * FROM ik_door_chunks WHERE upload_id=? ORDER BY ordinal').bind(row.id).all();

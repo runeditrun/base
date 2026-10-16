@@ -14,8 +14,11 @@ test('HTTP import door is absent until the installation opts in',async t=>{
 
 test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody',async t=>{
   const d=await door(t);await d.enable();
-  const badBytes=Buffer.from('[{"id":"bad","title":"Bad bundle"}]');
-  assert.equal((await d.call('uploads',{name:'bad.json',bundleSha256:'0'.repeat(64),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:sha256(badBytes),base64:badBytes.toString('base64')})).status,409);
+  const badBytes=Buffer.from('[{"id":"bad","title":"Bad bundle"}]'),badUploadId=crypto.randomUUID();
+  assert.equal((await d.call('uploads',{uploadId:badUploadId,name:'bad.json',bundleSha256:'0'.repeat(64),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:sha256(badBytes),base64:badBytes.toString('base64')})).status,409);
+  const badStatus=await d.call('uploads',{uploadId:badUploadId});
+  assert.notEqual(badStatus.body.complete,true);assert.equal(badStatus.status,409);
+  assert.equal((await d.call('plan',{uploadId:badUploadId})).status,409);
   assert.equal((await d.call('uploads',{name:'bad.json',bundleSha256:sha256(badBytes),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:'0'.repeat(64),base64:badBytes.toString('base64')})).status,400);
   assert.equal((await d.call('uploads',{name:'bad.json',bundleSha256:sha256(badBytes),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:sha256(badBytes),base64:badBytes.toString('base64')},{maxBytes:1})).status,400);
   const records=[...documents(50,true),{id:'unsupported',title:'Unsupported',reject:true}];
@@ -26,6 +29,16 @@ test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible und
   const history=await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate);assert.equal(history[0].jobId,job.id);assert.equal(history[0].reviewer,d.approval.approvalRecordId);
   const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.status,200,JSON.stringify(reconciled.body));
   assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,50);assert.equal(reconciled.body.counts.explained,1);assert.equal(reconciled.body.counts.nativeTargets,50);
+  const catchupRecords=[...records.map(r=>r.id==='0'?{...r,title:'Updated at source'}:r),{id:'50',title:'New source article'}];
+  const bounded={catchup:'bounded' as const,approvalRecordId:'test-standing-approval',approvedAt:d.approval.approvedAt};
+  const catchup=await d.plan(catchupRecords,{catchup:true},bounded);assert.equal(catchup.status,200,JSON.stringify(catchup.body));
+  assert.equal(catchup.body.summary.updated,1);assert.equal(catchup.body.summary.created,1);assert.equal(catchup.body.summary.unchanged,50);
+  assert.equal(catchup.body.rejected.length,0);assert.equal(catchup.body.differences.conflicts.length,0);
+  await d.apply(catchup.body,bounded);
+  const caughtUp=await d.call('reconcile',{planId:catchup.body.planId});assert.equal(caughtUp.status,200,JSON.stringify(caughtUp.body));
+  assert.equal(caughtUp.body.ok,true);assert.equal(caughtUp.body.counts.present,51);assert.equal(caughtUp.body.counts.explained,1);assert.equal(caughtUp.body.counts.nativeTargets,51);
+  assert.equal(caughtUp.body.sourceIds.find((r:any)=>r.sourceId==='unsupported').reason,reconciled.body.sourceIds.find((r:any)=>r.sourceId==='unsupported').reason);
+  await d.undo(catchup.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,50);
   await d.undo(planned.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
   // The ordinary seed owner, with the exact existing actor binding, can inspect
   // originals and repeat undo without any Business grant or special kit bypass.
@@ -42,7 +55,7 @@ test('HTTP grants and bounded catch-up fail closed while valid snapshot replacem
   assert.equal((await d.call('plan',{}, {installationId:'another-installation'})).status,403);
   const now=Math.floor(Date.now()/1000);
   assert.equal((await d.call('plan',{}, {iat:now-301,exp:now-1})).status,403);
-  const baselineRecords=documents(50),baseline=await d.plan(baselineRecords);assert.equal(baseline.status,200);await d.apply(baseline.body);
+  const baselineRecords=[...documents(50),{id:'unsupported',title:'Unsupported',reject:true}],baseline=await d.plan(baselineRecords);assert.equal(baseline.status,200);await d.apply(baseline.body);
   const replay=await d.token('status');assert.equal((await d.call('status',{planId:baseline.body.planId},{},replay)).status,200);
   assert.equal((await d.call('status',{planId:baseline.body.planId},{},replay)).status,403);
   const changed=[...baselineRecords.map(r=>r.id==='0'?{...r,title:'Updated at source'}:r),{id:'50',title:'New source article',body:'Historical knowledge.'}];
@@ -54,8 +67,10 @@ test('HTTP grants and bounded catch-up fail closed while valid snapshot replacem
   const reconciliation=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciliation.body.ok,true);assert.equal(reconciliation.body.counts.nativeTargets,51);
   assert.equal((await d.call('undo',{planId:baseline.body.planId})).status,409);
   const tooMany=changed.map((r,i)=>i<3?{...r,title:'Another source change '+i}:r);
-  const refused=await d.plan(tooMany,{catchup:true},bounded);assert.equal(refused.status,409);assert.match(refused.body.error,/catchup_requires_proposal/);
+  const refused=await d.plan(tooMany,{catchup:true},bounded);assert.equal(refused.status,409);assert.match(refused.body.error,/change_must_be_under_five_percent/);
   const gone=await d.plan(changed.slice(1),{catchup:true},bounded);assert.equal(gone.status,409);assert.match(gone.body.error,/source_records_gone/);
+  const rejected=await d.plan([...changed,{id:'new-unsupported',title:'New unsupported row',reject:true}],{catchup:true},bounded);
+  assert.equal(rejected.status,409);assert.match(rejected.body.error,/native_or_mapping_conflict/);
   // A same-revision native edit is protected, too.
   const native=d.runtime.native().prepare("SELECT value_json FROM native_records WHERE id='0'").get()!;
   d.runtime.native().prepare("UPDATE native_records SET value_json=? WHERE id='0'").run(canonicalJson({local:'owner edit'}));
