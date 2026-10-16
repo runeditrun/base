@@ -71,6 +71,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);
     assert.deepEqual(await (await fetch('/items', b)).json(), [{ name: 'sample' }]);
+    assert.deepEqual(await (await fetch('/d1-session', b)).json(), { names: ['sample'], bookmark: 'string', unknown: true }, 'D1 sessions read the visitor database; an unknown D1 method fails instead of hanging');
     assert.deepEqual(await (await fetch('/modules', a)).json(), { sum: 5, data: [7, 8, 9] }, 'the app answers with its wasm and data modules');
     assert.equal((await fetch('/bindings', a, { method: 'POST', body: 'visitor-a' })).status, 201);
     let processed;

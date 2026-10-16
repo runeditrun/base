@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.35-dev.g6719c951",
+  "cliVersion": "0.2.35",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1203,7 +1203,7 @@
     },
     "modules/demo-host/native/d1.mjs": {
       "source": "modules/demo-host/native/d1.mjs",
-      "sha256": "d9a05f2a7fc304edda4ced9360594bbf5cc24f943c1b3c7f78df714a5c906a69"
+      "sha256": "99f31664f87b90cd8d6c92b018ed8b660b623ab01ee21576789b92a7bc5250c1"
     },
     "modules/demo-host/native/deploy-r2.mjs": {
       "source": "modules/demo-host/native/deploy-r2.mjs",
@@ -1247,7 +1247,7 @@
     },
     "modules/demo-host/native/sql.mjs": {
       "source": "modules/demo-host/native/sql.mjs",
-      "sha256": "90e261e2384cabbfe6388e9356de6b02df6caefdfa7ae253997141fef083adc5"
+      "sha256": "48d8bfaa0e95a4d7c1fea083f3f24a21f6687713317d29a53f8c74ad09fc0d79"
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",

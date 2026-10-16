@@ -39,6 +39,13 @@ export default {
       result.fetch = (await env.RER_NATIVE_HOST.fetch(new Request(env.AUTH_ORIGIN + '/items'))).status === 404 ? 'denied' : 'reachable';
       return Response.json(result);
     }
+    if (path === '/d1-session') {
+      const session = env.DB.withSession('first-primary');
+      const [items] = await session.batch([session.prepare('SELECT name FROM items ORDER BY name')]);
+      // Slate batches reads inside queueMicrotask: a missing D1 method must reject there, not hang the request.
+      const unknown = await new Promise(resolve => queueMicrotask(() => env.DB.notD1('first-primary').batch([]).then(() => 'resolved', error => error.message).then(resolve)));
+      return Response.json({ names: items.results.map(row => row.name), bookmark: typeof session.getBookmark(), unknown: /^D1_UNSUPPORTED: .*notD1/.test(unknown) });
+    }
     if (path === '/modules') return Response.json({ sum: new WebAssembly.Instance(add).exports.add(2, 3), data: [...new Uint8Array(data)] });
     if (path === '/legacy-alarm') return env.LEGACY.getByName('same-name').fetch('https://legacy/alarm-status');
     if (path === '/alarms') {
