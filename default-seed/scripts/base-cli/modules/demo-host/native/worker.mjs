@@ -1,6 +1,7 @@
 import front from '../worker.mjs';
 import { bundle } from './loader.mjs';
-export { DemoAssets } from './loader.mjs';
+export { HostBridge } from './bridge.mjs';
+export { DemoAssets, DemoEgress } from './loader.mjs';
 export { NativeDemo } from './visitor.mjs';
 export { DemoCapacity } from '../capacity.mjs';
 

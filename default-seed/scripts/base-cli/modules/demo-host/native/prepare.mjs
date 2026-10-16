@@ -3,7 +3,7 @@ import { resolve, join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { collectBuildModules } from '../../deploy-kit/build-modules.mjs';
 import { collectFiles } from '../../deploy-kit/artifact.mjs';
-import { nativeBindings, ISOLATE_FILES } from './config.mjs';
+import { nativeBindings, ISOLATE_FILES, objectExports } from './config.mjs';
 
 // Reuse the normal production build and its migration inventory, without
 // building or running a container. The bundle is stored once in the front.
@@ -22,7 +22,7 @@ export async function prepareNative(folder) {
   }
   const entry = `../app/${main}`;
   modules['_rer/isolate.js'] = { js: (await readFile(new URL('./isolate.mjs', import.meta.url), 'utf8')).replace('__RER_APP_ENTRY__', entry)
-    + [...new Set(bindings.objects.map(item => item.class_name))].map(name => `\nexport { ${name} } from ${JSON.stringify(entry)};`).join('') };
+    + objectExports(bindings) };
   for (const file of ISOLATE_FILES) modules[`_rer/${file}.js`] = { js: await readFile(new URL(`./${file}.mjs`, import.meta.url), 'utf8') };
   const assets = await collectFiles(join(app, 'dist/client'));
   const bundle = { compatibilityDate: config.compatibility_date, compatibilityFlags: [...new Set([...(config.compatibility_flags ?? []), 'nodejs_compat'])], modules,

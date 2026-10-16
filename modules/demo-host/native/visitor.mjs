@@ -5,6 +5,7 @@ import { DemoD1 } from './d1.mjs';
 import { application, bundle } from './loader.mjs';
 import { database, object, r2, eraseResources } from './resources.mjs';
 import { enqueue, deliverQueues, nextQueue, queueMetrics } from './queues.mjs';
+import { seedAlarm, nextSeedAlarm, deliverSeedAlarms } from './alarms.mjs';
 import { cronMatches } from './cron.mjs';
 import { endedPage, clearCookie } from '../pages.mjs';
 
@@ -103,9 +104,10 @@ export class NativeDemo extends DurableObject {
   r2(binding, method, args) { return r2(this, binding, method, args); }
   queueMetrics(queue) { return queueMetrics(this, queue); }
   enqueue(queue, messages) { return enqueue(this, queue, messages); }
+  seedAlarm(binding, id, method, at) { return seedAlarm(this, binding, id, method, at); }
   async schedule(candidate = Infinity) {
     if (!this.state || this.state.phase === 'ending') return;
-    const at = Math.max(Date.now() + 50, Math.min(candidate, this.state.ends, this.state.seen + IDLE, (Math.floor(Date.now() / 60_000) + 1) * 60_000));
+    const at = Math.max(Date.now() + 50, Math.min(candidate, await nextSeedAlarm(this), this.state.ends, this.state.seen + IDLE, (Math.floor(Date.now() / 60_000) + 1) * 60_000));
     const current = await this.ctx.storage.getAlarm();
     if (!current || current > at) await this.ctx.storage.setAlarm(at);
   }
@@ -123,6 +125,7 @@ export class NativeDemo extends DurableObject {
             console.log(JSON.stringify({ event: 'native-demo-scheduled', correlation: this.state?.correlation, cron }));
           }
         }
+        await deliverSeedAlarms(this, now);
         await deliverQueues(this, now);
       }
     } finally { await this.schedule(await nextQueue(this)); }

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { RUNTIME_FILES, ISOLATE_FILES } from '../native/config.mjs';
+import { RUNTIME_FILES, ISOLATE_FILES, objectExports } from '../native/config.mjs';
 import { DEMO_FILES } from '../plan.mjs';
 
 test('Loader demos claim and seed two isolated native apps, serve edge assets, and erase on expiry', async () => {
@@ -19,7 +19,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     const bundle = { digest: 'fixture-native-app', compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], bindings: { databases: ['DB', 'SECOND'], buckets: ['FILES'], objects: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }], queues: { producers: [{ binding: 'JOBS', queue: 'work' }], consumers: [{ queue: 'work', max_retries: 2 }] }, assets: 'ASSETS' }, vars: {}, crons: [], assetPaths: ['/assets/fixture-12345678.js'],
       migrations: Object.fromEntries(['DB', 'SECOND'].map(binding => [binding, [{ name: '0001_items.sql', sql, sha256: createHash('sha256').update(sql).digest('hex'), statements: sql.split(';').filter(Boolean) }]])),
       modules: {
-        '_rer/isolate.js': { js: (await source('modules/demo-host/native/isolate.mjs')).replace('__RER_APP_ENTRY__', '../app/modules/demo-host/tests/native-app.mjs') + '\nexport { Counter, LegacyCounter } from \'../app/modules/demo-host/tests/native-app.mjs\';' },
+        '_rer/isolate.js': { js: (await source('modules/demo-host/native/isolate.mjs')).replace('__RER_APP_ENTRY__', '../app/modules/demo-host/tests/native-app.mjs') + objectExports({ objects: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }] }) },
         ...Object.fromEntries(await Promise.all(ISOLATE_FILES.map(async file => [`_rer/${file}.js`, { js: await source(`modules/demo-host/native/${file}.mjs`) }]))),
         'app/modules/demo-host/tests/native-app.mjs': { js: await source('modules/demo-host/tests/native-app.mjs') },
         'app/modules/owner-claim/verify.mjs': { js: await source('modules/owner-claim/verify.mjs') },
@@ -33,11 +33,11 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
       durableObjects: { DEMO: { className: 'NativeDemo', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
       ratelimits: { STARTS: { namespace_id: '1001', simple: { limit: 3, period: 60 } } },
-      bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}',
+      bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}', DEMO_SECONDARY_ORIGINS: '["https://page.demo.example.test"]',
         TURNSTILE_SITE_KEY: 'fixture-site-key', TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA', RER_DEMO_MEASUREMENT_TOKEN: measurement, NATIVE_TEST_TTL_MS: '12000' },
       r2Buckets: ['NATIVE_BUCKET'],
       serviceBindings: { ASSETS: () => new Response('fixture-asset') },
-      outboundService: request => { assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify'); return Response.json({ success: true }); },
+      outboundService: request => { if (request.url === 'https://network.example.test/') return new Response('network'); assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify'); return Response.json({ success: true }); },
     }));
     const fetch = (path, cookies = '', init = {}) => mf.dispatchFetch(origin + path, { redirect: 'manual', ...init, headers: { cookie: cookies, origin, ...init.headers } });
     const start = async ip => {
@@ -71,6 +71,27 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     }
     assert.deepEqual(processed, { keys: ['attachment'], body: 'visitor-a', retained: 'visitor-a', jobs: [{ name: 'visitor-a' }], secondary: [{ name: 'visitor-a' }] });
     assert.deepEqual(await (await fetch('/bindings', b)).json(), { keys: [], body: null, retained: null, jobs: [], secondary: [] });
+    for (const cookies of [a, b]) {
+      const own = await (await fetch('/own-fetch', cookies)).json();
+      assert.deepEqual(own.primary, own.secondary);
+      assert.deepEqual(own.primary, (await (await fetch('/items', cookies)).json()).map(row => row.name));
+      assert.equal(own.network, 'network');
+    }
+    const restricted = await (await fetch('/bridge-probe', a)).json();
+    assert.ok(Object.values(restricted).every(result => result === 'denied'), JSON.stringify(restricted));
+    assert.equal((await fetch('/alarms', a, { method: 'POST' })).status, 200);
+    let alarm;
+    for (let attempt = 0; attempt < 50; attempt++) {
+      alarm = await (await fetch('/alarms', a)).json();
+      if (alarm.fired) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(await (await fetch('/legacy-alarm', a)).json(), true, 'legacy plain classes receive alarms too');
+    assert.equal(alarm.fired, true, 'seed alarm delivered after a failed first attempt');
+    assert.equal(alarm.attempts, 2);
+    assert.equal(alarm.during, null, 'getAlarm is null during alarm delivery');
+    assert.ok(alarm.next > Date.now(), 'seed can schedule its next alarm from alarm()');
+    assert.equal((await (await fetch('/alarms', b)).json()).fired, false);
     const bucket = await mf.getR2Bucket('NATIVE_BUCKET');
     assert.equal((await bucket.list()).objects.length, 1, 'real visitor-scoped R2 object exists before expiry');
     const upgraded = await fetch('/socket', a, { headers: { upgrade: 'websocket' } });

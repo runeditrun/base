@@ -17,7 +17,28 @@ export default {
       await env.DB.prepare("INSERT OR IGNORE INTO items VALUES('sample')").run();
       return new Response('ready');
     }
+    if (path === '/own-data') return Response.json((await env.DB.prepare('SELECT name FROM items ORDER BY name').all()).results.map(row => row.name));
     if (!(request.headers.get('cookie') ?? '').split(';').some(part => part.trim() === `owner=${env.SESSION_SECRET}`)) return new Response('Unauthorized', { status: 401 });
+    if (path === '/own-fetch') {
+      const primary = await (await fetch(env.AUTH_ORIGIN + '/own-data')).json();
+      const secondary = await (await fetch('https://page.demo.example.test/own-data')).json();
+      return Response.json({ primary, secondary, network: await (await fetch('https://network.example.test/')).text() });
+    }
+    if (path === '/bridge-probe') {
+      const result = {};
+      for (const method of ['capacity', 'diagnostic', 'begin', 'erase', 'session', 'status', 'active', 'end', 'save', 'schedule']) {
+        try { await env.RER_NATIVE_HOST[method](); result[method] = 'reachable'; }
+        catch { result[method] = 'denied'; }
+      }
+      result.fetch = (await env.RER_NATIVE_HOST.fetch(new Request(env.AUTH_ORIGIN + '/items'))).status === 404 ? 'denied' : 'reachable';
+      return Response.json(result);
+    }
+    if (path === '/legacy-alarm') return env.LEGACY.getByName('same-name').fetch('https://legacy/alarm-status');
+    if (path === '/alarms') {
+      const object = env.COUNTER.getByName('alarm');
+      if (request.method === 'POST') await object.arm();
+      return Response.json(await object.alarmStatus());
+    }
     if (path === '/socket') return env.COUNTER.getByName('socket').fetch(request);
     if (path === '/bindings') {
       const retained = env.COUNTER.getByName('same-name');
@@ -69,11 +90,36 @@ export class Counter extends DurableObject {
     await this.env.DB.prepare('SELECT name FROM items').all();
     return await this.ctx.storage.get('retained') ?? null;
   }
+  async arm() {
+    await this.ctx.storage.setAlarm(new Date(Date.now() + 60000));
+    if (!await this.ctx.storage.getAlarm()) throw new Error('Alarm was not saved');
+    await this.ctx.storage.deleteAlarm();
+    if (await this.ctx.storage.getAlarm() !== null) throw new Error('Alarm was not deleted');
+    await this.ctx.storage.setAlarm(Date.now() + 100);
+  }
+  async alarm(info) {
+    const attempts = (await this.ctx.storage.get('attempts') ?? 0) + 1;
+    await this.ctx.storage.put('attempts', attempts);
+    if (attempts === 1) throw new Error('fixture first delivery fails');
+    if (!info.isRetry || info.retryCount !== 1) throw new Error('Missing retry information');
+    await this.ctx.storage.put({ fired: true, during: await this.ctx.storage.getAlarm() });
+    await this.ctx.storage.setAlarm(Date.now() + 60000);
+  }
+  async alarmStatus() {
+    return { fired: await this.ctx.storage.get('fired') ?? false, attempts: await this.ctx.storage.get('attempts') ?? 0,
+      during: await this.ctx.storage.get('during') ?? null, next: await this.ctx.storage.getAlarm() };
+  }
   webSocketMessage(socket, message) { socket.send(message); }
 }
 
 // Legacy DO exports (without the RPC base class) are used by real seeds too.
 export class LegacyCounter {
   constructor(ctx) { this.ctx = ctx; }
-  async fetch() { await this.ctx.storage.put('retained', 'present'); return new Response(await this.ctx.storage.get('retained')); }
+  async fetch(request) {
+    if (new URL(request.url).pathname === '/alarm-status') return Response.json(await this.ctx.storage.get('fired') ?? false);
+    await this.ctx.storage.put('retained', 'present');
+    await this.ctx.storage.setAlarm(Date.now() + 100);
+    return new Response(await this.ctx.storage.get('retained'));
+  }
+  async alarm() { await this.ctx.storage.put('fired', true); }
 }

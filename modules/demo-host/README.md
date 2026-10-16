@@ -6,7 +6,9 @@ host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
 - `build.mjs`: ordinary Vite output, declared SQL and public configuration,
   using the shared container migration-inventory and image-variable checks.
 - `native/`: bundle preparation, per-visitor D1/seed-DO facets, prefixed R2,
-  durable queue delivery and declared UTC crons.
+  durable queue delivery, seed-DO alarms and declared UTC crons.
+  A narrow bridge exposes only visitor resource operations to the seed; own-host
+  outbound requests return to the same visitor, including declared secondary hosts.
 - `worker.mjs`, `pages.mjs`, `start-script.mjs`: Turnstile start, progress,
   cancellation and visitor routing. Static assets are served at the edge.
 - `capacity.mjs`: concurrent visitor admission and operator diagnostics. This

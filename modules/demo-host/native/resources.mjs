@@ -1,3 +1,4 @@
+import { objectClass } from './config.mjs';
 import { application, loaded, bundle } from './loader.mjs';
 import { r2Call, eraseR2 } from './r2.mjs';
 
@@ -16,7 +17,7 @@ export async function object(host, binding, id, method, args) {
   const state = host.state, name = `object:${binding}:${id}`;
   await host.ctx.storage.put(`facet:${name}`, true);
   if (host.state !== state || state.phase === 'ending') throw new Error('demo-ended');
-  const stub = host.ctx.facets.get(name, () => ({ class: loaded(host.env, host.ctx, host.ctx.id.toString(), host.state.runtime).getDurableObjectClass(declared.class_name), id }));
+  const stub = host.ctx.facets.get(name, () => ({ class: loaded(host.env, host.ctx, host.ctx.id.toString(), host.state.runtime).getDurableObjectClass(objectClass(binding)), id }));
   if (['constructor', 'then'].includes(method) || method.startsWith('_')) throw new Error('Invalid Durable Object method');
   return stub[method](...args);
 }

@@ -1,7 +1,7 @@
 import { parseCron } from './cron.mjs';
 
-export const RUNTIME_FILES = ['worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'queues', 'resources', 'cron'];
-export const ISOLATE_FILES = ['bindings', 'namespace', 'r2-client', 'd1', 'sql'];
+export const RUNTIME_FILES = ['config', 'worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'queues', 'resources', 'cron', 'bridge', 'alarms'];
+export const ISOLATE_FILES = ['bindings', 'namespace', 'r2-client', 'd1', 'sql', 'seed-object'];
 export function nativeBindings(config) {
   for (const kind of ['kv_namespaces', 'services', 'workflows', 'ai', 'vectorize', 'hyperdrive', 'analytics_engine_datasets', 'browser', 'images', 'send_email', 'dispatch_namespaces', 'mtls_certificates', 'pipelines', 'secrets_store_secrets', 'unsafe', 'vpc_services', 'vpc_networks', 'ratelimits', 'worker_loaders', 'containers', 'ai_search_namespaces', 'ai_search', 'agent_memory', 'connect', 'artifacts', 'unsafe_hello_world', 'flagship', 'logfwdr', 'version_metadata']) {
     const value = config[kind];
@@ -28,3 +28,8 @@ export function nativeBindings(config) {
   if (new Set(names).size !== names.length) throw new Error('Loader demo has duplicate binding names');
   return { databases, buckets, objects, queues, assets: config.assets?.binding ?? 'ASSETS' };
 }
+
+// Export one wrapper per binding, including when several bindings share a class.
+export const objectClass = binding => `RerSeed_${binding}`;
+export const objectExports = bindings => (bindings.objects.length ? "\nimport { seedObject } from './seed-object.js';" : '') + bindings.objects.map(({ name, class_name }) =>
+  `\nexport const ${objectClass(name)} = seedObject(application[${JSON.stringify(class_name)}], ${JSON.stringify(name)});`).join('');
