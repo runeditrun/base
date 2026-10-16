@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.27
+
+- `rer release` of an exact source commit scans source history against the repository's public history. When the checkout's origin is a confirmed public GitHub repository, its default branch and published tags are the scanner's public base, so findings already public are classified pre-existing and unpublished content still blocks. `--public-base GIT_URL#BRANCH` selects public history explicitly; it cannot be combined with `--onto` or `--clean-history`.
+- On a busy machine, a process-table read that outlives its ordinary bound is awaited for up to 25 more seconds with a `RER_PROCESS_INSPECTION_SLOW` warning, instead of failing a passing run's cleanup. Cleanup still fails only on owned processes observed alive.
+- Setup, local import/restore, reset and local startup hold the checkout's exclusive operation lock through completion, and every local ownership check falls back to that lock proof when `lsof` does not answer within three seconds. Canonical-state commands then probe existing SQLite databases with an immediate exclusive transaction that rolls back, and refuse when another process holds a SQLite lock. Demo uses the lock proof without opening canonical SQLite.
+- `modules/operator-auth/policy.d.mts` ships client-safe types for `normalizeEmail`, `emailDomain` and `safeReturnTo`.
+- `DEMO.md` says that new visitors may get the previous demo version for several minutes after a deploy (about 7–9 minutes measured), so measure about 10 minutes after a demo deploy.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes.
+
 ## 0.2.26
 
 - The `rer` mail adapter carries `List-Id`, `List-Archive`, `List-Help`, `In-Reply-To` and `References` to the Managed relay as its `listId`, `listArchive`, `listHelp`, `inReplyTo` and `references` fields, and refuses invalid values before sending. Other raw headers stay refused.
