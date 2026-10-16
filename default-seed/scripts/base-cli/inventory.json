@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26-dev.gdeb139c2",
+  "cliVersion": "0.2.26-dev.g4950b5e2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -927,7 +927,7 @@
     },
     "modules/demo-host/remove.mjs": {
       "source": "modules/demo-host/remove.mjs",
-      "sha256": "302b8be384f24f9bad796203a8577a87cc40d2971cdb6430dd36a9d529f2bbd8"
+      "sha256": "e4c38265182326f7d02bae962e43b5447fc8d23a9706f9d8fe80916634a99f3b"
     },
     "modules/demo-host/start-script.mjs": {
       "source": "modules/demo-host/start-script.mjs",

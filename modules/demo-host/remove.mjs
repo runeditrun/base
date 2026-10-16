@@ -29,7 +29,7 @@ export async function demoInventory(api, plan) {
     // Without the Worker nothing proves these are the demo's.
     throw refuse('uncertain-resource-create', named[0] || attached[0] ? `domain:${(named[0] ?? attached[0]).hostname}` : `container:${plan.container}`);
   }
-  for (const app of apps) if (!container || app.durable_objects?.namespace_id !== container) throw refuse('resource-name-collision', `container:${plan.container}`);
+  for (const app of apps) if (app.name !== plan.container || !container || app.durable_objects?.namespace_id !== container) throw refuse('resource-name-collision', `container:${plan.container}`);
   return { worker, settings, namespaces, domains: named, apps };
 }
 
