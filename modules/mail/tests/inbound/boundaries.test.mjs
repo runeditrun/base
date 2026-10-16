@@ -44,6 +44,11 @@ test('invalid limits, UTF-8, unknown encoding and malformed folds fail closed', 
     full.replace('quoted-printable', 'unknown'), full.replace('caf=C3=A9', 'caf=FF'),
     full.replace('From:', ' From:'), full.replace('boundary=alternative', 'boundary=wrong'),
   ]) await assert.rejects(normalizeInbound(cloudflare(encoder.encode(source)), limits), { name: 'MailValidationError' });
+  await assert.rejects(normalizeInbound(cloudflare(encoder.encode(full.replace('<parent@example.test>\r\nRef', '<parent@example.test> stray\r\nRef'))), limits), { code: 'invalid_inbound_thread' });
+  // A long run of header whitespace before a line separator is refused in linear time.
+  const started = performance.now();
+  await assert.rejects(normalizeInbound(cloudflare(encoder.encode(full.replace('From:', `X-Pad:${' '.repeat(90_000)}\u2028\r\nFrom:`))), limits), { code: 'invalid_inbound_headers' });
+  assert.ok(performance.now() - started < 1000);
 });
 test('a later hydration failure yields no successful partial message', async () => {
   let calls = 0;
