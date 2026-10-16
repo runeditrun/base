@@ -28,10 +28,19 @@ function ciNames(source, entries, add) {
  }
 }
 
+export function infrastructureDocument(pathname, entries) {
+ return /\.(?:tf|hcl|tf\.json)$/i.test(pathname)
+  || /(?:^|\/)(?:charts?|helm)\//i.test(pathname)
+  || /(?:^|\/)Pulumi[^/]*\.(?:ya?ml|json)$/i.test(pathname)
+  || entries.some(({ path }) => path.length === 1 && path[0] === 'Resources')
+  || entries.some(({ path }) => path.at(-1) === 'apiVersion') && entries.some(({ path }) => path.at(-1) === 'kind');
+}
+
 export function infrastructureNames(pathname, source, entries, ci, add) {
  if (ci) ciNames(source, entries, add);
  if (/\.(?:tf|hcl)$/i.test(pathname)) terraformNames(source, add);
  const kubernetes = new Set(entries.filter(entry => entry.path.at(-1) === 'apiVersion').map(entry => entry.path.slice(0, -1).join('\0')));
+ const images = ci || infrastructureDocument(pathname, entries);
  for (const { path, value } of entries) {
   if (/\.tf\.json$/i.test(pathname)) {
    if (path[0] === 'provider' && path.length === 2) add('iac-provider', path[1]);
@@ -43,16 +52,16 @@ export function infrastructureNames(pathname, source, entries, ci, add) {
   const key = path.at(-1);
   if (key === 'kind' && kubernetes.has(path.slice(0, -1).join('\0')) && /^[A-Za-z][A-Za-z0-9]*$/.test(value)) add('iac-resource', value);
   if (/^(?:Type|type)$/.test(key)) {
-   if (path.includes('Resources') && /^[A-Za-z][A-Za-z0-9]*::[A-Za-z][A-Za-z0-9]*::[A-Za-z][A-Za-z0-9]*$/.test(value)) add('iac-resource', value);
-   if (path.includes('resources') && /^[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_./-]*:[A-Za-z][A-Za-z0-9_]*$/.test(value)) {
+   if (path[0] === 'Resources' && path.length === 3 && /^[A-Za-z][A-Za-z0-9]*::[A-Za-z][A-Za-z0-9]*::[A-Za-z][A-Za-z0-9]*$/.test(value)) add('iac-resource', value);
+   if (path[0] === 'resources' && path.length === 3 && /(?:^|\/)Pulumi[^/]*\.(?:ya?ml|json)$/i.test(pathname) && /^[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_./-]*:[A-Za-z][A-Za-z0-9_]*$/.test(value)) {
     const provider = /^pulumi:providers:([A-Za-z][A-Za-z0-9_-]*)$/.exec(value);
     add(provider ? 'iac-provider' : 'iac-resource', provider?.[1] ?? value);
    }
   }
-  if (key === 'image' || (key === 'repository' && path.includes('image'))) {
+  if (images && (key === 'image' || (key === 'repository' && path.includes('image')))) {
    const host = registryHost(value); if (host) add('iac-provider', host);
   }
-  if (key === 'registry' && path.includes('image')) {
+  if (images && key === 'registry' && path.includes('image')) {
    const host = registryHost(`${value}/_`); if (host) add('iac-provider', host);
   }
  }
