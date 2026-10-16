@@ -73,6 +73,7 @@ function absent(output, values) {
 test('packed business scan discovers names across manifests, infrastructure, CI and examples without scalar values', async () => {
  const root = await copyFixture('discovery');
  const { report, output } = await scan(root, ['--json']);
+ absent(output, ['syntheticprivatekind', 'Synthetic::Private::Value', 'synthetic-private-registry.invalid']);
  const expected = [
   ['package.json', '@stripe/stripe-js'], ['composer.json', 'stripe/stripe-php'],
   ['requirements.txt', 'sendgrid'], ['pyproject.toml', 'boto3'], ['Gemfile', 'sidekiq'],
@@ -80,7 +81,7 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   ['.env.example', 'SYNTHETIC_MAIL_TRANSPORT', 'trace'],
   ['.github/workflows/verify.yml', 'SYNTHETIC_CI_KEY', 'live-use'],
   ['infrastructure/main.tf', 'cloudflare/cloudflare'],
-  ['infrastructure/template.yaml', 'AWS::S3::Bucket'],
+  ['infrastructure/template.yaml', 'AWS::S3::Bucket', 'live-use'],
   ['index.ts', 'aws.s3.Bucket', 'live-use'],
   ['infrastructure/Pulumi.yaml', 'aws:s3/bucket:Bucket', 'live-use'],
   ['chart/templates/deployment.yaml', 'Deployment', 'live-use'],

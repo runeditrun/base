@@ -1,7 +1,7 @@
 import { comments, jsonEntries } from './parsers-syntax.mjs';
 import { configNames, tomlEntries, yamlEntries } from './parsers-config.mjs';
 import { environmentNames, packageNames } from './parsers-packages.mjs';
-import { infrastructureNames } from './parsers-infrastructure.mjs';
+import { infrastructureDocument, infrastructureNames } from './parsers-infrastructure.mjs';
 import { pulumiNames } from './parsers-pulumi.mjs';
 
 const examples = /(?:^|[/.\-_])(?:examples?|samples?|templates?|fixtures?)(?:[/.\-_]|$)/i;
@@ -33,7 +33,9 @@ export function parseNames(relativePath, text) {
   if (!seen.has(key)) { seen.add(key); result.push({ kind, value, class: evidenceClass }); }
  };
  const parse = (source, evidenceClass, isComment) => {
-  const add = emit(evidenceClass), entries = entriesFor(pathname, source);
+  const entries = entriesFor(pathname, source);
+  const deployed = !isComment && !explicitExample && (ci || infrastructureDocument(pathname, entries));
+  const add = emit(deployed ? 'live-use' : evidenceClass);
   if (manifest) packageNames(filename, source, entries, add);
   if (env) environmentNames(source, add);
   if (!manifest && !code.test(pathname)) configNames(entries, add);
