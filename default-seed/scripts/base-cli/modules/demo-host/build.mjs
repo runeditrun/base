@@ -2,8 +2,8 @@ import { readFile, writeFile, realpath, cp, mkdir, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { demoMigrationInventory } from './migration-inventory.mjs';
-import { checkBuildVariables } from './build-variables.mjs';
+import { containerMigrationInventory as demoMigrationInventory } from '../container/migration-inventory.mjs';
+import { checkImageVariables as checkBuildVariables } from '../container/image-variables.mjs';
 import { nativeBindings } from './native/config.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 

@@ -37,7 +37,8 @@
     "verify:portability": "node onboarding/queued-entry.mjs verify:portability -- sh -c 'node --test --test-concurrency=1 modules/portability/tests/*.test.mjs && ./default-seed/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2022 --lib ES2022,DOM default-seed/node_modules/@cloudflare/workers-types/index.d.ts modules/portability/tests/types.check.mts'",
     "verify:cli": "node onboarding/queued-entry.mjs verify:cli -- sh -c 'node --test --test-concurrency=2 cli/*.test.mjs'",
     "verify:rer": "node onboarding/queued-entry.mjs verify:rer -- sh -c 'node --test --test-concurrency=1 global/tests/*.test.mjs'",
-    "verify:review-harness": "node onboarding/queued-entry.mjs verify:review-harness -- sh -c 'node --test --test-concurrency=1 modules/review-harness/tests/*.test.mjs && ./default-seed/node_modules/.bin/tsc --project modules/review-harness/tests/tsconfig.json'"
+    "verify:review-harness": "node onboarding/queued-entry.mjs verify:review-harness -- sh -c 'node --test --test-concurrency=1 modules/review-harness/tests/*.test.mjs && ./default-seed/node_modules/.bin/tsc --project modules/review-harness/tests/tsconfig.json'",
+    "verify:container": "node onboarding/queued-entry.mjs verify:container -- sh -c 'node --test --test-concurrency=2 modules/container/tests/*.test.mjs'"
   },
   "bin": {
     "rer": "bin/rer.mjs"

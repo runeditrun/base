@@ -22,6 +22,8 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   for (const file of DEMO_FILES) await cp(new URL(`../modules/demo-host/${file}`, import.meta.url), join(folder, 'modules/demo-host', file));
   for (const file of RUNTIME_FILES) await cp(new URL(`../modules/demo-host/native/${file}.mjs`, import.meta.url), join(folder, `modules/demo-host/native/${file}.mjs`));
   for (const directory of ['deploy-kit']) await cp(new URL(`../modules/${directory}/`, import.meta.url), join(folder, 'modules', directory), { recursive: true });
+  await mkdir(join(folder, 'modules/container'), { recursive: true });
+  await cp(new URL('../modules/container/migrations.mjs', import.meta.url), join(folder, 'modules/container/migrations.mjs'));
   // Runtime imports use the same module topology as the maintained source.
   const bundle = await prepareNative(folder);
   const config = { ...plan.wrangler, main: 'modules/demo-host/native/worker.mjs', compatibility_flags: ['nodejs_compat'],

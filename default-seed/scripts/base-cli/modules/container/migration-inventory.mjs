@@ -13,14 +13,14 @@ async function migrationPolicy(root) {
   if (!file) continue;
   const packaging = JSON.parse(await readFile(file,'utf8'));
   const inputs = packaging.artifact?.specInputs;
-  if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs)) throw new Error('Invalid demo migration packaging policy');
+  if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs)) throw new Error('Invalid container migration packaging policy');
   policies.push({migrationPrefix:inputs.migrationPrefix === undefined ? '' : inputs.migrationPrefix,extraMigrationDirectories:inputs.extraMigrationDirectories === undefined ? [] : inputs.extraMigrationDirectories,...(inputs.wranglerFile === undefined ? {} : {wranglerFile:inputs.wranglerFile})});
  }
- if (policies.some(policy => !isDeepStrictEqual(policy,policies[0]))) throw new Error('Conflicting demo migration packaging policies');
+ if (policies.some(policy => !isDeepStrictEqual(policy,policies[0]))) throw new Error('Conflicting container migration packaging policies');
  return policies[0] ?? {migrationPrefix:'',extraMigrationDirectories:[]};
 }
 
-export async function demoMigrationInventory(root,{config,configFile}) {
+export async function containerMigrationInventory(root,{config,configFile}) {
  const policy = await migrationPolicy(root);
  const file = await sourcePath(root,policy.wranglerFile ?? configFile);
  const migrationConfig = policy.wranglerFile === undefined ? config : JSON.parse(await readFile(file,'utf8'));

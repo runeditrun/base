@@ -2,10 +2,11 @@
 
 ## Unreleased
 
-- Hosted demos now use native Worker Loader isolates and edge assets exclusively.
-  Existing Container demos upgrade automatically on the same Worker and hostname,
-  removing their old application and class. Removed Docker/SSH container hosting
-  and its tests; local `rer demo` remains supported.
+- Hosted demos run exclusively on native Worker Loader isolates with edge assets.
+  Existing Container demos upgrade unattended on the same Worker and hostname,
+  removing the owned container application and migrating its Durable Object classes.
+  Removed only the hosted demo image/runtime and placement code; portable container
+  hosting (`rer build/deploy --platform container`, Node/workerd and SSH) is unchanged.
 - Native demo bindings follow the seed configuration: isolated D1s, R2 prefixes,
   durable queue batches, seed DO facets and UTC cron delivery.
 

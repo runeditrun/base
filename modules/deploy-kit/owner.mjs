@@ -1,5 +1,6 @@
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
+import { ingressBindings } from './container-config.mjs';
 import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { assert, hash, identifier, resourceName, uuid, validatePlan } from './validation.mjs';
@@ -113,7 +114,14 @@ export function localOnlyBinding(declaration, localOnlyKeys = []) {
 export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [] } = {}) {
   assert(declaration?.version === 1 && typeof declaration === 'object' && Object.keys(declaration).every(key => DECLARATION_KEYS.includes(key)), 'invalid-owner-declaration');
   if (declaration.platforms !== undefined) assert(Array.isArray(declaration.platforms) && declaration.platforms.length > 0 && new Set(declaration.platforms).size === declaration.platforms.length && declaration.platforms.every(item => ['workers','container'].includes(item)), 'invalid-platforms');
-  // Older seeds may retain container metadata; native Workers do not use it.
+  if (declaration.container !== undefined) {
+    const config=declaration.container;
+    assert(config&&typeof config==='object'&&!Array.isArray(config)&&Object.keys(config).every(key=>['engine','cacheContract','runner','hostVariables','ingress'].includes(key))&&['node','workerd'].includes(config.engine),'invalid-container');
+    if(config.ingress!==undefined)ingressBindings(config.ingress);
+    assert(config.hostVariables===undefined||Array.isArray(config.hostVariables)&&config.hostVariables.every(name=>/^[A-Z][A-Z0-9_]*$/.test(name)),'invalid-container-host-variables');
+    assert(config.cacheContract===undefined||config.cacheContract==='lamp-retained-v1','invalid-container-cache');
+    if(config.runner!==undefined){const runner=config.runner,relative=path=>typeof path==='string'&&!path.startsWith('/')&&path.split('/').every(part=>part&&!['.','..'].includes(part));assert(runner&&Object.keys(runner).every(key=>['entry','files'].includes(key))&&relative(runner.entry)&&Array.isArray(runner.files)&&runner.files.length>0&&runner.files.every(relative),'invalid-container-runner');}
+  }
   const local = localOnlyBinding(declaration, localOnlyKeys);
   if (local) throw refuse('local-only-binding', 'binding', local);
   assert(declaration.project === undefined || declaration.project === target.project, 'owner-project-mismatch');

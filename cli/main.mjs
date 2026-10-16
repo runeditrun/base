@@ -50,6 +50,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   const bounded=await (await import('./bounded.mjs')).boundedCommand(project,options,argv,out);
   if(bounded)return bounded.exitCode;
+  if(options.platform==='container' && !['export','import'].includes(options.verb)) { const result = await (await import('./container.mjs')).containerCommand(project,options,out); out.result(true,0,result); return 0; }
   let result;
   if (options.verb === 'reset' && project.profile === 'first-party') result = await (await import('./local.mjs')).reset(project, options, out);
   else result = await (await import('./lifecycle.mjs')).runCommand(project, options, out);
