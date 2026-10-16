@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer release` finds the seed's verification workflow via `--verify-workflow NAME_OR_FILE`, committed `rer-project.json.verifyWorkflow`, `verify.yml`/`verify.yaml`, or a single workflow named `verify`, in that order. Names and files match case-insensitively; ambiguous selections block with the candidates and flag. Exact-SHA run safety checks are unchanged, and receipts include the workflow file and name.
+
 ## 0.2.30
 
 - **Hosted demos run as native Workers.** `rer deploy --demo` gives each visitor their own Worker Loader isolate of the seed's ordinary production bundle, with SQLite Durable Object storage and static files served at the edge, instead of a Cloudflare Container. Docker and the Containers permission are no longer needed for a new demo host. Portable container hosting (`rer build`/`rer deploy --platform container`, Node/workerd and SSH) is unchanged; only the hosted-demo image, runtime and placement code are removed.

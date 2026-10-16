@@ -40,11 +40,29 @@ Run from the project root, or use `--cwd PATH`. Every new verb accepts `--help`,
 | `doctor` | none | Read-only tool/version, local configuration and state-placement diagnostics, naming missing inputs and their documented sources, plus `warnings` for leftover Node quarantine copies, mismatched Node/pnpm/workerd pins across running checkouts and a checkout on another volume (warnings never change the exit code). No provider request. |
 | `describe` | none | Describes commands, flags, aliases, effects, pins and state without installing or executing project commands. |
 | `check` | `--profile first-party` | Read-only structural contract/operations validation, including required hooks, flags, aliases and pins. No credentials needed for a fresh clone. |
-| `release` | existing `--repo`, `--project`, `--repository`, `--output`, `--ref`, `--dry-run`, `--tag [vVERSION]`, `--clean-history`, `--onto`, `--env-file`, `--no-queue` | Existing Base release behavior, receipts, validation, gates, local tags and exit codes preserved. |
+| `release` | existing `--repo`, `--project`, `--repository`, `--output`, `--ref`, `--public-base`, `--dry-run`, `--local-verify`, `--verify-workflow NAME_OR_FILE`, `--tag [vVERSION]`, `--clean-history`, `--onto`, `--env-file`, `--no-queue` | Existing Base release behavior, receipts, validation, gates, local tags and exit codes preserved. |
 
 `signin` is rer's own verb, not a seed operation: no seed declares it and `check` does not ask for it. `rer signin [--environment NAME] [--env-file FILE]` gives the hosted owner a one-time sign-in link without mail when the seed uses operator-auth's `accounts/schema/owner-signin.sql` migration. It uses only the Cloudflare credentials that deployed that environment, writes a single-use grant for the recorded owner into the deployment's auth D1, and prints the link once to the terminal (never to a log or receipt). The link expires within 15 minutes and its use is recorded in the owner's audit log. Those seeds document `rer signin` in their README as the way into a hosted install whose mail is not working yet; after it, the owner corrects a wrong email in settings (`POST /auth/email`). A seed with native sign-in can declare its browser page with the `commandAdapter` option `signInPath: '/login'` (a same-origin path, not a magic-link API endpoint). When the owner sign-in table is absent, `rer signin` explains that the seed uses its own sign-in flow and points to that page on the recorded environment's origin, or to `/setup` for owner recovery when no page is declared. It exits 4 and issues no link.
 
 `release` is the compatibility exception: preserve its existing parser, required `--repo`/`--output`, JSON receipt and exit codes; do not retrofit the new common flags or infer publishing identities. Root help may list the new commands. Release never pushes or deploys. Source inspection and locking remain edition-authoring commands, not another implementation in `rer`.
+
+For GitHub sources, `release` selects its verification workflow in this order:
+`--verify-workflow NAME_OR_FILE`; optional top-level `verifyWorkflow` in the
+selected commit's `rer-project.json` (for example `"verifyWorkflow": "Verify Slate"`
+or `"verifyWorkflow": ".github/workflows/slate.yml"`); the workflow at
+`.github/workflows/verify.yml` or `.github/workflows/verify.yaml`; then exactly
+one workflow named `verify`. Names, full file paths and file basenames match
+case-insensitively. Explicit selections must resolve uniquely; they never fall
+through. Multiple conventional files or matching names are refused with the
+candidates and `--verify-workflow` remedy. This optional declaration does not
+change `operations.verify`, the seed's local command.
+
+The selected workflow must have a completed successful `push` or
+`workflow_dispatch` run for the exact source SHA in the same repository, on its
+default branch or the release tag when that tag resolves to the same commit.
+`gates.verify` in the receipt and site provenance records `workflowFile`,
+`workflowName`, `workflowId`, `runId` and `runUrl`. `--local-verify` explicitly
+runs frozen installation and the seed's local verification targets instead.
 
 `--no-queue` is available only on the heavy commands that list it and only
 when the original caller has `CI=true`. The actual descriptor is authoritative

@@ -14,7 +14,7 @@ import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark
 // Failure output belongs to the private receipt, not the site preview.
 const withoutOutput = gates => JSON.parse(JSON.stringify(gates, (key, value) => key === 'output' ? undefined : value));
 
-export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, localVerify = false, allowPlaceholderMark = false }) {
+export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, localVerify = false, allowPlaceholderMark = false, verifyWorkflow }) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(project ?? '')) throw Error('--project must be publisher/name');
   if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?$/i.test(repository ?? '')) throw Error('--repository must be a credential-free GitHub repository URL');
   if (onto !== undefined && clean) throw Error('--onto and --clean-history are mutually exclusive');
@@ -47,7 +47,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
     const checkout = resolve(temporary, 'seed');
     git(source.repo, 'clone', '--no-hardlinks', '--no-checkout', '--', source.repo, checkout);
     git(checkout, 'checkout', '--detach', source.commit);
-    const verify = await verifySource(source, checkout, localVerify);
+    const verify = await verifySource(source, checkout, localVerify, verifyWorkflow);
     // Explicit clean-history publication scans every byte and ref of the actual
     // parentless export. Exact-source releases classify against public history
     // when available, retaining the selected source commit and tag identity.
