@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.26
+
+- The `rer` mail adapter carries `List-Id`, `List-Archive`, `List-Help`, `In-Reply-To` and `References` to the Managed relay as its `listId`, `listArchive`, `listHelp`, `inReplyTo` and `references` fields, and refuses invalid values before sending. Other raw headers stay refused.
+- Hosted output takes Managed-mail credential stand-ins from the seed's mail spec when `mail.providers` includes `rer`, so a Managed seed no longer has to list them in `deploy.json`. `export/SEED-COMMAND-CONTRACT.md` documents the own-host and Managed contract.
+- In a hosted demo, the app's fetches to its own demo hosts (primary and declared secondary) are served by its own container as the same visitor, with no network egress. Every other destination still goes through the demo egress.
+- `rer deploy --demo` waits up to 10 minutes for each demo hostname to present a verified TLS certificate, and fails naming what each host last answered.
+- Demo hosts on Turnstile testing keys start demos only when the start carries the deploy's measurement token, as the cookie `rer_demo_measure` or the header `x-rer-demo-measurement`. `rer deploy --demo` uses `RER_DEMO_MEASUREMENT_TOKEN` when it is set; otherwise it writes a token per deploy to `.rer/demo-host/measurement-token` (0600) and prints that path, not the token.
+- Demo image builds accept `MAIL_RELAY_URL` as public Managed-mail configuration, alongside `MAIL_PROVIDER` and `MAIL_FROM`.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes.
+- A demo deployed to a test host (Turnstile testing keys) needs its measurement token to start demos: set the repository secret `RER_DEMO_MEASUREMENT_TOKEN`, which `run-demo.yml` passes to `rer deploy --demo`, and send it with each measurement start.
+- Remove `MAIL_RELAY_URL` from `deploy.json` secrets and keep it as a public spec or Wrangler variable.
+
 ## 0.2.25
 
 - Invitations stay valid for seven days (`invitationSeconds`), separately from sign-in and step-up links, which keep their short lifetime.
