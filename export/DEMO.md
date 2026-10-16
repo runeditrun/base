@@ -226,3 +226,20 @@ carries no record: deploy it once with this rer, then remove it.
    Edit** on the account.
 4. **`RUN_DEMO_DEPLOY=true`** as a repository variable when the demo should go
    live. Until then nothing deploys.
+
+### Native Loader prototype
+
+`deploy-demo.json` can select `"mode": "loader"` for a Worker Loader host.
+The production bundle is built once; each visitor gets a dynamic isolate and
+a SQLite Durable Object facet with a D1 statement facade. Static files are
+served by the front Worker's asset binding, with immutable caching for hashed
+assets. Owner claim, Turnstile, admission, `RER_DEMO`, sample seeding and the
+60-minute / 15-minute idle lifetime use the existing demo flow. Alarms call the
+seed's scheduled handler and delete both the facet and supervisor storage.
+
+This prototype supports one D1 binding and once-per-minute cron. Other resource
+bindings are refused explicitly. It requires Workers Paid and Loader/Facets
+access; no Workers for Platforms subscription is needed. Seeds that depend on
+a separate Node demo runner need a native runner adapter before their live
+checks work. In particular, Uptime currently disables its Worker checks under
+`RER_DEMO`; deploying this host alone does not supply its container-side runner.
