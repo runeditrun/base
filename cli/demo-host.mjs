@@ -22,7 +22,7 @@ import { MEASUREMENT_COOKIE, MEASUREMENT_HEADER, TESTING_SECRET } from '../modul
 export async function demoHostCommand(project, options, store, signal, out, operation) {
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Missing or malformed ${path}.`); } };
  const app = await read(project.adapter.deploy?.declaration ?? 'deploy.json'), declaration = await read('deploy-demo.json');
- if (!(app.platforms ?? ['workers']).includes('container')) throw refuse('A hosted demo runs the seed\'s container image: declare "container" in deploy.json platforms first.');
+ if (declaration.mode !== 'loader' && !(app.platforms ?? ['workers']).includes('container')) throw refuse('A hosted demo runs the seed\'s container image: declare "container" in deploy.json platforms first.');
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, hostVariables: app.container?.hostVariables, declaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }
  catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds {"version": 1, "domain": "<run site apex>", "name": "<product name>"}, optionally "maxInstances", "instanceType" (${INSTANCE_TYPES.join(', ')}; default basic), "ownerEmail" (the demo owner's address; default owner@demo.invalid) and plain "settings".`); }
@@ -30,6 +30,7 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const supplied = process.env.RER_DEMO_MEASUREMENT_TOKEN?.trim();
  if (supplied && (supplied.length < 32 || supplied.length > 512 || /[\s;,]/.test(supplied))) throw invalid('RER_DEMO_MEASUREMENT_TOKEN must contain 32 to 512 characters, with no spaces, semicolons or commas.');
+ if (declaration.mode === 'loader') return (await import('./demo-native.mjs')).nativeDemoCommand(project, options, store, signal, out, operation, app, plan);
  const folder = join(project.root, '.rer', 'demo-host');
  await rm(folder, { recursive: true, force: true });
  await mkdir(folder, { recursive: true, mode: 0o700 });

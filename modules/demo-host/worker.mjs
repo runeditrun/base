@@ -106,7 +106,7 @@ async function start(request, env, ctx) {
     // Who holds the place: automated browsers pass Turnstile's testing keys.
     report(correlation, started, 'admitted', { agent: (request.headers.get('user-agent') ?? '').slice(0, 160), network: request.cf?.asOrganization ?? null });
     demo = env.DEMO.get(id);
-    const begun = demo.begin({ correlation, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
+    const begun = demo.begin({ correlation, clientIp: ip, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
     // A new object can take seconds to answer. That is a slow start, not a
     // failed one: the page polls this copy, and a begin that later fails ends
     // it and releases its place.

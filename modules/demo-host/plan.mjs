@@ -24,7 +24,8 @@ export const INSTANCE_TYPES = ['lite', 'basic', 'standard-1', 'standard-2', 'sta
  * or its descendants, routed through the same visitor isolation.
  */
 export function demoDeclaration(value, originVar) {
-  assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'instanceType', 'ownerEmail', 'settings'].includes(key)), 'invalid-demo-declaration');
+  assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'instanceType', 'ownerEmail', 'settings', 'mode'].includes(key)), 'invalid-demo-declaration');
+  assert(value.mode === undefined || ['container', 'loader'].includes(value.mode), 'invalid-demo-mode');
   siteDeclaration({ version: 1, domain: value.domain });
   assert(typeof value.name === 'string' && value.name.trim() === value.name && value.name.length > 0 && value.name.length <= 60 && !/[\p{Cc}\p{Cf}]/u.test(value.name), 'invalid-demo-name');
   const maxInstances = value.maxInstances ?? 10;
