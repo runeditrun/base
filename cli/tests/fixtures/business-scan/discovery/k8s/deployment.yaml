@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synthetic-deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: synthetic-app
+          image: synthetic.invalid/fixture/app:latest
+          env:
+            - name: SYNTHETIC_KUBE_SETTING
+              value: synthetic-kube-value-never-export

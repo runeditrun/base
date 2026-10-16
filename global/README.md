@@ -296,3 +296,19 @@ No global package manager installation or sudo is needed. Independent projects
 continue to run their declared commands with their own tools. Server and job
 state default to `$HOME/.rer/servers` and `$HOME/.rer/jobs`; supplied
 `RER_SERVERS_DIR` and `RER_JOBS_DIR` take precedence and are passed to older pins.
+
+## Inspect local business signals
+
+`rer business scan [DIR...] [--json]` scans the current directory or the named
+local directories without installing dependencies, executing project code or
+using the network. It works outside RER checkouts. Both forms print one JSON
+document: `{schema: "rer-business-signals/1", source: "local", signals: [...],
+withheld: N}`. Signals identify package, environment, CI, infrastructure and
+configuration names with a relative `locator`, repository basename `repo`,
+`class` (`live-use` or `trace`) and `observedAt`.
+
+Only names leave the scanner. Secret files are never opened and contribute
+`secret-file` metadata (filename, path, size and modification time).
+Sensitive-looking outbound names are dropped and counted in `withheld`.
+Symlinks, generated outputs and dependency trees are skipped; unsupported
+formats and syntax may yield no signals.

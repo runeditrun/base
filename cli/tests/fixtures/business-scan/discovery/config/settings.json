@@ -1,0 +1,6 @@
+{
+  "SYNTHETIC_PUBLIC_SETTING": "synthetic-config-value-never-export",
+  "mail": {
+    "transport": "synthetic-nested-value-never-export"
+  }
+}

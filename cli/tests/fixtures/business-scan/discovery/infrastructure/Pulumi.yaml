@@ -1,0 +1,9 @@
+name: synthetic-infrastructure
+runtime: nodejs
+config:
+  aws:region: synthetic-region-value-never-export
+resources:
+  fixtureBucket:
+    type: aws:s3/bucket:Bucket
+    properties:
+      bucket: synthetic-bucket-value-never-export

@@ -17,6 +17,8 @@ pins (installed first by any verb when node_modules holds another), else its ven
                        to 10 minutes on a first launch, or rerun it to reattach. rer dev --stop stops it.
   rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether rer dev can
                        launch them, whether they are set up, and their running URL. --json for data.
+  rer business scan [DIR...] [--json]
+                       Discover local package, config and infrastructure names without secret values.
   rer door ...         The opt-in front door: every checkout at http://NAME.localhost:PORT, started
                        on its first visit and stopped when idle. rer door --help for its verbs.
   rer cli status       This rer: version, contents digest, install channel, launcher and other rer
@@ -50,6 +52,7 @@ export async function main(argv) {
  // verb never inherits it.
  delete process.env[localDefaults];
  if (verb === 'update') return (await import('./update/command.mjs')).update(argv.slice(1));
+ if (verb === 'business') return (await import('../cli/business/command.mjs')).businessCommand(argv.slice(1));
  const notice = await import('./update/notice.mjs');
  if (verb !== 'doctor' && notice.wantsNotice(argv)) await notice.updateNotice();
  if (!verb || verb === '--help' || verb === '-h' || verb === 'help') { process.stdout.write(help); return 0; }
