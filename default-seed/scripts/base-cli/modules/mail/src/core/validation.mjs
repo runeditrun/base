@@ -1,11 +1,11 @@
 import { fail } from './errors.mjs';
 import { validateMessagingConfig, validateMessagingResult, identity, rfc3339 } from '../adapters/messaging/contract.mjs';
-import { validateRerConfig, validateRerMessage } from '../adapters/rer/contract.mjs';
+import { validateRerConfig, validateRerMessage, validateRerMessageKey } from '../adapters/rer/contract.mjs';
 import { rerListHeaderField } from '../adapters/rer/list-headers.mjs';
 
 const providers = ['sendgrid', 'resend', 'cloudflare', 'rer', 'development', 'messaging'];
 const controls = /[\x00-\x1f\x7f]/;
-const fields = new Set(['deliveryId', 'from', 'to', 'subject', 'text', 'html', 'cc', 'bcc', 'replyTo', 'headers', 'attachments', 'unsubscribe', 'customArgs', 'asmGroupId', 'subscriptionTracking', 'kind', 'expiresAt']);
+const fields = new Set(['deliveryId', 'from', 'to', 'subject', 'text', 'html', 'cc', 'bcc', 'replyTo', 'headers', 'attachments', 'unsubscribe', 'customArgs', 'asmGroupId', 'subscriptionTracking', 'kind', 'expiresAt', 'messageKey']);
 const reservedHeaders = new Set(['x-sg-id', 'x-sg-eid', 'received', 'dkim-signature', 'content-type', 'content-transfer-encoding', 'mime-version', 'to', 'from', 'subject', 'reply-to', 'cc', 'bcc', 'return-path', 'sender']);
 const reservedArgs = new Set(['rer_delivery_id', 'email', 'event', 'timestamp', 'sg_event_id', 'sg_message_id']);
 
@@ -137,6 +137,11 @@ export function validateMessage(message, provider) {
     for (const attachment of message.attachments) validateAttachment(attachment);
   }
   if (message.unsubscribe !== undefined) validateUnsubscribe(message.unsubscribe);
+  if (message.messageKey !== undefined) {
+    // Only the rer relay assigns Message-IDs from keys; development accepts what rer accepts.
+    if (provider !== undefined && !['rer', 'development'].includes(provider)) fail('unsupported_provider_setting');
+    validateRerMessageKey(message.messageKey);
+  }
   if (provider === 'rer') validateRerMessage(message);
   const settings = ['customArgs', 'asmGroupId', 'subscriptionTracking'];
   if (provider && !['sendgrid', 'development'].includes(provider) && settings.some(key => message[key] !== undefined)) fail('unsupported_provider_setting');
