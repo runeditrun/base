@@ -415,7 +415,7 @@
     },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
-      "sha256": "01219c98b45773970080896b3d69727b920b4f71d7169403318b7132341eabad"
+      "sha256": "4111d47eceda7982561370d1322f78ff05a6dace2bba5a8b10346e26f29b4827"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
