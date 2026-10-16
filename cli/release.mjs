@@ -21,6 +21,9 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
                          Prepare a public child of the destination's current branch;
                          cannot be combined with --clean-history.
   --env-file FILE        Credential file for publication inspection.
+  --allow-placeholder-mark
+                         Release while the seed still carries Base's placeholder
+                         mark; the receipt records the files.
   --no-queue             Bypass the job queue only in the original CI environment.
   --help                 Print this help without performing release work.
 
@@ -45,6 +48,7 @@ export async function dispatchRelease(args) {
    else if (args[index] === '--tag') options.tag = args[index + 1]?.startsWith('v') ? args[++index] : true;
    else if (args[index] === '--clean-history') options.cleanHistory = true;
    else if (args[index] === '--dry-run') options.dryRun = true;
+   else if (args[index] === '--allow-placeholder-mark') options.allowPlaceholderMark = true;
    else if (['--repo', '--project', '--repository', '--output', '--ref', '--env-file', '--onto', '--public-base'].includes(args[index]) && args[index + 1] && !args[index + 1].startsWith('--'))
     options[args[index] === '--env-file' ? 'envFile' : args[index] === '--public-base' ? 'publicBase' : args[index].slice(2)] = args[++index];
    else throw Error('Invalid release arguments');
@@ -55,8 +59,8 @@ export async function dispatchRelease(args) {
   const receipt = await release(options);
   console.log(JSON.stringify(receipt, null, 2));
   return receipt.status === 'BLOCKED' ? 1 : 0;
- } catch {
-  console.error('Release failed during argument, source or artifact validation. No release completed.');
+ } catch (error) {
+  console.error(error?.code === 'placeholder_mark' ? error.message : 'Release failed during argument, source or artifact validation. No release completed.');
   return 2;
  }
 }

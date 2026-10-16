@@ -12,6 +12,7 @@ import { retireD1ImportCustody } from '../../../../../modules/import-kit/src/d1/
 import type { D1CustodyRetirement, D1ImportContext } from '../../../../../modules/import-kit/src/d1/index.ts'
 import { peopleImportContext, PERSON } from './imports.server'
 import { personRedaction } from './person-redaction.server'
+import { CommandKeyError, commandKey, runOnce } from '../../../../../foundation/runtime/command-receipts'
 import { addNote, attachFile, createPerson, erasureRequestedStatement, exportPerson, personExists } from './repository.server'
 
 type Environment = { Bindings: Bindings; Variables: { session: Session; files: R2Bucket } }
@@ -174,11 +175,19 @@ export function peopleRoutes() {
   app.post('/api/people', async (context) => {
     const parsed = personInput.safeParse(await context.req.json().catch(() => null))
     if (!parsed.success) return context.json({ error: 'invalid_person' }, 400)
-    const id = await createPerson(context.env.DB, context.get('session').operatorId, parsed.data)
-    const mail = context.env.MAIL_FROM ? operatorMail(context.env) : undefined
-    if (mail) await mail.send({ deliveryId: newUlid(), from: context.env.MAIL_FROM!, to: [parsed.data.email], subject: 'You were added',
-      text: `Hello ${parsed.data.name}, an operator added you to this workspace.`, html: '', headers: {} })
-    return context.json({ id }, 201)
+    const actor = context.get('session').operatorId
+    const create = async () => {
+      const id = await createPerson(context.env.DB, actor, parsed.data)
+      const mail = context.env.MAIL_FROM ? operatorMail(context.env) : undefined
+      if (mail) await mail.send({ deliveryId: newUlid(), from: context.env.MAIL_FROM!, to: [parsed.data.email], subject: 'You were added',
+        text: `Hello ${parsed.data.name}, an operator added you to this workspace.`, html: '', headers: {} })
+      return { result: { id } }
+    }
+    // An Idempotency-Key makes a retried create return the first person, not a second one.
+    const key = context.req.header('idempotency-key')
+    if (key === undefined) return context.json((await create()).result, 201)
+    try { return context.json((await runOnce(context.env.DB, { actor, command: 'person.create', key: commandKey({ commandKey: key }) }, create)).result, 201) }
+    catch (error) { if (error instanceof CommandKeyError) return context.json({ error: 'idempotency_key', message: error.message }, error.status); throw error }
   })
   app.post('/api/people/:id/notes', async (context) => {
     const id = context.req.param('id')

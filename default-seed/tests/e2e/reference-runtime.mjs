@@ -11,6 +11,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
+import { readableActivity, refreshSafeCreate } from './people-page.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const email = 'operator@example.test'
@@ -271,6 +272,9 @@ async function main() {
     assert.equal(freshSsr.status, 200)
     assert.match(await freshSsr.text(), /Updated Worker boundaries/)
 
+    const execute = (sql) => command('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'default-seed-reference', '--local', '--persist-to', persistPath, '--config', config, '--command', sql])
+    const refreshSafe = await refreshSafeCreate({ baseUrl, cookie, persistPath })
+    const activity = await readableActivity({ baseUrl, cookie, persistPath, execute })
     const browser = await browserNavigationCheck(baseUrl, cookie)
     console.log(JSON.stringify({
       status: 'passed',
@@ -279,6 +283,8 @@ async function main() {
       privateTransport: '/_serverFn/<generated-id>',
       queueCompleted: true,
       cronPersisted: true,
+      refreshSafe,
+      activity,
       browser,
     }))
   } finally {

@@ -49,6 +49,10 @@ export default withDemo({
       const setup = await firstRunResponse(request, bindings, operatorAuth(bindings), { theme })
       if (setup) return setup
     }
+    if (path === '/app/people') {
+      const people = await (await import('./core/features/people/page.server')).peoplePageResponse(request, bindings)
+      if (people) return people
+    }
     return dispatch(request, () => api.fetch(request, requireBindings(bindings), execution), async () => {
       const url = new URL(request.url)
       if (bindings.AUTH_ORIGIN && (url.origin !== bindings.AUTH_ORIGIN || (request.headers.has('host') && request.headers.get('host')?.toLowerCase() !== new URL(bindings.AUTH_ORIGIN).host.toLowerCase()))) return new Response('Not found', { status: 404 })

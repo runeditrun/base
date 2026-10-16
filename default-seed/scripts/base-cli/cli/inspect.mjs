@@ -21,6 +21,7 @@ import { doorProtocol } from './door.mjs';
 import { savedOrigin } from './door-mode.mjs';
 import { probePnpm } from './pnpm-probe.mjs';
 import { deliveryDeclarationClauses } from './delivery-declarations.mjs';
+import { checkoutPlaceholderMarks } from './placeholder-mark.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
 // too old to record one). defaults: what a server start applies when the person
@@ -73,6 +74,8 @@ async function localState(project) {
 
 export async function check(project, explicitProfile) {
  const clauses = [], add = (id, ok, message) => clauses.push({ id, ok: Boolean(ok), ...(!ok ? { message } : {}) });
+ // A warning, never a failing clause: live run sites redeploy while seeds keep Base's mark.
+ let placeholderMarks = [];
  clauses.push(...await deliveryDeclarationClauses(project.root));
  for (const command of project.commands) add('SC-10.inputs.' + command.name, command.available, `Restore the declared inputs for ${command.name}.`);
  for (const loop of project.descriptor.loops ?? []) add('SC-10.loop.' + loop.id, !loop.required || loop.enabled, `Enable the required ${loop.id} loop or correct its declaration.`);
@@ -126,9 +129,10 @@ export async function check(project, explicitProfile) {
   add('SC-08.portability', typeof adapter?.portability?.export === 'function' && typeof adapter?.portability?.import === 'function', 'Adopt the reviewed mainline complete local portability API; archive support remains unavailable until then.');
   if (adapter?.devIdentity) for (const [id, ok, message] of await devIdentityClauses(project.root, adapter)) add(id, ok, message);
   for (const [id, ok, message] of await authCopyClauses(project.root)) add(id, ok, message);
+  placeholderMarks = await checkoutPlaceholderMarks(project.root, project.descriptor.project);
  }
  for(const issue of await localAiDiagnostics(project,process.env))add('AI.'+issue.feature,false,issue.code+': '+issue.message);
- return { clauses, ok: clauses.every(clause => clause.ok) };
+ return { clauses, ok: clauses.every(clause => clause.ok), placeholderMarks };
 }
 
 // Package mode: the exact pin, its lockfile entry, no vendored copy and no
