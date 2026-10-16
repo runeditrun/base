@@ -85,7 +85,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if (options.environment !== undefined && !/^[a-z][a-z0-9-]{0,39}$/.test(options.environment)) throw invalid('Provide a valid deployment environment name.');
  for (const key of ['setSecret', 'unsetSecret']) if (options[key] !== undefined && !/^[A-Z][A-Z0-9_]{0,63}$/.test(options[key])) throw invalid('Name a declared secret binding, such as SESSION_SECRET.');
  if(verb==='deploy'&&options.demo&&(options.site||['platform','image','bindAddress','httpPort','httpsPort','envFile','host','setSecret','unsetSecret'].some(key=>options[key]!==undefined)))throw invalid('--demo takes only --environment, --dry-run and --remove --yes: the hosted demo is its own Worker on demo.<domain>.');
- if(verb==='deploy'&&options.demo&&options.remove&&(options.dryRun||!options.yes))throw invalid(options.dryRun?'Use --remove and --dry-run on separate runs.':'deploy --demo --remove deletes the hosted demo\'s Worker, its demo.<domain> Custom Domain and its Container application. Add --yes to confirm.');
+ if(verb==='deploy'&&options.demo&&options.remove&&(options.dryRun||!options.yes))throw invalid(options.dryRun?'Use --remove and --dry-run on separate runs.':'deploy --demo --remove deletes the hosted demo\'s Worker, its demo.<domain> Custom Domain. Add --yes to confirm.');
  if ((options.remove || options.setSecret || options.unsetSecret) && options.site) throw invalid('--remove, --set-secret and --unset-secret act on the application Worker, not the run site.');
  if (options.origin !== undefined) {
   let url; try { url = new URL(options.origin); } catch { throw invalid('Provide a valid credential-free origin.'); }

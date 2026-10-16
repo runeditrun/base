@@ -33,13 +33,7 @@ The host forwards WebSocket upgrades through the same ingress and app session
 checks as HTTP. An app response with status 101 and a `WebSocketPair` is bridged
 in both directions, preserving text and binary messages, selected protocols,
 cookies and close codes. Refused upgrades retain their HTTP response; other
-upgrade protocols receive 400. Hosted demo routing selects the visitor's own
-container before forwarding the upgrade, including on declared secondary hosts.
-In a hosted demo (`RER_DEMO=1` with `RER_INGRESS_ORIGIN`), the workerd demo
-egress serves the app's own fetch of any of its ingress origins through this
-container's ingress, never the network: the front admits only the visitor's
-cookie, so this is how the app reads its own public pages. Other destinations
-keep the demo egress and its refusals.
+upgrade protocols receive 400.
 
 The workerd source boundary permits Durable Object definitions, including export
 aliases and indirect inheritance. Unbound definitions create no namespace. The
@@ -77,7 +71,7 @@ Managed mail's `MAIL_PROVIDER`, `MAIL_FROM` and `MAIL_RELAY_URL` are public
 configuration. Keep them in the mail spec's public variables and Wrangler `vars`,
 and remove them from `deploy.json` secrets. For migration, the image builder
 accepts those legacy secret declarations when the managed-mail spec declares them public,
-and prints that correction. Demo runtime settings override their image defaults.
+and prints that correction. Runtime settings override their image defaults.
 API keys, tokens and other secrets in image variables remain refused.
 
 `rer deploy --platform container --host ssh://user@host --env-file FILE` uses
@@ -89,13 +83,6 @@ headers from other peers are discarded. `RER_SSH_IDENTITY` and
 `RER_SSH_KNOWN_HOSTS` select explicit SSH files; neither key contents nor settings
 are logged. Local loopback origins support a disposable SSH Docker host for
 qualification. Owner hosting/account setup remains an owner step.
-
-An isolated front can set `RER_INGRESS_ORIGIN` to its primary public origin and
-`RER_INGRESS_ORIGINS` to a JSON array of allowed HTTPS origins. It must overwrite
-`x-rer-ingress-origin` on each forwarded request with its validated public
-origin. The container accepts that header only with a fixed primary origin and
-an exact allowlist match, then strips it before the app. Requests without the
-header, including health probes and owner claims, use the primary origin.
 
 A seed can package its own scoped Node runner with a declaration such as:
 

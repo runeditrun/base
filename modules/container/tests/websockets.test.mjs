@@ -31,19 +31,19 @@ async function fixture(t) {
  await writeFile(join(root,'container.json'), JSON.stringify({engine:'workerd',entry:'dist/server/index.mjs',config:{compatibility_date:'2026-09-01',assets:{run_worker_first:true}},migrations:{}}));
  const start = async visitor => {
   const data = join(root,visitor); await mkdir(data); await writeFile(join(data,'host.lock'),'');
-  const host = await startHost({root,data,port:0,automaticTicks:false,settings:{VISITOR:visitor,RER_INGRESS_ORIGIN:'https://demo.example.com',RER_INGRESS_ORIGINS:'["https://page.demo.example.com"]'}});
+  const host = await startHost({root,data,port:0,automaticTicks:false,settings:{VISITOR:visitor,TRUSTED_PROXY:'127.0.0.1'}});
   t.after(() => host.close());
   return {host, url:'ws://127.0.0.1:' + host.server.address().port};
  };
  return start;
 }
 function connect(t, url, visitor, options={}) {
- const ws = new WebSocket(url, ['unused','echo'], {headers:{cookie:'session='+visitor,origin:'https://demo.example.com',...options}});
+ const ws = new WebSocket(url, ['unused','echo'], {headers:{cookie:'session='+visitor,origin:'https://app.example.com','x-forwarded-host':'app.example.com','x-forwarded-proto':'https',...options}});
  t.after(() => ws.terminate()); return ws;
 }
 function refused(url, headers={}) {
  return new Promise((resolve,reject) => {
-  const req = request(url.replace('ws:','http:'), {headers:{connection:'Upgrade',upgrade:'websocket','sec-websocket-key':randomBytes(16).toString('base64'),'sec-websocket-version':'13',origin:'https://demo.example.com',...headers}}, res => {
+  const req = request(url.replace('ws:','http:'), {headers:{connection:'Upgrade',upgrade:'websocket','sec-websocket-key':randomBytes(16).toString('base64'),'sec-websocket-version':'13',origin:'https://app.example.com','x-forwarded-host':'app.example.com','x-forwarded-proto':'https',...headers}}, res => {
    let body='';res.setEncoding('utf8');res.on('data',chunk=>body+=chunk);res.on('end',()=>resolve({status:res.statusCode,body,headers:res.headers}));
   });req.on('error',reject);req.end();
  });
@@ -67,8 +67,7 @@ test('container upgrade refusals retain HTTP status and use HTTP ingress/auth ch
  let result=await refused(url+'/refuse',{cookie:'session=alice',upgrade:'WebSocket'});assert.equal(result.status,403);assert.equal(result.body,'Origin denied');
  result=await refused(url);assert.equal(result.status,401);assert.ok(result.headers['set-cookie']);
  result=await refused(url,{upgrade:'h2c'});assert.equal(result.status,400);
- result=await refused(url,{cookie:'session=alice','x-rer-ingress-origin':'https://foreign.example.com'});assert.equal(result.status,400);
- result=await refused(url,{cookie:'session=alice',origin:'https://evil.example.com','x-forwarded-host':'evil.example.com','x-forwarded-proto':'https'});assert.equal(result.status,403);
+ result=await refused(url,{cookie:'session=alice',origin:'https://evil.example.com'});assert.equal(result.status,403);
 });
 
 test('a socket authenticated for one visitor cannot enter another container', {timeout:30000}, async t => {

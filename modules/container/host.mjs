@@ -12,13 +12,11 @@ export async function startHost({ root = '/app', data = '/data', settings = proc
  const release = await recordVolumeOwner(data);
  let engine, server, timer, idleTimer, runner, closing, closeWebSockets, lastMinute = -1, lastRequest=Date.now();
  try {
-  const origins = settings.RER_INGRESS_ORIGINS === undefined ? undefined : JSON.parse(settings.RER_INGRESS_ORIGINS);
-  if (origins !== undefined && (!Array.isArray(origins) || origins.some(value => { try { const url = new URL(value); return typeof value !== 'string' || url.protocol !== 'https:' || url.origin !== value; } catch { return true; } }))) throw new Error('Invalid ingress origins');
   const create = manifest.engine === 'node' ? (await import('./node-engine.mjs')).nodeEngine : (await import('./worker-engine.mjs')).workerEngine;
   engine = await create({ root,data,manifest,settings,edge });
   const schedules = (manifest.config.triggers?.crons ?? []).map(cron => [cron,parseCron(cron)]);
   const tick = async time => { for (const [cron, expression] of schedules) if (cronMatches(expression, new Date(time))) await engine.scheduled({ cron,scheduledTime:time }); await engine.drain(); };
-  const requestFrom = req => incoming(req, { trustedProxy:settings.TRUSTED_PROXY, origin:settings.RER_INGRESS_ORIGIN, origins, maxRequestBytes:manifest.maxRequestBytes });
+  const requestFrom = req => incoming(req, { trustedProxy:settings.TRUSTED_PROXY, maxRequestBytes:manifest.maxRequestBytes });
   server = createServer(async (req, res) => {
    try {
     lastRequest=Date.now();

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Hosted demos run exclusively on native Worker Loader isolates with edge assets.
+  Existing Container demos upgrade unattended on the same Worker and hostname,
+  removing the owned container application and migrating its Durable Object classes.
+  Removed only the hosted demo image/runtime and placement code; portable container
+  hosting (`rer build/deploy --platform container`, Node/workerd and SSH) is unchanged.
+- Native demo bindings follow the seed configuration: isolated D1s, R2 prefixes,
+  durable queue batches, seed DO facets and UTC cron delivery. Seed DO alarms
+  are scheduled by the visitor supervisor; own-host reads keep visitor context,
+  and a narrow resource bridge isolates seeds from front admission and diagnostics.
+
 ## 0.2.28
 
 - `rer release` of a GitHub source uses the exact source commit's completed successful **Verify** run instead of re-running the seed's full verification locally. Only a `push` or `workflow_dispatch` run on the default branch, or on the version's release tag when that tag resolves remotely to the same commit, qualifies; PR runs, other SHAs, repositories, branches and unsuccessful runs do not. The receipt and site provenance record the repository, commit, workflow, run id and URL. The producer still installs frozen dependencies, runs the committed `build` script, scans publication history and packages locally; a local install or build failure still blocks. A missing green Verify, or a GitHub API or authentication failure, blocks and names the exact SHA.
