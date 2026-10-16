@@ -5,6 +5,22 @@ including Base's default seed and composed foundation editions. Independently
 authored projects may use this CLI and installer, but RER does not require
 either; owners keep their own supported operations and integration choices.
 
+## Browser-free agent check
+
+After the pinned `pnpm install --frozen-lockfile`, run `pnpm run verify:agent`.
+The default seed and foundation export template run, in order: `build` (generates
+route/build inputs before checking types), `typecheck`, `source:check` (offline,
+frozen dependency-lock validation, with install scripts disabled), then
+`verify:base-source` (`rer check --profile first-party`: the command contract,
+recorded CLI/onboarding source inventory and recorded auth-copy custody).
+These templates have no edition-authoring source lock to refresh. An edition
+that adds one must declare `source:lock` and refresh it after its build and
+before checking it in `source:check`; never refresh custody records to hide drift.
+Platform recognizes `verify:agent` ahead of `verify:fast`, and also runs declared
+source/custody checks separately. No browser or external network is needed after
+the pinned install. This is not runtime, browser, migration, deployment or full
+product verification: full `rer verify` stays in trusted CI.
+
 ## Commands and flags
 
 Run from the project root, or use `--cwd PATH`. Every new verb accepts `--help`, `--cwd PATH`, `--non-interactive` and `--json`. Help exits before tools, configuration, adapters or effects run. Unknown flags, missing flag values and invalid values fail before effects. A single `--` separator is accepted for package-script forwarding. Flags belong only to the verbs listed below; there is no catch-all pass-through in the first-party profile.
