@@ -77,7 +77,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ ...workerConfig, durable_objects: { bindings: [{ name: 'COUNTER', class_name: 'MissingCounter' }] } }));
  const missingClass = await rer();
  assert.equal(missingClass.code, 1, missingClass.stdout + missingClass.stderr);
- assert.match(missingClass.stdout + missingClass.stderr, /configured Durable Object class: MissingCounter/);
+ assert.match(missingClass.stdout + missingClass.stderr, /cannot bind COUNTER:.*MissingCounter/);
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify(workerConfig));
 
  for (const value of [undefined, '', 'Page.' + primary, 'outside.example.test', primary + '.outside.test', 'other' + primary,
