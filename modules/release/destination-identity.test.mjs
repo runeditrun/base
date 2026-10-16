@@ -100,7 +100,7 @@ print(json.dumps([resolver.resolve(sys.argv[2]), resolver.resolve(sys.argv[2]),
 function run(f, mode) {
   const result = spawnSync(process.execPath, [cli, 'release', '--repo', f.repo,
     '--project', project, '--repository', url + '.git', '--output', f.options.output,
-    '--dry-run', ...mode.flags], { encoding: 'utf8', env: f.env });
+    '--dry-run', '--local-verify', ...mode.flags], { encoding: 'utf8', env: f.env });
   assert.equal(result.stderr, '');
   assert.ok(!result.stdout.includes('private-gh-diagnostic'));
   const receipt = JSON.parse(result.stdout);
