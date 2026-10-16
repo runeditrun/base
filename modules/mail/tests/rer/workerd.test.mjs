@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { createWorker } from '../runtime/harness.mjs';
 
 const signIn = { deliveryId: 'sign-in-1', from: 'Support <support@example.test>', to: ['reader@example.test'], subject: 'Your sign-in link',
@@ -67,6 +68,48 @@ test('a Worker sends sign-in and threaded subscriber notices through the rer rel
     assert.deepEqual(relay.at(-1).body, { to: 'reader@example.test', subject: notice.subject, text: notice.text,
       listId: headers['lIsT-iD'], listArchive: headers['list-archive'], listHelp: headers['LIST-HELP'],
       inReplyTo: headers['in-reply-to'], references: headers.references });
+    assert.equal(relay.length, 4);
+  } finally { await worker.dispose(); }
+});
+
+// Platform c1e3ade's keyed Message-ID: RFC 4648 base32 of sha256(installation + ':' + key), first 32 characters.
+function relayMessageId(messageKey) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let local = '', buffer = 0, bits = 0;
+  for (const byte of createHash('sha256').update('installation-1:' + messageKey).digest().subarray(0, 20)) {
+    buffer = (buffer << 8) | byte; bits += 8;
+    while (bits >= 5) { bits -= 5; local += alphabet[(buffer >>> bits) & 31]; }
+  }
+  return `<${local}@mail.rer.example.test>`;
+}
+
+test('a Worker threads incident updates on the Message-ID the relay assigned to the first notice', async () => {
+  const relay = [];
+  const worker = await createWorker('tests/rer/relay-worker.mjs', ['index.mjs'], async request => {
+    const body = await request.json();
+    relay.push(body);
+    return Response.json({ accepted: true, messageId: relayMessageId(body.messageKey) }, { status: 202 });
+  });
+  const send = async message => (await worker.dispatchFetch('https://mail.test', { method: 'POST', body: JSON.stringify(message) })).json();
+  const incident = { deliveryId: 'incident-7-opened', from: 'Status <status@example.test>', to: ['oncall@example.test'],
+    subject: 'Incident 7: elevated errors', text: 'We are investigating elevated errors.', messageKey: 'incident:7:opened' };
+  try {
+    const root = relayMessageId(incident.messageKey);
+    assert.deepEqual(await send(incident), { provider: 'rer', status: 'accepted', providerMessageId: root });
+    const update = { ...incident, deliveryId: 'incident-7-update-1', text: 'A fix is rolling out.', messageKey: 'incident:7:update-1',
+      headers: { 'In-Reply-To': root, References: root } };
+    assert.deepEqual(await send(update), { provider: 'rer', status: 'accepted', providerMessageId: relayMessageId(update.messageKey) });
+    assert.deepEqual(relay, [
+      { to: 'oncall@example.test', subject: incident.subject, text: incident.text, messageKey: incident.messageKey },
+      { to: 'oncall@example.test', subject: incident.subject, text: update.text, messageKey: update.messageKey, inReplyTo: root, references: root },
+    ]);
+    // The relay's own messageKey rule, refused before any request; a raw Message-ID stays refused.
+    for (const messageKey of ['', 'k'.repeat(201), 'incident 7', 'incident/7', 'incident@7', 'Störung-7', 7, null]) {
+      assert.deepEqual(await send({ ...incident, messageKey }), { error: 'invalid_message_key' }, JSON.stringify(messageKey));
+    }
+    assert.deepEqual(await send({ ...incident, headers: { 'Message-ID': root } }), { error: 'unsupported_provider_setting' });
+    assert.equal((await send({ ...incident, messageKey: 'k'.repeat(200) })).status, 'accepted');
+    assert.equal((await send({ ...incident, messageKey: 'A-z_0.9:-' })).status, 'accepted');
     assert.equal(relay.length, 4);
   } finally { await worker.dispose(); }
 });
