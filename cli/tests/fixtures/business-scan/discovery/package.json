@@ -1,0 +1,11 @@
+{
+  "name": "synthetic-business-app",
+  "private": true,
+  "dependencies": {
+    "@stripe/stripe-js": "^5.0.0",
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

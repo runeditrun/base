@@ -336,3 +336,20 @@ or deploy hook. Failure reports distinguish deployment, owner claim and token
 retirement and preserve the environment, checkout and env-file in recovery
 commands. Retirement can be finished with `rer deploy --unset-secret SETUP_TOKEN`
 plus the same `--environment`, `--env-file` and `--cwd` arguments.
+
+## Local business signals
+
+`rer business scan [DIR...] [--json]` reads local source and configuration names;
+with no directories it scans the current directory. It needs no RER project
+declaration, dependency installation, network access or command execution.
+Both forms write one JSON document with schema `rer-business-signals/1`,
+`source: "local"`, a `signals` array and a numeric `withheld` count. Each signal
+has `kind`, `value` (a name), relative `locator`, repository basename `repo`,
+`class` (`live-use` or `trace` for examples/comments), and `observedAt`.
+
+This is names-only discovery: configuration values and file contents are not
+emitted. Denied secret files are never opened; their `secret-file` observations
+contain only the filename, path, size and modification time. Sensitive-looking
+outbound names are dropped entirely and counted in `withheld`. Symlinks, build
+outputs and dependency trees are skipped. Unsupported syntax yields no signal;
+an empty result is not proof that a repository has no business dependencies.

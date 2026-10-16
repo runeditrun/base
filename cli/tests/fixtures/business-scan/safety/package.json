@@ -1,0 +1,14 @@
+{
+  "name": "synthetic-safety-app",
+  "dependencies": {
+    "synthetic-safe-library": "1.0.0",
+    "sk_live_fixture_synthetic_0123456789abcdefghijk": "1.0.0",
+    "rk_live_fixture_synthetic_0123456789abcdefghijk": "1.0.0",
+    "AKIASYNTHETICFIXTURE0": "1.0.0",
+    "ghp_fixture_synthetic_0123456789abcdefghijk": "1.0.0",
+    "gho_fixture_synthetic_0123456789abcdefghijk": "1.0.0",
+    "github_pat_fixture_synthetic_0123456789abcdefghijk": "1.0.0",
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMtZml4dHVyZSJ9.synthetic_fixture_signature": "1.0.0",
+    "synthetic_H7qR2mV9cX4pL8zN5tY1bK6wF0aD3sJ7uE9rG2hQ8vC4xZ5": "1.0.0"
+  }
+}

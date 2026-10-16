@@ -1,0 +1,9 @@
+{
+  "SYNTHETIC_PUBLIC_SETTING": "synthetic-config-value-never-export",
+  "mail": {
+    "transport": "synthetic-nested-value-never-export"
+  },
+  "kind": "syntheticprivatekind",
+  "Type": "Synthetic::Private::Value",
+  "image": "synthetic-private-registry.invalid/fixture/image:private"
+}

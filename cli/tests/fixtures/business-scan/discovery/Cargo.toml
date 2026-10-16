@@ -1,0 +1,5 @@
+[package]
+name = "synthetic-rust-app"
+version = "0.0.0"
+[dependencies]
+reqwest = "0.12"
