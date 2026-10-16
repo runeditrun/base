@@ -87,7 +87,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   await stateSafety(project);
   const {localOperation}=await shared('local/operation.mjs');
   try{operation=await localOperation(project.root);}catch(error){throw refuse(error.message);}
-  const ownership=await refuseLegacyProcess(project,{verb:options.verb,operation});
+  const ownership=await refuseLegacyProcess(project,{verb:options.verb,operation,isolated:options.demo});
   if(ownership?.lockProof)out.progress('Local process inspection did not answer; continuing with the exclusive checkout launch lock.\n');
   const {recoverInterrupted}=await shared('local/recovery.mjs');await recoverInterrupted(project.root,operation);
   const {loadInstallerSeed}=await shared('setup-manifest.mjs');

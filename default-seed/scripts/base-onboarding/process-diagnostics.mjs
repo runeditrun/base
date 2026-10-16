@@ -215,9 +215,7 @@ export async function localProcessConflict(root,savedOrigin,context=inspectionCo
    return {pid:held.pid,command:command||'process',reason:'the canonical local state'};
   }
  }
- let all;
- try{all=await listeners(undefined,context);}
- catch(error){if(!uncheckedInspection(error)||context.verb==='reset')throw error;return;}
+ const all=await listeners(undefined,context);
  const cwdRecords=process.platform!=='linux'&&all.length?records(await run(lsof,['-nP','-b','-w','-a','-p',all.map(row=>row.pid).join(','),'-d','cwd','-Fpn'],context)):[];
  let port;try{const url=new URL(savedOrigin);port=Number(url.port||80);}catch{}
  for(const row of all){
@@ -228,6 +226,9 @@ export async function localProcessConflict(root,savedOrigin,context=inspectionCo
   // A listener running somewhere else is another program's or another checkout's
   // server: it does not use this checkout's state, so it only blocks the port.
   if(onSavedPort&&places.length&&!places.some(place=>place===root||place.startsWith(root+'/')))continue;
-  if(onSavedPort||inCheckout)return {pid:row.pid,command:await processName(row.pid,context),reason:onSavedPort?`saved local port ${port}`:'this checkout'};
+  if(onSavedPort||inCheckout){
+   let command;try{command=await processName(row.pid,context);}catch(error){if(!uncheckedInspection(error))throw error;}
+   return {pid:row.pid,command:command||'process',reason:onSavedPort?`saved local port ${port}`:'this checkout'};
+  }
  }
 }
