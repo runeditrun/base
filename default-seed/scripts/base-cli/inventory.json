@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26-dev.g271b4768",
+  "cliVersion": "0.2.26-dev.g87a55b49",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -387,7 +387,11 @@
     },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
-      "sha256": "769e46411201eebc9a0fbfaf782856e2c4c4c9c884aa5a8afe1799ce5b5082aa"
+      "sha256": "dd5dfe2003235f81eddce8e5a345e3462f1e101c1ab15c9347a308f8b2d998b3"
+    },
+    "cli/demo-native.mjs": {
+      "source": "cli/demo-native.mjs",
+      "sha256": "66b0180895c0372420bc8fce02f75117bb0848f1314c45d7b5d43dda160b0c33"
     },
     "cli/demo-removal-provider.mjs": {
       "source": "cli/demo-removal-provider.mjs",
@@ -1017,6 +1021,42 @@
       "source": "modules/demo-host/measurement.mjs",
       "sha256": "6e8a755c0395d672b34f79bd44070e9a8959f97a6300abecc2dbebde98975cc2"
     },
+    "modules/demo-host/native/build.mjs": {
+      "source": "modules/demo-host/native/build.mjs",
+      "sha256": "795276d536005a76b9820a78de1ab08327f987fab1f27d5208b030d3c398b9c3"
+    },
+    "modules/demo-host/native/ingress.mjs": {
+      "source": "modules/demo-host/native/ingress.mjs",
+      "sha256": "7c2f162aef2e5194a7a8babb7aeaed233a56e5d9f47cd98bc555970946c7752f"
+    },
+    "modules/demo-host/native/plan.mjs": {
+      "source": "modules/demo-host/native/plan.mjs",
+      "sha256": "2922ce96ef156def228da0f268c334faf7d9b9dcca2b12d50df47dcef55e1afa"
+    },
+    "modules/demo-host/native/registry.mjs": {
+      "source": "modules/demo-host/native/registry.mjs",
+      "sha256": "c401493f7641da7be14609a69f9a79b4fc5760026a1db9d6e6aa232ba2ab1009"
+    },
+    "modules/demo-host/native/remove.mjs": {
+      "source": "modules/demo-host/native/remove.mjs",
+      "sha256": "970a860733030a62b257eeb81754b2953f7f8f31c18ee197fc702ac6b2d499ee"
+    },
+    "modules/demo-host/native/resources.mjs": {
+      "source": "modules/demo-host/native/resources.mjs",
+      "sha256": "a56d626d53d2b3878656d0bc69191ec1bf0a7292fe84b025dacf3ad397f12c39"
+    },
+    "modules/demo-host/native/session.mjs": {
+      "source": "modules/demo-host/native/session.mjs",
+      "sha256": "c6d465d6c8b5e6ee6d7411d4e1554a39bafc115cf087864a6f2b16f1dfe3eef5"
+    },
+    "modules/demo-host/native/visitor.mjs": {
+      "source": "modules/demo-host/native/visitor.mjs",
+      "sha256": "ed495c86ddf01ac1c68468c1f544a57c31c07d08685f8f61ee61c9227cea2967"
+    },
+    "modules/demo-host/native/worker.mjs": {
+      "source": "modules/demo-host/native/worker.mjs",
+      "sha256": "2a5cef4d1d51b42e8ed73906e04aabc7143509743661a665844b25edfbedc9c6"
+    },
     "modules/demo-host/operator.mjs": {
       "source": "modules/demo-host/operator.mjs",
       "sha256": "24a0a516d46c41c8896f96ea3746e1f949f00f52f1ae78d00aa6b65382da38bf"
@@ -1259,7 +1299,7 @@
     },
     "modules/deploy-kit/provider-transport.mjs": {
       "source": "modules/deploy-kit/provider-transport.mjs",
-      "sha256": "a5768fc0f3d6125aceb5b01fe800d9a3ba3c1507cf12dd9b7cc5346c6cb47a7a"
+      "sha256": "7891687d8f2d6380a867fbd6a9de94760c573c5feb6ef9608360a8b32343a071"
     },
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",

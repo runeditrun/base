@@ -22,6 +22,7 @@ import { MEASUREMENT_COOKIE, MEASUREMENT_HEADER, TESTING_SECRET } from '../modul
 export async function demoHostCommand(project, options, store, signal, out, operation) {
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Missing or malformed ${path}.`); } };
  const app = await read(project.adapter.deploy?.declaration ?? 'deploy.json'), declaration = await read('deploy-demo.json');
+ if (declaration.mode === 'native') return (await import('./demo-native.mjs')).nativeDemoCommand(project, options, store, signal, out, operation, app, declaration);
  if (!(app.platforms ?? ['workers']).includes('container')) throw refuse('A hosted demo runs the seed\'s container image: declare "container" in deploy.json platforms first.');
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, hostVariables: app.container?.hostVariables, declaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }

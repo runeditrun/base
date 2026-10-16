@@ -226,3 +226,21 @@ carries no record: deploy it once with this rer, then remove it.
    Edit** on the account.
 4. **`RUN_DEMO_DEPLOY=true`** as a repository variable when the demo should go
    live. Until then nothing deploys.
+
+### Native hosted mode (prototype)
+
+Set `"mode": "native"` in `deploy-demo.json`, then use `rer deploy --demo`.
+This builds the production Worker once, stores its bundle privately with the
+front Worker's assets, and creates a guarded Worker plus fresh migrated D1 and
+R2 buckets for each visitor. Hashed browser assets come from the front edge
+with a year-long immutable cache. Owner claim, `withDemo` sample data and
+`RER_DEMO` effects retain their existing behavior. A Durable Object alarm
+removes each visitor after 60 minutes or 15 idle minutes; the front's minute
+cron delivers the seed's scheduled handler and sweeps expired orphan resources.
+The API token is a front Worker secret and needs Workers, D1 and (if declared)
+R2 edit permissions. Ordinary Worker script and D1 account limits bound
+concurrency; this mode does not buy Workers for Platforms. It currently
+supports D1/R2 seeds; queues, KV, services and app Durable Objects are refused.
+`rer deploy --demo --remove --yes` removes visitors, storage and host DO data.
+A seed must itself allow real public checks under `RER_DEMO`; Uptime main
+currently opts out of its hosted runner in that mode.
