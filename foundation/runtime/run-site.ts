@@ -15,11 +15,16 @@ export interface RunData {
   name: string
   /** The public source repository: "https://github.com/just-every/cradle". */
   repository: string
-  /** The one-line start, led with on the Run page: "npx -y @runeditrun/rer dev just-every/cradle". */
+  /**
+   * The start line for someone who already has Node 22 or later:
+   * "npx -y @runeditrun/rer dev just-every/cradle". The Run page's step 2 is the
+   * same command without npx ("rer dev just-every/cradle"), which runs on what
+   * the installer in step 1 gives and nothing else.
+   */
   clone: string
   /** The folder the start line clones into, where `rer dev` restarts it: "cradle". */
   folder: string
-  /** Platforms and tools: "Needs Node 22 or later and pnpm 10.12.4, on macOS, Linux or Windows with WSL2." */
+  /** Platforms and tools: "Runs on macOS, Linux or Windows with WSL2, with git. The installer brings Node when it is missing, and rer brings pnpm." */
   requirements: string
   /** "MIT". */
   licence: string
@@ -30,13 +35,17 @@ export interface RunData {
 }
 export interface HostedOption { title: string; body: string; href: string; action: string }
 
-/** The global install of rer, offered as the alternative to the npx start line; the same for every seed. */
-export const installRer = { script: 'curl -fsSL https://runeditrun.com/install.sh | sh', npm: 'npm install -g @runeditrun/rer' }
+/** Step 1 of every Run page: the installer, which brings its own Node when there is none. */
+export const installRer = 'curl -fsSL https://runeditrun.com/install.sh | sh'
+const npxStart = 'npx -y @runeditrun/rer '
+/** Step 2: the clone line run by the rer the installer put in ~/.local/bin, not by npx. */
+const rerStart = (run: RunData) => `rer ${run.clone.slice(npxStart.length)}`
 
 const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))
 
 export function checkRunData(run: RunData): RunData {
   for (const key of ['name', 'clone', 'folder', 'requirements', 'licence'] as const) if (typeof run[key] !== 'string' || !run[key].trim()) throw new Error(`Run data needs ${key}.`)
+  if (!run.clone.startsWith(`${npxStart}dev `)) throw new Error(`Run data clone is the npx start line: ${npxStart}dev <owner>/<repo>.`)
   if (!/^https:\/\/[^\s"<>]+$/.test(run.repository)) throw new Error('Run data repository is an https URL.')
   if (!/^[A-Za-z0-9._/-]+$/.test(run.folder) || run.folder.split('/').some(part => !part || part === '..')) throw new Error('Run data folder is a relative folder.')
   if (typeof run.docs !== 'boolean' || !Array.isArray(run.hosted)) throw new Error('Run data declares docs and hosted.')
@@ -107,11 +116,12 @@ export function runPageHtml(identity: EditionIdentity, run: RunData): string {
   checkIdentity(identity); checkRunData(run)
   const name = escape(run.name), source = escape(run.repository.replace(/^https:\/\//, ''))
   const hosted = run.hosted.map(option => `<li class="step option"><div class="body"><h2>${escape(option.title)}</h2><p>${escape(option.body)}</p><p class="go"><a href="${escape(option.href)}">${escape(option.action)}</a></p></div></li>`).join('')
-  const body = `${header(identity, run)}<main><div class="intro"><h1>Run ${name} on your computer.</h1><p class="sub">100% free and open source. One line, and ${name} opens in your browser.</p></div>`
-    + `<ol class="steps"><li class="step"><span class="num" aria-hidden="true">1</span><div class="body"><h2>Start ${name}</h2>${codeBlock([run.clone], `Start ${run.name}`)}`
-    + `<p class="note">It installs rer, gets ${name} and runs <code>rer dev</code>, which installs everything, makes you the owner and prints a link that opens ${name} signed in.</p></div></li>`
-    + `<li class="step"><span class="num" aria-hidden="true">2</span><div class="body"><h2>Start it again later</h2>${codeBlock([`cd ${run.folder} && rer dev`], `Start ${run.name} again`)}`
-    + `<p class="alt">Prefer rer installed globally first? <code>${escape(installRer.script)}</code> or <code>${escape(installRer.npm)}</code>, then run <code>rer dev</code> in the folder.</p></div></li>${hosted}</ol>`
+  const body = `${header(identity, run)}<main><div class="intro"><h1>Run ${name} on your computer.</h1><p class="sub">100% free and open source. Two lines, and ${name} opens in your browser.</p></div>`
+    + `<ol class="steps"><li class="step"><span class="num" aria-hidden="true">1</span><div class="body"><h2>Install rer</h2>${codeBlock([installRer], 'Install rer')}`
+    + `<p class="note">It installs rer for you alone, with its own Node if you have no Node 22 or later. It changes no shell settings: if it prints an <code>export PATH=…</code> line, run that line before step 2.</p></div></li>`
+    + `<li class="step"><span class="num" aria-hidden="true">2</span><div class="body"><h2>Start ${name}</h2>${codeBlock([rerStart(run)], `Start ${run.name}`)}`
+    + `<p class="note">rer gets ${name}, installs everything, makes you the owner and prints a link that opens ${name} signed in. To start it again later: <code>${escape(`cd ${run.folder} && rer dev`)}</code></p>`
+    + `<p class="alt">Already have Node 22 or later? <code>${escape(run.clone)}</code> does both steps in one line.</p></div></li>${hosted}</ol>`
     + `<footer class="facts"><p>${escape(run.requirements)}</p><p>Source: <a href="${escape(run.repository)}">${source}</a> · ${escape(run.licence)} licence</p></footer></main>`
   return document(identity, `Run ${run.name}`, `Run ${run.name} on your computer. 100% free and open source.`, RUN, body, COPY_SCRIPT)
 }

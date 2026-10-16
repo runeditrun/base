@@ -151,21 +151,24 @@ Run page string and command in one `RunData` value (`src/site/run.ts` or
 | `repository` | `https://github.com/just-every/cradle` | `https://github.com/just-every/uptime-monitor` |
 | `clone` | `npx -y @runeditrun/rer dev just-every/cradle` | `npx -y @runeditrun/rer dev just-every/uptime-monitor --dir uptime` |
 | `folder` | `cradle` | `uptime` |
-| `requirements` | `Needs Node 22 or later and pnpm 10.12.4, on macOS, Linux or Windows with WSL2.` | same |
+| `requirements` | `Runs on macOS, Linux or Windows with WSL2, with git. The installer brings Node when it is missing, and rer brings pnpm.` | same |
 | `licence` | `MIT` | `MIT` |
 | `docs` | `true` once `/docs` is built | `true` |
 | `hosted` | `[]` | `[]` |
 
 The Run page then reads, exactly: "Run <Seed> on your computer."; "100% free and
-open source. One line, and <Seed> opens in your browser."; step 1 **Start <Seed>**,
-the `clone` line (the one-line start), "It installs rer, gets <Seed> and runs
-`rer dev`, which installs everything, makes you the owner and prints a link that
-opens <Seed> signed in."; step 2 **Start it again later**, `cd <folder> && rer dev`,
-"Prefer rer installed globally first? `curl -fsSL
-https://runeditrun.com/install.sh | sh` or `npm install -g @runeditrun/rer`, then
-run `rer dev` in the folder."; then the requirements line and "Source:
-<repository> · MIT licence". `clone` is the start command the README's "Run
-locally" shows, so the Run page and the README agree. `hosted` is the slot for hosted options, shown as cards under step 2
+open source. Two lines, and <Seed> opens in your browser."; step 1 **Install rer**,
+`curl -fsSL https://runeditrun.com/install.sh | sh`, "It installs rer for you
+alone, with its own Node if you have no Node 22 or later. It changes no shell
+settings: if it prints an `export PATH=…` line, run that line before step 2.";
+step 2 **Start <Seed>**, the `clone` line without `npx -y @runeditrun/` (`rer dev
+just-every/cradle`), "rer gets <Seed>, installs everything, makes you the owner
+and prints a link that opens <Seed> signed in. To start it again later: `cd
+<folder> && rer dev`", and "Already have Node 22 or later? <clone> does both steps
+in one line."; then the requirements line and "Source: <repository> · MIT
+licence". Step 2 runs on what the installer put on PATH alone, without npx. A
+README's "Run locally" shows the same two lines, so the Run page and the README
+agree. `hosted` is the slot for hosted options, shown as cards under step 2
 when RER hosting opens; leave it empty until then.
 
 `src/site/pages.tsx` exports `sitePages({ styles })`. Every CSS file your
