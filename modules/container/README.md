@@ -73,10 +73,10 @@ SQLite stays on the Docker host's local filesystem; host-shared checkout mounts
 are not used for database storage. Back up with export before deleting a volume. Build
 uses the ordinary private-file custody and command admission boundary. Secrets
 are provided at runtime, never baked into the image or transferred in archives.
-Managed mail's `MAIL_PROVIDER` and `MAIL_FROM` are public configuration. Keep
-them in the mail spec's public variables and Wrangler `vars`, and remove them
-from `deploy.json` secrets. For migration, the image builder accepts those two
-legacy secret declarations when the managed-mail spec declares them public,
+Managed mail's `MAIL_PROVIDER`, `MAIL_FROM` and `MAIL_RELAY_URL` are public
+configuration. Keep them in the mail spec's public variables and Wrangler `vars`,
+and remove them from `deploy.json` secrets. For migration, the image builder
+accepts those legacy secret declarations when the managed-mail spec declares them public,
 and prints that correction. Demo runtime settings override their image defaults.
 API keys, tokens and other secrets in image variables remain refused.
 

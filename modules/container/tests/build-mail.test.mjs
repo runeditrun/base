@@ -26,7 +26,7 @@ test('managed mail public image defaults tolerate legacy deploy secrets, runtime
  const specInputs={mail:{providers:['rer']},publicVariableNames:Object.keys(vars),secretNames:[],optionalSecretNames:['MAIL_API_KEY']};
  const packaging=()=>writeFile(join(root,'packaging.json'),JSON.stringify({artifact:{specInputs}}));
  await packaging();
- const declaration={secrets:['MAIL_FROM','MAIL_PROVIDER','MAIL_API_KEY'].map(binding=>({binding,environment:binding}))};
+ const declaration={secrets:['MAIL_FROM','MAIL_PROVIDER','MAIL_RELAY_URL','MAIL_API_KEY'].map(binding=>({binding,environment:binding}))};
  const image=join(root,'image');
  const build=()=>buildContainer(root,{engine:'workerd',declaration,output:image});
  await build();

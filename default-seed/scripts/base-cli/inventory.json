@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.25-dev.gd39055d1",
+  "cliVersion": "0.2.25-dev.g9084a38d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -823,7 +823,7 @@
     },
     "modules/container/README.md": {
       "source": "modules/container/README.md",
-      "sha256": "6843c0ee4a41243c9c7172ed87cfe35525ebc686daac18c36de90ebbe6cd84af"
+      "sha256": "a261f138f9db82cf207cb22bb66eddd9a545214a9876a2c4cbe7e3e585291559"
     },
     "modules/container/adapters/d1.mjs": {
       "source": "modules/container/adapters/d1.mjs",
@@ -891,7 +891,7 @@
     },
     "modules/container/image-variables.mjs": {
       "source": "modules/container/image-variables.mjs",
-      "sha256": "bc5dff0d8f6deae55cab37610b84eb9a0216558e5392848fdd5677dac545a746"
+      "sha256": "ce3d83329987f29a125be964156b4b2e01a6b59f4a0f5de25ad78cf0371c1158"
     },
     "modules/container/import-graph.mjs": {
       "source": "modules/container/import-graph.mjs",

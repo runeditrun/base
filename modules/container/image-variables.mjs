@@ -18,7 +18,7 @@ export async function checkImageVariables(root,vars,secrets) {
   const names=spec.publicVariableNames ?? Object.keys(spec.publicVariables ?? {});
   const publicVariables=Object.fromEntries(Object.entries(vars).filter(([name])=>names.includes(name)));
   validateMailSpec({...spec,publicVariables,secretNames:spec.secretNames ?? []});
-  for (const name of ['MAIL_PROVIDER','MAIL_FROM']) if (typeof publicVariables[name] === 'string') publicMail.add(name);
+  for (const name of ['MAIL_PROVIDER','MAIL_FROM','MAIL_RELAY_URL']) if (typeof publicVariables[name] === 'string') publicMail.add(name);
  }
  for (const {binding} of overlaps) if (!publicMail.has(binding) || privateNames.has(binding)) {
   throw new Error('Secret declared as an image variable: '+binding);
