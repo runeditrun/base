@@ -336,8 +336,10 @@ manager's piped input) into the OS keychain and prints only `sentry:read`.
 `rer business next` returns one locally templated classification or owner link,
 or `Nothing yet`, within 60 seconds. It never reflects server instructions or
 raw evidence. Owner items cannot be answered from this CLI.
-`rer business answer ID uses|sells|unknown` submits a task-scoped classification
-through MCP; the server remains responsible for accepting its completion.
+`rer business answer ID uses|sells|both|product-dependency` submits a task-scoped
+classification through MCP. It echoes the question's `vendor_id` and sends
+exactly `{vendor_id, usage, confidence: 1}`. The owner confirms the inventory in
+the browser.
 `rer business token` emits an MCP Authorization header object for direct use as
 a headers helper. That output is a short-lived credential: connect it directly
 to the MCP client and do not paste it into an agent transcript.
@@ -356,17 +358,18 @@ resume from its server checkpoint without rescanning a changed tree. Snapshots
 are removed after completion. A missing snapshot for an acknowledged page is
 an explicit error. Revocation stops the supervisor on its next 401.
 
-**Remaining integration blockers:** vendor grants currently have zero quota and
-an unavailable seed destination; the protocol does not yet supply vendor inputs
-or adapter resume state. Such tasks receive a connected-runner-required event
-and are released before a vendor key is read. Background mode parks those tasks;
-`run --once` reports the dependency as a command failure. MCP classification enum
-outputs are advertised by its schema but completion rejects nonempty outputs;
-a refused answer is released. The current server also filters owner items out
-of `next_question`; the CLI can render owner links when supplied, and always
-refuses owner answers. Vendor uploading and enum completion are not claimed to
-work end to end until those server contracts are connected.
+**Remaining export blockers:** grants for linked, configured targets now resolve
+to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare
+`upload_authorization: seed_import_grant_required` but supply no signed seed
+import authority. Vendor task inputs, adapter resume checkpoints and the chunk
+assembly/upload contract are also absent. The CLI releases these tasks before
+reading a vendor key; background mode parks them, and `run --once` reports the
+dependency as a command failure. Vendor export remains blocked.
+
+The current MCP `next_question` filters out owner items. When an owner summary
+is supplied, the CLI displays its browser link and refuses to answer it.
 
 The four deterministic adapter implementations and their native output formats
 are described in [the adapter guide](cli/business/vendors/README.md). Their
-presence does not enable export without a granted seed upload destination.
+presence does not enable export until the seed import authority and remaining
+transport contracts are connected.

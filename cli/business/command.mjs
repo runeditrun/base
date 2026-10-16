@@ -10,7 +10,7 @@ const usage = `Usage: rer business VERB
                                  Pair, compare a number in your browser, then opt in to a service
   run [--once]                   Run consented local discovery; vendor upload integration pending
   next                           Return one templated question or nothing yet within 60 seconds
-  answer ID ENUM                 Submit an agent classification: uses, sells, unknown
+  answer ID ENUM                 Classification: uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint

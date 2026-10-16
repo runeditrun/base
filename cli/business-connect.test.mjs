@@ -47,9 +47,17 @@ async function server(t) {
    const name = body.params.name;
    if (name === 'answer') {
     const args = body.params.arguments;
-    if (args.action === 'complete') return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: { status: 'action_unavailable' }, isError: true } });
+    const question = state.tasks.find(task => task.task_id === args.task_id);
+    if (args.action === 'complete') {
+     const output = args.outputs;
+     const valid = output && Object.keys(output).sort().join(',') === 'confidence,usage,vendor_id'
+      && output.vendor_id === question?.question?.vendor_id && ['uses','sells','both','product-dependency'].includes(output.usage)
+      && Number.isFinite(output.confidence) && output.confidence >= 0 && output.confidence <= 1;
+     if (!valid || state.refuseQuestion) return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: { status: 'action_unavailable' }, isError: true } });
+     state.questionCompleted = output;
+    }
     if (args.action === 'release') state.questionReleased = true;
-    return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: { task_id: 'question1', kind: 'classify.row', state: 'leased', runner: 'executor', fence: 1, grant_id: 'question-grant' }, isError: false } });
+    return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: { ...question, state: args.action === 'complete' ? 'done' : 'leased', fence: 1, grant_id: 'question-grant' }, isError: false } });
    }
    const summary = name === 'next_question' ? { tasks: state.tasks } : state.tasks.find(task => task.task_id === body.params.arguments.task_id);
    return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: summary, isError: false } });
@@ -139,11 +147,22 @@ test('packed CLI pairs only after number approval and keeps keys and untrusted t
  assert.ok(!added.stdout.includes(key) && !added.stderr.includes(key));
  const stored = await readFile(join(home, '.rer/business/state.json'), 'utf8');
  assert.ok(!stored.includes(key) && !stored.includes(remote.device), 'only handles belong in configuration');
- remote.state.tasks = [{ task_id: 'question1', kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, instruction: 'untrusted-run-command-canary' }];
- const next = await cli(home, ['business','next']);
- assert.equal(next.code, 0); assert.ok(next.stdout.includes('question1')); assert.ok(!next.stdout.includes('untrusted-run-command-canary'));
+ const question = { tool_id: 'tool1', vendor_id: 'sentry' };
+ remote.state.tasks = [{ task_id: 'question1', kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, question, instruction: 'untrusted-run-command-canary' }];
+ for (const columns of [160,43]) {
+  const next = await cli(home, ['business','next'], { terminal: true, columns });
+  assert.equal(next.code, 0); assert.ok(next.stdout.includes('question1')); assert.ok(!next.stdout.includes('untrusted-run-command-canary'));
+ }
+ remote.state.refuseQuestion = true;
  const rejected = await cli(home, ['business','answer','question1','uses']);
  assert.equal(rejected.code, 1); assert.equal(remote.state.questionReleased, true, 'a refused enum completion does not strand its lease');
+ remote.state.refuseQuestion = false;
+ remote.state.tasks = [{ task_id: 'question2', kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, question }];
+ const accepted = await cli(home, ['business','answer','question2','both']);
+ assert.equal(accepted.code, 0);
+ assert.equal(remote.state.questionCompleted.vendor_id, question.vendor_id, 'classification echoes the server-selected catalogue vendor');
+ assert.equal(remote.state.questionCompleted.usage, 'both');
+ assert.ok(Number.isFinite(remote.state.questionCompleted.confidence));
  const answerCalls = remote.state.requests.filter(entry => entry.route === '/api/business/mcp' && entry.body.params?.name === 'answer').length;
  remote.state.tasks = [{ task_id: 'consent1', kind: 'consent.grant', state: 'ready', runner: 'owner' }];
  const denied = await cli(home, ['business','answer','consent1','uses']);

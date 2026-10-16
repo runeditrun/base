@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g428d0082",
+  "cliVersion": "0.2.28-dev.g38d16938",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -375,7 +375,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "963d552411302c36f057e6d56cbfd6ce65e90ec25474a5fd73ca0506fb645922"
+      "sha256": "fd225a355723e03e6ef8e42dafda32eb13e41d86680cf0dbb9b6a8281314d580"
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
@@ -451,7 +451,7 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "0ead2454d10ae240e9d8c1a7bc63c9f992887443ef9abd742bc8f3349862073c"
+      "sha256": "248def11b8f76364fadabba773ca8b04850a9edb7cf3d089d6b45f17e1250265"
     },
     "cli/business/scan-command.mjs": {
       "source": "cli/business/scan-command.mjs",

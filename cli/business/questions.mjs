@@ -5,7 +5,7 @@ import { paired } from './local-commands.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
-export const classifications = ['uses', 'sells', 'unknown'];
+export const classifications = ['uses', 'sells', 'both', 'product-dependency'];
 
 export async function mcpClient(api, { taskId, signal } = {}) {
  const minted = await api.post('/api/business/executors/token', { audience: 'mcp', ...(taskId ? { task_id: identifier(taskId) } : {}) }, { signal });
@@ -37,6 +37,13 @@ export async function nextQuestions(api, signal) {
 const ownerKinds = new Set(['signup.checkout','connect.cloudflare','connect.github','consent.grant','confirm.inventory','plan.review','wave.approve','switchoff.cancel','cutover.billing','rollback.billing']);
 export const ownerLink = state => `${state.origin}/business/${encodeURIComponent(identifier(state.businessId))}`;
 
+function classification(task) {
+ const toolId = identifier(task.question?.tool_id), vendorId = task.question?.vendor_id;
+ if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId) || sensitive(toolId))
+  throw Error('Business classification metadata was refused.');
+ return { toolId, vendorId };
+}
+
 export async function next() {
  const signal = AbortSignal.timeout(55_000);
  const { state, credential } = await paired();
@@ -48,22 +55,24 @@ export async function next() {
  if (item.runner === 'owner' || ownerKinds.has(item.kind)) {
   process.stdout.write(`Owner: ${id}\nAnswer in your browser: ${ownerLink(state)}\n`); return;
  }
- process.stdout.write(`Agent: ${id}\nSuggest whether this tool is used, sold, or unknown.\nAnswers: uses | sells | unknown\nRun: rer business answer ${id} <enum>\n`);
+ const { toolId, vendorId } = classification(item);
+ process.stdout.write(`Agent: ${id}\nTool: ${toolId}\nCatalogue vendor: ${vendorId}\nSuggest how this tool is used. The owner confirms in the browser.\nAnswers: ${classifications.join(' | ')}\nRun: rer business answer ${id} <enum>\n`);
 }
 
 export async function answer(id, choice) {
  identifier(id);
- if (!classifications.includes(choice)) throw Error('Choose an enum: uses, sells, unknown.');
+ if (!classifications.includes(choice)) throw Error(`Choose an enum: ${classifications.join(', ')}.`);
  const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
  const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
  if (summary.runner === 'owner' || ownerKinds.has(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerLink(state)}`);
  if (summary.kind !== 'classify.row' || summary.runner !== 'executor') throw Error('This item does not accept a CLI classification answer.');
+ const { vendorId } = classification(summary);
  const tool = await mcpClient(api, { taskId: id, signal });
  let lease = summary;
  if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });
  if (typeof lease.grant_id !== 'string') throw Error('Business did not return a grant for this question.');
  try {
-  await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { decision: choice } });
+  await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { vendor_id: vendorId, usage: choice, confidence: 1 } });
  } catch (error) {
   try { await tool('answer', { task_id: id, action: 'release', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, reason: 'failed' }); } catch { /* Expiry/revocation still fences the lease. */ }
   throw error;
