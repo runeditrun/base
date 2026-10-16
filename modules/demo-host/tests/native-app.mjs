@@ -58,6 +58,7 @@ export default {
       return Response.json(await object.alarmStatus());
     }
     if (path === '/socket') return env.COUNTER.getByName('socket').fetch(request);
+    if (path === '/r2') return Response.json(await r2RoundTrip(env.FILES));
     if (path === '/bindings') {
       const retained = env.COUNTER.getByName('same-name');
       if (request.method === 'POST') {
@@ -140,4 +141,46 @@ export class LegacyCounter {
     return new Response(await this.ctx.storage.get('retained'));
   }
   async alarm() { await this.ctx.storage.put('fired', true); }
+}
+
+// The R2 surface seeds use, against the visitor's own storage.
+async function r2RoundTrip(files) {
+  const hex = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+  const page = async options => { const listed = await files.list(options); return { keys: listed.objects.map(item => item.key), prefixes: listed.delimitedPrefixes, truncated: listed.truncated, cursor: listed.cursor,
+    metadata: listed.objects.map(item => item.customMetadata) }; };
+  for (const key of ['r2/docs/a.txt', 'r2/docs/b.txt', 'r2/docs/sub/c.txt', 'r2/top.txt']) await files.put(key, key, { customMetadata: { key }, httpMetadata: { contentType: 'text/plain' } });
+  const first = await page({ prefix: 'r2/docs/', limit: 1 });
+  const result = { top: await page({ prefix: 'r2/', delimiter: '/' }), first: { ...first, cursor: typeof first.cursor },
+    rest: (await page({ prefix: 'r2/docs/', cursor: first.cursor })).keys, after: await page({ prefix: 'r2/', startAfter: 'r2/docs/b.txt', include: ['customMetadata'] }) };
+  result.after.cursor = typeof result.after.cursor;
+  result.top.cursor = typeof result.top.cursor;
+  const top = await files.head('r2/top.txt');
+  result.ranges = [await (await files.get('r2/top.txt', { range: { offset: 3, length: 3 } })).text(), await (await files.get('r2/top.txt', { range: { suffix: 3 } })).text(),
+    await (await files.get('r2/top.txt', { range: new Headers({ range: 'bytes=0-1' }) })).text()];
+  result.conditional = [await files.put('r2/top.txt', 'x', { onlyIf: { etagDoesNotMatch: '*' } }), 'body' in await files.get('r2/top.txt', { onlyIf: { etagMatches: '"other"' } }),
+    (await files.put('r2/top.txt', 'y', { onlyIf: new Headers({ 'if-match': top.httpEtag }) }))?.etag === (await files.head('r2/top.txt')).etag, await (await files.get('r2/top.txt')).text()];
+  result.checksum = await files.put('r2/sum', 'abc', { sha256: '0'.repeat(64) }).then(() => 'accepted', error => /SHA-256 checksum/.test(error.message));
+  const sum = await files.put('r2/sum', 'abc', { sha256: await hex(new TextEncoder().encode('abc')) });
+  result.sha256 = [...new Uint8Array(sum.checksums.sha256)].map(byte => byte.toString(16).padStart(2, '0')).join('') === await hex(new TextEncoder().encode('abc'));
+  // Six chunks streamed in, read back as a stream and across a chunk boundary.
+  const big = new Uint8Array(6 * 1024 * 1024 + 5).map((_, index) => index % 251), fixed = new FixedLengthStream(big.length);
+  const writer = fixed.writable.getWriter();
+  await Promise.all([files.put('r2/big', fixed.readable, { httpMetadata: { contentType: 'application/x-test' } }), (async () => { for (let at = 0; at < big.length; at += 65536) await writer.write(big.slice(at, at + 65536)); await writer.close(); })()]);
+  const read = await files.get('r2/big');
+  result.big = { size: read.size, same: await hex(await read.arrayBuffer()) === await hex(big), edge: [...new Uint8Array(await (await files.get('r2/big', { range: { offset: 1024 * 1024 - 2, length: 4 } })).arrayBuffer())] };
+  // Parts arrive out of order and complete in part order.
+  const upload = await files.createMultipartUpload('r2/multi', { httpMetadata: { contentType: 'application/x-multi' } });
+  const resumed = files.resumeMultipartUpload('r2/multi', upload.uploadId);
+  const second = await resumed.uploadPart(2, new Uint8Array([7, 8, 9]));
+  const one = await upload.uploadPart(1, new Response(big.slice(0, 1536 * 1024)).body);
+  const done = await upload.complete([second, one]);
+  const multi = await files.get('r2/multi');
+  const bytes = new Uint8Array(await multi.arrayBuffer());
+  result.multipart = { etag: /^[a-f0-9]{32}-2$/.test(done.etag), size: multi.size, contentType: multi.httpMetadata.contentType, tail: [...bytes.slice(-4)],
+    across: [...new Uint8Array(await (await files.get('r2/multi', { range: { offset: 1536 * 1024 - 1, length: 2 } })).arrayBuffer())],
+    missing: await files.resumeMultipartUpload('r2/multi', upload.uploadId).uploadPart(3, 'x').then(() => 'accepted', error => /multipart upload does not exist/.test(error.message)) };
+  await files.delete(['r2/docs/a.txt', 'r2/docs/b.txt']);
+  await files.delete('r2/big');
+  result.deleted = { docs: (await page({ prefix: 'r2/docs/' })).keys, big: await files.get('r2/big'), head: await files.head('r2/docs/a.txt') };
+  return result;
 }

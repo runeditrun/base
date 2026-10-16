@@ -2,9 +2,9 @@ import { createRequire } from 'node:module'
 import { mkdtemp, readdir, readFile, rm, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { testProvider } from './oidc-provider.mjs'
+import { startOnFreePort } from '../ports.mjs'
 
 export const root = fileURLToPath(new URL('../../', import.meta.url))
 const reactRequire = createRequire(await realpath(join(root, 'node_modules/@tanstack/react-start/package.json')))
@@ -18,21 +18,16 @@ export const { unstable_splitSqlQuery: splitSql } = require('wrangler')
 export const owner = 'owner@example.test'
 export const setupToken = 'disposable-test-only-owner-setup-token-00001'
 
-export async function freePort() {
-  const server = createServer()
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const port = server.address().port
-  await new Promise((resolve) => server.close(resolve))
-  return port
-}
 export async function migrate(db, filename) {
   const sql = await readFile(join(root, 'migrations/core', filename), 'utf8')
-  for (const statement of splitSql(sql)) await db.prepare(statement).run()
+  // One request per file: a request per statement opens hundreds of loopback
+  // connections per start, which exhausts the ephemeral port range under load.
+  await db.batch(splitSql(sql).map((statement) => db.prepare(statement)))
 }
-export async function emittedRuntime({ prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo } = {}) {
+export const emittedRuntime = (options = {}) => startOnFreePort((port) => startEmittedRuntime(port, options))
+async function startEmittedRuntime(port, { prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo }) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
-  const port = await freePort()
   // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
   const production = !noMail
   const origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://127.0.0.1:${port}`
@@ -98,5 +93,5 @@ export async function emittedRuntime({ prior = false, noMail = false, oidc = fal
       }) : mf.dispatchFetch(origin + path, { ...init, redirect: 'manual' })
     }
     return { origin, call, db, mails, mf, provider, networkRequests, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
-  } catch (error) { await mf.dispose(); await rm(directory, { recursive: true, force: true }); throw error }
+  } catch (error) { await Promise.allSettled([mf.dispose(), rm(directory, { recursive: true, force: true })]); throw error }
 }

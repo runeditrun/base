@@ -40,7 +40,6 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       ratelimits: { STARTS: { namespace_id: '1001', simple: { limit: 3, period: 60 } } },
       bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}', DEMO_SECONDARY_ORIGINS: '["https://page.demo.example.test"]',
         TURNSTILE_SITE_KEY: 'fixture-site-key', TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA', RER_DEMO_MEASUREMENT_TOKEN: measurement, NATIVE_TEST_TTL_MS: '12000' },
-      r2Buckets: ['NATIVE_BUCKET'],
       serviceBindings: { ASSETS: () => new Response('fixture-asset') },
       outboundService: request => { if (request.url === 'https://network.example.test/') return new Response('network'); assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify'); return Response.json({ success: true }); },
     }));
@@ -105,8 +104,20 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     assert.equal(alarm.during, null, 'getAlarm is null during alarm delivery');
     assert.ok(alarm.next > Date.now(), 'seed can schedule its next alarm from alarm()');
     assert.equal((await (await fetch('/alarms', b)).json()).fired, false);
-    const bucket = await mf.getR2Bucket('NATIVE_BUCKET');
-    assert.equal((await bucket.list()).objects.length, 1, 'real visitor-scoped R2 object exists before expiry');
+    // R2 lives in the visitor's own storage: objects, listing, ranges,
+    // conditions, checksums, streamed bodies and multipart, erased at expiry.
+    const at = (index, part = 0) => (index - part) % 251;
+    assert.deepEqual(await (await fetch('/r2', a)).json(), {
+      top: { keys: ['r2/top.txt'], prefixes: ['r2/docs/'], truncated: false, cursor: 'undefined', metadata: [{}] },
+      first: { keys: ['r2/docs/a.txt'], prefixes: [], truncated: true, cursor: 'string', metadata: [{}] },
+      rest: ['r2/docs/b.txt', 'r2/docs/sub/c.txt'],
+      after: { keys: ['r2/docs/sub/c.txt', 'r2/top.txt'], prefixes: [], truncated: false, cursor: 'undefined', metadata: [{ key: 'r2/docs/sub/c.txt' }, { key: 'r2/top.txt' }] },
+      ranges: ['top', 'txt', 'r2'], conditional: [null, false, true, 'y'], checksum: true, sha256: true,
+      big: { size: 6 * 1024 * 1024 + 5, same: true, edge: [0, 1, 2, 3].map(offset => at(1024 * 1024 - 2 + offset)) },
+      multipart: { etag: true, size: 1536 * 1024 + 3, contentType: 'application/x-multi', tail: [at(1536 * 1024 - 1), 7, 8, 9], across: [at(1536 * 1024 - 1), 7], missing: true },
+      deleted: { docs: ['r2/docs/sub/c.txt'], big: null, head: null },
+    });
+    assert.deepEqual((await (await fetch('/bindings', b)).json()).keys, [], 'another visitor sees none of these objects');
     const upgraded = await fetch('/socket', a, { headers: { upgrade: 'websocket' } });
     assert.equal(upgraded.status, 101);
     const socket = upgraded.webSocket; socket.accept();
@@ -146,12 +157,11 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     await new Promise(resolve => setTimeout(resolve, 12500));
     assert.equal((await fetch('/items', a)).status, 410);
     assert.equal((await fetch('/items', b)).status, 410);
-    assert.deepEqual((await bucket.list()).objects, [], 'expiry erased the R2 prefix');
     const namespace = await mf.getDurableObjectNamespace('DEMO');
     for (const cookies of [a, b, c, d]) {
       const id = namespace.idFromString(cookies.match(/(?:^|; )rer_demo=([^;]+)/)[1]);
       const storage = await mf.unsafeGetDurableObjectStorage('native-test', 'NativeDemo', { id: id.toString() });
-      assert.deepEqual(await storage.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_cf_METADATA'"), [], 'supervisor, queue records and facet inventory are erased');
+      assert.deepEqual(await storage.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_cf_METADATA'"), [], 'supervisor, R2 objects, queue records and facet inventory are erased');
     }
   } finally { await mf?.dispose(); await rm(folder, { recursive: true, force: true }); }
 });

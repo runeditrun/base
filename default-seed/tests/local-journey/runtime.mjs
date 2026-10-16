@@ -3,7 +3,6 @@ import { copyProject } from './copy.mjs'
 import { mkdir, mkdtemp, open, readFile, rm, statfs, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
@@ -11,6 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { StringDecoder } from 'node:string_decoder'
 import { assertDistExcludesSecrets, readmeCommands } from './readme.mjs'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
+import { freePort } from '../ports.mjs'
 import { servingLoadThreshold } from '../../scripts/base-cli/cli/server-resources.mjs'
 
 const execute = promisify(execFile)
@@ -28,14 +28,6 @@ async function resources(env) {
     assert.ok(attempt < 20, `machine load stayed above ${threshold} for 20 minutes`)
     await delay(60_000)
   }
-}
-
-async function freePort() {
-  const server = createServer()
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const { port } = server.address()
-  await new Promise((resolve) => server.close(resolve))
-  return port
 }
 
 export async function freshLocalProject(owner) {

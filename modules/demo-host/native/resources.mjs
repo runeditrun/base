@@ -1,6 +1,7 @@
 import { objectClass } from './config.mjs';
 import { application, loaded, bundle } from './loader.mjs';
-import { r2Call, eraseR2 } from './r2.mjs';
+import { r2Call } from './r2.mjs';
+import { store } from './r2-store.mjs';
 
 export async function database(host, binding, method, args) {
   await host.active();
@@ -24,7 +25,8 @@ export async function object(host, binding, id, method, args) {
 export async function r2(host, binding, method, args) {
   await host.active();
   if (!bundle.bindings.buckets.includes(binding)) throw new Error(`Unknown R2 binding: ${binding}`);
-  const operation = r2Call(host.env.NATIVE_BUCKET, host.ctx.storage, host.ctx.id.toString(), binding, method, args);
+  host.r2Store ??= store(host.ctx.storage);
+  const operation = r2Call(host.r2Store, binding, method, args);
   host.r2Pending ??= new Set(); host.r2Pending.add(operation);
   try { return await operation; } finally { host.r2Pending.delete(operation); }
 }
@@ -32,6 +34,7 @@ export async function eraseResources(host) {
   host.ctx.facets.delete('app');
   for (const binding of bundle.bindings.databases.slice(1)) host.ctx.facets.delete(`database:${binding}`);
   for (const key of (await host.ctx.storage.list({ prefix: 'facet:' })).keys()) host.ctx.facets.delete(key.slice(6));
+  // R2 objects are rows of the visitor's own storage, erased with it.
   await Promise.allSettled(host.r2Pending ?? []);
-  await eraseR2(host.env.NATIVE_BUCKET, host.ctx.storage, host.ctx.id.toString());
+  host.r2Store = undefined;
 }

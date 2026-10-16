@@ -4,13 +4,13 @@ const queuedExit=await queuedEntrypoint(import.meta.url,'verify:browser');
 if(queuedExit!==null)process.exit(queuedExit);
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { createServer } from 'node:net'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
+import { freePort } from '../ports.mjs'
 import { readableActivity, refreshSafeCreate } from './people-page.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
@@ -30,16 +30,6 @@ function command(name, args, options = {}) {
       else rejectCommand(new Error(`${name} ${args.join(' ')} exited ${code}\n${output}`))
     })
   })
-}
-
-async function freePort() {
-  const server = createServer()
-  await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen))
-  const address = server.address()
-  assert(address && typeof address !== 'string')
-  const { port } = address
-  await new Promise((resolveClose, rejectClose) => server.close((error) => error ? rejectClose(error) : resolveClose()))
-  return port
 }
 
 async function waitForHealth(baseUrl, child, output) {

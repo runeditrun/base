@@ -7,7 +7,6 @@ import { upgradeDemo } from '../modules/demo-host/upgrade.mjs';
 import { missing, invalid, RerError } from './errors.mjs';
 import { DEMO_FILES } from '../modules/demo-host/plan.mjs';
 import { cloudflare } from '../modules/deploy-kit/provider.mjs';
-import { demoBucketName, prepareBucket } from '../modules/demo-host/native/deploy-r2.mjs';
 import { RUNTIME_FILES } from '../modules/demo-host/native/config.mjs';
 import { prepareNative } from '../modules/demo-host/native/prepare.mjs';
 import { TESTING_SECRET } from '../modules/demo-host/measurement.mjs';
@@ -37,7 +36,6 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   const config = { ...plan.wrangler, main: 'modules/demo-host/native/worker.mjs', compatibility_flags: ['nodejs_compat'],
     assets: { directory: './assets', binding: 'ASSETS', run_worker_first: true }, worker_loaders: [{ binding: 'LOADER' }],
   };
-  if (bundle.bindings.buckets.length) config.r2_buckets = [{ binding: 'NATIVE_BUCKET', bucket_name: demoBucketName(plan.worker) }];
   config.vars.NATIVE_SOURCE_DIGEST = bundle.digest;
   if (process.env.RER_NATIVE_TEST_TTL_MS && TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY ?? '')) {
     if (!/^[1-9][0-9]{2,6}$/.test(process.env.RER_NATIVE_TEST_TTL_MS)) throw invalid('RER_NATIVE_TEST_TTL_MS must be positive milliseconds');
@@ -53,16 +51,7 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   const required = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'];
   if (required.some(name => !process.env[name]?.trim())) throw missing(`${required.join(', ')} are required`);
   const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
-  config.migrations = await upgradeDemo({ api, plan });
-  if (bundle.bindings.buckets.length) {
-    const statePath = join(project.root, '.rer/demo-buckets', plan.worker + '.json');
-    const pending = await readFile(statePath, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
-    const bucket = await prepareBucket(api, plan, pending);
-    await mkdir(dirname(statePath), { recursive: true, mode: 0o700 });
-    await writeFile(statePath, JSON.stringify({ record: plan.record, bucket }), { mode: 0o600 });
-    config.vars.NATIVE_BUCKET_CREATED = bucket.creation_date;
-    await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
-  }
+  config.migrations = await upgradeDemo({ api, plan, report: line => store.report(line) });
   await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   const testing = TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY);
   const measurement = testing ? process.env.RER_DEMO_MEASUREMENT_TOKEN || randomBytes(32).toString('base64url') : undefined;
