@@ -12,6 +12,8 @@ export default {
     }
     if (path === '/health') {
       await env.JOBS.metrics();
+      const legacy = await env.LEGACY.getByName('same-name').fetch('https://legacy/');
+      if (await legacy.text() !== 'present') throw new Error('Legacy Durable Object failed');
       await env.DB.prepare("INSERT OR IGNORE INTO items VALUES('sample')").run();
       return new Response('ready');
     }
@@ -22,13 +24,13 @@ export default {
       if (request.method === 'POST') {
         const body = await request.text();
         const upload = await env.FILES.createMultipartUpload('multipart');
-        const part = await upload.uploadPart(1, new Uint8Array([1, 2, 3]));
+        const part = await upload.uploadPart(1, new Response(new Uint8Array([1, 2, 3])).body);
         await upload.complete([part]);
         if ((await (await env.FILES.get('multipart')).arrayBuffer()).byteLength !== 3) throw new Error('Multipart bytes lost');
         await env.FILES.delete(['multipart']);
         const abandoned = await env.FILES.createMultipartUpload('abandoned');
         await abandoned.uploadPart(1, new Uint8Array([4]));
-        await env.FILES.put('attachment', body, { httpMetadata: { contentType: 'text/plain' } });
+        await env.FILES.put('attachment', new Response(body).body, { httpMetadata: { contentType: 'text/plain' } });
         await env.SECOND.prepare('INSERT INTO items VALUES(?)').bind(body).run();
         await env.JOBS.send({ body });
         return new Response(null, { status: 201 });
@@ -64,4 +66,10 @@ export class Counter extends DurableObject {
     return Response.json(await this.ctx.storage.get('retained') ?? null);
   }
   webSocketMessage(socket, message) { socket.send(message); }
+}
+
+// Legacy DO exports (without the RPC base class) are used by real seeds too.
+export class LegacyCounter {
+  constructor(ctx) { this.ctx = ctx; }
+  async fetch() { await this.ctx.storage.put('retained', 'present'); return new Response(await this.ctx.storage.get('retained')); }
 }

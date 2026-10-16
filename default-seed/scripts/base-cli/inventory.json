@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26-dev.gb93c8be8",
+  "cliVersion": "0.2.26-dev.g9246aa18",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1067,7 +1067,7 @@
     },
     "modules/demo-host/native/r2-client.mjs": {
       "source": "modules/demo-host/native/r2-client.mjs",
-      "sha256": "92b369ad216c8e87f872fb00b135688cb7e7fb05f4d526508ad4c0a0bd72f62e"
+      "sha256": "448d62cc119305d6bd4eb90d06070b4c4818b9458038a00612ed165cff8b6506"
     },
     "modules/demo-host/native/r2.mjs": {
       "source": "modules/demo-host/native/r2.mjs",

@@ -18,10 +18,10 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     await cp(join(base, 'cli/scheduled.mjs'), join(folder, 'cli/scheduled.mjs'));
     const source = name => readFile(join(base, name), 'utf8');
     const sql = 'CREATE TABLE owner(email TEXT PRIMARY KEY); CREATE TABLE items(name TEXT PRIMARY KEY); CREATE TABLE jobs(name TEXT PRIMARY KEY);';
-    const bundle = { digest: 'fixture-native-app', compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], bindings: { databases: ['DB', 'SECOND'], buckets: ['FILES'], objects: [{ name: 'COUNTER', class_name: 'Counter' }], queues: { producers: [{ binding: 'JOBS', queue: 'work' }], consumers: [{ queue: 'work', max_retries: 2 }] }, assets: 'ASSETS' }, vars: {}, crons: [], assetPaths: ['/assets/fixture-12345678.js'],
+    const bundle = { digest: 'fixture-native-app', compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], bindings: { databases: ['DB', 'SECOND'], buckets: ['FILES'], objects: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }], queues: { producers: [{ binding: 'JOBS', queue: 'work' }], consumers: [{ queue: 'work', max_retries: 2 }] }, assets: 'ASSETS' }, vars: {}, crons: [], assetPaths: ['/assets/fixture-12345678.js'],
       migrations: Object.fromEntries(['DB', 'SECOND'].map(binding => [binding, [{ name: '0001_items.sql', sql, sha256: createHash('sha256').update(sql).digest('hex'), statements: sql.split(';').filter(Boolean) }]])),
       modules: {
-        '_rer/isolate.js': { js: (await source('modules/demo-host/native/isolate.mjs')).replace('__RER_APP_ENTRY__', '../app/modules/demo-host/tests/native-app.mjs') + '\nexport { Counter } from \'../app/modules/demo-host/tests/native-app.mjs\';' },
+        '_rer/isolate.js': { js: (await source('modules/demo-host/native/isolate.mjs')).replace('__RER_APP_ENTRY__', '../app/modules/demo-host/tests/native-app.mjs') + '\nexport { Counter, LegacyCounter } from \'../app/modules/demo-host/tests/native-app.mjs\';' },
         ...Object.fromEntries(await Promise.all(ISOLATE_FILES.map(async file => [`_rer/${file}.js`, { js: await source(`modules/demo-host/native/${file}.mjs`) }]))),
         'app/modules/demo-host/tests/native-app.mjs': { js: await source('modules/demo-host/tests/native-app.mjs') },
         'app/modules/owner-claim/verify.mjs': { js: await source('modules/owner-claim/verify.mjs') },
