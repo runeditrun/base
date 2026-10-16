@@ -20,7 +20,7 @@ test('rer release retains exact public source and annotations but refuses unpubl
   const source = git(f.repo, 'rev-parse', 'HEAD');
   const invoke = (name, flags = [], repository = f.options.repository) => spawnSync(process.execPath, [resolve(import.meta.dirname, '../../bin/rer.mjs'),
     'release', '--repo', f.repo, '--ref', source, '--project', f.options.project, '--repository', repository,
-    '--output', resolve(f.temporary, name), ...flags], { env, encoding: 'utf8', timeout: 120000 });
+    '--output', resolve(f.temporary, name), '--local-verify', ...flags], { env, encoding: 'utf8', timeout: 120000 });
   const published = invoke('published', ['--tag'], 'https://github.com/octocat/Spoon-Knife');
   assert.equal(published.status, 0, published.stderr + published.stdout);
   assert.equal(git(f.repo, 'rev-parse', 'v1.2.3^{commit}'), source);
@@ -40,7 +40,7 @@ test('rer release retains exact public source and annotations but refuses unpubl
   git(f.repo, 'commit', '--allow-empty', '-qm', `Unpublished contact: ${['private-person', 'private-company.com'].join('@')}`);
   const unpublished = spawnSync(process.execPath, [resolve(import.meta.dirname, '../../bin/rer.mjs'),
     'release', '--repo', f.repo, '--project', f.options.project, '--repository', f.options.repository,
-    '--output', resolve(f.temporary, 'unpublished')],
+    '--output', resolve(f.temporary, 'unpublished'), '--local-verify'],
   { env, encoding: 'utf8', timeout: 120000 });
   assert.equal(unpublished.status, 1, unpublished.stderr + unpublished.stdout);
   const blocked = JSON.parse(readFileSync(resolve(f.temporary, 'unpublished/publish-check.json')));

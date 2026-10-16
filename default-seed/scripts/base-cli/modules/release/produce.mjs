@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { inspectSource, newOutput, git, command } from './source.mjs';
+import { inspectSource, newOutput, git } from './source.mjs';
+import { verifySource } from './source-verification.mjs';
 import { catalogue, writeCatalogue, sha256, json } from './catalogue.mjs';
 import { publicExport, cleanHistory, annotate, releaseMessage } from './export.mjs';
 import { publicationScan, validatePublicationDestination } from './publication-scan.mjs';
@@ -13,7 +14,7 @@ import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark
 // Failure output belongs to the private receipt, not the site preview.
 const withoutOutput = gates => JSON.parse(JSON.stringify(gates, (key, value) => key === 'output' ? undefined : value));
 
-export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, allowPlaceholderMark = false }) {
+export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, localVerify = false, allowPlaceholderMark = false }) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(project ?? '')) throw Error('--project must be publisher/name');
   if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?$/i.test(repository ?? '')) throw Error('--repository must be a credential-free GitHub repository URL');
   if (onto !== undefined && clean) throw Error('--onto and --clean-history are mutually exclusive');
@@ -46,22 +47,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
     const checkout = resolve(temporary, 'seed');
     git(source.repo, 'clone', '--no-hardlinks', '--no-checkout', '--', source.repo, checkout);
     git(checkout, 'checkout', '--detach', source.commit);
-    // Honour the seed's committed install policy. Base's native-build settings
-    // are not interchangeable with pnpm 8's locked onlyBuiltDependencies.
-    const install = await command('pnpm', ['install', '--frozen-lockfile'], checkout, { dependencies: true });
-    const verify = install.status === 'PASS' ? await command('pnpm', ['run', 'verify'], checkout) : { status: 'FAIL', reason: 'frozen-install-failed', tests: 0, passed: 0, failed: 0, output: install.output };
-    // Release-only scale and capacity cases stay outside routine CI. The
-    // committed seed script is an additional gate in previews and releases.
-    if (verify.status === 'PASS' && JSON.parse(source.bytes('package.json')).scripts['verify:release']) {
-      verify.release = await command('pnpm', ['run', 'verify:release'], checkout);
-      if (verify.release.status !== 'PASS') {
-        verify.status = 'FAIL'; verify.exitCode = verify.release.exitCode;
-        verify.reason = 'release-verification-failed';
-      }
-    }
-    if (git(checkout, 'status', '--porcelain', '--untracked-files=no').length) {
-      verify.status = 'FAIL'; verify.reason = 'verify-changed-tracked-source';
-    }
+    const verify = await verifySource(source, checkout, localVerify);
     // Explicit clean-history publication scans every byte and ref of the actual
     // parentless export. Exact-source releases classify against public history
     // when available, retaining the selected source commit and tag identity.

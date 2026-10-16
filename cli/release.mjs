@@ -1,7 +1,8 @@
 // Preserve release's accepted parser, producer, receipt and validation exits.
 const releaseHelp = `Usage: rer release --repo DIR --project PUBLISHER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
 
-Produce local release artifacts after frozen installation, verification and publication checks.
+Produce local artifacts using the exact source commit's green GitHub Verify,
+frozen installation, local build and publication checks.
 Without --tag, write a preview. This command never pushes, uploads or deploys.
 
   --repo DIR             Source Git repository.
@@ -16,6 +17,8 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --tag [vVERSION]       Prepare source artifacts and create a local annotated tag;
                          an explicit tag must match the committed release version.
   --dry-run              Run the real gates and suppress local tag creation.
+  --local-verify         Run the seed's full verification locally instead of
+                         requiring its exact commit's green GitHub Verify.
   --clean-history        Prepare a parentless public export.
   --onto GITHUB_URL#BRANCH
                          Prepare a public child of the destination's current branch;
@@ -49,6 +52,7 @@ export async function dispatchRelease(args) {
    else if (args[index] === '--clean-history') options.cleanHistory = true;
    else if (args[index] === '--dry-run') options.dryRun = true;
    else if (args[index] === '--allow-placeholder-mark') options.allowPlaceholderMark = true;
+   else if (args[index] === '--local-verify') options.localVerify = true;
    else if (['--repo', '--project', '--repository', '--output', '--ref', '--env-file', '--onto', '--public-base'].includes(args[index]) && args[index + 1] && !args[index + 1].startsWith('--'))
     options[args[index] === '--env-file' ? 'envFile' : args[index] === '--public-base' ? 'publicBase' : args[index].slice(2)] = args[++index];
    else throw Error('Invalid release arguments');

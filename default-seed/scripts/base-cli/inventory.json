@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.27-dev.g4e2f747e",
+  "cliVersion": "0.2.28-dev.g0978a385",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -383,7 +383,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "5777e6d452d7d64b92422ab44a64fea30b27c9013405f99e92890065fc240df8"
+      "sha256": "bb7ea41b2049f03554bee15c4e12a1d10c5cf7519e87e7cc9d2ea964ca97fed9"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -643,7 +643,7 @@
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "866f5213398856d901de4d9f33f366346a99449b22d2ae14e842fa5fe6c03501"
+      "sha256": "e01f03bfa05b9e3f6a8460cc9eee6f16f2aee96e306649c90dafa41fddf68360"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -2307,7 +2307,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "717608d5e24c64c09b281b0dd1785fa738a041cb05cfa55070999fb90cff1f3f"
+      "sha256": "0fa841d2c63ea49fb480b5f13735708e282e93fbb1be5892ea32bd3d0295388a"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -2317,13 +2317,17 @@
       "source": "modules/release/export.mjs",
       "sha256": "05f179928e53ccf657cf0225fe587fd082a8649791223db09df3ff3006c413db"
     },
+    "modules/release/github-verify.mjs": {
+      "source": "modules/release/github-verify.mjs",
+      "sha256": "6a1cebc0682e838393f6071d4db2f6b597e2e74179abc27c0ebb89a008e4f78a"
+    },
     "modules/release/keygen.mjs": {
       "source": "modules/release/keygen.mjs",
       "sha256": "f64597ba811a35994a74008a65641a29c5d742d23cb01843b628e224757ed43a"
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "749879742aff9a20183a41b35ee9012f6f38a646db0d0358113a6ee301b30980"
+      "sha256": "7d81b918fc4ea943eab30b077d127ca78df0c7b3a9d53a901ebe90d4c76a31c6"
     },
     "modules/release/public-base.mjs": {
       "source": "modules/release/public-base.mjs",
@@ -2368,6 +2372,10 @@
     "modules/release/signing-key.mjs": {
       "source": "modules/release/signing-key.mjs",
       "sha256": "c8c2e62f30ff0f6e2735110c332589769a0536aa87f087806ac8959e29228dae"
+    },
+    "modules/release/source-verification.mjs": {
+      "source": "modules/release/source-verification.mjs",
+      "sha256": "af87d534bd1955865678a8d3e7e355b35ecc21452c4811d7c980b20c62374c2a"
     },
     "modules/release/source.mjs": {
       "source": "modules/release/source.mjs",

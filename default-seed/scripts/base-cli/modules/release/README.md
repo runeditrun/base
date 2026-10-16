@@ -14,8 +14,8 @@ pnpm rer release --repo /path/to/seed --ref main \
 ```
 
 The `rer` bin and `node bin/rer.mjs` expose the same command. Node 22+, Python 3,
-Git, pnpm and tar are required. Use a full, clean seed clone with its declared
-package-manager version and browser prerequisites available. The producer reads
+Git, pnpm and tar are required, along with authenticated `gh` for GitHub sources.
+Use a full, clean seed clone with its declared package-manager version. The producer reads
 committed `seed.json`, `package.json`, `RELEASE.json`, `LICENSE`, `CONTRACT.md` and
 `AGENTS.md`. Version declarations must agree. `--project` declares the publishing
 identity; `--repository` is the credential-free public destination URL. Neither is inferred
@@ -47,18 +47,41 @@ and does not authorize publication. Legacy sources with neither declaration
 accept independent project and repository inputs, retain strict reference checks
 and cannot receive this INFO classification.
 
-It installs frozen dependencies and runs `pnpm run verify` in a disposable clone
-of the exact selected commit, then scans source history with publish-check.
-When the checkout's origin is a confirmed public repository, the scanner uses
-that source repository's advertised default branch and published tags as its public
-base. Already-public findings are classified pre-existing; unpublished content
-still blocks. Other sources retain complete local-ref history inspection.
-A verify that mutates tracked source fails.
-When declared in the committed package, it runs `pnpm run verify:release` after
-default verification succeeds. Keep capacity, maximum-size memory and load cases
-in that release-only script. Both dry runs and releases require it to pass;
-`gates.verify.release` records its result. Routine CI and default verification
-do not invoke it.
+For a GitHub source, the producer uses the operator's existing `gh` authentication
+to resolve the source repository's **Verify** workflow for the exact selected
+commit. The source identity comes from its GitHub `origin` (HTTPS or SSH), or the
+committed `rer-project.json.sourceRepository` when no GitHub origin is present;
+it is independent of the publication destination. Only a completed successful
+`push` or `workflow_dispatch` run on the default branch or the version's release
+tag qualifies. The run and head repository must both match the source repository,
+and a release tag must resolve remotely to the exact source commit. PR merge runs,
+other SHAs, repositories, branches and unsuccessful runs cannot authorize release.
+`gates.verify` records the source repository and commit, workflow id, `runId`,
+`runUrl`, event, branch and conclusion in both receipt and site provenance.
+
+CI is the verification wall: this path skips both local `verify` targets. It
+still installs frozen dependencies and runs the committed `pnpm run build`
+script, when declared, in a disposable clone. `gates.verify.install` and
+`gates.verify.build` record those local results; failure or a tracked-source
+mutation blocks release. Publication/history/annotation scans, exact-source
+packaging, package integrity checks and the separate signing commands still run
+locally. A missing green Verify blocks with the exact SHA and instructions to
+push or re-run it. API/authentication failures also block, without substituting
+local verification.
+
+Pass **`--local-verify`** to explicitly retain the previous behavior: frozen
+installation, `pnpm run verify`, then the committed `pnpm run verify:release`
+when declared, with its result in `gates.verify.release`. Sources without a
+GitHub origin or committed source identity also retain this behavior. This local
+path needs the seed's browser prerequisites and any resources its verification
+requires. Routine CI and default verification do not invoke the release-only
+script.
+
+Both paths then scan source history with publish-check. When the checkout's
+origin is a confirmed public repository, the scanner uses that source
+repository's advertised default branch and published tags as its public base.
+Already-public findings are classified pre-existing; unpublished content still
+blocks. Other sources retain complete local-ref history inspection.
 A passing step's receipt retains exit status and numeric final summaries from
 Node's spec/TAP reporters and Playwright's text reporters. A failing install,
 `verify` or `verify:release` step also keeps `output`: the last 40 lines (at most
@@ -88,7 +111,7 @@ commit and the exact source export. Existing tags are never changed. The command
 changes repository visibility, dispatches Actions, deploys or edits a site**.
 Publication and deployment retain their separate owner authorization.
 
-`--dry-run` performs the real install, verify and history scan and suppresses
+`--dry-run` performs the selected verification path, local artifact steps and history scan and suppresses
 tag creation even with `--tag`. `--tag --dry-run` also prepares the source archive
 for inspection. Existing tags do not prevent previews.
 If gates fail, it exits 1, omits the source export, records BLOCKED in

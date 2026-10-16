@@ -42,7 +42,7 @@ test("Base's placeholder mark warns on check and run site builds, and a release 
  await mkdir(join(f.repo, 'public/brand'), { recursive: true });
  await cp(placeholder, join(f.repo, 'public/brand/mark.svg'));
  f.commit();
- const release = (...flags) => spawnSync(process.execPath, [cli, 'release', '--repo', f.repo, '--project', 'octocat/Hello-World', '--repository', 'https://github.com/octocat/Hello-World', '--output', join(f.temporary, `release${flags.length}`), '--dry-run', ...flags], { encoding: 'utf8', timeout: 5 * 60_000 });
+ const release = (...flags) => spawnSync(process.execPath, [cli, 'release', '--repo', f.repo, '--project', 'octocat/Hello-World', '--repository', 'https://github.com/octocat/Hello-World', '--output', join(f.temporary, `release${flags.length}`), '--dry-run', '--local-verify', ...flags], { encoding: 'utf8', timeout: 5 * 60_000 });
  const refused = release();
  assert.equal(refused.status, 2);
  assert.equal(refused.stderr.trim(), `${message} Release refused; pass --allow-placeholder-mark to release with it.`);
