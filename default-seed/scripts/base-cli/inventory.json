@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g01b782a6",
+  "cliVersion": "0.2.28-dev.gf49032c4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1559,7 +1559,7 @@
     },
     "modules/mail/README.md": {
       "source": "modules/mail/README.md",
-      "sha256": "6115d4f3124fe8fdd3a905c3156e8f3d4ebd030b722b50d3aae117174aef4415"
+      "sha256": "7a041dddfa7161acfb2d53c7fd4522551c5e0c8a6061a8001eefaf9d0539be33"
     },
     "modules/mail/doctor.mjs": {
       "source": "modules/mail/doctor.mjs",
@@ -1631,15 +1631,15 @@
     },
     "modules/mail/src/adapters/rer/contract.mjs": {
       "source": "modules/mail/src/adapters/rer/contract.mjs",
-      "sha256": "a7209d344588a533602905ce0cf170e2ad6d9c6d07037a9bc627c9c04e9ed486"
+      "sha256": "b5daebf8e3b3e0a8cb9482d93af021db74e5202d75d1d414a98259841fa35ac3"
     },
     "modules/mail/src/adapters/rer/index.mjs": {
       "source": "modules/mail/src/adapters/rer/index.mjs",
-      "sha256": "23faa46d74aa987e7fc51e1a78d83760414a169e8bc0101e399bb4d685c4ce14"
+      "sha256": "bbf0d393bc9a5488595cc6f50854e3e7a90fe7272c4ba80721239913ca8be5c7"
     },
     "modules/mail/src/adapters/rer/list-headers.mjs": {
       "source": "modules/mail/src/adapters/rer/list-headers.mjs",
-      "sha256": "a45e5dc7db34e074a40a705cf88f2278c9d9962af4c8d2146ec90378df41d431"
+      "sha256": "2ee80e4fa4e9185efebc5ce02fca2f777dfce7b423f31d6a1ede5a19f411195b"
     },
     "modules/mail/src/adapters/resend/README.md": {
       "source": "modules/mail/src/adapters/resend/README.md",
@@ -1683,11 +1683,11 @@
     },
     "modules/mail/src/core/validation.mjs": {
       "source": "modules/mail/src/core/validation.mjs",
-      "sha256": "f2c37a1719fe66569e6aaf5fd31f2a4d93e3367264dbb9202ee526f6d8bbab51"
+      "sha256": "a6db031bcfb94718c6a42975990f904c8dd97115448e5a8b90c6e5f3513116c2"
     },
     "modules/mail/src/development/index.d.mts": {
       "source": "modules/mail/src/development/index.d.mts",
-      "sha256": "abec697c7f83a0cb7035a6c8d9b4e3a87c393d6ecd3ccb1ccbe49022eb03d0e2"
+      "sha256": "c5a98aa45d773ca730dda8a197aa3c9ee3fcf44c7999cfe5fd8365c28f8f2faf"
     },
     "modules/mail/src/development/index.mjs": {
       "source": "modules/mail/src/development/index.mjs",
