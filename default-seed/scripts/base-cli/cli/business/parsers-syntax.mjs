@@ -29,7 +29,9 @@ export function comments(source, slash = false) {
     if (quote === "'" && next === "'") { clean += next; i++; }
     else quote = '';
    }
-  } else if (char === '"' || char === "'" || (slash && char === '`')) { quote = char; clean += char; }
+  } else if (char === '"' || char === "'" || (slash && char === '`')) {
+   quote = char; clean += char;
+  }
   else if (slash && char === '/' && next === '*') { block = true; clean += '  '; i++; }
   else if (char === '#' || (slash && char === '/' && next === '/')) {
    const start = i + (char === '#' ? 1 : 2);

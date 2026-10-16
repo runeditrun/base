@@ -3,6 +3,7 @@ import { configNames, tomlEntries, yamlEntries } from './parsers-config.mjs';
 import { environmentNames, packageNames } from './parsers-packages.mjs';
 import { infrastructureDocument, infrastructureNames } from './parsers-infrastructure.mjs';
 import { pulumiNames } from './parsers-pulumi.mjs';
+import { configuration, configKeyLimit } from './config-policy.mjs';
 
 const examples = /(?:^|[/.\-_])(?:examples?|samples?|templates?|fixtures?)(?:[/.\-_]|$)/i;
 const manifests = /^(?:package\.json|composer\.json|requirements[^/]*\.txt|pyproject\.toml|gemfile|go\.mod|cargo\.toml)$/;
@@ -26,10 +27,14 @@ export function parseNames(relativePath, text) {
   || /(?:^|\/)(?:charts?|helm)\/templates\//i.test(pathname);
  const explicitExample = /(?:^|[/.\-_])(?:examples?|samples?|fixtures?)(?:[/.\-_]|$)/i.test(pathname);
  const manifest = manifests.test(filename), classification = examples.test(pathname) && (!helm || explicitExample) ? 'trace' : 'live-use';
- const result = [], seen = new Set();
+ const result = [], seen = new Set(), configKeys = new Set();
  const emit = evidenceClass => (kind, value) => {
   if (typeof value !== 'string' || !value || value.length > 512 || /[\r\n\0]/.test(value)) return;
   const key = `${evidenceClass}\0${kind}\0${value}`;
+  if (kind === 'config-key' && !configKeys.has(value)) {
+   if (configKeys.size >= configKeyLimit) return;
+   configKeys.add(value);
+  }
   if (!seen.has(key)) { seen.add(key); result.push({ kind, value, class: evidenceClass }); }
  };
  const parse = (source, evidenceClass, isComment) => {
@@ -38,7 +43,7 @@ export function parseNames(relativePath, text) {
   const add = emit(deployed ? 'live-use' : evidenceClass);
   if (manifest) packageNames(filename, source, entries, add);
   if (env) environmentNames(source, add);
-  if (!manifest && !code.test(pathname)) configNames(entries, add);
+  if (!manifest && configuration(pathname)) configNames(entries, add);
   infrastructureNames(pathname, source, entries, ci, add);
   if (code.test(pathname)) pulumiNames(pathname, source, add);
   // Commented-out env declarations are useful traces even in config files.
@@ -49,7 +54,8 @@ export function parseNames(relativePath, text) {
   const templateClean = text.replace(/\{\{\s*\/\*([\s\S]*?)\*\/\s*\}\}/g, (whole, content) => {
    templateTraces.push(content); return whole.replace(/[^\n]/g, ' ');
   });
-  const { clean, traces } = comments(templateClean, filename === 'go.mod' || /\.(?:jsonc?|tf|hcl|[cm]?[jt]sx?|go|cs)(?:\.(?:example|sample|template|tpl))?$/i.test(pathname));
+  const { clean, traces } = comments(templateClean,
+   filename === 'go.mod' || /\.(?:jsonc?|tf|hcl|[cm]?[jt]sx?|go|cs)(?:\.(?:example|sample|template|tpl))?$/i.test(pathname));
   parse(clean, classification, false);
   // Group consecutive comment lines so commented TOML/YAML sections retain
   // their structural context. Comments never inherit live-use classification.

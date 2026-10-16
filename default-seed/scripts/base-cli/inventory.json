@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.31-dev.g23a3f89d",
+  "cliVersion": "0.2.31",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -335,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "a7eea29491561c936835bab0b1ec633472f11bdf309c14e459b11e5a42a429da"
+      "sha256": "ef954633f6c44516285df2d17dda26326fb9421157028196bf339da7cfbcd836"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -373,6 +373,10 @@
       "source": "cli/business/command.mjs",
       "sha256": "acec00c15932695ef08344f1109980fd8c4dc5b21a3d31104731223f86a8adf2"
     },
+    "cli/business/config-policy.mjs": {
+      "source": "cli/business/config-policy.mjs",
+      "sha256": "e768f7e0c46dc26af5253061beb44c851dd17199067a7fc846b746e1a81e24e9"
+    },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
       "sha256": "137c0f2359242bd324ade57310661c6e70cd8f53c3101735ce0508de667b9f28"
@@ -395,7 +399,7 @@
     },
     "cli/business/parsers-syntax.mjs": {
       "source": "cli/business/parsers-syntax.mjs",
-      "sha256": "d6cc67dae8ac92329cb86a059bcd7d8cccd4d4e38875c58c978d3ed3a955be7d"
+      "sha256": "95d55be9540762a8fae71b0794b3ab005016e5de6efaa0216e8e2a4b2b7faadb"
     },
     "cli/business/parsers-terraform.mjs": {
       "source": "cli/business/parsers-terraform.mjs",
@@ -403,7 +407,7 @@
     },
     "cli/business/parsers.mjs": {
       "source": "cli/business/parsers.mjs",
-      "sha256": "0db5eca75c32b66b5dd5a9e02022c85c344b73162d560fd26474d95322bbf389"
+      "sha256": "a46d2415b6f051b9978da6821fa42a9c61317a9a8904e60cec699165abb057b7"
     },
     "cli/business/policy.mjs": {
       "source": "cli/business/policy.mjs",
@@ -411,7 +415,7 @@
     },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
-      "sha256": "eb394b8f39cd3bee353507a76ee904e3bc0b8d45a80912dc8b08732491fb89dc"
+      "sha256": "4111d47eceda7982561370d1322f78ff05a6dace2bba5a8b10346e26f29b4827"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",

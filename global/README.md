@@ -306,6 +306,17 @@ document: `{schema: "rer-business-signals/1", source: "local", signals: [...],
 withheld: N}`. Signals identify package, environment, CI, infrastructure and
 configuration names with a relative `locator`, repository basename `repo`,
 `class` (`live-use` or `trace`) and `observedAt`.
+Identical `(kind, value, repo, class)` signals are emitted once with an occurrence
+`count` and the first matching `locator`. `secret-file` signals remain separate
+for each path, preserving each file's size and modification time.
+
+Config keys come only from JSON (including JSONC), YAML and TOML files in
+configuration directories or with known config filenames.
+Data in tests, fixtures, locales, translations, samples and exports, along with
+lockfiles and generated output, contributes no config keys. The document's
+`configKeyLimit` declares the maximum distinct key paths per file (currently
+200). JavaScript and TypeScript config files are not read or parsed;
+dependencies still come from manifests.
 
 Only names leave the scanner. Secret files are never opened and contribute
 `secret-file` metadata (filename, path, size and modification time).
