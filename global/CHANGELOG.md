@@ -1,8 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.2.31
 
-- `rer release` finds the seed's verification workflow via `--verify-workflow NAME_OR_FILE`, committed `rer-project.json.verifyWorkflow`, `verify.yml`/`verify.yaml`, or a single workflow named `verify`, in that order. Names and files match case-insensitively; ambiguous selections block with the candidates and flag. Exact-SHA run safety checks are unchanged, and receipts include the workflow file and name.
+- **Each seed's verify workflow.** For a GitHub source, `rer release` takes the verify workflow from `--verify-workflow NAME_OR_FILE`. If that is absent, it uses the selected commit's `rer-project.json` `verifyWorkflow`, then `.github/workflows/verify.yml`/`verify.yaml`, then exactly one workflow named `verify`, in that order. Names, full file paths and basenames match case-insensitively. An explicit selection must resolve uniquely and never falls through. An ambiguous selection blocks and lists the candidates with the `--verify-workflow` remedy. The exact-SHA run checks are unchanged. `gates.verify` in the receipt and site provenance records `workflowFile`, `workflowName`, `workflowId`, `runId` and `runUrl`. `operations.verify` is unchanged.
+- **`rer business scan [DIR...] [--json]`.** Names-only discovery of package, environment, CI, infrastructure and configuration names in local directories, outside RER checkouts too. It needs no install, project code or network. It prints one JSON document, `{schema: "rer-business-signals/1", source: "local", signals, withheld}`, and each signal has a relative `locator`, a `repo` basename, a `live-use`/`trace` class and `observedAt`. Secret files are never opened and contribute only filename, path, size and mtime. Sensitive-looking outbound names are dropped and counted in `withheld`.
+- **Opt-in import door.** import-kit's `createImportDoorHandler` (`modules/import-kit/src/door/`) is a D1-only door that a seed may mount under POST `/api/rer/import/{uploads,plan,apply,status,reconcile,undo}`.
+  - It returns 404 until the owner opts in through `writeImportDoorSettings`.
+  - Every request needs a fresh single-use ES256 grant, lasting at most five minutes, from the owner-claim key ring.
+  - Uploads are resumable and SHA-256 checked. Plan makes no writes, and apply runs bounded batches bound to the owner's approved plan fingerprint.
+  - Bounded catch-up stays strictly below 5% of the baseline. Reconcile and owner undo are included.
+  - Base mounts it in no seed.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes.
+- A seed whose verify workflow is not `verify.yml`/`verify.yaml` or named `verify` sets `"verifyWorkflow"` in `rer-project.json`, or passes `--verify-workflow`. It no longer needs `--local-verify` for a GitHub release.
+- The import door is opt-in: a seed mounts the handler, applies `importDoorSchema` in a new numbered migration, and copies import-kit's `CONTRACT.md` and `src/door/README.md`. See "Optional grant-authorised import door" in SEED-COMMAND-CONTRACT.md.
 
 ## 0.2.30
 
