@@ -2,6 +2,7 @@
 # Install the rer command (@runeditrun/rer) for this user:
 #
 #   curl -fsSL https://runeditrun.com/install.sh | sh
+#   curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev owner/repo
 #
 # It reads the version, tarball and sha512 integrity from the npm registry
 # (npm_config_registry, default https://registry.npmjs.org; RER_VERSION=X pins an
@@ -18,6 +19,7 @@
 # Everything runs from main, so a partly downloaded script does nothing.
 main() {
  set -eu
+ if [ "${1:-}" = -- ]; then shift; fi
  package='@runeditrun/rer'
 
  case "$(uname -s 2>/dev/null || echo unknown)" in
@@ -139,6 +141,11 @@ NODE
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
  RER_INSTALL_CHANNEL=script node "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
+ if [ "$#" -gt 0 ]; then
+  PATH="$HOME/.local/bin:$PATH"
+  export PATH
+  "$HOME/.local/bin/rer" "$@"
+ fi
 }
 
 install_node() {
