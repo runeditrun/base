@@ -347,6 +347,20 @@ Both forms write one JSON document with schema `rer-business-signals/1`,
 has `kind`, `value` (a name), relative `locator`, repository basename `repo`,
 `class` (`live-use` or `trace` for examples/comments), and `observedAt`.
 
+A nested checkout with its own `.git` directory starts a new repository: its
+signals use that directory's basename and locators relative to it. Gitdir files
+for submodules also start repository boundaries; linked-worktree gitdir files
+are skipped without following their pointers. Agent and editor folders such as
+`.claude/`, `.codex/`, `.cursor/`, `.worktrees/`, `.idea/`, `.vscode/`,
+`.windsurf/` and `.continue/` are skipped, including when named explicitly.
+The document's `skipped` object counts pruned boundaries by kind:
+`linkedWorktrees`, `toolDirectories`, `generatedDirectories` (including
+dependencies), and `gitDirectories`. These counts contain no paths and count
+only the skipped boundary, not anything inside it. Git metadata, including
+`.git/worktrees/`, is never walked. Generated and vendored trees are excluded
+relative to each scan root, so an explicitly named ordinary root remains
+scannable even below a directory named `build` or `vendor`.
+
 `config-key` observations come only from configuration directories (such as
 `config/`, `.github/`, `deploy/`, `charts/`, `k8s/` and `infra/`) and known
 configuration names (such as `wrangler.*`, `docker-compose*.yaml`, `settings.*`
