@@ -159,6 +159,9 @@ export default {
         const state = await bounded(env.DEMO.get(id).status(), 2000).catch(() => null);
         if (state?.phase === 'starting') return progress(request, env, id, state);
       }
+      // A demo's owner has no mailbox, so the seed's sign-in page would strand
+      // the visitor: signing out ends their copy and shows the ended page.
+      if (url.pathname === '/auth/signout' && request.method === 'POST') return env.DEMO.get(id).signOut(request);
       return env.DEMO.get(id).fetch(request);
     }
     if (!['GET', 'HEAD'].includes(request.method)) return new Response('Start a demo first.', { status: 403 });

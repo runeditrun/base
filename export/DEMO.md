@@ -86,7 +86,9 @@ visitor into their own native Worker Loader isolate and SQLite Durable Object
 storage. The ordinary production Worker bundle is built once, with static files
 served directly at the edge. The visitor lands signed in as the demo owner with
 sample data and `RER_DEMO=1`; account effects remain simulated by the demo guard.
-Each copy ends after 60 minutes or 15 idle minutes, when its storage is erased.
+Each copy ends after 60 minutes or 15 idle minutes, or when the visitor signs
+out (`POST /auth/signout`), when its storage is erased and the visitor sees the
+ended page with "Start a new demo".
 
 1. Adopt local demo mode above and the owner-claim endpoint. The hosted app must
    export its Worker entry and declare all resources in its Wrangler config.
