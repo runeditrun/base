@@ -219,12 +219,34 @@ test('rer deploy --remove deletes only what this environment created, reads back
  assert.notEqual(provider.state.settings, null); assert.equal(provider.state.databases.length, databases);
 });
 
-test('a secret change settles after its response is lost; one the provider refused is not adopted, and one made outside rer is refused', async t => {
- const { root } = await checkout(t, { secrets: [{ binding: 'SESSION_SECRET', environment: 'SESSION_SECRET' }] });
+test('an optional secret deploys unset and is set and removed later; a secret change settles after its response is lost; one the provider refused is not adopted, and one made outside rer is refused', async t => {
+ const { root } = await checkout(t, { secrets: [{ binding: 'SESSION_SECRET', environment: 'SESSION_SECRET' }, { binding: 'PIER_SESSION', environment: 'PIER_SESSION', optional: true }] });
  const { provider } = account(t);
  const deploy = ownerDeploy('deploy.json', { ...lifecycle, hooks: {} });
- const run = options => deploy({ root, options: { environment: 'production', ...options }, store: store(), setupManifest: manifest });
- await run({});
+ const run = (options, out = store(), setupManifest = manifest) => deploy({ root, options: { environment: 'production', ...options }, store: out, setupManifest });
+ // A missing required secret still refuses before any provider write.
+ await assert.rejects(run({}, store(), {}), /Deploy needs SESSION_SECRET/);
+ assert.equal(provider.state.writes.length, 0);
+ // A missing optional one does not block the first deploy: it is named as not set and left unbound.
+ const out = store();
+ assert.equal((await run({}, out)).deployed, true);
+ assert.deepEqual(secretNames(provider), ['SESSION_SECRET']);
+ assert.equal(provider.state.settings.bindings.some(item => item.name === 'PIER_SESSION'), false);
+ assert.ok(out.lines.some(line => line.includes('Optional secrets not set: PIER_SESSION')), out.lines.join('\n'));
+ // Set later through rer: the next deploy accepts its own Worker, and an unchanged repeat writes nothing.
+ process.env.PIER_SESSION = 'test-only-pier-session';
+ await run({ setSecret: 'PIER_SESSION' });
+ assert.equal(provider.state.secrets.find(item => item.name === 'PIER_SESSION').value, 'test-only-pier-session');
+ let writes = provider.state.writes.length;
+ assert.equal((await run({})).deployed, true, 'the Worker the set made is not refused as replaced');
+ assert.equal(provider.state.writes.length, writes, 'an unchanged repeat makes no provider write');
+ // Removed through rer: the next deploy leaves it unset, again without a write.
+ await run({ unsetSecret: 'PIER_SESSION' });
+ writes = provider.state.writes.length;
+ assert.equal((await run({})).deployed, true);
+ assert.equal(provider.state.writes.length, writes);
+ assert.deepEqual(secretNames(provider), ['SESSION_SECRET']);
+ delete process.env.PIER_SESSION;
  provider.fail('DELETE', /\/secrets\/SESSION_SECRET$/, { afterApply: true });
  await run({ unsetSecret: 'SESSION_SECRET' });
  assert.deepEqual(secretNames(provider), []);

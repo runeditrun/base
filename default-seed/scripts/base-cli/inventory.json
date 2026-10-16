@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.32-dev.g4ecde9b3",
+  "cliVersion": "0.2.32-dev.g0d3f4a72",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -615,7 +615,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "b189813a97e30c4bcfa3c95ba8d49ac6f8b3b51bc1d1f203d20f5408345abd30"
+      "sha256": "d78d03f6978e0fe9ac686e011fbad1a9fb06dc54e694c62131a20788839a004a"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -1367,7 +1367,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "a3ef5136195fae0a93ef562c9c013ddbaf4b78abfe45ceb985dfc39c60ce8794"
+      "sha256": "8d9c8d10e086773cc9795a75c84081e5ce52f2cc3ed2932c816d8c197fd136a8"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1419,7 +1419,7 @@
     },
     "modules/deploy-kit/health.mjs": {
       "source": "modules/deploy-kit/health.mjs",
-      "sha256": "f747818ceb289cbbdbde874fae72c529cb384e125ec5a4541a76bbd83527e228"
+      "sha256": "6c1e35e0dba582993a961f331ab6ec0d14a575f518b05d107378c8fdf9c92851"
     },
     "modules/deploy-kit/index.mjs": {
       "source": "modules/deploy-kit/index.mjs",
@@ -1443,7 +1443,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "347c4e2d75dadc5ad103cc82114fea4f0e482a340275339d2310719d3daa1bdb"
+      "sha256": "2f8a402eca125d83772d1a93ece380ca8fd92cf6a5128295a193bb69dd39eb55"
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
@@ -1463,7 +1463,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "2123e7b081ab13d448f32980ee928d8abf9b687f2f38dd51b9433969d1bb466b"
+      "sha256": "4110729e0b158d426f5c6be2c37d485a32e1561d89f25140b3233eaede7c7d99"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
@@ -1547,11 +1547,11 @@
     },
     "modules/deploy-kit/validation.mjs": {
       "source": "modules/deploy-kit/validation.mjs",
-      "sha256": "1e9b0b3c20420176e8f8d10d5f88ae18776cb35649e1ac2e6051372c81ff1309"
+      "sha256": "0c466ae4909c19069e10857644f6422319e02316411bb91c170764479b26f26a"
     },
     "modules/deploy-kit/worker.mjs": {
       "source": "modules/deploy-kit/worker.mjs",
-      "sha256": "3e1ca1d9591f5b91b57777fbb0648c4925cfe86b8efd08f81f5d3861ef2e14f5"
+      "sha256": "9c886d32e40e0d16b77fec75f49c36b0a9aa31d0e959db8e903ca5c2e4ac0d47"
     },
     "modules/erasure/CONTRACT.md": {
       "source": "modules/erasure/CONTRACT.md",

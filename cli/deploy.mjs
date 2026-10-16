@@ -47,6 +47,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
    const worker = ownerWorkerName(declaration.project, environment);
    const artifact = await packageBuild({ root, source: { sha: '0'.repeat(40), tree: '0'.repeat(40) }, runIdentity: { id: '0', attempt: '1' }, productDirectory: '' });
    ownerPlan({ project: declaration.project, environment, worker, origin: `https://${worker}.example.invalid` }, declaration, artifact, { localOnlyKeys, env: production.env });
+   const optional = (Array.isArray(declaration.secrets) ? declaration.secrets : []).filter(item => item?.optional && !production.env[item.environment]?.trim()).map(item => item.binding);
+   if (optional.length) store.report(`deploy: optional secrets not supplied: ${optional.join(', ')}. A Worker that does not hold one deploys without it.`);
    store.report('deploy: dry run complete; no deployment occurred and no provider request was made.');
    return { dryRun: true, deployed: false };
   }
@@ -84,6 +86,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    deployed = await owner('deploy', [], env, { notice: line => store.report(line), onCreated: resource => created.push(redaction.redact(resource)) });
    const sent = supplied.filter(name => deployed.sentSecrets.includes(name));
    if (sent.length) store.report(`rer supplied ${sent.join(', ')} from the local setup owner and fresh generated values.`);
+   if (deployed.optionalUnset) store.report(`Optional secrets not set: ${deployed.optionalUnset.join(', ')}. The application runs without them; set one later with ${again} --set-secret NAME.`);
    step = 'health';
    await owner('health', [], env, {propagation:deployed.propagation});
    step = 'claim owner';

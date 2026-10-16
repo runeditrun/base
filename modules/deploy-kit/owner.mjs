@@ -23,7 +23,7 @@ const segment = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const STATE_KIND = 'rer-deploy-owner-state';
 export const KINDS = ['d1','r2','kv','queues'];
 const DECLARATION_KEYS = ['version','project','compatibilityDate','compatibilityFlags','d1','r2','kv','queues','durableObjects','secrets','crons','vars','originVar','publicOriginSetting','services','workersDev','platforms','container'];
-const ENTRY_KEYS = {d1:['binding'],r2:['binding','locationHint'],kv:['binding'],queues:['binding','consumer','deadLetterQueue'],durableObjects:['binding','className','storage'],secrets:['binding','environment','verifyStandIn'],services:['binding','project','entrypoint','allowedHosts','grant']};
+const ENTRY_KEYS = {d1:['binding'],r2:['binding','locationHint'],kv:['binding'],queues:['binding','consumer','deadLetterQueue'],durableObjects:['binding','className','storage'],secrets:['binding','environment','verifyStandIn','optional'],services:['binding','project','entrypoint','allowedHosts','grant']};
 
 export function refuse(code, kind, name) { const error = new Error(code); error.resource = `${kind}:${name}`; return error; }
 
@@ -149,6 +149,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
     queues:queues.map(item => ({...item,name:name(item.binding),...(item.deadLetterQueue === undefined ? {} : {deadLetterQueue:name(item.deadLetterQueue)})})),
     durableObjects:entries(declaration,'durableObjects').map(item => ({...item})),
     // verifyStandIn is only `rer verify`'s hosted-check value: never planned, sent or stored.
+    // An optional secret (`"optional": true`, an integration's credential) may stay unset: it is bound only once supplied.
     secrets:entries(declaration,'secrets').map(({verifyStandIn,...item}) => { assert(verifyStandIn === undefined || typeof verifyStandIn === 'string' && verifyStandIn.length > 0 && verifyStandIn.length <= 1024, 'invalid-verify-stand-in'); return item; }),
     crons:[...(declaration.crons ?? [])],vars,
     // Only declarations using these add the keys, so earlier plans and fingerprints are unchanged.
@@ -361,7 +362,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   const create = await ownedResourcesToCreate(api, plan, state);
   if (exists) await checkCronOwnership(api, plan);
   // The declared secrets this run uploads; every other one is inherited unchanged.
-  const {missing:sentSecrets} = await secretBindings(api, plan.worker, plan, env, exists);
+  const {missing:sentSecrets,unset:unsetSecrets} = await secretBindings(api, plan.worker, plan, env, exists);
   // Record intent before each create. A failed or lost response leaves it pending:
   // absent on resume means create again; present means an uncertain outcome to inspect.
   for (const {kind,item} of create) {
@@ -404,7 +405,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; delete state.pendingSecret; await save(); } },
     // Keep each first-health attempt beside the identity it belongs to.
     onHealth: async candidate => { if (candidate.changed) { state.receipt = candidate; await save(); } }});
-  return {receipt, created:create.map(({kind,item}) => `${kind}:${item.name}`), sentSecrets, freshUpload:!exists && receipt.changed};
+  return {receipt, created:create.map(({kind,item}) => `${kind}:${item.name}`), sentSecrets, unsetSecrets, freshUpload:!exists && receipt.changed};
 }
 
 /** Independent read-only health of the last owner deployment recorded in the state file. */

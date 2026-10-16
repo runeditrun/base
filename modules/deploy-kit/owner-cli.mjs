@@ -110,11 +110,13 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env}).secrets;
   const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness});
   requestWindow = window;
-  const {receipt,created,sentSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {
+  const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });
-  const result = {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,retiredSecrets,...(state.ownerClaim ? {ownerClaim:state.ownerClaim} : {}),state:statePath};
+  // Optional secrets the Worker does not hold: never supplied, or removed with --unset.
+  const optionalUnset = declaredSecrets.filter(item => item?.optional && (unsetSecrets.includes(item.binding) || retiredSecrets.includes(item.binding))).map(item => item.binding);
+  const result = {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,...(optionalUnset.length ? {optionalUnset} : {}),retiredSecrets,...(state.ownerClaim ? {ownerClaim:state.ownerClaim} : {}),state:statePath};
   const sentTokens = new Map(sentSecrets.map(binding => [binding,env[declaration.secrets.find(item => item.binding === binding)?.environment]]));
   Object.defineProperty(result, 'propagation', {value: {window,uploaded:receipt.changed,freshUpload,sentSecrets,versionId:receipt.provider.versionId,
     matchesToken:(binding,token) => sentTokens.has(binding) && sentTokens.get(binding) === token}});
