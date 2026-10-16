@@ -15,6 +15,7 @@ function OperatorApp() {
       <p>The private loader runs only after the parent session gate passes.</p>
       <p>Latest job: {dashboard.latestJob?.state ?? 'none'}</p>
       <p>Latest cron: {dashboard.latestSchedule?.cron ?? 'none'}</p>
+      <p><a href="/app/people">People and recent activity</a></p>
       <OperatorAccess />
     </section>
   )

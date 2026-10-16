@@ -31,6 +31,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (options.verb === 'describe') { const result = await describe(project); out.human(options.json ? JSON.stringify(result) : JSON.stringify(result, null, 2)); return 0; }
   if (options.verb === 'check') {
    const result = await check(project, options.profile);
+   (await import('./placeholder-mark.mjs')).warnPlaceholderMarks(out, options, result.placeholderMarks);
    if (!options.json) for (const clause of result.clauses.filter(c => !c.ok)) out.human(`${clause.id}: ${clause.message}`);
    out.result(result.ok, result.ok ? 0 : 1, { clauses: result.clauses }); return result.ok ? 0 : 1;
   }
@@ -42,7 +43,11 @@ export async function main(argv = process.argv.slice(2)) {
   // The owner link is printed once to this terminal: never through the logged lifecycle.
   if (options.verb === 'signin') { out.result(true, 0, await (await import('./signin.mjs')).signinCommand(project, options, out)); return 0; }
   // A checkout without a declared run site refuses --site before any effect.
-  if (options.site) (await import('./site.mjs')).declaredSite(project);
+  if (options.site) {
+   const { checkoutPlaceholderMarks, warnPlaceholderMarks } = await import('./placeholder-mark.mjs');
+   warnPlaceholderMarks(out, options, await checkoutPlaceholderMarks(project.root, project.descriptor.project));
+   (await import('./site.mjs')).declaredSite(project);
+  }
   if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret) {
    const { deliveryDeclarationClauses } = await import('./delivery-declarations.mjs');
    const failures = (await deliveryDeclarationClauses(project.root)).filter(clause => !clause.ok);

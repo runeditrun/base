@@ -9,17 +9,23 @@ import { publicationScan, validatePublicationDestination } from './publication-s
 import { publicDestination, requirePublicDestination, remotePublicHead, publicChild, assertPublicTree } from './public-child.mjs';
 import { writePublishHandoff } from './publish-handoff.mjs';
 import { releasePublicBase } from './public-base.mjs';
+import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark.mjs';
 
 // Failure output belongs to the private receipt, not the site preview.
 const withoutOutput = gates => JSON.parse(JSON.stringify(gates, (key, value) => key === 'output' ? undefined : value));
 
-export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, localVerify = false }) {
+export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, localVerify = false, allowPlaceholderMark = false }) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(project ?? '')) throw Error('--project must be publisher/name');
   if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?$/i.test(repository ?? '')) throw Error('--repository must be a credential-free GitHub repository URL');
   if (onto !== undefined && clean) throw Error('--onto and --clean-history are mutually exclusive');
   if (publicBase !== undefined && (onto !== undefined || clean)) throw Error('--public-base selects exact-source history; cannot combine with export history modes');
   const preview = dryRun || !tag;
   const source = inspectSource(repo, ref);
+  // A release refuses a seed still wearing Base's placeholder mark unless the
+  // caller allows it explicitly; the receipt records that allowance.
+  const files = [...source.entries].filter(([, entry]) => entry.type === 'blob' && ['100644', '100755'].includes(entry.mode)).map(([path]) => path);
+  const marks = await placeholderMarks(source.entries.has('OPERATIONS.json') ? JSON.parse(source.bytes('OPERATIONS.json')).project : project, files, source.bytes);
+  if (marks.length && !allowPlaceholderMark) throw Object.assign(Error(`${placeholderMessage(marks)} Release refused; pass --allow-placeholder-mark to release with it.`), { code: 'placeholder_mark' });
   validatePublicationDestination(source, project, repository);
   releaseMessage(source);
   if (typeof tag === 'string' && tag !== source.tag) throw Error('Requested tag must match the committed release version');
@@ -90,6 +96,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       dryRun, tagRequested: Boolean(tag), source: { commit: source.commit, tree: source.tree }, tag: { name: source.tag, created: false, pushed: false }, gates,
       publicationHistory: destination ? 'public-child' : clean ? 'parentless-export' : 'source-history',
       ...(destination ? { publicParent, publicDestination: { repository: destination.url, branch: destination.branch } } : {}),
+      ...(marks.length ? { placeholderMark: { allowed: true, files: marks } } : {}),
       publicExport: null, siteRelease: null };
     // A blocked preview may prepare the site metadata/docs for local review.
     // Its provenance explicitly records blocked gates; it is never a release.

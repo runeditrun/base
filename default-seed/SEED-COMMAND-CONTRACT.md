@@ -309,6 +309,58 @@ vendored `mail` package), run `pnpm install`, and run the seed's suites. Base's
 own suites showed no behaviour change from undici 7.29.1; Mango's one red
 move-in journey on it did not reproduce.
 
+## Seed mark, readable actors and refresh-safe forms
+
+Three shared rules from the seed quality report. Each arrives with a Base refresh
+(vendored copies; `src/base` for the two runtime files) or the rer pin that
+contains it; Base's `default-seed` shows each one in use.
+
+**The seed's own mark (SC-14).** While a seed's logo, favicon or app mark is
+byte-equal to Base's placeholder "F" (`foundation/template/public/brand/mark.svg`),
+`rer check --profile first-party`, `rer build --site` and `rer deploy --site`
+print one warning line naming the files ("Base's placeholder mark is still in
+<files>; replace with the seed's own mark."; a `warning` event with code
+`placeholder_mark` under `--json`) and do not fail, so a live run site keeps
+redeploying. `rer release` refuses it unless `--allow-placeholder-mark` is
+given; the receipt then records `placeholderMark: { allowed: true, files }`.
+Base's own projects (`example/foundation`, `runeditrun/default-seed-reference`)
+are exempt. Adopt: when the seed's brand round comes, draw its mark, replace
+`public/brand/mark.svg` and every copy the warning names (favicons, site assets),
+and the warning stops; until then, release with `--allow-placeholder-mark`.
+
+**Names, times and labelled evidence.** `src/base/actor.ts`
+(`foundation/runtime/actor.ts`) turns an actor id and a timestamp into
+`actorLine(directory, id, at, timeZone)`: "Maya Chen · 16 Oct 2026, 3:04 pm
+AEDT". An id the directory does not hold (an erased, removed or unrestored
+person) reads "Former member", never the UUID. `evidenceHtml(details, {
+directory, timeZone })` renders an evidence, details or snapshot object (or its
+JSON text) as a labelled `<dl>`: nested fields read "Decision › Reviewed at",
+actor-shaped fields (`actor`, `approvedBy`, `operatorId`…) resolve to names,
+timestamps render in the business time zone, and nothing renders as raw JSON or
+`[object Object]` (`evidenceFields` returns the same as text for other
+renderers). `operatorDirectory(db)` reads operator-auth's display names; add the
+seed's own people (members, staff, agents) to that map. Declare the business
+time zone as `timeZone` in the seed's identity (`EditionIdentity`), or pass the
+installation's own setting. Adopt: replace every place a screen prints an actor
+id, `JSON.stringify` of evidence, a raw journal or a UTC timestamp with these.
+
+**Refresh-safe writes.** `src/base/command-receipts.ts`
+(`foundation/runtime/command-receipts.ts`) with its table
+`command-receipts.sql`. A create form carries `commandKeyInput()` (a fresh key
+each render); its handler runs the create through `runOnce(db, { actor, command,
+key: commandKey(form) }, create)` and answers `seeOther(location)` (303 to a
+GET), so a refresh reads the result and a resubmitted form (Back, a retried
+request, a double click) returns the first result instead of creating a second
+credential, publication or key. A key in flight answers 409; a failed create
+releases its key. `create` may return `once`, a part shown only to the first
+`readReceipt` (a new credential's token): redirect to `?done=<key>` and read it
+there, never in the POST's own response. JSON creates take the same key as an
+`Idempotency-Key` header (default seed: `POST /api/people`). Archives never
+carry `rer_command_receipts`. Adopt: apply `command-receipts.sql` as the seed's
+next numbered migration (new foundations get `0015_command_receipts.sql`), then
+route every create form through `runOnce` and 303, removing any branch that
+renders a result page from the POST itself.
+
 ## Hydration units
 
 A mismatch between the server HTML and what React hydrates (an extension linking an address, a translator, a proxy rewrite) makes React client-render the nearest Suspense boundary; under TanStack Router that is everything under the root route, and the root route's own chrome is in no boundary at all. Seeds wrap every page section and the root chrome in `HydrationUnit`, mark one-time entrance animations with `data-intro` under the root's intro guard, hydrate through a `src/client.tsx` that passes `createRecoverableErrorHandler()`, keep addresses as lone text and send `no-transform` on documents. The convention and the adoption steps are in Base's `foundation/runtime/hydration/README.md` (in an edition, `src/base/hydration/README.md`).
@@ -408,6 +460,7 @@ Independent projects without an adapter use `OPERATIONS.json` v2 `commands.NAME.
 - SC-08: complete local export/import, integrity, empty-destination/confirmation and credential exclusions.
 - SC-09: structural check rejects omissions, doctor names missing inputs, stable JSON and exits.
 - SC-10: optional independent execution uses only declared argv, preserves child outcomes and forces no stack.
+- SC-14: the seed carries its own mark; check and run site builds and deploys warn on Base's placeholder mark, and releases refuse it unless `--allow-placeholder-mark` is given, which the receipt records.
 
 ## Managed servers and bounded work
 

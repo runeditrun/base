@@ -3,6 +3,9 @@
 import type { EditionIdentity } from '../../../../foundation/runtime/identity'
 import site from '../../../deploy-site.json'
 
+// The business's time zone: people read every recorded time in it (foundation/runtime/actor.ts).
+export const businessTimeZone = 'Australia/Sydney'
+
 export const identity: EditionIdentity = {
   product: 'Default seed',
   deployment: 'Default seed reference',
@@ -19,4 +22,5 @@ export const identity: EditionIdentity = {
   mark: '/brand/mark.svg',
   band: '/brand/band.svg',
   fonts: '/fonts/fonts.css',
+  timeZone: businessTimeZone,
 }
