@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { emittedRuntime, root, owner, setupToken, decodeStart } from './emitted-runtime.mjs'
+import { startTogether } from '../ports.mjs'
 
 export const cookieOf = (response) => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
 export async function functionId(name) {
@@ -113,10 +114,11 @@ test('emitted Worker browser: native sessions stay separate across loopback port
   // Browsers keep cookies per host, not per port: one browser holds both apps'
   // cookies for 127.0.0.1 and sends all of them to each port.
   const keys = ['a', 'b'].map((letter) => letter.repeat(43))
-  const [a, b] = await Promise.all(keys.map((devKey) => emittedRuntime({ noMail: true, devKey })))
-  const { chromium } = await import('@playwright/test')
-  const browser = await chromium.launch({ headless: true })
+  const [a, b] = await startTogether(keys.map((devKey) => () => emittedRuntime({ noMail: true, devKey })))
+  let browser
   try {
+    const { chromium } = await import('@playwright/test')
+    browser = await chromium.launch({ headless: true })
     const context = await browser.newContext()
     const signedIn = (page) => page.getByText(`${owner} · owner`, { exact: true }).waitFor()
     const open = async (runtime, key) => {
@@ -152,7 +154,7 @@ test('emitted Worker browser: native sessions stay separate across loopback port
     assert.equal(await admits(a), 401, 'sign-out on A ends only its session')
     await pageB.reload(); await signedIn(pageB)
     assert.equal(await admits(b), 200, 'sign-out on A leaves B signed in')
-  } finally { await browser.close(); await Promise.all([a.close(), b.close()]) }
+  } finally { await Promise.allSettled([browser?.close(), a.close(), b.close()]) }
 })
 
 test('emitted Worker: a linked Auth provider verifies a signed callback and shares revoked session admission', async () => {
