@@ -119,6 +119,10 @@ Reruns preserve an existing owner, data and exact settings bytes; setup does
 not create a second owner or rotate secrets. Dev and preview use the saved
 owner and canonical durable state. Dev opens through the local identity entry;
 application mail is silently suppressed in development and demo.
+Invited people choose **Sign in as <name>** in operator access or at `/signin`
+to open `/app` with their assigned roles. A fresh local browser profile first
+opens `RER_OPEN` to receive the checkout's key cookie. The local persona list
+also accepts an invited or active person's email through `rer dev --as EMAIL`.
 
 Adapters use the shared captured command store for child work. It redacts
 registered credential values from terminal output and private logs, records

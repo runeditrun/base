@@ -54,10 +54,13 @@ Use the setup prompt instead of `--owner-email` when entering the real owner
 mailbox. With dev identity, `dev` prints `RER_OPEN`: open it on this computer
 and the app opens signed in as the owner at `/setup` (`dev --as PERSONA` and
 `dev --login` keeps automatic entry; treat the line as a credential). Mail is
-silently suppressed in local dev and demo. Until
+silently suppressed in local dev and demo.
+An invited person chooses **Sign in as <name>** in operator access or at
+`/signin` to open `/app` with their role. In a fresh local browser profile, open
+`RER_OPEN` first to receive the checkout's key cookie. Until
 first-run completion is stored durably, app routes return the signed-in owner
 to `/setup`; a signed-out owner returns there after signing in. Once complete,
-`/setup` opens the app or its settings. Local dev and demo silently suppress mail. Stop `dev` with `rer dev --stop` or Ctrl-C, and stop `preview` with
+`/setup` opens the app or its settings. Stop `dev` with `rer dev --stop` or Ctrl-C, and stop `preview` with
 `rer preview --stop` before build or verification.
 
 Queue waits report immediately with a reason and numeric one-based position,

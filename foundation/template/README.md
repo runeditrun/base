@@ -32,6 +32,11 @@ uses the same automatic sign-in. Until first-run completion is stored durably, a
 signed-out visitors sign in and return there. Once complete, `/setup` opens the
 app or settings. Development and demo mail is silently suppressed.
 
+In dev and demo, invite a person and choose **Sign in as <name>** in operator
+access or at `/signin`. The same one-click entry opens `/app` with their assigned
+role. Each local browser profile first opens `RER_OPEN` for the checkout key
+cookie. Mail is silently suppressed; there is no email-reading step.
+
 The saved local port is used; a first setup saves the first free port from 8787. Explicit ports are decimal
 integers from 1 through 65535 and must be free; a busy requested port fails
 instead of silently moving. Only `127.0.0.1`, `localhost` and `::1` are allowed.

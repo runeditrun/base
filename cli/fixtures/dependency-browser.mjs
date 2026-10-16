@@ -85,8 +85,14 @@ export async function linkedBrowser(f,origin,provider,env,kind,network) {
      const recovery=await browser.newContext({viewport,javaScriptEnabled:false});
      try {
       const signIn=await nativeLogin(recovery,origin,f.root);await signIn.goto(origin+'/signin');
-      assert.equal(await signIn.getByRole('button',{name:/Continue with/}).count(),0);
-      await signIn.getByRole('link',{name:'Continue as owner',exact:true}).waitFor();
+      const ownerEntry=signIn.locator('a[href^="/auth/dev/enter?as=owner"]');
+      await ownerEntry.waitFor();
+      const entered=await recovery.request.get(origin+await ownerEntry.getAttribute('href'),{maxRedirects:0});
+      assert.equal(entered.status(),303);
+      const ownerSession=await (await recovery.request.get(origin+'/auth/session')).json();
+      assert.equal(ownerSession.operator.email,'cli-owner@example.test');
+      assert.equal(ownerSession.operator.role,'owner');
+      assert.equal(ownerSession.kind,'dev');
       await capture(signIn,'provider-unavailable');await signIn.close();
      }finally{await recovery.close();}
      assert.equal((await post(native,'/auth/dependencies/unlink',{interface:'oidc-provider@1'})).status(),200);

@@ -19,6 +19,11 @@ and demo mail is silently suppressed. Stop `dev` with
 `rer dev --stop` or Ctrl-C, and stop `preview` with
 `rer preview --stop` before build or verification.
 
+In dev and demo, invite a person and choose **Sign in as <name>** in operator
+access or at `/signin`. The same one-click entry opens `/app` with their assigned
+role. Each local browser profile first opens `RER_OPEN` for the checkout key
+cookie. Mail is silently suppressed; there is no email-reading step.
+
 ```sh
 rer verify
 rer reset --yes

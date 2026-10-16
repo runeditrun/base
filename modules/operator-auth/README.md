@@ -519,6 +519,17 @@ request URLs. `RER_DEV_IDENTITY=off` disables dev sign-in and personas. The
 layer answers 503 to every request when `RER_INSTALLATION_ID` is set beside a
 non-loopback `RER_MANAGEMENT_ORIGIN`.
 
+In dev and isolated hosted demos, `/signin` lists **Sign in as <name>** for
+active people and people with a live invitation. The default operator screen
+gets `signInUrl` on those `/auth/operators` records and offers the same action.
+`GET /auth/one-click?as=EMAIL&returnTo=/app` accepts the invitation with the
+existing atomic issuer, expiry, version and cancellation checks. Local sessions
+are always `dev` and require the checkout key on every request; hosted demo
+sessions belong only to that visitor's database. Production answers 404. The
+local persona list also includes invited/active people by email. Suppressed
+email-link form requests direct the admitted visitor to this same one-click
+entry rather than telling them to wait for mail.
+
 `dev/sign-in-as.mjs` is the test harness door: `signInAs({origin, key, as})`
 returns the cookies a test browser or fetch client installs, and
 `readDevKey(root)` reads the checkout's key.

@@ -132,6 +132,12 @@ uses the same automatic sign-in. Until first-run completion is stored durably,
 app routes return the signed-in owner to `/setup`; a signed-out owner returns
 there after signing in. Once setup is complete, `/setup` opens the app or settings.
 
+In dev and demo, invited people choose **Sign in as <name>** in operator access
+or at `/signin` to open `/app` with their assigned role. A fresh local browser
+profile opens `RER_OPEN` first for the checkout's key cookie. Mail is silently
+suppressed. `rer dev --as person@example.com` also opens an invited or active
+person's account through the same one-click path.
+
 The saved local port is used; a first setup saves the first free port from 8787. Explicit ports must be decimal
 integers from 1 to 65535 and free; only `127.0.0.1`, `localhost` and `::1` are
 allowed. Startup reports a conflict instead of drifting to another port. Dev
