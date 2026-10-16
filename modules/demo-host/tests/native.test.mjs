@@ -1,31 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, cp, writeFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { RUNTIME_FILES, ISOLATE_FILES, objectExports } from '../native/config.mjs';
+import { RUNTIME_FILES } from '../native/config.mjs';
+import { prepareNative } from '../native/prepare.mjs';
 import { DEMO_FILES } from '../plan.mjs';
 
 test('Loader demos claim and seed two isolated native apps, serve edge assets, and erase on expiry', async () => {
-  const folder = await mkdtemp(join(tmpdir(), 'rer-native-demo-'));
+  const folder = await realpath(await mkdtemp(join(tmpdir(), 'rer-native-demo-')));
   const base = resolve(import.meta.dirname, '../../..');
   let mf;
   try {
     await cp(join(base, 'modules'), join(folder, 'modules'), { recursive: true });
-    const source = name => readFile(join(base, name), 'utf8');
+    // The seed's Worker build as rer deploy --demo receives it, including a tiny
+    // WebAssembly module (add) and a data module the app imports.
+    const app = join(folder, 'bundle/app'), server = join(app, 'dist/server');
+    for (const file of ['modules/demo-host/tests/native-app.mjs', 'modules/owner-claim/verify.mjs', 'modules/operator-auth/loopback.mjs']) await cp(join(base, file), join(server, file));
+    await writeFile(join(server, 'modules/demo-host/tests/native-add.wasm'), Buffer.from('0061736d0100000001070160027f7f017f030201000707010361646400000a09010700200020016a0b', 'hex'));
+    await writeFile(join(server, 'modules/demo-host/tests/native-data.bin'), Buffer.from([7, 8, 9]));
+    await mkdir(join(app, 'dist/client/assets'), { recursive: true });
+    await writeFile(join(app, 'dist/client/assets/fixture-12345678.js'), 'fixture');
     const sql = 'CREATE TABLE owner(email TEXT PRIMARY KEY); CREATE TABLE items(name TEXT PRIMARY KEY); CREATE TABLE jobs(name TEXT PRIMARY KEY);';
-    const bundle = { digest: 'fixture-native-app', compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], bindings: { databases: ['DB', 'SECOND'], buckets: ['FILES'], objects: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }], queues: { producers: [{ binding: 'JOBS', queue: 'work' }], consumers: [{ queue: 'work', max_retries: 2 }] }, assets: 'ASSETS' }, vars: {}, crons: [], assetPaths: ['/assets/fixture-12345678.js'],
-      migrations: Object.fromEntries(['DB', 'SECOND'].map(binding => [binding, [{ name: '0001_items.sql', sql, sha256: createHash('sha256').update(sql).digest('hex'), statements: sql.split(';').filter(Boolean) }]])),
-      modules: {
-        '_rer/isolate.js': { js: (await source('modules/demo-host/native/isolate.mjs')).replace('__RER_APP_ENTRY__', '../app/modules/demo-host/tests/native-app.mjs') + objectExports({ objects: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }] }) },
-        ...Object.fromEntries(await Promise.all(ISOLATE_FILES.map(async file => [`_rer/${file}.js`, { js: await source(`modules/demo-host/native/${file}.mjs`) }]))),
-        'app/modules/demo-host/tests/native-app.mjs': { js: await source('modules/demo-host/tests/native-app.mjs') },
-        'app/modules/owner-claim/verify.mjs': { js: await source('modules/owner-claim/verify.mjs') },
-        'app/modules/operator-auth/loopback.mjs': { js: await source('modules/operator-auth/loopback.mjs') },
-      } };
-    await writeFile(join(folder, 'modules/demo-host/native/bundle.mjs'), `export default ${JSON.stringify(bundle)};`);
+    const config = { main: 'modules/demo-host/tests/native-app.mjs', compatibility_date: '2026-09-08', no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }],
+      d1_databases: [{ binding: 'DB' }, { binding: 'SECOND' }], r2_buckets: [{ binding: 'FILES' }],
+      durable_objects: { bindings: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }] },
+      queues: { producers: [{ binding: 'JOBS', queue: 'work' }], consumers: [{ queue: 'work', max_retries: 2 }] } };
+    const migrations = Object.fromEntries(['DB', 'SECOND'].map(binding => [binding, [{ name: '0001_items.sql', sql, sha256: createHash('sha256').update(sql).digest('hex'), statements: sql.split(';').filter(Boolean) }]]));
+    await writeFile(join(app, 'demo.json'), JSON.stringify({ config, migrations }));
+    await prepareNative(folder);
     const origin = 'https://demo.example.test', measurement = 'fixture-measurement-token-1234567890123456';
     const files = ['modules/demo-host/native/worker.mjs', ...[...RUNTIME_FILES.filter(file => file !== 'worker'), 'bundle'].map(file => `modules/demo-host/native/${file}.mjs`),
       ...DEMO_FILES.map(file => `modules/demo-host/${file}`), ...['migrations', 'demo-egress'].map(file => `modules/container/${file}.mjs`), ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
@@ -66,6 +71,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);
     assert.deepEqual(await (await fetch('/items', b)).json(), [{ name: 'sample' }]);
+    assert.deepEqual(await (await fetch('/modules', a)).json(), { sum: 5, data: [7, 8, 9] }, 'the app answers with its wasm and data modules');
     assert.equal((await fetch('/bindings', a, { method: 'POST', body: 'visitor-a' })).status, 201);
     let processed;
     for (let attempt = 0; attempt < 60; attempt++) {

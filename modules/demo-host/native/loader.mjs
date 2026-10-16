@@ -2,10 +2,15 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import demoEgress from '../../container/demo-egress.mjs';
 import bundle from './bundle.mjs';
 
+// wasm and data modules arrive as base64; the Loader takes their bytes.
+const bytes = text => Uint8Array.from(atob(text), char => char.charCodeAt(0)).buffer;
+const modules = Object.fromEntries(Object.entries(bundle.modules).map(([name, module]) =>
+  [name, 'wasm' in module ? { wasm: bytes(module.wasm) } : 'data' in module ? { data: bytes(module.data) } : module]));
+
 export function loaded(env, ctx, id, runtime) {
   return env.LOADER.get(`${bundle.digest}:${id}`, () => ({
     compatibilityDate: bundle.compatibilityDate, compatibilityFlags: bundle.compatibilityFlags,
-    mainModule: '_rer/isolate.js', modules: bundle.modules,
+    mainModule: '_rer/isolate.js', modules,
     globalOutbound: ctx.exports.DemoEgress({ props: { id } }),
     env: { ...runtime, RER_NATIVE_CONFIG: bundle.bindings, RER_NATIVE_HOST: ctx.exports.HostBridge({ props: { id, key: runtime.RER_NATIVE_KEY } }), [bundle.bindings.assets]: ctx.exports.DemoAssets({}) },
   }));

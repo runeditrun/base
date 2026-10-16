@@ -150,3 +150,5 @@ DO classes. D1s and seed DOs get separate SQLite facets; R2 keys are prefixed by
 visitor and binding. Alarms deliver UTC crons and durable queue batches with
 ack/retry, delays and dead letters. Expiry deletes facets, queued work, multipart
 uploads and R2 prefixes. Unsupported bindings are refused by name at demo build.
+The Worker's build modules (JavaScript, text, WebAssembly and data) load as a
+normal deploy uploads them; a failed demo build prints its reason and file.

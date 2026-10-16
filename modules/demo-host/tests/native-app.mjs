@@ -1,5 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { verifyOwnerClaim } from '../../owner-claim/verify.mjs';
+import add from './native-add.wasm';
+import data from './native-data.bin';
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
@@ -37,6 +39,7 @@ export default {
       result.fetch = (await env.RER_NATIVE_HOST.fetch(new Request(env.AUTH_ORIGIN + '/items'))).status === 404 ? 'denied' : 'reachable';
       return Response.json(result);
     }
+    if (path === '/modules') return Response.json({ sum: new WebAssembly.Instance(add).exports.add(2, 3), data: [...new Uint8Array(data)] });
     if (path === '/legacy-alarm') return env.LEGACY.getByName('same-name').fetch('https://legacy/alarm-status');
     if (path === '/alarms') {
       const object = env.COUNTER.getByName('alarm');

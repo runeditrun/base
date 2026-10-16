@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
 import { demoBundle } from './demo-build.mjs';
 import { upgradeDemo } from '../modules/demo-host/upgrade.mjs';
-import { missing, invalid } from './errors.mjs';
+import { missing, invalid, RerError } from './errors.mjs';
 import { DEMO_FILES } from '../modules/demo-host/plan.mjs';
 import { cloudflare } from '../modules/deploy-kit/provider.mjs';
 import { demoBucketName, prepareBucket } from '../modules/demo-host/native/deploy-r2.mjs';
@@ -17,15 +17,23 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   const folder = join(project.root, '.rer/demo-host');
   await rm(folder, { recursive: true, force: true });
   await mkdir(join(folder, 'modules/demo-host/native'), { recursive: true, mode: 0o700 });
-  await store.step('Building the native demo Worker bundle and static assets');
-  await demoBundle(project, operation, app, join(folder, 'bundle'));
+  const label = 'Building the native demo Worker bundle and static assets';
+  await store.step(label);
+  await demoBundle(project, operation, app, join(folder, 'bundle'), store, label, signal);
   for (const file of DEMO_FILES) await cp(new URL(`../modules/demo-host/${file}`, import.meta.url), join(folder, 'modules/demo-host', file));
   for (const file of RUNTIME_FILES) await cp(new URL(`../modules/demo-host/native/${file}.mjs`, import.meta.url), join(folder, `modules/demo-host/native/${file}.mjs`));
   for (const directory of ['deploy-kit']) await cp(new URL(`../modules/${directory}/`, import.meta.url), join(folder, 'modules', directory), { recursive: true });
   await mkdir(join(folder, 'modules/container'), { recursive: true });
   for (const file of ['migrations.mjs', 'demo-egress.mjs']) await cp(new URL(`../modules/container/${file}`, import.meta.url), join(folder, 'modules/container', file));
   // Runtime imports use the same module topology as the maintained source.
-  const bundle = await prepareNative(folder);
+  let bundle;
+  try { bundle = await prepareNative(folder); }
+  catch (error) {
+    // The reason (a refused module names its file) goes to the output and the capture log.
+    const reason = store.redact(`${label} failed: ${error.message}`);
+    store.report(reason);
+    throw new RerError('command_failed', reason, 1);
+  }
   const config = { ...plan.wrangler, main: 'modules/demo-host/native/worker.mjs', compatibility_flags: ['nodejs_compat'],
     assets: { directory: './assets', binding: 'ASSETS', run_worker_first: true }, worker_loaders: [{ binding: 'LOADER' }],
   };
