@@ -396,6 +396,49 @@ An import job is bound to the principal that created it, and its plan and finger
 
 Independent projects without an adapter use `OPERATIONS.json` v2 `commands.NAME.argv`, `inputs`, effects, environmentSources and loops. Execute argv directly with shell false in the checkout, forwarding explicit arguments after `--` unchanged; never translate them into Cloudflare/pnpm/Base behavior. Common wrapper flags are consumed before the separator. No declared verb means exit 4, not an inferred command/fallback. Existing v1 inspection remains supported. Do not infer runnable commands from the platform registration descriptor's shell strings. No global pins, aliases, installer, state layout or required verb set is imposed on independent projects; runtime requirements remain project-owned. Independent check still validates the actual declaration and refuses missing/outside-checkout inputs.
 
+## Optional grant-authorised import door
+
+A seed may explicitly mount import-kit's D1-only
+`createImportDoorHandler(options)` from `modules/import-kit/src/door/index.ts`
+under POST `/api/rer/import/{uploads,plan,apply,status,reconcile,undo}`. This is
+an optional product import integration. The seed supplies its database, real
+target adapter, parser/mapping, destination and actual owner principal, and
+applies `importDoorSchema` in a new numbered migration after its D1 kit schemas.
+Base does not mount the door in a seed automatically. Copy the module's
+`CONTRACT.md` and `src/door/README.md` with its runtime and dependencies.
+
+The door returns 404 until the installation explicitly opts in. The seed's
+server-only existing owner session, or provisioning under the owner's approved
+plan, writes enablement through `writeImportDoorSettings` with a current owner
+SQL predicate. The same control revokes trusted key ids permanently; rotation
+uses a new id. The public door cannot enable itself. Each request requires a
+fresh single-use ES256 grant from the same trusted key ring as owner-claim,
+binding installation, owner, action, logical namespace, expiry and upload/record
+quotas. Grants last at most five minutes. Apply also binds the owner's approval
+record/time and exact retained plan fingerprint; the body's
+`reviewedFingerprint` must match. Mutation batches recheck enablement, revocation
+and expiry. Existing operator-session binding and authority remain intact.
+
+Uploads are resumable and check per-chunk and complete-bundle SHA-256. Plan
+reports server-derived counts, rejected rows and catch-up differences without
+native writes; apply runs bounded kit batches. Catch-up adds inert records and
+replaces only unchanged import-created records using original provenance revision
+and native-value fences; missing source records are listed without deletion.
+Bounded catch-up needs standing owner approval and a nonempty baseline, refuses
+missing/conflicting/rejected/unmapped records, and requires additions plus
+replacements to be strictly below 5% of baseline source count. Other changes
+require a new reviewed proposal. Reconcile derives source-id presence and
+disposition, native/provenance values, revisions, attachments and counts.
+
+Use `readImportDoorHistory` under owner authority to join approval metadata to
+real jobs, captioned "approved via Business by <owner> at <time>, fingerprint
+<x>". The ordinary seed owner can undo those jobs with the same configured
+principal; snapshots undo newest first. Original bytes stay in the seed and RER
+retains receipts only. The seed owns route integration, native field sampling
+and acceptance evidence. This module has no external side effects and makes no
+hosted capacity claim. See import-kit's copied contract and door README for the
+exact grant fields, request bodies and recovery rules.
+
 ## Acceptance clauses
 
 - SC-01: required verbs, real flags, thin self-contained dispatcher and truthful describe output.

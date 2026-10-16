@@ -1,0 +1,87 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { door, documents } from './door/fixture.ts';
+import { readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
+import { readD1ImportOriginals, undoD1Import } from '../src/d1/index.ts';
+import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
+
+test('HTTP import door is absent until the installation opts in',async t=>{
+  const d=await door(t);
+  for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+});
+
+test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody',async t=>{
+  const d=await door(t);await d.enable();
+  const badBytes=Buffer.from('[{"id":"bad","title":"Bad bundle"}]');
+  assert.equal((await d.call('uploads',{name:'bad.json',bundleSha256:'0'.repeat(64),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:sha256(badBytes),base64:badBytes.toString('base64')})).status,409);
+  assert.equal((await d.call('uploads',{name:'bad.json',bundleSha256:sha256(badBytes),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:'0'.repeat(64),base64:badBytes.toString('base64')})).status,400);
+  assert.equal((await d.call('uploads',{name:'bad.json',bundleSha256:sha256(badBytes),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:sha256(badBytes),base64:badBytes.toString('base64')},{maxBytes:1})).status,400);
+  const records=[...documents(50,true),{id:'unsupported',title:'Unsupported',reject:true}];
+  const planned=await d.plan(records);assert.equal(planned.status,200,JSON.stringify(planned.body));
+  assert.equal(planned.body.rejected.length,1);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  const job=await d.apply(planned.body);
+  const status=await d.call('status',{planId:planned.body.planId});assert.equal(status.body.job.state,'completed');assert.ok(status.body.caption.includes(planned.body.fingerprint));
+  const history=await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate);assert.equal(history[0].jobId,job.id);assert.equal(history[0].reviewer,d.approval.approvalRecordId);
+  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.status,200,JSON.stringify(reconciled.body));
+  assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,50);assert.equal(reconciled.body.counts.explained,1);assert.equal(reconciled.body.counts.nativeTargets,50);
+  await d.undo(planned.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  // The ordinary seed owner, with the exact existing actor binding, can inspect
+  // originals and repeat undo without any Business grant or special kit bypass.
+  const context={...d.runtime.context(),namespace:job.namespace};
+  assert.equal((await undoD1Import(job.id,context)).state,'undone');
+  const originals=await readD1ImportOriginals(job.id,context);
+  assert.equal(originals[0].sha256,sha256(JSON.stringify(records)));assert.equal(originals[0].original.status,'retained');
+});
+
+test('HTTP grants and bounded catch-up fail closed while valid snapshot replacements preserve undo lineage',async t=>{
+  const d=await door(t);await d.enable();
+  const forged=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+  assert.equal((await d.call('plan',{}, {},await d.token('plan',{},forged.privateKey))).status,403);
+  assert.equal((await d.call('plan',{}, {installationId:'another-installation'})).status,403);
+  const now=Math.floor(Date.now()/1000);
+  assert.equal((await d.call('plan',{}, {iat:now-301,exp:now-1})).status,403);
+  const baselineRecords=documents(50),baseline=await d.plan(baselineRecords);assert.equal(baseline.status,200);await d.apply(baseline.body);
+  const replay=await d.token('status');assert.equal((await d.call('status',{planId:baseline.body.planId},{},replay)).status,200);
+  assert.equal((await d.call('status',{planId:baseline.body.planId},{},replay)).status,403);
+  const changed=[...baselineRecords.map(r=>r.id==='0'?{...r,title:'Updated at source'}:r),{id:'50',title:'New source article',body:'Historical knowledge.'}];
+  const bounded={catchup:'bounded' as const,approvalRecordId:'test-standing-approval',approvedAt:d.approval.approvedAt};
+  const planned=await d.plan(changed,{catchup:true},bounded);assert.equal(planned.status,200,JSON.stringify(planned.body));
+  assert.equal(planned.body.summary.updated,1);assert.equal(planned.body.summary.created,1);
+  assert.equal((await d.call('apply',{planId:planned.body.planId,reviewedFingerprint:planned.body.fingerprint},{fingerprint:'0'.repeat(64),...bounded})).status,403);
+  await d.apply(planned.body,bounded);
+  const reconciliation=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciliation.body.ok,true);assert.equal(reconciliation.body.counts.nativeTargets,51);
+  assert.equal((await d.call('undo',{planId:baseline.body.planId})).status,409);
+  const tooMany=changed.map((r,i)=>i<3?{...r,title:'Another source change '+i}:r);
+  const refused=await d.plan(tooMany,{catchup:true},bounded);assert.equal(refused.status,409);assert.match(refused.body.error,/catchup_requires_proposal/);
+  const gone=await d.plan(changed.slice(1),{catchup:true},bounded);assert.equal(gone.status,409);assert.match(gone.body.error,/source_records_gone/);
+  // A same-revision native edit is protected, too.
+  const native=d.runtime.native().prepare("SELECT value_json FROM native_records WHERE id='0'").get()!;
+  d.runtime.native().prepare("UPDATE native_records SET value_json=? WHERE id='0'").run(canonicalJson({local:'owner edit'}));
+  const edited=await d.plan(changed.map(r=>r.id==='0'?{...r,title:'Source wants another update'}:r),{catchup:true},bounded);
+  assert.equal(edited.status,409);assert.match(edited.body.error,/native_or_mapping_conflict/);
+  assert.equal(JSON.parse(d.runtime.native().prepare("SELECT value_json FROM native_records WHERE id='0'").get()!.value_json as string).local,'owner edit');
+  d.runtime.native().prepare("UPDATE native_records SET value_json=? WHERE id='0'").run(native.value_json);
+  await d.undo(planned.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,50);
+  await d.undo(baseline.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  const uploadId=await d.upload([{id:'guarded',title:'Guarded import'}]);
+  d.runtime.native().exec("CREATE TRIGGER interrupt_plan BEFORE INSERT ON ik_door_plan_chunks BEGIN SELECT RAISE(ABORT,'test interruption'); END");
+  assert.equal((await d.call('plan',{uploadId})).status,409);
+  const interrupted=await d.call('plan',{uploadId});assert.equal(interrupted.status,409);assert.ok(interrupted.body.details.planId);
+  assert.equal((await d.call('undo',{planId:interrupted.body.details.planId})).body.state,'cancelled');
+  d.runtime.native().exec('DROP TRIGGER interrupt_plan');
+  const guarded=await d.call('plan',{uploadId});assert.equal(guarded.status,200);
+  d.runtime.native().exec("CREATE TRIGGER interrupt_index BEFORE UPDATE OF job_id ON ik_door_plans BEGIN SELECT RAISE(ABORT,'test interruption'); END");
+  const interruptedApply=await d.call('apply',{planId:guarded.body.planId,reviewedFingerprint:guarded.body.fingerprint},{fingerprint:guarded.body.fingerprint,...d.approval});
+  assert.equal(interruptedApply.status,409);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  d.runtime.native().exec('DROP TRIGGER interrupt_index');
+  const recovered=await d.call('status',{planId:guarded.body.planId});assert.equal(recovered.body.job.state,'queued');
+  d.runtime.native().exec("CREATE TRIGGER revoke_door_during_write AFTER INSERT ON native_records BEGIN INSERT INTO ik_door_revoked_keys VALUES('test-installation','test'); END");
+  const stopped=await d.call('apply',{planId:guarded.body.planId,reviewedFingerprint:guarded.body.fingerprint},{fingerprint:guarded.body.fingerprint,...d.approval});
+  assert.equal(stopped.status,409);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  d.runtime.native().exec('DROP TRIGGER revoke_door_during_write');
+  await d.apply(guarded.body);await d.undo(guarded.body.planId);
+  await writeImportDoorSettings(d.db,d.options.claim.installationId,{enabled:true,revokedKids:['test']},d.ownerPredicate);
+  assert.equal((await d.call('plan',{})).status,403);
+});
