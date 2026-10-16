@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Hosted demos run exclusively on native Worker Loader isolates with edge assets.
+  Existing Container demos upgrade unattended on the same Worker and hostname,
+  removing the owned container application and migrating its Durable Object classes.
+  Removed only the hosted demo image/runtime and placement code; portable container
+  hosting (`rer build/deploy --platform container`, Node/workerd and SSH) is unchanged.
+- Native demo bindings follow the seed configuration: isolated D1s, R2 prefixes,
+  durable queue batches, seed DO facets and UTC cron delivery. Seed DO alarms
+  are scheduled by the visitor supervisor; own-host reads keep visitor context,
+  and a narrow resource bridge isolates seeds from front admission and diagnostics.
+
 ## 0.2.29
 
 - **Placeholder mark (SC-14).** While a seed's logo, favicon or app mark is byte-equal to Base's placeholder mark, `rer check --profile first-party`, `rer build --site` and `rer deploy --site` print one warning naming the files (a `placeholder_mark` warning event under `--json`) and still succeed. `rer release` refuses the placeholder unless `--allow-placeholder-mark` is given; the receipt then records `placeholderMark: { allowed: true, files }`. Base's own projects are exempt.

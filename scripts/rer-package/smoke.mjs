@@ -91,11 +91,14 @@ export async function smoke(tarball, { port } = {}) {
   process.stdout.write(reference.transcript);
   assert.equal(JSON.parse(await readFile(join(packaged, 'package.json'), 'utf8')).devDependencies['@runeditrun/rer'], version, 'the package-mode reference pins this tarball');
   await launch(packaged, reference.env, 'package mode');
-  // The exported seed carries the demo module in src/, where the container
-  // import boundary checks it.
+  // Every exported seed builds its hosted demo through the native Loader host.
   const demo = await run(rer, ['deploy', '--demo', '--dry-run'], { cwd: packaged, env: reference.env });
   assert.equal(demo.code, 0, 'rer deploy --demo --dry-run (package mode)');
-  assert.ok(JSON.parse(await readFile(join(packaged, '.rer/demo-host/wrangler.json'), 'utf8')).containers?.length, 'the dry run writes the demo Worker with its container');
+  const demoConfig = JSON.parse(await readFile(join(packaged, '.rer/demo-host/wrangler.json'), 'utf8'));
+  assert.ok(demoConfig.worker_loaders?.length, 'the dry run binds Worker Loader');
+  assert.ok(demoConfig.durable_objects.bindings.some(binding => binding.class_name === 'NativeDemo'), 'the dry run binds native visitor state');
+  assert.equal(demoConfig.assets.binding, 'ASSETS', 'the dry run serves built assets');
+  assert.equal(demoConfig.containers, undefined, 'the demo needs no Container application');
   return { version, url };
  } finally {
   for (const [root, launchEnv] of started) await run(rer, ['dev', '--stop'], { cwd: root, env: launchEnv }).catch(() => {});

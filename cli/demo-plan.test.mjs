@@ -10,14 +10,14 @@ import { isolatedQueue } from './fixtures/queue.mjs';
 
 const execute = promisify(execFile);
 
-// Exercise the public CLI and real Vite/Cloudflare image packaging. No build
-// stub supplies the image or generated deployment configuration.
+// Exercise the public CLI and real Vite/Cloudflare native packaging. No build
+// stub supplies the bundle or generated deployment configuration.
 test('rer deploy --demo --dry-run packages declared public hosts and refuses unsafe declarations', async t => {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-demo-plan-')));
  t.after(() => rm(root, { recursive: true, force: true }));
  const primary = 'demo.test.run-fixture.test', page = `page.${primary}`, status = `status.${primary}`;
  const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN',
-  platforms: ['workers', 'container'], container: { engine: 'workerd', hostVariables: ['STATUS_HOST', 'APP_HOST', 'PAGE_HOST', 'PAGE_ALIAS'] } };
+  platforms: ['workers'], container: { hostVariables: ['STATUS_HOST', 'APP_HOST', 'PAGE_HOST', 'PAGE_ALIAS'] } };
  const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture', instanceType: 'standard-1',
   settings: { APP_HOST: primary, PAGE_HOST: page, PAGE_ALIAS: page, STATUS_HOST: status, UNROUTED_HOST: 'outside.example.test' } };
  const configure = async (demo = declaration, deploy = app) => {
@@ -29,15 +29,20 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module', engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
  await writeFile(join(root, '.gitignore'), '.rer/\n.seed/\n.wrangler/\nnode_modules/\ndist/\n');
  await mkdir(join(root, 'src'));
+ await mkdir(join(root, 'public'));
+ await writeFile(join(root, 'public/asset.txt'), 'public asset');
+ await mkdir(join(root, 'migrations'));
+ await writeFile(join(root, 'migrations/0001.sql'), 'CREATE TABLE items(id TEXT);');
  await symlink(resolve(import.meta.dirname, '../default-seed/node_modules'), join(root, 'node_modules'));
+ await writeFile(join(root, 'src/client.js'), 'console.log(42)');
  await writeFile(join(root, 'src/server.ts'), "export default {fetch(request) { return Response.json({ok:true,origin:new URL(request.url).origin}); }};");
  await writeFile(join(root, 'vite.config.mjs'), `
   import {cloudflare} from '@cloudflare/vite-plugin';
   export default {logLevel:'silent',plugins:[cloudflare({viteEnvironment:{name:'ssr'}})],
-   environments:{ssr:{build:{outDir:'dist/server'}}},
-   builder:{buildApp:async builder=>{await builder.build(builder.environments.ssr);}}};
+   environments:{ssr:{build:{outDir:'dist/server'}},client:{build:{outDir:'dist/client',rolldownOptions:{input:'src/client.js'}}}},
+   builder:{buildApp:async builder=>{await builder.build(builder.environments.client);await builder.build(builder.environments.ssr);}}};
  `);
- await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ name: 'demo-plan-fixture', main: 'src/server.ts', compatibility_date: app.compatibilityDate }));
+ await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ name: 'demo-plan-fixture', main: 'src/server.ts', compatibility_date: app.compatibilityDate, assets: {directory:'public',binding:'ASSETS'}, d1_databases:[{binding:'DB',database_name:'fixture',database_id:'00000000-0000-0000-0000-000000000001',migrations_dir:'migrations'}] }));
  await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('./deploy.mjs', import.meta.url).href)};
  const lifecycle = {run:async()=>{},settings:[],hooks:{}};
  export const commandAdapter = {...lifecycle,deploy:ownerDeploy('owner-deployment.json',lifecycle)};`);
@@ -59,20 +64,22 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  assert.deepEqual(config.routes, hostnames.map(pattern => ({ pattern, custom_domain: true })));
  assert.deepEqual(JSON.parse(config.vars.DEMO_SECONDARY_ORIGINS), [`https://${page}`, `https://${status}`]);
  assert.deepEqual(JSON.parse(config.vars.DEMO_SETTINGS), declaration.settings);
- assert.equal(config.containers[0].instance_type, declaration.instanceType);
- const manifest = JSON.parse(await readFile(join(root, '.rer/demo-host/image/app/container.json'), 'utf8'));
- assert.equal(manifest.engine, 'workerd');
- assert.ok((await readFile(join(root, '.rer/demo-host/image/app', manifest.entry), 'utf8')).trim(), 'the real build emitted the packaged Worker entry');
+ assert.equal(config.containers, undefined);
+ assert.equal(config.durable_objects.bindings.find(row => row.name === 'DEMO').class_name, 'NativeDemo');
+ const manifest = JSON.parse(await readFile(join(root, '.rer/demo-host/bundle/app/demo.json'), 'utf8'));
+ assert.ok(manifest.migrations.DB.length, 'declared SQL is included in the native bundle');
+ assert.ok((await readFile(join(root, '.rer/demo-host/modules/demo-host/native/bundle.mjs'), 'utf8')).includes('app/'), 'the real build emitted the packaged Worker entry');
  const summary = built.stdout.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line)).find(value => value.event === 'demo');
  assert.deepEqual(summary.hostnames, hostnames);
  assert.deepEqual(summary.routes, config.routes);
 
- for (const instanceType of ['standard-9', 'standard', 'dev', 'Standard-1', { vcpu: 1 }]) {
-  await configure({ ...declaration, instanceType });
-  const refused = await rer();
-  assert.equal(refused.code, 2, refused.stdout + refused.stderr);
-  assert.match(refused.stdout + refused.stderr, /invalid-demo-instance-type/);
- }
+ const workerConfig = JSON.parse(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
+ await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ ...workerConfig, durable_objects: { bindings: [{ name: 'COUNTER', class_name: 'MissingCounter' }] } }));
+ const missingClass = await rer();
+ assert.equal(missingClass.code, 1, missingClass.stdout + missingClass.stderr);
+ assert.match(missingClass.stdout + missingClass.stderr, /cannot bind COUNTER:.*MissingCounter/);
+ await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify(workerConfig));
+
  for (const value of [undefined, '', 'Page.' + primary, 'outside.example.test', primary + '.outside.test', 'other' + primary,
   'https://' + page, page + ':443', 'a'.repeat(64) + '.' + primary, 'bad..' + primary]) {
   await configure({ ...declaration, settings: { ...declaration.settings, PAGE_HOST: value } });

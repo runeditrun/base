@@ -135,6 +135,7 @@ test('rer deploy --demo --remove --yes removes the demo its deploy recorded, by 
 
  // Anything the record does not cover is refused before the first delete.
  for (const extra of [
+  () => account.app('unrecorded-container', account.state.namespaces.find(row => row.script === plan.worker && row.class === 'DemoContainer').id), // a differently named application on the owned namespace is outside the record
   () => account.domain('extra.test.run-fixture.test', plan.worker), // another hostname someone attached to the demo Worker
   () => account.app(plan.container, account.namespace('someone-else', 'Other').id), // a Container application of the demo's name on another namespace
   () => { account.state.workers.delete(plan.worker); account.worker(plan.worker, 'Deploy from the dashboard'); }, // a Worker of the demo's name serving no record
