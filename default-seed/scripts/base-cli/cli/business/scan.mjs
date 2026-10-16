@@ -1,36 +1,20 @@
-import { constants } from 'node:fs';
-import { lstat, open, readdir, realpath } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve, parse } from 'node:path';
+import { lstat, readdir, realpath } from 'node:fs/promises';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { blockedSignal } from './detector.mjs';
-import { denied, example, readable, skipped } from './policy.mjs';
+import { denied, example, gitDirectory, readable, skipped, toolDirectory } from './policy.mjs';
 import { parseNames } from './parsers.mjs';
 import { configKeyLimit } from './config-policy.mjs';
-
-// Caller-named roots are canonicalized once; below them, refuse symlink
-// ancestors as well as symlink entries before reading any file content.
-async function plainAncestors(path) {
- const root = parse(path).root;
- let current = root;
- for (const part of path.slice(root.length).split('/').filter(Boolean)) {
-  current = join(current, part);
-  if ((await lstat(current)).isSymbolicLink()) return false;
- }
- return true;
-}
+import { readPlainFile } from './files.mjs';
+import { repositoryBoundary } from './repository.mjs';
 
 async function namesFromFile(path, info, locator, pulumi) {
  if (!readable(locator) && !(pulumi && /\.(?:[cm]?[jt]sx?|py|go|cs)$/i.test(locator))) return [];
- // O_NOFOLLOW blocks a replaced leaf; compare the opened inode before reading.
- const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
- try {
-  const opened = await file.stat();
-  if (!opened.isFile() || opened.ino !== info.ino || opened.dev !== info.dev || !await plainAncestors(dirname(path))) throw Error('Changed scan input');
-  return parseNames(locator, await file.readFile('utf8'));
- } finally { await file.close(); }
+ return parseNames(locator, await readPlainFile(path, info));
 }
 
 export async function scan(directories) {
- const result = { schema: 'rer-business-signals/1', source: 'local', configKeyLimit, signals: [], withheld: 0 };
+ const result = { schema: 'rer-business-signals/1', source: 'local', configKeyLimit, signals: [], withheld: 0,
+  skipped: { linkedWorktrees: 0, toolDirectories: 0, generatedDirectories: 0, gitDirectories: 0 } };
  const observedAt = new Date().toISOString(), seen = new Set(), grouped = new Map();
  const roots = [...new Set(directories.map(path => resolve(path)))];
  function emit(signal) {
@@ -48,21 +32,34 @@ export async function scan(directories) {
  }
  for (const requested of roots) {
   const root = await realpath(requested);
-  const rootInfo = await lstat(root), base = rootInfo.isDirectory() ? root : dirname(root), repo = basename(base);
-  async function walk(path, pulumi = false) {
-   if (skipped(relative(root, path)) || seen.has(path)) return;
-   seen.add(path);
+  const rootInfo = await lstat(root), base = rootInfo.isDirectory() ? root : dirname(root);
+  if (rootInfo.isDirectory() && (gitDirectory(basename(root)) || gitDirectory(basename(requested)))) {
+   throw Error('Git metadata cannot be a scan root');
+  }
+  async function walk(path, repository, pulumi = false) {
+   if (seen.has(path)) return;
    const info = await lstat(path);
    if (info.isSymbolicLink()) return;
+   const rootRelative = relative(root, path), requestedPath = join(requested, rootRelative);
+   const skip = toolDirectory(rootRelative) ? 'toolDirectories' :
+    gitDirectory(rootRelative) ? 'gitDirectories' : skipped(rootRelative);
+   if (skip) {
+    if (info.isDirectory()) result.skipped[skip]++;
+    return;
+   }
+   const boundary = info.isDirectory() && rootRelative ? await repositoryBoundary(path, denied(path) || denied(requestedPath)) : null;
+   if (boundary === 'linkedWorktree') { result.skipped.linkedWorktrees++; return; }
+   seen.add(path);
    if (info.isDirectory()) {
+    if (boundary === 'repository') { repository = path; pulumi = false; }
     const names = (await readdir(path)).sort();
     pulumi ||= names.some(name => /^Pulumi\.ya?ml$/i.test(name));
-    for (const name of names) await walk(join(path, name), pulumi);
+    for (const name of names) await walk(join(path, name), repository, pulumi);
    } else if (info.isFile()) {
-    const locator = relative(base, path).split('\\').join('/');
-    const common = { locator, repo, class: example(locator) ? 'trace' : 'live-use', observedAt };
+    const locator = relative(repository, path).split('\\').join('/');
+    const common = { locator, repo: basename(repository), class: example(locator) ? 'trace' : 'live-use', observedAt };
     // A caller-named store remains metadata-only even when it is an alias.
-    if (denied(path) || denied(join(requested, relative(root, path)))) {
+    if (denied(path) || denied(requestedPath)) {
      emit({ kind: 'secret-file', value: basename(path), ...common, size: info.size, mtime: info.mtime.toISOString() });
      return;
     }
@@ -71,7 +68,7 @@ export async function scan(directories) {
     }
    }
   }
-  await walk(root);
+  await walk(root, base);
  }
  return result;
 }

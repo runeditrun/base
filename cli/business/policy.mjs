@@ -1,8 +1,14 @@
 import { basename } from 'node:path';
 
 const outputs = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', 'target', 'coverage', '.next', '.nuxt', '.output', '.cache', '.venv', 'venv', '__pycache__', '.terraform', '.pulumi', '.wrangler', '.rer', '.seed', 'playwright-report', 'test-results']);
+const tools = new Set(['.claude', '.codex', '.cursor', '.worktrees', '.idea', '.vscode', '.vscode-insiders', '.windsurf', '.continue', '.zed', '.aider', '.gemini', '.opencode']);
 
-export const skipped = path => path.split('/').some(part => outputs.has(part.toLowerCase()));
+export const toolDirectory = path => path.split('/').some(part => tools.has(part.toLowerCase()));
+export const gitDirectory = path => path.split('/').some(part => part.toLowerCase() === '.git');
+export function skipped(path) {
+ const part = path.split('/').find(part => outputs.has(part.toLowerCase()));
+ return part ? part.toLowerCase() === '.git' ? 'gitDirectories' : 'generatedDirectories' : null;
+}
 
 const stores = new Set(['secrets', '.ssh', '.aws', '.gnupg', 'keychains', 'keychain', 'browser profiles', 'browser-profiles', '.mozilla', '.password-store', '.1password']);
 
