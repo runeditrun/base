@@ -79,7 +79,7 @@ test('strict backchannel logout, durable replay, ID-token events refusal and cre
  const legacy=await (await r.call('/test/credentials',{cookie:proved,body:{}})).json();r.sqlite.prepare('UPDATE oa_credentials SET operator_version=NULL WHERE id=?').run(legacy.id);assert.equal((await r.call('/test/credential-use',{bearer:legacy.token})).status,401);
  const nativeFence=await r.auth().credentialFence(r.request('/x',{cookie:proved}));
  const claims={iss:ISSUER,aud:'app-client',sub:'operator-subject',sid:'owner-sid',iat:r.now()/1000,exp:r.now()/1000+300,jti:'logout-1',events:{[LOGOUT_EVENT]:{}}};
- for(const edit of [{events:{wrong:{}}},{events:{}},{nonce:null},{jti:''},{sub:'different'},{aud:'wrong'},{sid:'wrong'},{sub:undefined,sid:undefined},{exp:undefined},{iss:'https://other.example'}]) {
+ for(const edit of [{events:{wrong:{}}},{events:{}},{events:{[FENCE_EVENT.slice(0,-1)]:{}}},{events:{[LOGOUT_EVENT]:{},[`${FENCE_EVENT}/x`]:{}}},{nonce:null},{jti:''},{sub:'different'},{aud:'wrong'},{sid:'wrong'},{sub:undefined,sid:undefined},{exp:undefined},{iss:'https://other.example'}]) {
   const token=await sign(r.idp.key,{...claims,...edit},{typ:'logout+jwt'});assert.equal((await r.call('/auth/oidc/auth/logout',{body:{logout_token:token}})).status,400);
  }
  const wrong=await sign(await keys('ES256'),claims,{typ:'logout+jwt'});assert.equal((await r.call('/auth/oidc/auth/logout',{body:{logout_token:wrong}})).status,400);

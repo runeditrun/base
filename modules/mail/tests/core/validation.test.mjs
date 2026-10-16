@@ -29,7 +29,7 @@ test('envelope, threading and binary contents remain intact', () => {
 });
 
 test('malformed inputs and injection fail before dispatch', () => {
-  for (const address of ['victim@example.net\r\nBcc: secret@example.net', 'a@example.net,b@example.net', 'bad..local@example.net', 'x@-bad.example', 'SENSITIVE']) rejects(() => parseAddress(address), 'invalid_address');
+  for (const address of ['victim@example.net\r\nBcc: secret@example.net', 'a@example.net,b@example.net', 'bad..local@example.net', 'x@-bad.example', 'SENSITIVE', `a${' '.repeat(996)}<`, `${'<'.repeat(997)}>`]) rejects(() => parseAddress(address), 'invalid_address');
   rejects(() => validateMessage({ ...message(), to: [] }), 'invalid_recipients');
   rejects(() => validateMessage({ ...message(), text: undefined }), 'body_required');
   rejects(() => validateMessage({ ...message(), html: false }), 'invalid_body');
