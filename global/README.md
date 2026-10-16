@@ -310,11 +310,13 @@ Identical `(kind, value, repo, class)` signals are emitted once with an occurren
 `count` and the first matching `locator`. `secret-file` signals remain separate
 for each path, preserving each file's size and modification time.
 
-Config keys come only from configuration directories or known config filenames.
+Config keys come only from JSON (including JSONC), YAML and TOML files in
+configuration directories or with known config filenames.
 Data in tests, fixtures, locales, translations, samples and exports, along with
 lockfiles and generated output, contributes no config keys. The document's
 `configKeyLimit` declares the maximum distinct key paths per file (currently
-200). Literal exported JavaScript config objects are read without execution.
+200). JavaScript and TypeScript config files are not read or parsed;
+dependencies still come from manifests.
 
 Only names leave the scanner. Secret files are never opened and contribute
 `secret-file` metadata (filename, path, size and modification time).
@@ -337,8 +339,8 @@ or systemd user service. Only the exact answer `yes` opts in. Noninteractive
 connect pairs but leaves those optional changes off. Background services use
 absolute Node and CLI paths. No model process is started.
 
-`rer business vendor-key add sentry` reads a hidden credential (or a password
-manager's piped input) into the OS keychain and prints only `sentry:read`.
+`rer business vendor-key add sentry` requires hidden credential entry in a
+terminal, stores it in the OS keychain and prints only `sentry:read`.
 `remove` deletes it. The same commands support `uptimerobot`, `pagerduty` and
 `calendly`. Never put a key in command arguments, chat or a URL.
 

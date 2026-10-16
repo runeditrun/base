@@ -80,19 +80,9 @@ export function createCredentialStore({ platform = process.platform, env = proce
  };
 }
 
-/** Interactive keys are never echoed. Piped input is accepted without printing
- * it, so a password manager can supply a key without a command-line argument.
- */
+/** Credentials require a terminal that can hide input; keys are never echoed. */
 export async function readSecret({ input = process.stdin, output = process.stderr } = {}) {
- if (!input.isTTY) {
-  let secret = '';
-  for await (const chunk of input) {
-   secret += chunk.toString('utf8');
-   if (Buffer.byteLength(secret) > 65538) throw new Error('Credential input is too long.');
-  }
-  return checkedSecret(secret.replace(/\r?\n$/, ''));
- }
- if (typeof input.setRawMode !== 'function') throw new Error('A terminal with hidden input is required.');
+ if (!input.isTTY || typeof input.setRawMode !== 'function') throw new Error('A terminal with hidden input is required.');
  return new Promise((resolve, reject) => {
   let secret = '', done = false; const wasRaw = input.isRaw, wasFlowing = input.readableFlowing === true;
   function finish(error) {

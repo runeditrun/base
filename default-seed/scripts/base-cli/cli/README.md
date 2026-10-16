@@ -364,14 +364,15 @@ only the skipped boundary, not anything inside it. Git metadata, including
 relative to each scan root, so an explicitly named ordinary root remains
 scannable even below a directory named `build` or `vendor`.
 
-`config-key` observations come only from configuration directories (such as
+`config-key` observations come only from JSON (including JSONC), YAML and TOML
+files in configuration directories (such as
 `config/`, `.github/`, `deploy/`, `charts/`, `k8s/` and `infra/`) and known
 configuration names (such as `wrangler.*`, `docker-compose*.yaml`, `settings.*`
-and `*.config.js`). Test/fixture data, translations, locales, samples, exports,
+and `*.config.json`). Test/fixture data, translations, locales, samples, exports,
 lockfiles and generated files contribute no config keys, even under a config
 directory. Each file contributes at most `configKeyLimit` distinct key paths;
-the document declares that limit (currently 200). Literal exported JavaScript
-config objects are inspected without executing the file or its helpers.
+the document declares that limit (currently 200). JavaScript and TypeScript
+config files are not read or parsed; dependencies still come from manifests.
 
 This is names-only discovery: configuration values and file contents are not
 emitted. Denied secret files are never opened; their `secret-file` observations

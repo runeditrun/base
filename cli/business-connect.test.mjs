@@ -177,7 +177,7 @@ test('terminal consent installs a user service and disconnect removes all additi
   await connect(home, remote, { terminal: true, columns });
   const status = await cli(home, ['business','status','--json']);
   assert.equal(status.code, 0); assert.equal(JSON.parse(status.stdout).service, 'running');
-  assert.equal((await cli(home, ['business','vendor-key','add','uptimerobot'], { input: 'fixture-read-only-vendor-key\n' })).code, 0);
+  assert.equal((await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: 'fixture-read-only-vendor-key\n' })).code, 0);
   assert.equal((await cli(home, ['business','disconnect'])).code, 0);
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
