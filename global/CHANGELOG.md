@@ -1,8 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.2.25
 
+- Invitations stay valid for seven days (`invitationSeconds`), separately from sign-in and step-up links, which keep their short lifetime.
+- Demo and Dev title suffixes are added once, including for missing, empty and suffix-only titles.
 - The shell installer acquires checksum-verified Node 22 in rer's private prefix when needed, leaving system tools alone. The launcher keeps using it without Node on PATH. `rer install` and `rer verify` acquire the checkout's Playwright Chromium and headless shell; `rer doctor` reports missing browser files with `rer install` as the fix, including through the global command for older checkout pins.
+- Portability imports stage their writes in batches within D1's transport budget, with a durable cursor, so populated archives no longer hit `D1_RPC_TRANSPORT_LIMIT`. A same-hash retry resumes an interrupted part, and conflicting content is refused.
+- On a fresh hosted deployment, the owner claim waits through a new route that still answers 404, within the upload propagation window. Asset uploads and checks replay a transient asset failure once; a final asset failure names the asset and its HTTP status.
+- Environment removal retries transient provider 5xx responses within its deadline. A failed removal names the resources still present or not confirmed absent, and gives the same command to finish.
+- Demo image builds accept `MAIL_PROVIDER` and `MAIL_FROM` as public configuration when the managed-mail spec declares them public. Credentials as image variables are still refused.
+- A migration whose D1 import failed is retried by the next deploy of the same bytes, once rer proves none of it applied. Otherwise it stays refused as `uncertain-migration-claim`, and `rer deploy` names the migration, what is present and the exact recovery step.
+- A failed D1 import keeps Cloudflare's codes and messages (credentials and URLs removed, 300 characters each) and names the migration it was running.
+- The deployment spec emits the optional `surfaces.app.signIn` and `nativeExport` declarations from packaging `artifact.specInputs`, using platform's field rules.
+- The owner-claim recovery command prints a relative cwd.
+- The import-kit security test's fixture token now starts with `synthetic-` (`modules/import-kit/tests/readers/security.test.ts`), so credential scans no longer match it.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes.
+- A deployment stuck at `changed-or-uncertain-migration-history` because its last migration stayed `applying` after a failed import recovers with a plain `rer deploy` of the same build, when that migration's effects are absent.
+- Remove `MAIL_PROVIDER` and `MAIL_FROM` from `deploy.json` secrets and keep them as public spec or Wrangler variables.
 
 ## 0.2.24
 
