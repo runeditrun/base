@@ -57,6 +57,12 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     const capacity = capacityNamespace.get(capacityNamespace.idFromName('capacity'));
     for (let i = 0; i < 10; i++) await capacity.acquire(capacityNamespace.newUniqueId().toString(), Date.now() + 60_000, 100, 'retired-visitor');
     assert.equal((await fetch('/')).status, 200);
+    // A start without a readable form is a clean 400 before any place is reserved.
+    for (const init of [{}, { body: '{"x":1}', headers: { 'content-type': 'application/json' } }, { body: 'x', headers: { 'content-type': 'multipart/form-data; boundary=none' } }]) {
+      const refused = await fetch('/__demo/start', `rer_demo_measure=${measurement}`, { method: 'POST', ...init, headers: { 'cf-connecting-ip': '203.0.113.9', accept: 'application/json', ...init.headers } });
+      assert.equal(refused.status, 400, 'unreadable start body');
+      assert.match((await refused.json()).notice, /readable form/);
+    }
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);
     assert.deepEqual(await (await fetch('/items', b)).json(), [{ name: 'sample' }]);
