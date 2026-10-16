@@ -77,6 +77,17 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   Array.from({ length: 1000 }, (_, index) => [`SYNTHETIC_CONFIG_${index}`, 'synthetic-capped-scalar-never-export']))));
  await writeFile(join(root, 'runtime.config.js'), 'module.exports = { mail: { transport: "synthetic-code-scalar-never-export" } };');
  await writeFile(join(root, '.github/workflows/deploy-stage.yml'), 'jobs:\n  deploy:\n    env:\n      TOKEN: ${{ secrets.CF_THROWAWAY_API_TOKEN }}\n      EVIDENCE: ${{ secrets.EVIDENCE_WRITE_TOKEN }}\n');
+ await mkdir(join(root, 'services/payments'), { recursive: true });
+ await writeFile(join(root, 'services/payments/package.json'), '{"dependencies":{"@stripe/stripe-js":"1.0.0"}}');
+ const examplePath = join(root, 'examples/package.json');
+ const exampleManifest = JSON.parse(await readFile(examplePath, 'utf8'));
+ exampleManifest.dependencies['@stripe/stripe-js'] = '1.0.0';
+ await writeFile(examplePath, JSON.stringify(exampleManifest));
+ const secretPaths = ['secrets/east/credentials.json', 'secrets/west/credentials.json'];
+ for (const locator of secretPaths) {
+  await mkdir(join(root, locator, '..'), { recursive: true });
+  await writeFile(join(root, locator), `synthetic-denied-content-never-export:${locator}`);
+ }
  const { report, output } = await scan(root, ['--json']);
  absent(output, ['syntheticprivatekind', 'Synthetic::Private::Value', 'synthetic-private-registry.invalid']);
  const expected = [
@@ -92,16 +103,38 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   ['index.ts', 'aws.s3.Bucket', 'live-use'],
   ['infrastructure/Pulumi.yaml', 'aws:s3/bucket:Bucket', 'live-use'],
   ['chart/templates/deployment.yaml', 'Deployment', 'live-use'],
-  ['k8s/deployment.yaml', 'Deployment', 'live-use'],
-  ['k8s/deployment.yaml', 'synthetic.invalid', 'live-use'],
+  ['chart/templates/deployment.yaml', 'synthetic.invalid', 'live-use'],
   ['examples/package.json', 'example-only-dependency', 'trace'],
   ['config/settings.json', 'SYNTHETIC_PUBLIC_SETTING', 'live-use'],
   ['notes.yaml', 'SYNTHETIC_COMMENT_SETTING', 'trace'],
-  ['runtime.config.js', 'mail.transport', 'live-use'],
+  ['config/settings.json', 'mail.transport', 'live-use'],
  ];
  for (const [locator, value, classification] of expected) {
   assert.ok(has(report, locator, value, classification), `discovers the public name from ${locator}`);
  }
+ const packages = report.signals.filter(signal => signal.kind === 'package' && signal.value === '@stripe/stripe-js');
+ assert.equal(packages.length, 2, 'live and example uses remain distinct');
+ const livePackage = packages.find(signal => signal.class === 'live-use');
+ assert.equal(livePackage.count, 2, 'the same package in two files is counted once');
+ assert.equal(livePackage.locator, 'package.json', 'the first locator represents the group');
+ assert.equal(packages.find(signal => signal.class === 'trace').count, 1);
+ for (const [kind, value] of [['iac-resource', 'Deployment'], ['iac-provider', 'synthetic.invalid'], ['config-key', 'mail.transport']]) {
+  const signals = report.signals.filter(signal => signal.kind === kind && signal.value === value);
+  assert.equal(signals.length, 1, 'identical configuration and infrastructure names are grouped');
+  assert.equal(signals[0].count, 2);
+ }
+ const secrets = report.signals.filter(signal => signal.kind === 'secret-file' && signal.value === 'credentials.json');
+ assert.deepEqual(secrets.map(signal => signal.locator).sort(), secretPaths, 'same-named denied files retain both paths');
+ for (const signal of secrets) {
+  const info = await lstat(join(root, signal.locator));
+  assert.equal(signal.size, info.size);
+  assert.equal(signal.mtime, info.mtime.toISOString());
+ }
+ const signalKeys = report.signals.filter(signal => signal.kind !== 'secret-file').map(signal => {
+  assert.ok(Number.isInteger(signal.count) && signal.count > 0);
+  return JSON.stringify([signal.kind, signal.value, signal.repo, signal.class]);
+ });
+ assert.equal(new Set(signalKeys).size, signalKeys.length, 'every non-secret identity is emitted once');
  assert.ok(report.signals.every(signal => signal.repo === basename(root)));
  assert.ok(!report.signals.some(signal => signal.kind === 'config-key' &&
   /^(?:fixtures\/|locales\/|notes\.yaml$)/.test(signal.locator)), 'data documents do not contribute config keys');
@@ -113,7 +146,8 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   'synthetic-region-value-never-export', 'synthetic-cf-value-never-export',
   'synthetic-kube-value-never-export', 'synthetic-config-value-never-export',
   'synthetic-nested-value-never-export', 'synthetic-comment-value-never-export', 'synthetic-yaml-value-never-export',
-  'synthetic-data-scalar-never-export', 'synthetic-capped-scalar-never-export', 'synthetic-code-scalar-never-export']);
+  'synthetic-data-scalar-never-export', 'synthetic-capped-scalar-never-export', 'synthetic-code-scalar-never-export',
+  'synthetic-denied-content-never-export']);
 });
 
 test('packed business scan reports denied files by metadata and withholds credential-shaped names', async () => {

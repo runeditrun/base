@@ -15,11 +15,20 @@ async function namesFromFile(path, info, locator, pulumi) {
 export async function scan(directories) {
  const result = { schema: 'rer-business-signals/1', source: 'local', configKeyLimit, signals: [], withheld: 0,
   skipped: { linkedWorktrees: 0, toolDirectories: 0, generatedDirectories: 0, gitDirectories: 0 } };
- const observedAt = new Date().toISOString(), seen = new Set();
+ const observedAt = new Date().toISOString(), seen = new Set(), grouped = new Map();
  const roots = [...new Set(directories.map(path => resolve(path)))];
  function emit(signal) {
   if (blockedSignal(signal)) { result.withheld++; return; }
-  result.signals.push(signal);
+  // Denied files retain their own locator, size and mtime, even when names match.
+  if (signal.kind === 'secret-file') { result.signals.push(signal); return; }
+  const key = JSON.stringify([signal.kind, signal.value, signal.repo, signal.class]);
+  const existing = grouped.get(key);
+  if (existing) existing.count++;
+  else {
+   const counted = { ...signal, count: 1 };
+   grouped.set(key, counted);
+   result.signals.push(counted);
+  }
  }
  for (const requested of roots) {
   const root = await realpath(requested);
