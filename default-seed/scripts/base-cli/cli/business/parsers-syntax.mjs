@@ -14,7 +14,7 @@ export function literal(source) {
 
 // Keep offsets/newlines, so a removed comment cannot join adjacent tokens.
 // In YAML/TOML, # starts comments; // only starts comments in JSON/HCL/code.
-export function comments(source, slash = false) {
+export function comments(source, slash = false, stringEnd = undefined) {
  let clean = '', quote = '', block = false, comment = '';
  const traces = [];
  for (let i = 0; i < source.length; i++) {
@@ -29,7 +29,11 @@ export function comments(source, slash = false) {
     if (quote === "'" && next === "'") { clean += next; i++; }
     else quote = '';
    }
-  } else if (char === '"' || char === "'" || (slash && char === '`')) { quote = char; clean += char; }
+  } else if (char === '"' || char === "'" || (slash && char === '`')) {
+   if (stringEnd) {
+    const end = stringEnd(source, i); clean += source.slice(i, end); i = end - 1;
+   } else { quote = char; clean += char; }
+  }
   else if (slash && char === '/' && next === '*') { block = true; clean += '  '; i++; }
   else if (char === '#' || (slash && char === '/' && next === '/')) {
    const start = i + (char === '#' ? 1 : 2);

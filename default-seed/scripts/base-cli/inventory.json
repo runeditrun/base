@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g034ea12a",
+  "cliVersion": "0.2.28-dev.gf9d66618",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -387,7 +387,7 @@
     },
     "cli/business/parsers-config-code.mjs": {
       "source": "cli/business/parsers-config-code.mjs",
-      "sha256": "6d68488b9cd7bce521dc07463f3a20b33583c5db71032037eda9d96d50f5c04c"
+      "sha256": "8dbbdbdfc02b8c25c05f800d8df5295293e8f7b90d528a806a28cf144dcc2618"
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
@@ -407,7 +407,7 @@
     },
     "cli/business/parsers-syntax.mjs": {
       "source": "cli/business/parsers-syntax.mjs",
-      "sha256": "d6cc67dae8ac92329cb86a059bcd7d8cccd4d4e38875c58c978d3ed3a955be7d"
+      "sha256": "d7bbb61a0b1a52c162709b97fd109dd40931a919e70a71bd3c7b8e9d579a22c8"
     },
     "cli/business/parsers-terraform.mjs": {
       "source": "cli/business/parsers-terraform.mjs",
@@ -415,7 +415,7 @@
     },
     "cli/business/parsers.mjs": {
       "source": "cli/business/parsers.mjs",
-      "sha256": "ff472b7dd7c86e6760d0aca609a627e99c9fe89b96a19f73aac079e9dfbafbd4"
+      "sha256": "e6c69be715aa784ae4e8712499ac49cb25c1e6cfbafcf3f10d46847cbb5e18c6"
     },
     "cli/business/policy.mjs": {
       "source": "cli/business/policy.mjs",
