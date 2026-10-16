@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.38-dev.g8706db66",
+  "cliVersion": "0.2.38-dev.g670337b9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -537,6 +537,10 @@
       "source": "cli/container.mjs",
       "sha256": "db236aeb05f8ab8329aa220465a48ebaf83df27149e6534120b890fae5b747c2"
     },
+    "cli/contract-status.mjs": {
+      "source": "cli/contract-status.mjs",
+      "sha256": "5da5e3bd2e9ad13a83eea648e05d2c378f0f2e98e04a7eef638f33e1504c34c6"
+    },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
       "sha256": "55dba9b034a7286c3a66364fde34af0bd5be1b653e02e8d6c98093138648d0f8"
@@ -667,7 +671,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "1d6b6f4f0f1cf1b3f42adea1bebfc8f0cb857e41bf66989b9a86660f9c677ea4"
+      "sha256": "ce524682bb80a2311d6b6c828f28b531e3bf2debaa57cf548f0e45b1191d47e0"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -711,7 +715,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "2e1c62a2b4a782f159dc750f98cc5915ad899cf5604e5303cbbb1c71d3be444b"
+      "sha256": "6740dcb0439928accfe1911d28be1f48f574243f61631dc0dd419108b8055dc8"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -956,6 +960,10 @@
     "edition-authoring/manifest.mjs": {
       "source": "edition-authoring/manifest.mjs",
       "sha256": "0c93bd39b1dd869b23a9d2727671fe8f9c933a9d56c7a3df1ba83c4a6f816e7b"
+    },
+    "foundation/runtime/seed-contract.mjs": {
+      "source": "foundation/runtime/seed-contract.mjs",
+      "sha256": "9649768eee1d2c79bf8f63f2d1c27589a5d4dd3ec279d139d104acb93c14adaf"
     },
     "modules/ai/LICENSE": {
       "source": "modules/ai/LICENSE",

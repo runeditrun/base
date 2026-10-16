@@ -22,6 +22,7 @@ import { savedOrigin } from './door-mode.mjs';
 import { probePnpm } from './pnpm-probe.mjs';
 import { deliveryDeclarationClauses } from './delivery-declarations.mjs';
 import { checkoutPlaceholderMarks } from './placeholder-mark.mjs';
+import { contractStatusClauses } from './contract-status.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
 // too old to record one). defaults: what a server start applies when the person
@@ -129,6 +130,7 @@ export async function check(project, explicitProfile) {
   add('SC-08.portability', typeof adapter?.portability?.export === 'function' && typeof adapter?.portability?.import === 'function', 'Adopt the reviewed mainline complete local portability API; archive support remains unavailable until then.');
   if (adapter?.devIdentity) for (const [id, ok, message] of await devIdentityClauses(project.root, adapter)) add(id, ok, message);
   for (const [id, ok, message] of await authCopyClauses(project.root)) add(id, ok, message);
+  clauses.push(...await contractStatusClauses(project.root));
   placeholderMarks = await checkoutPlaceholderMarks(project.root, project.descriptor.project);
  }
  for(const issue of await localAiDiagnostics(project,process.env))add('AI.'+issue.feature,false,issue.code+': '+issue.message);

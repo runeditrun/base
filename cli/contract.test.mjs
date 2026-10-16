@@ -9,7 +9,8 @@ import { verbs, aliases, pins } from './contract.mjs';
 const base = resolve(import.meta.dirname, '..');
 const common = [...Object.keys(verbs), 'release'];
 
-test('check diagnoses command and deployment declarations, accepts corrections and refuses missing runtime code without effects', async t => {
+// A first-party seed with every declaration check reads and no runnable app.
+async function structuralSeed(t) {
  const root = await mkdtemp(join(tmpdir(), 'rer-structural-')); t.after(() => rm(root, { recursive: true, force: true }));
  await exportCLI(base, root); await cp(join(base, 'onboarding'), join(root, 'scripts/base-onboarding'), { recursive: true });
  await writeFile(join(root, '.node-version'), pins.node + '\n');
@@ -23,6 +24,11 @@ test('check diagnoses command and deployment declarations, accepts corrections a
   const report = JSON.parse(result.stdout.trim()); return { ...result, report };
  };
  await save();
+ return { root, descriptor, save, check };
+}
+
+test('check diagnoses command and deployment declarations, accepts corrections and refuses missing runtime code without effects', async t => {
+ const { root, descriptor, save, check } = await structuralSeed(t);
  const accepted = check();
  assert.equal(accepted.status, 0, accepted.stderr);
  for (const [path, wrap] of [
@@ -63,4 +69,32 @@ test('check diagnoses command and deployment declarations, accepts corrections a
  assert.equal(incompleteRuntime.status, 1);
  assert.ok(incompleteRuntime.report.clauses.some(clause => !clause.ok && clause.message));
  await assert.rejects(stat(join(root, '.wrangler')), { code: 'ENOENT' }, 'read-only check creates no local state or credentials');
+});
+
+test("check validates a seed's CONTRACT.md Status table and names the line of each failure", async t => {
+ const { root, check } = await structuralSeed(t);
+ assert.equal(check().status, 0, 'a seed without CONTRACT.md is unaffected');
+ const contract = ['# Example contract', '', '## Product target', '', '| | |', '| --- | --- |', '| Category | Team notes |', '| Incumbents a buyer switches from | Notion, Confluence |', '| First buyer | A US team of 20 |', '',
+  '## Pages', '', '- **PAGE-001 — Create a page.** A member creates a page.', '- **PAGE-002 — Share a page.** A member shares a page.', '', '## Target clauses', '', '### Writing together', '', '#### LIVE-001 — Live editing.', 'Two members type at once.', '', '*Status:* missing.', '',
+  '## Status', '', 'Judged from the code and tests at commit `0123abc` (17 October 2026).', '', '| Clause | Title | Kind | Status | Evidence | Gap |', '| --- | --- | --- | --- | --- | --- |',
+  '| `PAGE-001` | Create a page | published | done | `tests/pages.test.mjs` |  |', '| `PAGE-002` | Share a page | published | partial | `src/share.mjs` | no journey |', '| `LIVE-001` | Live editing | target | missing |  | no implementation |', ''];
+ const row = id => contract.findIndex(line => line.startsWith(`| \`${id}\``)) + 1;
+ await mkdir(join(root, 'tests'), { recursive: true }); await mkdir(join(root, 'src'), { recursive: true });
+ await writeFile(join(root, 'tests/pages.test.mjs'), ''); await writeFile(join(root, 'src/share.mjs'), '');
+ // Each failure is one clause whose message starts with the CONTRACT.md line.
+ const failures = async lines => {
+  await writeFile(join(root, 'CONTRACT.md'), lines.join('\n')); const result = check();
+  return { status: result.status, failed: result.report.clauses.filter(clause => !clause.ok).map(clause => [clause.id, /^CONTRACT\.md:(\d+): /.exec(clause.message)?.[1], clause.message]) };
+ };
+ assert.deepEqual(await failures(contract), { status: 0, failed: [] });
+ const duplicate = [...contract]; duplicate.splice(row('PAGE-002'), 0, contract[row('PAGE-001') - 1]);
+ const twice = await failures(duplicate);
+ assert.equal(twice.status, 1);
+ assert.deepEqual(twice.failed.map(([id, line]) => [id, Number(line)]), [['CONTRACT.status', row('PAGE-002') + 1]]);
+ assert.match(twice.failed[0][2], /PAGE-001/);
+ await rm(join(root, 'tests/pages.test.mjs'));
+ const unproven = await failures(contract);
+ assert.equal(unproven.status, 1);
+ assert.deepEqual(unproven.failed.map(([id, line]) => [id, Number(line)]), [['CONTRACT.evidence.PAGE-001', row('PAGE-001')]]);
+ assert.match(unproven.failed[0][2], /tests\/pages\.test\.mjs/);
 });

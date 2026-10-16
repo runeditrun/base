@@ -117,6 +117,10 @@ startup, verification, provisioning and deployment. Check required accounts,
 credentials, bindings and migrations before running an operation. Use the
 configured health endpoint and real application journeys to establish what works.
 
+A change that ships or alters a contract clause updates that clause's row in
+`CONTRACT.md`'s Status table in the same PR; `rer check` refuses a table that
+disagrees with the contract.
+
 Do not infer provisioning from a command named `setup`, deployment from a push,
 or previews from a pull request. Those behaviours require actual scripts or
 workflows. Missing configuration must remain visible. Never invent working
