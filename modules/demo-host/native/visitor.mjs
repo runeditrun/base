@@ -99,6 +99,19 @@ export class NativeDemo extends DurableObject {
     if (!runtime) return endedPage(this.env, { headers: { 'set-cookie': clearCookie(this.env) } });
     return application(this.env, this.ctx, this.ctx.id.toString(), runtime).fetch(request);
   }
+  // The seed signs the visitor out, then the copy ends as an expired one does.
+  // A form navigation gets the ended page; a script gets the seed's answer and
+  // its next page load finds the ended page.
+  async signOut(request) {
+    const runtime = await this.session();
+    if (!runtime) return endedPage(this.env, { headers: { 'set-cookie': clearCookie(this.env) } });
+    const response = await application(this.env, this.ctx, this.ctx.id.toString(), runtime).fetch(request);
+    if (response.status >= 400) return response;
+    const body = await response.arrayBuffer();
+    await this.end();
+    if (/text\/html/.test(request.headers.get('accept') ?? '')) return endedPage(this.env, { headers: { 'set-cookie': clearCookie(this.env) } });
+    return new Response(response.status === 204 ? null : body, response);
+  }
   database(binding, method, args) { return database(this, binding, method, args); }
   object(binding, id, method, args) { return object(this, binding, id, method, args); }
   r2(binding, method, args) { return r2(this, binding, method, args); }

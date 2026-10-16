@@ -44,11 +44,11 @@ export function startPage(env, { status = 200, notice, pending = false, headers 
 <p class="note" id="note">${pending ? 'Your demo will open automatically when ready.' : 'Complete the human check to start your demo.'}</p><noscript><p class="note">The human check needs JavaScript. Turn it on to start the demo.</p></noscript><p class="visually-hidden" id="status" role="status"></p></form>` });
 }
 
-/** A demo whose hour or idle time is up: its isolate and data are gone. */
+/** A demo signed out of, or whose hour or idle time is up: its isolate and data are gone. */
 export function endedPage(env, { status = 410, headers = {} } = {}) {
   const name = escape(env.DEMO_NAME);
   return html(env, { page: 'ended', title: 'This demo has ended', status, headers, body: `<h1 id="title">This demo has ended</h1>
-<p class="intro">Demos last an hour, or until 15 minutes pass with nothing happening. Its copy of ${name} and everything in it have been deleted.</p>
+<p class="intro">A demo ends when you sign out, after an hour, or after 15 minutes with nothing happening. Its copy of ${name} and everything in it have been deleted.</p>
 <a class="button" href="${escape(env.DEMO_ORIGIN)}/">Start a new demo</a><p class="secondary"><a href="${escape(new URL(env.DEMO_SITE).origin)}/run">Run ${name} yourself</a></p>` });
 }
 

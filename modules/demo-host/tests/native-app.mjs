@@ -19,6 +19,7 @@ export default {
     }
     if (path === '/own-data') return Response.json((await env.DB.prepare('SELECT name FROM items ORDER BY name').all()).results.map(row => row.name));
     if (!(request.headers.get('cookie') ?? '').split(';').some(part => part.trim() === `owner=${env.SESSION_SECRET}`)) return new Response('Unauthorized', { status: 401 });
+    if (path === '/auth/signout' && request.method === 'POST') return new Response(null, { status: 204, headers: { 'set-cookie': 'owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax' } });
     if (path === '/own-fetch') {
       const primary = await (await fetch(env.AUTH_ORIGIN + '/own-data')).json();
       const secondary = await (await fetch('https://page.demo.example.test/own-data')).json();

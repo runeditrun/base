@@ -107,12 +107,35 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     const asset = await fetch('/assets/fixture-12345678.js');
     assert.equal(await asset.text(), 'fixture-asset');
     assert.ok(asset.headers.get('cache-control').includes('immutable'));
+    // Signing out ends the visitor's copy as expiry does; the ended page's
+    // Start a new demo leads to a fresh signed-in copy. A refused sign-out
+    // passes through and keeps the copy.
+    const c = await start('203.0.113.3');
+    assert.equal((await fetch('/auth/signout', c.replace(/owner=[^;]+/, 'owner=wrong'), { method: 'POST' })).status, 401);
+    assert.equal((await fetch('/items', c)).status, 200);
+    const signedOut = await fetch('/auth/signout', c, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(signedOut.status, 204);
+    assert.match(signedOut.headers.get('set-cookie'), /^owner=;/);
+    const ended = await fetch('/signin', c);
+    assert.equal(ended.status, 410);
+    assert.match(ended.headers.get('set-cookie'), /^rer_demo=;.*Max-Age=0/);
+    const next = new URL((await ended.text()).match(/<a class="button" href="([^"]+)"/)[1]);
+    assert.equal(next.origin, origin);
+    assert.equal((await fetch(next.pathname)).status, 200);
+    const d = await start('203.0.113.3');
+    assert.notEqual(d.match(/rer_demo=[^;]+/)[0], c.match(/rer_demo=[^;]+/)[0]);
+    assert.deepEqual(await (await fetch('/items', d)).json(), [{ name: 'sample' }]);
+    const navigated = await fetch('/auth/signout', d, { method: 'POST', headers: { accept: 'text/html,application/xhtml+xml,*/*;q=0.8', 'content-type': 'application/x-www-form-urlencoded' }, body: '' });
+    assert.equal(navigated.status, 410);
+    assert.match(navigated.headers.get('set-cookie'), /^rer_demo=;.*Max-Age=0/);
+    assert.equal(new URL((await navigated.text()).match(/<a class="button" href="([^"]+)"/)[1]).origin, origin);
+    assert.equal((await fetch('/items', d)).status, 410);
     await new Promise(resolve => setTimeout(resolve, 12500));
     assert.equal((await fetch('/items', a)).status, 410);
     assert.equal((await fetch('/items', b)).status, 410);
     assert.deepEqual((await bucket.list()).objects, [], 'expiry erased the R2 prefix');
     const namespace = await mf.getDurableObjectNamespace('DEMO');
-    for (const cookies of [a, b]) {
+    for (const cookies of [a, b, c, d]) {
       const id = namespace.idFromString(cookies.match(/(?:^|; )rer_demo=([^;]+)/)[1]);
       const storage = await mf.unsafeGetDurableObjectStorage('native-test', 'NativeDemo', { id: id.toString() });
       assert.deepEqual(await storage.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_cf_METADATA'"), [], 'supervisor, queue records and facet inventory are erased');
