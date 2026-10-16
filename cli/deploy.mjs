@@ -33,8 +33,9 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const recordedState = change.length ? await deploymentRecord(root, options) : undefined;
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
+  let production;
   if (!change.length) {
-   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
+   production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
    await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options });
    if (!options.dryRun) committedSource(root, options);
    await lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken });
@@ -45,7 +46,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    // account lookup. This synthetic target is validation data, not a provider.
    const worker = ownerWorkerName(declaration.project, environment);
    const artifact = await packageBuild({ root, source: { sha: '0'.repeat(40), tree: '0'.repeat(40) }, runIdentity: { id: '0', attempt: '1' }, productDirectory: '' });
-   ownerPlan({ project: declaration.project, environment, worker, origin: `https://${worker}.example.invalid` }, declaration, artifact, { localOnlyKeys });
+   ownerPlan({ project: declaration.project, environment, worker, origin: `https://${worker}.example.invalid` }, declaration, artifact, { localOnlyKeys, env: production.env });
    store.report('deploy: dry run complete; no deployment occurred and no provider request was made.');
    return { dryRun: true, deployed: false };
   }
