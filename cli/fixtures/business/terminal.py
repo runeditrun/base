@@ -16,6 +16,7 @@ child = subprocess.Popen(sys.argv[1:], stdin=slave, stdout=slave, stderr=slave, 
 os.close(slave)
 buffer = b''
 answered = 0
+secret_answered = False
 deadline = time.monotonic() + 30
 try:
     while time.monotonic() < deadline:
@@ -32,6 +33,9 @@ try:
             sys.stdout.buffer.write(chunk)
             sys.stdout.buffer.flush()
             buffer += chunk
+            if not secret_answered and b'Credential (hidden): ' in buffer:
+                os.write(master, sys.stdin.buffer.readline())
+                secret_answered = True
             count = buffer.count(b'[yes/no] ')
             if count > answered:
                 os.write(master, b'yes\n')

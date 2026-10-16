@@ -8,8 +8,7 @@ const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-V
 export const classifications = ['uses', 'sells', 'both', 'product-dependency'];
 
 export async function mcpClient(api, { taskId, signal } = {}) {
- const minted = await api.post('/api/business/executors/token', { audience: 'mcp', ...(taskId ? { task_id: identifier(taskId) } : {}) }, { signal });
- if (typeof minted.access_token !== 'string') throw Error('Business server did not issue an MCP bearer.');
+ const minted = await api.mintToken('mcp', { taskId, signal });
  const options = { token: minted.access_token, signal, headers };
  let sequence = 0;
  async function rpc(method, params, notification = false) {
@@ -39,9 +38,14 @@ export const ownerLink = state => `${state.origin}/business/${encodeURIComponent
 
 function classification(task) {
  const toolId = identifier(task.question?.tool_id), vendorId = task.question?.vendor_id;
- if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId) || sensitive(toolId))
+ const schema = task.question?.answer_schema, vendors = schema?.properties?.vendor_id?.enum;
+ const usages = schema?.properties?.usage?.enum;
+ if (!Array.isArray(vendors) || !vendors.length || vendors.some(value => typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(value) || sensitive(value))
+  || !vendors.includes('none') || !vendors.includes(vendorId) || sensitive(toolId)
+  || !Array.isArray(usages) || usages.length !== classifications.length || classifications.some(value => !usages.includes(value))
+  || schema.properties.confidence?.type !== 'number' || schema.properties.confidence.minimum !== 0 || schema.properties.confidence.maximum !== 1)
   throw Error('Business classification metadata was refused.');
- return { toolId, vendorId };
+ return { toolId, vendorId, vendors };
 }
 
 export async function next() {
@@ -55,24 +59,29 @@ export async function next() {
  if (item.runner === 'owner' || ownerKinds.has(item.kind)) {
   process.stdout.write(`Owner: ${id}\nAnswer in your browser: ${ownerLink(state)}\n`); return;
  }
- const { toolId, vendorId } = classification(item);
- process.stdout.write(`Agent: ${id}\nTool: ${toolId}\nCatalogue vendor: ${vendorId}\nSuggest how this tool is used. The owner confirms in the browser.\nAnswers: ${classifications.join(' | ')}\nRun: rer business answer ${id} <enum>\n`);
+ const { toolId, vendorId, vendors } = classification(item);
+ process.stdout.write(`Agent: ${id}\nTool: ${toolId}\nSuggested vendor: ${vendorId}\nVendors: ${vendors.join(' | ')}\nSuggest how this tool is used. The owner confirms in the browser.\nUsage: ${classifications.join(' | ')}\nRun: rer business answer ${id} <vendor_id|none> <usage> [confidence]\n`);
 }
 
-export async function answer(id, choice) {
+export async function answer(id, vendorId, choice, rawConfidence = '1') {
  identifier(id);
+ // Reject free text before even looking up the question or minting a bearer.
+ if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId)) throw Error('Choose a catalogue vendor id from rer business next, or none.');
  if (!classifications.includes(choice)) throw Error(`Choose an enum: ${classifications.join(', ')}.`);
+ if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(rawConfidence)) throw Error('Choose a numeric confidence between 0 and 1.');
+ const confidence = Number(rawConfidence);
  const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
  const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
  if (summary.runner === 'owner' || ownerKinds.has(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerLink(state)}`);
  if (summary.kind !== 'classify.row' || summary.runner !== 'executor') throw Error('This item does not accept a CLI classification answer.');
- const { vendorId } = classification(summary);
+ const { vendors } = classification(summary);
+ if (!vendors.includes(vendorId)) throw Error('Choose a catalogue vendor id from this question, or none.');
  const tool = await mcpClient(api, { taskId: id, signal });
  let lease = summary;
  if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });
  if (typeof lease.grant_id !== 'string') throw Error('Business did not return a grant for this question.');
  try {
-  await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { vendor_id: vendorId, usage: choice, confidence: 1 } });
+  await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { vendor_id: vendorId, usage: choice, confidence } });
  } catch (error) {
   try { await tool('answer', { task_id: id, action: 'release', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, reason: 'failed' }); } catch { /* Expiry/revocation still fences the lease. */ }
   throw error;
@@ -82,8 +91,7 @@ export async function answer(id, choice) {
 
 export async function token() {
  const { state, credential } = await paired();
- const result = await new Api(state.origin, credential).post('/api/business/executors/token', { audience: 'mcp' });
- if (typeof result.access_token !== 'string') throw Error('Business server did not issue an MCP bearer.');
+ const result = await new Api(state.origin, credential).mintToken('mcp');
  // Claude headersHelper consumes this directly; never run this in an agent
  // transcript. Vendor credentials cannot be retrieved through this command.
  process.stdout.write(JSON.stringify({ Authorization: `Bearer ${result.access_token}` }) + '\n');

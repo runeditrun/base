@@ -94,12 +94,14 @@ export async function readSecret({ input = process.stdin, output = process.stder
  }
  if (typeof input.setRawMode !== 'function') throw new Error('A terminal with hidden input is required.');
  return new Promise((resolve, reject) => {
-  let secret = '', done = false; const wasRaw = input.isRaw, wasPaused = input.isPaused();
+  let secret = '', done = false; const wasRaw = input.isRaw, wasFlowing = input.readableFlowing === true;
   function finish(error) {
    if (done) return; done = true;
    input.off('data', data); input.off('end', ended); input.off('error', ended);
    process.off('SIGTERM', terminated); process.off('SIGINT', interrupted);
-   input.setRawMode(Boolean(wasRaw)); if (wasPaused) input.pause(); output.write('\n');
+   // A fresh stdin has readableFlowing === null, but isPaused() is false.
+   // Stop the read we started so the terminal does not keep the command alive.
+   input.setRawMode(Boolean(wasRaw)); if (!wasFlowing) input.pause(); output.write('\n');
    if (error) reject(error); else { try { resolve(checkedSecret(secret)); } catch (e) { reject(e); } }
   }
   const interrupted = () => finish(new Error('Credential entry cancelled.'));
@@ -114,7 +116,7 @@ export async function readSecret({ input = process.stdin, output = process.stder
     if (Buffer.byteLength(secret) > 65536) { finish(new Error('Credential input is too long.')); return; }
    }
   }
-  output.write('Credential (hidden): '); input.setRawMode(true);
+  input.setRawMode(true); output.write('Credential (hidden): ');
   input.on('data', data); input.once('end', ended); input.once('error', ended);
   process.once('SIGTERM', terminated); process.once('SIGINT', interrupted); input.resume();
  });

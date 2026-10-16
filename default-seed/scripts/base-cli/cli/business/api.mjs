@@ -19,6 +19,15 @@ export class ApiError extends Error {
 
 export class Api {
  constructor(origin, credential) { this.origin = originUrl(origin); this.credential = credential; }
+ async mintToken(audience, { taskId, signal } = {}) {
+  const result = await this.post('/api/business/executors/token', { audience, ...(taskId ? { task_id: identifier(taskId) } : {}) }, { signal });
+  const maximum = audience === 'mcp' ? 300 : 900;
+  if (typeof result?.access_token !== 'string' || !result.access_token.startsWith('bz_task_') || result.token_type !== 'Bearer'
+   || result.audience !== `${this.origin}/api/business/${audience}` || result.task_id !== (taskId ?? null)
+   || !Number.isInteger(result.expires_in) || result.expires_in < 1 || result.expires_in > maximum
+   || !Number.isFinite(Date.parse(result.expires_at)) || Date.parse(result.expires_at) <= Date.now()) throw Error('Business server returned an invalid scoped bearer.');
+  return result;
+ }
  async post(path, body, { token = this.credential, signal, timeout = 30_000, headers = {} } = {}) {
   if (!path.startsWith('/api/business/') || path.includes('..') || path.includes('?') || path.includes('#')) throw Error('Invalid Business route.');
   let response;

@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { ApiError, taskPath } from './api.mjs';
+import { ApiError, identifier, taskPath } from './api.mjs';
 import { saveProgress } from './progress.mjs';
 
 export class Lease {
  constructor(api, claim, progress, outerSignal) {
+  identifier(claim.task.id); identifier(claim.grant?.id);
+  if (!Number.isSafeInteger(claim.fence) || claim.fence < 1 || claim.task.fence !== claim.fence
+   || claim.grant.task_id !== claim.task.id || claim.grant.fence !== claim.fence || claim.heartbeat_interval_seconds !== 60) throw Error('Business server returned an invalid task grant.');
   this.api = api; this.claim = claim; this.progress = progress;
   this.checkpoint = claim.task.checkpoint ?? {}; this.cursor = 0;
   this.controller = new AbortController(); this.signal = AbortSignal.any([outerSignal, this.controller.signal]);
@@ -19,9 +22,8 @@ export class Lease {
  }
  async token() {
   if (!this.bearer || Date.now() >= this.bearerUntil - 60_000) {
-   const minted = await this.api.post('/api/business/executors/token', { audience: 'tasks', task_id: this.claim.task.id }, { signal: this.signal });
-   if (typeof minted.access_token !== 'string' || !Number.isFinite(Number(minted.expires_in)) || minted.expires_in > 900 || minted.expires_in <= 0) throw Error('Business task bearer was invalid.');
-   this.bearer = minted.access_token; this.bearerUntil = Date.now() + minted.expires_in * 1000;
+   const minted = await this.api.mintToken('tasks', { taskId: this.claim.task.id, signal: this.signal });
+   this.bearer = minted.access_token; this.bearerUntil = Date.parse(minted.expires_at);
   }
   return this.bearer;
  }

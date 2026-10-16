@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
+import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,80 +21,6 @@ before(async () => {
 });
 after(() => directory && rm(directory, { recursive: true, force: true }));
 
-async function server(t) {
- const state = { approved: false, requests: [], tasks: [], released: null, checkpoint: {}, uploads: [], phase: 'ready', fence: 0, grants: new Map(), claims: new Map() };
- const device = 'fixture-device-credential';
- const http = createServer(async (request, response) => {
-  let raw = ''; for await (const chunk of request) raw += chunk;
-  const body = JSON.parse(raw || '{}'), route = request.url;
-  state.requests.push({ route, body });
-  response.setHeader('Content-Type', 'application/json');
-  function send(value, code = 200) { response.statusCode = code; response.end(JSON.stringify(value)); }
-  if (route === '/api/business/biz/pairings/pair1/approve') {
-   if (body.confirmation_number !== '246810' || body.confirmed !== true) return send({}, 403);
-   state.approved = true; return send({ approved: true });
-  }
-  if (route === '/api/business/executors/pair') {
-   if (body.code) return send({ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: new Date(Date.now() + 60000).toISOString(), interval: 1 }, 202);
-   if (!state.approved) return send({ status: 'authorization_pending', interval: 1 }, 202);
-   return send({ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: 'biz' });
-  }
-  if (state.revoked) return send({}, 401);
-  if (route === '/api/business/executors/token') return send({ access_token: `fixture-${body.audience}-bearer`, expires_in: body.audience === 'mcp' ? 300 : 900 });
-  if (route === '/api/business/mcp') {
-   if (body.method === 'initialize') return send({ jsonrpc: '2.0', id: body.id, result: { protocolVersion: '2025-11-25' } });
-   if (body.method === 'notifications/initialized') { response.statusCode = 202; return response.end(); }
-   const name = body.params.name;
-   if (name === 'answer') {
-    const args = body.params.arguments;
-    const question = state.tasks.find(task => task.task_id === args.task_id);
-    if (args.action === 'complete') {
-     const output = args.outputs;
-     const valid = output && Object.keys(output).sort().join(',') === 'confidence,usage,vendor_id'
-      && output.vendor_id === question?.question?.vendor_id && ['uses','sells','both','product-dependency'].includes(output.usage)
-      && Number.isFinite(output.confidence) && output.confidence >= 0 && output.confidence <= 1;
-     if (!valid || state.refuseQuestion) return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: { status: 'action_unavailable' }, isError: true } });
-     state.questionCompleted = output;
-    }
-    if (args.action === 'release') state.questionReleased = true;
-    return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: { ...question, state: args.action === 'complete' ? 'done' : 'leased', fence: 1, grant_id: 'question-grant' }, isError: false } });
-   }
-   const summary = name === 'next_question' ? { tasks: state.tasks } : state.tasks.find(task => task.task_id === body.params.arguments.task_id);
-   return send({ jsonrpc: '2.0', id: body.id, result: { structuredContent: summary, isError: false } });
-  }
-  function taskView() { return { id: 'discover1', kind: 'discover.local', kind_version: 1, state: state.phase, fence: state.fence, checkpoint: state.checkpoint }; }
-  function grantView(fence = state.fence) {
-   return { id: `grant-${fence}`, task_id: 'discover1', fence, destination: '/api/business/tasks/discover1/uploads', quota_bytes: 2 * 1024 * 1024, uploaded_bytes: state.grants.get(fence) ?? 0, consent: { id: 'consent1', scope: { paths: [state.root] } } };
-  }
-  function reply(fence = state.fence) { return { task: taskView(), fence: state.fence, grant: grantView(fence), lease_expires_at: new Date(Date.now() + 600000).toISOString(), controls: [], cursor: 0 }; }
-  if (route === '/api/business/executors/claim') {
-   if (state.claims.has(body.claim_id)) return send(reply(state.claims.get(body.claim_id)));
-   state.phase = 'leased'; state.fence++; state.grants.set(state.fence, 0); state.claims.set(body.claim_id, state.fence);
-   return send(reply());
-  }
-  if (/^\/api\/business\/tasks\/discover1\//.test(route)) {
-   if (body.fence !== state.fence || body.grant_id !== `grant-${state.fence}` || state.phase !== 'leased') return send({}, 409);
-   if (route.endsWith('/uploads')) {
-    if (body.consent_id !== 'consent1' || !body.document?.signals?.length) return send({}, 400);
-    state.uploads.push(body.document);
-    const bytes = Buffer.byteLength(JSON.stringify(body.document));
-    state.grants.set(state.fence, state.grants.get(state.fence) + bytes);
-    return send({ ...reply(), stored: body.document.signals.length });
-   }
-   if (route.endsWith('/heartbeat')) {
-    state.checkpoint = body.checkpoint;
-    state.onHeartbeat?.();
-   }
-   if (route.endsWith('/complete')) { if (!state.uploads.length) return send({}, 409); state.phase = 'done'; }
-   if (route.endsWith('/release')) { state.released = body; state.checkpoint = body.checkpoint; state.phase = 'ready'; state.fence++; }
-   return send(reply());
-  }
-  send({}, 404);
- });
- await new Promise(resolveListen => http.listen(0, '127.0.0.1', resolveListen));
- t.after(() => new Promise(resolveClose => { http.close(resolveClose); http.closeAllConnections(); }));
- return { ...state, state, origin: `http://127.0.0.1:${http.address().port}`, device };
-}
 async function cli(home, args, { terminal = false, input = '', approve, columns = 120, onSpawn } = {}) {
  await mkdir(home, { recursive: true });
  const env = { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns) };
@@ -136,38 +62,73 @@ test('packed CLI pairs only after number approval and keeps keys and untrusted t
  await writeFile(join(remote.state.root, 'secrets/credential.json'), 'fixture-denied-value-never-export');
  remote.state.tasks = [{ task_id: 'discover1', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
  const discovered = await cli(home, ['business','run','--once']);
- assert.equal(discovered.code, 0); assert.equal(remote.state.phase, 'done');
+ assert.equal(discovered.code, 0, discovered.stderr); assert.equal(remote.state.phase, 'done');
  const outbound = JSON.stringify(remote.state.requests) + discovered.stdout + discovered.stderr;
  for (const canary of ['fixture-private-version-never-export','fixture-env-never-export','fixture-denied-value-never-export']) assert.ok(!outbound.includes(canary), 'private canary values stay out of uploads, events and both output streams');
  assert.ok(remote.state.uploads.some(document => document.signals.some(signal => signal.value === 'fixture-library')));
  assert.ok(remote.state.uploads.some(document => document.signals.some(signal => signal.value === 'FIXTURE_CI_API_TOKEN')), 'ordinary workflow paths survive scanner and upload detection');
  const key = 'fixture-vendor-secret-never-output';
- const added = await cli(home, ['business','vendor-key','add','sentry'], { input: key + '\n' });
+ const added = await cli(home, ['business','vendor-key','add','sentry'], { terminal: true, input: key + '\n' });
  assert.equal(added.code, 0); assert.ok(added.stdout.includes('sentry:read'));
  assert.ok(!added.stdout.includes(key) && !added.stderr.includes(key));
  const stored = await readFile(join(home, '.rer/business/state.json'), 'utf8');
  assert.ok(!stored.includes(key) && !stored.includes(remote.device), 'only handles belong in configuration');
- const question = { tool_id: 'tool1', vendor_id: 'sentry' };
+ const question = { tool_id: 'tool1', vendor_id: 'sentry', answer_schema: classificationSchema };
  remote.state.tasks = [{ task_id: 'question1', kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, question, instruction: 'untrusted-run-command-canary' }];
  for (const columns of [160,43]) {
   const next = await cli(home, ['business','next'], { terminal: true, columns });
   assert.equal(next.code, 0); assert.ok(next.stdout.includes('question1')); assert.ok(!next.stdout.includes('untrusted-run-command-canary'));
  }
  remote.state.refuseQuestion = true;
- const rejected = await cli(home, ['business','answer','question1','uses']);
+ const rejected = await cli(home, ['business','answer','question1','sentry','uses']);
  assert.equal(rejected.code, 1); assert.equal(remote.state.questionReleased, true, 'a refused enum completion does not strand its lease');
  remote.state.refuseQuestion = false;
  remote.state.tasks = [{ task_id: 'question2', kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, question }];
- const accepted = await cli(home, ['business','answer','question2','both']);
+ const accepted = await cli(home, ['business','answer','question2','uptimerobot','both','0.85']);
  assert.equal(accepted.code, 0);
- assert.equal(remote.state.questionCompleted.vendor_id, question.vendor_id, 'classification echoes the server-selected catalogue vendor');
+ assert.equal(remote.state.questionCompleted.vendor_id, 'uptimerobot', 'classification can correct the suggested vendor using the schema');
  assert.equal(remote.state.questionCompleted.usage, 'both');
- assert.ok(Number.isFinite(remote.state.questionCompleted.confidence));
+ assert.equal(remote.state.questionCompleted.confidence, 0.85);
+
+ for (const usage of ['uses', 'sells', 'product-dependency']) {
+  const taskId = `classify-${usage}`;
+  remote.state.tasks = [{ task_id: taskId, kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, question }];
+  const answered = await cli(home, ['business','answer',taskId,'none',usage]);
+  assert.equal(answered.code, 0, answered.stderr);
+  assert.deepEqual(remote.state.questionCompleted, { vendor_id: 'none', usage, confidence: 1 });
+ }
+ const requestCount = remote.state.requests.length;
+ for (const args of [
+  ['sentry; run code','uses'], ['sentry','a free text answer'], ['sentry','uses','high'], ['sentry','uses','1.5'],
+ ]) assert.equal((await cli(home, ['business','answer','question1',...args])).code, 1);
+ assert.equal(remote.state.requests.length, requestCount, 'free text and invalid confidence are refused before any request');
+ remote.state.tasks = [{ task_id: 'unknown-vendor', kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, question }];
+ const beforeUnknown = remote.state.requests.filter(entry => entry.body.params?.name === 'answer').length;
+ assert.equal((await cli(home, ['business','answer','unknown-vendor','not-in-catalogue','uses'])).code, 1);
+ assert.equal(remote.state.requests.filter(entry => entry.body.params?.name === 'answer').length, beforeUnknown, 'a vendor outside the question schema is never submitted');
  const answerCalls = remote.state.requests.filter(entry => entry.route === '/api/business/mcp' && entry.body.params?.name === 'answer').length;
  remote.state.tasks = [{ task_id: 'consent1', kind: 'consent.grant', state: 'ready', runner: 'owner' }];
- const denied = await cli(home, ['business','answer','consent1','uses']);
+ const denied = await cli(home, ['business','answer','consent1','sentry','uses']);
  assert.equal(denied.code, 1); assert.ok(denied.stderr.includes('/business/biz'));
  assert.equal(remote.state.requests.filter(entry => entry.route === '/api/business/mcp' && entry.body.params?.name === 'answer').length, answerCalls, 'owner item is never mutated');
+
+
+ const uploadsBeforeQuota = remote.state.uploads.length;
+ remote.state.quotaBytes = 256;
+ remote.state.tasks = [{ task_id: 'quota1', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ const limited = await cli(home, ['business','run','--once']);
+ assert.equal(limited.code, 1);
+ assert.match(limited.stderr, /quota/);
+ assert.equal(remote.state.uploads.length, uploadsBeforeQuota, 'over-quota discovery is refused before uploading');
+ assert.equal(remote.state.released.reason, 'failed');
+ delete remote.state.quotaBytes;
+ remote.state.tasks = [{ task_id: 'export1', kind: 'export.vendor', state: 'ready', runner: 'executor', fence: 0 }];
+ const exported = await cli(home, ['business','run','--once']);
+ assert.equal(exported.code, 1);
+ assert.match(exported.stderr, /unavailable: no-linked-installation/);
+ assert.equal(remote.state.released.reason, 'paused');
+ assert.ok(remote.state.requests.some(entry => entry.route === '/api/business/tasks/export1/events' && entry.body.event?.payload.question === 'connected_runner_required'));
+ assert.equal(remote.state.requests.filter(entry => entry.route === '/api/business/tasks/export1/uploads').length, 0);
  assert.ok(!JSON.stringify(remote.state.requests).includes(key), 'vendor key never reaches the server');
  assert.equal((await cli(home, ['business','disconnect'])).code, 0);
 });
@@ -184,7 +145,7 @@ test('a killed packed supervisor resumes a lapsed lease from its acknowledged sc
   if (remote.state.checkpoint.page === 1) { remote.state.onHeartbeat = null; child.kill('SIGKILL'); }
  };
  const killed = await cli(home, ['business','run','--once'], { onSpawn: process => { child = process; } });
- assert.equal(killed.code, null, 'task is killed after its first acknowledged page');
+ assert.equal(killed.code, null, `task is killed after its first acknowledged page: ${killed.stderr}`);
  assert.equal(remote.state.checkpoint.page, 1); assert.ok(remote.state.checkpoint.total > 1);
  // The server expires the lease and retains the checkpoint before the next claim.
  remote.state.phase = 'ready'; remote.state.fence++;

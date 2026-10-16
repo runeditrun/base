@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g1fb24de2",
+  "cliVersion": "0.2.28-dev.g1a6f1f53",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -371,11 +371,11 @@
     },
     "cli/business/api.mjs": {
       "source": "cli/business/api.mjs",
-      "sha256": "63d57ccee9323ea1c452d151cfd674bc6444b39ef74c737e9ec35d316c684789"
+      "sha256": "84ad1cbbd06b6dac720a287e00f5f15b6389d87ea4c195d828ef1e585dc5c943"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "fd225a355723e03e6ef8e42dafda32eb13e41d86680cf0dbb9b6a8281314d580"
+      "sha256": "e7b53d412a1c4fad704b29b49d6caa5fea22cf90139e0437c2abd0a04168bd7f"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -391,7 +391,7 @@
     },
     "cli/business/discovery-task.mjs": {
       "source": "cli/business/discovery-task.mjs",
-      "sha256": "15c0e2bcbb26654b8b6770dc05ea20197183942d566bf26cb6fc375460f443be"
+      "sha256": "a7988a4516bffd79c240512184f55c5a5ee7e46edd8f1a5076f84183d79c0598"
     },
     "cli/business/files.mjs": {
       "source": "cli/business/files.mjs",
@@ -399,11 +399,11 @@
     },
     "cli/business/keychain.mjs": {
       "source": "cli/business/keychain.mjs",
-      "sha256": "69d8ad1c5ba7cbd94091a78c77b1976f3a75cdaf61b196976eb53f1a3e28ee86"
+      "sha256": "852bd6323842c46b2b1992cbe48667358de961096756c140167d2c07a2c7e413"
     },
     "cli/business/lease.mjs": {
       "source": "cli/business/lease.mjs",
-      "sha256": "2b57f675109f8fe2fa2d862edbbfb93e69aabc9767fc5d4b420feac23c4b76cb"
+      "sha256": "55c1b3faafa80f991ea8853f1d55f03883372e421509b31e12f0d7e685e627cc"
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
@@ -463,7 +463,7 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "248def11b8f76364fadabba773ca8b04850a9edb7cf3d089d6b45f17e1250265"
+      "sha256": "8a05c4963956ca442ca871323ca0e13124ec5ca2db00f8a37bbe2d567b252983"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",
@@ -487,7 +487,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "c1e831c3b11adc74b12f476a2df20f7a71ce52bc730bb1f43ca54c2f6489ac90"
+      "sha256": "c75f8ad9d93c763a70ce426cd54c88d4ca4504be252bb74ec9527537ff325530"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

@@ -11,6 +11,7 @@ import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
+const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-installation', 'installation-import-origin-unavailable', 'installation-owner-claim-unconfigured', 'connected-seed-import-required']);
 
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
@@ -44,15 +45,19 @@ export async function run({ once = false } = {}) {
    }
    if (!kinds.has(claimed.task.kind) || claimed.task.kind_version !== 1) throw Error('Business server returned an unimplemented task kind.');
    const lease = new Lease(api, claimed, progress, stop.signal);
-   let finished = false, failure;
+   let finished = false, released = false, failure;
    try {
     progress.current = { kind: claimed.task.kind, checkpoint: claimed.task.checkpoint, uploadedBytes: claimed.task.checkpoint?.bytes_done ?? 0 };
     await saveProgress(progress);
     if (claimed.task.kind === 'export.vendor') {
-     // The published protocol explicitly returns an unavailable, zero-quota
-     // destination. Do not read a vendor key until a real import door exists.
+     // A destination is not upload authority. Keep vendor keys local until
+     // the seed's signed import grant and chunk transport are connected.
      await lease.send(taskPath(claimed.task.id, 'events'), { event: { kind: 'question', payload: { question: 'connected_runner_required' } } });
      parked.add(claimed.task.id);
+     if (claimed.grant.available === false && claimed.grant.destination === `unavailable:${claimed.grant.reason}`) {
+      const reason = unavailableReasons.has(claimed.grant.reason) ? claimed.grant.reason : 'connected-seed-import-required';
+      throw Error(`Business vendor export unavailable: ${reason}. Task released as paused.`);
+     }
      throw Error('Business vendor export needs a connected seed upload grant and execution-input contract.');
     }
     const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
@@ -63,15 +68,15 @@ export async function run({ once = false } = {}) {
    } catch (error) { failure = lease.signal.aborted ? lease.signal.reason : error; }
    finally {
     if (!finished && failure?.status !== 401) {
-     try { await lease.release(stop.signal.aborted ? 'handover' : parked.has(claimed.task.id) ? 'paused' : 'failed'); }
+     try { await lease.release(stop.signal.aborted ? 'handover' : parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
      catch (error) { if (error.status === 401) failure = error; }
     }
     await lease.close();
-    if (finished || parked.has(claimed.task.id)) { progress = {}; await saveProgress(progress); }
+    if (finished || released) { progress = {}; await saveProgress(progress); }
    }
    if (failure) {
     if (failure.status === 401 || once || !parked.has(claimed.task.id)) throw failure;
-    process.stderr.write('Business vendor export is waiting for a connected seed upload grant.\n');
+    process.stderr.write(failure.message + '\n');
    }
    if (once) return;
   } while (!stop.signal.aborted);

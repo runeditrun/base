@@ -322,7 +322,7 @@ Sensitive-looking outbound names are dropped and counted in `withheld`.
 Symlinks, generated outputs and dependency trees are skipped; unsupported
 formats and syntax may yield no signals.
 
-## Business device commands (protocol integration in progress)
+## Business device commands
 
 `rer business connect --code ABCD-1234 [--origin https://app.runeditrun.com]`
 redeems a browser-created code, prints a six-digit confirmation number and waits
@@ -345,10 +345,12 @@ manager's piped input) into the OS keychain and prints only `sentry:read`.
 `rer business next` returns one locally templated classification or owner link,
 or `Nothing yet`, within 60 seconds. It never reflects server instructions or
 raw evidence. Owner items cannot be answered from this CLI.
-`rer business answer ID uses|sells|both|product-dependency` submits a task-scoped
-classification through MCP. It echoes the question's `vendor_id` and sends
-exactly `{vendor_id, usage, confidence: 1}`. The owner confirms the inventory in
-the browser.
+`rer business answer ID VENDOR uses|sells|both|product-dependency [CONFIDENCE]`
+submits a task-scoped classification through MCP. Choose a vendor ID from the
+question's displayed answer schema, or `none`; the suggested vendor can be
+corrected. Confidence is a number from 0 to 1, defaulting to 1. The completion
+sends exactly `{vendor_id, usage, confidence}`. Free text is refused locally.
+The owner confirms the inventory in the browser.
 `rer business token` emits an MCP Authorization header object for direct use as
 a headers helper. That output is a short-lived credential: connect it directly
 to the MCP client and do not paste it into an agent transcript.
@@ -373,7 +375,9 @@ to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They decla
 import authority. Vendor task inputs, adapter resume checkpoints and the chunk
 assembly/upload contract are also absent. The CLI releases these tasks before
 reading a vendor key; background mode parks them, and `run --once` reports the
-dependency as a command failure. Vendor export remains blocked.
+dependency as a command failure. An unavailable destination reports its reason
+and releases with `paused` after a `connected_runner_required` event.
+Vendor export remains blocked.
 
 The current MCP `next_question` filters out owner items. When an owner summary
 is supplied, the CLI displays its browser link and refuses to answer it.

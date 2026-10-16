@@ -13,6 +13,15 @@ const integer = value => Number.isSafeInteger(value) && value >= 0;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const fail = message => { throw Error(`Business discovery ${message}.`); };
 
+// The scan command includes local counts and skip diagnostics. The executor
+// upload contract accepts only the names-only signal projection.
+function uploadDocument(result) {
+ return { schema: result.schema, source: result.source, withheld: result.withheld,
+  signals: result.signals.map(({ kind, value, locator, repo, class: sourceClass, observedAt, size, mtime }) => ({
+   kind, value, locator, repo, class: sourceClass, observedAt, ...(size === undefined ? {} : { size, mtime }),
+  })) };
+}
+
 function inputs(task, grant, checkpoint, stateDir) {
  if (!object(task) || task.kind !== 'discover.local' || !object(grant)) fail('requires a scoped local discovery grant');
  identifier(task.id); identifier(grant.id); identifier(grant.consent?.id);
@@ -27,7 +36,7 @@ function inputs(task, grant, checkpoint, stateDir) {
  if (!isAbsolute(stateDir ?? '')) fail('requires an absolute private state directory');
  if (!object(checkpoint) || Object.keys(checkpoint).some(key => !['page', 'total', 'records_done', 'bytes_done', 'progress'].includes(key))) fail('checkpoint is invalid');
  for (const key of ['page', 'total', 'records_done', 'bytes_done']) if (checkpoint[key] !== undefined && !integer(checkpoint[key])) fail('checkpoint is invalid');
- if (checkpoint.progress !== undefined && (!Number.isFinite(checkpoint.progress) || checkpoint.progress < 0 || checkpoint.progress > 100)) fail('checkpoint progress is invalid');
+ if (checkpoint.progress !== undefined && (!integer(checkpoint.progress) || checkpoint.progress > 100)) fail('checkpoint progress is invalid');
  if (!checkpoint.page && (checkpoint.records_done || checkpoint.bytes_done)) fail('checkpoint lacks its acknowledged page');
  return { roots, identity: hash(JSON.stringify([task.id, grant.consent.id, roots])) };
 }
@@ -48,7 +57,7 @@ function paginate(document) {
  let start = 0, bytes = Buffer.byteLength(JSON.stringify(pageDocument(document, 0, 0)));
  for (let index = 0; index < document.signals.length; index++) {
   const signalBytes = Buffer.byteLength(JSON.stringify(document.signals[index]));
-  if (bytes + signalBytes + (index > start ? 1 : 0) >= PAGE_BYTES) {
+  if (index - start >= 2000 || bytes + signalBytes + (index > start ? 1 : 0) >= PAGE_BYTES) {
    if (index === start) fail('signal exceeds the upload page bound');
    ends.push(index); start = index;
    bytes = Buffer.byteLength(JSON.stringify(pageDocument(document, start, start)));
@@ -135,7 +144,7 @@ export async function runDiscovery({ task, grant, checkpoint = task?.checkpoint 
  if (!snapshot) {
   if (checkpoint.page > 0) fail('cannot resume acknowledged pages without the original snapshot; restore it or start a new consent');
   let document;
-  try { document = await scan(roots); }
+  try { document = uploadDocument(await scan(roots)); }
   catch { fail('could not read a consented local input; no upload was started'); }
   signal?.throwIfAborted();
   validateDocument(document);
@@ -145,6 +154,7 @@ export async function runDiscovery({ task, grant, checkpoint = task?.checkpoint 
  }
  const pages = pagesFrom(snapshot, identity, grant.quota_bytes), page = checkpoint.page ?? 0;
  if (page > pages.length) fail('checkpoint is outside its saved pagination');
+ if (grant.uploaded_bytes + pages.slice(page).reduce((sum, item) => sum + item.bytes, 0) > grant.quota_bytes) fail('remaining pages exceed the granted upload quota');
  const expected = counts(pages, page);
  for (const key of ['total', 'records_done', 'bytes_done']) {
   // A fresh server task can project zero counters before a plan exists.

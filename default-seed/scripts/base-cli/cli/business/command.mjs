@@ -10,7 +10,8 @@ const usage = `Usage: rer business VERB
                                  Pair, compare a number in your browser, then opt in to a service
   run [--once]                   Run consented local discovery; vendor upload integration pending
   next                           Return one templated question or nothing yet within 60 seconds
-  answer ID ENUM                 Classification: uses, sells, both, product-dependency
+  answer ID VENDOR USAGE [CONFIDENCE]
+                                 Catalogue vendor or none; uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
@@ -33,7 +34,7 @@ export async function businessCommand(argv) {
    if (typeof options.code !== 'string' || !/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(options.code)) return invalid();
    await connect(options);
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
-  else if (verb === 'answer' && args.length === 2) await answer(...args);
+  else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
   else if (verb === 'run' && (!args.length || args.length === 1 && args[0] === '--once')) await run({ once: args[0] === '--once' });
   else if (verb === 'status' && args.length === 1 && args[0] === '--json') await status({ json: true });
   else if (!args.length && ['next','token','status','disconnect'].includes(verb)) await ({ next, token, status, disconnect })[verb]();
