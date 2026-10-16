@@ -81,7 +81,10 @@ seed's demo data and its Demo name. Each visitor gets their own Cloudflare
 Container running this seed's image (`rer build --platform container`, workerd
 engine) with `RER_DEMO=1` and public internet access, behind one front Worker
 (`<project>-<environment>--demo`). The guard mocks account effects; egress
-retains a small direct mail/SMS transport denylist. Only the visitor's random `rer_demo`
+retains a small direct mail/SMS transport denylist. The app's own fetch of one
+of its demo hosts (`demo.<domain>` or a declared secondary host) never leaves
+the container: its egress serves it from the same container, so it reads that
+visitor's own demo. Only the visitor's random `rer_demo`
 cookie (HttpOnly, Secure, SameSite=Lax, one hour) reaches their container. A
 demo ends after 60 minutes, or 15 minutes with no requests; its container is
 destroyed and its state deleted, and the visitor sees "This demo has ended".
@@ -151,11 +154,24 @@ The seed needs, beyond the adoption above:
    when the repository variable `RUN_DEMO_DEPLOY` is `true`, and whenever it
    is run by hand. Run by hand with `test_only`, it deploys a separate test
    host instead: environment `demo-test` at `demo.test.<domain>`, with
-   Cloudflare's Turnstile test keys, which let every visitor start a demo
-   (the 10-demo cap and the rate limit still apply). After a deploy it waits
-   for the new hostname to resolve in public DNS (10 minutes at most) and for
-   the start page to answer 200 (5 minutes more), then checks it sets no
-   cookie; either wait ends with an error naming what did not happen.
+   Cloudflare's Turnstile test keys, which pass every browser, automated or
+   not. So a test host starts a demo only for a start that carries the
+   deploy's measurement token, as the cookie `rer_demo_measure=<token>` on
+   `demo.test.<domain>` or the header `x-rer-demo-measurement: <token>`; any
+   other start gets the start page's refusal (the 10-demo cap and the rate
+   limit still apply). `rer deploy --demo` uses `RER_DEMO_MEASUREMENT_TOKEN`
+   (32 to 512 characters) when that is set, as the workflow does from the
+   repository secret of that name; otherwise it makes a new token on each
+   test deploy and writes it to `.rer/demo-host/measurement-token` (private
+   to the operator). Either way it prints where the token is, never the token. A host with a
+   real Turnstile secret never asks for a token. After `wrangler deploy`,
+   `rer deploy --demo` waits for each demo hostname's certificate (a TLS
+   handshake that verifies for that name, about 2.5 minutes on a fresh zone,
+   10 minutes at most), logging what each attempt saw; it fails if the
+   certificate never verifies. The workflow then waits for the new hostname
+   to resolve in public DNS (10 minutes at most) and for the start page to
+   answer 200 (5 minutes more), then checks it sets no cookie; either wait
+   ends with an error naming what did not happen.
 
 `rer deploy --demo --dry-run` builds everything into `.rer/demo-host/` (add it
 to `.gitignore`) with no provider request. The build first loads the seed's

@@ -20,8 +20,8 @@ export async function workerEngine({ root, data, manifest, settings, edge }) {
  const mf = new Miniflare(convertV4MiniflareOptions({ host:'127.0.0.1',port:0,cf:false,resourcePersistencePath:data,unsafeLocalExplorer:false,
   workers:[{ name:'ingress',modules:true,script:`export default {fetch(request,env){const observed=request.headers.get('x-rer-original-url');if(!observed)return new Response(null,{status:400});const url=new URL(observed),headers=new Headers(request.headers);headers.delete('x-rer-original-url');headers.set('host',url.host);return env.APP.fetch(new Request(url,{method:request.method,headers,redirect:'manual',...(!['GET','HEAD'].includes(request.method)?{body:request.body}:{})}))}}`,serviceBindings:{ APP:'app' } }, app,
    { name:'egress',modules:[{ type:'ESModule',path:join(import.meta.dirname,'demo-egress.mjs') }],modulesRoot:import.meta.dirname,
-    bindings:{ RER_DEMO:settings.RER_DEMO ?? '' },
-    serviceBindings:{ NETWORK:{ network:{ allow:['public'],tlsOptions:{ trustBrowserCas:true,trustedCertificates:[...rootCertificates] } } } } }],
+    bindings:{ RER_DEMO:settings.RER_DEMO ?? '', RER_DEMO_ORIGINS:JSON.stringify(settings.RER_DEMO === '1' && settings.RER_INGRESS_ORIGIN ? [settings.RER_INGRESS_ORIGIN, ...JSON.parse(settings.RER_INGRESS_ORIGINS ?? '[]')] : []) },
+    serviceBindings:{ SELF:'ingress', NETWORK:{ network:{ allow:['public'],tlsOptions:{ trustBrowserCas:true,trustedCertificates:[...rootCertificates] } } } } }],
  }));
  await mf.ready; const databases = {}, objects = {};
  for (const [binding, plan] of Object.entries(manifest.migrations)) { const db = await mf.getD1Database(binding, 'app'); databases[binding] = db; await migrate(db, plan); await ensurePortabilitySchema(db, manifest.portabilityMigrations); }

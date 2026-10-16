@@ -203,3 +203,27 @@ test("a seed's demo owner signs in with the address its deploy-demo.json names",
     assert.equal(demos.get(id).env.OWNER_EMAIL, 'ada@run-test.example');
   } finally { await mf.dispose(); }
 });
+
+test('a test host on Turnstile testing keys starts demos only for starts that carry its measurement token', async () => {
+  const token = 'measurement-only-test-credential-0123456789';
+  const { mf, demos, fetch, start } = await front({ secret: '1x0000000000000000000000000000000AA', measurement: token });
+  try {
+    assert.equal((await fetch('/')).status, 200);
+    for (const headers of [{}, { cookie: 'rer_demo_measure=another-credential-0123456789-abcdefgh' }, { 'x-rer-demo-measurement': token.slice(1) }]) {
+      const refused = await start({ ip: '203.0.113.7', headers });
+      assert.equal(refused.status, 403);
+      assert.match(await refused.text(), /test host/);
+      assert.equal(demoCookie(refused), undefined);
+    }
+    assert.equal(demos.size, 0);
+    assert.equal((await start({ ip: '203.0.113.8', headers: { 'x-rer-demo-measurement': token } })).status, 303);
+    assert.equal((await start({ ip: '203.0.113.9', headers: { cookie: `rer_demo_measure=${token}` } })).status, 303);
+    assert.equal(demos.size, 2);
+  } finally { await mf.dispose(); }
+  // A test host deployed without a token admits nobody.
+  const bare = await front({ secret: '1x0000000000000000000000000000000AA' });
+  try {
+    assert.equal((await bare.start({ headers: { 'x-rer-demo-measurement': token } })).status, 403);
+    assert.equal(bare.demos.size, 0);
+  } finally { await bare.mf.dispose(); }
+});

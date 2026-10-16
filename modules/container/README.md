@@ -35,6 +35,11 @@ in both directions, preserving text and binary messages, selected protocols,
 cookies and close codes. Refused upgrades retain their HTTP response; other
 upgrade protocols receive 400. Hosted demo routing selects the visitor's own
 container before forwarding the upgrade, including on declared secondary hosts.
+In a hosted demo (`RER_DEMO=1` with `RER_INGRESS_ORIGIN`), the workerd demo
+egress serves the app's own fetch of any of its ingress origins through this
+container's ingress, never the network: the front admits only the visitor's
+cookie, so this is how the app reads its own public pages. Other destinations
+keep the demo egress and its refusals.
 
 The workerd source boundary permits Durable Object definitions, including export
 aliases and indirect inheritance. Unbound definitions create no namespace. The
@@ -68,10 +73,10 @@ SQLite stays on the Docker host's local filesystem; host-shared checkout mounts
 are not used for database storage. Back up with export before deleting a volume. Build
 uses the ordinary private-file custody and command admission boundary. Secrets
 are provided at runtime, never baked into the image or transferred in archives.
-Managed mail's `MAIL_PROVIDER` and `MAIL_FROM` are public configuration. Keep
-them in the mail spec's public variables and Wrangler `vars`, and remove them
-from `deploy.json` secrets. For migration, the image builder accepts those two
-legacy secret declarations when the managed-mail spec declares them public,
+Managed mail's `MAIL_PROVIDER`, `MAIL_FROM` and `MAIL_RELAY_URL` are public
+configuration. Keep them in the mail spec's public variables and Wrangler `vars`,
+and remove them from `deploy.json` secrets. For migration, the image builder
+accepts those legacy secret declarations when the managed-mail spec declares them public,
 and prints that correction. Demo runtime settings override their image defaults.
 API keys, tokens and other secrets in image variables remain refused.
 
