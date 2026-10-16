@@ -93,17 +93,20 @@ test('a state-file lock refuses before any provider request and preserves the ot
   assert.equal(await readFile(`${args.statePath}.lock`,'utf8'),'other-run\n');
 });
 
-test('first-upload recovery requires the same build and remains resumable after another lost response', async t => {
+test('first-upload recovery requires the pending fingerprint as binding and annotation, and remains resumable after another lost response', async t => {
   const {args,state,fail} = await setup(t);
   fail('PUT',/^\/workers\/scripts\/penny-production$/,{afterApply:true});
   await assert.rejects(ownerDeploy(args),/provider-transport-failed/);
+  const annotation = state.version.annotations['workers/message'];
+  state.version.annotations['workers/message'] = 'Deploy from the dashboard';
   const writes = state.writes.length, bytes = await readFile(args.statePath);
   await assert.rejects(ownerDeploy(change(args)),/uncertain-resource-create/);
   assert.equal(state.writes.length,writes); assert.deepEqual(await readFile(args.statePath),bytes);
+  state.version.annotations['workers/message'] = annotation;
   fail('PUT',/^\/workers\/scripts\/penny-production$/,{afterApply:true});
-  await assert.rejects(ownerDeploy(args),/provider-transport-failed/);
-  assert.equal((await ownerDeploy(args)).receipt.changed,true);
-  assert.equal((await ownerDeploy(args)).receipt.changed,false);
+  await assert.rejects(ownerDeploy(change(args)),/provider-transport-failed/);
+  assert.equal((await ownerDeploy(change(args))).receipt.changed,true);
+  assert.equal((await ownerDeploy(change(args))).receipt.changed,false);
 });
 
 test('owner documentation explains restoring state, safe resource cleanup and subdomain registration', async () => {

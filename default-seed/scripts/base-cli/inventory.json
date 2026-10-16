@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.33-dev.ga2aeca07",
+  "cliVersion": "0.2.33-dev.g839ea925",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1367,7 +1367,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "8d9c8d10e086773cc9795a75c84081e5ce52f2cc3ed2932c816d8c197fd136a8"
+      "sha256": "e319d35173d37b996654924a2a93e8a17a9cc0ce333f5613292b744ddc0d89ff"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1463,7 +1463,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "4110729e0b158d426f5c6be2c37d485a32e1561d89f25140b3233eaede7c7d99"
+      "sha256": "6b44f67775b611200c5bae05b6fe88809019ff2e49f96f0b932d6db063f6ecc3"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
@@ -1543,7 +1543,7 @@
     },
     "modules/deploy-kit/uploaded-worker.mjs": {
       "source": "modules/deploy-kit/uploaded-worker.mjs",
-      "sha256": "9105e6a2b0248e9a98c566988e77a3c9b700611a839025ea7c986ac405c0b359"
+      "sha256": "0c0e11accf4ab9a6342de140240b0ce0014b8fe571041eee6b3216e648fc2dc8"
     },
     "modules/deploy-kit/validation.mjs": {
       "source": "modules/deploy-kit/validation.mjs",
