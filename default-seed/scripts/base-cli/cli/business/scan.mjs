@@ -4,7 +4,7 @@ import { basename, dirname, join, relative, resolve, parse } from 'node:path';
 import { blockedSignal } from './detector.mjs';
 import { denied, example, readable, skipped } from './policy.mjs';
 import { parseNames } from './parsers.mjs';
-import { configKeyLimit } from './config-policy.mjs';
+import { configuration, configKeyLimit } from './config-policy.mjs';
 
 // Caller-named roots are canonicalized once; below them, refuse symlink
 // ancestors as well as symlink entries before reading any file content.
@@ -19,6 +19,9 @@ async function plainAncestors(path) {
 }
 
 async function namesFromFile(path, info, locator, pulumi) {
+ // Executable configs are not inputs, even inside a Pulumi project. Their
+ // dependencies are discovered through manifests instead.
+ if (configuration(locator) && /\.[cm]?[jt]sx?$/i.test(locator)) return [];
  if (!readable(locator) && !(pulumi && /\.(?:[cm]?[jt]sx?|py|go|cs)$/i.test(locator))) return [];
  // O_NOFOLLOW blocks a replaced leaf; compare the opened inode before reading.
  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);

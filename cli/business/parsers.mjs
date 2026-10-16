@@ -4,7 +4,6 @@ import { environmentNames, packageNames } from './parsers-packages.mjs';
 import { infrastructureDocument, infrastructureNames } from './parsers-infrastructure.mjs';
 import { pulumiNames } from './parsers-pulumi.mjs';
 import { configuration, configKeyLimit } from './config-policy.mjs';
-import { codeStringEnd, configCodeEntries } from './parsers-config-code.mjs';
 
 const examples = /(?:^|[/.\-_])(?:examples?|samples?|templates?|fixtures?)(?:[/.\-_]|$)/i;
 const manifests = /^(?:package\.json|composer\.json|requirements[^/]*\.txt|pyproject\.toml|gemfile|go\.mod|cargo\.toml)$/;
@@ -14,7 +13,6 @@ function entriesFor(pathname, source) {
  if (/\.jsonc?(?:\.(?:example|sample|template|tpl))?$/i.test(pathname)) return jsonEntries(source);
  if (/\.toml(?:\.(?:example|sample|template|tpl))?$/i.test(pathname)) return tomlEntries(source);
  if (/\.ya?ml(?:\.(?:example|sample|template|tpl))?$/i.test(pathname)) return yamlEntries(source);
- if (/\.[cm]?[jt]s$/i.test(pathname) && configuration(pathname)) return configCodeEntries(source);
  return [];
 }
 
@@ -52,14 +50,12 @@ export function parseNames(relativePath, text) {
   if (isComment && !manifest) environmentNames(source, add);
  };
  try {
-  const configCode = /\.[cm]?[jt]s$/i.test(pathname) && configuration(pathname);
   const templateTraces = [];
-  const templateClean = configCode ? text : text.replace(/\{\{\s*\/\*([\s\S]*?)\*\/\s*\}\}/g, (whole, content) => {
+  const templateClean = text.replace(/\{\{\s*\/\*([\s\S]*?)\*\/\s*\}\}/g, (whole, content) => {
    templateTraces.push(content); return whole.replace(/[^\n]/g, ' ');
   });
   const { clean, traces } = comments(templateClean,
-   filename === 'go.mod' || /\.(?:jsonc?|tf|hcl|[cm]?[jt]sx?|go|cs)(?:\.(?:example|sample|template|tpl))?$/i.test(pathname),
-   configCode ? codeStringEnd : undefined);
+   filename === 'go.mod' || /\.(?:jsonc?|tf|hcl|[cm]?[jt]sx?|go|cs)(?:\.(?:example|sample|template|tpl))?$/i.test(pathname));
   parse(clean, classification, false);
   // Group consecutive comment lines so commented TOML/YAML sections retain
   // their structural context. Comments never inherit live-use classification.

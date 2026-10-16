@@ -75,6 +75,7 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
  await writeFile(join(root, 'config/large.json'), JSON.stringify(Object.fromEntries(
   Array.from({ length: 1000 }, (_, index) => [`SYNTHETIC_CONFIG_${index}`, 'synthetic-capped-scalar-never-export']))));
  await writeFile(join(root, 'runtime.config.js'), 'module.exports = { mail: { transport: "synthetic-code-scalar-never-export" } };');
+ await writeFile(join(root, 'runtime.config.json'), '{"mail":{"transport":"synthetic-config-value-never-export"}}');
  await writeFile(join(root, 'webpack.config.js'), [
   'module.exports = { plugins: [], define: { NOTE: `staging, "db.internal.acme.example": primary` },',
   ' "public-quoted-key": { \'nested-quoted-key\': "synthetic-double-string, \\\"synthetic-double-key\\\": value" },',
@@ -85,6 +86,9 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   ' afterTemplate: true };',
  ].join('\n'));
  await writeFile(join(root, 'rollup.config.js'), 'export default { output: { banner: `/*! acme-web build, Copyright: Acme Holdings */` } };');
+ for (const extension of ['js', 'ts', 'mjs', 'cjs', 'mts', 'cts']) {
+  await writeFile(join(root, `regex.config.${extension}`), 'module.exports = { a: /"/, NOTE: "staging, leakednine: primary", b: /"/ };');
+ }
  await writeFile(join(root, '.github/workflows/deploy-stage.yml'), 'jobs:\n  deploy:\n    env:\n      TOKEN: ${{ secrets.CF_THROWAWAY_API_TOKEN }}\n      EVIDENCE: ${{ secrets.EVIDENCE_WRITE_TOKEN }}\n');
  await mkdir(join(root, 'services/payments'), { recursive: true });
  await writeFile(join(root, 'services/payments/package.json'), '{"dependencies":{"@stripe/stripe-js":"1.0.0"}}');
@@ -117,11 +121,6 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   ['config/settings.json', 'SYNTHETIC_PUBLIC_SETTING', 'live-use'],
   ['notes.yaml', 'SYNTHETIC_COMMENT_SETTING', 'trace'],
   ['config/settings.json', 'mail.transport', 'live-use'],
-  ['webpack.config.js', 'plugins', 'live-use'],
-  ['webpack.config.js', 'define.NOTE', 'live-use'],
-  ['webpack.config.js', 'public-quoted-key.nested-quoted-key', 'live-use'],
-  ['webpack.config.js', 'afterTemplate', 'live-use'],
-  ['rollup.config.js', 'output.banner', 'live-use'],
  ];
  for (const [locator, value, classification] of expected) {
   assert.ok(has(report, locator, value, classification), `discovers the public name from ${locator}`);
@@ -153,6 +152,7 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
  assert.ok(!report.signals.some(signal => signal.kind === 'config-key' &&
   /^(?:fixtures\/|locales\/|notes\.yaml$)/.test(signal.locator)), 'data documents do not contribute config keys');
  assert.ok(report.signals.some(signal => signal.kind === 'config-key' && signal.locator === 'config/settings.json'), 'configuration directories contribute keys');
+ assert.ok(!report.signals.some(signal => signal.kind === 'config-key' && /\.[cm]?[jt]s$/i.test(signal.locator)), 'JavaScript and TypeScript configs contribute no keys');
  const capped = report.signals.filter(signal => signal.kind === 'config-key' && signal.locator === 'config/large.json');
  assert.ok(Number.isInteger(report.configKeyLimit) && report.configKeyLimit > 0, 'document declares its per-file key limit');
  assert.ok(capped.length > 0 && capped.length <= report.configKeyLimit && capped.length < 1000, 'large config files obey the declared key cap');
@@ -161,7 +161,7 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   'synthetic-kube-value-never-export', 'synthetic-config-value-never-export',
   'synthetic-nested-value-never-export', 'synthetic-comment-value-never-export', 'synthetic-yaml-value-never-export',
   'synthetic-data-scalar-never-export', 'synthetic-capped-scalar-never-export', 'synthetic-code-scalar-never-export',
-  'db.internal.acme.example', 'Copyright', 'synthetic-single-string', 'synthetic-double-string',
+  'db.internal.acme.example', 'Copyright', 'leakednine', 'synthetic-single-string', 'synthetic-double-string',
   'synthetic-single-key', 'synthetic-double-key', 'synthetic-escaped-template',
   'synthetic-nested-template', 'synthetic-template-interpolation', 'synthetic-template-comment',
   'synthetic-denied-content-never-export']);
