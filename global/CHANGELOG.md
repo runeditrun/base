@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.29
+
+- **Placeholder mark (SC-14).** While a seed's logo, favicon or app mark is byte-equal to Base's placeholder mark, `rer check --profile first-party`, `rer build --site` and `rer deploy --site` print one warning naming the files (a `placeholder_mark` warning event under `--json`) and still succeed. `rer release` refuses the placeholder unless `--allow-placeholder-mark` is given; the receipt then records `placeholderMark: { allowed: true, files }`. Base's own projects are exempt.
+- **Readable actors and evidence.** `foundation/runtime/actor.ts` (seeds: `src/base/actor.ts`): `actorLine` renders "<display name> · <time in the business time zone>", with "Former member" for an unknown actor. `evidenceHtml`/`evidenceFields` render evidence or details as labelled fields, never raw JSON or `[object Object]`. `EditionIdentity` gains an optional `timeZone`.
+- **Refresh-safe forms.** `foundation/runtime/command-receipts.ts` and `.sql`: create forms carry a command key, and `runOnce` returns the first result for a replayed POST (409 while it is in flight). `seeOther` answers 303 to a GET. One-time secrets are read from the receipt once. Archives never carry `rer_command_receipts`; new foundations get `0015_command_receipts.sql`. In the default seed, `/app/people` is server-rendered and `POST /api/people` honours `Idempotency-Key` (migration `0025_command_receipts.sql`).
+- **Invited people sign in with one click in dev and demo.** Invited and active people get the owner's **Sign in as <name>** action at `/signin` and beside their operator record. `rer dev --as EMAIL` prints their one-click entry. Mail stays suppressed and there is no outbox. Invitation expiry, cancellation, role, allow-list and inviter-authority checks still apply. Production keeps email sign-in and refuses the one-click route.
+- **Mail threading.** The `rer` mail adapter sends an optional `messageKey` (1–200 characters of `[A-Za-z0-9._:-]`, validated before any request) and returns the relay's Message-ID as `providerMessageId`, so a follow-up can set In-Reply-To/References. Other providers refuse `messageKey`.
+- **Browser-free agent check.** The default seed and foundation template declare `verify:agent` (build, typecheck, offline `source:check`, `verify:base-source`). Platform runs it ahead of `verify:fast`; full `rer verify` stays in CI.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes. Seeds adopt the runtime files (`src/base/actor.ts`, `src/base/command-receipts.ts` and the receipts migration) on their next Base refresh; see "Seed mark, readable actors and refresh-safe forms" in SEED-COMMAND-CONTRACT.md.
+- A seed still carrying Base's placeholder mark now needs `rer release --allow-placeholder-mark` until it has its own mark.
+
 ## 0.2.28
 
 - `rer release` of a GitHub source uses the exact source commit's completed successful **Verify** run instead of re-running the seed's full verification locally. Only a `push` or `workflow_dispatch` run on the default branch, or on the version's release tag when that tag resolves remotely to the same commit, qualifies; PR runs, other SHAs, repositories, branches and unsuccessful runs do not. The receipt and site provenance record the repository, commit, workflow, run id and URL. The producer still installs frozen dependencies, runs the committed `build` script, scans publication history and packages locally; a local install or build failure still blocks. A missing green Verify, or a GitHub API or authentication failure, blocks and names the exact SHA.
