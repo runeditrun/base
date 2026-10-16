@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.33
+
+- **CodeQL-clean mail and logout copies.** mail's `parseAddress`, `parseHeaders` and `messageIds` now parse in linear time, without backtracking regular expressions. Results and error codes are unchanged, and U+2028/U+2029 in a display name or header line is still refused. In dependencies' back-channel logout, the session fence is read from the exact `events` key with `Object.hasOwn`. Seeds that patched these files in their recorded Base copies can now refresh to Base's bytes.
+- **Signing out of a hosted demo ends the copy.** In a native hosted demo, `POST /auth/signout` first lets the seed sign the visitor out. The visitor's copy then ends and its storage is erased, the same as when the hour or idle time runs out. A form navigation gets the ended page with "Start a new demo"; a script gets the seed's own answer, and its next page load finds the ended page. A refused sign-out (4xx/5xx) leaves the copy running.
+- **An unreadable demo start is a 400.** A `POST /__demo/start` whose body is not a readable form (an empty body, JSON, or broken multipart) is refused with 400 "The start request was not a readable form." before the human check or any reservation, instead of being reported as a failed start.
+
+### Upgrade notes
+
+- Update the exact rer package pin, or refresh vendored operating commands, to receive these changes.
+- A seed that fixed `modules/dependencies/logout.mjs` or mail files in its own copy runs `refresh-base` to the release commit. If it dropped those files from its copy record, it puts Base's bytes back with `git -C <base> show <commit>:<path>`, re-records the containing copy (`record-base src/modules/dependencies modules/dependencies <commit>`, and the same for `modules/mail`), and expects `verify-base` drift 0.
+- A hosted demo picks up the sign-out and start changes on its next `rer deploy --demo`.
+
 ## 0.2.32
 
 - **One line from nothing to a running seed.** `rer dev <repo>` clones the seed, installs its dependencies, sets up the local owner and starts the signed-in app, so `npx -y @runeditrun/rer dev just-every/run-inkwell` works from an empty folder and also installs the rer CLI. `rer setup <repo>` stops after setup and prints the next command; `rer install <repo>` stops after dependencies. `<repo>` is `<owner>/<repo>`, a GitHub HTTPS URL (with or without `.git`) or any git URL. The clone goes into `./<repo name>` unless `--dir DIR` says otherwise; an existing clone of the same repository is reused and any other non-empty folder is refused. Inside a checkout with no repo argument every verb behaves as before. `install.sh` forwards its arguments after installing (`curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell`). Verb help and `rer describe` list the repository forms, also for checkouts that pin an older rer.
