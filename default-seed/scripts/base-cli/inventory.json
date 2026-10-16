@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.29",
+  "cliVersion": "0.2.29-dev.gc67a05f7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -399,7 +399,7 @@
     },
     "cli/demo-native.mjs": {
       "source": "cli/demo-native.mjs",
-      "sha256": "c3375f5a002aa47b12fab9a904b842dbc4f67501ec50581b3f378df9fcb70e10"
+      "sha256": "f8f83b0b6cd9ab779bde00c04d931383814fd96647b46aaa7bd74e2e7c8dc522"
     },
     "cli/demo-removal-provider.mjs": {
       "source": "cli/demo-removal-provider.mjs",
@@ -885,6 +885,10 @@
       "source": "modules/container/build.mjs",
       "sha256": "8045a14a8a805fa703af785c9cc0956a5af4a57761b5ec107f506384639ff16a"
     },
+    "modules/container/demo-egress.mjs": {
+      "source": "modules/container/demo-egress.mjs",
+      "sha256": "4de28532b90ec1edd244a92b499f239f96e1fcdfe16ade63eb07a67b256f0aa5"
+    },
     "modules/container/deploy-input.mjs": {
       "source": "modules/container/deploy-input.mjs",
       "sha256": "4cdc729c12be4ede7181ec445af9caa4541313268af7f166df13aa6cf66f864c"
@@ -1055,7 +1059,7 @@
     },
     "modules/demo-host/native/loader.mjs": {
       "source": "modules/demo-host/native/loader.mjs",
-      "sha256": "d77e8d491c37262703eda2e678586caf021076bf333e03a57aebc90dd6aa8e66"
+      "sha256": "f820a5b9f13624ad02aa4aee2c9d35d6ac47677135e939771ffda9965a90fbf6"
     },
     "modules/demo-host/native/namespace.mjs": {
       "source": "modules/demo-host/native/namespace.mjs",

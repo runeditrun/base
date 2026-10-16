@@ -1,4 +1,5 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import demoEgress from '../../container/demo-egress.mjs';
 import bundle from './bundle.mjs';
 
 export function loaded(env, ctx, id, runtime) {
@@ -19,10 +20,11 @@ export { bundle };
 
 export class DemoEgress extends WorkerEntrypoint {
   fetch(request) {
-    const origin = new URL(request.url).origin;
-    if (origin === this.env.DEMO_ORIGIN || JSON.parse(this.env.DEMO_SECONDARY_ORIGINS ?? '[]').includes(origin)) {
-      return this.env.DEMO.get(this.env.DEMO.idFromString(this.ctx.props.id)).fetch(request);
-    }
-    return fetch(request);
+    return demoEgress.fetch(request, {
+      RER_DEMO: '1',
+      RER_DEMO_ORIGINS: JSON.stringify([this.env.DEMO_ORIGIN, ...JSON.parse(this.env.DEMO_SECONDARY_ORIGINS ?? '[]')]),
+      SELF: { fetch: request => this.env.DEMO.get(this.env.DEMO.idFromString(this.ctx.props.id)).fetch(request) },
+      NETWORK: { fetch: request => fetch(request) },
+    });
   }
 }
