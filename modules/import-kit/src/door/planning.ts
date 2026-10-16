@@ -79,7 +79,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     const record: DoorRecord = {kind:entry.source.kind,sourceId:entry.source.sourceId,
       sourceHash:entry.rejection && old ? old.sourceHash : entry.source.payloadHash,
       targets:entry.effects.length?entry.effects.map(e=>({kind:e.targetKind,id:e.targetId,ownerPlanId:snapshot.id,sourceIdentity:entry.identity})):(old?.targets ?? [])};
-    const reason = unchanged ? old?.explanation : entry.rejection ?? (entry.unmapped.length ? entry.unmapped.map(u=>u.reason).join('; ') : undefined);
+    const reason = unchanged ? (old?.targets.length ? undefined : old?.explanation) : entry.rejection ?? (entry.unmapped.length ? entry.unmapped.map(u=>u.reason).join('; ') : undefined);
     if (reason) record.explanation = reason;
     snapshot.records.push(record);
   }

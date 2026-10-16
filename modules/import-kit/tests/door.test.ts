@@ -46,6 +46,28 @@ test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible und
   assert.equal((await undoD1Import(job.id,context)).state,'undone');
   const originals=await readD1ImportOriginals(job.id,context);
   assert.equal(originals[0].sha256,sha256(JSON.stringify(records)));assert.equal(originals[0].original.status,'retained');
+  const returningRecords=documents(10),returningBase=await d.plan(returningRecords);
+  assert.equal(returningBase.status,200,JSON.stringify(returningBase.body));await d.apply(returningBase.body);
+  const absent=await d.plan(returningRecords.filter(r=>r.id!=='5'),{catchup:true});
+  assert.equal(absent.status,200,JSON.stringify(absent.body));
+  assert.deepEqual(absent.body.differences.gone,[canonicalJson(['document','5'])]);
+  await d.apply(absent.body);
+  const whileAbsent=await d.call('reconcile',{planId:absent.body.planId});
+  assert.equal(whileAbsent.status,200,JSON.stringify(whileAbsent.body));
+  assert.equal(whileAbsent.body.counts.nativeTargets,10);assert.equal(whileAbsent.body.counts.explained,1);
+  assert.equal(whileAbsent.body.sourceIds.find((r:any)=>r.sourceId==='5').status,'explained');
+  const returnedRecords=[...returningRecords,{id:'10',title:'New source article'}];
+  const returned=await d.plan(returnedRecords,{catchup:true});
+  assert.equal(returned.status,200,JSON.stringify(returned.body));
+  assert.equal(returned.body.summary.created,1);assert.equal(returned.body.summary.unchanged,10);assert.equal(returned.body.summary.gone,0);
+  await d.apply(returned.body);
+  const present=await d.call('reconcile',{planId:returned.body.planId});
+  assert.equal(present.status,200,JSON.stringify(present.body));assert.equal(present.body.ok,true);
+  assert.equal(present.body.counts.present,11);assert.equal(present.body.counts.explained,0);assert.equal(present.body.counts.nativeTargets,11);
+  assert.deepEqual(present.body.sourceIds.map((r:any)=>r.sourceId).sort(),returnedRecords.map(r=>r.id).sort());
+  assert.ok(present.body.sourceIds.every((r:any)=>r.status==='present'));
+  await d.undo(returned.body.planId);await d.undo(absent.body.planId);await d.undo(returningBase.body.planId);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
 });
 
 test('HTTP grants and bounded catch-up fail closed while valid snapshot replacements preserve undo lineage',async t=>{
