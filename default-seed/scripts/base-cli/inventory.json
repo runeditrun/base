@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26-dev.gca68d2e7",
+  "cliVersion": "0.2.26-dev.g0d9ed143",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2116,6 +2116,10 @@
     "modules/operator-auth/page.mjs": {
       "source": "modules/operator-auth/page.mjs",
       "sha256": "5a6e74e3e1861dbe6906ab2e0219b498f1943c11e9c88a779819563ec32e7322"
+    },
+    "modules/operator-auth/policy.d.mts": {
+      "source": "modules/operator-auth/policy.d.mts",
+      "sha256": "c0e46fcab9ce8626b8da53f88561eb00a1e83e9460fd91407a32a2daf605c4cf"
     },
     "modules/operator-auth/policy.mjs": {
       "source": "modules/operator-auth/policy.mjs",
