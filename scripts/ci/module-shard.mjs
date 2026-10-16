@@ -41,6 +41,9 @@ export async function verifyModuleShard(shard) {
   console.log(`VERIFY_STAGE start verify:modules shard=${shard}/${MODULE_SHARDS}`);
   const child = spawn(process.execPath, [
     'onboarding/queued-entry.mjs', 'verify:modules', '--', process.execPath,
+    // The original wrapper initializes the public D1 entry in engine.test.ts
+    // before its internal utility suites. Keep that context in each worker.
+    '--import', './modules/import-kit/src/d1/index.ts',
     '--max-old-space-size=4096', '--test', '--test-concurrency=2', `--test-shard=${shard}/${MODULE_SHARDS}`, ...files,
   ], { stdio: 'inherit' });
   const onTerm = () => child.kill('SIGTERM'), onInt = () => child.kill('SIGINT');
