@@ -86,7 +86,9 @@ async function start(request, env, ctx) {
   try {
     const ip = request.headers.get('cf-connecting-ip') ?? '';
     if (!(await bounded(env.STARTS.limit({ key: ip }), 1000)).success) return refuse(429, 'Too many demos started from your network. Try again in a minute.');
-    const form = await bounded(request.formData(), 1000);
+    // A probe or bot without a readable form is a bad request, not a failed start.
+    const form = await bounded(request.formData(), 1000).catch(() => null);
+    if (!form) return refuse(400, 'The start request was not a readable form. Reload the page and try again.');
     if (!await bounded(human(env, form.get('cf-turnstile-response'), ip), 5000)) return refuse(403, 'The check did not pass. Try again.');
     // A retry while the original start is pending resumes that copy, not a
     // second reservation that the visitor can never use.
