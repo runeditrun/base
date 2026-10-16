@@ -1,4 +1,5 @@
 import { basename } from 'node:path';
+import { configuration } from './config-policy.mjs';
 
 const outputs = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', 'target', 'coverage', '.next', '.nuxt', '.output', '.cache', '.venv', 'venv', '__pycache__', '.terraform', '.pulumi', '.wrangler', '.rer', '.seed', 'playwright-report', 'test-results']);
 
@@ -41,6 +42,7 @@ export function readable(path) {
  const name = basename(path).toLowerCase();
  return /\.(?:jsonc?|ya?ml|toml|tf|hcl)(?:\.(?:example|sample|template|tpl))?$/.test(name) ||
   ['gemfile', 'go.mod', 'jenkinsfile'].includes(name) || /^requirements.*\.txt$/.test(name) ||
+  configuration(path) && /\.[cm]?[jt]s$/.test(name) ||
   example(path) && /(?:env|config|settings)/i.test(path) ||
   /(?:^|\/)(?:pulumi[^/]*|infra(?:structure)?)(?:\/|\.)/i.test(path) && /\.(?:[cm]?[jt]s|tsx|py|go|cs)$/.test(name);
 }

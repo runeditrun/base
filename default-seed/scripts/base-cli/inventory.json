@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g386d66a6",
+  "cliVersion": "0.2.28-dev.g17a60b3e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -335,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "a7eea29491561c936835bab0b1ec633472f11bdf309c14e459b11e5a42a429da"
+      "sha256": "01edd6f32b653f3e2b913e86b59f56a95dff096fdd80cb165df28acf21c8e151"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -373,9 +373,17 @@
       "source": "cli/business/command.mjs",
       "sha256": "acec00c15932695ef08344f1109980fd8c4dc5b21a3d31104731223f86a8adf2"
     },
+    "cli/business/config-policy.mjs": {
+      "source": "cli/business/config-policy.mjs",
+      "sha256": "e768f7e0c46dc26af5253061beb44c851dd17199067a7fc846b746e1a81e24e9"
+    },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
       "sha256": "137c0f2359242bd324ade57310661c6e70cd8f53c3101735ce0508de667b9f28"
+    },
+    "cli/business/parsers-config-code.mjs": {
+      "source": "cli/business/parsers-config-code.mjs",
+      "sha256": "6d68488b9cd7bce521dc07463f3a20b33583c5db71032037eda9d96d50f5c04c"
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
@@ -403,15 +411,15 @@
     },
     "cli/business/parsers.mjs": {
       "source": "cli/business/parsers.mjs",
-      "sha256": "0db5eca75c32b66b5dd5a9e02022c85c344b73162d560fd26474d95322bbf389"
+      "sha256": "ff472b7dd7c86e6760d0aca609a627e99c9fe89b96a19f73aac079e9dfbafbd4"
     },
     "cli/business/policy.mjs": {
       "source": "cli/business/policy.mjs",
-      "sha256": "fdafcb772253a2b3f1eccfb5233c45b0cf79f5e0c77249f5179474dace97357c"
+      "sha256": "4d778d5953792bcb0fe643666c6bd0688a0ba19fccd849520280fbd0c100be93"
     },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
-      "sha256": "eb394b8f39cd3bee353507a76ee904e3bc0b8d45a80912dc8b08732491fb89dc"
+      "sha256": "8187846abf42440ed8c25cab51e736dcc9422d4128f839995dc9d46d86b1c50c"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",

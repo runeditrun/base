@@ -72,6 +72,9 @@ function absent(output, values) {
 
 test('packed business scan discovers names across manifests, infrastructure, CI and examples without scalar values', async () => {
  const root = await copyFixture('discovery');
+ await writeFile(join(root, 'config/large.json'), JSON.stringify(Object.fromEntries(
+  Array.from({ length: 1000 }, (_, index) => [`SYNTHETIC_CONFIG_${index}`, 'synthetic-capped-scalar-never-export']))));
+ await writeFile(join(root, 'runtime.config.js'), 'module.exports = { mail: { transport: "synthetic-code-scalar-never-export" } };');
  await writeFile(join(root, '.github/workflows/deploy-stage.yml'), 'jobs:\n  deploy:\n    env:\n      TOKEN: ${{ secrets.CF_THROWAWAY_API_TOKEN }}\n      EVIDENCE: ${{ secrets.EVIDENCE_WRITE_TOKEN }}\n');
  const { report, output } = await scan(root, ['--json']);
  absent(output, ['syntheticprivatekind', 'Synthetic::Private::Value', 'synthetic-private-registry.invalid']);
@@ -93,16 +96,23 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   ['examples/package.json', 'example-only-dependency', 'trace'],
   ['config/settings.json', 'SYNTHETIC_PUBLIC_SETTING', 'live-use'],
   ['notes.yaml', 'SYNTHETIC_COMMENT_SETTING', 'trace'],
-  ['notes.yaml', 'SYNTHETIC_LIVE_SETTING', 'live-use'],
+  ['runtime.config.js', 'mail.transport', 'live-use'],
  ];
  for (const [locator, value, classification] of expected) {
   assert.ok(has(report, locator, value, classification), `discovers the public name from ${locator}`);
  }
  assert.ok(report.signals.every(signal => signal.repo === basename(root)));
+ assert.ok(!report.signals.some(signal => signal.kind === 'config-key' &&
+  /^(?:fixtures\/|locales\/|notes\.yaml$)/.test(signal.locator)), 'data documents do not contribute config keys');
+ assert.ok(report.signals.some(signal => signal.kind === 'config-key' && signal.locator === 'config/settings.json'), 'configuration directories contribute keys');
+ const capped = report.signals.filter(signal => signal.kind === 'config-key' && signal.locator === 'config/large.json');
+ assert.ok(Number.isInteger(report.configKeyLimit) && report.configKeyLimit > 0, 'document declares its per-file key limit');
+ assert.ok(capped.length > 0 && capped.length <= report.configKeyLimit && capped.length < 1000, 'large config files obey the declared key cap');
  absent(output, ['synthetic-env-value-never-export', 'synthetic-bucket-value-never-export',
   'synthetic-region-value-never-export', 'synthetic-cf-value-never-export',
   'synthetic-kube-value-never-export', 'synthetic-config-value-never-export',
-  'synthetic-nested-value-never-export', 'synthetic-comment-value-never-export', 'synthetic-yaml-value-never-export']);
+  'synthetic-nested-value-never-export', 'synthetic-comment-value-never-export', 'synthetic-yaml-value-never-export',
+  'synthetic-data-scalar-never-export', 'synthetic-capped-scalar-never-export', 'synthetic-code-scalar-never-export']);
 });
 
 test('packed business scan reports denied files by metadata and withholds credential-shaped names', async () => {

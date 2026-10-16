@@ -347,6 +347,15 @@ Both forms write one JSON document with schema `rer-business-signals/1`,
 has `kind`, `value` (a name), relative `locator`, repository basename `repo`,
 `class` (`live-use` or `trace` for examples/comments), and `observedAt`.
 
+`config-key` observations come only from configuration directories (such as
+`config/`, `.github/`, `deploy/`, `charts/`, `k8s/` and `infra/`) and known
+configuration names (such as `wrangler.*`, `docker-compose*.yaml`, `settings.*`
+and `*.config.js`). Test/fixture data, translations, locales, samples, exports,
+lockfiles and generated files contribute no config keys, even under a config
+directory. Each file contributes at most `configKeyLimit` distinct key paths;
+the document declares that limit (currently 200). Literal exported JavaScript
+config objects are inspected without executing the file or its helpers.
+
 This is names-only discovery: configuration values and file contents are not
 emitted. Denied secret files are never opened; their `secret-file` observations
 contain only the filename, path, size and modification time. Sensitive-looking

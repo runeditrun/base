@@ -3,6 +3,8 @@ import { configNames, tomlEntries, yamlEntries } from './parsers-config.mjs';
 import { environmentNames, packageNames } from './parsers-packages.mjs';
 import { infrastructureDocument, infrastructureNames } from './parsers-infrastructure.mjs';
 import { pulumiNames } from './parsers-pulumi.mjs';
+import { configuration, configKeyLimit } from './config-policy.mjs';
+import { configCodeEntries } from './parsers-config-code.mjs';
 
 const examples = /(?:^|[/.\-_])(?:examples?|samples?|templates?|fixtures?)(?:[/.\-_]|$)/i;
 const manifests = /^(?:package\.json|composer\.json|requirements[^/]*\.txt|pyproject\.toml|gemfile|go\.mod|cargo\.toml)$/;
@@ -12,6 +14,7 @@ function entriesFor(pathname, source) {
  if (/\.jsonc?(?:\.(?:example|sample|template|tpl))?$/i.test(pathname)) return jsonEntries(source);
  if (/\.toml(?:\.(?:example|sample|template|tpl))?$/i.test(pathname)) return tomlEntries(source);
  if (/\.ya?ml(?:\.(?:example|sample|template|tpl))?$/i.test(pathname)) return yamlEntries(source);
+ if (/\.[cm]?[jt]s$/i.test(pathname) && configuration(pathname)) return configCodeEntries(source);
  return [];
 }
 
@@ -26,10 +29,14 @@ export function parseNames(relativePath, text) {
   || /(?:^|\/)(?:charts?|helm)\/templates\//i.test(pathname);
  const explicitExample = /(?:^|[/.\-_])(?:examples?|samples?|fixtures?)(?:[/.\-_]|$)/i.test(pathname);
  const manifest = manifests.test(filename), classification = examples.test(pathname) && (!helm || explicitExample) ? 'trace' : 'live-use';
- const result = [], seen = new Set();
+ const result = [], seen = new Set(), configKeys = new Set();
  const emit = evidenceClass => (kind, value) => {
   if (typeof value !== 'string' || !value || value.length > 512 || /[\r\n\0]/.test(value)) return;
   const key = `${evidenceClass}\0${kind}\0${value}`;
+  if (kind === 'config-key' && !configKeys.has(value)) {
+   if (configKeys.size >= configKeyLimit) return;
+   configKeys.add(value);
+  }
   if (!seen.has(key)) { seen.add(key); result.push({ kind, value, class: evidenceClass }); }
  };
  const parse = (source, evidenceClass, isComment) => {
@@ -38,7 +45,7 @@ export function parseNames(relativePath, text) {
   const add = emit(deployed ? 'live-use' : evidenceClass);
   if (manifest) packageNames(filename, source, entries, add);
   if (env) environmentNames(source, add);
-  if (!manifest && !code.test(pathname)) configNames(entries, add);
+  if (!manifest && configuration(pathname)) configNames(entries, add);
   infrastructureNames(pathname, source, entries, ci, add);
   if (code.test(pathname)) pulumiNames(pathname, source, add);
   // Commented-out env declarations are useful traces even in config files.

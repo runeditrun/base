@@ -4,6 +4,7 @@ import { basename, dirname, join, relative, resolve, parse } from 'node:path';
 import { blockedSignal } from './detector.mjs';
 import { denied, example, readable, skipped } from './policy.mjs';
 import { parseNames } from './parsers.mjs';
+import { configKeyLimit } from './config-policy.mjs';
 
 // Caller-named roots are canonicalized once; below them, refuse symlink
 // ancestors as well as symlink entries before reading any file content.
@@ -29,7 +30,7 @@ async function namesFromFile(path, info, locator, pulumi) {
 }
 
 export async function scan(directories) {
- const result = { schema: 'rer-business-signals/1', source: 'local', signals: [], withheld: 0 };
+ const result = { schema: 'rer-business-signals/1', source: 'local', configKeyLimit, signals: [], withheld: 0 };
  const observedAt = new Date().toISOString(), seen = new Set();
  const roots = [...new Set(directories.map(path => resolve(path)))];
  function emit(signal) {
