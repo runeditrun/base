@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.25-dev.ge87c98e6",
+  "cliVersion": "0.2.25-dev.gfdc47133",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -129,7 +129,7 @@
     },
     "local/sqlite-custody.mjs": {
       "source": "onboarding/local/sqlite-custody.mjs",
-      "sha256": "7166a9a9e4f64604a07ead92e8097c9d7e7354cfb0847634692d325e6d0227a8"
+      "sha256": "20c8e57786938ae7d63dcf3318c6b92479620e3b02c0b60107b6b873472710ed"
     },
     "local/state-files.mjs": {
       "source": "onboarding/local/state-files.mjs",
@@ -335,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "5aa8911890849f18ba2fedba133126f4fd6d12ee88a41dd854d5da4d75270ae7"
+      "sha256": "d992f6e7af592f6b7600772884c4eb692f06e136bb6d2f57320cc51ffb8abd11"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",

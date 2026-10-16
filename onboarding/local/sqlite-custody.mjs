@@ -21,9 +21,10 @@ export async function sqliteCustody(root) {
   const {DatabaseSync}=await import('node:sqlite');
   let db;
   try{
-   // A read-only connection can take this lock without checkpointing idle WAL
-   // data on close. WAL read marks can still change: never use this for demo.
-   db=new DatabaseSync(path,{readOnly:true});
+   // This must be a writable connection: read-only WAL transactions do not
+   // exclude writers. Closing it may checkpoint idle WAL, so never use it for
+   // demo, whose canonical owner-state bytes must remain unchanged.
+   db=new DatabaseSync(path);
    db.exec('PRAGMA busy_timeout=0; BEGIN EXCLUSIVE; ROLLBACK;');
   }catch(error){
    if(error.errcode===5||error.errcode===6)return relative(root,path);
