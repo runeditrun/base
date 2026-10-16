@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.37
+
+- **A native demo's D1 answers `withSession`, `dump()` and `meta.size_after`, as production D1 does.** In a native hosted demo, `env.DB.withSession(...)` now returns a session whose `prepare`, `batch` and `getBookmark` work against the visitor's own database. Each visitor's database is a single primary, so every constraint or bookmark is already met and the bookmark stays the same. Before, a seed that read through a session hung: Slate's feature routes never answered. `dump()` now exists and rejects with `D1_DUMP_ERROR`, as production D1 does. Before, Uptime's owner-session revoke bound `db.dump` and answered 503 `auth_unavailable`; it now answers 404 `session_not_found`, once Uptime takes this release. Query `meta` adds `size_after`, which Orbit's archive budget reads.
+- **A native demo's D1 errors read as D1's do.** SQL errors are `D1_ERROR: <SQLite message>`, and `exec`, type and missing-column errors carry D1's codes. Each carries the original error as its `cause`. Seeds that classify errors by their D1 text, such as Mango, Oncall, Spool, Uptime and Chest, behave as they do in production.
+- **An unknown D1 property reads `undefined`, as on real D1.** Feature detection takes its fallback. The first read of each unknown name per isolate logs `D1_UNSUPPORTED: <Kind>.<name> is not available in hosted demos` in the Worker's tail, so a seed that calls a missing method leaves a trace.
+
 ## 0.2.36
 
 - **A native demo keeps each visitor's R2 files in that visitor's own storage.** A native hosted demo now stores R2 objects, their metadata and multipart uploads per binding in the visitor's own Durable Object storage, next to the app. Before, every visitor shared one demo-owned bucket, often far from the visitor. File reads and writes now answer from where the visitor is. Measured from Queensland on Beam: opening a file took 55 ms instead of 256 ms, uploading 207 ms instead of 1543 ms, and starting the demo 1.64 s instead of 2.65 s. One visitor's objects may total 256 MiB; a write past that fails with R2's error for an oversized upload. Expiry erases a visitor's objects along with the rest of their storage. A new demo creates no R2 bucket.
