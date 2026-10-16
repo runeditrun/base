@@ -6,6 +6,7 @@
 // show its progress and failures; a plain form post gets the 303 or the page. Every request with that cookie goes to the visitor's
 // container; nothing else on this host is reachable.
 import { operatorPage } from './operator.mjs';
+import { measured, testHost } from './measurement.mjs';
 import { bounded, category, report } from './diagnostics.mjs';
 import { startPage, demoCookie, clearCookie } from './pages.mjs';
 
@@ -80,6 +81,7 @@ async function start(request, env, ctx) {
   const correlation = crypto.randomUUID();
   const refuse = (status, notice, headers = {}) => refusal(request, env, status, notice, { 'x-rer-demo-correlation': correlation, ...headers });
   if (request.headers.get('origin') !== env.DEMO_ORIGIN) return refuse(403, 'Start the demo from this page.');
+  if (testHost(env) && !await measured(request, env)) return refuse(403, 'This is a test host: it starts demos only for its operator\'s measurement runs.');
   let demo;
   const started = Date.now();
   try {

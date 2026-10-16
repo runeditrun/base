@@ -26,8 +26,11 @@ start page.
   held (at most 1.5 seconds) until the start changes, so the page learns of the
   sign-in at once; a slow status read answers pending. Each admission logs
   `demo_admitted` with the request's user agent and network owner, so a held
-  place can be joined to whoever started it (automated browsers pass
-  Turnstile's always-pass testing keys on test hosts). A request
+  place can be joined to whoever started it. On Turnstile's testing secret (a
+  test host) a start must also carry the deploy's measurement token
+  (`measurement.mjs`: cookie `rer_demo_measure` or header
+  `x-rer-demo-measurement`), since automated browsers pass those keys; a
+  test host without a token admits nobody. A request
   with that cookie goes to the visitor's Durable Object; nothing else reaches
   a container.
 - `container.mjs`: `DemoContainer`, one per visitor (`newUniqueId`, checked
@@ -48,6 +51,10 @@ start page.
   exact idle/absolute deadline without keeping a timer in flight. Requests
   check both deadlines before refreshing activity. A container found stopped
   ends the demo and answers the ended page (410).
+- `certificate.mjs`: after `wrangler deploy`, the CLI waits for each demo
+  hostname's certificate, a TLS handshake that verifies for that name at the
+  address public DNS over HTTPS gives (10 minutes at most), and logs each
+  attempt. A failed or unverified handshake never counts as active.
 - `capacity.mjs`: `DemoCapacity` counts unexpired reservation rows inside a
   storage transaction, excluding diagnostics and expired rows. A lost start
   handoff expires after one minute; a successful claim extends the reservation
