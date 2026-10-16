@@ -148,7 +148,47 @@ Answer `/health` with `deploymentHealth(env)` from `foundation/runtime/deploymen
 
 A seed's own deploy hook (the `commandAdapter` option `deploy`) returns `{deployed: true, origin}` once its upload is live (an https origin; rer refuses an http one off loopback before sending it anything), plus `setupToken`, the setup token its Worker holds, when that is not the `SETUP_TOKEN` rer passed it in the environment. `rer deploy` then waits until the origin's `/health` names the checkout's commit and claims the owner with that token, needing no deployment record from the hook. A hook that deploys with the kit under its own state file also returns that file as `state` (the kit's `deploy` result names it); rer then reads that record for every later step, so it issues, claims with and retires the setup token, and `--set-secret`, `--unset-secret` and `rer deploy --remove --yes` act on what the hook deployed.
 
-Run `rer verify` after refreshing `scripts/base-cli/` from Base in vendored mode, or after updating the exact `@runeditrun/rer` pin in package mode. After the seed's own verification it serves `dist/` in Miniflare from the seed's own Wrangler, with the deploy kit's asset setting, the deploy declaration's vars and origin variable (at an https origin), stand-in secrets and a generated deploy identity, applies the D1 migrations, then requests every built file except dot paths (built `.html` documents included, each by its own path), every same-origin file linked from the built HTML and the home page, and `/health`, and fails on any answer but 200. A secret's stand-in follows the setup manifest's kind or default; when that value is one the hosted app refuses (a `MAIL_PROVIDER` whose setup default `development` a deployed app answers 503 for), the secret item in the deploy declaration names a hosted-valid one, `{"binding": "MAIL_PROVIDER", "environment": "MAIL_PROVIDER", "verifyStandIn": "resend"}`. `verifyStandIn` is used only by this check: `rer deploy` never sends it, never plans or prints it and never makes it a secret value. It needs no network and no account. The declaration is the one `ownerDeploy` reads (`deploy.json`); a seed with its own deploy command names its file with the `commandAdapter` option `deployDeclaration` (for example `deployDeclaration: 'owner-deployment.json'`). In vendored mode, `node scripts/base-cli/cli/hosted-output.mjs . [DECLARATION]` runs the same check on an existing build.
+Run `rer verify` after refreshing `scripts/base-cli/` from Base in vendored mode, or after updating the exact `@runeditrun/rer` pin in package mode. After the seed's own verification it serves `dist/` in Miniflare from the seed's own Wrangler, with the deploy kit's asset setting, the deploy declaration's vars and origin variable (at an https origin), stand-in secrets and a generated deploy identity, applies the D1 migrations, then requests every built file except dot paths (built `.html` documents included, each by its own path), every same-origin file linked from the built HTML and the home page, and `/health`, and fails on any answer but 200. It needs no network and no account. The declaration is the one `ownerDeploy` reads (`deploy.json`); a seed with its own deploy command names its file with the `commandAdapter` option `deployDeclaration` (for example `deployDeclaration: 'owner-deployment.json'`). In vendored mode, `node scripts/base-cli/cli/hosted-output.mjs . [DECLARATION]` runs the same check on an existing build.
+
+### Mail declarations: own-host and Managed
+
+For an own-host deploy, declare public `MAIL_PROVIDER` and `MAIL_FROM` in
+`deploy.json`'s `vars`, and the selected adapter's credential in `secrets` with
+its explicit `binding` and `environment` mapping. Base's shared adapters use
+`MAIL_API_KEY`; direct Resend and SendGrid adapters can use `RESEND_API_KEY`
+and `SENDGRID_API_KEY`, respectively. A seed adapter that instead reads
+`MAIL_PROVIDER_API_KEY` must declare that binding. Cloudflare mail also needs
+`MAIL_ACCOUNT_ID`; an own-host installation using the `rer` relay also needs
+its assigned HTTPS `MAIL_RELAY_URL`. Credentials stay private runtime inputs.
+Provider, sender and relay URL are public configuration, including in the
+mail spec and Wrangler vars; remove legacy `MAIL_PROVIDER` and `MAIL_FROM`
+entries from `deploy.json`'s secrets when adopting that layout.
+
+Managed mail is the explicit capability `mail: {"providers": ["rer"]}` in
+the seed's delivery spec. The platform supplies `MAIL_PROVIDER`, `MAIL_FROM`,
+`MAIL_RELAY_URL` and private `MAIL_API_KEY` at runtime; the seed need not list
+platform-supplied credentials in its own-host `deploy.json`. Declare the
+public names in `publicVariableNames` (or `publicVariables` in the integration
+projection), and credentials in `secretNames` or `optionalSecretNames`.
+The hosted check reads `artifact.specInputs` from `rer-packaging.json`,
+`packaging.json` or `scripts/delivery/base/packaging.json`, and the direct spec
+at `management/integration/deployment-spec.json`. When `mail.providers`
+includes `rer`, it adds stand-ins only for explicitly listed mail credentials:
+`MAIL_API_KEY`, `MAIL_PROVIDER_API_KEY`, `RESEND_API_KEY` and `SENDGRID_API_KEY`.
+This also supports a Managed-capable seed retaining a direct-provider adapter
+for its hosted check. It does not synthesize unrelated secrets, undeclared
+credentials or missing public configuration. An own-host seed without that
+Managed capability still needs its credential in `deploy.json`; omitting a
+required binding remains a failing `/health` check.
+
+A deploy secret's stand-in follows the setup manifest's kind or default;
+its nonempty `verifyStandIn` overrides that choice and any spec-derived
+stand-in. For example, the legacy declaration
+`{"binding": "MAIL_PROVIDER", "environment": "MAIL_PROVIDER", "verifyStandIn": "resend"}`
+selects a hosted-valid provider when the setup default `development` would
+answer 503. Stand-ins exist only in the local hosted check: `rer deploy` never
+sends, plans or prints them. Passing this check proves the declared runtime
+can become healthy; it does not prove live mail credentials or delivery.
 
 Start document responses send `Cache-Control` with `no-transform`, keeping their other directives (the reference's `uncachedStartResponse` sends `no-store, no-transform`). It stops any proxy rewriting the HTML React hydrates; Cloudflare's email address obfuscation honours it. Cloudflare documents that obfuscation does not apply to HTML a Worker generates, which is how `rer deploy` hosts every response. A Worker that proxies an origin on the same Cloudflare zone instead passes `fetch(url, { cf: { scrapeShield: false } })` on that subrequest, or the owner adds a Configuration Rule for the hostname with `email_obfuscation: false`. The deploy kit changes nothing for this.
 

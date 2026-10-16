@@ -48,3 +48,38 @@ test('verify fails plainly when the hosted Worker would 404 its built files or o
  assert.equal(hydration?.code,1,'the symlinked hydration command refuses an absent build');
  assert.ok(hydration.stderr.trim(),'the check reports its failure instead of silently returning');
 });
+
+test('hosted mail uses declared Managed credentials without concealing missing own-host secrets',async t=>{
+ const root=await seed(t,true),entry=resolve(import.meta.dirname,'hosted-output.mjs');
+ const declaration={vars:{MAIL_FROM:'sender@example.com'},secrets:[{binding:'MAIL_PROVIDER',verifyStandIn:'resend'}]};
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ await writeFile(join(root,'rer-setup.json'),JSON.stringify({fields:[{name:'MAIL_PROVIDER',default:'development'}]}));
+ await writeFile(join(root,'dist/server/index.js'),worker(true).replace("if(path==='/health')",`if(path==='/health'&&(!env.MAIL_FROM||!(env.MAIL_PROVIDER==='rer'?env.MAIL_API_KEY&&env.MAIL_RELAY_URL:env.MAIL_PROVIDER==='resend'&&env.MAIL_PROVIDER_API_KEY)))return Response.json({ok:false},{status:503});
+ if(path==='/health'&&env.REQUIRE_SESSION&&!env.SESSION_SECRET)return Response.json({ok:false},{status:503});
+ if(path==='/health')`));
+ const check=()=>run(process.execPath,[entry,root]);
+ const fails=async()=>{const error=await check().then(()=>null,error=>error);assert.equal(error?.code,1);assert.match(error.stderr,/HTTP 503/);};
+ // Own-host cannot obtain an undeclared credential from setup or ambient env.
+ await fails();
+ const spec={mail:{providers:['rer']},optionalSecretNames:['MAIL_API_KEY','MAIL_PROVIDER_API_KEY','SESSION_SECRET']};
+ await writeFile(join(root,'packaging.json'),JSON.stringify({artifact:{specInputs:spec}}));
+ assert.equal(JSON.parse((await check()).stdout).health,'identity');
+ // The Managed provider uses its own declared key, too.
+ declaration.vars={MAIL_PROVIDER:'rer',MAIL_FROM:'sender@example.com',MAIL_RELAY_URL:'https://mail.example.invalid/relay'};
+ declaration.secrets=[];
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ assert.equal(JSON.parse((await check()).stdout).health,'identity');
+ // A mail capability cannot invent unrelated application secrets.
+ declaration.vars.REQUIRE_SESSION=true;
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ await fails();
+ declaration.vars.REQUIRE_SESSION=false;
+ declaration.vars.MAIL_PROVIDER='resend';
+ spec.mail.providers=['resend'];
+ await writeFile(join(root,'packaging.json'),JSON.stringify({artifact:{specInputs:spec}}));
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ await fails();
+ declaration.secrets=[{binding:'MAIL_PROVIDER_API_KEY',verifyStandIn:'test-own-host-mail-key'}];
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ assert.equal(JSON.parse((await check()).stdout).health,'identity');
+});

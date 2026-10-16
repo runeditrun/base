@@ -8,6 +8,7 @@ import { publicAssetPaths } from '../modules/deploy-kit/artifact.mjs';
 import { migrate } from '../modules/container/migrations.mjs';
 import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migrations.mjs';
 import { RerError } from './errors.mjs';
+import { hostedMailCredentials } from './hosted-mail.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -40,8 +41,8 @@ async function miniflareFor(root) {
 const standIn = (item, field) => typeof item.verifyStandIn === 'string' && item.verifyStandIn ? item.verifyStandIn : field?.kind === 'email' ? 'owner@example.com' : typeof field?.default === 'string' && field.default ? field.default : randomBytes(24).toString('hex');
 const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map(match => match[1].slice(1)).filter(path => !path.startsWith('/') && /\.[A-Za-z0-9]+$/.test(path));
 
-/** The build served as rer deploy hosts it, with the vars, origin and (stand-in) secrets of its
- * deploy declaration. `fetch(path, init)` answers for the deployed origin. */
+/** The build served as rer deploy hosts it, with declared vars, origin and
+ * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
 export async function serveHosted(root, { declaration: declarationPath = 'deploy.json' } = {}) {
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
@@ -56,6 +57,9 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  const modules = [entry, ...(await files(build)).map(path => join(build, path)).filter(path => path !== entry && moduleTypes[extname(path)])].map(path => ({ type: moduleTypes[extname(path)], path }));
  const identity = { sourceSha: createHash('sha1').update(randomBytes(16)).digest('hex'), fingerprint: createHash('sha256').update(randomBytes(16)).digest('hex'), versionId: crypto.randomUUID() };
  const secrets = Object.fromEntries((declaration.secrets ?? []).map(item => [item.binding, standIn(item, manifest.fields?.find(field => field.name === item.binding))]));
+ for (const binding of await hostedMailCredentials(root)) {
+  if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
+ }
  const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app' } }, {
   name: 'app', modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
   bindings: { ...config.vars, ...declaration.vars, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: ORIGIN } : {}),
