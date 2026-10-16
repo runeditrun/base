@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g38d16938",
+  "cliVersion": "0.2.28-dev.g1fb24de2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -335,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "a7eea29491561c936835bab0b1ec633472f11bdf309c14e459b11e5a42a429da"
+      "sha256": "86500fb1ce61baea87e837e2d8d3abd29ae3f9bd02fd753f57ef781a09b45155"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -377,6 +377,10 @@
       "source": "cli/business/command.mjs",
       "sha256": "fd225a355723e03e6ef8e42dafda32eb13e41d86680cf0dbb9b6a8281314d580"
     },
+    "cli/business/config-policy.mjs": {
+      "source": "cli/business/config-policy.mjs",
+      "sha256": "e768f7e0c46dc26af5253061beb44c851dd17199067a7fc846b746e1a81e24e9"
+    },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
       "sha256": "ff3ecefa1d881e7397f30edc81b1268e981aa9e4cda9ae966a7e5667977710f4"
@@ -388,6 +392,10 @@
     "cli/business/discovery-task.mjs": {
       "source": "cli/business/discovery-task.mjs",
       "sha256": "15c0e2bcbb26654b8b6770dc05ea20197183942d566bf26cb6fc375460f443be"
+    },
+    "cli/business/files.mjs": {
+      "source": "cli/business/files.mjs",
+      "sha256": "6baeb92fe718208680b1b0360c416b7badd11626aaaa6f66cede63f58a420838"
     },
     "cli/business/keychain.mjs": {
       "source": "cli/business/keychain.mjs",
@@ -404,6 +412,10 @@
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
       "sha256": "191f2274d47adfa706bfe4a258c7ab50a37a3569edb20837b317a5279460825f"
+    },
+    "cli/business/parsers-config-code.mjs": {
+      "source": "cli/business/parsers-config-code.mjs",
+      "sha256": "8dbbdbdfc02b8c25c05f800d8df5295293e8f7b90d528a806a28cf144dcc2618"
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
@@ -423,7 +435,7 @@
     },
     "cli/business/parsers-syntax.mjs": {
       "source": "cli/business/parsers-syntax.mjs",
-      "sha256": "d6cc67dae8ac92329cb86a059bcd7d8cccd4d4e38875c58c978d3ed3a955be7d"
+      "sha256": "d7bbb61a0b1a52c162709b97fd109dd40931a919e70a71bd3c7b8e9d579a22c8"
     },
     "cli/business/parsers-terraform.mjs": {
       "source": "cli/business/parsers-terraform.mjs",
@@ -431,7 +443,7 @@
     },
     "cli/business/parsers.mjs": {
       "source": "cli/business/parsers.mjs",
-      "sha256": "0db5eca75c32b66b5dd5a9e02022c85c344b73162d560fd26474d95322bbf389"
+      "sha256": "e6c69be715aa784ae4e8712499ac49cb25c1e6cfbafcf3f10d46847cbb5e18c6"
     },
     "cli/business/permissions.mjs": {
       "source": "cli/business/permissions.mjs",
@@ -439,7 +451,7 @@
     },
     "cli/business/policy.mjs": {
       "source": "cli/business/policy.mjs",
-      "sha256": "fdafcb772253a2b3f1eccfb5233c45b0cf79f5e0c77249f5179474dace97357c"
+      "sha256": "1ebbd3706f95e57c03fb69ae572a355c906d3693faf60d00a4283d9197c09ae9"
     },
     "cli/business/progress.mjs": {
       "source": "cli/business/progress.mjs",
@@ -453,13 +465,17 @@
       "source": "cli/business/questions.mjs",
       "sha256": "248def11b8f76364fadabba773ca8b04850a9edb7cf3d089d6b45f17e1250265"
     },
+    "cli/business/repository.mjs": {
+      "source": "cli/business/repository.mjs",
+      "sha256": "10ba93237061130c17222ddeba43645802e2c97b7a0d935d01958516d753b325"
+    },
     "cli/business/scan-command.mjs": {
       "source": "cli/business/scan-command.mjs",
       "sha256": "300e87546d3c82ae98009f1cf2fd125376146b436c8ee765c0df8513187547af"
     },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
-      "sha256": "eb394b8f39cd3bee353507a76ee904e3bc0b8d45a80912dc8b08732491fb89dc"
+      "sha256": "1a67a574027b6c0320bbef5002c2b0a552343338597262563edbe708f5dffba0"
     },
     "cli/business/service.mjs": {
       "source": "cli/business/service.mjs",
