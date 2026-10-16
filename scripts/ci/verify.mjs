@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { verifyStages } from '../verify-stages.mjs';
 import { verify } from '../verify.mjs';
-import { cliTestFiles, verifyCLIShard } from './cli-shard.mjs';
+import { CLI_SHARDS, cliShardPlan, verifyCLIShard } from './cli-shard.mjs';
 import { MODULE_SHARDS, moduleTestFiles, verifyModuleShard } from './module-shard.mjs';
 import { referenceShardPlan, verifyReferenceShard } from './reference-shard.mjs';
 
@@ -24,12 +24,12 @@ assert.deepEqual([...stages].sort(), [...verifyStages].sort(), 'CI must cover ev
 const group = process.argv[2];
 if (group === '--matrix') {
   assert.ok((await moduleTestFiles()).length >= MODULE_SHARDS, 'Each module shard must have test files');
-  await cliTestFiles();
+  await cliShardPlan();
   await referenceShardPlan();
   console.log(JSON.stringify({ include: Object.keys(groups)
     .filter(group => group !== 'journeys' || process.env.CI_INCLUDE_JOURNEYS === 'true')
     .flatMap(group => {
-      const total = group === 'modules' ? MODULE_SHARDS : group === 'cli' ? 3 : group === 'reference' ? 2 : 0;
+      const total = group === 'modules' ? MODULE_SHARDS : group === 'cli' ? CLI_SHARDS : group === 'reference' ? 2 : 0;
       return total ? Array.from({ length: total }, (_, index) => ({ group, shard: index + 1, total })) : [{ group }];
     }) }));
 } else {

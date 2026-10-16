@@ -4,6 +4,8 @@ import { readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 
 const journeys = new Set(['reference-journey.test.mjs']);
+const isolated = ['cli/dependency-setup.test.mjs', 'cli/package-mode.test.mjs'];
+export const CLI_SHARDS = 5;
 
 export async function cliTestFiles({ journey = false } = {}) {
   const files = (await readdir('cli')).filter(name => name.endsWith('.test.mjs')).sort();
@@ -11,16 +13,26 @@ export async function cliTestFiles({ journey = false } = {}) {
   return files.filter(name => journeys.has(name) === journey).map(name => `cli/${name}`);
 }
 
+export async function cliShardPlan() {
+  const files = await cliTestFiles();
+  for (const file of isolated) assert.ok(files.includes(file), `Missing CLI suite: ${file}`);
+  const regular = files.filter(file => !isolated.includes(file));
+  const groups = Object.fromEntries([1, 2, 3].map(shard => [String(shard), regular.filter((_, index) => index % 3 === shard - 1)]));
+  isolated.forEach((file, index) => { groups[String(index + 4)] = [file]; });
+  assert.deepEqual(Object.values(groups).flat().sort(), files, 'CLI CI must cover every push file exactly once');
+  return groups;
+}
+
 export async function verifyCLIShard(shard, { journey = false } = {}) {
-  if (!journey) assert.match(shard ?? '', /^[123]$/, 'CLI_SHARD must be one of the three matrix shards');
-  const files = await cliTestFiles({ journey });
+  if (!journey) assert.match(shard ?? '', /^[1-5]$/, `CLI_SHARD must be one of the ${CLI_SHARDS} matrix shards`);
+  const files = journey ? await cliTestFiles({ journey }) : (await cliShardPlan())[shard];
   assert.ok(files.length, 'No CLI test files found');
   const started = performance.now();
-  const label = journey ? 'journeys' : `shard=${shard}/3`;
+  const label = journey ? 'journeys' : `shard=${shard}/${CLI_SHARDS}`;
   console.log(`VERIFY_STAGE start verify:cli ${label}`);
   const child = spawn(process.execPath, [
     'onboarding/queued-entry.mjs', 'verify:cli', '--', process.execPath,
-    '--test', '--test-concurrency=2', ...(journey ? [] : [`--test-shard=${shard}/3`]), ...files,
+    '--test', '--test-concurrency=2', ...files,
   ], { stdio: 'inherit' });
   const onTerm = () => child.kill('SIGTERM'), onInt = () => child.kill('SIGINT');
   process.on('SIGTERM', onTerm); process.on('SIGINT', onInt);
