@@ -9,6 +9,7 @@ import { localDurableObjects } from './durable-objects.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 import { containerMigrationInventory } from './migration-inventory.mjs';
 import { checkImageVariables } from './image-variables.mjs';
+import { refuseLocalEnvFiles } from '../deploy-kit/local-only.mjs';
 export async function buildContainer(root, options={}) {
  const previous=process.cwd();process.chdir(root);
  try{return await buildImage(root,options);}finally{process.chdir(previous);}
@@ -57,6 +58,9 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  const builder = await vite.createBuilder({ ...config,root,configFile:false }); await builder.buildApp();
  // Apply the same local-only bundle guard before packaging any container image.
  await (await import('../../cli/dev-identity.mjs')).refuseDevLayerOutput(root);
+ // The image copies dist/ whole: a local settings file there would ship in it.
+ try { await refuseLocalEnvFiles(root,['dist']); }
+ catch (error) { if (!error.resource) throw error; throw new Error(`The build output holds the local settings file ${error.resource}; a container image never carries one. Remove what copies it into dist/, then build again.`); }
  let workerConfig;
  if (engine === 'workerd') {
   workerConfig = JSON.parse(await readFile(join(root,'dist/server/wrangler.json'),'utf8'));

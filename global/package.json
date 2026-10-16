@@ -46,6 +46,10 @@
       "types": "./onboarding/archive-output.d.mts",
       "default": "./onboarding/archive-output.mjs"
     },
+    "./local-variables-output": {
+      "types": "./onboarding/local-variables-output.d.mts",
+      "default": "./onboarding/local-variables-output.mjs"
+    },
     "./launcher": "./onboarding/launcher.mjs",
     "./installer-server": "./onboarding/server.mjs",
     "./server-resources": "./cli/server-resources.mjs",

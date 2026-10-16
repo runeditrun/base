@@ -151,6 +151,19 @@ deployed main, and declares `devIdentity: {entry, output}`. `rer build` scans
 Seeds using native authentication retain their real accounts, sessions and roles
 and declare their local automatic entry integration.
 
+**Local settings never reach a deployment.** The Cloudflare Vite plugin copies
+`.dev.vars` (or `.env`, or process variables) into `dist/<worker>/.dev.vars` for
+`vite preview`. `rer build`, the build `rer deploy` runs and a seed's own deploy
+hook run with the checkout's local settings files (`.dev.vars`,
+`.dev.vars.previous` and the adapter's declared settings) moved aside and
+Wrangler's `.env` and process-variable loading switched off. `rer build` and
+`rer deploy` then refuse build output (`devIdentity.output`, else `dist/`) that
+holds a `.dev.vars*`, `.env*` or `*.env` file, naming it; the deploy kit, the
+container image build and the delivery package refuse one too. Add
+`excludeLocalVariables()` from Base's `onboarding/local-variables-output.mjs`
+(`@runeditrun/rer/local-variables-output` in package mode) to the seed's Vite
+plugins so a direct `vite build` drops the file as well.
+
 ## First-run setup at /setup
 
 Every first-party seed serves its owner's first-run setup at `/setup`: while setup is unfinished the signed-in owner completes it there (and any app route sends the owner to it); once finished, `/setup` takes the owner into the app (or to settings for later changes). Signed-out visitors are sent to sign-in and back. `rer setup`, dev identity return the owner to `/setup` until first-run is complete, and the README/AGENTS name it (owner, 10 Oct 2026).
@@ -195,6 +208,8 @@ Answer `/health` with `deploymentHealth(env)` from `foundation/runtime/deploymen
 For an optional canonical public origin, declare `"publicOriginSetting": "PUBLIC_ORIGIN"` beside `originVar` (`AUTH_ORIGIN` or `APP_ORIGIN`) in `deploy.json`. `rer deploy` reads `PUBLIC_ORIGIN` from the adapter's saved settings; the process environment overrides saved settings and `--env-file` wins over both. The value must be `https://host[:port]`, with no credentials, path (including a trailing `/`), query, fragment, whitespace or backslashes; it is normalized to `URL.origin`. When omitted, the origin remains workers.dev. This changes only `originVar`: readiness, health checks, the deployment target, recorded resource names and IDs, and the owner claim retain the kit's workers.dev origin and identity.
 
 A seed's own deploy hook (the `commandAdapter` option `deploy`) returns `{deployed: true, origin}` once its upload is live (an https origin; rer refuses an http one off loopback before sending it anything), plus `setupToken`, the setup token its Worker holds, when that is not the `SETUP_TOKEN` rer passed it in the environment. `rer deploy` then waits until the origin's `/health` names the checkout's commit and claims the owner with that token, needing no deployment record from the hook. A hook that deploys with the kit under its own state file also returns that file as `state` (the kit's `deploy` result names it); rer then reads that record for every later step, so it issues, claims with and retires the setup token, and `--set-secret`, `--unset-secret` and `rer deploy --remove --yes` act on what the hook deployed.
+
+**Secrets rer generates are kept.** A secret field the setup manifest generates (`generate`, such as a session or subscriber-link secret; not the one-time setup token) that neither the environment nor `--env-file` supplies gets a value rer keeps in `.rer/deploy/<environment>.secrets.env` (an owned 0600 file that Git ignores), beside the environment's deployment record. Every later `rer deploy` of that environment reuses it and says so. Cloudflare reads back only a secret's name, never its value: when a seed's own deploy hook would get a newly generated value for a secret the live Worker (`<project>-<environment>`) already holds, rer refuses before the hook runs, names the secrets, and says how to restore the file (copy it from the checkout that deployed, or set the values in `--env-file`). `rer deploy --rotate-secret NAME[,NAME]` replaces them on purpose: a fresh value is kept and handed to the hook, or, for the owner kit and a hook that deploys through it, set on the Worker as a recorded secret change. The owner kit never replaces a secret its Worker holds, so it keeps a generated value only once it has uploaded it. `rer deploy --remove --yes` deletes the kept file with the environment. The values rer puts in a deploy hook's environment are the ones the Worker must hold, a rotation included: a hook uploads each declared secret as given, rather than keeping what the Worker holds.
 
 A custom hook using a canonical URL puts it into `PUBLIC_ORIGIN` before invoking the owner kit and declares `"publicOriginSetting": "PUBLIC_ORIGIN"` in its generated deploy declaration. It returns the kit's workers.dev `origin` and `state` for finalization.
 
