@@ -312,3 +312,53 @@ Only names leave the scanner. Secret files are never opened and contribute
 Sensitive-looking outbound names are dropped and counted in `withheld`.
 Symlinks, generated outputs and dependency trees are skipped; unsupported
 formats and syntax may yield no signals.
+
+## Business device commands (protocol integration in progress)
+
+`rer business connect --code ABCD-1234 [--origin https://app.runeditrun.com]`
+redeems a browser-created code, prints a six-digit confirmation number and waits
+for approval in the browser that created it. Device credentials stay in macOS
+Keychain or Linux Secret Service. A missing or locked Secret Service refuses;
+there is no plaintext credential store. Linux needs `secret-tool` and an
+unlocked desktop Secret Service session.
+
+In a terminal, connect asks separately before adding Claude Code user Read deny
+rules, allowing export-scoped macOS wake prevention, and installing a launchd
+or systemd user service. Only the exact answer `yes` opts in. Noninteractive
+connect pairs but leaves those optional changes off. Background services use
+absolute Node and CLI paths. No model process is started.
+
+`rer business vendor-key add sentry` reads a hidden credential (or a password
+manager's piped input) into the OS keychain and prints only `sentry:read`.
+`remove` deletes it. The same commands support `uptimerobot`, `pagerduty` and
+`calendly`. Never put a key in command arguments, chat or a URL.
+
+`rer business next` returns one locally templated classification or owner link,
+or `Nothing yet`, within 60 seconds. It never reflects server instructions or
+raw evidence. Owner items cannot be answered from this CLI.
+`rer business answer ID uses|sells|unknown` submits a task-scoped classification
+through MCP; the server remains responsible for accepting its completion.
+`rer business token` emits an MCP Authorization header object for direct use as
+a headers helper. That output is a short-lived credential: connect it directly
+to the MCP client and do not paste it into an agent transcript.
+
+`rer business status` shows local pairing, service state and progress without
+printing checkpoints or vendor data. `rer business disconnect` removes the
+service, device and vendor credentials, state and introduced Claude rules,
+preserving preexisting settings and unrelated edits. Revocation in the browser
+removes remote authority; disconnect removes the local installation's additions.
+
+**Current integration blocker:** the executor route contract currently returns
+only a model-facing task summary. It does not supply the scanner's consent ID
+and approved roots, vendor inputs or full resume checkpoint. Vendor grants
+currently have zero quota and an unavailable import destination. The MCP
+classification schema also accepts enum outputs that completion currently
+rejects. Consequently `run` returns such leases with their checkpoint and a
+configuration-required event before accessing local files or vendor keys. A
+background supervisor parks those tasks; `run --once` reports the dependency
+as a command failure. Scanning, export uploading and enum completion are not
+claimed to work end to end until those server contracts are connected.
+
+The four deterministic adapter implementations and their native output formats
+are described in [the adapter guide](cli/business/vendors/README.md). Their
+presence does not enable export without a granted seed upload destination.

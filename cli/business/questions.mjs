@@ -1,0 +1,75 @@
+import { randomUUID } from 'node:crypto';
+import { Api, identifier } from './api.mjs';
+import { sensitive } from './detector.mjs';
+import { paired } from './local-commands.mjs';
+
+const protocolVersion = '2025-11-25';
+const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
+export const classifications = ['uses', 'sells', 'unknown'];
+
+export async function mcpClient(api, { taskId, signal } = {}) {
+ const minted = await api.post('/api/business/executors/token', { audience: 'mcp', ...(taskId ? { task_id: identifier(taskId) } : {}) }, { signal });
+ if (typeof minted.access_token !== 'string') throw Error('Business server did not issue an MCP bearer.');
+ const options = { token: minted.access_token, signal, headers };
+ let sequence = 0;
+ async function rpc(method, params, notification = false) {
+  const result = await api.post('/api/business/mcp', { jsonrpc: '2.0', ...(!notification ? { id: ++sequence } : {}), method, params }, options);
+  if (notification) return;
+  if (!result || result.error || result.id !== sequence) throw Error('Business MCP operation was refused.');
+  return result.result;
+ }
+ const initialized = await rpc('initialize', { protocolVersion, capabilities: {}, clientInfo: { name: 'rer-business', version: '1.0.0' } });
+ if (initialized.protocolVersion !== protocolVersion) throw Error('Business MCP protocol revision is unsupported.');
+ await rpc('notifications/initialized', {}, true);
+ return async (name, args = {}) => {
+  const result = await rpc('tools/call', { name, arguments: args });
+  if (result?.isError || !result?.structuredContent) throw Error('Business task action is unavailable. Use the browser to check its requirements.');
+  return result.structuredContent;
+ };
+}
+
+export async function nextQuestions(api, signal) {
+ const tool = await mcpClient(api, { signal });
+ const result = await tool('next_question');
+ if (!Array.isArray(result.tasks)) throw Error('Business server returned invalid task summaries.');
+ return result.tasks;
+}
+const ownerKinds = new Set(['signup.checkout','connect.cloudflare','connect.github','consent.grant','confirm.inventory','plan.review','wave.approve','switchoff.cancel','cutover.billing','rollback.billing']);
+export const ownerLink = state => `${state.origin}/business/${encodeURIComponent(identifier(state.businessId))}`;
+
+export async function next() {
+ const { state, credential } = await paired();
+ const tasks = await nextQuestions(new Api(state.origin, credential), AbortSignal.timeout(55_000));
+ const item = tasks.find(task => task.kind === 'classify.row' || task.runner === 'owner' || ownerKinds.has(task.kind));
+ if (!item) { process.stdout.write('Nothing yet.\n'); return; }
+ const id = identifier(item.task_id);
+ if (sensitive(id)) throw Error('Business task identifier was refused by the outbound detector.');
+ if (item.runner === 'owner' || ownerKinds.has(item.kind)) {
+  process.stdout.write(`Owner: ${id}\nAnswer in your browser: ${ownerLink(state)}\n`); return;
+ }
+ process.stdout.write(`Agent: ${id}\nSuggest whether this tool is used, sold, or unknown.\nAnswers: uses | sells | unknown\nRun: rer business answer ${id} <enum>\n`);
+}
+
+export async function answer(id, choice) {
+ identifier(id);
+ if (!classifications.includes(choice)) throw Error('Choose an enum: uses, sells, unknown.');
+ const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
+ const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
+ if (summary.runner === 'owner' || ownerKinds.has(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerLink(state)}`);
+ if (summary.kind !== 'classify.row' || summary.runner !== 'executor') throw Error('This item does not accept a CLI classification answer.');
+ const tool = await mcpClient(api, { taskId: id, signal });
+ let lease = summary;
+ if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });
+ if (typeof lease.grant_id !== 'string') throw Error('Business did not return a grant for this question.');
+ await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { decision: choice } });
+ process.stdout.write('Business answer submitted for server validation.\n');
+}
+
+export async function token() {
+ const { state, credential } = await paired();
+ const result = await new Api(state.origin, credential).post('/api/business/executors/token', { audience: 'mcp' });
+ if (typeof result.access_token !== 'string') throw Error('Business server did not issue an MCP bearer.');
+ // Claude headersHelper consumes this directly; never run this in an agent
+ // transcript. Vendor credentials cannot be retrieved through this command.
+ process.stdout.write(JSON.stringify({ Authorization: `Bearer ${result.access_token}` }) + '\n');
+}

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.geb6e5ae6",
+  "cliVersion": "0.2.28-dev.g71e69dcd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -369,13 +369,33 @@
       "source": "cli/browser-runtime.mjs",
       "sha256": "5cafb40696ae245b5c9629f14405c97f4948cdc0ffe7268821589afe13d60f79"
     },
+    "cli/business/api.mjs": {
+      "source": "cli/business/api.mjs",
+      "sha256": "63d57ccee9323ea1c452d151cfd674bc6444b39ef74c737e9ec35d316c684789"
+    },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "acec00c15932695ef08344f1109980fd8c4dc5b21a3d31104731223f86a8adf2"
+      "sha256": "bf94cd3e0b30f5d9cad701484fe962460ec6c7cf0f6025f8c7d0d725688a0b2e"
+    },
+    "cli/business/connect.mjs": {
+      "source": "cli/business/connect.mjs",
+      "sha256": "ff3ecefa1d881e7397f30edc81b1268e981aa9e4cda9ae966a7e5667977710f4"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
       "sha256": "03b1207efcaf692cb341356951964503078a3ee3b006c58f7ced05d722c6306b"
+    },
+    "cli/business/keychain.mjs": {
+      "source": "cli/business/keychain.mjs",
+      "sha256": "2830b7be1c041592d44f59d61996533485908fd8dc13a11ac35f8718fe1db59c"
+    },
+    "cli/business/local-commands.mjs": {
+      "source": "cli/business/local-commands.mjs",
+      "sha256": "3df354f56e331bbf7e229e1529e1e84aa6d0ff03097ea4fc6b2f36f2bfa00dad"
+    },
+    "cli/business/outbound.mjs": {
+      "source": "cli/business/outbound.mjs",
+      "sha256": "bed06cfeb5b0c21ca351b4726bea886ac7deb68eeb8d64e98e254ced95e38e67"
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
@@ -405,13 +425,69 @@
       "source": "cli/business/parsers.mjs",
       "sha256": "c42161a609b2775bcc820fdbebd4cc92e5606998ce4cdf769a5d203fe0e14c3d"
     },
+    "cli/business/permissions.mjs": {
+      "source": "cli/business/permissions.mjs",
+      "sha256": "042038eced03869663fc3becbb25b341981da233a1c54808064bce2797bd48a1"
+    },
     "cli/business/policy.mjs": {
       "source": "cli/business/policy.mjs",
       "sha256": "f239a476aa36f6a612722181e8d790e37c4b9a37b7e5f9398c26588bb9b88f8d"
     },
+    "cli/business/prompts.mjs": {
+      "source": "cli/business/prompts.mjs",
+      "sha256": "f628b3b87707c52601c7c23234eb0d10cff7b87ed03b613aacc33cd645fd0232"
+    },
+    "cli/business/questions.mjs": {
+      "source": "cli/business/questions.mjs",
+      "sha256": "4b8171d1d88cada0946c44e1a4dd08f5e9f08ca4d7f0b7596970ec48184b157a"
+    },
+    "cli/business/scan-command.mjs": {
+      "source": "cli/business/scan-command.mjs",
+      "sha256": "300e87546d3c82ae98009f1cf2fd125376146b436c8ee765c0df8513187547af"
+    },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
       "sha256": "0d5cc830c3d7e19de5d3892b44db77322106ce91147a071cccc8748330107da1"
+    },
+    "cli/business/service.mjs": {
+      "source": "cli/business/service.mjs",
+      "sha256": "4d2a991a0b40da4b0252d1071f182505cc722ea381e43d6149a6123714ff2f96"
+    },
+    "cli/business/state.mjs": {
+      "source": "cli/business/state.mjs",
+      "sha256": "0b739097b706702f7ce40d531934955e051d934791d7b307e75996327957b554"
+    },
+    "cli/business/supervisor.mjs": {
+      "source": "cli/business/supervisor.mjs",
+      "sha256": "8d6a87b0a0d8f750f9d751fbfdcaf478be32e8f79d3b4318549acef2ec6bb9ff"
+    },
+    "cli/business/vendors/README.md": {
+      "source": "cli/business/vendors/README.md",
+      "sha256": "5ab50a3aed5f7948baaf444b44e6ba2785320e48c148e7343f35f9d500cee0eb"
+    },
+    "cli/business/vendors/calendly.mjs": {
+      "source": "cli/business/vendors/calendly.mjs",
+      "sha256": "8badcaeab56c16084f1bc420d1d7454b7fcc5b439598d9f3598a7a5754a913d7"
+    },
+    "cli/business/vendors/common.mjs": {
+      "source": "cli/business/vendors/common.mjs",
+      "sha256": "f07670c758ef1fdef00157ea4bef93369ecb836af6d352ff28c2935ffa8d790a"
+    },
+    "cli/business/vendors/index.mjs": {
+      "source": "cli/business/vendors/index.mjs",
+      "sha256": "3d2a9c791ab2744a162c1984aadc9a478eccadd0a7991352ff101fb996767871"
+    },
+    "cli/business/vendors/pagerduty.mjs": {
+      "source": "cli/business/vendors/pagerduty.mjs",
+      "sha256": "313a56ef30c7ead91b0665c810373941d8620bc8f3e1994d509bb2ece4d4a239"
+    },
+    "cli/business/vendors/sentry.mjs": {
+      "source": "cli/business/vendors/sentry.mjs",
+      "sha256": "851f969f9fa26ac229749b0e3f1cf9bfd3f18e12e7bdc938a73175b9fb904295"
+    },
+    "cli/business/vendors/uptimerobot.mjs": {
+      "source": "cli/business/vendors/uptimerobot.mjs",
+      "sha256": "a4a3f68046853279600404ade5521c551bea84d57a078569a7eecf5f24ba3dc4"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
