@@ -56,16 +56,46 @@ test('a Worker replaced before the first receipt is refused too', async t => {
 });
 
 test('an interrupted upgrade of the kit\'s own Worker resumes; it is not mistaken for a replacement', async t => {
-  const {args,state,fail,target,statePath} = await setup(t);
+  const {args,state,fail,foreign,target,statePath} = await setup(t);
   const first = await ownerDeploy(args);
+  // Cloudflare can activate an upload before its own read of that version finds it (code 100146).
+  const readback = () => { const before = uploads(state); return {test:path => uploads(state) > before && path === `/workers/scripts/penny-production/versions/${state.version.id}`}; };
+  const unreadable = {status:404,errors:[{code:100146,message:'The requested Worker version could not be found'}]};
+  const quick = {...args,readiness:{sleep:async () => {}}};
+  const propagating = build('export default {scheduled() {},fetch(){return new Response("propagating")}}');
+  const waited = readback(); fail('GET',waited,unreadable); fail('GET',waited,unreadable);
+  const settled = await ownerDeploy({...quick,plan:ownerPlan(target,declaration(),propagating),artifact:propagating});
+  assert.equal(settled.receipt.changed,true); assert.equal(settled.receipt.provider.versionId,state.version.id);
+  assert.equal(state.calls.filter(x => x.failed && x.path.includes('/versions/')).length,2);
   const next = build('export default {scheduled() {},fetch(){return new Response("v2")}}');
   const plan = ownerPlan(target,declaration({crons:['* * * * *','*/5 * * * *']}),next);
   fail('PUT',/^\/workers\/scripts\/penny-production\/schedules$/);
   await assert.rejects(ownerDeploy({...args,plan,artifact:next}),/provider-http-500/);
-  assert.deepEqual((await readOwnerState(statePath,target)).receipt,first.receipt);
+  assert.deepEqual((await readOwnerState(statePath,target)).receipt,settled.receipt);
   const {receipt} = await ownerDeploy({...args,plan,artifact:next});
   assert.equal(receipt.changed,true); assert.notEqual(receipt.provider.versionId,first.receipt.provider.versionId);
   assert.deepEqual(state.schedules,[{cron:'* * * * *'},{cron:'*/5 * * * *'}]);
+  // Any other readback error fails and leaves the upload without its provider identity.
+  const later = build('export default {scheduled() {},fetch(){return new Response("v3")}}');
+  const laterArgs = {...quick,plan:ownerPlan(target,declaration({crons:['* * * * *','*/5 * * * *']}),later),artifact:later};
+  fail('GET',readback(),{status:404});
+  await assert.rejects(ownerDeploy(laterArgs),/provider-http-404/);
+  const interrupted = await readOwnerState(statePath,target);
+  assert.deepEqual(interrupted.receipt,receipt); assert.equal(interrupted.pendingUpload.provider,undefined);
+  assert.equal(interrupted.pendingUpload.fingerprint,state.settings.bindings.find(x => x.name === 'RER_DEPLOY_FINGERPRINT').text);
+  // Only a live version carrying that fingerprint as binding and annotation is this deploy's own.
+  const live = {settings:state.settings,version:state.version,deployments:state.deployments}, annotation = state.version.annotations['workers/message'];
+  for (const replace of [() => { state.version.annotations['workers/message'] = 'Deploy from the dashboard'; }, () => foreign.replaceWorker()]) {
+    replace();
+    const writes = state.writes.length, bytes = await readFile(statePath);
+    await assert.rejects(ownerDeploy(laterArgs),error => error.message === 'owned-resource-replaced' && error.resource === 'worker:penny-production');
+    assert.equal(state.writes.length,writes); assert.deepEqual(await readFile(statePath),bytes);
+    Object.assign(state,live); state.version.annotations['workers/message'] = annotation;
+  }
+  const resumed = await ownerDeploy(laterArgs);
+  assert.equal(resumed.receipt.changed,true); assert.equal(resumed.receipt.provider.versionId,state.version.id);
+  const saved = await readOwnerState(statePath,target);
+  assert.deepEqual(saved.receipt,resumed.receipt); assert.equal(saved.pendingUpload,undefined);
 });
 
 test('a bucket replaced under the same name is refused, never adopted', async t => {
@@ -102,7 +132,7 @@ test('an account with no workers.dev subdomain gets a named error before anythin
   assert.deepEqual(report(new Error('workers-subdomain-missing')),{ok:false,code:'workers-subdomain-missing'});
 });
 
-test('a lost response on the first Worker upload resumes when the live Worker carries the recorded build', async t => {
+test('a lost response on the first Worker upload resumes when the live Worker carries the recorded fingerprint', async t => {
   const {args,state,fail,statePath,target} = await setup(t);
   fail('PUT',/^\/workers\/scripts\/penny-production$/,{afterApply:true});
   await assert.rejects(ownerDeploy(args),/provider-transport-failed/);

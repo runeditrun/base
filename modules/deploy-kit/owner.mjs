@@ -171,7 +171,7 @@ export async function readOwnerState(path, target) {
   assert(state?.version === 1 && state.kind === STATE_KIND && state.owned && typeof state.owned === 'object'
     && (state.owned.worker === null || ['pending','created'].includes(state.owned.worker?.status))
     && KINDS.every(kind => state.owned[kind] && typeof state.owned[kind] === 'object' && Object.values(state.owned[kind]).every(entry => ['pending','created'].includes(entry?.status))), 'invalid-owner-state');
-  assert(state.pendingUpload === undefined || typeof state.pendingUpload?.fingerprint === 'string' && typeof state.pendingUpload?.build === 'string', 'invalid-owner-state');
+  assert(state.pendingUpload === undefined || typeof state.pendingUpload?.fingerprint === 'string', 'invalid-owner-state');
   // Declared secrets rer removed on purpose (the spent setup token): later plans omit them.
   assert(state.pendingSecret === undefined || identifier(state.pendingSecret?.binding) && typeof state.pendingSecret?.present === 'boolean'
     && (state.pendingSecret.versionId === undefined || uuid(state.pendingSecret.versionId))
@@ -302,28 +302,32 @@ export async function settleOwnerState({api: provider, target, statePath}) {
 }
 export const sameDeployment = (a, b) => a?.versionId === b?.versionId && a?.deploymentId === b?.deploymentId && a?.etag === b?.etag;
 
+/** Both marks rer's upload puts on a version: the build binding and the version annotation. */
+const carriesUpload = (live, fingerprint) => deployedFingerprint(live?.settings) === fingerprint && live.version?.annotations?.['workers/message'] === `rer-deploy:${fingerprint}`;
 /** A completed receipt or the exact identity of an interrupted successful upload proves ownership.
- * Only the first upload, with no receipt, may recover a lost response by its pending build. */
-async function checkWorkerIdentity(api, plan, artifact, state) {
+ * An upload whose response or readback was lost is this deploy's own when the live version carries
+ * the fingerprint saved just before its PUT: rer records its ids, as a completed readback would. */
+async function checkWorkerIdentity(api, plan, state, save) {
   const live = await activeWorker(api, plan.worker);
   const pending = state.pendingUpload;
-  const expected = pending?.provider ?? state.receipt?.provider;
-  if (expected) {
-    if (!sameDeployment(live, expected)) throw refuse('owned-resource-replaced','worker',plan.worker);
-  } else {
-    const mine = state.owned.worker?.status === 'pending' && pending?.build === hash({plan,artifact}) && pending.fingerprint === deployedFingerprint(live?.settings);
-    if (!mine) throw refuse('uncertain-resource-create','worker',plan.worker);
+  if (pending && !pending.provider && carriesUpload(live, pending.fingerprint)) {
+    pending.provider = {versionId:live.versionId,deploymentId:live.deploymentId,etag:live.etag};
+    state.owned.worker = {status:'created'}; await save();
+    return live;
   }
+  const expected = pending?.provider ?? state.receipt?.provider;
+  if (!expected) throw refuse('uncertain-resource-create','worker',plan.worker);
+  if (!sameDeployment(live, expected)) throw refuse('owned-resource-replaced','worker',plan.worker);
   return live;
 }
-async function checkOwnedWorker(api, plan, artifact, state) {
+async function checkOwnedWorker(api, plan, state, save) {
   const settings = await workerSettings(api, plan.worker);
   if (settings === null) {
     if (state.owned.worker?.status === 'created') throw refuse('owned-resource-missing','worker',plan.worker);
     return null;
   }
   if (!state.owned.worker) throw refuse('resource-name-collision','worker',plan.worker);
-  return checkWorkerIdentity(api, plan, artifact, state);
+  return checkWorkerIdentity(api, plan, state, save);
 }
 
 /** One deploy at a time per state file: an exclusive lock file for the whole run. */
@@ -355,7 +359,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   const save = () => writeOwnerState(statePath, state);
   if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
   await checkServiceWorkers(api, plan);
-  const priorWorker = await checkOwnedWorker(api, plan, artifact, state);
+  const priorWorker = await checkOwnedWorker(api, plan, state, save);
   assert(!state.pendingSecret, 'secret-change-unsettled');
   const exists = priorWorker !== null;
   const create = await ownedResourcesToCreate(api, plan, state);
@@ -384,9 +388,9 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     const sending = path === upload && options?.method === 'PUT';
     if (sending) {
       await checkSavedResourceIdentities(api, state);
-      const current = await checkOwnedWorker(api, plan, artifact, state);
+      const current = await checkOwnedWorker(api, plan, state, save);
       if (!sameDeployment(priorWorker,current)) throw refuse('owned-resource-replaced','worker',plan.worker);
-      state.pendingUpload = {fingerprint:await uploadFingerprint(options.body),build:hash({plan,artifact})}; await save();
+      state.pendingUpload = {fingerprint:await uploadFingerprint(options.body)}; await save();
     }
     const result = await api.request(path, options);
     if (sending) {
