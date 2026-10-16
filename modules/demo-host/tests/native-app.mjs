@@ -22,7 +22,10 @@ export default {
     if (path === '/own-fetch') {
       const primary = await (await fetch(env.AUTH_ORIGIN + '/own-data')).json();
       const secondary = await (await fetch('https://page.demo.example.test/own-data')).json();
-      return Response.json({ primary, secondary, network: await (await fetch('https://network.example.test/')).text() });
+      let messaging = 'sent';
+      try { await fetch('https://api.sendgrid.com/v3/mail/send', { method: 'POST', body: 'fixture-message' }); }
+      catch (error) { messaging = error.message; }
+      return Response.json({ primary, secondary, messaging, network: await (await fetch('https://network.example.test/')).text() });
     }
     if (path === '/bridge-probe') {
       const result = {};

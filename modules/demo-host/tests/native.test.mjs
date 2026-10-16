@@ -28,7 +28,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     await writeFile(join(folder, 'modules/demo-host/native/bundle.mjs'), `export default ${JSON.stringify(bundle)};`);
     const origin = 'https://demo.example.test', measurement = 'fixture-measurement-token-1234567890123456';
     const files = ['modules/demo-host/native/worker.mjs', ...[...RUNTIME_FILES.filter(file => file !== 'worker'), 'bundle'].map(file => `modules/demo-host/native/${file}.mjs`),
-      ...DEMO_FILES.map(file => `modules/demo-host/${file}`), 'modules/container/migrations.mjs', ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
+      ...DEMO_FILES.map(file => `modules/demo-host/${file}`), ...['migrations', 'demo-egress'].map(file => `modules/container/${file}.mjs`), ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
     mf = new Miniflare(convertV4MiniflareOptions({ name: 'native-test', unsafeInspectDurableObjects: true, modulesRoot: folder, modules: files.map(path => ({ type: 'ESModule', path: join(folder, path) })),
       compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
       durableObjects: { DEMO: { className: 'NativeDemo', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
@@ -75,7 +75,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       const own = await (await fetch('/own-fetch', cookies)).json();
       assert.deepEqual(own.primary, own.secondary);
       assert.deepEqual(own.primary, (await (await fetch('/items', cookies)).json()).map(row => row.name));
-      assert.equal(own.network, 'network');
+      assert.deepEqual({ messaging: own.messaging, network: own.network }, { messaging: 'Demo direct messaging transport refused', network: 'network' });
     }
     const restricted = await (await fetch('/bridge-probe', a)).json();
     assert.ok(Object.values(restricted).every(result => result === 'denied'), JSON.stringify(restricted));
