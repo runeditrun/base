@@ -3,7 +3,7 @@ import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkou
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
 import { handleBrokenPipes } from './output.mjs';
-import { repositoryCommands, repositoryHelp } from '../cli/repository-contract.mjs';
+import { repositoryCommands, repositoryHelp } from './cli/repository-contract.mjs';
 import { repoArguments } from './cli/repository.mjs';
 
 const help = `Usage: rer VERB [FLAGS]

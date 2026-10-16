@@ -1,5 +1,4 @@
 import { browserDoctor } from './browser-runtime.mjs';
-import { repositoryCommands } from './repository-contract.mjs';
 import { dependencyDoctor } from './dependency-doctor.mjs';
 import { inventory } from './export.mjs';
 import { lstat, readFile } from 'node:fs/promises';
@@ -31,11 +30,11 @@ export async function describe(project) {
  const pkg = await readPackage(project.root), cliVersion = runningVersion(), versioned = cliVersion ? { cliVersion } : {};
  const defaults = { serverLimit: serverDefaults.serverLimit, idleSeconds: serverDefaults.idleSeconds };
  if (project.profile === 'independent') return {
-  contractVersion: 1, ...versioned, profile: 'independent', defaults, repositoryCommands, pins: {}, aliases: {},
+  contractVersion: 1, ...versioned, profile: 'independent', defaults, pins: {}, aliases: {},
   verbs: Object.fromEntries(Object.entries(project.descriptor.commands).map(([verb, declaration]) => [verb, { flags: ['--help', '--cwd', '--non-interactive', '--json', ...(['install','setup','build','verify','dev','preview','deploy','export','import'].includes(verb)?['--no-queue']:[]), '--'], effects: declaration.effects }])),
  };
  const capabilities = project.adapter?.verbs ?? {};
- return { contractVersion: 1, ...versioned, profile: 'first-party', defaults, repositoryCommands, pins: { node: pkg.engines?.node, pnpm: pkg.packageManager?.replace(/^pnpm@/, '') },
+ return { contractVersion: 1, ...versioned, profile: 'first-party', defaults, pins: { node: pkg.engines?.node, pnpm: pkg.packageManager?.replace(/^pnpm@/, '') },
   verbs: Object.fromEntries(Object.entries(capabilities).map(([verb, capability]) => {
    const adapterEffects = capability.effects;
    const operationsEffects = project.descriptor.commands?.[verb]?.effects;
