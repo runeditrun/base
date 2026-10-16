@@ -127,12 +127,13 @@ jobs:
             exit 1
           fi
       - name: Strict checks of seed module copies
-        if: ${{ matrix.group == 'modules' }}
+        if: ${{ matrix.group == 'modules' && matrix.shard == 1 }}
         run: pnpm typecheck:modules
       - name: Run full-verify stages assigned to this job
         env:
           VERIFY_GROUP: ${{ matrix.group }}
           CLI_SHARD: ${{ matrix.shard }}
+          MODULE_SHARD: ${{ matrix.shard }}
         run: node scripts/ci/verify.mjs "$VERIFY_GROUP"
       - name: Fetch pinned active HappyToHelp source without credentials
         if: ${{ !cancelled() && matrix.group == 'launcher' }}

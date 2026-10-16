@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { verifyStages } from '../verify-stages.mjs';
 import { verify } from '../verify.mjs';
 import { verifyCLIShard } from './cli-shard.mjs';
+import { moduleTestFiles, verifyModuleShard } from './module-shard.mjs';
 
 const dedicated = ['modules', 'cli', 'reference', 'portability', 'release', 'editor'];
 const groups = Object.fromEntries(dedicated.map(name => [name, [`verify:${name}`]]));
@@ -18,12 +19,15 @@ assert.deepEqual([...stages].sort(), [...verifyStages].sort(), 'CI must cover ev
 
 const group = process.argv[2];
 if (group === '--matrix') {
+  assert.ok((await moduleTestFiles()).length >= 3, 'Each module shard must have test files');
   console.log(JSON.stringify({ include: Object.keys(groups).flatMap(group =>
-    group === 'cli' ? [1, 2, 3].map(shard => ({ group, shard })) : [{ group }]) }));
+    ['cli', 'modules'].includes(group) ? [1, 2, 3].map(shard => ({ group, shard })) : [{ group }]) }));
 } else {
   assert.ok(Object.hasOwn(groups, group), 'Choose a CI verify group from --matrix');
   console.log(`VERIFY_GROUP ${group} ${groups[group].join(' ')}`);
   process.exitCode = group === 'cli'
     ? await verifyCLIShard(process.env.CLI_SHARD)
-    : await verify(groups[group]);
+    : group === 'modules'
+      ? await verifyModuleShard(process.env.MODULE_SHARD)
+      : await verify(groups[group]);
 }
