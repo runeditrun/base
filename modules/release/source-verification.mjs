@@ -1,9 +1,9 @@
 import { command, git } from './source.mjs';
 import { githubSource, githubVerify } from './github-verify.mjs';
 
-export async function verifySource(source, checkout, localVerify) {
+export async function verifySource(source, checkout, localVerify, verifyWorkflow) {
   const repository = localVerify ? null : githubSource(source);
-  const verify = repository ? githubVerify(source, repository) : null;
+  const verify = repository ? githubVerify(source, repository, verifyWorkflow) : null;
   // Refuse missing CI evidence before spending time installing or building.
   if (verify?.status === 'FAIL') return verify;
   const install = await command('pnpm', ['install', '--frozen-lockfile'], checkout, { dependencies: true });

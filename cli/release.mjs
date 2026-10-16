@@ -19,6 +19,9 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --dry-run              Run the real gates and suppress local tag creation.
   --local-verify         Run the seed's full verification locally instead of
                          requiring its exact commit's green GitHub Verify.
+  --verify-workflow NAME_OR_FILE
+                         Override the seed's declared GitHub verification workflow
+                         by name or file (case-insensitive).
   --clean-history        Prepare a parentless public export.
   --onto GITHUB_URL#BRANCH
                          Prepare a public child of the destination's current branch;
@@ -49,8 +52,8 @@ export async function dispatchRelease(args) {
    else if (args[index] === '--clean-history') options.cleanHistory = true;
    else if (args[index] === '--dry-run') options.dryRun = true;
    else if (args[index] === '--local-verify') options.localVerify = true;
-   else if (['--repo', '--project', '--repository', '--output', '--ref', '--env-file', '--onto', '--public-base'].includes(args[index]) && args[index + 1] && !args[index + 1].startsWith('--'))
-    options[args[index] === '--env-file' ? 'envFile' : args[index] === '--public-base' ? 'publicBase' : args[index].slice(2)] = args[++index];
+   else if (['--repo', '--project', '--repository', '--output', '--ref', '--env-file', '--onto', '--public-base', '--verify-workflow'].includes(args[index]) && args[index + 1] && !args[index + 1].startsWith('--'))
+    options[args[index] === '--env-file' ? 'envFile' : args[index] === '--public-base' ? 'publicBase' : args[index] === '--verify-workflow' ? 'verifyWorkflow' : args[index].slice(2)] = args[++index];
    else throw Error('Invalid release arguments');
   }
   if(args.includes('--no-queue')){const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw Error('Original CI required');}finally{await policy.close();}}

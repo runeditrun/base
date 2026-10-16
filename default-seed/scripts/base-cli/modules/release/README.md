@@ -56,8 +56,18 @@ it is independent of the publication destination. Only a completed successful
 tag qualifies. The run and head repository must both match the source repository,
 and a release tag must resolve remotely to the exact source commit. PR merge runs,
 other SHAs, repositories, branches and unsuccessful runs cannot authorize release.
-`gates.verify` records the source repository and commit, workflow id, `runId`,
+`gates.verify` records the source repository and commit, `workflowId`,
+`workflowFile`, `workflowName`, `runId`,
 `runUrl`, event, branch and conclusion in both receipt and site provenance.
+
+Workflow selection uses `--verify-workflow NAME_OR_FILE` first, then the
+optional top-level `verifyWorkflow` from committed `rer-project.json`, then
+`.github/workflows/verify.yml` or `verify.yaml`, then a single workflow named
+`verify`. Names, full file paths and basenames match case-insensitively. For
+example, `"verifyWorkflow": "Verify Slate"` or
+`--verify-workflow .github/workflows/candidate.yml` selects a seed's own gate.
+An explicit selection that is missing or ambiguous blocks; multiple conventional
+files or matching names also block, naming the candidates and the flag.
 
 CI is the verification wall: this path skips both local `verify` targets. It
 still installs frozen dependencies and runs the committed `pnpm run build`

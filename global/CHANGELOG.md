@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer release` finds the seed's verification workflow via `--verify-workflow NAME_OR_FILE`, committed `rer-project.json.verifyWorkflow`, `verify.yml`/`verify.yaml`, or a single workflow named `verify`, in that order. Names and files match case-insensitively; ambiguous selections block with the candidates and flag. Exact-SHA run safety checks are unchanged, and receipts include the workflow file and name.
+
 ## 0.2.28
 
 - `rer release` of a GitHub source uses the exact source commit's completed successful **Verify** run instead of re-running the seed's full verification locally. Only a `push` or `workflow_dispatch` run on the default branch, or on the version's release tag when that tag resolves remotely to the same commit, qualifies; PR runs, other SHAs, repositories, branches and unsuccessful runs do not. The receipt and site provenance record the repository, commit, workflow, run id and URL. The producer still installs frozen dependencies, runs the committed `build` script, scans publication history and packages locally; a local install or build failure still blocks. A missing green Verify, or a GitHub API or authentication failure, blocks and names the exact SHA.

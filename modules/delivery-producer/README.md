@@ -28,6 +28,12 @@ producer. Optional `edition` selects a component by `manifestFile` and
 `componentId` from the real schemaVersion-1 edition authoring manifest; packaging
 policy is separate from that manifest's authoring fields.
 
+Optional `project.verifyWorkflow` is a nonempty workflow name or file path
+(up to 300 characters), emitted as top-level `verifyWorkflow` in
+`rer-project.json`. `rer release` reads it from the selected commit to choose
+the GitHub verification workflow; `--verify-workflow NAME_OR_FILE` overrides it.
+See `export/SEED-COMMAND-CONTRACT.md` for the full lookup order.
+
 The producer writes descriptor `sourceRepository` as the canonical
 `https://github.com/<owner>/<repo>` URL, with lowercase scheme and host and no
 `.git` suffix or trailing slash. Input may use bare `<owner>/<repo>` or a GitHub HTTPS

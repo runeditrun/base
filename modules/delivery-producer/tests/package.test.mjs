@@ -49,12 +49,14 @@ test('one producer emits all files, exact payload identities and current seed de
 });
 test('exported runtime works inside an independent seed with no Base checkout dependency', async t => {
   const root = await fixture(t), policy = config();
+  policy.project.verifyWorkflow = 'Verify application';
   const exported = await exportProducer({root,config:policy});
   assert(!((await readdir(exported)).includes('tests')));
   const run = args => execFileSync(process.execPath,[join(exported,'cli.mjs'),...args],{cwd:root,stdio:'pipe'});
   run(['artifact','--config','scripts/delivery/base/packaging.json']);
   const original = await readFile(join(root,'delivery-artifact/app.json'));
   run(['package','--config','scripts/delivery/base/packaging.json']);
+  assert.equal(JSON.parse(await readFile(join(root,'rer-package/rer-project.json'))).verifyWorkflow, policy.project.verifyWorkflow);
   assert.deepEqual(await readFile(join(root,'rer-package/delivery-artifact/app.json')),original);
   assert.throws(() => run(['package','--config','scripts/delivery/base/packaging.json']));
   assert.throws(() => run(['artifact','--config','scripts/delivery/base/packaging.json','--root',root,'--root',root]));
