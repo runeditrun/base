@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.gf9d66618",
+  "cliVersion": "0.2.28-dev.g053f2a0d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -335,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "86500fb1ce61baea87e837e2d8d3abd29ae3f9bd02fd753f57ef781a09b45155"
+      "sha256": "95961b1c0fd720028d8fc9524e2fbabcc59871b40cf30c88aafa6b589252e003"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -385,10 +385,6 @@
       "source": "cli/business/files.mjs",
       "sha256": "6baeb92fe718208680b1b0360c416b7badd11626aaaa6f66cede63f58a420838"
     },
-    "cli/business/parsers-config-code.mjs": {
-      "source": "cli/business/parsers-config-code.mjs",
-      "sha256": "8dbbdbdfc02b8c25c05f800d8df5295293e8f7b90d528a806a28cf144dcc2618"
-    },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
       "sha256": "6158ff18391f7d83535555ad4005be51e5670ced14d3381eadf0c494300375b0"
@@ -407,7 +403,7 @@
     },
     "cli/business/parsers-syntax.mjs": {
       "source": "cli/business/parsers-syntax.mjs",
-      "sha256": "d7bbb61a0b1a52c162709b97fd109dd40931a919e70a71bd3c7b8e9d579a22c8"
+      "sha256": "95d55be9540762a8fae71b0794b3ab005016e5de6efaa0216e8e2a4b2b7faadb"
     },
     "cli/business/parsers-terraform.mjs": {
       "source": "cli/business/parsers-terraform.mjs",
@@ -415,11 +411,11 @@
     },
     "cli/business/parsers.mjs": {
       "source": "cli/business/parsers.mjs",
-      "sha256": "e6c69be715aa784ae4e8712499ac49cb25c1e6cfbafcf3f10d46847cbb5e18c6"
+      "sha256": "a46d2415b6f051b9978da6821fa42a9c61317a9a8904e60cec699165abb057b7"
     },
     "cli/business/policy.mjs": {
       "source": "cli/business/policy.mjs",
-      "sha256": "1ebbd3706f95e57c03fb69ae572a355c906d3693faf60d00a4283d9197c09ae9"
+      "sha256": "1b25a1372345861c45b06a0d6c3609a0ced0120899602295a24e6f4ff196f6c0"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",
@@ -427,7 +423,7 @@
     },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
-      "sha256": "1a67a574027b6c0320bbef5002c2b0a552343338597262563edbe708f5dffba0"
+      "sha256": "5471887e8f1a0111b08ae3d3038a46a70659b5e0eb69138098f2416f0d17fe20"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
