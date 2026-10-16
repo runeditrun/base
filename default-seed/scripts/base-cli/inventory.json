@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.26",
+  "cliVersion": "0.2.26-dev.g902f1110",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -177,7 +177,7 @@
     },
     "process-cleanup.mjs": {
       "source": "onboarding/process-cleanup.mjs",
-      "sha256": "b82c3706fb801c4a0b81fbf92be8e117ec4a530567e872993b545a134958be33"
+      "sha256": "659c04cfd8f1b84bda4234c74140b33b9b275a53f8801ccd8c2226cc49a44c39"
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
@@ -185,11 +185,11 @@
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "14906360603414b95a1d3d5beded2115a9fa9613e01655740016954f777268ed"
+      "sha256": "b4f08012191dc13ede6d85c928a9782553aa2d61224359a51851e181a54297bd"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "cb674f29143a788c6ec02c4b7d0ee888465bf31e73595239aca64388093c8056"
+      "sha256": "4a1977ec6f153bda36b194e9ec5a7ad38c26702987ea520a6072d285109aa812"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",

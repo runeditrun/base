@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
-import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
+import { extensionMs, inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
 
 const execute = promisify(execFile)
 const scopes = new WeakMap()
@@ -35,7 +35,9 @@ export function processScopeEnvironment(scope, environment) {
 }
 export async function scopedProcesses(scope, table, timeout = inspectionMs, previous = []) {
   if (!scopes.has(scope)) throw new Error('Unknown process scope.')
-  const inspectionEnd = Date.now() + timeout
+  // Reading environments is the slowest inspection on a busy Mac; it shares
+  // process-table's bounded extension rather than failing at the ordinary bound.
+  const inspectionEnd = Date.now() + timeout + extensionMs
   // Inspect same-user candidates in one bounded call. A child can change cwd,
   // detach and lose its parent between captures; the exclusive inherited marker
   // still proves ownership. Arguments/environment never leave this function.
@@ -52,7 +54,7 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
     && (member.uid === undefined || member.uid === process.getuid())
 )
   if (!candidates.length) return []
-  const environments = process.platform === 'linux' ? new Map() : await readEnvironments(candidates.map(member => member.pid), timeout)
+  const environments = process.platform === 'linux' ? new Map() : await readEnvironments(candidates.map(member => member.pid), Math.max(1, inspectionEnd - Date.now()))
   const matches = []
   inspectCandidate: for (const member of candidates) {
     let environment
