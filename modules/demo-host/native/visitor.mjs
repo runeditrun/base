@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { claimKeys, signClaim } from '../claim.mjs';
-import { migrate } from '../../container/migrations.mjs';
+import { migrate } from '../../deploy-kit/local-migrations.mjs';
 import { DemoD1 } from './d1.mjs';
 import { application, bundle } from './loader.mjs';
 import { database, object, r2, eraseResources } from './resources.mjs';

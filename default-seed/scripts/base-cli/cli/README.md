@@ -268,18 +268,7 @@ Run the CLI contract and current first-party seed checks as part of Base's
 documented verification workflow. Structural `check` results and local runtime
 checks do not establish hosted acceptance or provider delivery.
 
-Portable hosting adds `--platform workers|container` to build, deploy, dev,
-preview and local export/import. Workers remains the default; container support
-must be declared in deploy.json. Container deploy takes `--host ssh://user@host`
-and a private `--env-file`. See [container hosting](../modules/container/README.md)
-for image/runtime, secrets, SSH and owner setup. `rer archive diff BEFORE AFTER`
-validates both archives and lists changes written during a move without merging.
-
-Container SSH deployment also accepts `--image IMAGE` to select an existing local
-image instead of building, and `--bind-address`, `--http-port`, `--https-port` to
-override `deploy.json`'s `container.ingress` bindings. Image identity is pinned
-before transfer. See `modules/container/README.md` for the remote Python/Docker
-requirements, ownership refusal rules and shared TCP/SNI proxy routing.
+Hosted demos use native Worker Loader isolates. See [demo hosting](../export/DEMO.md#hosting-the-demo).
 
 ## The installable `rer` command
 

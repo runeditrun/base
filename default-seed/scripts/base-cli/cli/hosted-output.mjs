@@ -5,7 +5,7 @@ import { join, resolve, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RUN_WORKER_FIRST } from '../modules/deploy-kit/render.mjs';
 import { publicAssetPaths } from '../modules/deploy-kit/artifact.mjs';
-import { migrate } from '../modules/container/migrations.mjs';
+import { migrate } from '../modules/deploy-kit/local-migrations.mjs';
 import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migrations.mjs';
 import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';

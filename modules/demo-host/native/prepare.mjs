@@ -8,8 +8,8 @@ import { nativeBindings, ISOLATE_FILES } from './config.mjs';
 // Reuse the normal production build and its migration inventory, without
 // building or running a container. The bundle is stored once in the front.
 export async function prepareNative(folder) {
-  const app = join(folder, 'image/app');
-  const manifest = JSON.parse(await readFile(join(app, 'container.json'), 'utf8'));
+  const app = join(folder, 'bundle/app');
+  const manifest = JSON.parse(await readFile(join(app, 'demo.json'), 'utf8'));
   const config = manifest.config, root = join(app, 'dist/server');
   const bindings = nativeBindings(config);
   const main = relative(root, resolve(root, config.main));

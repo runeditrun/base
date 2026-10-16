@@ -1,6 +1,6 @@
 // The signed owner claim (modules/owner-claim) a demo's front Worker makes for
-// its container: one ES256 key pair per container, its public JWK given to the
-// container at start, and one five-minute claim signed with the private key,
+// its isolate: one ES256 key pair per isolate, its public JWK given to the
+// isolate at start, and one five-minute claim signed with the private key,
 // which is never stored.
 const base64url = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const segment = value => base64url(new TextEncoder().encode(JSON.stringify(value)));

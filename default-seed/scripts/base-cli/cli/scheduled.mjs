@@ -38,7 +38,7 @@ export function cronMatches(cron, date) {
 // triggers.crons must declare the same ones: otherwise `rer dev` would run a
 // schedule the deployed Worker does not have.
 export async function declaredCrons(root, adapter) {
- // Imported here: the container image runs this file's parseCron and cronMatches without the CLI's project modules.
+ // Imported here: the isolate image runs this file's parseCron and cronMatches without the CLI's project modules.
  const { declaredCronSources } = await import('./deploy-config.mjs');
  const sources = await declaredCronSources(root, adapter);
  for (const { path, crons } of sources) for (const cron of crons) parseCron(cron);

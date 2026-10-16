@@ -39,7 +39,7 @@ export default {
       const head = await env.FILES.head('attachment');
       if (attachment && head.httpMetadata.contentType !== 'text/plain') throw new Error('Lost R2 metadata');
       return Response.json({ keys: (await env.FILES.list()).objects.map(item => item.key), body: attachment ? await attachment.text() : null,
-        retained: await (await retained.fetch('https://counter/')).json(), jobs: (await env.DB.prepare('SELECT name FROM jobs').all()).results,
+        retained: await retained.read(), jobs: (await env.DB.prepare('SELECT name FROM jobs').all()).results,
         secondary: (await env.SECOND.prepare('SELECT name FROM items').all()).results });
     }
     if (request.method === 'POST') await env.DB.batch([env.DB.prepare('INSERT INTO items VALUES(?)').bind(await request.text())]);
@@ -64,6 +64,10 @@ export class Counter extends DurableObject {
     await this.env.SECOND.prepare('SELECT name FROM items').all();
     if (request.method === 'PUT') await this.ctx.storage.put('retained', await request.text());
     return Response.json(await this.ctx.storage.get('retained') ?? null);
+  }
+  async read() {
+    await this.env.DB.prepare('SELECT name FROM items').all();
+    return await this.ctx.storage.get('retained') ?? null;
   }
   webSocketMessage(socket, message) { socket.send(message); }
 }

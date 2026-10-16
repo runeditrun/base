@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, cp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -14,8 +14,6 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
   let mf;
   try {
     await cp(join(base, 'modules'), join(folder, 'modules'), { recursive: true });
-    await mkdir(join(folder, 'cli'));
-    await cp(join(base, 'cli/scheduled.mjs'), join(folder, 'cli/scheduled.mjs'));
     const source = name => readFile(join(base, name), 'utf8');
     const sql = 'CREATE TABLE owner(email TEXT PRIMARY KEY); CREATE TABLE items(name TEXT PRIMARY KEY); CREATE TABLE jobs(name TEXT PRIMARY KEY);';
     const bundle = { digest: 'fixture-native-app', compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], bindings: { databases: ['DB', 'SECOND'], buckets: ['FILES'], objects: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }], queues: { producers: [{ binding: 'JOBS', queue: 'work' }], consumers: [{ queue: 'work', max_retries: 2 }] }, assets: 'ASSETS' }, vars: {}, crons: [], assetPaths: ['/assets/fixture-12345678.js'],
@@ -30,7 +28,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     await writeFile(join(folder, 'modules/demo-host/native/bundle.mjs'), `export default ${JSON.stringify(bundle)};`);
     const origin = 'https://demo.example.test', measurement = 'fixture-measurement-token-1234567890123456';
     const files = ['modules/demo-host/native/worker.mjs', ...[...RUNTIME_FILES.filter(file => file !== 'worker'), 'bundle'].map(file => `modules/demo-host/native/${file}.mjs`),
-      ...DEMO_FILES.map(file => `modules/demo-host/${file}`), 'cli/scheduled.mjs', 'modules/container/migrations.mjs', ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
+      ...DEMO_FILES.map(file => `modules/demo-host/${file}`), 'modules/deploy-kit/local-migrations.mjs', ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
     mf = new Miniflare(convertV4MiniflareOptions({ name: 'native-test', unsafeInspectDurableObjects: true, modulesRoot: folder, modules: files.map(path => ({ type: 'ESModule', path: join(folder, path) })),
       compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
       durableObjects: { DEMO: { className: 'NativeDemo', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
@@ -53,6 +51,11 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       assert.equal(response.status, 303, await response.text());
       return [...jar].map(([k,v]) => `${k}=${v}`).join('; ');
     };
+    // A full old demo host can leave reservations for a retired namespace.
+    // New visitors must still enter through the public start door immediately.
+    const capacityNamespace = await mf.getDurableObjectNamespace('CAPACITY');
+    const capacity = capacityNamespace.get(capacityNamespace.idFromName('capacity'));
+    for (let i = 0; i < 10; i++) await capacity.acquire(capacityNamespace.newUniqueId().toString(), Date.now() + 60_000, 100, 'retired-visitor');
     assert.equal((await fetch('/')).status, 200);
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Hosted demos now use native Worker Loader isolates and edge assets exclusively.
+  Existing Container demos upgrade automatically on the same Worker and hostname,
+  removing their old application and class. Removed Docker/SSH container hosting
+  and its tests; local `rer demo` remains supported.
+
+
 ## 0.2.26
 
 - The `rer` mail adapter carries `List-Id`, `List-Archive`, `List-Help`, `In-Reply-To` and `References` to the Managed relay as its `listId`, `listArchive`, `listHelp`, `inReplyTo` and `references` fields, and refuses invalid values before sending. Other raw headers stay refused.

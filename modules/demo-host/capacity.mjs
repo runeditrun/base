@@ -22,9 +22,15 @@ export class DemoCapacity extends DurableObject {
     return this.ctx.storage.transaction(async storage => {
       const now = Date.now(), places = [...await storage.list()]
         .filter(([key, until]) => /^[0-9a-f]{64}$/.test(key) && typeof until === 'number');
-      const expired = places.filter(([, until]) => until <= now).map(([key]) => key);
+      // A class migration retires visitor ids from the old namespace. Release
+      // those reservations on the first native start rather than holding a
+      // full legacy host closed until its former visitors' hour expires.
+      const expired = places.filter(([key, until]) => {
+        if (until <= now) return true;
+        try { this.env.DEMO.idFromString(key); return false; } catch { return true; }
+      }).map(([key]) => key);
       if (expired.length) await storage.delete(expired);
-      const held = places.filter(([key, until]) => key !== id && until > now);
+      const held = places.filter(([key]) => key !== id && !expired.includes(key));
       if (held.length >= max) {
         // Fingerprints identify held reservations without logging bearer cookies.
         const heldIds = await Promise.all(held.map(async ([key, until]) => ({ id: await fingerprint(key), ends: until })));

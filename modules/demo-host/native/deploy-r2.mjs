@@ -8,9 +8,10 @@ const missing = async (api, name) => {
   catch (error) { if (error.status === 404) return null; throw error; }
 };
 export async function prepareBucket(api, plan, pending) {
-  const name = demoBucketName(plan.worker), bucket = await missing(api, name);
+  const name = demoBucketName(plan.worker), bucket = await missing(api, name), settings = await workerSettings(api, plan.worker);
+  if (!bucket && settings?.bindings?.some(item => item.name === 'NATIVE_BUCKET')) throw new Error(`Demo R2 bucket is missing: ${name}`);
   if (bucket) {
-    const settings = await workerSettings(api, plan.worker), version = settings && await servedVersion(api, plan.worker);
+    const version = settings && await servedVersion(api, plan.worker);
     if (!settings && pending?.record === plan.record && pending.bucket?.name === name && pending.bucket.creation_date === bucket.creation_date) return bucket;
     if (!version?.current || version.annotation !== plan.record || !ownsBucket(settings, bucket)) throw new Error(`Demo R2 bucket ownership is unproven: ${name}`);
     return bucket;

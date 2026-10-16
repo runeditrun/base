@@ -2,7 +2,8 @@ import { cp, mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
-import { imageFolder } from './container.mjs';
+import { demoBundle } from './demo-build.mjs';
+import { upgradeDemo } from '../modules/demo-host/upgrade.mjs';
 import { missing, invalid } from './errors.mjs';
 import { DEMO_FILES } from '../modules/demo-host/plan.mjs';
 import { cloudflare } from '../modules/deploy-kit/provider.mjs';
@@ -17,17 +18,15 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   await rm(folder, { recursive: true, force: true });
   await mkdir(join(folder, 'modules/demo-host/native'), { recursive: true, mode: 0o700 });
   await store.step('Building the native demo Worker bundle and static assets');
-  await imageFolder(project, operation, app, { output: join(folder, 'image'), engine: 'workerd' });
+  await demoBundle(project, operation, app, join(folder, 'bundle'));
   for (const file of DEMO_FILES) await cp(new URL(`../modules/demo-host/${file}`, import.meta.url), join(folder, 'modules/demo-host', file));
   for (const file of RUNTIME_FILES) await cp(new URL(`../modules/demo-host/native/${file}.mjs`, import.meta.url), join(folder, `modules/demo-host/native/${file}.mjs`));
-  for (const directory of ['container', 'deploy-kit']) await cp(new URL(`../modules/${directory}/`, import.meta.url), join(folder, 'modules', directory), { recursive: true });
+  for (const directory of ['deploy-kit']) await cp(new URL(`../modules/${directory}/`, import.meta.url), join(folder, 'modules', directory), { recursive: true });
   // Runtime imports use the same module topology as the maintained source.
   const bundle = await prepareNative(folder);
   const config = { ...plan.wrangler, main: 'modules/demo-host/native/worker.mjs', compatibility_flags: ['nodejs_compat'],
     assets: { directory: './assets', binding: 'ASSETS', run_worker_first: true }, worker_loaders: [{ binding: 'LOADER' }],
-    durable_objects: { bindings: [{ name: 'DEMO', class_name: 'NativeDemo' }, { name: 'CAPACITY', class_name: 'DemoCapacity' }] },
-    migrations: [{ tag: 'native-v1', new_sqlite_classes: ['NativeDemo', 'DemoCapacity'] }] };
-  delete config.containers;
+  };
   if (bundle.bindings.buckets.length) config.r2_buckets = [{ binding: 'NATIVE_BUCKET', bucket_name: demoBucketName(plan.worker) }];
   config.vars.NATIVE_SOURCE_DIGEST = bundle.digest;
   if (process.env.RER_NATIVE_TEST_TTL_MS && TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY ?? '')) {
@@ -36,11 +35,16 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   }
   await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   const summary = { worker: plan.worker, origin: plan.origin, mode: 'loader', digest: bundle.digest, modules: Object.keys(bundle.modules).length, minutes: 60, idleMinutes: 15 };
-  if (options.dryRun) return { dryRun: true, deployed: false, demo: summary };
+  if (options.dryRun) {
+    if (options.json) out.event('demo', { ...summary, hostnames: plan.hostnames, routes: config.routes });
+    else out.human(`Native demo plan: ${plan.origin} (Worker Loader), written to .rer/demo-host`);
+    return { dryRun: true, deployed: false, demo: summary };
+  }
   const required = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'];
   if (required.some(name => !process.env[name]?.trim())) throw missing(`${required.join(', ')} are required`);
+  const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
+  config.migrations = await upgradeDemo({ api, plan });
   if (bundle.bindings.buckets.length) {
-    const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
     const statePath = join(project.root, '.rer/demo-buckets', plan.worker + '.json');
     const pending = await readFile(statePath, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
     const bucket = await prepareBucket(api, plan, pending);
@@ -49,6 +53,7 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
     config.vars.NATIVE_BUCKET_CREATED = bucket.creation_date;
     await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   }
+  await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   const testing = TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY);
   const measurement = testing ? process.env.RER_DEMO_MEASUREMENT_TOKEN || randomBytes(32).toString('base64url') : undefined;
   const secrets = { TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY, ...(measurement ? { RER_DEMO_MEASUREMENT_TOKEN: measurement } : {}),
