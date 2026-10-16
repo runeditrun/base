@@ -39,7 +39,7 @@ for (const cleanHistory of [false, true]) {
       writeFileSync(resolve(f.repo, 'RELEASE.json'), JSON.stringify({ version: '1.2.3', publicReleaseNotes: notes }));
       const source = f.commit();
       const result = spawnSync(process.execPath, [cli, 'release', '--repo', f.repo, '--project', f.options.project,
-        '--repository', f.options.repository + '.git', '--output', f.options.output, '--tag', 'v1.2.3',
+        '--repository', f.options.repository + '.git', '--output', f.options.output, '--tag', 'v1.2.3', '--local-verify',
         ...(cleanHistory ? ['--clean-history'] : []), ...(dryRun ? ['--dry-run'] : [])], { encoding: 'utf8' });
       assert.equal(result.status, 0, result.stderr);
       const receipt = JSON.parse(result.stdout);

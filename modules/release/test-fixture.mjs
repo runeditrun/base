@@ -37,5 +37,5 @@ export function fixture(t, verify = 'node --test check.test.mjs', packageManager
   files['pnpm-lock.yaml'] = readFileSync(resolve(repo, 'pnpm-lock.yaml'));
   const commit = () => { git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'synthetic fixture', '--allow-empty'); return git(repo, 'rev-parse', 'HEAD'); };
   const sha = commit();
-  return { repo, temporary, files, commit, sha, options: { repo, tag: true, output: resolve(temporary, 'release'), project: 'octocat/Hello-World', repository: 'https://github.com/octocat/Hello-World' } };
+  return { repo, temporary, files, commit, sha, options: { repo, localVerify: true, tag: true, output: resolve(temporary, 'release'), project: 'octocat/Hello-World', repository: 'https://github.com/octocat/Hello-World' } };
 }
