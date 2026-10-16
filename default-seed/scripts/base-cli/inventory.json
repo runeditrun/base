@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.33-dev.g1af92375",
+  "cliVersion": "0.2.33-dev.g355b8895",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -547,7 +547,7 @@
     },
     "cli/demo-native.mjs": {
       "source": "cli/demo-native.mjs",
-      "sha256": "4deec7738b5f8499a226faa62d7b906440742a8d6656c3908fd9728a0b6c5372"
+      "sha256": "444c1a893413af5edeeb417fbfb770dc94733c3ce0703644bce7830e1209e15e"
     },
     "cli/demo-removal-provider.mjs": {
       "source": "cli/demo-removal-provider.mjs",
@@ -1283,7 +1283,7 @@
     },
     "modules/demo-host/upgrade.mjs": {
       "source": "modules/demo-host/upgrade.mjs",
-      "sha256": "82d03412a5762716f75c69329ae89cdd2e3cb557f7365d9584e4fdaeaf02fc1a"
+      "sha256": "9f69970f6b43eab49933830b5c22a41b2421a2451ab626a392df64bbe32d2496"
     },
     "modules/demo-host/worker.mjs": {
       "source": "modules/demo-host/worker.mjs",
