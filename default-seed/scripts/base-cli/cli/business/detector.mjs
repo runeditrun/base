@@ -18,9 +18,8 @@ function entropy(value) {
  return bits;
 }
 
-export function sensitive(text) {
- if (shapes.some(pattern => pattern.test(text))) return true;
- for (const match of text.matchAll(/[A-Za-z0-9_+\/=\-]{24,}/g)) {
+function highEntropy(text, tokens) {
+ for (const match of text.matchAll(tokens)) {
   const value = match[0];
   if (/^[a-f\d]{32,}$/i.test(value) && entropy(value.toLowerCase()) >= 3.5) return true;
   if (entropy(value) >= 4.2) return true;
@@ -28,4 +27,16 @@ export function sensitive(text) {
  return false;
 }
 
-export const blockedSignal = signal => Object.values(signal).some(value => typeof value === 'string' && sensitive(value));
+export function sensitive(text) {
+ return shapes.some(pattern => pattern.test(text)) || highEntropy(text, /[A-Za-z0-9_+\/=\-]{24,}/g);
+}
+
+function sensitivePath(path) {
+ // Keep shape checks across the full path, but never combine ordinary path
+ // segments into an apparent high-entropy credential.
+ return shapes.some(pattern => pattern.test(path)) ||
+  path.split('/').some(part => highEntropy(part, /[A-Za-z0-9_+=\-]{24,}/g));
+}
+
+export const blockedSignal = signal => Object.entries(signal).some(([key, value]) =>
+ typeof value === 'string' && (key === 'locator' || key === 'repo' ? sensitivePath(value) : sensitive(value)));

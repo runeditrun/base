@@ -1,12 +1,12 @@
 import { constants } from 'node:fs';
-import { lstat, open, readdir } from 'node:fs/promises';
+import { lstat, open, readdir, realpath } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, parse } from 'node:path';
 import { blockedSignal } from './detector.mjs';
 import { denied, example, readable, skipped } from './policy.mjs';
 import { parseNames } from './parsers.mjs';
 
-// Refuse symlink roots and ancestors as well as symlink entries. This also
-// keeps an explicit directory argument from bypassing the normal walker.
+// Caller-named roots are canonicalized once; below them, refuse symlink
+// ancestors as well as symlink entries before reading any file content.
 async function plainAncestors(path) {
  const root = parse(path).root;
  let current = root;
@@ -36,11 +36,11 @@ export async function scan(directories) {
   if (blockedSignal(signal)) { result.withheld++; return; }
   result.signals.push(signal);
  }
- for (const root of roots) {
-  if (!await plainAncestors(root)) continue;
+ for (const requested of roots) {
+  const root = await realpath(requested);
   const rootInfo = await lstat(root), base = rootInfo.isDirectory() ? root : dirname(root), repo = basename(base);
   async function walk(path, pulumi = false) {
-   if (skipped(path) || seen.has(path)) return;
+   if (skipped(relative(root, path)) || seen.has(path)) return;
    seen.add(path);
    const info = await lstat(path);
    if (info.isSymbolicLink()) return;
@@ -51,7 +51,8 @@ export async function scan(directories) {
    } else if (info.isFile()) {
     const locator = relative(base, path).split('\\').join('/');
     const common = { locator, repo, class: example(locator) ? 'trace' : 'live-use', observedAt };
-    if (denied(path)) {
+    // A caller-named store remains metadata-only even when it is an alias.
+    if (denied(path) || denied(join(requested, relative(root, path)))) {
      emit({ kind: 'secret-file', value: basename(path), ...common, size: info.size, mtime: info.mtime.toISOString() });
      return;
     }
