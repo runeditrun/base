@@ -1,16 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.2.30
 
-- Hosted demos run exclusively on native Worker Loader isolates with edge assets.
-  Existing Container demos upgrade unattended on the same Worker and hostname,
-  removing the owned container application and migrating its Durable Object classes.
-  Removed only the hosted demo image/runtime and placement code; portable container
-  hosting (`rer build/deploy --platform container`, Node/workerd and SSH) is unchanged.
-- Native demo bindings follow the seed configuration: isolated D1s, R2 prefixes,
-  durable queue batches, seed DO facets and UTC cron delivery. Seed DO alarms
-  are scheduled by the visitor supervisor; own-host reads keep visitor context,
-  and a narrow resource bridge isolates seeds from front admission and diagnostics.
+- **Hosted demos run as native Workers.** `rer deploy --demo` gives each visitor their own Worker Loader isolate of the seed's ordinary production bundle, with SQLite Durable Object storage and static files served at the edge, instead of a Cloudflare Container. Docker and the Containers permission are no longer needed for a new demo host. Portable container hosting (`rer build`/`rer deploy --platform container`, Node/workerd and SSH) is unchanged; only the hosted-demo image, runtime and placement code are removed.
+- **Seed bindings in native demos.** The seed's Wrangler configuration supplies every D1, R2 bucket, queue and local Durable Object class: D1s and seed DOs get separate SQLite facets per visitor, R2 keys are prefixed by visitor and binding, and alarms deliver UTC crons, seed DO alarms and durable queue batches (ack/retry, delays, dead letters). Own-host reads keep the visitor's context, and a narrow resource bridge keeps seeds away from front admission and diagnostics. Unsupported bindings are refused by name at demo build.
+- **Demo egress guard.** Native visitors' outbound requests go through the same `demo-egress` guard as before: direct mail/SMS provider APIs (SendGrid, Resend, Twilio, Mailgun, Postmark) and SMTP ports are refused, and reads of the demo's own hosts stay inside that visitor's copy.
+- **Removal.** `rer deploy --demo --remove --yes` empties and removes the demo-owned R2 bucket and deletes the demo's Worker and Custom Domains covered by its ownership record, reading back their absence; an existing legacy Container application is removed only when its namespace proves ownership.
+
+### Upgrade notes
+
+- Pin rer 0.2.30 and run the same demo workflow. The Worker id and `demo.<domain>` stay the same. The first deploy verifies the previous version's ownership record, removes its Container application by exact id and migrates `DemoContainer` to `NativeDemo` (keeping `DemoCapacity`). Visitor copies that are running end during the upgrade. That one deploy's token still needs Containers: Edit; later deploys do not.
+- `deploy.json` no longer needs `"container"` in `platforms` for a hosted demo. Retired sizing and mode keys in `deploy-demo.json` (such as `instanceType`) are consumed with a migration notice; remove them when next editing the file.
+- Worker Loader/Facets access on Workers Paid is required; no Workers for Platforms subscription is needed.
 
 ## 0.2.29
 
