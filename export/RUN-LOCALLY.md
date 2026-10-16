@@ -1,7 +1,12 @@
 # Run it locally
 
-Install the `rer` command once using the [RER installer](https://runeditrun.com).
-After the script or `npx` install, activate it in the current shell with
+Start a published seed with one line, which installs `rer`, clones the seed and
+starts it: `npx -y @runeditrun/rer dev <owner>/<repo>`, for example
+`npx -y @runeditrun/rer dev just-every/run-inkwell`. To start it again later, run
+`cd <folder> && rer dev` (the folder is the repository name). To install the
+`rer` command globally first, use the [RER installer](https://runeditrun.com)
+(`curl -fsSL https://runeditrun.com/install.sh | sh`) or
+`npm install -g @runeditrun/rer`, then activate it in the current shell with
 `export PATH="$HOME/.local/bin:$PATH"`. First-party commands fetch and verify
 the exact pnpm version declared in `package.json` when it is missing, using
 `$HOME/.rer/pnpm`; no global pnpm installation or sudo is needed.
