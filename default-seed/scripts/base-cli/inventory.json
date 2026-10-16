@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.31-dev.gbd80e617",
+  "cliVersion": "0.2.31-dev.gfdd3d0ef",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -575,7 +575,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "84f0d2ddebc90ad3c6867fbc6c69f086b447d91c275f8d852c08f2c721f7348c"
+      "sha256": "13e2946eec3e14858f5d29a1808a9d5277ca5c4216d2fc3e65a3b90bd2d37b1e"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -591,7 +591,7 @@
     },
     "cli/deploy-inputs.mjs": {
       "source": "cli/deploy-inputs.mjs",
-      "sha256": "2b4f6793d2fd871e7ee9d802377fe20a5719ad2c338fc8482c5518a3b72e7dd1"
+      "sha256": "70777bcdb307531e6b84ad7b73b41d20d64b7974ded1da8913e386f502f95278"
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",
@@ -615,7 +615,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "b39a05f6889bc2da29ddfea6e6562719fa16c6b1fbf37fc055f475f24813d412"
+      "sha256": "b189813a97e30c4bcfa3c95ba8d49ac6f8b3b51bc1d1f203d20f5408345abd30"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -1443,7 +1443,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "3232fc7d0482f4e2bd2ff96a08923725ec94ab70cc8e5d7b3d423d8655afa929"
+      "sha256": "347c4e2d75dadc5ad103cc82114fea4f0e482a340275339d2310719d3daa1bdb"
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
@@ -1463,7 +1463,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "72b937a2f5aa144a1646fee6fc53bddfa639e3f8b32aed1bca7f33d27bf21b0f"
+      "sha256": "2123e7b081ab13d448f32980ee928d8abf9b687f2f38dd51b9433969d1bb466b"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
@@ -1480,6 +1480,10 @@
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",
       "sha256": "7b5d4404bb335b923a99396255730cfb4df99e8a54c8aef57b17818fcbef4f69"
+    },
+    "modules/deploy-kit/public-origin.mjs": {
+      "source": "modules/deploy-kit/public-origin.mjs",
+      "sha256": "b462ed0192e5cd4a3534c3d1e8ee9e163277226df0ea509cbe7f21201b303387"
     },
     "modules/deploy-kit/queue-consumer.mjs": {
       "source": "modules/deploy-kit/queue-consumer.mjs",

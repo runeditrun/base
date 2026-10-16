@@ -19,7 +19,7 @@ export async function deployProviderFixture(t, declaration = {}) {
  await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', r2: [{ binding: 'FILES' }], ...declaration }));
  await writeFile(join(root, '.node-version'), process.versions.node + '\n');
  await writeFile(join(root, 'package.json'), JSON.stringify({engines:{node:process.versions.node},packageManager:'pnpm@10.12.4'}));
- await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\n');
+ await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\n.dev.vars\ndeploy.env\n');
  await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('../deploy.mjs', import.meta.url).href)};
  const lifecycle = {run:async()=>{},settings:{},hooks:{}};
  export const commandAdapter = {...lifecycle,deploy:ownerDeploy('deploy.json',lifecycle)};`);

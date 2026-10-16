@@ -3,6 +3,7 @@ import { relative } from 'node:path';
 import { shared } from './shared.mjs';
 import { invalid } from './errors.mjs';
 import { readDeployEnvFile } from '../modules/deploy-kit/env-file.mjs';
+import { publicOrigin } from '../modules/deploy-kit/public-origin.mjs';
 
 // The values a Workers deploy reads for its declared secrets: this process's
 // environment, then the --env-file (which wins), then what rer supplies itself:
@@ -17,6 +18,14 @@ export async function deployEnvironment({ root, options, declaration, setupManif
   catch (error) { throw invalid(`The --env-file ${options.envFile} could not be used: ${error.code === 'ENOENT' ? 'no such file' : error.message}.`); }
   Object.assign(env, values);
  }
+ const originSetting = declaration.publicOriginSetting;
+ if (originSetting !== undefined && env[originSetting] === undefined && settings) {
+  const { readSettings } = await shared('adapter-settings.mjs');
+  const value = (await readSettings(root, settings)).values[originSetting];
+  if (value !== undefined) env[originSetting] = value;
+ }
+ try { publicOrigin(declaration, env); }
+ catch { throw invalid('Declare publicOriginSetting beside originVar and set it to an HTTPS origin (https://host[:port]), without credentials, path, query or fragment.'); }
  const secrets = Array.isArray(declaration.secrets) ? declaration.secrets : [];
  const absent = item => item && !env[item.environment]?.trim();
  const emailField = setupManifest?.steps?.find(step => step.type === 'owner-claim')?.emailField;

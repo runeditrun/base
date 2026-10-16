@@ -12,6 +12,7 @@ import { validateMigrations } from './migrations.mjs';
 import { deploy } from './deploy.mjs';
 import { verifyHealth } from './health.mjs';
 import { validSecretNames, secretNames, pendingSecretNames } from './owner-secret-names.mjs';
+import { publicOrigin } from './public-origin.mjs';
 
 /* Owner-account mode: the owner's own Cloudflare account, token and account id.
  * Names are derived from the project id and the owner's environment. A local
@@ -21,7 +22,7 @@ import { validSecretNames, secretNames, pendingSecretNames } from './owner-secre
 const segment = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const STATE_KIND = 'rer-deploy-owner-state';
 export const KINDS = ['d1','r2','kv','queues'];
-const DECLARATION_KEYS = ['version','project','compatibilityDate','compatibilityFlags','d1','r2','kv','queues','durableObjects','secrets','crons','vars','originVar','services','workersDev','platforms','container'];
+const DECLARATION_KEYS = ['version','project','compatibilityDate','compatibilityFlags','d1','r2','kv','queues','durableObjects','secrets','crons','vars','originVar','publicOriginSetting','services','workersDev','platforms','container'];
 const ENTRY_KEYS = {d1:['binding'],r2:['binding','locationHint'],kv:['binding'],queues:['binding','consumer','deadLetterQueue'],durableObjects:['binding','className','storage'],secrets:['binding','environment','verifyStandIn'],services:['binding','project','entrypoint','allowedHosts','grant']};
 
 export function refuse(code, kind, name) { const error = new Error(code); error.resource = `${kind}:${name}`; return error; }
@@ -107,11 +108,11 @@ function entries(declaration, key) {
 export const LOCAL_ONLY_KEYS = Object.freeze(['RER_DEV_KEY', 'RER_DEMO', 'RER_MODELS_KEY', 'RER_MODELS_SERVICE', '.rer/local/models.json']);
 export function localOnlyBinding(declaration, localOnlyKeys = []) {
   const refused = new Set([...LOCAL_ONLY_KEYS, ...localOnlyKeys]);
-  const names = [...Object.keys(declaration?.vars ?? {}), declaration?.originVar, ...(Array.isArray(declaration?.secrets) ? declaration.secrets.flatMap(item => [item?.binding, item?.environment]) : [])];
+  const names = [...Object.keys(declaration?.vars ?? {}), declaration?.originVar, declaration?.publicOriginSetting, ...(Array.isArray(declaration?.secrets) ? declaration.secrets.flatMap(item => [item?.binding, item?.environment]) : [])];
   return names.find(name => refused.has(name)) ?? null;
 }
 /** A seed declares bindings, never names. Migrations come from the packaged artifact. */
-export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [] } = {}) {
+export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], env = {} } = {}) {
   assert(declaration?.version === 1 && typeof declaration === 'object' && Object.keys(declaration).every(key => DECLARATION_KEYS.includes(key)), 'invalid-owner-declaration');
   if (declaration.platforms !== undefined) assert(Array.isArray(declaration.platforms) && declaration.platforms.length > 0 && new Set(declaration.platforms).size === declaration.platforms.length && declaration.platforms.every(item => ['workers','container'].includes(item)), 'invalid-platforms');
   if (declaration.container !== undefined) {
@@ -131,9 +132,10 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [] } 
   const queues = entries(declaration,'queues');
   for (const item of queues) assert(item.deadLetterQueue === undefined || queues.some(other => other.binding === item.deadLetterQueue), 'invalid-dead-letter-queue');
   const vars = {...(declaration.vars ?? {})};
+  const origin = publicOrigin(declaration, env);
   if (declaration.originVar !== undefined) {
     assert(identifier(declaration.originVar) && !Object.hasOwn(vars,declaration.originVar), 'invalid-owner-origin-variable');
-    vars[declaration.originVar] = target.origin;
+    vars[declaration.originVar] = origin ?? target.origin;
   }
   const kv = entries(declaration,'kv').map(({binding}) => ({binding,name:name(binding)}));
   // A service binding names another project; its Worker name derives from the same environment.

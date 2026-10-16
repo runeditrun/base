@@ -14,6 +14,7 @@ import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
 import { ownerSignin } from './owner-signin.mjs';
 import { refuseLocalModels } from './local-only.mjs';
+import { publicOrigin } from './public-origin.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
 const usage = 'usage: owner-cli.mjs deploy|health|remove|inspect|record-owner|signin --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME|--unset NAME';
@@ -44,6 +45,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   try { declaration = JSON.parse(await regularBytes(resolve(root,values.declaration),256 * 1024)); }
   catch (error) { throw new Error(error.code === 'ENOENT' ? 'missing-owner-declaration' : 'invalid-owner-declaration'); }
   assert(typeof declaration?.project === 'string','missing-owner-project');
+  // Validate even direct kit invocations before any provider request or write.
+  publicOrigin(declaration, env);
   // Removal reads identity before each object DELETE and may span many pages.
   // Bound each response, not the owner's bucket size; failures retain ownership.
   let requestWindow = propagation?.uploaded ? propagation.window : undefined;
@@ -93,7 +96,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   }
   const current = retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
   const artifact = await ownerArtifact(root,values.product);
-  const plan = ownerPlan(target,current,artifact,{localOnlyKeys});
+  const plan = ownerPlan(target,current,artifact,{localOnlyKeys,env});
   if (command === 'health') {
     const readiness = {...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}),
       ...healthOptions?.readiness,single:true,totalMs:30000,
@@ -104,7 +107,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   // Dispatch is the provider's: on some accounts a new Cron starts only at the account scheduler's next refresh.
   if (plan.crons.length) notice(cronNotice);
   // The fingerprint names every declared secret, retired ones too: an untouched repeat after the claim is a no-op.
-  const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys}).secrets;
+  const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env}).secrets;
   const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness});
   requestWindow = window;
   const {receipt,created,sentSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {
