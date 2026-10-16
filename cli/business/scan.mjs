@@ -3,14 +3,11 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { blockedSignal } from './detector.mjs';
 import { denied, example, gitDirectory, readable, skipped, toolDirectory } from './policy.mjs';
 import { parseNames } from './parsers.mjs';
-import { configuration, configKeyLimit } from './config-policy.mjs';
+import { configKeyLimit } from './config-policy.mjs';
 import { readPlainFile } from './files.mjs';
 import { repositoryBoundary } from './repository.mjs';
 
 async function namesFromFile(path, info, locator, pulumi) {
- // Executable configs are not inputs, even inside a Pulumi project. Their
- // dependencies are discovered through manifests instead.
- if (configuration(locator) && /\.[cm]?[jt]sx?$/i.test(locator)) return [];
  if (!readable(locator) && !(pulumi && /\.(?:[cm]?[jt]sx?|py|go|cs)$/i.test(locator))) return [];
  return parseNames(locator, await readPlainFile(path, info));
 }
