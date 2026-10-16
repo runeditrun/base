@@ -75,6 +75,16 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
  await writeFile(join(root, 'config/large.json'), JSON.stringify(Object.fromEntries(
   Array.from({ length: 1000 }, (_, index) => [`SYNTHETIC_CONFIG_${index}`, 'synthetic-capped-scalar-never-export']))));
  await writeFile(join(root, 'runtime.config.js'), 'module.exports = { mail: { transport: "synthetic-code-scalar-never-export" } };');
+ await writeFile(join(root, 'webpack.config.js'), [
+  'module.exports = { plugins: [], define: { NOTE: `staging, "db.internal.acme.example": primary` },',
+  ' "public-quoted-key": { \'nested-quoted-key\': "synthetic-double-string, \\\"synthetic-double-key\\\": value" },',
+  ' single: \'synthetic-single-string, \\\'synthetic-single-key\\\': value\',',
+  ' escaped: `staging \\`, "synthetic-escaped-template": value`,',
+  ' nested: `outer ${ { value: `inner, "synthetic-nested-template": value` } }, "synthetic-template-interpolation": value`,',
+  ' comment: `{{/* module.exports = { "synthetic-template-comment": 1 }; */}}`,',
+  ' afterTemplate: true };',
+ ].join('\n'));
+ await writeFile(join(root, 'rollup.config.js'), 'export default { output: { banner: `/*! acme-web build, Copyright: Acme Holdings */` } };');
  await writeFile(join(root, '.github/workflows/deploy-stage.yml'), 'jobs:\n  deploy:\n    env:\n      TOKEN: ${{ secrets.CF_THROWAWAY_API_TOKEN }}\n      EVIDENCE: ${{ secrets.EVIDENCE_WRITE_TOKEN }}\n');
  await mkdir(join(root, 'services/payments'), { recursive: true });
  await writeFile(join(root, 'services/payments/package.json'), '{"dependencies":{"@stripe/stripe-js":"1.0.0"}}');
@@ -107,6 +117,11 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   ['config/settings.json', 'SYNTHETIC_PUBLIC_SETTING', 'live-use'],
   ['notes.yaml', 'SYNTHETIC_COMMENT_SETTING', 'trace'],
   ['config/settings.json', 'mail.transport', 'live-use'],
+  ['webpack.config.js', 'plugins', 'live-use'],
+  ['webpack.config.js', 'define.NOTE', 'live-use'],
+  ['webpack.config.js', 'public-quoted-key.nested-quoted-key', 'live-use'],
+  ['webpack.config.js', 'afterTemplate', 'live-use'],
+  ['rollup.config.js', 'output.banner', 'live-use'],
  ];
  for (const [locator, value, classification] of expected) {
   assert.ok(has(report, locator, value, classification), `discovers the public name from ${locator}`);
@@ -146,6 +161,9 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
   'synthetic-kube-value-never-export', 'synthetic-config-value-never-export',
   'synthetic-nested-value-never-export', 'synthetic-comment-value-never-export', 'synthetic-yaml-value-never-export',
   'synthetic-data-scalar-never-export', 'synthetic-capped-scalar-never-export', 'synthetic-code-scalar-never-export',
+  'db.internal.acme.example', 'Copyright', 'synthetic-single-string', 'synthetic-double-string',
+  'synthetic-single-key', 'synthetic-double-key', 'synthetic-escaped-template',
+  'synthetic-nested-template', 'synthetic-template-interpolation', 'synthetic-template-comment',
   'synthetic-denied-content-never-export']);
 });
 
