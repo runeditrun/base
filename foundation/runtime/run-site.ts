@@ -15,9 +15,9 @@ export interface RunData {
   name: string
   /** The public source repository: "https://github.com/just-every/cradle". */
   repository: string
-  /** The clone command: "git clone https://github.com/just-every/cradle.git". */
+  /** The one-line start, led with on the Run page: "npx -y @runeditrun/rer dev just-every/cradle". */
   clone: string
-  /** The folder the clone makes, where `rer dev` runs: "cradle". */
+  /** The folder the start line clones into, where `rer dev` restarts it: "cradle". */
   folder: string
   /** Platforms and tools: "Needs Node 22 or later and pnpm 10.12.4, on macOS, Linux or Windows with WSL2." */
   requirements: string
@@ -25,12 +25,12 @@ export interface RunData {
   licence: string
   /** Whether the run site carries /docs. */
   docs: boolean
-  /** Hosted options, shown as cards under step 2. Empty until hosting opens. */
+  /** Hosted options, shown as cards under the steps. Empty until hosting opens. */
   hosted: HostedOption[]
 }
 export interface HostedOption { title: string; body: string; href: string; action: string }
 
-/** rer itself, the same for every seed. */
+/** The global install of rer, offered as the alternative to the npx start line; the same for every seed. */
 export const installRer = { script: 'curl -fsSL https://runeditrun.com/install.sh | sh', npm: 'npm install -g @runeditrun/rer' }
 
 const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))
@@ -107,10 +107,11 @@ export function runPageHtml(identity: EditionIdentity, run: RunData): string {
   checkIdentity(identity); checkRunData(run)
   const name = escape(run.name), source = escape(run.repository.replace(/^https:\/\//, ''))
   const hosted = run.hosted.map(option => `<li class="step option"><div class="body"><h2>${escape(option.title)}</h2><p>${escape(option.body)}</p><p class="go"><a href="${escape(option.href)}">${escape(option.action)}</a></p></div></li>`).join('')
-  const body = `${header(identity, run)}<main><div class="intro"><h1>Run ${name} on your computer.</h1><p class="sub">100% free and open source. Two steps, and ${name} opens in your browser.</p></div>`
-    + `<ol class="steps"><li class="step"><span class="num" aria-hidden="true">1</span><div class="body"><h2>Install rer</h2><p>The Run Edit Run command. Once per computer.</p>${codeBlock([installRer.script, 'export PATH="$HOME/.local/bin:$PATH"'], 'Install rer')}<p class="alt">or <code>${escape(installRer.npm)}</code></p></div></li>`
-    + `<li class="step"><span class="num" aria-hidden="true">2</span><div class="body"><h2>Get ${name} and start it</h2>${codeBlock([run.clone, `cd ${run.folder} && rer dev`], `Get ${run.name} and start it`)}`
-    + `<p class="note"><code>rer dev</code> installs everything, makes you the owner and prints a link that opens ${name} signed in.</p></div></li>${hosted}</ol>`
+  const body = `${header(identity, run)}<main><div class="intro"><h1>Run ${name} on your computer.</h1><p class="sub">100% free and open source. One line, and ${name} opens in your browser.</p></div>`
+    + `<ol class="steps"><li class="step"><span class="num" aria-hidden="true">1</span><div class="body"><h2>Start ${name}</h2>${codeBlock([run.clone], `Start ${run.name}`)}`
+    + `<p class="note">It installs rer, gets ${name} and runs <code>rer dev</code>, which installs everything, makes you the owner and prints a link that opens ${name} signed in.</p></div></li>`
+    + `<li class="step"><span class="num" aria-hidden="true">2</span><div class="body"><h2>Start it again later</h2>${codeBlock([`cd ${run.folder} && rer dev`], `Start ${run.name} again`)}`
+    + `<p class="alt">Prefer rer installed globally first? <code>${escape(installRer.script)}</code> or <code>${escape(installRer.npm)}</code>, then run <code>rer dev</code> in the folder.</p></div></li>${hosted}</ol>`
     + `<footer class="facts"><p>${escape(run.requirements)}</p><p>Source: <a href="${escape(run.repository)}">${source}</a> · ${escape(run.licence)} licence</p></footer></main>`
   return document(identity, `Run ${run.name}`, `Run ${run.name} on your computer. 100% free and open source.`, RUN, body, COPY_SCRIPT)
 }

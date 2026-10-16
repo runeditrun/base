@@ -149,7 +149,7 @@ Run page string and command in one `RunData` value (`src/site/run.ts` or
 | --- | --- | --- |
 | `name` | `Cradle` | `Uptime` |
 | `repository` | `https://github.com/just-every/cradle` | `https://github.com/just-every/uptime-monitor` |
-| `clone` | `git clone https://github.com/just-every/cradle.git` | `git clone https://github.com/just-every/uptime-monitor.git uptime` |
+| `clone` | `npx -y @runeditrun/rer dev just-every/cradle` | `npx -y @runeditrun/rer dev just-every/uptime-monitor --dir uptime` |
 | `folder` | `cradle` | `uptime` |
 | `requirements` | `Needs Node 22 or later and pnpm 10.12.4, on macOS, Linux or Windows with WSL2.` | same |
 | `licence` | `MIT` | `MIT` |
@@ -157,13 +157,15 @@ Run page string and command in one `RunData` value (`src/site/run.ts` or
 | `hosted` | `[]` | `[]` |
 
 The Run page then reads, exactly: "Run <Seed> on your computer."; "100% free and
-open source. Two steps, and <Seed> opens in your browser."; step 1 **Install rer**,
-"The Run Edit Run command. Once per computer.", `curl -fsSL
-https://runeditrun.com/install.sh | sh` followed by `export PATH="$HOME/.local/bin:$PATH"` for the current shell, "or `npm install -g @runeditrun/rer`";
-step 2 **Get <Seed> and start it**, the clone line and `cd <folder> && rer dev`,
-"`rer dev` installs everything, makes you the owner and prints a link that opens
-<Seed> signed in."; then the requirements line and "Source: <repository> · MIT
-licence". `hosted` is the slot for hosted options, shown as cards under step 2
+open source. One line, and <Seed> opens in your browser."; step 1 **Start <Seed>**,
+the `clone` line (the one-line start), "It installs rer, gets <Seed> and runs
+`rer dev`, which installs everything, makes you the owner and prints a link that
+opens <Seed> signed in."; step 2 **Start it again later**, `cd <folder> && rer dev`,
+"Prefer rer installed globally first? `curl -fsSL
+https://runeditrun.com/install.sh | sh` or `npm install -g @runeditrun/rer`, then
+run `rer dev` in the folder."; then the requirements line and "Source:
+<repository> · MIT licence". `clone` is the start command the README's "Run
+locally" shows, so the Run page and the README agree. `hosted` is the slot for hosted options, shown as cards under step 2
 when RER hosting opens; leave it empty until then.
 
 `src/site/pages.tsx` exports `sitePages({ styles })`. Every CSS file your
