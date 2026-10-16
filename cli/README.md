@@ -346,6 +346,9 @@ Both forms write one JSON document with schema `rer-business-signals/1`,
 `source: "local"`, a `signals` array and a numeric `withheld` count. Each signal
 has `kind`, `value` (a name), relative `locator`, repository basename `repo`,
 `class` (`live-use` or `trace` for examples/comments), and `observedAt`.
+Identical `(kind, value, repo, class)` signals are emitted once with an occurrence
+`count` and the first matching `locator`. `secret-file` signals are exempt: each
+denied file keeps its own path, size and modification time.
 
 `config-key` observations come only from configuration directories (such as
 `config/`, `.github/`, `deploy/`, `charts/`, `k8s/` and `infra/`) and known

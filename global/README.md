@@ -306,6 +306,9 @@ document: `{schema: "rer-business-signals/1", source: "local", signals: [...],
 withheld: N}`. Signals identify package, environment, CI, infrastructure and
 configuration names with a relative `locator`, repository basename `repo`,
 `class` (`live-use` or `trace`) and `observedAt`.
+Identical `(kind, value, repo, class)` signals are emitted once with an occurrence
+`count` and the first matching `locator`. `secret-file` signals remain separate
+for each path, preserving each file's size and modification time.
 
 Config keys come only from configuration directories or known config filenames.
 Data in tests, fixtures, locales, translations, samples and exports, along with

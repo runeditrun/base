@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.28-dev.g17a60b3e",
+  "cliVersion": "0.2.28-dev.g33f16a29",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -335,7 +335,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "01edd6f32b653f3e2b913e86b59f56a95dff096fdd80cb165df28acf21c8e151"
+      "sha256": "c45987e3110bb65fe4ad58f9b0c823ee89098c44de4e71ee112c5a148e417433"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -419,7 +419,7 @@
     },
     "cli/business/scan.mjs": {
       "source": "cli/business/scan.mjs",
-      "sha256": "8187846abf42440ed8c25cab51e736dcc9422d4128f839995dc9d46d86b1c50c"
+      "sha256": "4111d47eceda7982561370d1322f78ff05a6dace2bba5a8b10346e26f29b4827"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
