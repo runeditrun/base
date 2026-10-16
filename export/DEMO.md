@@ -237,8 +237,15 @@ assets. Owner claim, Turnstile, admission, `RER_DEMO`, sample seeding and the
 60-minute / 15-minute idle lifetime use the existing demo flow. Alarms call the
 seed's scheduled handler and delete both the facet and supervisor storage.
 
-This prototype supports one D1 binding and once-per-minute cron. Other resource
-bindings are refused explicitly. It requires Workers Paid and Loader/Facets
+Bindings come from the seed's Wrangler config: each D1 has its own SQLite
+storage; R2 uses a demo-owned bucket with visitor and binding prefixes; queues
+persist messages and deliver the seed's `queue()` handler with batching, delays,
+ack/retry and dead letters; the seed's own DO classes run as isolated facets.
+Alarms match the declared UTC crons. Expiry aborts facets, clears queued work,
+aborts multipart uploads and erases the visitor's objects and storage.
+Unsupported binding kinds are refused by name during `rer deploy --demo`.
+
+It requires Workers Paid and Loader/Facets
 access; no Workers for Platforms subscription is needed. Seeds that depend on
 a separate Node demo runner need a native runner adapter before their live
 checks work. In particular, Uptime currently disables its Worker checks under

@@ -5,6 +5,9 @@ import { randomBytes } from 'node:crypto';
 import { imageFolder } from './container.mjs';
 import { missing, invalid } from './errors.mjs';
 import { DEMO_FILES } from '../modules/demo-host/plan.mjs';
+import { cloudflare } from '../modules/deploy-kit/provider.mjs';
+import { demoBucketName, prepareBucket } from '../modules/demo-host/native/deploy-r2.mjs';
+import { RUNTIME_FILES } from '../modules/demo-host/native/config.mjs';
 import { prepareNative } from '../modules/demo-host/native/prepare.mjs';
 import { TESTING_SECRET } from '../modules/demo-host/measurement.mjs';
 import { awaitCertificates } from '../modules/demo-host/certificate.mjs';
@@ -16,7 +19,7 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   await store.step('Building the native demo Worker bundle and static assets');
   await imageFolder(project, operation, app, { output: join(folder, 'image'), engine: 'workerd' });
   for (const file of DEMO_FILES) await cp(new URL(`../modules/demo-host/${file}`, import.meta.url), join(folder, 'modules/demo-host', file));
-  for (const file of ['worker', 'visitor', 'loader', 'd1', 'sql']) await cp(new URL(`../modules/demo-host/native/${file}.mjs`, import.meta.url), join(folder, `modules/demo-host/native/${file}.mjs`));
+  for (const file of RUNTIME_FILES) await cp(new URL(`../modules/demo-host/native/${file}.mjs`, import.meta.url), join(folder, `modules/demo-host/native/${file}.mjs`));
   for (const directory of ['container', 'deploy-kit']) await cp(new URL(`../modules/${directory}/`, import.meta.url), join(folder, 'modules', directory), { recursive: true });
   // Runtime imports use the same module topology as the maintained source.
   const bundle = await prepareNative(folder);
@@ -25,6 +28,7 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
     durable_objects: { bindings: [{ name: 'DEMO', class_name: 'NativeDemo' }, { name: 'CAPACITY', class_name: 'DemoCapacity' }] },
     migrations: [{ tag: 'native-v1', new_sqlite_classes: ['NativeDemo', 'DemoCapacity'] }] };
   delete config.containers;
+  if (bundle.bindings.buckets.length) config.r2_buckets = [{ binding: 'NATIVE_BUCKET', bucket_name: demoBucketName(plan.worker) }];
   config.vars.NATIVE_SOURCE_DIGEST = bundle.digest;
   if (process.env.RER_NATIVE_TEST_TTL_MS && TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY ?? '')) {
     if (!/^[1-9][0-9]{2,6}$/.test(process.env.RER_NATIVE_TEST_TTL_MS)) throw invalid('RER_NATIVE_TEST_TTL_MS must be positive milliseconds');
@@ -35,6 +39,16 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   if (options.dryRun) return { dryRun: true, deployed: false, demo: summary };
   const required = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'];
   if (required.some(name => !process.env[name]?.trim())) throw missing(`${required.join(', ')} are required`);
+  if (bundle.bindings.buckets.length) {
+    const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
+    const statePath = join(project.root, '.rer/demo-buckets', plan.worker + '.json');
+    const pending = await readFile(statePath, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    const bucket = await prepareBucket(api, plan, pending);
+    await mkdir(dirname(statePath), { recursive: true, mode: 0o700 });
+    await writeFile(statePath, JSON.stringify({ record: plan.record, bucket }), { mode: 0o600 });
+    config.vars.NATIVE_BUCKET_CREATED = bucket.creation_date;
+    await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
+  }
   const testing = TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY);
   const measurement = testing ? process.env.RER_DEMO_MEASUREMENT_TOKEN || randomBytes(32).toString('base64url') : undefined;
   const secrets = { TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY, ...(measurement ? { RER_DEMO_MEASUREMENT_TOKEN: measurement } : {}),
