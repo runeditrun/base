@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.35
+
+- **The Run page starts a seed without Node.** The shared /run page has two steps. Step 1 is `curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node and changes no shell settings. Step 2 is `rer dev <owner>/<repo>`, with `cd <folder> && rer dev` to start it again later. `npx -y @runeditrun/rer dev <owner>/<repo>` remains only as the alternative under "Already have Node 22 or later?". Before this, a newcomer without Node got `sh: npx: command not found` at step 2, because the installer keeps its Node private. Step 2 is built from Run data's existing `clone` line, so seeds need no edits. RUN-LOCALLY, HOMEPAGE-VARIANTS, SEED-COMMAND-CONTRACT and the READMEs describe the two steps, and the default and foundation Run requirements no longer say "Needs Node 22".
+- **install.sh names the next step.** Run with no arguments, `install.sh` now ends with `Next, start a seed: rer dev <owner>/<repo>`. It still puts no `node`, `npm` or `npx` on PATH.
+
+### Upgrade notes
+
+- A seed refreshes its copy of the /run page and docs from Base to get the two steps.
+- The installer served at runeditrun.com takes its text from the published package, so the Next line arrives with this release.
+
 ## 0.2.34
 
 - **Optional deploy secrets.** A deploy declaration's secret entry may add `"optional": true` for an integration's credential (Pier, Stripe). When neither the Worker nor the deploy inputs hold it, the first deploy succeeds without binding it and reports `Optional secrets not set: NAME`, and a dry run names optional secrets that were not supplied. Health waits only for required secrets, and a missing required secret still refuses before any write. `rer deploy --set-secret NAME` and `--unset-secret NAME` record the Worker version they make, so the next deploy accepts that Worker and an unchanged repeat writes nothing. A declaration without `optional` plans and fingerprints exactly as before.
