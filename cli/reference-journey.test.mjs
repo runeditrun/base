@@ -190,7 +190,9 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  for(const name of identityTables)assert.deepEqual(archiveRows(firstArchive,name),retainedIdentityTables.includes(name)?identityBefore[name]:[],`${name} follows the seed's archive identity policy`);
  for(const name of ['oa_sessions','oa_provider_sessions','rer_dependency_keys'])assert.deepEqual(archiveRows(firstArchive,name),[],`${name} does not travel`);
  await f.run(['export','--output','exports/first.rer','--json'],4);
- await f.run(['export','--target','remote','--output','exports/remote.rer','--json'],4);
+ // The hosted install cannot be exported yet: a remote export is refused before any effect and saves nothing.
+ await f.run(['export','--target','remote','--output','exports/remote.rer','--json'],2);
+ await assert.rejects(stat(join(f.root,'exports/remote.rer')),{code:'ENOENT'});
  await f.run(['import','--input','exports/first.rer','--json'],4);
  await f.run(['import','--input','exports/first.rer','--yes','--json'],4);
  assert.deepEqual((await f.data(`SELECT * FROM ${table} WHERE id='archive-row'`))[0].results,beforeRows,'nonempty refusal leaves rows untouched');
