@@ -1,9 +1,11 @@
 """Real disposable Git repositories; only test suites contain synthetic values."""
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import secrets
 import subprocess
 import tempfile
+from unittest.mock import patch
 from history_scan import scan
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +17,20 @@ def generic_credential():
     # (about 2% of random base64url strings). Letters here never touch, so no
     # word can occur, while length, digits and entropy stay credential-shaped.
     return ''.join(secrets.choice('BCDFGHJKLMNPQRSTVWXZ') + secrets.choice('0123456789') for _ in range(20))
+
+
+@contextmanager
+def resolving(state):
+    """Answer the scan's bulk repository lookup with one verdict, or a verdict per repository.
+
+    Yields the set of repositories the scan asked about.
+    """
+    asked = set()
+    def resolve_all(resolver, repositories):
+        asked.update(repositories)
+        return {repository: state(repository) if callable(state) else state for repository in repositories}
+    with patch('github_refs.GitHubResolver.resolve_all', resolve_all):
+        yield asked
 
 
 class RepositoryFixture:

@@ -154,6 +154,17 @@ destination appears as `pending-public-destination` in `info`; a private or
 unresolved destination fails. `gh` supplies existing authentication only for
 visibility queries and Git's remote fetch uses its normal configured transport.
 
+The scan collects every GitHub repository reference first and resolves them
+together: one aliased GraphQL query per 100 repositories (`gh api graphql`, which
+draws on GitHub's separate GraphQL budget), so a scan costs a few calls instead
+of one per repository. A repository is public or private only from a complete
+answer for it that is neither disabled nor locked, and missing only from
+GitHub's own not-found error for exactly that name. Any other answer for one
+repository, or a batch that is not a complete HTTP 200 GraphQL document, sends
+that repository to the single REST lookup (`gh api repos/<owner>/<repo>`), whose
+strict 200/404 reading decides public, private, missing or incomplete. Verdicts
+are kept in memory for one run only.
+
 Run the retained real-repository fixtures with `pnpm verify:publish-check`.
 Apply publication scans to every public export, including Base. Retained private
 authoring archives are separate from the public acquisition source.

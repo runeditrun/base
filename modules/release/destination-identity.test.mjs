@@ -40,16 +40,34 @@ function githubFixture(temporary, repositoryState) {
   const calls = resolve(temporary, 'api-calls.jsonl');
   writeFileSync(executable, `#!${process.execPath}
 const fs = require('node:fs');
-const reference = process.argv.at(-1).replace('repos/', '');
-fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(reference) + '\\n');
-if (![${JSON.stringify(project)}, ${JSON.stringify(repository)}].includes(reference)) process.exit(2);
-const state = reference === ${JSON.stringify(repository)} ? ${JSON.stringify(repositoryState)} : 'public';
+const args = process.argv.slice(2);
+// A GraphQL batch names each repository as owner (oN) and name (nN) variables.
+const fields = Object.fromEntries(args.flatMap((arg, i) => arg === '-f' ? [args[i + 1].split(/=(.*)/s).slice(0, 2)] : []));
+const references = args.includes('graphql')
+  ? Object.keys(fields).filter(key => /^o\\d+$/.test(key)).map(key => [key.slice(1), fields[key] + '/' + fields['n' + key.slice(1)]])
+  : [[null, args.at(-1).replace('repos/', '')]];
+for (const [, reference] of references) fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(reference) + '\\n');
+if (references.some(([, reference]) => ![${JSON.stringify(project)}, ${JSON.stringify(repository)}].includes(reference))) process.exit(2);
+const states = references.map(([index, reference]) => [index, reference, reference === ${JSON.stringify(repository)} ? ${JSON.stringify(repositoryState)} : 'public']);
+const answer = (code, body) => {
+  process.stdout.write('HTTP/2.0 ' + code + ' Result\\r\\nContent-Type: application/json\\r\\n\\r\\n' + body);
+  process.stderr.write('private-gh-diagnostic');
+};
+if (args.includes('graphql') && states.every(([, , state]) => ['public', 'private', 'missing'].includes(state))) {
+  const data = {}, errors = [];
+  for (const [index, reference, state] of states) {
+    data['r' + index] = state === 'missing' ? null : { isDisabled: false, isLocked: false, isPrivate: state === 'private' };
+    if (state === 'missing') errors.push({ type: 'NOT_FOUND', path: ['r' + index], message: "Could not resolve to a Repository with the name '" + reference + "'." });
+  }
+  answer(200, JSON.stringify(errors.length ? { data, errors } : { data }));
+  process.exit(errors.length ? 1 : 0);
+}
+// A broken batch answers as its broken repository would over REST.
+const state = states.map(([, , state]) => state).find(state => !['public', 'private'].includes(state)) ?? states[0][2];
 const code = ['missing', 'empty', 'malformed'].includes(state) ? 404 : state === 'unavailable' ? 503 : 200;
-const body = state === 'empty' ? '' : state === 'malformed' ? '{broken' : JSON.stringify(code === 404
+answer(code, state === 'empty' ? '' : state === 'malformed' ? '{broken' : JSON.stringify(code === 404
   ? { message: 'Not Found', documentation_url: 'https://docs.github.com/rest/repos/repos#get-a-repository', status: '404' }
-  : { private: state === 'private' });
-process.stdout.write('HTTP/2.0 ' + code + ' Result\\r\\nContent-Type: application/json\\r\\n\\r\\n' + body);
-process.stderr.write('private-gh-diagnostic');
+  : { private: state === 'private' }));
 process.exit(code === 200 ? 0 : 1);
 `);
   chmodSync(executable, 0o755);

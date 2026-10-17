@@ -153,32 +153,33 @@ def without_spans(data, spans):
     return b' '.join(kept)
 
 
-def inspect(data, path, config, resolver, *, commit_message=False):
+def inspect(data, path, config, *, commit_message=False):
     chunks = list(text_chunks(data))
     # Image and video samples are not text: they can spell an address or a
     # path by chance. Comments, XMP, tags and other metadata remain text.
     spans = sample_spans(data) or []
     # Names in a C2PA manifest's signing certificates are certificate metadata.
     spans += certificate_spans(data)
-    rules, provenance = set(), False
+    rules, provenance, references = set(), False, set()
     for start, end, fields in chunks:
         spans.append((start, end))
         for field in fields:
             # A metadata value is text, not a standalone source manifest or
             # trust bundle, even when the containing image has a JSON name.
-            field_rules, field_provenance = inspect_text(field, '@png-text', config, resolver, binary_content=False)
+            field_rules, field_provenance, field_references = inspect_text(field, '@png-text', config, binary_content=False)
             rules.update(field_rules)
             provenance |= field_provenance
+            references |= field_references
     # Keep the original binary classification for content outside text chunks.
     # CRC-adjacent bytes must not also create a synthetic raw mailbox match.
-    raw_rules, raw_provenance = inspect_text(without_spans(data, spans), path, config, resolver,
-                                            commit_message=commit_message, binary_content=binary(data))
+    raw_rules, raw_provenance, raw_references = inspect_text(without_spans(data, spans), path, config,
+                                                            commit_message=commit_message, binary_content=binary(data))
     rules.update(raw_rules)
     provenance |= raw_provenance
-    return rules, provenance
+    return rules, provenance, frozenset(references | raw_references)
 
 
-def inspect_text(data, path, config, resolver, *, commit_message=False, binary_content=None):
+def inspect_text(data, path, config, *, commit_message=False, binary_content=None):
     # NUL removal covers UTF-16/32 ASCII content, matching the secret scanner.
     text = decoded_text(data)
     rules = set()
@@ -197,21 +198,30 @@ def inspect_text(data, path, config, resolver, *, commit_message=False, binary_c
                 rules.add('hygiene.email')
     ref_text, provenance = provenance_text(text, path, config.get('declaredSources', frozenset()))
     stated, ambiguous = reference_sets(ref_text, path, config.get('localPaths', frozenset()), config.get('projectIdentity'))
-    for repository in sorted(stated | ambiguous):
+    references = set()
+    for repository in stated | ambiguous:
         # A future source identity does not assert current GitHub visibility.
         # Explicit release destinations still take the strict visibility path.
         if (repository in config.get('intendedPublicRepositories', frozenset()) and
                 repository != config.get('pendingDestination')):
             continue
-        state = resolver.resolve(repository)
+        references.add((repository, repository in ambiguous, repository == config.get('pendingDestination')))
+    return rules, provenance, frozenset(references)
+
+
+def reference_rules(references, states):
+    """Rules for (repository, ambiguous, pending destination) references once their states are known."""
+    rules = set()
+    for repository, ambiguous, pending in references:
+        state = states[repository]
         # A bare word/word with no GitHub context names a repository only when
         # one exists privately; that no repository answers to it proves nothing.
-        if state == 'missing' and repository in ambiguous and repository != config.get('pendingDestination'):
+        if state == 'missing' and ambiguous and not pending:
             continue
-        if state == 'missing' and repository == config.get('pendingDestination'):
+        if state == 'missing' and pending:
             rules.add(PENDING_DESTINATION)
         elif state in ('private', 'missing'):
             rules.add('hygiene.github-' + state)
         elif state != 'public':
             rules.add('scan.github-incomplete')
-    return rules, provenance
+    return rules
