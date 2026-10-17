@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.38-dev.g670337b9",
+  "cliVersion": "0.2.38-dev.gd7b1ddad",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -963,7 +963,7 @@
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",
-      "sha256": "9649768eee1d2c79bf8f63f2d1c27589a5d4dd3ec279d139d104acb93c14adaf"
+      "sha256": "38ffeb35e435ae011528500dc066b346398de1c78527f57435593e25f0bc260f"
     },
     "modules/ai/LICENSE": {
       "source": "modules/ai/LICENSE",
@@ -2575,7 +2575,7 @@
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
-      "sha256": "24fdf0a3802208ddd693e7b6b2951574f81e47f7b8fa257d4f141da2af5fe89e"
+      "sha256": "8cc4de0d643c789312d8047f20d327de2cd45b7cc5af983a0af9edada3451c8f"
     },
     "modules/release/export.mjs": {
       "source": "modules/release/export.mjs",

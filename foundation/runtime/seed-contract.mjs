@@ -12,7 +12,11 @@ export const statuses = Object.freeze(['done', 'partial', 'missing'])
 export const statusHeader = Object.freeze(['Clause', 'Title', 'Kind', 'Status', 'Evidence', 'Gap'])
 const summaryHeader = ['Clauses', 'Done', 'Partial', 'Missing', 'Total']
 
-const id = '[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-[0-9]+'
+// The one clause-ID rule, shared with the release catalogue: uppercase words
+// and a two- or three-digit number joined by hyphens (HOME-001, PAN-01), or the
+// legacy hyphenless form of up to four capitals and a number (E1, A7).
+export const clauseIdSource = '(?:[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-[0-9]{2,3}|[A-Z]{1,4}[0-9]{1,3})'
+const id = clauseIdSource
 const clauseId = new RegExp(`^${id}$`)
 const dash = '\\s+[—–-]\\s+'
 // The three ways a contract defines a clause: a bold bullet, a bold paragraph

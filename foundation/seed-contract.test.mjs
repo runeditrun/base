@@ -40,6 +40,15 @@ test("Slate's contract parses into its target, areas and one clause per Status r
   for (const clause of contract.clauses) if (clause.status !== 'missing') assert.ok(clause.evidence.length, clause.id)
 })
 
+test('two-digit AREA-NN and legacy E1-style clause IDs parse; other shapes still refuse at their line', () => {
+  const home = rowLine('HOME-001')
+  const renamed = (from, to) => slate.replaceAll(from, to)
+  const contract = parseContract(renamed('DOCS-001', 'E1').replaceAll('HOME-001', 'PAN-01'))
+  assert.ok(contract.clauses.some(clause => clause.id === 'PAN-01' && clause.line === home))
+  assert.ok(contract.clauses.some(clause => clause.id === 'E1'))
+  for (const bad of ['E', 'PAN-1234', 'pan-01']) refuses(edit(copy => { copy[home - 1] = copy[home - 1].replace('HOME-001', bad) }), home, /not a clause ID/)
+})
+
 test('a malformed or inconsistent contract is refused, naming the line of each problem', () => {
   const home = rowLine('HOME-001'), docs = rowLine('DOCS-001'), collab = rowLine('COLLAB-004')
   refuses(edit(copy => { copy[statusLine - 1] = '## State' }), lines.length, /## Status/)

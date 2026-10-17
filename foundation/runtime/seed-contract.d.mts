@@ -1,3 +1,5 @@
+/** The clause-ID rule as a regular-expression source, shared with the release catalogue. */
+export const clauseIdSource: string
 export type ClauseKind = 'published' | 'target' | 'push-further'
 export type ClauseStatus = 'done' | 'partial' | 'missing'
 
