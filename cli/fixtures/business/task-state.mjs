@@ -41,7 +41,7 @@ export function taskStore(state) {
   task.phase = 'leased'; task.fence++; task.lease = expires();
   const id = `grant-${task.summary.task_id}-${task.fence}`, local = task.summary.kind === 'discover.local';
   task.grants.set(task.fence, { id, task_id: task.summary.task_id, fence: task.fence,
-   destination: local ? `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/uploads` : task.summary.kind === 'classify.row' ? 'none' : 'unavailable:no-linked-installation',
+   destination: local ? state.destination ?? `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/uploads` : task.summary.kind === 'classify.row' ? 'none' : 'unavailable:no-linked-installation',
    quota_bytes: local ? state.quotaBytes ?? 2 * 1024 * 1024 : 0,
    ...(local || task.summary.kind === 'classify.row' ? {} : { available: false, reason: 'no-linked-installation' }),
    consent: local ? { id: 'consent1', scope: { paths: [state.root] } } : null });
@@ -113,7 +113,7 @@ export function taskStore(state) {
     state.released = body;
     if (task.summary.kind === 'classify.row') state.questionReleased = true;
     if (body.checkpoint !== undefined) task.checkpoint = body.checkpoint;
-    task.phase = 'ready'; task.fence++; task.lease = null;
+    task.phase = body.reason === 'failed' ? 'failed' : 'ready'; task.fence++; task.lease = null;
    }
    sync(task);
   }

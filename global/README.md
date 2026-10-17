@@ -371,17 +371,34 @@ formats and syntax may yield no signals.
 ## Business device commands
 
 `rer business connect --code ABCD-1234 [--origin https://app.runeditrun.com]`
-redeems a browser-created code, prints a six-digit confirmation number and waits
-for approval in the browser that created it. Device credentials stay in macOS
+redeems a browser-created code and prints a six-digit confirmation number for
+approval in the browser that created it. Without a terminal it returns while
+approval is pending. Run `rer business connect` again in a later turn to resume
+the same pairing and number; a new server pairing is never started until the
+old one is refused, expired or disconnected. Pending tokens are kept in the
+private CLI config directory for at most ten minutes. Device credentials stay in macOS
 Keychain or Linux Secret Service. A missing or locked Secret Service refuses;
 there is no plaintext credential store. Linux needs `secret-tool` and an
 unlocked desktop Secret Service session.
 
-In a terminal, connect asks separately before adding Claude Code user Read deny
-rules, allowing export-scoped macOS wake prevention, and installing a launchd
-or systemd user service. Only the exact answer `yes` opts in. Noninteractive
-connect pairs but leaves those optional changes off. Background services use
+The owner chooses Claude Code user Read deny rules, export-scoped macOS wake
+prevention, and a launchd or systemd user service in the browser. Connect reads
+`optIns` from device-authenticated `GET /api/business/executors/self`, with keys
+`installPermissions`, `awakeConsent` and `installService`. Only `true` enables
+an option. Undecided (`null`) options print a browser link; an older server
+without this route leaves all options undecided. Run connect again after the
+owner decides. The first device-authenticated request happens after both the
+credential and local pairing state are stored, so a storage failure cannot
+activate the computer. Background services use
 absolute Node and CLI paths. No model process is started.
+
+An agent can run `npx -y @runeditrun/rer business connect --code ABCD-1234 --origin URL`
+directly, without a global installation. In Codex's workspace-write sandbox,
+allow network access and the CLI's config directory (`~/.rer`), and put npm's
+cache inside the working folder with `npm_config_cache="$PWD/.rer/npm"`.
+Later turns can omit `--code` to resume the saved request. Do not install a
+background service or change user settings unless the owner enables those
+options and the sandbox permits their locations.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
@@ -402,10 +419,11 @@ a headers helper. That output is a short-lived credential: connect it directly
 to the MCP client and do not paste it into an agent transcript.
 
 `rer business status` shows local pairing, service state and progress without
-printing checkpoints or vendor data. `rer business disconnect` removes the
-service, device and vendor credentials, state and introduced Claude rules,
-preserving preexisting settings and unrelated edits. Revocation in the browser
-removes remote authority; disconnect removes the local installation's additions.
+printing checkpoints or vendor data. `rer business disconnect` revokes this
+device through device-authenticated `DELETE /api/business/executors/self` before
+removing its service, device and vendor credentials, state and introduced Claude
+rules, preserving preexisting settings and unrelated edits. If the server
+cannot confirm revocation, local credentials stay available for a retry.
 
 `rer business run` performs consented `discover.local` tasks through claims,
 short-lived task bearers, quota-bound uploads, 60-second heartbeats and server

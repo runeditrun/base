@@ -56,7 +56,7 @@ export async function server(t) {
   requireValue(['macos', 'linux', 'wsl', 'windows', 'other'].includes(body.os) && ['codex', 'claude', 'other'].includes(body.agent_kind));
   requireValue(Array.isArray(body.capabilities) && body.capabilities.length <= 100 && body.capabilities.every(value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,100}$/.test(value)));
   // Each explicit pairing starts a fresh browser-created fixture pairing.
-  redeemed = true; issued = false; state.approved = false;
+  redeemed = true; issued = false; state.approved = false; state.revoked = false; state.active = false;
   return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(600), interval: 5 }, 202];
  }
  function tool(token, name, args) {
@@ -124,13 +124,27 @@ export async function server(t) {
    object(body);
    const route = request.url;
    state.requests.push({ route, body, authorization: request.headers.authorization, method: request.method });
+   if (route === '/api/business/executors/self') {
+    requireDevice(request);
+    if (request.method === 'GET') {
+     if (state.selfMissing) return send({}, 404);
+     await state.onSelf?.(); state.active = true;
+     return send({ optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
+    }
+    requireValue(request.method === 'DELETE', 405);
+    if (state.revokeRefused) return send({}, 503);
+    state.revoked = true; return send({ revoked: true });
+   }
    requireValue(request.method === 'POST', 405);
    if (route === '/api/business/biz/pairings/pair1/approve') {
     closed(body, ['confirmation_number', 'confirmed']);
     requireValue(redeemed && !issued && body.confirmation_number === '246810' && body.confirmed === true, 403);
     state.approved = true; return send({ approved: true });
    }
-   if (route === '/api/business/executors/pair') return send(...pair(body));
+   if (route === '/api/business/executors/pair') {
+    if (body.pairing_token && state.pairingRefused) return send({}, 401);
+    return send(...pair(body));
+   }
    if (route === '/api/business/executors/token') return send(mint(request, body));
    if (route === '/api/business/mcp') return mcp(request, body, send);
    if (route === '/api/business/executors/claim') { requireDevice(request); return send(tasks.claim(body)); }

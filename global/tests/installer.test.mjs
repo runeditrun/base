@@ -61,6 +61,19 @@ test('install.sh and rer update install verified registry releases, the Run page
 
  // A development build is published; install.sh installs it.
  registry.publish(manifest.version, built);
+ // Business connect runs directly from the installer without asking the agent
+ // to start an app or change PATH, both on first install and on reuse.
+ const businessEnv = { ...env, HOME: join(directory, 'business-home') };
+ const businessRer = join(businessEnv.HOME, '.local/bin/rer');
+ for (let attempt = 0; attempt < 2; attempt++) {
+  const connected = await run('sh', [installer, 'business', 'connect', '--help'], businessEnv);
+  assert.equal(connected.code, 0, connected.stderr);
+  assert.doesNotMatch(connected.stdout + connected.stderr, /rer dev|\bPATH\b/);
+  const help = await run(businessRer, ['business', 'connect', '--help'], businessEnv);
+  assert.equal(help.code, 0, help.stderr);
+  assert.ok(help.stdout.length > 0 && connected.stdout.endsWith(help.stdout), 'the installer runs the requested business command');
+ }
+ assert.equal((await run(businessRer, ['cli', 'uninstall'], businessEnv)).code, 0);
  const installed = await run('sh', [installer], env);
  assert.equal(installed.code, 0, installed.stderr);
  assert.equal(await selected(), manifest.version);

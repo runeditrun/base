@@ -29,13 +29,18 @@ export class Api {
   return result;
  }
  async post(path, body, { token = this.credential, signal, timeout = 30_000, headers = {} } = {}) {
+  return this.request('POST', path, body, { token, signal, timeout, headers });
+ }
+ async get(path) { return this.request('GET', path); }
+ async delete(path) { return this.request('DELETE', path); }
+ async request(method, path, body, { token = this.credential, signal, timeout = 30_000, headers = {} } = {}) {
   if (!path.startsWith('/api/business/') || path.includes('..') || path.includes('?') || path.includes('#')) throw Error('Invalid Business route.');
   let response;
   try {
    response = await fetch(this.origin + path, {
-    method: 'POST', redirect: 'error',
+    method, redirect: 'error',
     headers: { ...headers, 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(body), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
    });
   } catch (error) { if (signal?.aborted) throw signal.reason; throw Error('Could not reach the Business server.'); }
   if (!response.ok) { await response.body?.cancel(); throw new ApiError(response.status); }
