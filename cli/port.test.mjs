@@ -77,3 +77,12 @@ test('a busy port held by another checkout names that checkout and the command t
   finally{if(socket.listening)await new Promise(resolve=>socket.close(resolve));}
  }
 });
+
+test('a seed adapter host is a fresh checkout\'s default; a saved origin keeps its own host',async t=>{
+ const root=await directory(t),hooks={secrets:{keepExisting:true,originKey:'AUTH_ORIGIN',values:({origin})=>({AUTH_ORIGIN:origin})}};
+ assert.equal((await selectedOrigin({root,adapter:{host:'localhost',hooks}},{port:8791},{setup:true})).url,'http://localhost:8791');
+ assert.equal((await selectedOrigin({root,adapter:{host:'localhost',hooks}},{port:8791,host:'127.0.0.1'},{setup:true})).url,'http://127.0.0.1:8791');
+ await assert.rejects(selectedOrigin({root,adapter:{host:'0.0.0.0',hooks}},{port:8791},{setup:true}),/must be exactly 127\.0\.0\.1, localhost or ::1/);
+ await writeFile(join(root,'.dev.vars'),'AUTH_ORIGIN=http://127.0.0.1:8787\n',{mode:0o600});
+ assert.equal((await selectedOrigin({root,adapter:{host:'localhost',hooks}},{})).url,'http://127.0.0.1:8787');
+});

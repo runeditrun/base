@@ -182,6 +182,13 @@ idle timeout, and they stop with `dev` (explicit stop, idle timeout, Ctrl-C or
 an application exit). `preview` does not run schedules. A seed that does not
 want this declares one adapter option: `commandAdapter(lifecycle, { scheduled: false, ... })`.
 
+Without `--host`, `setup`, `dev` and `preview` on a fresh checkout bind
+`127.0.0.1`; a seed declares another loopback host with the adapter option
+`commandAdapter(lifecycle, { host: 'localhost', ... })` (one of `127.0.0.1`,
+`localhost`, `::1`). Auth needs `localhost` because WebAuthn refuses an IP
+address as its relying-party ID. A saved origin keeps its own host, and the
+front door and `--host` take precedence.
+
 ### Local and production sign-in
 
 `setup` claims the local owner and stops its temporary runtime. `dev` prints

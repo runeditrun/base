@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.43-dev.gef1a5083",
+  "cliVersion": "0.2.43",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -347,7 +347,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "b9640a2e41aedeb28fb2d9ab5392b4998492246157d6069c1b827b6945640653"
+      "sha256": "232e6a0481f7d07921ee7954e3197ec79e9d7d9755ebd424727c70259d8abe3e"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -743,7 +743,7 @@
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
-      "sha256": "4b9449738ec9e6d93152168b84350c4211375ad5a7656f8a729d490ea816e364"
+      "sha256": "ceb5af926cbdadcd01b5c42b14d124366073a3c26f1290516f8ff771b4d85e43"
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",

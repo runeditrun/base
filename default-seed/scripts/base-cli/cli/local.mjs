@@ -3,7 +3,7 @@ import { resolve, relative } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { contained } from './project.mjs';
 import { shared } from './shared.mjs';
-import { origin, loopback } from './parse.mjs';
+import { origin, loopback, listenHost } from './parse.mjs';
 import { refuse } from './errors.mjs';
 import { defaultPort, firstFreePort, busyPortMessage } from './port.mjs';
 import { localSettingKeys } from './settings.mjs';
@@ -22,7 +22,11 @@ export async function selectedOrigin(project, options, { setup = false } = {}) {
  // A front-door origin (saved, or --door on a fresh setup) serves through the door.
  const door = await selectDoor(project, options, previous, { vars, savedOrigin: previous?.origin });
  if (door) return door;
- const host = options.host ?? (previous && !doorSite(previous.origin) ? previous.hostname.replace(/^\[|\]$/g, '') : '127.0.0.1');
+ // A seed may declare the host a fresh checkout binds (commandAdapter({ host })),
+ // such as localhost for a WebAuthn RP ID; a saved origin keeps its own host.
+ const declared = project.adapter?.host;
+ if (declared !== undefined && !listenHost(declared)) throw refuse('The seed adapter declares host ' + JSON.stringify(String(declared)).slice(0, 80) + '; it must be exactly 127.0.0.1, localhost or ::1.');
+ const host = options.host ?? (previous && !doorSite(previous.origin) ? previous.hostname.replace(/^\[|\]$/g, '') : declared ?? '127.0.0.1');
  const savedPort = previous && !doorSite(previous.origin) ? Number(previous.port || 80) : undefined;
  // A first setup with no port asked for takes the first free one, never a busy one.
  let port = options.port ?? savedPort, taken;
