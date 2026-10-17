@@ -8,6 +8,8 @@ import { nextQuestions } from './questions.mjs';
 import { lockSupervisor, stateDirectory, credentialHandle } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
+import { classify } from './model-cli.mjs';
+import { ownerKinds } from './classification.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
@@ -15,6 +17,7 @@ const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-
 
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
+ const runnable = new Set([...kinds, ...(state.classifier ? ['classify.row'] : [])]);
  const parked = new Set(), unlock = await lockSupervisor(), stop = new AbortController();
  const interrupted = () => stop.abort(Error('Business supervisor stopped.'));
  process.once('SIGTERM', interrupted); process.once('SIGINT', interrupted);
@@ -26,7 +29,7 @@ export async function run({ once = false } = {}) {
   do {
    if (!progress.pendingClaim) {
     const summaries = await nextQuestions(api, stop.signal);
-    const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
+    const selected = summaries.find(task => runnable.has(task.kind) && task.runner === 'executor' && !ownerKinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
     if (!selected) { if (once) { process.stdout.write('Nothing yet.\n'); return; } await pause(25_000, stop.signal); continue; }
     progress.pendingClaim = { claim_id: randomUUID(), task_id: selected.task_id };
     await saveProgress(progress);
@@ -44,10 +47,10 @@ export async function run({ once = false } = {}) {
     if (once && !claimed.task) { process.stdout.write('Nothing yet.\n'); return; }
     continue;
    }
-   if (!kinds.has(claimed.task.kind) || claimed.task.kind_version !== 1) throw Error('Business server returned an unimplemented task kind.');
    const lease = new Lease(api, claimed, progress, stop.signal);
    let finished = false, released = false, failure;
    try {
+    if (!runnable.has(claimed.task.kind) || claimed.task.kind_version !== 1 || claimed.task.runner === 'owner' || ownerKinds.has(claimed.task.kind)) throw Error('Business server returned an unimplemented or owner-only task kind.');
     progress.current = { kind: claimed.task.kind, checkpoint: claimed.task.checkpoint, uploadedBytes: claimed.task.checkpoint?.bytes_done ?? 0 };
     await saveProgress(progress);
     if (claimed.task.kind === 'export.vendor') {
@@ -61,15 +64,25 @@ export async function run({ once = false } = {}) {
      }
      throw Error('Business vendor export needs a connected seed upload grant and execution-input contract.');
     }
-    const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
-     send: (destination, body) => lease.send(destination, body), saveCheckpoint: checkpoint => lease.checkpointSaved(checkpoint), stateDir: directory });
-    await lease.complete(); finished = true;
-    await result.cleanup();
-    process.stdout.write('Business discover.local completed and checked by the server.\n');
-   } catch (error) { failure = lease.signal.aborted ? lease.signal.reason : error; }
+    if (claimed.task.kind === 'classify.row') {
+     await lease.heartbeat();
+     const outputs = await classify(claimed.task, state.classifier, { signal: lease.signal });
+     await lease.complete(outputs); finished = true;
+     process.stdout.write('Business classify.row answer submitted for server validation.\n');
+    } else {
+     const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
+      send: (destination, body) => lease.send(destination, body), saveCheckpoint: checkpoint => lease.checkpointSaved(checkpoint), stateDir: directory });
+     await lease.complete(); finished = true;
+     await result.cleanup();
+     process.stdout.write('Business discover.local completed and checked by the server.\n');
+    }
+   } catch (error) {
+    failure = lease.signal.aborted ? lease.signal.reason : error;
+    if (claimed.task.kind === 'classify.row') parked.add(claimed.task.id);
+   }
    finally {
     if (!finished && failure?.status !== 401) {
-     try { await lease.release(stop.signal.aborted ? 'handover' : parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
+     try { await lease.release(stop.signal.aborted ? 'handover' : claimed.task.kind === 'export.vendor' && parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
      catch (error) { if (error.status === 401) failure = error; }
     }
     await lease.close();

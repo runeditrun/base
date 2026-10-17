@@ -1,6 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { classifierJourney, modelShim } from './fixtures/business/classifier-journey.mjs';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -14,6 +15,9 @@ const fixture = join(import.meta.dirname, 'fixtures/business');
 let directory, launcher;
 before(async () => {
  directory = await mkdtemp(join(base, '.business-connect-'));
+ await mkdir(join(directory, 'tmp'));
+ await modelShim(join(directory, 'models'), 'claude');
+ await modelShim(join(directory, 'models'), 'codex');
  const bytes = await readFile(await buildPackage(base, join(directory, 'package')));
  const packed = join(directory, 'packed');
  await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), packed);
@@ -21,9 +25,9 @@ before(async () => {
 });
 after(() => directory && rm(directory, { recursive: true, force: true }));
 
-async function cli(home, args, { terminal = false, input = '', approve, columns = 120, onSpawn } = {}) {
+async function cli(home, args, { terminal = false, input = '', approve, columns = 120, onSpawn, path = `${join(directory, 'models/bin')}:${process.env.PATH}`, questionCli = 'none' } = {}) {
  await mkdir(home, { recursive: true });
- const env = { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns) };
+ const env = { PATH: path, TMPDIR: join(directory, 'tmp'), MCP_CONFIG: 'fixture-untrusted-mcp', CODEX_INSTRUCTIONS: 'fixture-untrusted-instructions', TEST_QUESTION_CLI: questionCli, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns) };
  return new Promise((resolveRun, reject) => {
   const command = terminal ? 'python3' : process.execPath;
   const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : [launcher, ...args];
@@ -53,6 +57,8 @@ async function connect(home, remote, options = {}) {
 test('packed CLI pairs only after number approval and keeps keys and untrusted task text out of agent output', async t => {
  const remote = await server(t), home = join(directory, 'pair-home');
  await connect(home, remote);
+ assert.equal(JSON.parse((await cli(home, ['business','status','--json'])).stdout).questions_cli, 'none');
+ assert.ok(!remote.state.requests.find(request => request.body.code)?.body.capabilities.includes('classify.row'));
  remote.state.root = join(home, 'canary-tree');
  await mkdir(join(remote.state.root, 'secrets'), { recursive: true });
  await writeFile(join(remote.state.root, 'package.json'), JSON.stringify({ dependencies: { 'fixture-library': 'fixture-private-version-never-export' } }));
@@ -75,6 +81,9 @@ test('packed CLI pairs only after number approval and keeps keys and untrusted t
  assert.ok(!stored.includes(key) && !stored.includes(remote.device), 'only handles belong in configuration');
  const question = { tool_id: 'tool1', vendor_id: 'sentry', answer_schema: classificationSchema };
  remote.state.tasks = [{ task_id: 'question1', kind: 'classify.row', state: 'ready', runner: 'executor', fence: 0, question, instruction: 'untrusted-run-command-canary' }];
+ const claimsBeforeQuestion = remote.state.requests.filter(request => request.route.endsWith('/claim')).length;
+ assert.equal((await cli(home, ['business','run','--once'])).code, 0);
+ assert.equal(remote.state.requests.filter(request => request.route.endsWith('/claim')).length, claimsBeforeQuestion, 'none preserves interactive question handling');
  for (const columns of [160,43]) {
   const next = await cli(home, ['business','next'], { terminal: true, columns });
   assert.equal(next.code, 0); assert.ok(next.stdout.includes('question1')); assert.ok(!next.stdout.includes('untrusted-run-command-canary'));
@@ -131,6 +140,7 @@ test('packed CLI pairs only after number approval and keeps keys and untrusted t
  assert.equal(remote.state.requests.filter(entry => entry.route === '/api/business/tasks/export1/uploads').length, 0);
  assert.ok(!JSON.stringify(remote.state.requests).includes(key), 'vendor key never reaches the server');
  assert.equal((await cli(home, ['business','disconnect'])).code, 0);
+ await classifierJourney({ directory, remote, cli, connect });
 });
 
 test('a killed packed supervisor resumes a lapsed lease from its acknowledged scan checkpoint', async t => {
