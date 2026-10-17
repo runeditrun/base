@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.40-dev.g9b08b7b8",
+  "cliVersion": "0.2.40",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1283,7 +1283,7 @@
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",
-      "sha256": "a4f17ee8002fe4b9d1a933ef92e39e82969a8a50ae05905e254e80607d85c9d7"
+      "sha256": "d88cd7264d3dd697a909410ac55c8a9ee0e5752c7091ccb6b590d79d7380b9b5"
     },
     "modules/demo-host/native/worker.mjs": {
       "source": "modules/demo-host/native/worker.mjs",

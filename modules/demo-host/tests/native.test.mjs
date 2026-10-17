@@ -68,6 +68,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       assert.match((await refused.json()).notice, /readable form/);
     }
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
+    assert.deepEqual([await (await fetch('/health-client', a)).json(), await (await fetch('/health-client', b)).json()], ['203.0.113.1', '203.0.113.2'], "the seed's /health during start sees each visitor's client address");
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);
     assert.deepEqual(await (await fetch('/items', b)).json(), [{ name: 'sample' }]);
     assert.deepEqual(await (await fetch('/d1-session', b)).json(), { names: ['sample'], bookmark: 'string', unknown: true, warnings: 1 }, 'D1 sessions read the visitor database; an unknown D1 method reads undefined and warns once');

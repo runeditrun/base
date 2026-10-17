@@ -13,12 +13,14 @@ export default {
       return new Response(null, { status: 303, headers: { location: '/items', 'set-cookie': `owner=${env.SESSION_SECRET}; Path=/; HttpOnly; Secure; SameSite=Lax` } });
     }
     if (path === '/health') {
+      await env.COUNTER.getByName('health').noteClient(request.headers.get('cf-connecting-ip'));
       await env.JOBS.metrics();
       const legacy = await env.LEGACY.getByName('same-name').fetch('https://legacy/');
       if (await legacy.text() !== 'present') throw new Error('Legacy Durable Object failed');
       await env.DB.prepare("INSERT OR IGNORE INTO items VALUES('sample')").run();
       return new Response('ready');
     }
+    if (path === '/health-client') return Response.json(await env.COUNTER.getByName('health').noteClient());
     if (path === '/own-data') return Response.json((await env.DB.prepare('SELECT name FROM items ORDER BY name').all()).results.map(row => row.name));
     if (!(request.headers.get('cookie') ?? '').split(';').some(part => part.trim() === `owner=${env.SESSION_SECRET}`)) return new Response('Unauthorized', { status: 401 });
     if (path === '/auth/signout' && request.method === 'POST') return new Response(null, { status: 204, headers: { 'set-cookie': 'owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax' } });
@@ -108,6 +110,10 @@ export class Counter extends DurableObject {
   async read() {
     await this.env.DB.prepare('SELECT name FROM items').all();
     return await this.ctx.storage.get('retained') ?? null;
+  }
+  async noteClient(ip) {
+    if (ip !== undefined) await this.ctx.storage.put('client', ip);
+    return await this.ctx.storage.get('client') ?? null;
   }
   async arm() {
     await this.ctx.storage.setAlarm(new Date(Date.now() + 60000));
