@@ -51,6 +51,7 @@ export async function detectClassifiers() {
    catch { continue; }
    const temporary = await mkdtemp(join(tmpdir(), 'rer-business-cli-help-'));
    try {
+    if (name === 'codex') await mkdir(join(temporary, 'codex'), { mode: 0o700 });
     const help = await execute(path, name === 'codex' ? ['exec', '--help'] : ['--help'], { cwd: temporary, timeout: 10_000, env: { ...environment(), HOME: temporary, CODEX_HOME: join(temporary, 'codex') } });
     if (!required[name].every(flag => help.includes(flag))) return null;
     if (name === 'codex') {

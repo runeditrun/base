@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.51-dev.gda4abdd5",
+  "cliVersion": "0.2.51-dev.g22ba7020",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -435,7 +435,7 @@
     },
     "cli/business/model-cli.mjs": {
       "source": "cli/business/model-cli.mjs",
-      "sha256": "a5f6a216da987d0b4db920029a81d29707a00df501cd06d1e6ac55e81b04d667"
+      "sha256": "4ad6adb0ed25eedea9cda1a93822d47f338d33c3ca6ad0e2c8482ba6a78affa7"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
