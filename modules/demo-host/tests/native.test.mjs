@@ -168,3 +168,32 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     }
   } finally { await mf?.dispose(); await rm(folder, { recursive: true, force: true }); }
 });
+
+// The start page's warm list is what the seed's build produced, wherever its assetsDir puts the chunks.
+test('the start page warms the seed build\'s hashed route chunks, in the default and a custom assetsDir', async () => {
+  const chunk = (name, size) => [name, Buffer.from(Array.from({ length: size }, (_, i) => (i * 2654435761) % 251))];
+  const build = async ({ dir, assetsDir, manifest }) => {
+    const folder = await realpath(await mkdtemp(join(tmpdir(), 'rer-native-warm-')));
+    try {
+      const app = join(folder, 'bundle/app'), server = join(app, 'dist/server'), client = join(app, 'dist/client');
+      await mkdir(join(folder, 'modules/demo-host/native'), { recursive: true });
+      await mkdir(join(server, dir), { recursive: true });
+      await mkdir(join(client, dir), { recursive: true });
+      await mkdir(join(client, '.vite'), { recursive: true });
+      await writeFile(join(server, 'index.js'), 'export default {};');
+      await writeFile(join(server, dir, '_tanstack-start-manifest_v-abc12345.js'), `export const tsrStartManifest = () => ({ routes: {
+        __root__: { preloads: ['/${dir}/entry-AAAAAAAA.js'] }, '/app': { preloads: ['/${dir}/app.settings-BBBBBBBB.js'], css: ['/${dir}/app-CCCCCCCC.css'] } } });`);
+      for (const [name, bytes] of [chunk('entry-AAAAAAAA.js', 400), chunk('app.settings-BBBBBBBB.js', 4000), chunk('app-CCCCCCCC.css', 300), chunk('other-DDDDDDDD.js', 200),
+        chunk('entry-AAAAAAAA.js.map', 100), chunk('plain.js', 100)]) await writeFile(join(client, dir, name), bytes);
+      await writeFile(join(client, 'rer-theme.css'), 'body{}');
+      if (manifest) await writeFile(join(client, '.vite/manifest.json'), JSON.stringify({ 'src/entry.ts': { file: `${dir}/entry-AAAAAAAA.js`, css: [`${dir}/app-CCCCCCCC.css`] }, 'src/other.ts': { file: `${dir}/other-DDDDDDDD.js` } }));
+      const config = { main: 'index.js', compatibility_date: '2026-09-08', no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }] };
+      await writeFile(join(app, 'demo.json'), JSON.stringify({ config, migrations: {}, operatorPath: '/app', assetsDir }));
+      return (await prepareNative(folder)).warm;
+    } finally { await rm(folder, { recursive: true, force: true }); }
+  };
+  const names = dir => ['entry-AAAAAAAA.js', 'app-CCCCCCCC.css', 'app.settings-BBBBBBBB.js', 'other-DDDDDDDD.js'].map(name => `/${dir}/${name}`);
+  assert.deepEqual(await build({ dir: 'assets' }), names('assets'), 'the default layout warms the root, the console, then the rest by size');
+  assert.deepEqual(await build({ dir: 'app-assets', assetsDir: 'app-assets' }), names('app-assets'), 'a seed that builds to another assetsDir is warmed too');
+  assert.deepEqual(await build({ dir: 'app-assets', assetsDir: 'app-assets', manifest: true }), [names('app-assets')[0], names('app-assets')[1], names('app-assets')[3]], 'a Vite manifest names the chunks when the build wrote one');
+});

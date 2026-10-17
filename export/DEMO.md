@@ -86,7 +86,8 @@ visitor into their own native Worker Loader isolate and SQLite Durable Object
 storage. The ordinary production Worker bundle is built once, with static files
 served directly at the edge. While the visitor waits for the human check and
 sign-in, the start page prefetches the console's hashed JS and CSS at idle
-priority (at most 1 MiB compressed, the `deploy.operatorPath` views first), so
+priority (at most 1 MiB compressed, the `deploy.operatorPath` views first; the
+chunks are read from the build's Vite manifest, else its `build.assetsDir`), so
 each view's first visit is served from the browser's cache. The visitor lands
 signed in as the demo owner with sample data and `RER_DEMO=1`; account effects
 remain simulated by the demo guard.
