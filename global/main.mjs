@@ -29,6 +29,8 @@ pins (installed first by any verb when node_modules holds another), else its ven
                        launch them, whether they are set up, and their running URL. --json for data.
   rer business ...     Pair a Business device, store local vendor keys, inspect tasks and disconnect.
                        rer business --help lists the commands and current protocol limitations.
+  rer companion ...    Pair this computer with a Run Edit Run app and run its change requests here
+                       with your own Codex or Claude. rer companion --help lists the commands.
   rer door ...         The opt-in front door: every checkout at http://NAME.localhost:PORT, started
                        on its first visit and stopped when idle. rer door --help for its verbs.
   rer cli status       This rer: version, contents digest, install channel, launcher and other rer
@@ -63,6 +65,7 @@ export async function main(argv) {
  delete process.env[localDefaults];
  if (verb === 'update') return (await import('./update/command.mjs')).update(argv.slice(1));
  if (verb === 'business') return (await import('../cli/business/command.mjs')).businessCommand(argv.slice(1));
+ if (verb === 'companion') return (await import('../cli/companion/command.mjs')).companionCommand(argv.slice(1));
  const notice = await import('./update/notice.mjs');
  if (verb !== 'doctor' && notice.wantsNotice(argv)) await notice.updateNotice();
  if (!verb || verb === '--help' || verb === '-h' || verb === 'help') { process.stdout.write(help); return 0; }

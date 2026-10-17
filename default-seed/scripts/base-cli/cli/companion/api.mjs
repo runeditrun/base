@@ -1,0 +1,22 @@
+// The companion's only network path: outbound HTTPS requests to the management
+// service named at pairing. It listens on nothing.
+function loopback(hostname) {
+ const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+ return host === 'localhost' || host === '::1' || host === '127.0.0.1' || host.startsWith('127.');
+}
+export function assertServerUrl(raw) {
+ let url;
+ try { url = new URL(raw); } catch { throw new Error('Server must be an absolute HTTPS URL (or loopback HTTP for local testing).'); }
+ if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback(url.hostname))) throw new Error('Server must use HTTPS. HTTP is allowed only for localhost test servers.');
+ if (url.username || url.password || url.hash) throw new Error('Server URL must not include credentials or a fragment.');
+ return url.toString().replace(/\/$/, '');
+}
+export class Api {
+  constructor(server,token) {this.server=assertServerUrl(server);this.token=token;}
+  async post(path,body) {
+    const response=await fetch(`${this.server}${path}`,{method:'POST',headers:{'content-type':'application/json',...(this.token?{authorization:`Bearer ${this.token}`}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
+    const result=await response.json();
+    if(!response.ok) throw Object.assign(new Error(result.error?.message||result.error||`HTTP ${response.status}`),{status:response.status});
+    return Object.hasOwn(result,'data') ? result.data : result;
+  }
+}
