@@ -1,7 +1,7 @@
 import { canonicalJson, sha256, attachmentHash } from '../provenance/identity.ts';
 import type { ProvenanceRow, TargetRow } from '../types.ts';
 import type { DoorRecord, DoorRequest, DoorTarget } from './types.ts';
-import { DoorError } from './grants.ts';
+import { DoorError } from './protocol.ts';
 import { planRow } from './store.ts';
 import { readD1PersistedImport } from '../d1/index.ts';
 
@@ -12,7 +12,7 @@ export const recordKey = (r: {kind:string;sourceId:string}) => canonicalJson([r.
 export async function importedTarget(request: DoorRequest, target: DoorTarget): Promise<{provenance:ProvenanceRow;current:TargetRow|undefined;matches:boolean}> {
   const owner = await planRow(request, target.ownerPlanId);
   if (!owner.job_id) throw new DoorError('import_lineage_incomplete', 409);
-  request.persisted ??= readD1PersistedImport({destination:request.options.destination,namespace:request.grant.namespace,mappingVersion:request.options.mapping.version,
+  request.persisted ??= readD1PersistedImport({destination:request.options.destination,namespace:request.access.namespace,mappingVersion:request.options.mapping.version,
     storage:{database:request.options.database,targets:request.options.targets},
     authorization:{principalId:request.options.ownerPrincipalId,predicate:action=>action==='read'?request.authority:{sql:'0'}}});
   const persisted = await request.persisted;

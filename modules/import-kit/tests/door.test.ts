@@ -10,6 +10,10 @@ test('HTTP import door is absent until the installation opts in',async t=>{
   for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  await d.enable();
+  delete (d.options.claim.publicKeys as Record<string, JsonWebKey>).test;
+  for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
 });
 
 test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody',async t=>{
@@ -121,4 +125,43 @@ test('HTTP grants and bounded catch-up fail closed while valid snapshot replacem
   await d.apply(guarded.body);await d.undo(guarded.body.planId);
   await writeImportDoorSettings(d.db,d.options.claim.installationId,{enabled:true,revokedKids:['test']},d.ownerPredicate);
   assert.equal((await d.call('plan',{})).status,403);
+});
+
+
+test('owner-session HTTP pipeline works in a seed with no owner-claim module or grant key ring',async t=>{
+  const d=await door(t,'operator');
+  for (const action of ['uploads','plan','apply','status','reconcile','undo']) {
+    assert.equal((await fetch(d.origin+'/api/rer/import/'+action,{method:'POST'})).status,404);
+  }
+  const post=(body:unknown,headers:Record<string,string>)=>fetch(d.origin+'/api/operator/import/apply',{
+    method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
+  assert.equal((await post({}, {Origin:d.origin,Authorization:'Bearer test-not-an-owner-session'})).status,401);
+  assert.equal((await post({}, {Origin:'https://other.example.test',Cookie:'test-owner-session'})).status,403);
+  const planned=await d.plan(documents(25,true));
+  assert.equal(planned.status,200,JSON.stringify(planned.body));
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  assert.equal((await d.call('apply',{planId:planned.body.planId})).status,400);
+  assert.equal((await d.call('apply',{planId:planned.body.planId,reviewedFingerprint:'0'.repeat(64)})).status,403);
+  d.runtime.native().exec("CREATE TRIGGER revoke_owner_during_write AFTER INSERT ON native_records BEGIN UPDATE native_authority SET enabled=0 WHERE id='owner'; END");
+  assert.equal((await d.call('apply',{planId:planned.body.planId,reviewedFingerprint:planned.body.fingerprint})).status,409);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  d.runtime.native().exec('DROP TRIGGER revoke_owner_during_write');
+  const job=await d.apply(planned.body);
+  const status=await d.call('status',{planId:planned.body.planId});
+  assert.equal(status.status,200);assert.equal(status.body.job.state,'completed');
+  assert.match(status.body.caption,/^approved by /);
+  const history=await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate);
+  assert.equal(history[0].jobId,job.id);assert.notEqual(history[0].reviewer,history[0].approvalRecordId);
+  const report=await d.call('reconcile',{planId:planned.body.planId});
+  assert.equal(report.status,200,JSON.stringify(report.body));assert.equal(report.body.ok,true);
+  assert.equal(report.body.counts.present,25);assert.equal(report.body.counts.nativeTargets,25);
+  d.runtime.native().exec("UPDATE native_authority SET enabled=0 WHERE id='owner'");
+  assert.equal((await d.call('undo',{planId:planned.body.planId})).status,403);
+  d.runtime.native().exec("UPDATE native_authority SET enabled=1 WHERE id='owner'");
+  await d.undo(planned.body.planId);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  const originals=await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace});
+  assert.equal(originals[0].original.status,'retained');
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
+  assert.equal(d.runtime.native().prepare('SELECT enabled FROM ik_door_settings').get()!.enabled,0);
 });

@@ -1,5 +1,9 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime, sqliteTargets } from '../d1/sqlite-runtime.ts';
@@ -8,7 +12,7 @@ import { sha256 } from '../../src/provenance/identity.ts';
 import type { DoorAction, DoorGrant } from '../../src/door/grants.ts';
 import type { Json } from '../../src/types.ts';
 
-export async function door(t: TestContext) {
+export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant') {
   const runtime = await sqliteRuntime(t), db = runtime.db();
   await db.batch(importDoorSchema.map(q=>db.prepare(q)));
   const keys = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
@@ -29,9 +33,24 @@ export async function door(t: TestContext) {
     parse(value:Json) {const record=value as {id:string;title:string};return {kind:'document',sourceId:record.id,payload:value};},
     mapping:{version:'v1',map:(record:any)=>record.payload.reject?{effects:[],rejection:'Unsupported source record'}:{effects:[{targetKind:'record',targetId:record.sourceId,value:record.payload}]}},
   };
-  handler = createImportDoorHandler(options);
   const ownerPredicate = {sql:"EXISTS(SELECT 1 FROM native_authority WHERE id='owner' AND enabled=1)"};
   const approval = {approvalRecordId:'test-owner-approval',approvedAt:new Date().toISOString()};
+  if (mode === 'operator') {
+    // An independently copied seed has NO sibling owner-claim or operator-auth.
+    const copy = await mkdtemp(join(tmpdir(),'door-without-claim-'));
+    t.after(()=>rm(copy,{recursive:true,force:true}));
+    await cp(new URL('../../src',import.meta.url),join(copy,'import-kit/src'),{recursive:true});
+    await cp(new URL('../../../d1-transport',import.meta.url),join(copy,'d1-transport'),{recursive:true});
+    // The guide's operator-only source inventory excludes optional grant code.
+    for (const file of ['index.ts','admission.ts','grants.ts']) await rm(join(copy,'import-kit/src/door',file));
+    const {createImportOperatorHandler} = await import(pathToFileURL(join(copy,'import-kit/src/door/operator.ts')).href);
+    const {claim,...runtimeOptions} = options;
+    handler = createImportOperatorHandler({...runtimeOptions,installationId:claim.installationId,
+      appOrigin:origin,ownerEmail:claim.expectedEmail,namespace:'knowledge',
+      authorize:async (request:Request)=>request.headers.get('Cookie')==='test-owner-session' ? ownerPredicate : null});
+    await writeImportDoorSettings(db,claim.installationId,{enabled:false},ownerPredicate);
+  } else handler = createImportDoorHandler(options);
+
   async function token(action:DoorAction,overrides:Partial<DoorGrant>={},privateKey=keys.privateKey) {
     const now=Math.floor(Date.now()/1000);
     const payload:DoorGrant={v:1,iss:options.claim.issuer,aud:origin,installationId:options.claim.installationId,email:options.claim.expectedEmail,jti:randomUUID(),iat:now,exp:now+300,action,namespace:'knowledge',maxBytes:2_000_000,maxChunks:32,maxRecords:1000,...overrides};
@@ -40,7 +59,7 @@ export async function door(t: TestContext) {
     return header+'.'+body+'.'+Buffer.from(signature).toString('base64url');
   }
   async function call(action:DoorAction,body:unknown,overrides:Partial<DoorGrant>={},signed?:string) {
-    const response=await fetch(origin+'/api/rer/import/'+action,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+(signed ?? await token(action,overrides))},body:JSON.stringify(body)});
+    const response=await fetch(origin+(mode==='operator'?'/api/operator/import/':'/api/rer/import/')+action,{method:'POST',headers:{'Content-Type':'application/json',...(mode==='operator'?{Origin:origin,Cookie:'test-owner-session'}:{Authorization:'Bearer '+(signed ?? await token(action,overrides))})},body:JSON.stringify(body)});
     return {status:response.status,body:await response.json() as any};
   }
   async function upload(records:unknown[],overrides:Partial<DoorGrant>={}) {
@@ -70,7 +89,7 @@ export async function door(t: TestContext) {
     do {result=await call('undo',{planId});assert.equal(result.status,200,JSON.stringify(result.body));} while(!['undone','rolled_back'].includes(result.body.job.state));
     return result;
   }
-  return {runtime,db,options,ownerPredicate,approval,call,token,upload,plan,apply,undo,
+  return {origin,runtime,db,options,ownerPredicate,approval,call,token,upload,plan,apply,undo,
     enable:()=>writeImportDoorSettings(db,options.claim.installationId,{enabled:true},ownerPredicate)};
 }
 export const documents = (count:number,large=false) => Array.from({length:count},(_,i)=>({id:String(i),title:`Knowledge article ${i}`,body:large?'Reviewed historical knowledge. '.repeat(55):'Historical knowledge.'}));
