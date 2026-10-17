@@ -39,6 +39,13 @@ async function writeLauncher(paths) {
  await rename(temporary, paths.launcher);
 }
 
+// The next step, then (when needed) the exact line that puts rer on PATH, last.
+// install.sh running a command itself, and rer update, set RER_INSTALL_NO_NEXT.
+async function closing(paths) {
+ const advice = await pathAdvice(paths);
+ return `${process.env.RER_INSTALL_NO_NEXT ? '' : 'Next, start an app: rer dev <owner>/<repo>\n'}${advice ? advice + '\n' : ''}`;
+}
+
 export async function install({ quiet = false } = {}) {
  const paths = layout(), manifest = ownManifest(), digest = await packageDigest(ownRoot);
  const name = `${manifest.version}-${digest.slice(0, 8)}`, channel = process.env.RER_INSTALL_CHANNEL === 'script' ? 'script' : 'npx';
@@ -52,8 +59,7 @@ export async function install({ quiet = false } = {}) {
  let present = false;
  try { present = await packageDigest(join(paths.versions, name)) === digest; } catch (error) { if (error.code !== 'ENOENT') throw error; }
  if (present && current === join('versions', name) && launcher.text === script && record?.channel === channel) {
-  const advice = await pathAdvice(paths);
-  if (!quiet) process.stdout.write(`rer ${manifest.version} is already current (${join(paths.versions, name)}). Nothing changed.\n${advice ? advice + '\n' : ''}`);
+  if (!quiet) process.stdout.write(`rer ${manifest.version} is already current (${join(paths.versions, name)}). Nothing changed.\n${await closing(paths)}`);
   return 0;
  }
  if (!present) { await rm(join(paths.versions, name), { recursive: true, force: true }); await copyVersion(paths, name); }
@@ -66,7 +72,6 @@ export async function install({ quiet = false } = {}) {
  for (const entry of await readdir(paths.versions)) if (!keep.has(entry) && !entry.startsWith('.staging-')) await rm(join(paths.versions, entry), { recursive: true, force: true });
  await writeFile(paths.record, JSON.stringify({ channel, links: record?.links ?? [], previous: previousName && keep.has(previousName) ? previousName : null }, null, 2) + '\n', { mode: 0o644 });
  if (launcher.text !== script) await writeLauncher(paths);
- const advice = await pathAdvice(paths);
- if (!quiet) process.stdout.write(`Installed rer ${manifest.version} in ${join(paths.versions, name)}.\n${paths.launcher} runs it.${previousName ? ` The previous version (${previousName}) is kept.` : ''}\n${advice ? advice + '\n' : ''}`);
+ if (!quiet) process.stdout.write(`Installed rer ${manifest.version} in ${join(paths.versions, name)}.\n${paths.launcher} runs it.${previousName ? ` The previous version (${previousName}) is kept.` : ''}\n${await closing(paths)}`);
  return 0;
 }

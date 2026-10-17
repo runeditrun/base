@@ -1,7 +1,7 @@
 // Chromium from the seed's own Playwright, the two ways of serving pages to it
 // (the production build as rer deploy hosts it, or a running origin), and one
 // load: scripts held until the probe releases them, every external request aborted.
-import { checkoutPlaywright, browserRepair } from '../browser-runtime.mjs';
+import { checkoutPlaywright } from '../browser-runtime.mjs';
 import { RerError } from '../errors.mjs';
 import { serveHosted } from '../hosted-output.mjs';
 import { probe } from './probe.mjs';
@@ -12,7 +12,7 @@ export async function launchChromium(root) {
  // Pages fulfilled by the check would otherwise count as public, and Chromium would
  // refuse a dev server's loopback HMR socket from them.
  try { return await playwright.chromium.launch({ args: ['--disable-features=LocalNetworkAccessChecks'] }); }
- catch (error) { throw new RerError('hydration_browser_missing', `The hydration check could not start Chromium from the seed's ${name}: ${String(error.message).split('\n').find(line => line.trim()) ?? error}. Install the browser it pins with ${browserRepair}.`, 1); }
+ catch (error) { throw new RerError('hydration_browser_missing', `The hydration check could not start Chromium from the seed's ${name}: ${String(error.message).split('\n').find(line => line.trim()) ?? error}. Run rer verify, which downloads the browser it pins first.`, 1); }
 }
 
 const strip = new Set(['content-encoding', 'content-length', 'transfer-encoding', 'connection']);

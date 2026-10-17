@@ -11,11 +11,11 @@ export const defaultPort = 8787;
 // this host can bind. Another checkout's server may listen on every address,
 // which a bind to 127.0.0.1 alone does not notice.
 export async function firstFreePort(host, from = defaultPort, context) {
- const { inspectionContext } = await shared('process-diagnostics.mjs');
+ const { searchContext } = await shared('process-diagnostics.mjs');
  const { probePort } = await shared('port-probe.mjs');
- context ??= inspectionContext({verb:'setup'});
+ context ??= searchContext({verb:'setup'});
  for (let port = from; port <= 65535; port++) {
-  if ((await probePort(host, port, { context, anyAddress: true })).available) return port;
+  if ((await probePort(host, port, { context, anyAddress: true, searching: true })).available) return port;
   if (performance.now() >= context.deadline) throw Error('Could not find a free port in time (system busy). Run rer setup again.');
  }
  throw Error(`No free port from ${from} upward.`);

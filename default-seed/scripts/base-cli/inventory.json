@@ -173,7 +173,7 @@
     },
     "port-probe.mjs": {
       "source": "onboarding/port-probe.mjs",
-      "sha256": "0be129deac11ca3aaff8c45fc0ea19909a0afca7599c543063142a391ef0bc40"
+      "sha256": "505fce33f771474c2c9e1a41bd03bc0e828b97c27d1cf84eea6030bc113abb0a"
     },
     "prefill.mjs": {
       "source": "onboarding/prefill.mjs",
@@ -193,7 +193,7 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "f3f572e71884d5a6c62d5804c34b79d685be2157c0e4f3650be5ffa7336e59f0"
+      "sha256": "5ab774583c23209913d24f27a985f038bb3cbc9aef1fa34dd86dcf81545e0565"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
@@ -379,7 +379,7 @@
     },
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
-      "sha256": "8eff2b722c0797078b948fee4b194736701c96ef1c54d7dbd8ebf1a43529d4ac"
+      "sha256": "993ac97de526d169d36b0f71b4b25b703d6023c63bd259403cc86e85c1f36ed5"
     },
     "cli/business/api.mjs": {
       "source": "cli/business/api.mjs",
@@ -591,7 +591,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "fce7301ef835937f48b3cf618416e6255eb7c3b5aacc3700155ca1c128891091"
+      "sha256": "ca684ea4bc45e111a30fd2507a2dc0c380ff7ad175fd270a19dd9d0849efa891"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -691,7 +691,7 @@
     },
     "cli/hydration/browser.mjs": {
       "source": "cli/hydration/browser.mjs",
-      "sha256": "b2e70a116450d1c5839c15981f5c1dbd451869bcb1df62eeb0b9b67a69dbdb7b"
+      "sha256": "df47fdb798c70cd6882654ac48f0c4bb39149dddb2e7867fb25a48521baf8e4f"
     },
     "cli/hydration/cases.mjs": {
       "source": "cli/hydration/cases.mjs",
@@ -727,7 +727,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "321862cca6bb7aa1250288f297af2d029385a6292d37758dd8de3c2b5cdad2ad"
+      "sha256": "35ffc6a61e729736cd2b89f09c49235560d54bd5472cb116a2a887dc0fb2d48d"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -743,7 +743,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "8d34abc01890f488980c6ac2f669a8407cee7ab505c49a59ef923e8099164edf"
+      "sha256": "63cd1dc485c4d87243788f2f6db065556dcb7938056693ac454163a3a4f7adf8"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -795,7 +795,7 @@
     },
     "cli/port.mjs": {
       "source": "cli/port.mjs",
-      "sha256": "45cb6a256469604f595a87c742f86f19c459d4c3ca8d39c2416951e3014c82c8"
+      "sha256": "b65a8de007506be8282583383f33934642ba5437a2c57c52f64c079c0b7e36d6"
     },
     "cli/portability-policy.mjs": {
       "source": "cli/portability-policy.mjs",
@@ -807,7 +807,7 @@
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "06dd727dd0b3c20e1edf30ba887e2ec796aa8f66f7da3b4c39878fbf1da63af8"
+      "sha256": "ce1d2b831d4df58017fb728013be5fdf5dd74c731263244d03dda80bb8a61d6d"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -940,6 +940,10 @@
     "cli/site.mjs": {
       "source": "cli/site.mjs",
       "sha256": "7dedd5ed20cba3311d683da39d1bef437726b7224e6be84033170fe707eb39d4"
+    },
+    "cli/sqlite-notice.mjs": {
+      "source": "cli/sqlite-notice.mjs",
+      "sha256": "d4f80aaf6bf338651486ca46adec13019265406677de259ed375829a18b67f6d"
     },
     "cli/stdio.mjs": {
       "source": "cli/stdio.mjs",

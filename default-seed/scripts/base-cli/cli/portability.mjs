@@ -54,9 +54,11 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   // Check real existing bindings first; finalize repeats this under the lock.
   if(legacyRecovery)await nativeWorker(store,'legacy-preflight',input,signal);
   // Local migrations need no provider account: wrangler runs without credentials.
+  // Its info lines (the local location and "Use --remote if you want to access
+  // the remote instance") only confuse a local backup; warnings and errors print.
   const { dependencyEnvironment } = await shared('dependency-environment.mjs');
   await store.run('Applying local data migrations', 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], {
-   cwd: root, signal, env: { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false' },
+   cwd: root, signal, env: { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG: 'warn' },
   });
   const receipt=await nativeWorker(store,direction,input,signal);
   if(legacyRecovery)receipt.output=relative(root,legacyRecovery.output);
@@ -66,9 +68,10 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
 }
 
 async function nativeWorker(store,direction,input,signal) {
-  const worker = fileURLToPath(new URL('./portability-worker.mjs', import.meta.url));
+  // The notice filter loads before the worker links its static node:sqlite import.
+  const worker = fileURLToPath(new URL('./portability-worker.mjs', import.meta.url)), notice = new URL('./sqlite-notice.mjs', import.meta.url).href;
   const child = store.spawn(`${direction === 'policy-preflight' ? 'Checking archive policy' : direction === 'legacy-preflight' ? 'Checking empty recovery destination' : direction === 'export' ? 'Exporting' : 'Restoring'} local installation data`, process.execPath,
-   [worker, direction, JSON.stringify(input)], { cwd: input.root, signal, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+   ['--import', notice, worker, direction, JSON.stringify(input)], { cwd: input.root, signal, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   let receipt;
   child.once('message', message => { receipt = message; });
   const closed = new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));

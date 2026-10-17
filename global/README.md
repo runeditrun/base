@@ -14,10 +14,10 @@ rer dev just-every/run-inkwell
 ```
 
 The installer needs no Node: without Node 22 or later on PATH it installs a
-private one for `rer` (see below). It edits no shell profile, so when
-`~/.local/bin` is not on PATH, run the `export PATH=…` line it prints before
-`rer dev`. Its last line names that next command. The same start also fits on
-one line:
+private one for `rer` (see below). It edits no shell profile: it names the next
+command, `rer dev <owner>/<repo>`, and when `~/.local/bin` is not on PATH for new
+terminals its last line is the one to run first, which adds it for your shell.
+The same start also fits on one line:
 
 ```sh
 curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell
@@ -57,16 +57,19 @@ verifies the tarball against that release's published `SHASUMS256.txt`, and
 prints its location. The launcher uses this private runtime on later runs.
 System Node and other PATH directories are left alone: the private runtime's
 `node`, `npm` and `npx` are not put on PATH, because `rer` is the one command
-the installer provides. With no arguments the script ends by naming the next
-command, `rer dev <owner>/<repo>`.
+the installer provides. With no arguments the script names the next command,
+`rer dev <owner>/<repo>`, and ends with the PATH line below when one is needed.
 
 No installer edits shell profiles. The canonical launcher is `~/.local/bin/rer`.
 Installation creates that directory if needed and never writes into another
 PATH directory. It names any existing `rer` elsewhere on PATH and leaves it
-unchanged. If `~/.local/bin` is absent from PATH or another command shadows it,
-it prints one activation line to run in the current shell:
-`export PATH="$HOME/.local/bin:$PATH"` (with fish syntax for fish). Without a
-private runtime, the launcher uses `node` from PATH. A re-run with the same build changes
+unchanged. If `~/.local/bin` is absent from PATH, another command shadows it,
+or no startup file of your shell adds it for new terminals, its last line is
+one command to run: it appends `export PATH="$HOME/.local/bin:$PATH"` to that
+startup file (`~/.zshrc` for zsh; `~/.bash_profile` for bash on macOS and
+`~/.bashrc` elsewhere; `~/.profile` otherwise) and runs it in the current shell.
+For fish it is `fish_add_path ~/.local/bin`. Without a private runtime, the
+launcher uses `node` from PATH. A re-run with the same build changes
 nothing; a different build is installed beside the current one, the previous one
 is kept and older ones are removed. It refuses to replace a `~/.local/bin/rer`
 that it did not write.
@@ -88,11 +91,14 @@ install in place.
 - For `install.sh`: `curl`, `tar`, and `shasum` or `sha256sum` when it installs
   Node. macOS includes these tools.
 - For the npm/npx install alternatives: Node 22 or later on PATH.
-- Checkout commands acquire the checkout's pinned Node and pnpm when needed.
-  `rer install` also downloads the checkout's Playwright Chromium and headless
-  shell for verification; `rer verify` installs missing browser files on first
-  need. Downloads print progress. `rer doctor` reports a missing browser and
-  directs you to `rer install`, without downloading anything itself.
+- Checkout commands acquire the checkout's pinned Node and pnpm when needed,
+  in rer's own cache: neither goes on PATH. `rer run SCRIPT [ARGS]` runs a
+  package.json script with them, so a project's `pnpm run X -- ARGS` is
+  `rer run X -- ARGS`. `rer install` downloads no browser: the checkout's
+  Playwright Chromium and headless shell download the first time a command needs
+  them (`rer verify`, or `rer run` of a script that runs Playwright). Downloads
+  print progress. `rer doctor` lists browsers not downloaded yet, without
+  counting them as a problem or downloading anything itself.
 
 Not supported: native Windows (`install.sh` and `rer` say to use WSL2), and
 `OPERATIONS.json` version 1 projects.

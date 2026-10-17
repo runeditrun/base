@@ -22,6 +22,9 @@ pins (installed first by any verb when node_modules holds another), else its ven
                        RER_READY and a sign-in link. Without a terminal it returns once the app is
                        ready and leaves it running (--detach and --foreground override); allow up
                        to 10 minutes on a first launch, or rerun it to reattach. rer dev --stop stops it.
+  rer run SCRIPT [ARGS]
+                       Run a package.json script with the pnpm and Node the checkout pins (rer keeps
+                       them off PATH): where a project's docs say pnpm run X, run rer run X.
   rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether rer dev can
                        launch them, whether they are set up, and their running URL. --json for data.
   rer business ...     Pair a Business device, store local vendor keys, inspect tasks and disconnect.
@@ -66,6 +69,7 @@ export async function main(argv) {
  if (verb === 'cli') return (await import('./cli/command.mjs')).cliCommand(argv.slice(1));
  if (verb === 'list') return (await import('./list.mjs')).listCommand(argv.slice(1));
  if (verb === 'door') return (await import('./door/command.mjs')).doorCommand(argv.slice(1));
+ if (verb === 'run') return (await import('./run.mjs')).runScript(argv.slice(1));
  if (repositoryCommands[verb] && argv.includes('--help')) {
   const { help } = await import('../cli/parse.mjs');
   process.stdout.write(`${help(verb)}\n${repositoryCommands[verb].usage}\n${repositoryCommands[verb].effects}\n${repositoryHelp}`);
@@ -136,7 +140,7 @@ export async function main(argv) {
  }
  if (mode === 'package' && installsFirst.has(verb)) await (await import('./launch/install-pinned.mjs')).settledPin(target.root);
  if (verb === 'describe' && !argv.includes('--help')) return (await import('./cli/describe.mjs')).describeCommand(target);
- if (first && dispatcher(target.root).mode !== 'bundled' && ['install', 'verify'].includes(verb) && !argv.includes('--help') && !argv.includes('--site')) {
+ if (first && dispatcher(target.root).mode !== 'bundled' && verb === 'verify' && !argv.includes('--help') && !argv.includes('--site')) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
   if (code !== undefined) return code;
  }

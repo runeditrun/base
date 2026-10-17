@@ -11,7 +11,8 @@
 # differently from this script's own check), and installs through the
 # package's own `rer cli install`: the same layout as
 # `npx -y @runeditrun/rer cli install`. A failure leaves any previous install
-# selected and working. It never edits shell profiles.
+# selected and working. It never edits shell profiles: when ~/.local/bin is not
+# on PATH for new terminals, its last line is the one to run that adds it.
 #
 # Needs curl and tar. If Node 22 or later is absent, installs the pinned official
 # Node release in rer's own data directory. macOS/Linux x64/arm64; Windows: WSL2.
@@ -139,13 +140,13 @@ if (process.argv[5] !== '' && Number(process.argv[5]) !== total) stop('the archi
 NODE
  mkdir "$work/stage"
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
- RER_INSTALL_CHANNEL=script node "$work/stage/package/global/rer.mjs" cli install </dev/null \
+ # It ends with the next step and, when rer is not on PATH in new terminals,
+ # the exact line that puts it there (no npx: Node may be rer's own).
+ no_next=
+ if [ "$#" -gt 0 ]; then no_next=1; fi
+ RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next node "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
- if [ "$#" -eq 0 ]; then
-  # The same next step a Run page gives; no npx, since Node may be rer's own.
-  printf 'Next, start a seed: rer dev <owner>/<repo>\n'
-  return
- fi
+ if [ "$#" -eq 0 ]; then return; fi
  PATH="$HOME/.local/bin:$PATH"
  export PATH
  "$HOME/.local/bin/rer" "$@"

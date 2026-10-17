@@ -44,6 +44,18 @@ export async function declarationFor(root, adapter) {
  return matches[0];
 }
 
+// What a real deploy of this checkout still needs from its owner, read from its
+// deploy declaration as a dry run reads it. Local setup lists it when it ends.
+export async function hostedDeployNeeds(project) {
+ const { adapter, root, setupManifest, setupSeed } = project;
+ if (typeof adapter?.deploy !== 'function') return [];
+ const { path, value: declaration } = await declarationFor(root, adapter);
+ const options = { dryRun: true }, settings = adapter.hooks?.secrets ?? adapter.settings;
+ const { env } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys: adapter.localOnlyKeys ?? [] });
+ const { signIn } = await requireProductionAuth({ root, declaration, env, setupManifest, setupSeed, adapter, declarationPath: path, options }) ?? {};
+ return neededForRealDeploy({ declaration, env, signIn });
+}
+
 export async function deployCommand(context) {
  const { adapter, root, options, store, setupManifest, linkDependencies, localOnlyKeys = [] } = context;
  validateDeployOptions(options);

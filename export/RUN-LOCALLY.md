@@ -2,17 +2,24 @@
 
 Start a published seed in two lines. The [RER installer](https://runeditrun.com)
 (`curl -fsSL https://runeditrun.com/install.sh | sh`) installs `rer` in
-`~/.local/bin`, with its own Node when there is no Node 22 or later on PATH; it
-edits no shell profile, so run the `export PATH=…` line it prints when
-`~/.local/bin` is not on PATH. Then `rer dev <owner>/<repo>`, for example
-`rer dev just-every/run-inkwell`, clones the seed and starts it. To start it
-again later, run `cd <folder> && rer dev` (the folder is the repository name).
+`~/.local/bin`, with its own Node when there is no Node 22 or later on PATH. It
+edits no shell profile: when `~/.local/bin` is not on PATH for new terminals,
+its last line is the one command that adds it for your shell (for zsh:
+`echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && export PATH="$HOME/.local/bin:$PATH"`);
+run it once. Then `rer dev <owner>/<repo>`, for example
+`rer dev just-every/run-inkwell`, clones the app and starts it. The clone has
+every commit and release tag (file contents arrive as a checkout needs them), so
+`git checkout <tag>` adopts an older release. To start it again later, run
+`cd <folder> && rer dev` (the folder is the repository name).
 With Node 22 or later already on PATH, `npx -y @runeditrun/rer dev <owner>/<repo>`
 does both in one line, and `npm install -g @runeditrun/rer` is another way to
 install `rer`. The installer's Node stays private to `rer`: it puts no `node`,
 `npm` or `npx` on PATH. First-party commands fetch and verify
 the exact pnpm version declared in `package.json` when it is missing, using
-`$HOME/.rer/pnpm`; no global pnpm installation or sudo is needed.
+`$HOME/.rer/pnpm`; no global pnpm installation or sudo is needed. That pnpm stays
+off PATH, so where a project's docs say `pnpm run X -- ARGS`, run
+`rer run X -- ARGS`: the same script, with the pnpm and Node the project pins.
+`rer run` alone lists the scripts.
 First-party seeds pin the command implementation in either vendored mode or
 package mode. Vendored mode carries Base's exported CLI; package mode pins an
 exact `@runeditrun/rer` devDependency. In both modes the checkout's
@@ -32,7 +39,9 @@ with exit 3 and a message naming the field.
 
 - **Port.** The first port from 8787 that is free on both `127.0.0.1` and `::1`
   and held by no registered server. Override with `rer dev --port N`; start the
-  search elsewhere with `RER_DEV_PORT_FROM=N`.
+  search elsewhere with `RER_DEV_PORT_FROM=N`. The search moves past a port in
+  use as soon as it cannot bind it, and on a busy computer it allows longer (15
+  seconds, up to 60 at a high load per CPU) before it gives up.
 - **Detaching.** Without a terminal (an agent's shell tool) `rer dev` returns once
   the app is ready and leaves it running in the background, printing its
   private log path; in a terminal it stays in the foreground and Ctrl-C stops
@@ -68,6 +77,14 @@ rer install
 rer setup --owner-email you@example.com
 rer dev
 ```
+
+`rer install` installs the locked dependencies only. The Playwright browser a
+seed's tests use downloads the first time a command needs it (`rer verify`, or
+`rer run` of a script that runs Playwright), so an owner who only deploys never
+fetches it. `rer setup` ends by listing what a hosted deploy will still need,
+read from the deploy declaration: the Cloudflare account ID and API token (with
+the permissions, or the project's deploy guide), each required secret not yet
+set, and production sign-in's mail inputs.
 
 Commands that run project work select the exact Node version declared by the
 project. They use an exact matching installed runtime or a checksum-verified
@@ -231,7 +248,10 @@ keeps source, dependencies, exports and deployment receipts. It refuses active
 operations and ambiguous or linked state.
 
 Local export creates a private archive with an integrity receipt and explicit
-exclusions. Import validates the archive and restores into an empty destination.
+exclusions. Export, reset and import print only their own steps: Node's
+"SQLite is an experimental feature" notice and wrangler's local-only hints
+(such as "Use --remote if you want to access the remote instance") are left out.
+They are local operations; nothing remote is read or changed. Import validates the archive and restores into an empty destination.
 After import, run setup to establish the owner and local configuration. Auth,
 private settings and transient runtime state are excluded. Remote
 transfer is unsupported by the maintained references and fails visibly.

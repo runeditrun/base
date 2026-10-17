@@ -82,7 +82,7 @@ export async function update(args) {
    }
   }
   if (channel === 'npm-global') return await npmGlobal(release.version);
-  return await run(process.execPath, [join(work, 'package/global/rer.mjs'), 'cli', 'install'], { ...process.env, RER_INSTALL_CHANNEL: channel });
+  return await run(process.execPath, [join(work, 'package/global/rer.mjs'), 'cli', 'install'], { ...process.env, RER_INSTALL_CHANNEL: channel, RER_INSTALL_NO_NEXT: '1' });
  } catch (error) {
   if (!(error instanceof UpdateFailure)) throw error;
   process.stderr.write(`rer update: ${error.message} rer ${current} is still selected.\n`);

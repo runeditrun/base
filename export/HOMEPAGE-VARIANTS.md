@@ -160,7 +160,7 @@ The Run page then reads, exactly: "Run <Seed> on your computer."; "100% free and
 open source. Two lines, and <Seed> opens in your browser."; step 1 **Install rer**,
 `curl -fsSL https://runeditrun.com/install.sh | sh`, "It installs rer for you
 alone, with its own Node if you have no Node 22 or later. It changes no shell
-settings: if it prints an `export PATH=…` line, run that line before step 2.";
+settings: if its last line puts rer on your PATH, run that line before step 2.";
 step 2 **Start <Seed>**, the `clone` line without `npx -y @runeditrun/` (`rer dev
 just-every/cradle`), "rer gets <Seed>, installs everything, makes you the owner
 and prints a link that opens <Seed> signed in. To start it again later: `cd

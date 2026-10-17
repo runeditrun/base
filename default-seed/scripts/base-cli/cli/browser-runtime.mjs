@@ -1,6 +1,8 @@
 // Browser prerequisites come from the checkout's Playwright, including its
 // platform/revision and PLAYWRIGHT_BROWSERS_PATH handling. Inspection never
-// launches a browser or downloads anything.
+// launches a browser or downloads anything. The browser itself downloads on
+// the first command that needs it (rer verify, or rer run of a Playwright
+// script), never during rer install: a deploy-only owner never fetches it.
 import { access, constants } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
@@ -8,6 +10,7 @@ import { RerError } from './errors.mjs';
 import { shared } from './shared.mjs';
 
 export const browserRepair = 'rer install';
+export const browserDownload = 'rer verify downloads them the first time it runs';
 
 export function checkoutPlaywright(root, { required = true } = {}) {
  const require = createRequire(join(root, 'package.json'));
@@ -44,22 +47,28 @@ export async function browserDoctor(root) {
   if (path) try { await access(path, process.platform === 'win32' ? constants.F_OK : constants.X_OK); ok = true; } catch {}
   executables.push({ name, ...(path ? { path } : {}), ok });
  }
+ // Not yet downloaded is the normal state until a command needs the browser.
  const missing = executables.filter(executable => !executable.ok).map(executable => executable.name);
- return { ok: !missing.length, package: resolved.name, executables, ...(missing.length ? { issue: `Playwright browser executables are missing: ${missing.join(', ')}. Run ${browserRepair}.`, fix: browserRepair } : {}) };
+ return { ok: true, package: resolved.name, executables, ...(missing.length ? { note: `Playwright browsers not downloaded yet: ${missing.join(', ')}; ${browserDownload}.` } : {}) };
 }
 
 export async function ensureChromium(root, store, signal, { required = true } = {}) {
- // Installing a first-party adapter without browser dependencies remains valid.
- // Verification requires Playwright; installation provisions it when declared.
+ // A first-party adapter without browser dependencies remains valid.
+ // Verification requires Playwright; rer run provisions it when declared.
  const resolved = checkoutPlaywright(root, { required });
  if (!resolved) return;
- const before = await browserDoctor(root);
- if (before.ok) return;
+ if (await browsersPresent(root)) return;
  const { cli } = resolved;
  const { dependencyEnvironment } = await shared('dependency-environment.mjs');
  const env = dependencyEnvironment();
  if (process.env.PLAYWRIGHT_BROWSERS_PATH !== undefined) env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH;
  await store.run('Installing Chromium and its headless shell from the checkout’s Playwright', 'pnpm', ['exec', 'node', cli, 'install', 'chromium'], { cwd: root, signal, env, display: `pnpm exec node ${relative(root, cli)} install chromium` });
- const after = await browserDoctor(root);
- if (!after.ok) throw new RerError('browser_install_incomplete', after.issue, 3);
+ const absent = (await browserDoctor(root)).executables.filter(executable => !executable.ok).map(executable => executable.name);
+ if (absent.length) throw new RerError('browser_install_incomplete', `The checkout's Playwright did not install every browser it pins (missing: ${absent.join(', ')}). Run the same command again; it retries the download.`, 3);
+}
+
+// Whether every browser the checkout's Playwright pins is on disk.
+export async function browsersPresent(root) {
+ const browser = await browserDoctor(root).catch(() => undefined);
+ return Boolean(browser?.ok && !browser.note);
 }

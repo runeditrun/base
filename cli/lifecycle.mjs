@@ -2,6 +2,7 @@ import { ensureChromium } from './browser-runtime.mjs';
 import { dependencyInputs } from './dependency-input.mjs';
 import { linkDependencies } from './dependencies.mjs';
 import { savedSetupAnswers } from './setup-answers.mjs';
+import { localDefaultsVariable } from './setup-input.mjs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -93,9 +94,10 @@ async function runLifecycle(project, options, out, deployRedaction) {
    try {
     const { dependencyEnvironment } = await shared('dependency-environment.mjs');
     await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...dependencyEnvironment(), CI: 'true' }, display: 'pnpm install --frozen-lockfile' });
-    // Inspecting the checkout's Playwright is its own step, before any download command.
-    state.step = 'Checking the checkout’s Playwright browsers';
-    await ensureChromium(project.root, store, signal, { required: false }); return {};
+    // The test browser downloads on first need (verify), not here. Package
+    // scripts run with the pinned pnpm through rer run, which keeps pnpm off PATH.
+    if (!options.json) store.report('Run this project\'s package scripts with rer run SCRIPT (it uses the pnpm this project pins).');
+    return {};
    } catch (error) { if (signal.aborted) throw error; throw await installStepError(error, store, project.root); }
   }
   if (options.verb === 'verify') {
@@ -144,8 +146,12 @@ async function runLifecycle(project, options, out, deployRedaction) {
    }
    await store.stop(app);
    await rememberSetupAnswers(project, input);
-   if (options.json) out.event('setup-ready', { url, setupUrl: url+'/setup' });
-   else { out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup.`); }
+   const deployNeeds = await hostedNeeds(project);
+   if (options.json) out.event('setup-ready', { url, setupUrl: url+'/setup', ...(deployNeeds.length ? { neededForDeploy: deployNeeds } : {}) });
+   else {
+    out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup.`);
+    if (deployNeeds.length) out.human(['To host it on your own Cloudflare account later, rer deploy needs:', ...deployNeeds.map(item => `  - ${item}`), 'Set them in your environment or a private (mode 0600) file passed with --env-file, then check with rer deploy --dry-run.'].join('\n'));
+   }
   } else if (options.verb !== 'build') throw refuse('The requested first-party capability is unavailable.');
   return {};
  } catch (error) {
@@ -165,6 +171,13 @@ async function runLifecycle(project, options, out, deployRedaction) {
   for (const [name, handler] of handlers) process.removeListener(name, handler);
   if (termination) throw new RerError('cancelled', `Stopped by ${termination} after owned children were stopped.`, termination === 'SIGINT' ? 130 : 143);
  }
+}
+
+// An explicit rer setup lists what hosting this checkout will need; the setup
+// a zero-setup rer dev runs does not. The list is advice: it never fails setup.
+async function hostedNeeds(project) {
+ if (process.env[localDefaultsVariable] === '1') return [];
+ try { return await (await import('./deploy-command.mjs')).hostedDeployNeeds(project); } catch { return []; }
 }
 
 // A failed install step names itself: its command, exit code, last output and
