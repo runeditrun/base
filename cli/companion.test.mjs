@@ -153,7 +153,8 @@ test('run turns a job into an exact-commit isolated checkout inside the OS bound
  assert.equal((await companion(['codex-auth'], { home, state, env })).code, 0);
  assert.equal(existsSync(join(state, 'executor-home/.codex/config.toml')), false, 'only auth.json is copied');
  assert.equal(await mode(join(state, 'executor-home/.codex/auth.json')), 0o600);
- const verify = [process.execPath, '-e', "process.exit(require('fs').readFileSync('change.txt','utf8')==='changed by provider\\n'?0:1)"];
+ // Verify is repository code: it sees the change but not the provider's credentials.
+ const verify = [process.execPath, '-e', `const fs=require('fs');let leaked=true;try{fs.readFileSync(${JSON.stringify(join(state, 'executor-home/.codex/auth.json'))})}catch{leaked=false}process.exit(!leaked&&fs.readFileSync('change.txt','utf8')==='changed by provider\\n'?0:1)`];
  await writeFile(join(root, 'commands.json'), JSON.stringify({ verify: [verify] }));
  assert.equal((await companion(['commands', projectId, join(root, 'commands.json')], { home, state })).code, 0);
 
@@ -176,14 +177,22 @@ test('run turns a job into an exact-commit isolated checkout inside the OS bound
 
  assert.equal((await companion(['run', '--once'], { home, state })).code, 1, 'a runner lock left by a killed runner refuses a second runner');
  await rm(join(state, 'runner.lock'));
+ // A redirect is refused, never followed: nothing reaches the other origin and the result stays queued.
+ const other = await managementServer(t, { repository, projectId });
+ server.redirect = other.origin;
+ assert.equal((await companion(['run', '--once'], { home, state })).code, 1);
+ assert.equal(other.requests.length, 0, 'nothing was sent to the redirect target');
+ assert.ok((await readState(state)).outbox.some(item => item.path === '/api/local/jobs/job-1/result'), 'the redirected result is still queued');
+ server.redirect = null;
+ const attempts = server.posted('/result').length;
  const resumed = await companion(['run', '--once'], { home, state });
  assert.equal(resumed.code, 0, resumed.stderr);
  const results = server.posted('/result');
- assert.equal(results.length, 2);
- assert.deepEqual(results[1].body, results[0].body, 'the retried result keeps its event id and content');
+ assert.equal(results.length, attempts + 1, 'one more send delivers the queued result');
+ for (const retry of results.slice(1)) assert.deepEqual(retry.body, results[0].body, 'the retried result keeps its event id and content');
  assert.equal((await readState(state)).outbox.length, 0);
 
- const { result } = results[1].body;
+ const { result } = results.at(-1).body;
  assert.equal(result.base_commit, jobBase);
  assert.equal(result.commit, jobBase, 'the checkout is the exact job commit, not the owner HEAD');
  const file = path => Buffer.from(result.files.find(entry => entry.path === path).contentBase64, 'base64').toString();
@@ -246,7 +255,7 @@ test('an uncertain running job is never restarted on its own, and a revoked devi
  assert.equal(revoked.code, 1, 'a revoked device ends the runner');
 });
 
-test('no-turn attestation is explicit, exact and holds the runner lock', async () => {
+test('no-turn attestation is explicit, exact and holds the runner lock', { skip: !macOS && 'attestation reads the checkout with Git inside macOS sandbox-exec' }, async () => {
  const root = join(directory, 'attest'), home = join(root, 'home'), state = join(root, 'state');
  const jobId = 'failed-setup', worktree = join(state, 'worktrees', jobId);
  await mkdir(home, { recursive: true });
@@ -259,6 +268,12 @@ test('no-turn attestation is explicit, exact and holds the runner lock', async (
  const baseCommit = ownerGit(worktree, 'rev-parse', 'HEAD');
  await mkdir(join(worktree, 'node_modules'));
  await writeFile(join(worktree, 'node_modules/dependency'), 'retained');
+ // Setup ran repository code that planted a Git clean filter in the retained
+ // checkout. Attestation must run it, if at all, only inside the boundary.
+ const outsideMarker = join(root, 'filter-ran-outside');
+ ownerGit(worktree, 'config', 'filter.planted.clean', `sh -c 'touch "${outsideMarker}"; touch "$HOME/filter-ran"; cat'`);
+ await mkdir(join(worktree, '.git/info'), { recursive: true });
+ await writeFile(join(worktree, '.git/info/attributes'), '* filter=planted\n');
  const active = { job: { id: jobId, run_id: 'run', repository, project_id: projectId, base_commit: baseCommit }, status: 'needs_reconciliation', phase: 'executor_starting', executorStarted: true, workspace: { worktree, baseCommit } };
  const saved = JSON.stringify({ mappings: { [projectId]: { repository, checkout: worktree, remote: origin } }, outbox: [], cursor: 2, provider: 'codex', active });
  await writeFile(join(state, 'state.json'), saved, { mode: 0o600 });
@@ -293,6 +308,13 @@ test('no-turn attestation is explicit, exact and holds the runner lock', async (
  await refused('a live runner holds the lock', flag);
  assert.equal(await readFile(join(state, 'runner.lock'), 'utf8'), 'live-runner');
  await rm(join(state, 'runner.lock'));
+ assert.equal(existsSync(outsideMarker), false, 'the planted filter never ran outside the boundary');
+ // Setup can also break the boundary's scratch folder; attestation then fails closed.
+ const scratch = join(state, 'command-home/tmp');
+ await rm(scratch, { recursive: true, force: true });
+ await writeFile(scratch, '');
+ await refused('the checkout cannot be read inside the boundary', flag);
+ await rm(scratch);
 
  assert.equal((await attest(flag)).code, 0);
  const accepted = await readState(state);
@@ -302,4 +324,6 @@ test('no-turn attestation is explicit, exact and holds the runner lock', async (
  assert.equal(accepted.cursor, 2);
  assert.equal(await readFile(join(worktree, 'node_modules/dependency'), 'utf8'), 'retained');
  assert.equal(existsSync(join(state, 'runner.lock')), false);
+ assert.ok(existsSync(join(state, 'command-home/filter-ran')), 'the planted filter ran inside the boundary');
+ assert.equal(existsSync(outsideMarker), false, 'nor while the attestation was accepted');
 });

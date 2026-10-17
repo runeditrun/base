@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 // The management service's device edge, in memory: pairing, heartbeat
 // controls, claims, and the event/result relay. Every request is recorded.
 export async function managementServer(t, { repository, projectId }) {
- const state = { requests: [], token: 'fixture-device-key-0001', code: 'ABCD-2345', job: null, claimed: false, controls: [], failResults: 0, onRequest: () => {} };
+ const state = { requests: [], token: 'fixture-device-key-0001', code: 'ABCD-2345', job: null, claimed: false, controls: [], failResults: 0, redirect: null, onRequest: () => {} };
  const reply = (response, status, body) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(body)); };
  const server = createServer(async (request, response) => {
   let text = '';
@@ -11,6 +11,8 @@ export async function managementServer(t, { repository, projectId }) {
   const body = text ? JSON.parse(text) : {}, path = request.url;
   const record = { path, body, authorization: request.headers.authorization ?? null };
   state.requests.push(record);
+  // A rule in front of the origin may answer with a redirect to another origin.
+  if (state.redirect) { response.writeHead(307, { location: `${state.redirect}${path}` }); return response.end(); }
   if (path === '/api/local/pair') {
    if (body.code !== state.code) return reply(response, 401, { error: 'Pairing expired or used' });
    state.code = null;

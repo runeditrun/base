@@ -1,7 +1,14 @@
 import { lstat } from 'node:fs/promises';
-import { git } from './workspace.mjs';
+import { git, scopedGit, commandEnvironment } from './workspace.mjs';
 import { join } from 'node:path';
 import { assertNoTurnEvidence } from './no-turn-evidence.mjs';
+
+// A retained worktree was writable by setup and the provider, so its Git
+// configuration is untrusted: only the owner's checkout is read with host Git.
+function retainedGit(root,worktree) {
+  const run=scopedGit(worktree,commandEnvironment(root));
+  return async(...args)=>(await run(args)).stdout.trim();
+}
 
 export function canRestartPreparation(active) {
   return active?.status==='needs_reconciliation' && ['workspace_preparation_failed','pre_executor_failed'].includes(active.phase)
@@ -17,15 +24,16 @@ export async function confirmUnstarted(root,state,jobId,confirmed) {
     || active.identity || active.workspace || active.phase || active.executorStarted!==undefined || state.pendingControl)
     throw new Error('Only an exact legacy preparation failure without executor or pending-control state can be attested.');
   let workspace;
-  try {
-    const worktree=join(root,'worktrees',jobId);await lstat(worktree);
+  const worktree=join(root,'worktrees',jobId);
+  const retained=await lstat(worktree).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;});
+  if(retained) {
     const mapping=state.mappings[active.job.project_id];
     if(!mapping || mapping.repository!==active.job.repository || !/^[a-f0-9]{40}$/.test(active.job.base_commit||''))throw new Error('Retained worktree cannot be verified against approved mapping.');
-    if(await git(mapping.checkout,'remote','get-url','origin')!==mapping.remote || await git(worktree,'remote','get-url','origin')!==mapping.remote
-      || await git(worktree,'rev-parse','HEAD')!==active.job.base_commit || await git(worktree,'status','--porcelain','--untracked-files=all','--ignored'))throw new Error('Retained worktree differs from clean approved base; recovery refused.');
+    const inside=retainedGit(root,worktree);
+    if(await git(mapping.checkout,'remote','get-url','origin')!==mapping.remote || await inside('remote','get-url','origin')!==mapping.remote
+      || await inside('rev-parse','HEAD')!==active.job.base_commit || await inside('status','--porcelain','--untracked-files=all','--ignored'))throw new Error('Retained worktree differs from clean approved base; recovery refused.');
     workspace={worktree,baseCommit:active.job.base_commit};
   }
-  catch(error){if(error.code!=='ENOENT')throw error;}
   active.phase=workspace?'pre_executor_failed':'workspace_preparation_failed';active.executorStarted=false;
   if(workspace)active.workspace=workspace;
   active.recoveryAttestation={kind:'operator_confirmed_no_executor',at:new Date().toISOString(),jobId};
@@ -46,10 +54,11 @@ export async function confirmNoTurnStarted(root,state,jobId,confirmed) {
     throw new Error('Retained worktree cannot be verified against approved mapping.');
   const info=await lstat(worktree);
   if(!info.isDirectory() || info.isSymbolicLink())throw new Error('Retained worktree must be an ordinary directory.');
-  if(await git(mapping.checkout,'remote','get-url','origin')!==mapping.remote || await git(worktree,'remote','get-url','origin')!==mapping.remote
-    || await git(worktree,'rev-parse','HEAD')!==active.job.base_commit || await git(worktree,'status','--porcelain','--untracked-files=all'))
+  const inside=retainedGit(root,worktree);
+  if(await git(mapping.checkout,'remote','get-url','origin')!==mapping.remote || await inside('remote','get-url','origin')!==mapping.remote
+    || await inside('rev-parse','HEAD')!==active.job.base_commit || await inside('status','--porcelain','--untracked-files=all'))
     throw new Error('Retained worktree differs from clean approved source; recovery refused.');
-  const ignored=await git(worktree,'ls-files','--others','--ignored','--exclude-standard','-z');
+  const ignored=await inside('ls-files','--others','--ignored','--exclude-standard','-z');
   if(ignored.split('\0').filter(Boolean).some(path=>!path.startsWith('node_modules/'))) throw new Error('Ignored files outside installed node_modules prevent no-turn attestation.');
   await assertNoTurnEvidence(root,state);
   const previousState=structuredClone(active);

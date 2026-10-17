@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { realpath, mkdir } from 'node:fs/promises';
 import { join, dirname, isAbsolute, delimiter } from 'node:path';
-import { realpathSync, accessSync, constants } from 'node:fs';
+import { realpathSync, accessSync, constants, mkdirSync } from 'node:fs';
 const exec = promisify(execFile);
 export function approvedGit() {
   const configured = process.env.RER_LOCAL_GIT;
@@ -59,11 +59,20 @@ export function executorEnvironment(provider, home) {
   if (provider === 'claude') {
     // Claude Code reads OAuth subscription state from the dedicated HOME
     // (installed by `claude-auth`). An API key remains an explicit alternative
-    // for operators who choose provider billing; it is never inferred from a
-    // host-wide environment or sent through the management relay.
-    if (process.env.ANTHROPIC_API_KEY) env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+    // for operators who choose provider billing: only the companion's own
+    // variable supplies it, never a host-wide ANTHROPIC_API_KEY, and it is
+    // never sent through the management relay.
+    if (process.env.RER_COMPANION_ANTHROPIC_API_KEY) env.ANTHROPIC_API_KEY = process.env.RER_COMPANION_ANTHROPIC_API_KEY;
   }
   return env;
+}
+// Repository code (approved setup and verify commands, and Git filters a
+// checkout may carry) runs with a home of its own that holds no provider
+// credentials; the executor home stays outside its read boundary.
+export function commandEnvironment(stateRoot) {
+  const home = join(stateRoot, 'command-home');
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  return { PATH: approvedGit().path, HOME: home, TMPDIR: process.env.TMPDIR || '/tmp', LANG: 'en_US.UTF-8' };
 }
 
 async function verifyPatch(run) {
@@ -84,7 +93,9 @@ async function collectFiles(cwd,base,run) {
  return files;
 }
 
-function scopedGit(cwd,env) {
+// Git on an agent-writable checkout runs inside the boundary: the checkout's own
+// configuration (filters, fsmonitor) is repository-controlled code.
+export function scopedGit(cwd,env) {
  const sandbox=sandboxCommand('git',cwd,env);
- return (args,options={})=>exec(sandbox.command,[...sandbox.args,'-c','core.hooksPath=/dev/null',...args],{cwd,env:sandbox.env,maxBuffer:16*1024*1024,...options});
+ return (args,options={})=>exec(sandbox.command,[...sandbox.args,'-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{cwd,env:sandbox.env,maxBuffer:16*1024*1024,...options});
 }

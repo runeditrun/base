@@ -448,7 +448,11 @@ for every verb.
 
 - `map PROJECT_ID <owner>/<repo> CHECKOUT` approves one local Git checkout for an
   app. Its `origin` must be exactly that GitHub repository. `PROJECT_ID` is the
-  app's id, shown in the command on its Devices page.
+  app's id, shown in the command on its Devices page. On a Managed app, if you
+  cloned with the temporary clone URL the app gives you, reset `origin` first
+  with `git remote set-url origin https://github.com/<owner>/<repo>.git`: `map`
+  refuses a URL that carries a token, and the reset keeps the expired token out
+  of your `.git/config`.
 - `pair URL CODE` redeems the one-use code from the app's Devices page (the
   8-character code or the full code; both expire after 10 minutes). The app
   must name the repository you mapped, or this computer stays unpaired.
@@ -462,12 +466,14 @@ for every verb.
   executor home. Codex configuration and MCP servers are not imported.
 - `claude-auth` runs Claude Code's own sign-in with the dedicated executor home
   (add `--console` for a Console account). Host Claude configuration and
-  history are not copied. An `ANTHROPIC_API_KEY` in the environment is used
-  instead, if you choose API billing.
+  history are not copied. To use API billing instead, set
+  `RER_COMPANION_ANTHROPIC_API_KEY`; a host-wide `ANTHROPIC_API_KEY` is never
+  passed to the provider.
 - `commands PROJECT_ID FILE` approves argv lists for setup and verification,
   for example `{"setup":[["pnpm","install","--frozen-lockfile"]],"verify":[["pnpm","verify"]]}`.
-  They run in the same boundary, with network access and no deployment
-  credentials. A job from the browser cannot change them.
+  They run in the same boundary, with network access, a home of their own and
+  no provider or deployment credentials. A job from the browser cannot change
+  them.
 - `run [--once]` takes jobs from the app and runs them. `status` prints the
   paired device, mapped projects, the active job and pending events, never the
   device key.
@@ -497,4 +503,6 @@ on that computer.
 If setup failed before any provider turn and you have confirmed no provider or
 setup process is still running, `confirm-no-turn-started JOB_ID
 --confirm-no-provider-turn-started` lets the app resume it. It refuses if the
-checkout changed or the provider recorded a session for it.
+checkout changed or the provider recorded a session for it. It reads the
+checkout with Git inside the same boundary, because setup could have changed
+the checkout's Git configuration.
