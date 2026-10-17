@@ -58,9 +58,17 @@ export function OperatorAccess() {
       catch (inner) { setMessage((inner as Error).message) }
     }
   }
+  async function changeName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await mutate('display-name', { displayName: new FormData(event.currentTarget).get('displayName') })
+  }
   return <section className="auth-panel">
     <h2>Operator access</h2>
     {session ? <p>{session.operator.email} · {session.operator.role}</p> : null}
+    {session ? <form key={session.operator.displayName} onSubmit={changeName}>
+      <label>Your name <input name="displayName" required maxLength={120} autoComplete="name" defaultValue={session.operator.displayName} /></label>
+      <button type="submit">Save name</button>
+    </form> : null}
     {session ? <form key={session.operator.email} onSubmit={changeEmail}>
       <label>Your sign-in email <input name="email" type="email" required defaultValue={session.operator.email} /></label>
       <button type="submit">Save email</button>

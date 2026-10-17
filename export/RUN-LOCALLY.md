@@ -158,7 +158,9 @@ private inputs and never go in command arguments. A setup rerun with the saved
 owner and origin preserves existing owner/data and exact private settings.
 Conflicting saved identity or origin reports an actionable recovery path.
 Review reset's exact removal inventory before confirmation; export domain data
-first if it should be restored, and import only into an empty destination.
+first if it should be restored, and import only into an empty destination. Rows
+the app's own migrations insert, such as default settings, do not count: the
+archive's rows replace them. Any other row refuses the import, naming its table.
 
 Queue waits report immediately with a reason and numeric one-based position,
 then refresh about every 15 seconds while waiting. The running command reports
