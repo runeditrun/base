@@ -9,7 +9,7 @@ Owner history and undo must include jobs from either authority.
 ## Add to the seed
 
 1. **Schema and copies.** Vendor `modules/import-kit/src`, its schema JSON in
-   `modules/import-kit/schema`, and sibling `modules/d1-transport` with relative
+   `modules/import-kit/schema`, and sibling `./modules/d1-transport` with relative
    paths intact; record copies using the
    seed's existing Base provenance workflow. Install the D1 kit schemas from
    `modules/import-kit/src/d1/database.ts` (`d1Schema` and the additional
