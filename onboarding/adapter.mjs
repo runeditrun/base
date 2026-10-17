@@ -1,7 +1,7 @@
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
-import { commandFailure, approvedFailure, installationFailure, installationFailureMessage } from './failures.mjs';
+import { commandFailure, approvedFailure, installationFailure, installationFailureMessage, isBusyFailure } from './failures.mjs';
 import { withoutLocalVariables } from './local/build.mjs';
 import { buildEnvironment } from './local/environment.mjs';
 import { localOperation } from './local/operation.mjs';
@@ -72,7 +72,7 @@ export function localInstaller(hooks = {}) {
   if (['installer', 'setup', 'dev'].includes(verb) && hooks.migrate) {
    try { await phase(context, hooks, 'migrate', hooks.migrate); }
    catch (error) {
-    if (verb !== 'dev' || signal?.aborted) throw error;
+    if (verb !== 'dev' || signal?.aborted || isBusyFailure(error)) throw error;
     const failure = approvedFailure(error);
     throw commandFailure(`${store.redact(failure?.message ?? error.message)}\nLocal migrations failed. Fix the error and run rer setup before trying again.`, failure ?? {});
    }
@@ -124,7 +124,7 @@ function createContext(root, input, store, onApp, signal, guard) {
   async run(label, command, args = [], { step = 'setup', ...options } = {}) {
    if (guard) await guard(context);
    try { return await store.run(label, command, args, { cwd: root, signal, ...options }); } catch (error) {
-    if (signal?.aborted || options.signal?.aborted) throw error;
+    if (signal?.aborted || options.signal?.aborted || isBusyFailure(error)) throw error;
     throw installationFailure('command_failed', { step, diagnostic: error });
    }
   },

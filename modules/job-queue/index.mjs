@@ -90,7 +90,7 @@ export async function createQueue(options = {}) {
         if (!result) break;
         const elapsed = performance.now() - start;
         if (opts.maxWait !== undefined && elapsed >= opts.maxWait * 1000)
-          return { code: TIMEOUT_EXIT, timedOut: true, reason: result.reason };
+          return { code: TIMEOUT_EXIT, timedOut: true, reason: result.reason, reasonCodes: result.reasonCodes, resources: result.resources, limits: result.limits };
         const signature = `${result.position}:${result.reasonCodes.join(',')}`;
         const now = performance.now();
         if (!lastWaitReportAt || signature !== lastWaitSignature || now - lastWaitReportAt >= WAIT_REPORT_INTERVAL_MS) {
