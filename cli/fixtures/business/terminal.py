@@ -17,6 +17,7 @@ os.close(slave)
 buffer = b''
 answered = 0
 secret_answered = False
+question_cli_answered = False
 deadline = time.monotonic() + 30
 try:
     while time.monotonic() < deadline:
@@ -36,6 +37,9 @@ try:
             if not secret_answered and b'Credential (hidden): ' in buffer:
                 os.write(master, sys.stdin.buffer.readline())
                 secret_answered = True
+            if not question_cli_answered and b'] (none): ' in buffer:
+                os.write(master, os.environ.get('TEST_QUESTION_CLI', 'none').encode() + b'\n')
+                question_cli_answered = True
             count = buffer.count(b'[yes/no] ')
             if count > answered:
                 os.write(master, b'yes\n')

@@ -8,13 +8,13 @@ const usage = `Usage: rer business VERB
   scan [DIR...] [--json]          Names-only local discovery
   connect --code CODE [--origin URL]
                                  Pair, compare a number in your browser, then opt in to a service
-  run [--once]                   Run consented local discovery; vendor upload integration pending
+  run [--once]                   Run discovery and chosen CLI questions; vendor uploads pending
   next                           Return one templated question or nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
                                  Catalog vendor or none; uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage
   token                          MCP headersHelper output; send directly to the MCP client
-  status [--json]                Pairing, service, current task and checkpoint
+  status [--json]                Pairing, questions CLI, service, task and checkpoint
   disconnect                     Remove local service, credentials and added permissions
 Vendors: sentry, uptimerobot, pagerduty, calendly. Owner approvals stay in the browser.
 `;

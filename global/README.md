@@ -381,7 +381,13 @@ In a terminal, connect asks separately before adding Claude Code user Read deny
 rules, allowing export-scoped macOS wake prevention, and installing a launchd
 or systemd user service. Only the exact answer `yes` opts in. Noninteractive
 connect pairs but leaves those optional changes off. Background services use
-absolute Node and CLI paths. No model process is started.
+absolute Node and CLI paths.
+
+Connect also asks once which supported CLI should answer agent questions:
+Claude, Codex or `none`. It checks their help on PATH and records the chosen
+absolute executable and device capabilities. Noninteractive connect chooses
+`none`, preserving interactive `next` / `answer` use. Reconnect to change the
+choice. `status` shows the recorded questions CLI.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
@@ -401,7 +407,7 @@ The owner confirms the inventory in the browser.
 a headers helper. That output is a short-lived credential: connect it directly
 to the MCP client and do not paste it into an agent transcript.
 
-`rer business status` shows local pairing, service state and progress without
+`rer business status` shows local pairing, questions CLI, service state and progress without
 printing checkpoints or vendor data. `rer business disconnect` removes the
 service, device and vendor credentials, state and introduced Claude rules,
 preserving preexisting settings and unrelated edits. Revocation in the browser
@@ -414,6 +420,28 @@ snapshots and page boundaries are saved privately so a killed supervisor can
 resume from its server checkpoint without rescanning a changed tree. Snapshots
 are removed after completion. A missing snapshot for an acknowledged page is
 an explicit error. Revocation stops the supervisor on its next 401.
+
+With a chosen CLI, `run` also claims `classify.row` and starts one classifier
+process per question in an empty temporary working directory. Its prompt has
+only RER template text, catalog vendor IDs, and closed usage enums. Raw vendor
+and DNS evidence, server instructions and schema annotations never enter the
+prompt. Answers must match the question's closed vendor/usage/confidence schema
+locally before completion. Invalid output, process failure, cancellation or a
+120-second timeout releases the lease; model diagnostics are never printed.
+Owner-only tasks remain in the browser. Temporary schema and answer files stay
+outside the model's working directory and are removed afterwards.
+
+Claude runs with `-p --tools "" --strict-mcp-config --setting-sources ""
+--output-format json --json-schema <schema> --safe-mode
+--disable-slash-commands --no-session-persistence`. Codex runs with
+`exec --sandbox read-only --skip-git-repo-check --output-schema <schema-file>
+--ignore-user-config --ignore-rules --ephemeral --output-last-message <answer-file>`.
+Codex additionally disables hooks, plugins, apps, memory, shell, browser,
+image and subagent features, suppresses inherited instructions and web search,
+and inspects MCP configuration without starting servers so each configured
+server is explicitly disabled for the classification. The inspection never
+prints or persists transport settings. The customer's CLI authentication remains available; supervisor preloads and
+agent-specific environment instructions are excluded.
 
 **Remaining export blockers:** grants for linked, configured targets now resolve
 to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare

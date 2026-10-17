@@ -67,16 +67,17 @@ export async function disconnect() {
 export async function status({ json = false } = {}) {
  const state = await loadState();
  if (!state) {
-  process.stdout.write(json ? JSON.stringify({ paired: false, service: 'not_installed', current_task: null, checkpoint: null }) + '\n' : 'Business: not paired.\nService: not installed.\nTask: none.\nCheckpoint: none.\n'); return;
+  process.stdout.write(json ? JSON.stringify({ paired: false, service: 'not_installed', current_task: null, checkpoint: null, questions_cli: 'none' }) + '\n' : 'Business: not paired.\nService: not installed.\nTask: none.\nCheckpoint: none.\nQuestions CLI: none.\n'); return;
  }
  const stored = state.origin && await createCredentialStore().get(credentialHandle(state.origin));
  const service = await serviceStatus();
  const active = (await loadProgress()).current;
  if (json) {
-  process.stdout.write(JSON.stringify({ paired: Boolean(stored), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: ['discover.local', 'export.vendor'].includes(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
+  process.stdout.write(JSON.stringify({ paired: Boolean(stored), questions_cli: state.classifier?.name ?? 'none', service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: ['discover.local', 'export.vendor', 'classify.row'].includes(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
   return;
  }
  process.stdout.write(`Business: ${stored ? 'paired' : 'credential missing'}.\nService: ${service.running ? 'running' : service.installed ? 'installed, stopped' : 'not installed'}.\n`);
- process.stdout.write(`Task: ${['discover.local', 'export.vendor'].includes(active?.kind) ? active.kind : 'none'}.\n`);
+ process.stdout.write(`Questions CLI: ${state.classifier?.name ?? 'none'}.\n`);
+ process.stdout.write(`Task: ${['discover.local', 'export.vendor', 'classify.row'].includes(active?.kind) ? active.kind : 'none'}.\n`);
  process.stdout.write(`Checkpoint: ${active?.checkpoint ? 'saved' : 'none'}${Number.isSafeInteger(active?.uploadedBytes) ? `; ${active.uploadedBytes} bytes uploaded` : ''}.\n`);
 }
