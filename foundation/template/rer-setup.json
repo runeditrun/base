@@ -23,7 +23,7 @@
     },
     {
       "name": "PRIMARY_COLOR",
-      "label": "Brand colour",
+      "label": "Brand color",
       "kind": "colour",
       "required": true,
       "default": "#356c60",

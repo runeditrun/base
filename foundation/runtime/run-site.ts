@@ -128,7 +128,7 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
     + `<li class="step"><span class="num" aria-hidden="true">2</span><div class="body"><h2>Start ${name}</h2>${codeBlock([rerStart(run)], `Start ${run.name}`)}`
     + `<p class="note">rer gets ${name}, installs everything, makes you the owner and prints a link that opens ${name} signed in. To start it again later: <code>${escape(`cd ${run.folder} && rer dev`)}</code></p>`
     + `<p class="alt">Already have Node 22 or later? <code>${escape(run.clone)}</code> does both steps in one line.</p></div></li>${hosted}</ol>`
-    + `<footer class="facts"><p>${escape(run.requirements)}</p><p>Source: <a href="${escape(run.repository)}">${source}</a> · ${escape(run.licence)} licence</p></footer></main>`
+    + `<footer class="facts"><p>${escape(run.requirements)}</p><p>Source: <a href="${escape(run.repository)}">${source}</a> · ${escape(run.licence)} license</p></footer></main>`
   return document(identity, `Run ${run.name}`, `Run ${run.name} on your computer. 100% free and open source.`, RUN, body, COPY_SCRIPT)
 }
 

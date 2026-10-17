@@ -15,7 +15,7 @@ export async function git(directory, args, signal) {
     });
     return result.trim();
   } catch (error) {
-    if (signal?.aborted) throw Error('Source acquisition cancelled.');
+    if (signal?.aborted) throw Error('Source acquisition canceled.');
     if (error.code === 'ENOENT') throw Error('Git is required. Install Git and run setup again.');
     // Git/provider errors can contain authentication URLs. Do not echo them.
     throw Error(`Git ${args[0]} failed. Check repository access, the requested ref and existing Git authentication.`);
