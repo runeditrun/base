@@ -159,3 +159,35 @@ test('site upload waits for its own version through lagging provider reads witho
     assert.equal(provider.state.writes.slice(writes).filter(write => write.path === `/workers/scripts/${plan.worker}`).length, 1, 'only readback is retried');
   });
 });
+
+test('site deploy polls the zone domain list within the readiness window: a lagging list succeeds, a hostname never listed fails at the deadline naming it, another Worker fails at once', async t => {
+  const { siteProvider } = await import('./site-provider.mjs');
+  for (const scenario of ['lags two polls', 'never lists www', 'bound to another Worker']) await t.test(scenario, async t => {
+    const provider = siteProvider({ domain: 'run-cradle.com' }), { files, folder, receiptPath } = await site(t);
+    t.after(() => provider.close());
+    let attached = false, lists = 0, elapsed = 0, sleeps = 0;
+    const fetch = async (input, init = {}) => {
+      const response = await provider.fetch(input, init), url = new URL(input);
+      if (!url.pathname.endsWith('/workers/domains')) return response;
+      if (init.method === 'PUT') { attached = true; return response; }
+      if (!attached) return response;
+      const body = await response.json();
+      if (scenario === 'bound to another Worker') body.result = body.result.map(row => row.hostname === 'www.run-cradle.com' ? { ...row, service: 'someone-elses-worker' } : row);
+      else if (scenario === 'never lists www') body.result = body.result.filter(row => row.hostname !== 'www.run-cradle.com');
+      else if (++lists <= 2) body.result = [];
+      return Response.json(body);
+    };
+    const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch });
+    const plan = sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: folder });
+    const readiness = { totalMs: 9000, clock: () => elapsed, sleep: async ms => { sleeps++; elapsed += ms; } };
+    const run = () => siteDeploy({ api, plan, files, receiptPath, readiness });
+    if (scenario === 'lags two polls') {
+      assert.equal((await run()).origin, 'https://run-cradle.com');
+      assert.ok(lists >= 3, 'two empty lists are followed by the attached hostnames');
+    } else {
+      await assert.rejects(run(), error => error.message === 'domain-readback-mismatch' && error.resource === 'domain:www.run-cradle.com');
+      if (scenario === 'never lists www') assert.equal(elapsed, readiness.totalMs, 'the wait ends at the deploy deadline');
+      else assert.equal(sleeps, 0, 'a foreign Worker is refused without a retry');
+    }
+  });
+});
