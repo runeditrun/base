@@ -20,7 +20,7 @@ const within = (path, root) => path === root || path.startsWith(root.endsWith('/
 // names (build.manifest), else everything under the configured build.assetsDir
 // (Vite's default is 'assets'). Never source maps or unhashed files.
 const MANIFESTS = ['.vite/manifest.json', 'manifest.json'];
-function builtChunks(files, assetsDir) {
+export function builtChunks(files, assetsDir) {
   const manifest = files.find(file => MANIFESTS.includes(file.path));
   const paths = (manifest
     ? Object.values(JSON.parse(Buffer.from(manifest.base64, 'base64'))).flatMap(entry => [entry.file, ...(entry.css ?? [])]).map(path => '/' + path)

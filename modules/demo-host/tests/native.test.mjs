@@ -23,13 +23,15 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     await writeFile(join(server, 'modules/demo-host/tests/native-data.bin'), Buffer.from([7, 8, 9]));
     await mkdir(join(app, 'dist/client/assets'), { recursive: true });
     await writeFile(join(app, 'dist/client/assets/fixture-12345678.js'), 'fixture');
+    await mkdir(join(app, 'dist/client/app-assets'), { recursive: true });
+    for (const name of ['chunk-ABCDEFGH.js', 'plain.js']) await writeFile(join(app, 'dist/client/app-assets', name), 'fixture');
     const sql = 'CREATE TABLE owner(email TEXT PRIMARY KEY); CREATE TABLE items(name TEXT PRIMARY KEY); CREATE TABLE jobs(name TEXT PRIMARY KEY);';
     const config = { main: 'modules/demo-host/tests/native-app.mjs', compatibility_date: '2026-09-08', no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }],
       d1_databases: [{ binding: 'DB' }, { binding: 'SECOND' }], r2_buckets: [{ binding: 'FILES' }],
       durable_objects: { bindings: [{ name: 'COUNTER', class_name: 'Counter' }, { name: 'LEGACY', class_name: 'LegacyCounter' }] },
       queues: { producers: [{ binding: 'JOBS', queue: 'work' }], consumers: [{ queue: 'work', max_retries: 2 }] } };
     const migrations = Object.fromEntries(['DB', 'SECOND'].map(binding => [binding, [{ name: '0001_items.sql', sql, sha256: createHash('sha256').update(sql).digest('hex'), statements: sql.split(';').filter(Boolean) }]]));
-    await writeFile(join(app, 'demo.json'), JSON.stringify({ config, migrations }));
+    await writeFile(join(app, 'demo.json'), JSON.stringify({ config, migrations, assetsDir: 'app-assets' }));
     await prepareNative(folder);
     const origin = 'https://demo.example.test', measurement = 'fixture-measurement-token-1234567890123456';
     const files = ['modules/demo-host/native/worker.mjs', ...[...RUNTIME_FILES.filter(file => file !== 'worker'), 'bundle'].map(file => `modules/demo-host/native/${file}.mjs`),
@@ -62,7 +64,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     for (let i = 0; i < 10; i++) await capacity.acquire(capacityNamespace.newUniqueId().toString(), Date.now() + 60_000, 100, 'retired-visitor');
     const home = await fetch('/');
     assert.equal(home.status, 200);
-    assert.match(await home.text(), /<link rel="prefetch" href="\/assets\/fixture-12345678\.js">/, "the start page prefetches the seed's built chunks");
+    assert.match(await home.text(), /<link rel="prefetch" href="\/app-assets\/chunk-ABCDEFGH\.js">/, "the start page prefetches the seed's built chunks");
     // A start without a readable form is a clean 400 before any place is reserved.
     for (const init of [{}, { body: '{"x":1}', headers: { 'content-type': 'application/json' } }, { body: 'x', headers: { 'content-type': 'multipart/form-data; boundary=none' } }]) {
       const refused = await fetch('/__demo/start', `rer_demo_measure=${measurement}`, { method: 'POST', ...init, headers: { 'cf-connecting-ip': '203.0.113.9', accept: 'application/json', ...init.headers } });
@@ -134,6 +136,9 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     const asset = await fetch('/assets/fixture-12345678.js');
     assert.equal(await asset.text(), 'fixture-asset');
     assert.ok(asset.headers.get('cache-control').includes('immutable'));
+    // A seed that builds to another assetsDir gets its chunks immutable too; its unhashed files keep the origin's header.
+    assert.ok((await fetch('/app-assets/chunk-ABCDEFGH.js')).headers.get('cache-control').includes('immutable'));
+    assert.equal((await fetch('/app-assets/plain.js')).headers.get('cache-control'), null);
     // Signing out ends the visitor's copy as expiry does; the ended page's
     // Start a new demo leads to a fresh signed-in copy. A refused sign-out
     // passes through and keeps the copy.

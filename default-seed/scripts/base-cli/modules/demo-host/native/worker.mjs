@@ -7,6 +7,8 @@ export { NativeDemo } from './visitor.mjs';
 export { DemoCapacity } from '../capacity.mjs';
 
 const assets = new Set(bundle.assetPaths);
+// The seed's built chunks (its Vite manifest, else its assetsDir) are hashed wherever the build put them.
+const chunks = new Set(bundle.immutable);
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -14,7 +16,7 @@ export default {
     if (['GET', 'HEAD'].includes(request.method) && assets.has(url.pathname)) {
       const response = await env.ASSETS.fetch(request);
       const headers = new Headers(response.headers);
-      if (HASHED_ASSET.test(url.pathname)) headers.set('cache-control', 'public, max-age=31536000, immutable');
+      if (chunks.has(url.pathname) || HASHED_ASSET.test(url.pathname)) headers.set('cache-control', 'public, max-age=31536000, immutable');
       headers.set('x-rer-demo-assets', 'edge');
       return new Response(response.body, { status: response.status, headers });
     }
