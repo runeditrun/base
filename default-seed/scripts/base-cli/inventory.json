@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.51-dev.g6d6a4c5f",
+  "cliVersion": "0.2.51",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -53,7 +53,7 @@
     },
     "busy.mjs": {
       "source": "onboarding/busy.mjs",
-      "sha256": "8bc1c242b498bb4f37073a151f0cc128b9fd30e0f54c266712528abc08110346"
+      "sha256": "9934cb0d2cd006f52e4fd67a4f6a8d1df32069815f70b9fcb9fc0698dbf92ea9"
     },
     "command-custody.mjs": {
       "source": "onboarding/command-custody.mjs",
@@ -241,7 +241,7 @@
     },
     "queue.mjs": {
       "source": "onboarding/queue.mjs",
-      "sha256": "d06bc38421b6c8378d9ced3d75ee982cda4b6fcbc3768bd735d31c2a2af96d04"
+      "sha256": "6b7ae0ecab337c0ada05cc88aac7efc92107b3d94fb5560af2d5ded8e785553f"
     },
     "queued-entry.mjs": {
       "source": "onboarding/queued-entry.mjs",
@@ -383,7 +383,7 @@
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
-      "sha256": "f4065e71025bf205878a727d422200ad5bf8ccd86c8060aebd6dce90012ae7e8"
+      "sha256": "17b4fb00aef63e77b5fb8c8efb3b103682daafd7aeaaa2b00c8781d28da4200a"
     },
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
