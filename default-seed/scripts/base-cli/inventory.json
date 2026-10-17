@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.39-dev.gc2767dc1",
+  "cliVersion": "0.2.39-dev.gb162934d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1563,11 +1563,11 @@
     },
     "modules/deploy-kit/site-readback.mjs": {
       "source": "modules/deploy-kit/site-readback.mjs",
-      "sha256": "d7538b5e4531a3c1e899dd0802614a25ff714a108fe542f3293bec798f38b33b"
+      "sha256": "bd9bb14c186c70505e86a9e57014e33e17dd1092db05f629b9f190c03d9352c2"
     },
     "modules/deploy-kit/site.mjs": {
       "source": "modules/deploy-kit/site.mjs",
-      "sha256": "696f3a33aab3576f6de5ecbdf4e422ca02dff2e6c4f08101f16605148beee09c"
+      "sha256": "be50648104dabadf1906b0d2b751e5b859ecd10c6804d1534f4d45329dd6444a"
     },
     "modules/deploy-kit/sql-safety.mjs": {
       "source": "modules/deploy-kit/sql-safety.mjs",
