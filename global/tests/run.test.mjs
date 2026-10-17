@@ -22,9 +22,10 @@ test('rer run runs a package script with the pnpm the checkout pins, fetched int
  const release = join(directory, 'release/package');
  await mkdir(join(release, 'bin'), { recursive: true });
  await writeFile(join(release, 'package.json'), JSON.stringify({ name: 'pnpm', version: pin }));
- await writeFile(join(release, 'bin/pnpm.cjs'), `const [verb, name, ...args] = process.argv.slice(2);
+ await writeFile(join(release, 'bin/pnpm.cjs'), `const [verb, ...rest] = process.argv.slice(2), silent = rest[0] === '--silent', [name, ...args] = silent ? rest.slice(1) : rest;
 if (verb === '--version') { console.log(${JSON.stringify(pin)}); process.exit(0); }
 const script = require(process.cwd() + '/package.json').scripts[name];
+if (!silent) console.log('> app@1.0.0 ' + name);
 process.exit(require('node:child_process').spawnSync('/bin/sh', ['-c', script + ' "$@"', name, ...args], { stdio: 'inherit' }).status);
 `);
  const archive = join(directory, 'pnpm.tgz');
@@ -47,6 +48,7 @@ globalThis.fetch = async url => new Response(String(url).endsWith('.tgz') ? read
  const result = await run(process.execPath, [rer, 'run', 'export:data', '--', '--remote', '--out', 'x'], { cwd: join(checkout, 'nested'), env });
  assert.equal(result.code, 0, result.stderr);
  assert.match(result.stdout, new RegExp(`exported to ${checkout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} with -- --remote --out x`));
+ assert.doesNotMatch(result.stdout, /^> /m, 'no pnpm banner naming the package');
  await access(join(home, '.rer/pnpm', `pnpm-${pin}`));
  const outside = await run(process.execPath, [rer, 'run', 'export:data'], { cwd: directory, env });
  assert.equal(outside.code, 2, 'outside a checkout it names where it runs');
