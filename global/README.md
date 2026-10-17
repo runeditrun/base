@@ -181,6 +181,10 @@ naming their PIDs.
 
 Servers started through `rer` (`rer dev`, `rer preview`) get a 10-server limit and a 12-hour idle timeout
 unless you set `RER_SERVER_LIMIT`, `RER_SERVER_IDLE_SECONDS` or `--idle-timeout`.
+`RER_SERVER_LIMIT_FILE=PATH` names a file holding the limit as a positive integer,
+read at every start; it overrides `RER_SERVER_LIMIT` and the limits running servers
+recorded, so a fleet's one current value cannot be capped by an older run's
+environment. An unreadable or non-integer file refuses the start, naming the file.
 `rer` supplies them only to checkouts whose pinned copy applies lower defaults
 or does not report its own (`rer describe` reports `defaults`), so a current
 checkout never records a limit you did not set.

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **`RER_SERVER_LIMIT_FILE` sets the server limit from a file.** A start that sees it reads the positive integer in the named file and uses that as the limit, over its own `RER_SERVER_LIMIT` and over the limits running servers recorded, in both the launcher's check and the dispatcher's registry. A fleet's launcher points every run at one file, so a long-lived run that still exports an older `RER_SERVER_LIMIT` can no longer cap the rest. An unreadable file or a non-integer refuses the start naming the file; the limit refusal names it when it set the cap. Without the variable nothing changes.
+
 ## 0.2.43
 
 - **The installer ends with the line that puts `rer` on PATH.** `install.sh` and `rer cli install` end with `Next, start an app: rer dev <owner>/<repo>`. When new terminals will not find `rer`, the last line is the one command that adds `~/.local/bin` for your shell, for example `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && export PATH="$HOME/.local/bin:$PATH"` (bash: `~/.bash_profile` on macOS and `~/.bashrc` elsewhere; fish: `fish_add_path ~/.local/bin`; otherwise `~/.profile`). Once a startup file already adds it, no line is printed. The installer still never edits a shell profile itself (#190).

@@ -217,6 +217,7 @@ expiry clean up owned descendants before releasing state and capacity.
 The private registry defaults to the OS user's `~/.rer/servers` independently
 of checkout and Codex home; `RER_SERVERS_DIR` selects an isolated directory.
 The combined dev/preview cap is 10 (`RER_SERVER_LIMIT`, positive integer). A start that sets `RER_SERVER_LIMIT` is capped by that value, higher or lower, whatever running servers recorded; a start that sets nothing is capped by the lowest limit a running server's person set explicitly, and a limit recorded by a server that did not set it never lowers the cap.
+`RER_SERVER_LIMIT_FILE` names a file holding one positive integer, read afresh at every start: that value is the limit for the start and overrides this process's `RER_SERVER_LIMIT` and every running server's recorded limit (servers started under the file still count). A fleet uses it so one current value, edited in the file, controls every run, including long-lived ones that still export an older `RER_SERVER_LIMIT`. A file that cannot be read or holds anything but a positive integer refuses the start, naming the file; the limit refusal names the file when it set the cap.
 Starting reservations count. At the cap a start is refused with a plain message
 naming each running server, its checkout and its stop command; rer never stops
 another checkout's server to make room, in any mode. A run that declares itself

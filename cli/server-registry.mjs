@@ -9,6 +9,7 @@ import { identity, alive } from '../modules/job-queue/identity.mjs';
 import { transaction } from '../modules/job-queue/storage.mjs';
 import { refuse, invalid } from './errors.mjs';
 import { serverDefaults } from './contract.mjs';
+import { serverLimitFile } from './server-limit-file.mjs';
 import { availableMemory } from '../modules/job-queue/resources.mjs';
 
 export function positive(value, name, fallback) {
@@ -55,11 +56,13 @@ function memoryMessage(counted,available,floor,mode) {
  const list=counted.length?`Running now:\n${counted.map(listing).join('\n')}\nA dev server holds about 0.5-1.3 GiB and a preview 0.4-0.8 GiB; stopping one with its command above frees that.`:'No dev or preview server is running, so something else is using the memory.';
  return `${head}\n${list}\nTo start anyway, lower the floor, for example RER_SERVERS_MIN_MEMORY_BYTES=${Math.floor(floor/2)} rer ${mode} (0 turns it off).`;
 }
-function limitMessage(counted,cap,explicit,mode) {
+function limitMessage(counted,cap,explicit,mode,file) {
  const holders=explicit?[]:counted.filter(item=>item.explicit&&item.limit===cap);
  const head=`Not started: ${counted.length} dev or preview ${counted.length===1?'server is':'servers are'} running on this computer and the limit is ${cap}.`;
  const list=`Running now:\n${counted.map(listing).join('\n')}`;
- const raise=holders.length
+ const raise=file
+  ?`The limit is ${cap} because ${file} (RER_SERVER_LIMIT_FILE) says ${cap}; to allow more, raise the number in that file and start again.`
+  :holders.length
   ?`The limit is ${cap} because ${holders.length===1?'a server was':'servers were'} started with RER_SERVER_LIMIT=${cap} (${holders.map(item=>item.checkout).join(', ')}). Stop ${holders.length===1?'it':'them'} and start again, or start everything with a higher RER_SERVER_LIMIT=N.`
   :explicit?`This start set RER_SERVER_LIMIT=${cap}; to allow more, start it with a higher RER_SERVER_LIMIT=N.`
   :`To allow more, start this one with a higher limit, for example RER_SERVER_LIMIT=${cap*2} rer ${mode}. Servers started without RER_SERVER_LIMIT allow ${defaultServerLimit}.`;
@@ -78,7 +81,10 @@ function limitMessage(counted,cap,explicit,mode) {
 // running server's person set explicitly, so a deliberate "RER_SERVER_LIMIT=3"
 // keeps holding starts that do not say otherwise. A recorded default (including
 // the old default of 2 in records written before this rule) never lowers the cap
-// below the current default.
+// below the current default. When RER_SERVER_LIMIT_FILE names a file holding a
+// positive integer, that value (read at this start) is the cap and overrides both
+// RER_SERVER_LIMIT and every running record's limit: records started under the
+// file are counted, and the limit they recorded lowers nothing.
 export const defaultServerLimit=serverDefaults.serverLimit;
 export const serversDirectory=(env=process.env)=>resolve(env.RER_SERVERS_DIR??join((env.HOME || homedir()),'.rer/servers'));
 export async function serverRegistry(root,{env=process.env,memory=availableMemory}={}) {
@@ -140,12 +146,13 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
    const same=state.running.find(item=>item.checkout===checkout);
    if(same)return {existing:same};
    // Journeys are listed but uncounted: they neither use nor lower the cap.
-   const counted=state.running.filter(item=>!item.journey),cap=explicit?limit:Math.min(limit,...counted.filter(item=>item.explicit).map(item=>item.limit));
-   if(!journey&&counted.length>=cap)throw refuse(limitMessage(counted,cap,explicit,mode));
+   const fileLimit=await serverLimitFile(env),counted=state.running.filter(item=>!item.journey);
+   const cap=fileLimit?fileLimit.limit:explicit?limit:Math.min(limit,...counted.filter(item=>item.explicit).map(item=>item.limit));
+   if(!journey&&counted.length>=cap)throw refuse(limitMessage(counted,cap,explicit||Boolean(fileLimit),mode,fileLimit?.path));
    // Unreadable memory is not a reason to refuse; only a reading below the floor is.
    const available=journey||floor===0?NaN:await memory();
    if(available<floor)throw refuse(memoryMessage(counted,available,floor,mode));
-   owned={checkout,mode,journey,generation:randomUUID(),token:randomUUID(),owner:lifetime.info,limit,explicit,startedAt:Number(process.hrtime.bigint()/1000000n),idleTimeout:options.idleTimeout};
+   owned={checkout,mode,journey,generation:randomUUID(),token:randomUUID(),owner:lifetime.info,limit:fileLimit?fileLimit.limit:limit,explicit:explicit||Boolean(fileLimit),startedAt:Number(process.hrtime.bigint()/1000000n),idleTimeout:options.idleTimeout};
    owned.lastActivity=owned.startedAt;owned.active=0;
    const name=`rer-server-${createHash('sha256').update(owned.generation).digest('hex').slice(0,20)}.sock`;
    owned.control=join(tmpdir(),name);if(Buffer.byteLength(owned.control)>=100)owned.control=join('/tmp',name);
