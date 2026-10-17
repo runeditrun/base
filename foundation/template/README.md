@@ -1,14 +1,21 @@
 # Run it locally
 
-Install the `rer` command once with the installer script on the RER site
-(`curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node
-when there is none), or with `npx -y @runeditrun/rer cli install` when Node 22
-or later is on PATH.
-This edition is runnable after composition. From the composed edition's
-checkout root, `rer dev` alone launches it for review: it installs pinned
+Start it with one line:
+
+```sh
+npx -y @runeditrun/rer dev just-every/run-foundation
+```
+
+It clones the repository into `run-foundation`, installs the pinned
 dependencies, sets up a local owner on a free port, starts the real app and
-prints `RER_READY` and a sign-in link. To install for a real owner, run the
-verbs yourself:
+prints `RER_READY` and a sign-in link. To set up without starting, run
+`npx -y @runeditrun/rer setup just-every/run-foundation`. Without Node 22 or
+later, run `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-foundation`
+instead; it brings its own Node. To start it again later, run
+`cd run-foundation && rer dev`.
+
+This edition is runnable after composition. Inside the composed edition's
+checkout, to install for a real owner, run the verbs yourself:
 
 ```sh
 rer install
