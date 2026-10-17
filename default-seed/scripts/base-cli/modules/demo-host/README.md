@@ -12,6 +12,9 @@ host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
   outbound requests return to the same visitor, including declared secondary hosts.
 - `worker.mjs`, `pages.mjs`, `start-script.mjs`: Turnstile start, progress,
   cancellation and visitor routing. Static assets are served at the edge.
+- `native/warm.mjs`: the start page's prefetch list, built from `dist/client`
+  and TanStack Start's route manifest, the console's views first, capped by
+  compressed size.
 - `capacity.mjs`: concurrent visitor admission and operator diagnostics. This
   is used by the native host as well as retained during legacy upgrades.
 - `upgrade.mjs`: verifies ownership, removes the old Container application and
