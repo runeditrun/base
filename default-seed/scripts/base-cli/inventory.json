@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.49-dev.g6127260b",
+  "cliVersion": "0.2.49-dev.g14981141",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1255,7 +1255,7 @@
     },
     "modules/delivery-producer/declarations.mjs": {
       "source": "modules/delivery-producer/declarations.mjs",
-      "sha256": "d8cf67d18fdc6ff027d323d0986a7815b52c71df01c4cbb3dde428cfc7f55a0c"
+      "sha256": "bf63076ba1c203c948fe57f41f28fe6ad06ec1e057eecf2b55aab5aeee7c5e2c"
     },
     "modules/delivery-producer/mail.mjs": {
       "source": "modules/delivery-producer/mail.mjs",

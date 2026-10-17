@@ -65,7 +65,9 @@ Optional `surfaces.app.signIn: {path: "/login", loginHint: true}` declares the
 browser sign-in path. `loginHint` is a required boolean; declare `true` only if
 the app reads `login_hint`. The path starts with one slash and contains only
 ASCII letters, digits, slashes, underscores and hyphens. Only the app surface
-may declare sign-in. Without an explicit sign-in policy, a seed's
+may declare sign-in. `signIn` may also carry an optional `ownerSignIn` path, the
+route that accepts the platform's owner sign-in grant (for example
+`/auth/owner-signin`), with the same path rules. Without an explicit sign-in policy, a seed's
 `OPERATIONS.json` `seedContract.adapter` supplies its `commandAdapter.signInPath`
 with `loginHint: false`; without either declaration the field stays absent.
 
