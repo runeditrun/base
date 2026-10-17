@@ -1,14 +1,16 @@
 # Run it locally
 
-Start a published seed in two lines. The [RER installer](https://runeditrun.com)
-(`curl -fsSL https://runeditrun.com/install.sh | sh`) installs `rer` in
-`~/.local/bin`, with its own Node when there is no Node 22 or later on PATH; it
-edits no shell profile, so run the `export PATH=…` line it prints when
-`~/.local/bin` is not on PATH. Then `rer dev <owner>/<repo>`, for example
-`rer dev just-every/run-inkwell`, clones the seed and starts it. To start it
-again later, run `cd <folder> && rer dev` (the folder is the repository name).
-With Node 22 or later already on PATH, `npx -y @runeditrun/rer dev <owner>/<repo>`
-does both in one line, and `npm install -g @runeditrun/rer` is another way to
+Start a published seed with one line:
+`npx -y @runeditrun/rer dev just-every/<repo>`, for example
+`npx -y @runeditrun/rer dev just-every/run-inkwell`. It clones the seed into
+`./<repo>`, installs its dependencies, sets up a local owner and starts the app.
+To set up without starting, use `npx -y @runeditrun/rer setup just-every/<repo>`.
+Without Node 22 or later, the [RER installer](https://runeditrun.com) runs the
+same line: `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/<repo>`.
+It installs `rer` in `~/.local/bin` with its own Node and edits no shell
+profile; run the `export PATH=…` line it prints when `~/.local/bin` is not on
+PATH. To start the seed again later, run `cd <repo> && rer dev` (the folder is
+the repository name). `npm install -g @runeditrun/rer` is another way to
 install `rer`. The installer's Node stays private to `rer`: it puts no `node`,
 `npm` or `npx` on PATH. First-party commands fetch and verify
 the exact pnpm version declared in `package.json` when it is missing, using
@@ -59,8 +61,8 @@ with exit 3 and a message naming the field.
 
 ## Install for a real owner
 
-To install with a real owner mailbox, run the verbs yourself from the runnable
-edition's root: install locked dependencies, prepare its local owner, then start
+To install with a real owner mailbox instead, run the verbs yourself from the
+runnable edition's root: install locked dependencies, prepare its local owner, then start
 development:
 
 ```sh

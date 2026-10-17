@@ -25,7 +25,9 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
   }
   const json = (path, data) => put(path, JSON.stringify(data, null, 2) + '\n')
   try {
-    for (const file of files) await put(`editions/${edition}/${file.relative}`, file.bytes, file.path)
+    // The docs a person reads first start the seed from its public repository, named by convention.
+    const startDocs = new Set(['README.md', 'ONBOARDING.md', 'OPERATIONS.md'])
+    for (const file of files) await put(`editions/${edition}/${file.relative}`, startDocs.has(file.relative) ? file.bytes.toString().replaceAll('run-foundation', `run-${edition}`) : file.bytes, file.path)
     for (const name of ['verify.yml', 'verify-nightly.yml']) {
       const workflow = select(baseRepo, revision, `export/${name}`)[0]
       await put(`editions/${edition}/.github/workflows/${name}`, workflow.bytes, workflow.path)

@@ -1,11 +1,14 @@
 # Foundation operations
 
-Run all first-party operations from the composed, runnable edition checkout
-with `rer`. Without it, install it once with
-`npx -y @runeditrun/rer cli install`, or the installer script on the RER site
-(`curl -fsSL https://runeditrun.com/install.sh | sh`). `rer dev` alone launches
-a fresh checkout for review. The detailed flags and effects are in
-`RUN-LOCALLY.md` and `SEED-COMMAND-CONTRACT.md`.
+Start a fresh copy with one line: `npx -y @runeditrun/rer dev just-every/run-foundation`
+(set up only: `npx -y @runeditrun/rer setup just-every/run-foundation`; without
+Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-foundation`).
+It clones, installs, sets up a local owner and starts the app; to start it again
+later, run `cd run-foundation && rer dev`. Run all other first-party operations
+from the composed, runnable edition checkout with `rer`. The detailed flags and
+effects are in `RUN-LOCALLY.md` and `SEED-COMMAND-CONTRACT.md`.
+
+To install for a real owner instead, run the verbs yourself inside the checkout:
 
 ```sh
 rer install
