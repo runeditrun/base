@@ -1,36 +1,16 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { clauseIdSource } from '../../foundation/runtime/seed-contract.mjs';
+import { parseContract } from '../../foundation/runtime/seed-contract.mjs';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = value => JSON.stringify(value, null, 2) + '\n';
 
+// The listing's clauses are the contract's published ones, read by the parser
+// `rer check` and the run site use: a malformed contract throws its ContractError.
 function clauses(text) {
-  const result = [];
-  let current = null;
-  const finish = () => {
-    if (!current) return;
-    const body = current.body.join(' ').replace(/\s+/gu, ' ').trim();
-    if (body) result.push({ id: current.id, title: current.title, text: body });
-    current = null;
-  };
-  const clauseLine = new RegExp(`^- \\*\\*(${clauseIdSource})\\s+[—–-]\\s+(.+?)\\.?\\*\\*[ \\t]*(.*)$`);
-  for (const line of text.split(/\r\n|\n|\r/)) {
-    const match = clauseLine.exec(line);
-    if (match) {
-      finish();
-      current = { id: match[1], title: match[2], body: [match[3]] };
-      continue;
-    }
-    if (!current) continue;
-    if (!line.trim() || /^[\t ]/.test(line)) {
-      current.body.push(line);
-      continue;
-    }
-    finish();
-  }
-  finish();
+  const result = parseContract(text).clauses.filter(clause => clause.kind === 'published' && clause.text)
+    .sort((a, b) => a.line - b.line).map(({ id, title, text }) => ({ id, title, text }));
   if (!result.length) throw Error('CONTRACT.md must contain published clauses');
   return result;
 }

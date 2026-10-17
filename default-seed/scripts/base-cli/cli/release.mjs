@@ -67,7 +67,7 @@ export async function dispatchRelease(args) {
   console.log(JSON.stringify(receipt, null, 2));
   return receipt.status === 'BLOCKED' ? 1 : 0;
  } catch (error) {
-  console.error(error?.code === 'placeholder_mark' ? error.message : 'Release failed during argument, source or artifact validation. No release completed.');
+  console.error(error?.message || 'Release failed during argument, source or artifact validation. No release completed.');
   return 2;
  }
 }

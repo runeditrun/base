@@ -175,5 +175,5 @@ async function devReady(url,key,options,signal){
  const as=options.as??'owner',persona=await resolvePersona(url,key,as,signal);
  // The owner persona names the owner the session will actually have (the
  // remaining owner once the setup owner has left), or none when none is left.
- return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:openUrl(url,key,{path:'/__dev/key',as})};
+ return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:openUrl(url,key,{path:'/__dev/key',as:persona.as})};
 }
