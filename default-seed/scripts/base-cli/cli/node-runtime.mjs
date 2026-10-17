@@ -39,7 +39,7 @@ export async function selectNodeRuntime(options, argv, out) {
   if (options.json) out.event('node-selection', { versionSelected: version, previousVersion: process.versions.node, message });
   else out.human(message);
   child = spawn(binary, [...process.execArgv, process.argv[1], ...argv], {
-   cwd: process.cwd(), stdio: 'inherit', env: { ...process.env, PATH: dirname(binary) + delimiter + (process.env.PATH ?? '') },
+   cwd: process.cwd(), stdio: 'inherit', env: { ...process.env, RER_NODE_BINARY: binary, PATH: [process.env.PATH, dirname(binary)].filter(value => value !== undefined).join(delimiter) },
   });
   const result = await new Promise((resolve, reject) => {
    child.once('error', reject);

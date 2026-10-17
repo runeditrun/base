@@ -10,6 +10,7 @@ import { checkoutPath, stepDiagnostic } from './step-failure.mjs';
 import { waitForReadiness } from './readiness.mjs';
 import { commandCustody } from './command-custody.mjs';
 import { createProcessBaseline, createProcessScope, inheritedScopeTokens, processScopeEnvironment } from './process-scope.mjs';
+import { toolCommand } from './tool-command.mjs';
 
 export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting}={}) {
  let policy=queuePolicy?await commandPolicy():{environment:{},close:async()=>{}};
@@ -52,7 +53,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   const lines=(capture?.snapshot()||'').split('\n');if(lines.at(-1)==='')lines.pop();
   // The step, its command, exit code, last output and log, for callers that name a failed step.
   const step=stepDiagnostic({name:redaction.redact(String(label)),command:capture?.display,exitCode:detail.code,signal:detail.signal,output:lines,log:redaction.redact(checkoutPath(capture?.cwd,logPath))});
-  return Object.assign(commandFailure(`${redaction.redact(String(label))}: ${status}.${detail.lastHealth?` Last health: ${redaction.redact(String(detail.lastHealth))}.`:''}\nLast output (up to 40 lines):\n${lines.length?lines.slice(-40).join('\n'):'(no output)'}\nLog: ${redaction.redact(logPath)}`,{childExitCode:detail.code,signal:detail.signal,step}),{childExitCode:detail.code,signal:detail.signal});
+  return Object.assign(commandFailure(`${redaction.redact(String(label))}: ${status}.${detail.lastHealth?` Last health: ${redaction.redact(String(detail.lastHealth))}.`:''}\nCommand: ${capture?.display ?? '(none: the step failed inside rer)'}\nLast output (up to 40 lines):\n${lines.length?lines.slice(-40).join('\n'):'(no output)'}\nLog: ${redaction.redact(logPath)}`,{childExitCode:detail.code,signal:detail.signal,step}),{childExitCode:detail.code,signal:detail.signal});
  };
  const track=(label,child,ownershipScope)=>{
   if(captures.has(child))return child;
@@ -120,16 +121,18 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   // label must not show that label twice.
   const announced=redaction.redact(String(label)),repeated=state.step===announced;
   state.step=announced;if(!repeated)report(label);
-  // display: the command line a caller names in its failure; argv itself is never shown.
+  // Name the executable by default; only a caller's explicit safe display may
+  // include arguments. Raw argv can contain private positional values.
   const {signal:providedSignal,afterCommand,onChild,heavy,phase,display,...native}=options;
   const commandSignal=signal&&providedSignal?AbortSignal.any([signal,providedSignal]):providedSignal||signal;
   if(commandSignal?.aborted)throw failure(label,{reason:'cancel'});
   const ownershipScope=createProcessScope(custodyBaseline);redaction.addSecrets([ownershipScope.token,...inheritedScopeTokens(process.env),...inheritedScopeTokens(native.env)]);
-  const child=spawn(command,args,{...native,env:processScopeEnvironment(ownershipScope,{...(native.env??process.env),...policy.environment,...(custodyToken?{RER_ONBOARDING_PROCESS_OWNER:[...inheritedScopeTokens(native.env??process.env),custodyToken].join(',')}:{})}),shell:false,detached:process.platform!=='win32',stdio:[Array.isArray(native.stdio)?native.stdio[0]:'ignore','pipe','pipe',...(native.stdio?.includes('ipc')?['ipc']:[])]});
+  const [program,argv]=toolCommand(command,args,native.env??process.env);
+  const child=spawn(program,argv,{...native,env:processScopeEnvironment(ownershipScope,{...(native.env??process.env),...policy.environment,...(custodyToken?{RER_ONBOARDING_PROCESS_OWNER:[...inheritedScopeTokens(native.env??process.env),custodyToken].join(',')}:{})}),shell:false,detached:process.platform!=='win32',stdio:[Array.isArray(native.stdio)?native.stdio[0]:'ignore','pipe','pipe',...(native.stdio?.includes('ipc')?['ipc']:[])]});
   onChild?.(child);
   ownershipRecords.set(child,{pid:child.pid,token:ownershipScope.token});
   track(label,child,ownershipScope);
-  Object.assign(captures.get(child),{cwd:native.cwd??process.cwd(),display:display===undefined?undefined:redaction.redact(String(display))});
+  Object.assign(captures.get(child),{cwd:native.cwd??process.cwd(),display:redaction.redact(String(display??command))});
   const cancel=()=>{void stopCommand(child);};
   commandSignal?.addEventListener('abort',cancel,{once:true});if(commandSignal?.aborted)cancel();
   const capture=captures.get(child);capture.removeCancellation=()=>commandSignal?.removeEventListener('abort',cancel);
@@ -154,7 +157,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
     if(result?.timedOut)throw busyRefusal({...result,reason:redaction.redact(String(result.reason))},{verb:queuePolicy.verb,maxWait:queuePolicy.maxWait??maxWaitSeconds});
     if(result){if(result.code!==0)throw failure(label,result,captures.get(queuedChild));return result;}
    }
-   let child;try{child=spawnCommand(label,command,args,options);}catch{throw failure(label,options.signal?.aborted||signal?.aborted?{reason:'cancel'}:{error:true});}
+   let child;try{child=spawnCommand(label,command,args,options);}catch{throw failure(label,options.signal?.aborted||signal?.aborted?{reason:'cancel'}:{error:true},{display:redaction.redact(String(options.display??command)),cwd:options.cwd,snapshot:()=>''});}
    const capture=captures.get(child);
    // Start cleanup at exit: inherited pipes can hold close open indefinitely.
    // Only run's bounded command ends here; spawn's app stays owned until stop.

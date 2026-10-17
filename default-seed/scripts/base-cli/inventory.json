@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.50-dev.g551c17d1",
+  "cliVersion": "0.2.50-dev.g1599e30a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -65,7 +65,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "a8a2af610cb15332b3178950718ba52247696ac68361f9f386135b5e58e9e8df"
+      "sha256": "fa27fc8e6feb2ffefefbf23bfd553ae3a675793ed9381531928079273af98bdb"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -161,7 +161,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "ca8ca54a856c8466d27f0a7dcc8838e5b15b42010823c30695c5b2a6e4c7f75e"
+      "sha256": "d734f6a805bf95b2614e90b409cf36cfb7fbd1330e7a01ad5a4c96f750522454"
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
@@ -302,6 +302,10 @@
     "theme.mjs": {
       "source": "onboarding/theme.mjs",
       "sha256": "1826537aa6eba5c87785afa3756e3970ca00cac74dc055a9e87210de087970b0"
+    },
+    "tool-command.mjs": {
+      "source": "onboarding/tool-command.mjs",
+      "sha256": "bf34bcca187b792fb093d9069f1aad3dcb50aa717298ea604407f162b23b2d8d"
     },
     "ui/activity.js": {
       "source": "onboarding/ui/activity.js",
@@ -791,11 +795,11 @@
     },
     "cli/independent.mjs": {
       "source": "cli/independent.mjs",
-      "sha256": "1a411c883a52bb257b191f44f509a2e13cc25306ad0a164d4ea0b99fa865420a"
+      "sha256": "ddddaf3f3ce7e272d2aee6d6f289bc1cf85542c283f07ab83c1860c2c0caf914"
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "6740dcb0439928accfe1911d28be1f48f574243f61631dc0dd419108b8055dc8"
+      "sha256": "d346976f2d70782852f2e764381bde8daf2ddc1c9bf14b5031f3f8b499db122f"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -803,7 +807,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "e7f59887f4d1649185af9d98d0f064f2bebe3377898c3e5db9618495dc5b0764"
+      "sha256": "d1599705962888376ac2c2ff66ab31608745fdbcf2a171be00244dde6dd5407c"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -839,7 +843,7 @@
     },
     "cli/node-runtime.mjs": {
       "source": "cli/node-runtime.mjs",
-      "sha256": "69608bfc074c8f55280d1cffc003528b3b8595f9664a3c60a2307b1b35d2bab3"
+      "sha256": "d5edabd45812203ed9315bfe3fb3be4b1eb1f6fe5a2d30551d4e39f7226b0293"
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
@@ -867,7 +871,7 @@
     },
     "cli/pnpm-runtime.mjs": {
       "source": "cli/pnpm-runtime.mjs",
-      "sha256": "74b0dd7fbe87bb73e0cc05df5b725f570d97dee324706bec1eb085bc8d1cb723"
+      "sha256": "027370fa7929d5b19c79eb1fe41938b00416fefccea15b6f6c7d25ece8c5008e"
     },
     "cli/port.mjs": {
       "source": "cli/port.mjs",
@@ -903,7 +907,7 @@
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
-      "sha256": "5793898f0d1e8b297d1aa48369e83687a749ebba82eef656b5cde45b0410a6f6"
+      "sha256": "d3b9dfb181d6f4ad4ef057fdd15a6b9a9e33b08464f0b446eafb91a5d6353c40"
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",

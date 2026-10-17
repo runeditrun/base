@@ -161,7 +161,10 @@ export async function tools(root, store, signal) {
  const { ensureProjectPnpm } = await import('./project-pnpm.mjs');
  await ensureProjectPnpm(root, { signal, store, report: text => store.report?.(text) });
 }
-const usePnpm = directory => { process.env.PATH = [directory, dirname(process.execPath), process.env.PATH].filter(Boolean).join(delimiter); };
+const usePnpm = directory => {
+ process.env.RER_PNPM_ENTRY = resolve(directory, '..', 'bin', 'pnpm.cjs');
+ process.env.PATH = [process.env.PATH, directory, dirname(process.execPath)].filter(value => value !== undefined).join(delimiter);
+};
 
 export async function doctor(project, store, signal) {
  const { inspectOperations } = await import('../operations/operations.mjs');
