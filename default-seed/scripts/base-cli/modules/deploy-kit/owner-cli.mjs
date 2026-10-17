@@ -114,6 +114,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });
+  for (const {binding,retried = []} of receipt.migrations) for (const name of retried) notice(`Migrations: retried ${name}: the earlier attempt was rolled back (D1 ${plan.d1.find(item => item.binding === binding).name}).`);
   // Optional secrets the Worker does not hold: never supplied, or removed with --unset.
   const optionalUnset = declaredSecrets.filter(item => item?.optional && (unsetSecrets.includes(item.binding) || retiredSecrets.includes(item.binding))).map(item => item.binding);
   const result = {ok:true,changed:receipt.changed,worker:target.worker,origin:receipt.origin,versionId:receipt.provider.versionId,created,sentSecrets,...(optionalUnset.length ? {optionalUnset} : {}),retiredSecrets,...(state.ownerClaim ? {ownerClaim:state.ownerClaim} : {}),state:statePath};

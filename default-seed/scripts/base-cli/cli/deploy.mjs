@@ -165,7 +165,7 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  lines.push(`Resources created this attempt: ${created.join(', ') || 'none'}.`);
  const migration = migrationFailure(error, again);
  if (migration) lines.push(redact(migration));
- if (code !== 'uncertain-migration-claim') lines.push(recovery({ code, at, resource, again, retry, secretChange }));
+ if (code !== 'uncertain-migration-claim' && !error.unconfirmedClaim) lines.push(recovery({ code, at, resource, again, retry, secretChange }));
  return lines.join('\n');
 }
 

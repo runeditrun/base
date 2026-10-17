@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { migrate, readMigrationRewrites, withRewrites } from '../migrations.mjs';
 import { cloudflare } from '../provider.mjs';
 import { hash } from '../validation.mjs';
+import { migrationFailure } from '../diagnostics.mjs';
+import { main } from '../owner-cli.mjs';
+import { ownerProvider } from './owner-provider.mjs';
 import { providerFixture } from './provider-fixture.mjs';
 
 const entry = sql => ({ name: '0001_schema.sql', sql, sha256: hash(sql) });
@@ -157,4 +161,56 @@ test('a seed-declared reviewed rewrite lets upgrades past a released migration p
   assert.deepEqual((await migrate(api, id, upgrade)).applied, ['0003_converge.sql']);
   assert.deepEqual(ledger(), [...before, { name: '0003_converge.sql', sha256: current[2].sha256, state: 'applied' }], 'the ledger keeps the released digest it applied');
   assert.deepEqual((await migrate(api, id, upgrade)).applied, []);
+});
+
+test('rer deploy retries a claim D1 rolled back on bytes a reviewed rewrite replaced; a claim on any other bytes is refused with the command that clears it', async t => {
+  const provider = ownerProvider(); t.after(() => provider.close());
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'rewritten-claim-'))); t.after(() => rm(root, { recursive: true, force: true }));
+  for (const dir of ['dist/server', 'dist/client', 'migrations/core']) await mkdir(join(root, dir), { recursive: true });
+  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }] }));
+  await writeFile(join(root, 'dist/server/index.js'), 'export default {fetch(){return new Response("vector")}};');
+  await writeFile(join(root, 'dist/client/index.html'), '<h1>Vector</h1>');
+  await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'runeditrun/vector', compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], d1: [{ binding: 'DB' }], secrets: [], crons: [], vars: {} }));
+  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n');
+  const git = (...args) => execFileSync('git', ['-c', 'user.email=owner@example.test', '-c', 'user.name=Owner', '-c', 'commit.gpgsign=false', ...args], { cwd: root, stdio: 'pipe' });
+  const commit = async files => {
+    for (const [path, text] of Object.entries(files)) await writeFile(join(root, path), text);
+    git('add', '.'); git('commit', '-qm', 'change');
+  };
+  // Like Pantry's 0018: a rebuilt table, which exists either way and proves nothing, then new tables and indexes
+  // whose absence proves the rollback (more of them than D1 accepts in one compound SELECT).
+  const rebuild = 'CREATE TABLE projects_next(id TEXT PRIMARY KEY, name TEXT);\nINSERT INTO projects_next(id) SELECT id FROM projects;\nDROP TABLE projects;\nALTER TABLE projects_next RENAME TO projects;\nCREATE INDEX projects_name ON projects(name);\n';
+  const custody = `CREATE TABLE custody(id TEXT);\n${[1, 2, 3, 4, 5].map(n => `CREATE INDEX custody_${n} ON custody(id);`).join('\n')}\n`;
+  const fixed = `${rebuild}${custody}INSERT INTO custody SELECT id FROM projects;`;
+  const sql = { schema: 'CREATE TABLE projects(id TEXT PRIMARY KEY);\nCREATE INDEX projects_name ON projects(id);', released: `${rebuild}${custody}INSERT INTO custody SELECT id FROM missing;`, other: `${fixed}\n-- edited without a rewrite record`, fixed };
+  git('init', '-q');
+  await commit({ 'migrations/core/0001_projects.sql': sql.schema, 'migrations/core/0002_custody.sql': sql.released });
+  const notices = [], deploy = () => main(['deploy', '--declaration', 'deploy.json', '--environment', 'production'], { CLOUDFLARE_ACCOUNT_ID: provider.accountId, CLOUDFLARE_API_TOKEN: provider.token }, { fetch: provider.fetch, cwd: root, notice: line => notices.push(line) });
+  const db = () => provider.state.databases[0].db;
+  const ledger = () => db().prepare('SELECT name,sha256,state FROM d1_migrations ORDER BY id').all().map(row => ({ ...row }));
+  await assert.rejects(deploy(), error => error.message === 'd1-import-failed' && error.migration === '0002_custody.sql');
+  assert.deepEqual(ledger().at(-1), { name: '0002_custody.sql', sha256: hash(sql.released), state: 'applying' }, 'D1 rolled the import back and the claim stays');
+  // Other bytes, undeclared: refused, and the message gives the exact command that clears the claim.
+  await commit({ 'migrations/core/0002_custody.sql': sql.other });
+  let writes = provider.state.writes.length;
+  await assert.rejects(deploy(), error => {
+    assert.equal(error.message, 'changed-or-uncertain-migration-history');
+    const text = migrationFailure(error);
+    assert.ok(text.includes(`npx wrangler d1 execute vector-production-db --remote --command "DELETE FROM d1_migrations WHERE name='0002_custody.sql' AND sha256='${hash(sql.released)}' AND state='applying'"`), text);
+    assert.match(text, /no other deploy of this environment is running/);
+    return true;
+  });
+  assert.equal(provider.state.writes.length, writes, 'a refusal writes nothing');
+  // The fix, with its reviewed rewrite: the rolled-back claim runs again with the new bytes.
+  db().exec("INSERT INTO projects VALUES ('kept')");
+  await commit({ 'migrations/core/0002_custody.sql': sql.fixed, 'migrations/rewrites.json': JSON.stringify({ version: 1, rewrites: [{ migration: '0002_custody.sql', from: hash(sql.released), to: hash(sql.fixed), reason: 'The released bytes read a table that does not exist.', reviewed: true }] }) });
+  const unlocked = cloudflare(provider); writes = provider.state.writes.length;
+  const plan = withRewrites([['0001_projects.sql', sql.schema], ['0002_custody.sql', sql.fixed]].map(([name, text]) => ({ name, sql: text, sha256: hash(text) })), await readMigrationRewrites(root));
+  await assert.rejects(migrate(unlocked, provider.state.databases[0].uuid, plan), /changed-or-uncertain-migration-history/, 'a caller without the deploy lock keeps the refusal');
+  assert.equal(provider.state.writes.length, writes);
+  assert.equal((await deploy()).ok, true);
+  assert.deepEqual(ledger().at(-1), { name: '0002_custody.sql', sha256: hash(sql.fixed), state: 'applied' });
+  assert.deepEqual(db().prepare('SELECT id FROM custody').all().map(row => row.id), ['kept']);
+  assert.ok(notices.includes('Migrations: retried 0002_custody.sql: the earlier attempt was rolled back (D1 vector-production-db).'), notices.join('\n'));
+  assert.equal((await deploy()).changed, false, 'the next deploy has nothing to do');
 });

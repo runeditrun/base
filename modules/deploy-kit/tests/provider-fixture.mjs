@@ -75,6 +75,8 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
         }
       }
       const sql = body.sql;
+      // D1 refuses a compound SELECT of more than five terms (measured 17 Oct 2026).
+      if (/^SELECT /i.test(sql) && (sql.match(/\b(?:UNION|INTERSECT|EXCEPT)\b/gi) ?? []).length > 4) return Response.json({success:false,errors:[{code:7500,message:'too many terms in compound SELECT: SQLITE_ERROR'}]},{status:400});
       if (/^SELECT /i.test(sql)) return ok([{success:true,results:row.db.prepare(sql).all()}]);
       if (/CREATE\s+(?:(?:TEMP|TEMPORARY)\s+)?TRIGGER/i.test(sql)) throw Error('trigger must use file import');
       write(method,path,body);
