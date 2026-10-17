@@ -519,3 +519,57 @@ export const commandAdapter = {...lifecycle,deploy:ownerDeploy('deploy.json',lif
   if (!mode.startsWith('persistent')) assert.ok(provider.state.settings);
  });
 });
+
+test('rer deploy sets a group of secrets in one command as one Worker version, removes them together, and refuses a missing value before any write', async t => {
+ const { root, git } = await checkout(t, { secrets: ['SESSION_SECRET', 'PIER_SESSION', 'PIER_TOKEN'].map(name => ({ binding: name, environment: name, ...(name === 'SESSION_SECRET' ? {} : { optional: true }) })) });
+ await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('./deploy.mjs', import.meta.url).href)};
+const lifecycle = {run:async()=>{},settings:{},hooks:{}};
+export const commandAdapter = {...lifecycle,deploy:ownerDeploy('deploy.json',lifecycle)};`);
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({version:2,project:'tests/fixture',runtime:{requirements:[]},requiredEnvironment:[],seedContract:{version:1,profile:'first-party',adapter:'adapter.mjs'},commands:{deploy:{argv:['node','adapter.mjs'],inputs:['adapter.mjs','deploy.json'],effects:'Deploy to the fake provider.'}}}));
+ await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+ await writeFile(join(root, 'package.json'), JSON.stringify({engines:{node:process.versions.node},packageManager:'pnpm@10.12.4'}));
+ git('add', '.'); git('commit', '-qm', 'deploy door');
+ const { provider } = account(t);
+ const previous = { CI: process.env.CI, PIER_TOKEN: process.env.PIER_TOKEN }; process.env.CI = 'true';
+ t.after(() => { for (const [name, value] of Object.entries(previous)) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
+ const rer = async (...args) => {
+  const output = [];
+  const capture = t.mock.method(process.stdout, 'write', chunk => { output.push(String(chunk)); return true; });
+  const code = await cli(['deploy', ...args, '--cwd', root, '--json']).finally(() => capture.mock.restore());
+  const events = output.flatMap(text => text.trim().split('\n')).filter(Boolean).map(text => JSON.parse(text));
+  return { code, events, error: events.find(event => event.event === 'error')?.message ?? '' };
+ };
+ const secretValue = name => provider.state.secrets.find(item => item.name === name)?.value;
+ const versions = () => provider.state.versions.length, writes = () => provider.state.writes.length;
+ process.env.SESSION_SECRET = 'test-only-session';
+ const first = await rer();
+ assert.equal(first.code, 0, first.error);
+ assert.deepEqual(secretNames(provider), ['SESSION_SECRET']);
+ // Repeated flags: both secrets in ONE new version, through one upload and its deployment.
+ Object.assign(process.env, { PIER_TOKEN: 'test-only-pier-token', PIER_SESSION: 'test-only-pier' });
+ let before = { versions: versions(), writes: writes() };
+ const set = await rer('--set-secret', 'PIER_TOKEN', '--set-secret', 'PIER_SESSION');
+ assert.equal(set.code, 0, set.error);
+ assert.equal(versions(), before.versions + 1, 'one Worker version holds both secrets');
+ assert.deepEqual(provider.state.writes.slice(before.writes).map(write => `${write.method} ${write.path}`), ['POST /workers/scripts/fixture-production/versions', 'POST /workers/scripts/fixture-production/deployments']);
+ assert.deepEqual(secretNames(provider), ['PIER_SESSION', 'PIER_TOKEN', 'SESSION_SECRET']);
+ assert.deepEqual([secretValue('PIER_TOKEN'), secretValue('PIER_SESSION'), secretValue('SESSION_SECRET')], ['test-only-pier-token', 'test-only-pier', 'test-only-session']);
+ assert.ok(provider.state.settings.bindings.some(item => item.name === 'DB' && item.type === 'd1'), 'every other binding is inherited');
+ // The next deploy recognises the Worker the change made and writes nothing.
+ before = { versions: versions(), writes: writes() };
+ assert.equal((await rer()).code, 0);
+ assert.deepEqual({ versions: versions(), writes: writes() }, before, 'an unchanged repeat makes no provider write');
+ // A comma list removes the group together, again as one version.
+ const unset = await rer('--unset-secret', 'PIER_TOKEN,PIER_SESSION');
+ assert.equal(unset.code, 0, unset.error);
+ assert.equal(versions(), before.versions + 1);
+ assert.deepEqual(secretNames(provider), ['SESSION_SECRET']);
+ // A missing value refuses before any provider write, naming every missing one.
+ delete process.env.PIER_TOKEN; delete process.env.PIER_SESSION;
+ before = { versions: versions(), writes: writes() };
+ const refused = await rer('--set-secret', 'PIER_TOKEN,SESSION_SECRET,PIER_SESSION');
+ assert.equal(refused.code, 3);
+ assert.match(refused.error, /needs a value for each secret; PIER_TOKEN, PIER_SESSION are not set\./);
+ assert.deepEqual({ versions: versions(), writes: writes() }, before, 'nothing is written');
+ assert.deepEqual(secretNames(provider), ['SESSION_SECRET']);
+});

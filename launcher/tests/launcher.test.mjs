@@ -91,7 +91,7 @@ test('cancelling acquisition waits for Git and removes only the new checkout', a
   const controller = new AbortController();
   const acquisition = acquire({ ...options, signal: controller.signal });
   setImmediate(() => controller.abort());
-  await assert.rejects(acquisition, /cancelled|aborted/);
+  await assert.rejects(acquisition, /canceled|aborted/);
   await assert.rejects(stat(directory), { code: 'ENOENT' });
   assert.equal(await readFile(join(source, 'SEED.json'), 'utf8'), '{"id":"ferry"}');
 });

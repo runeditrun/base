@@ -66,7 +66,7 @@ export async function next() {
 export async function answer(id, vendorId, choice, rawConfidence = '1') {
  identifier(id);
  // Reject free text before even looking up the question or minting a bearer.
- if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId)) throw Error('Choose a catalogue vendor id from rer business next, or none.');
+ if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId)) throw Error('Choose a catalog vendor id from rer business next, or none.');
  if (!classifications.includes(choice)) throw Error(`Choose an enum: ${classifications.join(', ')}.`);
  if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(rawConfidence)) throw Error('Choose a numeric confidence between 0 and 1.');
  const confidence = Number(rawConfidence);
@@ -75,7 +75,7 @@ export async function answer(id, vendorId, choice, rawConfidence = '1') {
  if (summary.runner === 'owner' || ownerKinds.has(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerLink(state)}`);
  if (summary.kind !== 'classify.row' || summary.runner !== 'executor') throw Error('This item does not accept a CLI classification answer.');
  const { vendors } = classification(summary);
- if (!vendors.includes(vendorId)) throw Error('Choose a catalogue vendor id from this question, or none.');
+ if (!vendors.includes(vendorId)) throw Error('Choose a catalog vendor id from this question, or none.');
  const tool = await mcpClient(api, { taskId: id, signal });
  let lease = summary;
  if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });

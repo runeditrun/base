@@ -7,7 +7,7 @@ import { runCommands } from './commands.mjs';
 import { Api } from './api.mjs';
 import { canRestartPreparation } from './recovery.mjs';
 import { saveState } from './state.mjs';
-import { prepareWorkspace,collectResult,executorEnvironment } from './workspace.mjs';
+import { prepareWorkspace,collectResult,executorEnvironment,commandEnvironment } from './workspace.mjs';
 import { CodexSession } from './providers/codex.mjs';
 import { ClaudeSession } from './providers/claude.mjs';
 import { executionGrant, safeGrantId } from './grants.mjs';
@@ -38,7 +38,7 @@ export async function run(root,state,{once=false}={}) {
     const Provider=state.provider==='claude'?ClaudeSession:CodexSession;
     try {
       state.active.phase='setup';await persist();
-      if(!resume){const setup=await runCommands(mapping.commands?.setup,workspace.worktree,executorEnvironment('codex',home));if(setup.some(r=>r.exit_code!==0))throw new Error(`Local setup failed: ${JSON.stringify(setup)}`);}
+      if(!resume){const setup=await runCommands(mapping.commands?.setup,workspace.worktree,commandEnvironment(root));if(setup.some(r=>r.exit_code!==0))throw new Error(`Local setup failed: ${JSON.stringify(setup)}`);}
       await event('status',{status:'running',phase:resume?'session_resuming':'setup_completed'});
     state.active.phase='executor_starting';state.active.executorStarted=true;await persist();
     session=new Provider({cwd:workspace.worktree,env:executorEnvironment(state.provider,home),onEvent:e=>{if(!acceptingEvents || e.payload?.method?.endsWith('/delta'))return;const payload=guard.redact(e.payload);void event(e.kind,boundedEventPayload(payload));},onIdentity:async identity=>{state.active.identity=identity;await persist();await event('session',{...identity,session_id:identity.thread_id});}});
@@ -51,7 +51,7 @@ export async function run(root,state,{once=false}={}) {
       if(result.status==='interrupted') await event('status',{status:'cancelled',executor_confirmed:true});
       else if(result.status!=='completed') throw new Error(`Executor finished ${result.status}`);
       else {
-        const output=await collectVerifiedResult(workspace,JSON.stringify(result),mapping.commands?.verify,executorEnvironment('codex',home));
+        const output=await collectVerifiedResult(workspace,JSON.stringify(result),mapping.commands?.verify,commandEnvironment(root));
         guard.assertPublishable(output);
         await enqueue(`/api/local/jobs/${job.id}/result`,{run_id:job.run_id,event_id:randomUUID(),result:output,...(grant?{grant_id:grant.id}:{})});
       }

@@ -43,12 +43,16 @@ export function sandboxCommand(provider, cwd, env) {
   const literals = ['/',...libraries,cli,node,'/dev/null','/dev/urandom','/dev/random','/private/etc/resolv.conf','/private/etc/hosts','/private/etc/localtime','/private/etc/services','/private/etc/protocols','/private/var/run/resolv.conf','/private/var/db/timezone/zoneinfo'];
   const quote = JSON.stringify;
   // Codex 0.163+ loads macOS managed preferences at thread start and fails
-  // without read access to the preferences daemon's shared page. That page is
-  // reachable only through cfprefsd (already a mach service); no file opens.
+  // without read access to the preferences daemon's two shared pages (change
+  // counters, no preference values): the daemon's and this user's. No file opens.
+  const cfprefs = ['daemonv1', `${process.getuid()}v1`].map(name => `(ipc-posix-name ${quote(`apple.cfprefs.${name}`)})`).join(' ');
+  // Network stays open: providers and package managers need outbound access and
+  // dev servers need to listen. sandbox-exec cannot confine listening to
+  // loopback (a "localhost" network-inbound rule still allows 0.0.0.0).
   // Keep the loader spelling for libraries as well as their canonical targets:
   // macOS may resolve an @loader_path dependency through a versioned symlink,
   // then ask the sandbox for that symlink path during dyld startup.
   const reads = roots.filter(existsSync).map(path => `(subpath ${quote(realpathSync(path))})`).concat(literals.filter(existsSync).map(path => `(literal ${quote(path)})`));
-  const profile = `(version 1)(deny default)(allow process-exec)(allow process-fork)(allow signal (target same-sandbox))(allow process-info* (target same-sandbox))(allow sysctl-read)(allow mach-lookup)(allow ipc-posix-shm-read-data (ipc-posix-name-prefix "apple.cfprefs."))(allow network*)(allow file-read-metadata)(allow file-read* file-map-executable ${reads.join(' ')})(allow file-write* (subpath ${quote(workspace)}) (subpath ${quote(home)}) (literal "/dev/null"))`;
+  const profile = `(version 1)(deny default)(allow process-exec)(allow process-fork)(allow signal (target same-sandbox))(allow process-info* (target same-sandbox))(allow sysctl-read)(allow mach-lookup)(allow ipc-posix-shm-read-data ${cfprefs})(allow network*)(allow file-read-metadata)(allow file-read* file-map-executable ${reads.join(' ')})(allow file-write* (subpath ${quote(workspace)}) (subpath ${quote(home)}) (literal "/dev/null"))`;
   return {command:'/usr/bin/sandbox-exec',args:['-p',profile,...(/\.(?:mjs|cjs|js)$/.test(cli)?[node,cli]:[cli])],env:{...env,GIT_CONFIG_NOSYSTEM:'1',OPENSSL_CONF:'/dev/null',TMPDIR:tmp,CLAUDE_CODE_TMPDIR:tmp},profile};
 }
