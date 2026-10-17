@@ -135,6 +135,9 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
  const packagingPath = join(seed.root, 'rer-packaging.json');
  await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: spec } }));
  assert.match(await error('SENDGRID_API_KEY=test-only-provider-credential\n'), /MAIL_FROM/);
+ // The documented display-name sender passes like a bare address, quoted or not; an invalid one names the accepted forms.
+ for (const from of ['Your Business <sender@example.test>', '"Your Business <sender@example.test>"']) assert.match(await error(`MAIL_FROM=${from}\nRESEND_API_KEY=test-only-provider-credential\n`), /not committed/, from);
+ assert.match(await error('MAIL_FROM=Your Business sender@example.test\nRESEND_API_KEY=test-only-provider-credential\n'), /MAIL_FROM \(\S+@\S+ or [^)]*<\S+@\S+>\)/);
  assert.match(await error('MAIL_FROM=sender@example.test\nMAIL_PROVIDER=resend\nSENDGRID_API_KEY=test-only-provider-credential\n'), /RESEND_API_KEY/, 'explicit provider cannot borrow another provider key');
  assert.match(await error('MAIL_FROM=sender@example.test\nMAIL_API_KEY=test-only-provider-credential\n'), /SENDGRID_API_KEY.*RESEND_API_KEY/, 'an ambiguous shared key does not resolve a deferred native provider');
  spec.optionalSecretNames = ['RESEND_API_KEY'];

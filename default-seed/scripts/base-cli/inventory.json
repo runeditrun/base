@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.41-dev.gb45ebe13",
+  "cliVersion": "0.2.41-dev.g5f6fcaba",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -543,7 +543,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "55dba9b034a7286c3a66364fde34af0bd5be1b653e02e8d6c98093138648d0f8"
+      "sha256": "91acfc4a85f65a62f59a69b4f36be5b20c307eaaeff414c56c4c7deaf2619103"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -647,7 +647,7 @@
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
-      "sha256": "f87398cef16e62eac85abf8813f54bd84175f5856833d47899ec7589e2fd8023"
+      "sha256": "977edfc2aaae201a8b42bfe5c2aeb817af3dff69fb11b0b70f28577de1af6743"
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
@@ -655,7 +655,7 @@
     },
     "cli/dev-identity.mjs": {
       "source": "cli/dev-identity.mjs",
-      "sha256": "9f32113f14dd7ada3dcba84480ad8dc16ae7de5e01135dc62b99f0ffa3603339"
+      "sha256": "2d9d7a4e3e52b19de65aebb4be714f0e323e29c2d55bbf2beeefca1736450761"
     },
     "cli/door-mode.mjs": {
       "source": "cli/door-mode.mjs",
@@ -671,7 +671,7 @@
     },
     "cli/export-summary.mjs": {
       "source": "cli/export-summary.mjs",
-      "sha256": "70ba827a6595305f8084a78f927d77371eed46ed72861b501483b596bbd06179"
+      "sha256": "b75bd040388b1f330312c6a0b242b0d83ebe26664eb7b4af7e52e595e2b142e0"
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
@@ -680,6 +680,10 @@
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
       "sha256": "e540e9b5e48d9c27c0b54ca52d12c25273b917004111ebc389c25d08f67b5ada"
+    },
+    "cli/hosted-export.mjs": {
+      "source": "cli/hosted-export.mjs",
+      "sha256": "7337d05a4210c4a7cefbd0be0edec21f9a7e45337f87981be0d938b4ab81e8d5"
     },
     "cli/hosted-mail.mjs": {
       "source": "cli/hosted-mail.mjs",
@@ -743,7 +747,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "8d34abc01890f488980c6ac2f669a8407cee7ab505c49a59ef923e8099164edf"
+      "sha256": "6a4c3261e79544222f80e2c1b548b2d300c3a17bd2837c78d3a3981d1a636b94"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -819,7 +823,7 @@
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "5e8f6b0c1aea9a0d50e9b416b7deca272c15c989c80b6defdf882619c67b9b85"
+      "sha256": "fa803a8d6a09e63a51e0b82e8f364949bb385f6b5cd348b3171a3d97df7bd9bd"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
@@ -947,7 +951,7 @@
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
-      "sha256": "89ec5842a71717cf6ab2a9eacdbee5fdd28b3f68fe91b168e273a1c9f3643111"
+      "sha256": "8df8f10fc853aacd7a3f52700e25d7c85a79d1e07ba23bc29c847189410c3aed"
     },
     "cli/version.mjs": {
       "source": "cli/version.mjs",

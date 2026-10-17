@@ -62,8 +62,12 @@ export async function resolvePersona(url, key, as, signal) {
  const response = await appFetch(url + '/__dev/personas', { headers: { [DEV_KEY_HEADER]: key }, signal: AbortSignal.any([signal, AbortSignal.timeout(10000)].filter(Boolean)) });
  if (!response.ok) { await response.body?.cancel(); throw refuse(`The application did not serve dev identity (HTTP ${response.status}). Check its local-only entry.`); }
  const personas = await response.json(), persona = personas.find(entry => entry.as === as);
- if (!persona) throw invalid(`Unknown dev persona ${as}. This app declares: ${personas.map(entry => entry.as).join(', ')}.`);
- return persona;
+ if (persona) return persona;
+ // The people rer can sign in as: each persona with its email, then every
+ // invited or active person in this checkout's local database by email.
+ const valid = personas.map(entry => entry.as === entry.email || !entry.email ? entry.as : `${entry.as} (${entry.email})`).join(', ');
+ if (!as.includes('@')) throw invalid(`Unknown dev persona ${as}. rer dev --as takes one of: ${valid}.`);
+ throw invalid(`No one with the email ${as} can sign in to this app locally. rer dev --as takes one of: ${valid}. Someone added only to the app's own records can sign in once the app invites them (its Invite action, which sends no mail locally); then run rer dev --as ${as} again.`);
 }
 
 // rer build refuses output that bundles the dev layer, naming the file.

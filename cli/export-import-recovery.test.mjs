@@ -22,7 +22,11 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
  const receipt = (await seed.run(['export', '--output', 'exports/shown-data.rer'])).at(-1);
  const rowCount = receipt.tables.reduce((sum, table) => sum + table.count, 0);
  assert.ok(receipt.contentHash && rowCount >= 2, 'the receipt stays --json data');
- assert.match(shown.stdout.trimEnd().split('\n').at(-1), new RegExp(`^Exported exports/shown\\.rer \\(\\d+(\\.\\d)? (B|KB|MB)\\): ${receipt.tables.length} tables, ${rowCount.toLocaleString('en-US')} rows$`));
+ assert.match(shown.stdout.trimEnd().split('\n').at(-1), new RegExp(`^Exported the local copy to exports/shown\\.rer \\(\\d+(\\.\\d)? (B|KB|MB)\\): ${receipt.tables.length} tables, ${rowCount.toLocaleString('en-US')} rows$`));
+ // A hosted address is refused before any effect, naming the command that exports it, never answered with this computer's copy.
+ const hosted = await seed.text(['export', '--origin', 'https://example.invalid', '--output', 'exports/hosted.rer'], 2);
+ assert.match(hosted.stderr, /https:\/\/example\.invalid[^]*npx wrangler d1 export \S+ --remote --output /);
+ await assert.rejects(stat(join(seed.root, 'exports/hosted.rer')), { code: 'ENOENT' });
  const query = 'SELECT * FROM computed_entries ORDER BY id', rows = (await seed.data(query))[0].results;
  let previous;
  for (const round of [1, 2, 3]) {

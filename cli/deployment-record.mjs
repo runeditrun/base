@@ -16,7 +16,7 @@ export async function deploymentRecord(root, options) {
  try { await access(path); }
  catch (error) {
   if (error.code !== 'ENOENT') throw error;
-  const availableDeployments = (await environments(root)).map(environment => ({ environment, command: commandFor(options, environment) }));
+  const availableDeployments = (await heldDeployments(root)).map(({ environment }) => ({ environment, command: commandFor(options, environment) }));
   const held = availableDeployments.length
    ? `It holds:\n${availableDeployments.map(item => `  ${item.environment}: ${item.command}`).join('\n')}`
    : 'This checkout holds no deployment environments. Run it from the checkout that deployed it.';
@@ -26,7 +26,8 @@ export async function deploymentRecord(root, options) {
  return state;
 }
 
-async function environments(root) {
+// The deployments this checkout holds: each environment with its owner-state record.
+export async function heldDeployments(root) {
  let entries;
  try { entries = await readdir(await contained(root, '.rer/deploy', { optional: true })); }
  catch (error) { if (error.code === 'ENOENT') return []; throw error; }
@@ -36,10 +37,10 @@ async function environments(root) {
    const state = await hookState(root, environment);
    const path = await contained(root, state ?? recordPath(environment));
    const record = JSON.parse(await readFile(path, 'utf8'));
-   return record?.kind === 'rer-deploy-owner-state' && record.environment === environment ? environment : undefined;
+   return record?.kind === 'rer-deploy-owner-state' && record.environment === environment ? { environment, record } : undefined;
   } catch { return undefined; } // An unrelated or broken file is not a held deployment.
  }));
- return held.filter(Boolean).sort();
+ return held.filter(Boolean).sort((a, b) => a.environment.localeCompare(b.environment));
 }
 
 function commandFor(options, environment) {

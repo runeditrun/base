@@ -49,6 +49,8 @@ export async function main(argv = process.argv.slice(2)) {
    warnPlaceholderMarks(out, options, await checkoutPlaceholderMarks(project.root, project.descriptor.project));
    (await import('./site.mjs')).declaredSite(project);
   }
+  // A hosted address never exports this computer's copy under its name.
+  if (options.verb === 'export' && project.profile === 'first-party') await (await import('./hosted-export.mjs')).refuseHostedExport(project, options);
   if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret) {
    const { deliveryDeclarationClauses } = await import('./delivery-declarations.mjs');
    const failures = (await deliveryDeclarationClauses(project.root)).filter(clause => !clause.ok);

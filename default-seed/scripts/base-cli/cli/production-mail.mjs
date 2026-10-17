@@ -1,13 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { contained } from './project.mjs';
 import { refuse } from './errors.mjs';
-import { mailbox } from './parse.mjs';
+import { parseAddress } from '../modules/mail/src/core/validation.mjs';
 import { deliveryDeclarationSources } from './delivery-declarations.mjs';
 import { validateRerConfig } from '../modules/mail/src/adapters/rer/contract.mjs';
 
 const providers = ['resend', 'sendgrid', 'cloudflare', 'rer'];
 const nativeCredential = { sendgrid: 'SENDGRID_API_KEY', resend: 'RESEND_API_KEY' };
 const present = value => typeof value === 'string' && Boolean(value.trim());
+// The sender forms the mail runtime sends from: a bare address or "Display Name <address>".
+const sender = value => { try { parseAddress(value); return true; } catch { return false; } };
+const SENDER = 'MAIL_FROM (billing@example.com or Your Business <billing@example.com>)';
 
 // Packaging can declare inputs that a product's deploy adapter adds to the
 // root declaration later. Read that source contract, never arbitrary ambient
@@ -52,7 +55,7 @@ export async function productionMail(root, declaration, env) {
    if (provider === 'rer') try { validateRerConfig({ relayUrl: bindings.MAIL_RELAY_URL }); } catch { relaySelected = false; }
    const has = key => present(bindings[key]) || secrets.has(key) && live.includes(key);
    return [
-    ...(!mailbox(bindings.MAIL_FROM) ? ['MAIL_FROM'] : []),
+    ...(!sender(bindings.MAIL_FROM) ? [SENDER] : []),
     ...(!credentialKeys.some(has) ? [declaredCredentials.join(' or ') || credentialKeys.join(' or ')] : []),
     ...(provider === 'cloudflare' && !has('MAIL_ACCOUNT_ID') ? ['MAIL_ACCOUNT_ID'] : []),
     ...(!relaySelected ? ['MAIL_RELAY_URL (assigned HTTPS relay URL)'] : []),
@@ -62,10 +65,10 @@ export async function productionMail(root, declaration, env) {
  return {
   declared: 'MAIL_PROVIDER' in bindings || publicInputs.has('MAIL_PROVIDER') || secrets.has('MAIL_API_KEY') || selected.length > 0,
   configured: (live = []) => routes.some(missing => missing(live).length === 0),
-  canInspect: mailbox(bindings.MAIL_FROM) && routes.length > 0,
+  canInspect: sender(bindings.MAIL_FROM) && routes.length > 0,
   missing: routes.length ? routes.map(missing => missing([]).join(', ')).join(' or ') : [
    'MAIL_PROVIDER (resend, sendgrid, cloudflare or rer)',
-   ...(!mailbox(bindings.MAIL_FROM) ? ['MAIL_FROM'] : []),
+   ...(!sender(bindings.MAIL_FROM) ? [SENDER] : []),
    'MAIL_API_KEY',
   ].join(', '),
  };

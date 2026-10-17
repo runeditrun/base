@@ -101,7 +101,8 @@ Invite another person from the app's operator access screen, then choose
 it accepts their current invitation and opens `/app` with their assigned role.
 After opening `RER_OPEN`, this browser can switch people without email. A fresh
 browser profile first opens `RER_OPEN` to receive this checkout's key cookie.
-`rer dev --as person@example.com` also selects an invited or active person.
+`rer dev --as person@example.com` also selects an invited or active person;
+for an email that is no one in the local database, it lists the people it takes.
 Local dev and demos silently suppress mail; there is no mail-reading step.
 Cancelled or expired invitations and inactive people cannot use these actions.
 
@@ -345,7 +346,14 @@ token that differs from the deployed token), then rerun the same deploy. Leave
 a stale supplied setup token unset so rer can issue a fresh token. A completed
 claim retires the one-time token; deploying again keeps an existing owner.
 
-`rer deploy --environment NAME --remove --yes` detaches the environment's queue
+`rer deploy --environment NAME --remove --yes` deletes the hosted install's
+Worker and its databases and files. Save the hosted data first: `rer export`
+saves only the local copy on this computer, and refuses `--origin` or
+`--target remote` (exit 2), saving nothing. Its refusal names the command that
+exports each hosted database, with the Cloudflare credentials that deployed it:
+`npx wrangler d1 export DATABASE --remote --output exports/DATABASE.sql`.
+Files the hosted install keeps in R2 are not in that export. Removal
+detaches the environment's queue
 consumers before deleting its queues, then confirms their absence in Cloudflare.
 It waits up to a minute for a deleted queue to disappear from the account list.
 If the provider still lists it, the error names the queue and the call; keep the

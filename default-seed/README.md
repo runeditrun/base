@@ -156,7 +156,9 @@ Do not commit credentials or place them in browser configuration.
 ## Sign-in, mail and administration
 
 For production, set `MAIL_PROVIDER` to `resend`, `sendgrid` or `cloudflare`,
-`MAIL_API_KEY`, and `MAIL_FROM` to a sender verified at that provider.
+`MAIL_API_KEY`, and `MAIL_FROM` to a sender verified at that provider, as a
+bare address (`billing@example.com`) or with a display name
+(`Your Business <billing@example.com>`).
 Cloudflare additionally needs `MAIL_ACCOUNT_ID`. Sends use the actual
 `modules/mail/index.mjs` facade in production mode. The explicit `development`
 provider silently suppresses mail in development and demo. Production never
