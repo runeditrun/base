@@ -6,7 +6,7 @@ test('RER_OPEN enters as owner on initial load and same-path fragment navigation
   const r = await browserRuntime();
   let browser;
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
     for (const waitingGate of [false, true]) {
       const context = await browser.newContext();
       try {
@@ -49,4 +49,34 @@ test('RER_OPEN enters as owner on initial load and same-path fragment navigation
       } finally { await context.close(); }
     }
   } finally { await browser?.close(); await r.close(); }
+});
+
+test('the hand-off page shows the seed\'s own logo, and its product name as text when the seed declares none', async () => {
+  const cases = [
+    { branding: { productName: 'Gate Test', theme: '/rer-theme.css' }, logo: true },
+    { branding: { productName: 'Gate Test', theme: '/no-logo-theme.css' }, logo: false },
+  ];
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
+    for (const { branding, logo } of cases) {
+      const r = await browserRuntime(branding);
+      try {
+        const page = await (await browser.newContext()).newPage();
+        await page.goto(`${r.origin}/__dev/key`);
+        const brand = page.locator('.brand');
+        assert.match(await brand.textContent(), /Gate Test/);
+        if (logo) {
+          const image = brand.locator('img');
+          await image.waitFor();
+          assert.equal(await image.getAttribute('alt'), 'Gate Test');
+          assert.equal(new URL(await image.getAttribute('src'), r.origin).pathname, '/brand/mark.svg');
+          assert.equal(await image.evaluate(img => img.complete && img.naturalWidth > 0), true, 'the mark loads under the page\'s own policy');
+        } else {
+          assert.equal(await brand.locator('img').count(), 0);
+          assert.equal(await brand.locator('span').getAttribute('aria-hidden'), null, 'the name is the only mark, so readers keep it');
+        }
+      } finally { await r.close(); }
+    }
+  } finally { await browser?.close(); }
 });

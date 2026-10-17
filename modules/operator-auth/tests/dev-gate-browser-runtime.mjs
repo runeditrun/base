@@ -16,12 +16,12 @@ const { build } = require('esbuild');
 export const { chromium } = createRequire(join(root, 'default-seed/package.json'))('@playwright/test');
 export { DEV_KEY, OWNER };
 
-export async function browserRuntime() {
+export async function browserRuntime(branding = { productName: 'Gate Test', theme: '/rer-theme.css' }) {
   const output = await build({ entryPoints: [fileURLToPath(new URL('./dev-gate-browser-worker.mjs', import.meta.url))],
     bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022' });
   const directory = await mkdtemp(join(tmpdir(), 'operator-auth-dev-browser-'));
   const config = { origin: 'http://127.0.0.1', local: true, OWNER_EMAIL: OWNER, SESSION_SECRET: SECRET,
-    MAIL_FROM: 'auth@example.com', ipLimit: 1000, emailLimit: 1000 };
+    MAIL_FROM: 'auth@example.com', ipLimit: 1000, emailLimit: 1000, branding };
   const options = (port = 0) => ({
     ...convertV4MiniflareOptions({ host: '127.0.0.1', port, modules: true, script: output.outputFiles[0].text,
       compatibilityDate: '2026-09-01', d1Databases: { DB: 'dev-browser-auth' },

@@ -21,6 +21,7 @@ import { sourceRoots } from './export.mjs';
 import {fixture,freePort,hostStatus,pause,chromium,forwardingProxy,documentedCommand} from './fixtures/reference.mjs';
 import { readDevKey } from '../modules/operator-auth/dev/sign-in-as.mjs';
 import { privateRuntime } from './fixtures/private-runtime.mjs';
+import { unreadableCommands } from './fixtures/run-page.mjs';
 for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real Worker install/setup/dev/sign-in/build/reset and teardown`,{timeout:20*60_000},async t=>{
  const f=await fixture(kind,t),port=await freePort(),url=`http://127.0.0.1:${port}`;let setupPort=await freePort();while(setupPort===port)setupPort=await freePort();
  await t.test('frozen install and real local application lifecycle', async local=>{
@@ -89,6 +90,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  assert.equal((await fetch(url+'/setup/state',{method:'POST'})).status,405);
  assert.match(ready.siteUrl,/^http:\/\/127\.0\.0\.1:\d+$/,'rer dev names the run site preview');assert.notEqual(ready.siteUrl,url);
  for(const path of ['/','/run'])assert.equal((await fetch(ready.siteUrl+path)).status,200,`run site preview ${path}`);
+ {const pageBrowser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});try{assert.deepEqual(await unreadableCommands(pageBrowser,ready.siteUrl+'/run',790),[],'the Copy button never covers a command on the built Run page at 790px');}finally{await pageBrowser.close();}}
  const key=await readDevKey(f.root),gated={headers:{'x-rer-dev-key':key}};
  assert.equal(ready.signedInAs,'cli-owner@example.test','dev opens signed in as the owner setup claimed');
  assert.ok(!new URL(ready.openUrl).search,'the dev credential is never sent in a URL query');
