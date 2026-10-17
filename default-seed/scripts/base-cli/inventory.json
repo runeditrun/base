@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.42-dev.g01462fb3",
+  "cliVersion": "0.2.42",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -347,7 +347,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "b9640a2e41aedeb28fb2d9ab5392b4998492246157d6069c1b827b6945640653"
+      "sha256": "a80f4e8f3464be09370c6cdd328deb9a46dd56cdc342b22d849c639a078b2438"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -543,7 +543,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "91acfc4a85f65a62f59a69b4f36be5b20c307eaaeff414c56c4c7deaf2619103"
+      "sha256": "cf2f65a36efac585ce3179ad47d16d239dce918ec42b6c5031b46e4ec5744f16"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -623,7 +623,7 @@
     },
     "cli/deploy-readiness.mjs": {
       "source": "cli/deploy-readiness.mjs",
-      "sha256": "de03d00676776d16a9d6e175f66257e6295b868894027f507c9cf49e0efff15c"
+      "sha256": "331bb95c8c3b1b9a756f15f5e03d705b6075accf2f26a28b9a4df2bff2d019ab"
     },
     "cli/deploy-secrets.mjs": {
       "source": "cli/deploy-secrets.mjs",
@@ -643,7 +643,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "126e610972862a56c730a8b86cc7a16d6d1531ccb3d7babdff957ee63b001a59"
+      "sha256": "10efd3a4c085af44d0c2b2edf7674af06dce0e8b0c56acd4800e7067dbe8a3f8"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -783,7 +783,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "42dc1d0653db937e5ad5bf606a78fb65f15ebc4e27536ddc928751fa0fdacd56"
+      "sha256": "c4c6ad72300d916bb61044ae050e1911902b9c272f190f9c670d917b1e3cbc97"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -1415,7 +1415,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "b2b3a69f5e11c7783c1d0a56422d828d4b225eabeb03e28797bf4f720644d8ca"
+      "sha256": "52f0c6f3cdcc1ab13d393b44c990b5c04c0e0cb748d37f995d0f87f9589c363d"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1491,19 +1491,23 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "2f8a402eca125d83772d1a93ece380ca8fd92cf6a5128295a193bb69dd39eb55"
+      "sha256": "344049d41d92bf00cb8b7659340322b85027e19a4cc6ad212f4bc2158f4d81be"
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
       "sha256": "a564f995b582812f98908310fa71aa040eda9835114eabbc93bb3ec611cb462a"
     },
+    "modules/deploy-kit/owner-secret-copy.mjs": {
+      "source": "modules/deploy-kit/owner-secret-copy.mjs",
+      "sha256": "5c9f5331d123487c5cfaf13be5c61cfec24848208b89b7b0d107930a720b80c3"
+    },
     "modules/deploy-kit/owner-secret-names.mjs": {
       "source": "modules/deploy-kit/owner-secret-names.mjs",
-      "sha256": "2043f3a6e6568a1a04b02aa8702d3324131788da5da2c03c8c1bcb9515af8a69"
+      "sha256": "ea72001ab53ed398059fe70329e6aa7983168612ec48c0e1c7469316e7979ea1"
     },
     "modules/deploy-kit/owner-secret.mjs": {
       "source": "modules/deploy-kit/owner-secret.mjs",
-      "sha256": "2c27f14b7d723fd25bd91e19a8554c17751883a9dd409af63bf3288c203625b8"
+      "sha256": "c539198e8d13e60b0d1c7076728edfd8b378c058617dc6cf367969dcf93a7a37"
     },
     "modules/deploy-kit/owner-signin.mjs": {
       "source": "modules/deploy-kit/owner-signin.mjs",
@@ -1511,7 +1515,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "424081d0f671d5c3f1afaebb0d7a17b1e1e8afdc805b6896ff24f756e3b13a19"
+      "sha256": "e6d3d4cee9f9c9073c3d526deb3dfb87f0792a04d9ed966133f797b5b6e795c1"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
@@ -1527,7 +1531,7 @@
     },
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",
-      "sha256": "7b5d4404bb335b923a99396255730cfb4df99e8a54c8aef57b17818fcbef4f69"
+      "sha256": "b8f4438ccc9076900f0c665b7e6d0fb27446579c9719690ac1ecdbccabaa4e04"
     },
     "modules/deploy-kit/public-origin.mjs": {
       "source": "modules/deploy-kit/public-origin.mjs",
