@@ -1,5 +1,6 @@
 import front from '../worker.mjs';
 import { bundle } from './loader.mjs';
+import { HASHED_ASSET } from './config.mjs';
 export { HostBridge } from './bridge.mjs';
 export { DemoAssets, DemoEgress } from './loader.mjs';
 export { NativeDemo } from './visitor.mjs';
@@ -13,10 +14,11 @@ export default {
     if (['GET', 'HEAD'].includes(request.method) && assets.has(url.pathname)) {
       const response = await env.ASSETS.fetch(request);
       const headers = new Headers(response.headers);
-      if (/^\/assets\/.*-[\w-]{8,}\.[\w]+$/.test(url.pathname)) headers.set('cache-control', 'public, max-age=31536000, immutable');
+      if (HASHED_ASSET.test(url.pathname)) headers.set('cache-control', 'public, max-age=31536000, immutable');
       headers.set('x-rer-demo-assets', 'edge');
       return new Response(response.body, { status: response.status, headers });
     }
-    return front.fetch(request, env, ctx);
+    // The start page prefetches the console's chunks while the visitor waits.
+    return front.fetch(request, { ...env, DEMO_WARM: bundle.warm }, ctx);
   },
 };

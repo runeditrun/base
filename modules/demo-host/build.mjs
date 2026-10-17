@@ -40,7 +40,9 @@ export async function buildDemo(root, output, declaration) {
   await rm(output, { recursive: true, force: true });
   await mkdir(join(output, 'app'), { recursive: true });
   await cp(join(root, 'dist'), join(output, 'app/dist'), { recursive: true });
-  await writeFile(join(output, 'app/demo.json'), JSON.stringify({ config: workerConfig, migrations }) + '\n');
+  // Where the console is mounted orders what the start page prefetches (native/warm.mjs).
+  const { operatorPath } = JSON.parse(await readFile(join(root, 'seed.json'), 'utf8').catch(() => '{}')).deploy ?? {};
+  await writeFile(join(output, 'app/demo.json'), JSON.stringify({ config: workerConfig, migrations, operatorPath }) + '\n');
 }
 
 if (process.argv[1] === import.meta.filename) {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.43-dev.gef1a5083",
+  "cliVersion": "0.2.43",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1195,7 +1195,7 @@
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
-      "sha256": "61f6ebf53ced62001fba55f62aeb86e64bf46f3819283292fe84742972663fd5"
+      "sha256": "0168f1b1a8f2357149a8c473215c7caaba222ec7c15b4d8dd8c5b259053cb87c"
     },
     "modules/demo-host/capacity.mjs": {
       "source": "modules/demo-host/capacity.mjs",
@@ -1231,7 +1231,7 @@
     },
     "modules/demo-host/native/config.mjs": {
       "source": "modules/demo-host/native/config.mjs",
-      "sha256": "753ee3d541107f061b2ebb32f553ab073d5057d83dd93cb2eb6865460ada3a9b"
+      "sha256": "152da97ca3d11bffd24ac908e185dd1e2c7d46290372a986c665a4017e501418"
     },
     "modules/demo-host/native/cron.mjs": {
       "source": "modules/demo-host/native/cron.mjs",
@@ -1259,7 +1259,7 @@
     },
     "modules/demo-host/native/prepare.mjs": {
       "source": "modules/demo-host/native/prepare.mjs",
-      "sha256": "0c1416e00a40cde7cc4dd0f4e716a07474e1f559bfa8adf39fd71e46d4c80a08"
+      "sha256": "f3d2a6a7c2e12e57fd0714900746ad5e06915a9563ca614821048424be1fd869"
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
@@ -1293,9 +1293,13 @@
       "source": "modules/demo-host/native/visitor.mjs",
       "sha256": "d88cd7264d3dd697a909410ac55c8a9ee0e5752c7091ccb6b590d79d7380b9b5"
     },
+    "modules/demo-host/native/warm.mjs": {
+      "source": "modules/demo-host/native/warm.mjs",
+      "sha256": "457ab7f2faa2c63fe56adea33d10ec0cfc34250d40ed4d3e409de7b3dc157eba"
+    },
     "modules/demo-host/native/worker.mjs": {
       "source": "modules/demo-host/native/worker.mjs",
-      "sha256": "b99b943c06184afe23fc664d3369420536c4144d317033a32d21b99224d88a7a"
+      "sha256": "5ef6d74a37f24c9cf4d6b00d45233f79178afcf8692261e77a3b7d5d67d377f4"
     },
     "modules/demo-host/operator.mjs": {
       "source": "modules/demo-host/operator.mjs",
@@ -1303,7 +1307,7 @@
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "2abc1abb6e5cd3a9da7b9c9238a794703c3b9997705f2069c6c810ab686a6240"
+      "sha256": "ad1e4f91386b5804bf6d009debf5e365edce6ed025e0a64c1216e85c44a426b9"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",

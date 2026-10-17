@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { collectBuildModules } from '../../deploy-kit/build-modules.mjs';
 import { collectFiles, moduleType } from '../../deploy-kit/artifact.mjs';
 import { nativeBindings, ISOLATE_FILES, objectExports } from './config.mjs';
+import { warmList } from './warm.mjs';
 
 // The Worker Loader module kind for each upload type deploy-kit gives a build
 // module, so a demo carries what a normal deploy uploads. Binary kinds travel
@@ -32,7 +33,8 @@ export async function prepareNative(folder) {
   const assets = await collectFiles(join(app, 'dist/client'));
   const bundle = { compatibilityDate: config.compatibility_date, compatibilityFlags: [...new Set([...(config.compatibility_flags ?? []), 'nodejs_compat'])], modules,
     bindings, migrations: manifest.migrations, vars: config.vars ?? {}, crons: config.triggers?.crons ?? [],
-    assetPaths: assets.filter(file => !file.path.split('/').some(part => part.startsWith('.'))).map(file => '/' + file.path) };
+    assetPaths: assets.filter(file => !file.path.split('/').some(part => part.startsWith('.'))).map(file => '/' + file.path),
+    warm: (await warmList(assets, root, manifest.operatorPath)).paths };
   bundle.digest = createHash('sha256').update(JSON.stringify(bundle)).digest('hex');
   await cp(join(app, 'dist/client'), join(folder, 'assets'), { recursive: true });
   await writeFile(join(folder, 'modules/demo-host/native/bundle.mjs'), `export default ${JSON.stringify(bundle)};\n`);
