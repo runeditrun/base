@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.49-dev.g6127260b",
+  "cliVersion": "0.2.49",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2163,7 +2163,7 @@
     },
     "modules/operator-auth/README.md": {
       "source": "modules/operator-auth/README.md",
-      "sha256": "e946a97bdb9eedffb5af8f6eb05f45b0d14f8fa21903216167915417172502c4"
+      "sha256": "90f6818bc40771777e020c11bec516039fe534bcf885c27461069fb9ed0d3e7c"
     },
     "modules/operator-auth/accounts/adapter.mjs": {
       "source": "modules/operator-auth/accounts/adapter.mjs",
@@ -2311,7 +2311,7 @@
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
-      "sha256": "0d06b400bc57d066c9af21012ef941220f02828a2c43c77c9a9c6d6bf0b7e2ff"
+      "sha256": "c547b2cfa6a400ab76fd625aefa82a8ed97ecb37bb5f7535ac50bb98c8c54875"
     },
     "modules/operator-auth/dev/cli-session.mjs": {
       "source": "modules/operator-auth/dev/cli-session.mjs",
@@ -2323,7 +2323,7 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "fa00b8643163de8b0c8b63fb4c669c1aa213822357eff13c3de8b494c3b2d635"
+      "sha256": "cdfd59ec19f6e5b8cf0d85add580c17540a160501010a6d4eeb514b0d2d8b1a9"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
@@ -2451,7 +2451,7 @@
     },
     "modules/operator-auth/index.d.mts": {
       "source": "modules/operator-auth/index.d.mts",
-      "sha256": "aa4d07e1a3794d88586d8211de5cde90471580d57ff1d688967da1b2088627d3"
+      "sha256": "cf3ba368871ed4db7b4966b64876bed9116db7dc00d462e8d64cbcf985a717aa"
     },
     "modules/operator-auth/index.mjs": {
       "source": "modules/operator-auth/index.mjs",
