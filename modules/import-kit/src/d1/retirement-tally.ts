@@ -1,13 +1,23 @@
 import type { D1Database, D1Sql } from './types.ts';
 import { guard, sql } from './database.ts';
+import { doorRetirementStore } from './retirement-door.ts';
 
 // Bookkeeping that every custody change bumps, plus the erasure's own records.
 const SKIPPED = new Set(['ik_d1_assertions', 'ik_d1_custody_states', 'ik_d1_custody_revisions', 'ik_d1_publication_fences',
-  'ik_d1_erasure_tally', 'ik_d1_erasure_journal', 'ik_d1_erasure_progress', 'ik_d1_retirements', 'ik_d1_erased_sources', 'ik_d1_erased_targets', 'ik_targets']);
+  'ik_d1_erasure_tally', 'ik_d1_erasure_journal', 'ik_d1_erasure_progress', 'ik_d1_retirements', 'ik_d1_erased_sources', 'ik_d1_erased_targets', 'ik_targets',
+  'ik_door_settings', // Installation opt-in only; no uploaded record content.
+  'ik_door_revoked_keys', // Persistent key revocations must survive erasure.
+  'ik_door_grants', // Grant nonce replay protection; no uploaded record content.
+]);
+// Other door control rows are scoped and withdrawn, rather than skipped:
+// ik_door_namespaces: reset head/pending ids when their snapshots are withdrawn.
+// ik_door_plans: remove snapshot/job indexes alongside their content chunks.
+// ik_door_approvals: remove approval metadata before its plan foreign key.
+// ik_door_scopes: remove namespace/destination bindings after their children.
 const COUNTERS = new Set(['revision', 'layout_revision', 'progress_revision', 'seal']);
 
 export interface TallyScope { destination: string; jobs: string[]; streams: string[] }
-interface Store { name: string; image: string; where: string; params: (scope: TallyScope) => unknown[] }
+interface Store { name: string; image: string; where: string; params: (scope: TallyScope) => unknown[]; withdraw?: number; scopeGuard?: D1Sql }
 
 /** Each custody store with the row image the journal counts and the rows an
  * erasure of these jobs and streams can touch. */
@@ -17,9 +27,12 @@ export async function tallyStores(db: D1Database): Promise<Store[]> {
   for (const row of results) if (!SKIPPED.has(row.store)) columns.set(row.store, [...columns.get(row.store) ?? [], row]);
   const jobs = (scope: TallyScope) => [JSON.stringify(scope.jobs)], streams = (scope: TallyScope) => [JSON.stringify(scope.streams)];
   const destination = (scope: TallyScope) => [scope.destination];
+  const installed = new Set(columns.keys());
   return [...columns].map(([name, list]) => {
     const names = list.map(item => item.column);
     const image = `json_array(${list.filter(item => !COUNTERS.has(item.column)).map(item => /BLOB/i.test(item.type) ? `hex("${item.column}")` : `"${item.column}"`).join(',')})`;
+    const door = doorRetirementStore(name, installed);
+    if (door) return { name, image, ...door };
     if (name === 'ik_jobs') return { name, image, where: 'id IN (SELECT value FROM json_each(?))', params: jobs };
     if (name === 'ik_d1_streams') return { name, image, where: 'id IN (SELECT value FROM json_each(?))', params: streams };
     if (name === 'ik_d1_stream_revisions') return { name, image, where: 'stream_id IN (SELECT value FROM json_each(?))', params: streams };
@@ -36,6 +49,14 @@ export async function tallyStores(db: D1Database): Promise<Store[]> {
 /** Images of every row in scope, taken first in the erasure batch. */
 export function tallyBefore(stores: Store[], receipt: string, scope: TallyScope): D1Sql[] {
   return stores.map(store => sql(`INSERT INTO ik_d1_erasure_tally(receipt_id,store,image) SELECT ?,?,${store.image} FROM ${store.name} WHERE ${store.where}`, receipt, store.name, ...store.params(scope)));
+}
+
+/** Opaque door content is withdrawn after all before-images are tallied and
+ * before kit job/header changes can sever its scope links, in the same batch. */
+export function tallyWithdraw(stores: Store[], scope: TallyScope): D1Sql[] {
+  return [...stores.flatMap(store => store.scopeGuard ? [guard(store.scopeGuard)] : []),
+    ...stores.filter(store => store.withdraw !== undefined).sort((a, b) => a.withdraw! - b.withdraw!)
+      .map(store => sql(`DELETE FROM ${store.name} WHERE ${store.where}`, ...store.params(scope)))];
 }
 
 /** Drops the images still present unchanged; the rest were deleted or rewritten.

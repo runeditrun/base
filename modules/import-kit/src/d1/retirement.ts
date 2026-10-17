@@ -7,7 +7,7 @@ import { targetErasure, type ErasureStep } from './erasure.ts';
 import { destinationRevisions, readProgress, type JobRevision, type RedactionProgress } from './retirement-steps.ts';
 import { overflow, redactionSteps } from './redaction-step.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
-import { tallyBefore, tallyJournal, tallyStores } from './retirement-tally.ts';
+import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw } from './retirement-tally.ts';
 import { fieldRedactions } from './field-redaction.ts';
 import { retireD1ImportCustodyStep } from './retirement-bounded.ts';
 import type { D1ErasurePending, D1ErasureStepOptions } from './erasure-progress.ts';
@@ -74,7 +74,7 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
     touched.streams = [...new Set([...scope.anchors, ...await pageStreams(db, touched.jobs)])].sort();
     const stores = await tallyStores(db);
     const entry = { recordedAt, recordsErased: erasure.decisions.length, jobsRetired: scope.jobs.length, streamsRetired: scope.anchors.length };
-    prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...erasure.before, ...scopeGuards(scope)]);
+    prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...tallyWithdraw(stores, touched), ...erasure.before, ...scopeGuards(scope)]);
     suffix = [...packGuards([...erasure.after, ...retirementWrites(scope, destination, receiptId, recordedAt), ...headerAbsence(destination, values),
       ...tallyJournal(stores, receiptId, touched, entry, fenced), authority(context, 'erase'), sql('DELETE FROM ik_d1_assertions')]), ...readonlyChecks(erasure.final), finalAuthority(context, 'erase')];
     // One read after the batch returns its journal row.

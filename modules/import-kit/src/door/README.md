@@ -22,6 +22,20 @@ numbered migration after the D1 import-kit schemas. Preserve existing applied
 migration names. Copy the import-kit runtime and its sibling owner-claim and
 D1 transport dependencies with their relative topology intact.
 
+Upgrading an installed door also requires a new numbered migration containing
+the additive `CREATE TABLE IF NOT EXISTS ik_door_scopes` statement from
+`importDoorSchema` (or all of its idempotent statements). It binds each logical
+namespace to the product destination on the first uploaded chunk, before a
+plan/job exists. Old applied namespaces remain scoped through their kit job id
+or the recoverable `door:<plan id>` operation key. Legacy uploads in a namespace
+that never had a job have no stored destination: the seed must bind those
+namespaces to their actual destination in this migration before erasure.
+
+Import-kit custody retirement withdraws the destination's uploaded bundles and
+saved door snapshots whole, including unapplied uploads, in the same D1 batch as
+native erasure, the restore checkpoint and the journal. The journal counts the
+withdrawn rows. Enablement, key revocations and grant replay protection survive.
+
 The door starts disabled and returns 404 until explicitly enabled. From the
 seed's server-only owner control, call
 `writeImportDoorSettings(database, installationId, { enabled, revokedKids? },

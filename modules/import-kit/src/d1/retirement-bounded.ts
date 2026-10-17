@@ -8,7 +8,7 @@ import { prepareErasureSelection } from './erasure-selection.ts';
 import { stageD1ImportErasure } from './erasure-stage.ts';
 import { erasureRequestContext, erasureStatementBinding, type D1ErasurePending, type D1ErasureStepOptions } from './erasure-progress.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
-import { tallyBefore, tallyJournal, tallyStores } from './retirement-tally.ts';
+import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw } from './retirement-tally.ts';
 
 /** Retire headers and erase records over bounded requests. Only the final
  * publication changes public custody, native rows and the restore checkpoint.
@@ -49,7 +49,7 @@ export async function retireD1ImportCustodyStep(person: D1ImportPerson, nativeSt
         const streams = [...new Set([...scope.anchors, ...(await db.prepare('SELECT DISTINCT stream_id AS id FROM ik_d1_stream_pages WHERE job_id IN (SELECT value FROM json_each(?)) ORDER BY id').bind(JSON.stringify(jobs)).all<{ id: string }>()).results.map(row => row.id)])].sort();
         const touched = { destination, jobs, streams };
         return {
-          before: [...closure, ...tallyBefore(stores, receipt.id, touched)],
+          before: [...closure, ...tallyBefore(stores, receipt.id, touched), ...tallyWithdraw(stores, touched)],
           after: fenced ? checkpoint : [],
           tail: [...retirementWrites(scope, destination, receipt.id, receipt.recordedAt), ...absence,
             ...tallyJournal(stores, receipt.id, touched, { recordedAt: receipt.recordedAt, recordsErased: compiler.erased, jobsRetired: scope.jobs.length, streamsRetired: scope.anchors.length }, fenced)],

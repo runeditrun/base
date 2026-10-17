@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
-import { readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
-import { readD1ImportOriginals, undoD1Import } from '../src/d1/index.ts';
+import { createImportDoorHandler, importDoorSchema, readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
+import { readD1ImportOriginals, readD1ErasureJournal, retireD1ImportCustody, undoD1Import } from '../src/d1/index.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
 
 test('HTTP import door is absent until the installation opts in',async t=>{
@@ -10,6 +10,87 @@ test('HTTP import door is absent until the installation opts in',async t=>{
   for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  const erased=await retireD1ImportCustody({values:['absent@example.test']},[],d.runtime.context(),[]);
+  assert.equal(erased.phase,'complete');
+  assert.equal((await readD1ErasureJournal(d.runtime.context()))[0].receiptId,erased.receiptId);
+});
+
+test('HTTP door uploads and applied snapshots erase with their destination in the journal batch',async t=>{
+  for (const mode of [{bounded:false,legacy:false},{bounded:true,legacy:false},{bounded:false,legacy:true},{bounded:true,legacy:true}]) {
+    const {bounded,legacy}=mode;
+    const d=await door(t);await d.enable();
+    const secret='test-private-record-value',records=[{id:'private',title:secret,body:'Private imported knowledge'}];
+    const planned=await d.plan(records);assert.equal(planned.status,200,JSON.stringify(planned.body));
+    const job=await d.apply(planned.body);
+    const other=createImportDoorHandler({...d.options,destination:'other-workspace'});
+    const wrongDestination=await other(new Request(d.options.claim.appOrigin+'/api/rer/import/status',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await d.token('status')},body:JSON.stringify({planId:planned.body.planId})}));
+    assert.equal(wrongDestination!.status,403,'a namespace binding cannot move to another destination');
+    const otherCall=async (action:'uploads'|'plan'|'apply',body:unknown,extra:Record<string,string>={})=>{
+      const response=await other(new Request(d.options.claim.appOrigin+'/api/rer/import/'+action,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await d.token(action,{namespace:'other',...extra})},body:JSON.stringify(body)}));
+      assert.equal(response!.status,200);return response!.json() as Promise<any>;
+    };
+    const keptBytes=Buffer.from(JSON.stringify([{id:'kept',title:'Kept knowledge'}]));
+    const kept=await otherCall('uploads',{name:'kept.json',bundleSha256:sha256(keptBytes),totalBytes:keptBytes.length,totalChunks:1,index:0,chunkSha256:sha256(keptBytes),base64:keptBytes.toString('base64')});
+    const keptPlan=await otherCall('plan',{uploadId:kept.uploadId});
+    await otherCall('apply',{planId:keptPlan.planId,reviewedFingerprint:keptPlan.fingerprint},{fingerprint:keptPlan.fingerprint,...d.approval});
+    // Unplanned uploads have content too, including in a previously unused namespace.
+    await d.upload(records,{namespace:legacy?'knowledge':'unplanned'});
+    if (!bounded) await writeImportDoorSettings(d.db,d.options.claim.installationId,{enabled:false},d.ownerPredicate);
+    const native=d.runtime.native();
+    if (legacy) {
+      native.exec('DROP TABLE ik_door_scopes');
+      // Creation can commit before the door's job index update. Its immutable
+      // operation key is still a real scope link in the legacy schema.
+      native.prepare('UPDATE ik_door_plans SET job_id=NULL WHERE id=?').run(planned.body.planId);
+    }
+    const doorTables=()=>native.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ik_door_%' ORDER BY name").all().map(r=>r.name as string);
+    const contentTables=['ik_door_chunks','ik_door_plan_chunks','ik_door_uploads'];
+    const before=new Map(doorTables().map(table=>[table,Number(native.prepare(`SELECT count(*) n FROM ${table}`).get()!.n)]));
+    const erase=()=>retireD1ImportCustody({target:{kind:'record',id:'private'}},[{sql:"DELETE FROM native_records WHERE destination='workspace' AND id='private'"}],
+      d.runtime.context(),[{sql:'UPDATE native_authority SET enabled=enabled'}],bounded?{operationKey:'door-erasure'}:{});
+    native.exec("CREATE TRIGGER refuse_door_erasure BEFORE INSERT ON ik_d1_erasure_journal BEGIN SELECT RAISE(ABORT,'test journal failure'); END");
+    await assert.rejects(erase());
+    for (const table of contentTables) assert.equal(Number(native.prepare(`SELECT count(*) n FROM ${table}`).get()!.n),before.get(table),'a journal failure rolls back door custody');
+    native.exec('DROP TRIGGER refuse_door_erasure');
+    let erased;do {erased=await erase();} while(erased.phase==='pending');
+    assert.equal(erased.phase,'complete');
+    assert.equal((await readD1ErasureJournal(d.runtime.context()))[0].receiptId,erased.receiptId);
+    for (const table of contentTables) {
+      assert.equal(native.prepare(`SELECT count(*) n FROM ${table}`).get()!.n,1,`${table}: other destination survives`);
+    }
+    for (const table of doorTables()) {
+      const removed=before.get(table)!-Number(native.prepare(`SELECT count(*) n FROM ${table}`).get()!.n);
+      if (removed) assert.equal(erased.stores.find(row=>row.store===table)?.rows,removed,`${table} journal count`);
+    }
+    for (const table of doorTables()) {
+      for (const row of native.prepare(`SELECT * FROM ${table}`).all()) {
+        for (const value of Object.values(records[0])) {
+          assert.ok(!JSON.stringify(row).includes(value),table);
+          if (typeof row.base64==='string') assert.ok(!Buffer.from(row.base64,'base64').toString().includes(value),table);
+        }
+      }
+    }
+    assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='private'").get()!.n,0);
+    assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='kept'").get()!.n,1);
+    await assert.rejects(retireD1ImportCustody({target:{kind:'record',id:'private'}},[],d.runtime.context(),[]),/IMPORT_RETIREMENT_CHECKPOINT_REQUIRED/);
+    native.exec('CREATE TABLE ik_unknown_unscoped(body TEXT)');
+    await assert.rejects(retireD1ImportCustody({target:{kind:'record',id:'private'}},[],d.runtime.context(),[{sql:'UPDATE native_authority SET enabled=enabled'}]),/IMPORT_RETIREMENT_UNSCOPED_STORE:ik_unknown_unscoped/);
+    t.diagnostic(JSON.stringify({...mode,jobId:job.id,receiptId:erased.receiptId,stores:erased.stores.filter(row=>row.store.startsWith('ik_door_'))}));
+  }
+  const d=await door(t);await d.enable();
+  await d.upload([{id:'never-planned',title:'test-private-legacy-upload'}],{namespace:'legacy-unplanned'});
+  const native=d.runtime.native();native.exec('DROP TABLE ik_door_scopes');
+  const erase=()=>retireD1ImportCustody({target:{kind:'record',id:'never-planned'}},[],d.runtime.context(),[{sql:'UPDATE native_authority SET enabled=enabled'}]);
+  await assert.rejects(erase(),'legacy unplanned bytes cannot silently escape erasure without a destination binding');
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_chunks').get()!.n,1);
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_d1_erasure_journal').get()!.n,0);
+  // The additive migration leaves every existing column untouched and permits
+  // the seed, which knows its destination, to bind a legacy unplanned namespace.
+  await d.db.batch(importDoorSchema.map(q=>d.db.prepare(q)));
+  native.prepare('INSERT INTO ik_door_scopes VALUES(?,?,?)').run(d.options.claim.installationId,'legacy-unplanned',d.options.destination);
+  const erased=await erase();
+  assert.equal(erased.stores.find(row=>row.store==='ik_door_chunks')?.rows,1);
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_chunks').get()!.n,0);
 });
 
 test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody',async t=>{
