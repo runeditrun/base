@@ -35,6 +35,10 @@ export interface ImportOperatorOptions extends ImportDoorRuntimeOptions {
    * Check the seed's normal CSRF policy here as well. Null denies access. */
   authorize(request: Request, action: DoorAccess['action']): Promise<D1Sql | null>;
 }
+export interface DoorHistoryEntry {
+  planId: string; jobId: string; namespace: string; fingerprint: string; state: string;
+  owner: string; approvedAt: string; approvalRecordId: string; reviewer: string; caption: string;
+}
 export interface DoorTarget { kind: string; id: string; ownerPlanId: string; sourceIdentity: string }
 export interface DoorRecord {
   kind: string; sourceId: string; sourceHash: string; targets: DoorTarget[];

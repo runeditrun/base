@@ -1,6 +1,6 @@
 import type { D1Database, D1Sql } from '../d1/types.ts';
 import type { ImportAction } from '../types.ts';
-import type { DoorRequest, DoorSnapshot } from './types.ts';
+import type { DoorRequest, DoorSnapshot, DoorHistoryEntry } from './types.ts';
 import { DoorError, type DoorAction } from './protocol.ts';
 import { assertion, sql, statement, transact } from './store.ts';
 
@@ -48,7 +48,7 @@ export async function readImportDoorHistory(db: D1Database, installationId: stri
     statement(db, query),
     statement(db, sql(`SELECT CASE WHEN (${ownerPredicate.sql}) THEN 1 ELSE json('IMPORT_DOOR_OWNER_REQUIRED') END`, ...ownerPredicate.params ?? [])),
   ]);
-  const rows = (results[1] as {results: Record<string, unknown>[]} | Record<string, unknown>[]);
+  const rows = results[1] as {results: Omit<DoorHistoryEntry, 'caption'>[]} | Omit<DoorHistoryEntry, 'caption'>[];
   return (Array.isArray(rows) ? rows : rows.results).map(row => ({...row, caption: `${row.reviewer !== row.approvalRecordId ? 'approved' : 'approved via Business'} by ${row.owner} at ${row.approvedAt}, fingerprint ${row.fingerprint}`}));
 }
 export async function reserveApply(request: DoorRequest, snapshot: DoorSnapshot): Promise<void> {
