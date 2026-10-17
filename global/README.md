@@ -428,6 +428,8 @@ and DNS evidence, server instructions and schema annotations never enter the
 prompt. Answers must match the question's closed vendor/usage/confidence schema
 locally before completion. Invalid output, process failure, cancellation or a
 120-second timeout releases the lease; model diagnostics are never printed.
+Timeout and cancellation stop the private process group, including a CLI's
+native child process.
 Owner-only tasks remain in the browser. Temporary schema and answer files stay
 outside the model's working directory and are removed afterwards.
 

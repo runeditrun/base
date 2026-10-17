@@ -435,7 +435,11 @@
     },
     "cli/business/model-cli.mjs": {
       "source": "cli/business/model-cli.mjs",
-      "sha256": "4ad6adb0ed25eedea9cda1a93822d47f338d33c3ca6ad0e2c8482ba6a78affa7"
+      "sha256": "87f9e064c979771a3c2f377c27b0c5703c367969801d7347063d7fb6a6afa425"
+    },
+    "cli/business/model-process.mjs": {
+      "source": "cli/business/model-process.mjs",
+      "sha256": "f5f57f1c0e93819bdea46e01deb225bcd366ff088efa20e4355d75943675e198"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",

@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execute as runProcess } from './model-process.mjs';
 import { constants } from 'node:fs';
 import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -31,17 +31,7 @@ function environment() {
  return env;
 }
 
-async function execute(path, args, { cwd, input, signal, timeout = 120_000, env = environment() }) {
- signal?.throwIfAborted();
- return new Promise((resolveRun, reject) => {
-  const child = execFile(path, args, { cwd, env, timeout, signal, killSignal: 'SIGKILL', maxBuffer: 65536, encoding: 'utf8' }, (error, stdout) => {
-   if (error) reject(Error('Business classifier failed, timed out or was canceled. Task released.'));
-   else resolveRun(stdout);
-  });
-  child.stdin.on('error', () => {});
-  child.stdin.end(input);
- });
-}
+const execute = (path, args, options) => runProcess(path, args, { env: environment(), ...options });
 
 export async function detectClassifiers() {
  const found = await Promise.all(Object.keys(required).map(async name => {
