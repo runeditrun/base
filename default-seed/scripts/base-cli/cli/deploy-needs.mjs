@@ -48,7 +48,7 @@ export function neededForRealDeploy({ declaration, env, signIn }) {
  return [
   ...(credentials.length ? [`${credentials.join(' and ')} (${credentialHelp(declaration).join(' ')})`] : []),
   ...secrets,
-  ...(mail ? [`production sign-in mail: ${mail}`] : []),
+  ...(mail ? [`production sign-in mail: ${mail}${deployGuide(declaration) ? ` (see ${deployGuide(declaration)})` : ''}`] : []),
  ];
 }
 

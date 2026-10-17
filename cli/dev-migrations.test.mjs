@@ -18,7 +18,7 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  // Setup ends by naming what a hosted deploy will still need, from deploy.json.
  const setupReady = events(await f.run(['setup', '--owner-email', 'migration-owner@example.test', '--port', String(port), '--non-interactive', '--json'])).find(event => event.event === 'setup-ready');
  assert.ok(setupReady?.neededForDeploy?.some(item => item.includes('CLOUDFLARE_API_TOKEN')), JSON.stringify(setupReady));
- assert.ok(setupReady.neededForDeploy.some(item => item.includes('MAIL_API_KEY')), JSON.stringify(setupReady));
+ assert.ok(setupReady.neededForDeploy.some(item => item.includes('MAIL_API_KEY (or RESEND_API_KEY)')), JSON.stringify(setupReady));
  await f.sql("CREATE TABLE saved_before_upgrade(value TEXT); INSERT INTO saved_before_upgrade VALUES('owner content')");
  const path = join(f.root, 'migrations/core/9998_local_upgrade.sql');
  // Simulate git pull after setup: the old build cannot know this migration.

@@ -50,13 +50,18 @@ export async function productionMail(root, declaration, env) {
   const credentialKeys = deferred && nativeCredential[provider] && !declaredProviders.has(provider) ? [nativeCredential[provider]]
    : ['MAIL_API_KEY', ...(nativeCredential[provider] ? [nativeCredential[provider]] : [])];
   const declaredCredentials = credentialKeys.filter(key => secrets.has(key));
+  // Only resend and sendgrid have a provider key of their own; cloudflare and rer send with MAIL_API_KEY alone.
+  const providerKeys = (nativeCredential[provider] ? [nativeCredential[provider]] : []).filter(key => !declaredCredentials.includes(key));
+  const credentialText = declaredCredentials.includes('MAIL_API_KEY') && providerKeys.length
+    ? `MAIL_API_KEY (or ${providerKeys.join(' / ')})`
+    : declaredCredentials.join(' or ') || credentialKeys.join(' or ');
   return live => {
    let relaySelected = true;
    if (provider === 'rer') try { validateRerConfig({ relayUrl: bindings.MAIL_RELAY_URL }); } catch { relaySelected = false; }
    const has = key => present(bindings[key]) || secrets.has(key) && live.includes(key);
    return [
     ...(!sender(bindings.MAIL_FROM) ? [SENDER] : []),
-    ...(!credentialKeys.some(has) ? [declaredCredentials.join(' or ') || credentialKeys.join(' or ')] : []),
+    ...(!credentialKeys.some(has) ? [credentialText] : []),
     ...(provider === 'cloudflare' && !has('MAIL_ACCOUNT_ID') ? ['MAIL_ACCOUNT_ID'] : []),
     ...(!relaySelected ? ['MAIL_RELAY_URL (assigned HTTPS relay URL)'] : []),
    ];
