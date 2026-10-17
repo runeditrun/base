@@ -34,11 +34,12 @@ async function fixture(t) {
 test('producer emits optional app sign-in, carries adapter paths, and refuses platform-invalid declarations', async t => {
   const f = await fixture(t), app = f.config.artifact.specInputs.surfaces.app;
   assert.equal(Object.hasOwn((await f.emit()).surfaces.app, 'signIn'), false);
-  for (const signIn of [{path:'/login', loginHint:true}, {path:'/', loginHint:false}, {path:'/nested//login/', loginHint:false}, {path:`/${'a'.repeat(2048)}`, loginHint:true}]) {
+  for (const signIn of [{path:'/login', loginHint:true}, {path:'/', loginHint:false}, {path:'/nested//login/', loginHint:false}, {path:`/${'a'.repeat(2048)}`, loginHint:true}, {path:'/signin', loginHint:true, ownerSignIn:'/auth/owner-signin'}]) {
     app.signIn = signIn;
     assert.deepEqual((await f.emit()).surfaces.app.signIn, signIn);
   }
-  const invalid = [null, false, '/login', [], {}, {path:'/login'}, {loginHint:false}, {path:'/login', loginHint:'true'}, {path:'/login', loginHint:null}, {path:'/login', loginHint:true, extra:true}];
+  const invalid = [null, false, '/login', [], {}, {path:'/login'}, {loginHint:false}, {path:'/login', loginHint:'true'}, {path:'/login', loginHint:null}, {path:'/login', loginHint:true, extra:true}, {path:'/login', loginHint:true, ownerSignIn:null}, {path:'/login', loginHint:true, ownerSignIn:false}];
+  for (const ownerSignIn of ['', 'auth/owner-signin', '//evil', 'https://x', '/auth/owner-signin?x=1', '/auth/../x', '/a b']) invalid.push({path:'/login', loginHint:true, ownerSignIn});
   for (const path of [null, 1, '', 'login', '//example.test/login', 'https://example.test/login', '/login?email=x', '/login#email', '/log.in', '/a/../login', '/%2flogin', '/\\login', '/log in', '/login\n', '/登录']) invalid.push({path, loginHint:false});
   for (const signIn of invalid) {
     app.signIn = signIn;
