@@ -41,7 +41,7 @@ globalThis.fetch = async url => new Response(String(url).endsWith('.tgz') ? read
  await symlink(process.execPath, join(bin, 'node'));
  await writeFile(join(checkout, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/run', seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' } }));
  await writeFile(join(checkout, '.node-version'), process.versions.node + '\n');
- await writeFile(join(checkout, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: `pnpm@${pin}`, scripts: { 'export:data': 'echo "exported to $PWD with"' } }));
+ await writeFile(join(checkout, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: `pnpm@${pin}`, scripts: { 'export:data': 'echo "exported to $PWD with"', fails: 'exit 7' } }));
  const env = { HOME: home, PATH: bin, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${pathToFileURL(edge).href}` };
  assert.notEqual((await run('/bin/sh', ['-c', 'command -v pnpm'], { env })).code, 0, 'no pnpm on PATH');
 
@@ -52,4 +52,9 @@ globalThis.fetch = async url => new Response(String(url).endsWith('.tgz') ? read
  await access(join(home, '.rer/pnpm', `pnpm-${pin}`));
  const outside = await run(process.execPath, [rer, 'run', 'export:data'], { cwd: directory, env });
  assert.equal(outside.code, 2, 'outside a checkout it names where it runs');
+ const missingScript = await run(process.execPath, [rer, 'run', 'hosted-backup', '--', '--remote'], { cwd: join(checkout, 'nested'), env });
+ assert.equal(missingScript.code, 2, missingScript.stdout + missingScript.stderr);
+ assert.equal(missingScript.stderr.trim(), 'No script named hosted-backup in this checkout. Scripts: export:data, fails');
+ assert.equal(missingScript.stdout, '');
+ assert.equal((await run(process.execPath, [rer, 'run', 'fails'], { cwd: join(checkout, 'nested'), env })).code, 7, 'a script that exists keeps its own exit code');
 });

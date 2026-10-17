@@ -41,14 +41,19 @@ export async function runScript(args) {
   process.stderr.write(`rer run runs inside a checkout: a folder with OPERATIONS.json at or above this one, or --cwd DIR.\n`);
   return 2;
  }
+ let scripts = {};
+ try { scripts = JSON.parse(await readFile(join(target.root, 'package.json'), 'utf8')).scripts ?? {}; } catch {}
+ // pnpm run --silent hides pnpm's own missing-script error, so say it here, before any pnpm is fetched or spawned.
+ if (args[0] && !args[0].startsWith('-') && !Object.hasOwn(scripts, args[0])) {
+  process.stderr.write(`No script named ${args[0]} in this checkout. Scripts: ${Object.keys(scripts).join(', ') || '(none)'}\n`);
+  return 2;
+ }
  const { ensureProjectPnpm } = await import('../cli/project-pnpm.mjs');
  const { RerError } = await import('../cli/errors.mjs');
  try {
   await ensureProjectPnpm(target.root, { report: text => process.stderr.write(text + '\n') });
   await projectNode(target.root, process.env);
  } catch (error) { if (!(error instanceof RerError)) throw error; process.stderr.write(error.message + '\n'); return error.exitCode; }
- let scripts = {};
- try { scripts = JSON.parse(await readFile(join(target.root, 'package.json'), 'utf8')).scripts ?? {}; } catch {}
  if (args[0] && /\bplaywright\b/.test(scripts[args[0]] ?? '')) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, ['run']);
   if (code !== undefined) return code;

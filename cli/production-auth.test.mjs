@@ -77,6 +77,16 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  assert.match(dry,/dry run complete/);
  const needed=dry.slice(dry.indexOf('Needed for a real deploy'));
  for(const name of ['CLOUDFLARE_ACCOUNT_ID','OWNER_EMAIL','MAIL_API_KEY','https://dash.cloudflare.com/profile/api-tokens','Workers Scripts: Edit','D1: Edit','Queues: Edit'])assert.ok(needed.includes(name),dry);
+ // MAIL_API_KEY is the declared credential for resend: the list also names the provider's own key, and no other provider's.
+ assert.ok(needed.includes('production sign-in mail: ') && needed.includes('MAIL_API_KEY (or RESEND_API_KEY)'),dry);
+ assert.ok(!needed.includes('SENDGRID_API_KEY'),dry);
+ for(const [provider,key] of [['sendgrid','MAIL_API_KEY (or SENDGRID_API_KEY)'],['cloudflare','MAIL_API_KEY']]){
+  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,vars:{...declaration.vars,MAIL_PROVIDER:provider}}));
+  const text=(await seed.text(['deploy','--dry-run'])).stderr,other=text.slice(text.indexOf('Needed for a real deploy'));
+  assert.ok(other.includes(key),other);
+  assert.equal(other.includes('(or '),provider==='sendgrid','a provider with no key of its own names only MAIL_API_KEY: '+other);
+ }
+ await writeFile(join(seed.root,'deploy.json'),JSON.stringify(declaration));
  // Without Cloudflare values a real deploy says where to get them: the token
  // page and the permissions this declaration needs, or the project's own guide.
  git('checkout','package.json');
@@ -87,6 +97,8 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,deployGuide:guide}));
  const guided=(await seed.text(['deploy','--env-file','production.env'],3)).stderr;
  assert.ok(guided.includes(guide),guided);
+ const guidedDry=(await seed.text(['deploy','--dry-run'])).stderr;
+ assert.match(guidedDry,new RegExp(`production sign-in mail: MAIL_API_KEY \\(or RESEND_API_KEY\\).* \\(see ${guide.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\)`),guidedDry);
  assert.doesNotMatch(guided,/profile\/api-tokens/);
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,deployGuide:'http://guide.example.test'}));
  assert.match(error(await seed.run(['deploy','--dry-run'],2)).message,/deployGuide must be an https URL/);

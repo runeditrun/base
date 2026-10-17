@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.50-dev.g93e0dc5d",
+  "cliVersion": "0.2.50-dev.g551c17d1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -683,7 +683,7 @@
     },
     "cli/deploy-needs.mjs": {
       "source": "cli/deploy-needs.mjs",
-      "sha256": "1b9ebb57d876f449f2b39d5ca449cc715e07694e80c9f547dce14231cd80fd0f"
+      "sha256": "fa397ff1a19824f1a821c12513414fb67c87736338f26d26f0c4298b7e39a1cc"
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",
@@ -899,7 +899,7 @@
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "fa803a8d6a09e63a51e0b82e8f364949bb385f6b5cd348b3171a3d97df7bd9bd"
+      "sha256": "b83a1c2990851e693cc67bbf03a5db232b5853faaa9a140d632f7b54a08a442c"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
