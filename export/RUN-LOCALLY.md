@@ -262,6 +262,13 @@ exclusions. Export, reset and import print only their own steps: Node's
 "SQLite is an experimental feature" notice and wrangler's local-only hints
 (such as "Use --remote if you want to access the remote instance") are left out.
 They are local operations; nothing remote is read or changed. Import validates the archive and restores into an empty destination.
+A large install takes many minutes (about 30 for 1.2 GB on a busy machine), so export and import
+print a line every few seconds: the first says roughly how long an archive of that size takes, then
+parts done and bytes, and the time left once two samples exist. An export builds every part before it
+writes any, because the archive opens with a manifest that holds the final part count. If an import
+stops part-way (the machine slept, or the process was killed), run the same command again: it removes
+the unfinished import's staged data, says so, and starts over. An unexpected failure names its error
+class and code, never row data, and says to run the same command again.
 After import, run setup to establish the owner and local configuration. Auth,
 private settings and transient runtime state are excluded. Remote
 transfer is unsupported by the maintained references and fails visibly.

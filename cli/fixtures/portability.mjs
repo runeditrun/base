@@ -29,8 +29,8 @@ export async function portabilityFixture(t,{generated=true}={}) {
  await useWorkspaceDependencies(root);
  if(generated)await writeFile(join(root,'migrations/core/0999_computed_entries.sql'),generatedSQL);
  const env=await isolatedQueue(t,{PATH:process.env.PATH,HOME:process.env.HOME,CI:'true',WRANGLER_SEND_METRICS:'false',RER_NODE_AUTO:'0'});
- async function command(args,expected=0) {
-  const child=spawn(process.execPath,args,{cwd:root,env,stdio:['ignore','pipe','pipe']});children.add(child);
+ async function command(args,expected=0,extraEnv={}) {
+  const child=spawn(process.execPath,args,{cwd:root,env:{...env,...extraEnv},stdio:['ignore','pipe','pipe']});children.add(child);
   let stdout='',stderr='';child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);
   child.done=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
   const code=await child.done;
@@ -39,7 +39,8 @@ export async function portabilityFixture(t,{generated=true}={}) {
  }
  const run=async(args,expected=0,{slow=false}={})=>(await command([...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json'],expected)).stdout.trim().split('\n').map(JSON.parse);
  // A command as a person runs it, without --json: its terminal output.
- const text=(args,expected=0)=>command(['scripts/rer.mjs',...args],expected);
+ // `fault` names a transfer-fault.mjs failure for the transfer worker.
+ const text=(args,expected=0,{fault}={})=>command(['scripts/rer.mjs',...args],expected,fault?{NODE_OPTIONS:`--import=${join(base,'cli/fixtures/transfer-fault.mjs')}`,RER_TEST_TRANSFER_FAULT:fault}:{});
  const data=async sql=>JSON.parse((await command(['node_modules/wrangler/bin/wrangler.js','d1','execute','default-seed-reference','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--command',sql,'--json'])).stdout);
  return {root,run,text,data};
 }

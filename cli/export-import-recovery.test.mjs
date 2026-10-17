@@ -76,3 +76,42 @@ test('local import and setup after import finish with a slow inspection and reta
  assert.deepEqual((await seed.data("SELECT title,body FROM articles WHERE id='retained'"))[0].results,[{title:'Restored title',body:'Owner content'}]);
  assert.deepEqual((await seed.data("SELECT email FROM oa_operators WHERE role='owner' AND status='active'"))[0].results,[{email:'restored@example.test'}]);
 });
+
+// A large install takes many minutes; the person sees lines for it instead of silence, a restore that
+// died part-way is cleaned up at the next import, and an unexpected failure names its class and the way on.
+test('export and import print progress; a crashed import is cleaned at the next start; a native error names its class, never its data', { timeout: 20 * 60_000 }, async t => {
+ const seed = await portabilityFixture(t), query = 'SELECT * FROM computed_entries ORDER BY id';
+ await seed.run(['export', '--output', 'exports/empty.rer']);
+ // A part holds at most 1,000 rows: this archive has several parts.
+ await seed.data("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2500) INSERT INTO computed_entries(id,quantity,unit_price,label) SELECT 'row' || i, i, 2, NULL FROM n");
+ const rows = (await seed.data(query))[0].results;
+ const exported = await seed.text(['export', '--output', 'exports/large.rer']);
+ assert.match(exported.stderr, /Exporting about [\d.]+ [KMG]?B of local data\./);
+ assert.match(exported.stderr, /Building the archive: (\d+) of \1 parts/);
+ assert.match(exported.stderr, /Writing the archive: (\d+) of \1 parts \([\d.]+ [KMG]?B\)/);
+ assert.ok(Number(/Writing the archive: \d+ of (\d+) parts/.exec(exported.stderr)[1]) >= 3, 'the archive has several parts');
+ await seed.run(['reset', '--yes']);
+ // The restore process dies once a part is staged (as a crashed worker or workerd does): the person is told, and the staging stays.
+ const crashed = await seed.text(['import', '--input', 'exports/large.rer', '--yes'], 1, { fault: 'crash' });
+ assert.match(crashed.stderr, /Restoring a [\d.]+ [KMG]?B archive\./);
+ assert.match(crashed.stderr, /ended before it finished \(signal SIGKILL\)\. Run the same command again; it starts over/);
+ // The unfinished imports and the staging tables of one import job (a successful import keeps its own finished snapshot).
+ const unfinished = "SELECT (SELECT import_job FROM rer_portability_state) AS job, (SELECT COUNT(*) FROM rer_portability_jobs WHERE kind = 'import' AND phase NOT IN ('complete', 'aborted')) AS unfinished";
+ const tablesOf = async job => (await seed.data(`SELECT COUNT(*) AS n FROM sqlite_master WHERE instr(name, 'rer_portability_stage_${job.replaceAll('-', '')}') = 1`))[0].results[0].n;
+ const left = (await seed.data(unfinished))[0].results[0];
+ assert.ok(left.job && left.unfinished === 1 && await tablesOf(left.job) > 0, 'the crashed import left its staging');
+ // The same command again cleans it, says so, shows progress and restores the data.
+ const again = await seed.text(['import', '--input', 'exports/large.rer', '--yes']);
+ assert.match(again.stderr, /cleaned up an unfinished earlier import/i);
+ assert.match(again.stderr, /Staging the restore: (\d+) of \1 parts/);
+ assert.match(again.stderr, /All \d+ parts are staged/);
+ assert.deepEqual((await seed.data(query))[0].results, rows);
+ assert.deepEqual((await seed.data(unfinished))[0].results[0], { job: null, unfinished: 0 });
+ assert.equal(await tablesOf(left.job), 0, 'the crashed import\'s staging is gone');
+ // An unexpected failure names its class, never its message, and the staging it made is aborted.
+ await seed.run(['reset', '--yes']);
+ const native = await seed.text(['import', '--input', 'exports/large.rer', '--yes'], 1, { fault: 'native' });
+ assert.match(native.stderr, /\(native_error: RangeError\)\. Run the same command again; it starts over\./);
+ assert.doesNotMatch(native.stdout + native.stderr, /private row content/);
+ assert.deepEqual((await seed.data(unfinished))[0].results[0], { job: null, unfinished: 0 });
+});

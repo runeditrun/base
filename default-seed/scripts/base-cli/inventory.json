@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.47-dev.g9391dc6d",
+  "cliVersion": "0.2.47-dev.gf2e6d505",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -873,13 +873,17 @@
       "source": "cli/portability-policy.mjs",
       "sha256": "490d4f28aa1baade262dddfb1bfcd66c1ce824be2453f19376217bd0699ea0f5"
     },
+    "cli/portability-progress.mjs": {
+      "source": "cli/portability-progress.mjs",
+      "sha256": "9a3f1f1f182b18895d38a2d8d86904ff0590e6d987435b8e78f971411331bb14"
+    },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "1ddb298e309b3e8e2359d0826078c2dec6901e8b79d8165485dec7f2c728962b"
+      "sha256": "469573bd58a25bd0204800c82595cb4532dbe80f2ed5c8cb2721b39bd85b219e"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "38ebc309cd8d3a5008c908c62864af4b0dc8d2620ae860cd70cf597124d6681c"
+      "sha256": "8e009720caefe57e6158a209d5584a2d906e3ea9fe8e6544500f02b0e073dff9"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -2547,7 +2551,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "109e5f657abc5d5a73cfc0c0968de13698ca68eea3435025245769dfe79ceb5c"
+      "sha256": "3a6d8719fc23b6957abae3653988b9754e946de3777f6b0759173979eb28bc46"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
@@ -2579,15 +2583,15 @@
     },
     "modules/portability/export.mjs": {
       "source": "modules/portability/export.mjs",
-      "sha256": "e2afe881ac1d5b0d55f1f574bece3cf3dedb9c27497f3b71833873b2b3a3bc43"
+      "sha256": "c72b55cf0c4a824c662cc06f65bf263bec3309abfc9f8d9321795b7d966eb49c"
     },
     "modules/portability/files.mjs": {
       "source": "modules/portability/files.mjs",
-      "sha256": "dfcfa205c033d872ec0ad75c46f67d13f9434ca4ff0c05878c0d85e65c542314"
+      "sha256": "e191f04d5b7ac3cc26386a083e967cf3841ee62c008e9fe98dfb9daa8679600f"
     },
     "modules/portability/format.mjs": {
       "source": "modules/portability/format.mjs",
-      "sha256": "814158564d5f76b44e2db486602db4b8a06c73694d0bbc76b881119f8b67f3c6"
+      "sha256": "a894cab57d5642119c20f648096dbbfee6586ed18168c86107188c62d84f6767"
     },
     "modules/portability/generated.mjs": {
       "source": "modules/portability/generated.mjs",
@@ -2611,15 +2615,15 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "62d2b81a885ba26d76b3e63f8e3dd54251abd28ca8c1bbf4cfd6ee80e9f70570"
+      "sha256": "db55060061cf04871e3529f423b4bde2237b9e066bed5a644072d16675909461"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
-      "sha256": "1d3f04b62b0840694054ffa0dfa93acc4faece948f8f971bae72fffb9e06d3a8"
+      "sha256": "a479fc83261edb28f106743e1dedd68a9422497011c3d352eef13be38c5ed335"
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
-      "sha256": "92ba1f89415130b7a067cc22851f3c00d806f5d9b7c016205444d935e4104148"
+      "sha256": "e29d5ad39ab1af669b0b65746e4deea7279b8b51e82153f4163bcde7153e2c04"
     },
     "modules/portability/journal.mjs": {
       "source": "modules/portability/journal.mjs",
@@ -2648,6 +2652,10 @@
     "modules/portability/payloads.mjs": {
       "source": "modules/portability/payloads.mjs",
       "sha256": "bcfb978b8c0a0ac1d5dfb5fbccc9f2ed5c3c20c7d6286f0ab6bcadc95ea691a2"
+    },
+    "modules/portability/progress.mjs": {
+      "source": "modules/portability/progress.mjs",
+      "sha256": "801bc3cfa12f490613a3643ad77623273cad83f9e6f558229baf7263472076e6"
     },
     "modules/portability/provider-data.mjs": {
       "source": "modules/portability/provider-data.mjs",
