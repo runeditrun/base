@@ -60,7 +60,9 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     const capacityNamespace = await mf.getDurableObjectNamespace('CAPACITY');
     const capacity = capacityNamespace.get(capacityNamespace.idFromName('capacity'));
     for (let i = 0; i < 10; i++) await capacity.acquire(capacityNamespace.newUniqueId().toString(), Date.now() + 60_000, 100, 'retired-visitor');
-    assert.equal((await fetch('/')).status, 200);
+    const home = await fetch('/');
+    assert.equal(home.status, 200);
+    assert.match(await home.text(), /<link rel="prefetch" href="\/assets\/fixture-12345678\.js">/, "the start page prefetches the seed's built chunks");
     // A start without a readable form is a clean 400 before any place is reserved.
     for (const init of [{}, { body: '{"x":1}', headers: { 'content-type': 'application/json' } }, { body: 'x', headers: { 'content-type': 'multipart/form-data; boundary=none' } }]) {
       const refused = await fetch('/__demo/start', `rer_demo_measure=${measurement}`, { method: 'POST', ...init, headers: { 'cf-connecting-ip': '203.0.113.9', accept: 'application/json', ...init.headers } });
