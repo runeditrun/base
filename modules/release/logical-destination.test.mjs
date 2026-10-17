@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { contractText } from './contract-fixture.mjs';
 import { release } from './produce.mjs';
 import { publicationScan, validatePublicationDestination } from './publication-scan.mjs';
 
@@ -60,7 +61,7 @@ test('empty GitHub 404 remains incomplete and blocks producer export and tag', a
   const f = fixture(t, publicSlug, 'empty');
   f.write('seed.json', { id: 'fixture', version: '1.2.3', name: 'Fixture', category: 'test',
     description: 'Synthetic destination fixture.', maturity: 'experimental' });
-  writeFileSync(resolve(f.repo, 'CONTRACT.md'), '# Fixture\n\n- **TEST-001 — Exact bytes.** Export the verified committed bytes.\n');
+  writeFileSync(resolve(f.repo, 'CONTRACT.md'), contractText());
   writeFileSync(resolve(f.repo, 'AGENTS.md'), '# Fixture\n');
   const selected = f.commit();
   const report = publicationScan(f.repo, selected, undefined, project, repository);

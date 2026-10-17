@@ -36,6 +36,9 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  // rer dev --as takes anyone in the local database by email; an unknown email names the people it takes.
  await f.sql("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('local-member','jordan@example.test','Jordan','member','active',1)");
  assert.equal(events(await f.run(['dev', '--as', 'jordan@example.test', '--json'])).find(event => event.event === 'ready')?.signedInAs, 'jordan@example.test');
+ // Someone added at a built-in persona's address is signed in by that email, as the person they are.
+ await f.sql("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('local-ada','admin@dev.localhost','Ada','member','active',1)");
+ assert.equal(events(await f.run(['dev', '--as', 'admin@dev.localhost', '--json'])).find(event => event.event === 'ready')?.signedInAs, 'admin@dev.localhost');
  const unknown = events(await f.run(['dev', '--as', 'nobody@example.test', '--json'], 2)).find(event => event.event === 'error')?.message;
  assert.match(unknown, /nobody@example\.test[^]*owner \(migration-owner@example\.test\)[^]*jordan@example\.test/);
  await f.run(['dev', '--stop', '--json']);

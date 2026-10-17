@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { catalogue } from './catalogue.mjs';
+import { contractAround, contractText } from './contract-fixture.mjs';
 
 function manifestFor(contract) {
   const files = new Map([
@@ -23,9 +24,7 @@ function manifestFor(contract) {
 }
 
 test('catalogue keeps wrapped clause bodies, boundary rules, separators, and canonical titles', () => {
-  const contract = [
-    '# Contract',
-    '',
+  const definitions = [
     '- **DEMO-001 — Preserve Title.** Do not rewrite `x`; retain “café” — exactly!',
     '  The next paragraph includes Unicode 東京 and punctuation: [a/b]; keep it.',
     '',
@@ -36,7 +35,8 @@ test('catalogue keeps wrapped clause bodies, boundary rules, separators, and can
     '  Its continuation stays with the clause.',
     '## More',
     '- **DEMO-003 - Keep hyphen form.** Final body at EOF with a period.',
-  ].join('\r\n');
+  ];
+  const contract = contractAround(definitions, [['DEMO-001', 'Preserve Title'], ['DEMO-002', 'Keep another title'], ['DEMO-003', 'Keep hyphen form']]).split('\n').join('\r\n');
 
   const listing = manifestFor(contract).listing;
   assert.equal(listing.clauseCount, 3);
@@ -50,18 +50,32 @@ test('catalogue keeps wrapped clause bodies, boundary rules, separators, and can
   ]);
 });
 
+test('heading and bold-paragraph clauses list the same as bullets, and only published ones are listed', () => {
+  const clauses = [
+    { id: 'DEMO-001', title: 'Bullet form', body: 'Bullet body.' },
+    { id: 'DEMO-002', title: 'Paragraph form', body: 'Paragraph body.', form: 'paragraph' },
+    { id: 'DEMO-003', title: 'Heading form', body: 'Heading body\nover two lines.', form: 'heading' },
+    { id: 'DEMO-004', title: 'Later work', body: 'Not published.', kind: 'target', form: 'heading' },
+  ];
+  assert.deepEqual(manifestFor(contractText(clauses)).listing.clauses, [
+    { id: 'DEMO-001', title: 'Bullet form', text: 'Bullet body.' },
+    { id: 'DEMO-002', title: 'Paragraph form', text: 'Paragraph body.' },
+    { id: 'DEMO-003', title: 'Heading form', text: 'Heading body over two lines.' },
+  ]);
+});
+
 test('catalogue omits empty clause bodies and rejects contracts with no published clauses', () => {
-  const listing = manifestFor([
-    '# Contract',
+  const listing = manifestFor(contractAround([
     '- **DEMO-001 — Empty body.**',
     '- **DEMO-002 — Published body.** This clause has content.',
-  ].join('\n')).listing;
+  ], [['DEMO-001', 'Empty body'], ['DEMO-002', 'Published body']])).listing;
   assert.deepEqual(listing.clauses, [
     { id: 'DEMO-002', title: 'Published body', text: 'This clause has content.' },
   ]);
 
   for (const contract of [
-    '# Contract\n- **DEMO-001 — Empty body.**\n  \n## End\n',
-    '# Contract\nUnstructured text only.\n',
+    contractAround(['- **DEMO-001 — Empty body.**', ''], [['DEMO-001', 'Empty body']]),
+    contractText([{ id: 'DEMO-001', title: 'Later work', body: 'Not published.', kind: 'target' }]),
   ]) assert.throws(() => manifestFor(contract), /CONTRACT\.md must contain published clauses/);
+  assert.throws(() => manifestFor('# Contract\nUnstructured text only.\n'), /CONTRACT\.md:\d+: CONTRACT\.md has no "## Status" section/);
 });

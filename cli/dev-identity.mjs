@@ -61,7 +61,7 @@ export async function resolvePersona(url, key, as, signal) {
  const { appFetch } = await shared('app-fetch.mjs');
  const response = await appFetch(url + '/__dev/personas', { headers: { [DEV_KEY_HEADER]: key }, signal: AbortSignal.any([signal, AbortSignal.timeout(10000)].filter(Boolean)) });
  if (!response.ok) { await response.body?.cancel(); throw refuse(`The application did not serve dev identity (HTTP ${response.status}). Check its local-only entry.`); }
- const personas = await response.json(), persona = personas.find(entry => entry.as === as);
+ const personas = await response.json(), email = as.toLowerCase(), persona = personas.find(entry => entry.as === as || (as.includes('@') && entry.email?.toLowerCase() === email));
  if (persona) return persona;
  // The people rer can sign in as: each persona with its email, then every
  // invited or active person in this checkout's local database by email.

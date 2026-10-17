@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.47-dev.gf2e6d505",
+  "cliVersion": "0.2.47-dev.gbf941d90",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -723,7 +723,7 @@
     },
     "cli/dev-identity.mjs": {
       "source": "cli/dev-identity.mjs",
-      "sha256": "2d9d7a4e3e52b19de65aebb4be714f0e323e29c2d55bbf2beeefca1736450761"
+      "sha256": "ab6ef143895ec8ac42f8f210607c004906e747bf0c510ddfd617d18a5006dcc9"
     },
     "cli/door-mode.mjs": {
       "source": "cli/door-mode.mjs",
@@ -819,7 +819,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "5ae0a5dc460674800869ea40ccfab5dd020399c3606e84b8013ed31179176880"
+      "sha256": "5e6a42b52390abdd28cf649d46faae70f6bcedf81c8d63e67d8d2d773a9f44fc"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -907,7 +907,7 @@
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "85e92d4b885809ec935ab03a87feeb45e483c6af6a2c7ed54668fe237fe64bc8"
+      "sha256": "01f5a171548f84081feff6704866b69b8badcd3df33301bff2ccb69cf33bca85"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -1051,7 +1051,7 @@
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",
-      "sha256": "fe40fa189caf33b7531b6d02e31616275f324d5727b9b0db7ddf35998712dd7c"
+      "sha256": "7beada5d271beaaf63d76e1f8cf2712ba906ec7d430f8312f4abedfad57428b4"
     },
     "modules/ai/LICENSE": {
       "source": "modules/ai/LICENSE",
@@ -2323,7 +2323,7 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "af555f0b1ee95ccadb301dca3d777fbbd764373f6e441d4ace2b9879b8b24125"
+      "sha256": "fa00b8643163de8b0c8b63fb4c669c1aa213822357eff13c3de8b494c3b2d635"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
@@ -2679,7 +2679,7 @@
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
-      "sha256": "999a2f5e40e8d276f179656d114d0a30d4852d1ca84c0f01bbce24b59ac66f3b"
+      "sha256": "10cc8768eeccf3c27c883d27daffee027712b24274a24e075ed3a7949aafc008"
     },
     "modules/release/export.mjs": {
       "source": "modules/release/export.mjs",

@@ -70,6 +70,20 @@ test('a link minted while using a dev session is a dev credential: it needs the 
   } finally { await r.close(); }
 });
 
+test("a person invited at a persona's address signs in as that person, with the role they were invited to", async () => {
+  const r = await fresh();
+  try {
+    const owner = cookies(await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
+    assert.equal((await r.call('/auth/invite', { method: 'POST', cookie: owner, input: { email: 'admin@dev.localhost', displayName: 'Invited Ada', role: 'member' } })).status, 202);
+    const entered = await r.call('/auth/dev/enter?as=admin', { cookie: owner });
+    assert.equal(entered.status, 303, 'the pending invitation signs in by the persona name');
+    const person = (await (await r.call('/auth/session', { cookie: [gateOnly(owner), cookies(entered)].join('; ') })).json()).operator;
+    assert.deepEqual([person.email, person.displayName, person.role, person.status], ['admin@dev.localhost', 'Invited Ada', 'member', 'active']);
+    const operators = await r.db.prepare("SELECT role FROM oa_operators WHERE email='admin@dev.localhost'").all();
+    assert.deepEqual(operators.results, [{ role: 'member' }], 'the persona never adds or widens a role');
+  } finally { await r.close(); }
+});
+
 test('dev sign-in obeys domain provider rules on issue and reuse, with an active owner exemption', async () => {
   const r = await runtime([await read('../accounts/schema/operator-auth.sql'), await read('../identity/oidc/schema/oidc.sql')], {
     OIDC_TRANSACTION_SECRET: 'test-only-dev-domain-transaction-secret',

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { contractText } from './contract-fixture.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -22,7 +23,7 @@ export function fixture(t, verify = 'node --test check.test.mjs', packageManager
     'package.json': JSON.stringify({ name: 'fixture', version: '1.2.3', private: true, type: 'module', packageManager, scripts: { verify } }),
     'pnpm-lock.yaml': "lockfileVersion: '9.0'\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\nimporters:\n  .: {}\n",
     'RELEASE.json': JSON.stringify({ version: '1.2.3' }),
-    'CONTRACT.md': '# Fixture\n\n- **TEST-001 — Exact bytes.** Export the verified committed bytes.\n',
+    'CONTRACT.md': contractText(),
     'AGENTS.md': 'Synthetic fixture instructions.\n',
     'README.md': 'Synthetic producer fixture.\n',
     'check.test.mjs': "import { test } from 'node:test'; import assert from 'node:assert/strict'; import { readFileSync } from 'node:fs'; test('committed product guarantee', () => assert.match(readFileSync('CONTRACT.md', 'utf8'), /TEST-001/));\n",
