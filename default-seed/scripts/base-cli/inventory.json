@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.45-dev.g321497a0",
+  "cliVersion": "0.2.45-dev.gae3bd4ed",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -529,6 +529,74 @@
       "source": "cli/cache-doctor.mjs",
       "sha256": "28d90e72bf971865543149dba83e7cff81f738af8e54208b848b8e08a36377f8"
     },
+    "cli/companion/api.mjs": {
+      "source": "cli/companion/api.mjs",
+      "sha256": "55ad736961d6f6027ecd1ff44ac5c0188ecff3739be9efc581b9f4f39e259c4b"
+    },
+    "cli/companion/auth.mjs": {
+      "source": "cli/companion/auth.mjs",
+      "sha256": "e8848d44b31644193344c5538c4dd63efd72099dc1825febbfeff5a4f86b2e62"
+    },
+    "cli/companion/command.mjs": {
+      "source": "cli/companion/command.mjs",
+      "sha256": "159a7d1e75d1ed4eef84fbdab5fd47d1c2e88b9a0aeb7fa3fb7e881b3b948d5c"
+    },
+    "cli/companion/commands.mjs": {
+      "source": "cli/companion/commands.mjs",
+      "sha256": "11f196e74d774b279f2f788a174619f7d1a17cd6d27f3f9e9b025ed2ff35c25f"
+    },
+    "cli/companion/event-payload.mjs": {
+      "source": "cli/companion/event-payload.mjs",
+      "sha256": "6e9643d6d49eb857e12528212712f06d5c21b904a67fde7e2ccbe4b7c86ef62b"
+    },
+    "cli/companion/grants.mjs": {
+      "source": "cli/companion/grants.mjs",
+      "sha256": "73ed9397987395fe511af48d6b19a0db38f925eaef6cb39261da8779e4c3d88e"
+    },
+    "cli/companion/no-turn-evidence.mjs": {
+      "source": "cli/companion/no-turn-evidence.mjs",
+      "sha256": "5ea1ed49487a522b8a735767f8af47867160315f5a5bbc4ae0da720b01541a52"
+    },
+    "cli/companion/providers/claude.mjs": {
+      "source": "cli/companion/providers/claude.mjs",
+      "sha256": "3de37afb73b6c393caafbca7282299eb52b56b73d20da62856f9314f49754027"
+    },
+    "cli/companion/providers/codex.mjs": {
+      "source": "cli/companion/providers/codex.mjs",
+      "sha256": "6b92df0af7b670da6aef640841f04ccf6f3206d1a5f6b708be37f14cb8bd797d"
+    },
+    "cli/companion/providers/jsonl-rpc.mjs": {
+      "source": "cli/companion/providers/jsonl-rpc.mjs",
+      "sha256": "258b89d524bd0828943206f883cd442d7cfffc38f2df480c39ef01d0d902a999"
+    },
+    "cli/companion/providers/sandbox.mjs": {
+      "source": "cli/companion/providers/sandbox.mjs",
+      "sha256": "8f6506c8baae70ece701fd668fdd1a78f433ace678de592c48da79702adc6f88"
+    },
+    "cli/companion/providers/secrets.mjs": {
+      "source": "cli/companion/providers/secrets.mjs",
+      "sha256": "56b026499dbf41884da60015dfa6d80996cb2d708a4534ce065efed58c379dae"
+    },
+    "cli/companion/recovery.mjs": {
+      "source": "cli/companion/recovery.mjs",
+      "sha256": "130200a1cbeea2e5bdb99c7044b6f0dfff9095c80fa3ff7358502e0d8c4334cd"
+    },
+    "cli/companion/runner.mjs": {
+      "source": "cli/companion/runner.mjs",
+      "sha256": "d2011a35ab8dce56545d636e653e85d9110880a3f466aace0fd28c17b16ccd20"
+    },
+    "cli/companion/setup.mjs": {
+      "source": "cli/companion/setup.mjs",
+      "sha256": "226d6e0b11562bbee3aa9d371e7dd36b9e6b536b2246f213eb2fc8d1efc99d4b"
+    },
+    "cli/companion/state.mjs": {
+      "source": "cli/companion/state.mjs",
+      "sha256": "3cb6c9873edc831d082ffd10f6539003c07c589c741b91544897dead943f3039"
+    },
+    "cli/companion/workspace.mjs": {
+      "source": "cli/companion/workspace.mjs",
+      "sha256": "c2e25de13e5270a6cb698c88115fe899ef6908bea1f8624f60685165a863b4aa"
+    },
     "cli/container-transfer.mjs": {
       "source": "cli/container-transfer.mjs",
       "sha256": "11d21734456391e1c49d4b7dd792859cb86398f99616a84ec589f93819cd644e"
@@ -747,7 +815,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "16deb67396a35fdb7747a513ead25bb2af540560faca94ea35fbe723f0f156ae"
+      "sha256": "e9d2a8d99a5a4d98ac5c432962a3e2f934c1c3ede7cd9e20f62545eb8cc5cebd"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",

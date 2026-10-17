@@ -432,3 +432,83 @@ The four deterministic adapter implementations and their native output formats
 are described in [the adapter guide](cli/business/vendors/README.md). Their
 presence does not enable export until the seed import authority and remaining
 transport contracts are connected.
+
+## Local engineering companion
+
+`rer companion` pairs your own computer with a Run Edit Run app, then runs the
+change requests the app sends it with your own Codex or Claude, here. It makes
+outbound HTTPS requests to the app only and opens no local server. It needs
+Node 22 or later; `run` needs macOS, because each provider runs inside a macOS
+`sandbox-exec` boundary. On other systems `run` refuses before it asks the app
+for work: it never runs a provider without that boundary.
+
+```sh
+npx -y @runeditrun/rer companion map PROJECT_ID <owner>/<repo> /path/to/your/checkout
+npx -y @runeditrun/rer companion pair https://app.runeditrun.com ABCD-2345
+npx -y @runeditrun/rer companion codex-auth     # or: claude-auth
+npx -y @runeditrun/rer companion run
+```
+
+With `rer` installed, drop `npx -y @runeditrun/rer`. Run `rer companion --help`
+for every verb.
+
+- `map PROJECT_ID <owner>/<repo> CHECKOUT` approves one local Git checkout for an
+  app. Its `origin` must be exactly that GitHub repository. `PROJECT_ID` is the
+  app's id, shown in the command on its Devices page. On a Managed app, if you
+  cloned with the temporary clone URL the app gives you, reset `origin` first
+  with `git remote set-url origin https://github.com/<owner>/<repo>.git`: `map`
+  refuses a URL that carries a token, and the reset keeps the expired token out
+  of your `.git/config`.
+- `pair URL CODE` redeems the one-use code from the app's Devices page (the
+  8-character code or the full code; both expire after 10 minutes). The app
+  must name the repository you mapped, or this computer stays unpaired.
+  `--project ID`, `--provider codex|claude` and `--name NAME` set the rest; in
+  a terminal it asks for a missing project (and offers to map it) and provider.
+  With exactly one mapped project it uses that one, and the provider defaults
+  to `codex`. The earlier form `pair URL CODE PROJECT_ID [PROVIDER] [NAME]`
+  still works.
+- `codex-auth [AUTH_FILE]` copies only Codex's `auth.json`
+  (`$CODEX_HOME/auth.json`, else `~/.codex/auth.json`) into a dedicated
+  executor home. Codex configuration and MCP servers are not imported.
+- `claude-auth` runs Claude Code's own sign-in with the dedicated executor home
+  (add `--console` for a Console account). Host Claude configuration and
+  history are not copied. To use API billing instead, set
+  `RER_COMPANION_ANTHROPIC_API_KEY`; a host-wide `ANTHROPIC_API_KEY` is never
+  passed to the provider.
+- `commands PROJECT_ID FILE` approves argv lists for setup and verification,
+  for example `{"setup":[["pnpm","install","--frozen-lockfile"]],"verify":[["pnpm","verify"]]}`.
+  They run in the same boundary, with network access, a home of their own and
+  no provider or deployment credentials. A job from the browser cannot change
+  them.
+- `run [--once]` takes jobs from the app and runs them. `status` prints the
+  paired device, mapped projects, the active job and pending events, never the
+  device key.
+
+How a job runs: each job starts from the exact commit the app names, fetched
+into a separate detached checkout with its own Git metadata. Fetch that commit
+into your checkout first. Your branch, index, dirty and untracked files stay
+untouched. Git runs without global or system configuration, hooks or
+templates. The provider (Codex `app-server`, or `claude`) can write only that
+checkout and the dedicated home, and read only them, its own installation and
+the system runtime; other files, including through symlinks, are denied. Its
+environment has no GitHub, Cloudflare or MCP credentials. A request to widen
+that boundary can only be declined from the app; it is never approved
+remotely. Known provider credentials are redacted from relayed progress and
+block a result that contains them. Events wait on disk and are retried with the
+same ids until the app accepts them. A job that was running when the companion
+stopped is never restarted on its own: resume or cancel it from the app. The
+provider's own network access is not fenced.
+
+State lives in `~/.rer-local` (`RER_LOCAL_HOME` picks another private folder).
+The device key is stored there in a 0600 file; the app keeps only its hash.
+
+**Revoke a device** in the app: Settings › Devices › Revoke. A running
+companion stops at its next request to the app. Then delete the state folder
+on that computer.
+
+If setup failed before any provider turn and you have confirmed no provider or
+setup process is still running, `confirm-no-turn-started JOB_ID
+--confirm-no-provider-turn-started` lets the app resume it. It refuses if the
+checkout changed or the provider recorded a session for it. It reads the
+checkout with Git inside the same boundary, because setup could have changed
+the checkout's Git configuration.
