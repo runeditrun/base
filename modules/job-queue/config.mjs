@@ -35,7 +35,7 @@ export function ordered(jobs) {
 
 // Each reason says what is running, what the limit is and how to change it.
 export function admissionDetails(running, config, sample) {
-  if (running >= config.slots) return { code: 'slots', reason: `all job slots are in use (${running} of ${config.slots}; change with RER_JOBS_SLOTS)` };
+  if (running >= config.slots) return { code: 'slots', reason: `all job slots are in use (${running} of ${config.slots}; change slots in ${config.directory}/config.json)` };
   if (!Number.isFinite(sample.load) || !Number.isFinite(sample.availableMemoryBytes))
     return { code: 'resources_unavailable', reason: 'this computer\'s load or available memory could not be read' };
   if (sample.load > config.loadThreshold) return { code: 'load',

@@ -36,7 +36,7 @@ threshold when one is set, and available memory is strictly above the floor. Def
 
 | Setting in config.json | Default | Environment override |
 | --- | --- | --- |
-| slots | max(1, min(3, floor(CPUs / 4), floor(RAM / 8 GiB))) | RER_JOBS_SLOTS |
+| slots | max(1, min(3, floor(CPUs / 4), floor(RAM / 8 GiB))) | RER_JOBS_SLOTS (request; shared policy below) |
 | loadThreshold | none: a fleet sets one in its own environment | RER_JOBS_LOAD_THRESHOLD |
 | minFreeMemoryBytes | 2 GiB | RER_JOBS_MIN_FREE_MEMORY_BYTES |
 | pollMs | 3000 | RER_JOBS_POLL_MS |
@@ -44,9 +44,20 @@ threshold when one is set, and available memory is strictly above the floor. Def
 | killGraceMs | 1000 | RER_JOBS_KILL_GRACE_MS |
 
 Put numeric settings in `$RER_JOBS_DIR/config.json` (or `~/.rer/jobs/config.json`).
-Environment overrides take precedence. All clients should use the same policy;
-central config avoids differing limits between sessions. Resource settings are
-read when a client is created. `status` prints its effective policy, current load,
+For slots, `config.json` is authoritative and is read under the queue lock on
+every operation, including admission: its `slots` overrides environment and
+library requests from every client. Without a configured `slots`, the shared
+limit is the largest slot request among live queue clients (environment, library
+override, or hardware default). The limit and live membership are recorded in
+`state.json` under the same lock as admission. Closing or reclaiming a dead client
+removes its request; lowering the limit never interrupts running jobs. A client
+whose request differs prints one line per differing effective limit, naming
+the queue's limit and `config.json` as the way to change it. Thus an older shell
+requesting 3 cannot block a head waiter when another live client requests 5.
+Restart clients using older queue code before sharing this policy.
+
+Environment overrides still take precedence for the other settings. Resource settings are
+read when a client is created. `status` prints the shared slot limit, current load,
 available and raw free memory, running labels/repositories/elapsed times, ordered
 waiting jobs, and the head's admission reason. Available memory is what the OS
 can reclaim: on macOS the free, inactive, speculative and purgeable pages from
