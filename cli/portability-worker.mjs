@@ -6,9 +6,11 @@ import { legacyTargetState, requireLegacyEmpty } from '../modules/portability/le
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
 import { appliedMigrations as appliedMigrationNames } from '../modules/portability/bridge.mjs';
 import { join } from 'node:path';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createPortability, PortabilityError, readArchive } from '../modules/portability/index.mjs';
+import { transferProgress } from '../modules/portability/progress.mjs';
+import { nativeFailure, stateBytes } from './portability-progress.mjs';
 import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
 
@@ -33,8 +35,12 @@ async function dataConfiguration(root) {
 }
 
 async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery }) {
+ // Lines for the person go to the CLI over IPC, which prints them as the command's progress.
+ const progress = transferProgress(line => process.send({ progress: line }));
+ if (!legacyRecovery && ['export', 'import'].includes(direction)) progress({ phase: 'start', direction, bytes: direction === 'export' ? await stateBytes(join(root, '.wrangler/state')) : (await stat(path)).size });
  // Validate all inputs before opening bindings or acquiring a restore lock.
  if (direction === 'import') {
+  progress({ phase: 'checking', direction });
   for await (const record of fileRecords(path,legacyRecovery?readLegacyArchive:readArchive)) {}
   if(journal)for await(const record of fileRecords(journal)) {}
  }
@@ -56,7 +62,9 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   await ensurePortabilitySchema(proxy.env[binding], await portabilityPlan(unstable_splitSqlQuery));
   if(legacyRecovery)return await recoverLegacyArchive(options,path,legacyRecovery.output,transient,legacyRecovery.acknowledged);
   const service = await createPortability(options);
-  return await (direction === 'export' ? exportArchive(service,path,transient) : importArchive(service,path,transient,journal));
+  // This checkout's operation lock means no other import can be running: staging left behind is a crashed restore's.
+  if (direction === 'import' && await service.imports.abortAbandoned()) process.send({ progress: 'Cleaned up an unfinished earlier import: a restore that stopped part-way left its staged data here. Its staging is removed and this import starts from the beginning.' });
+  return await (direction === 'export' ? exportArchive(service,path,transient,progress) : importArchive(service,path,transient,journal,progress));
  } finally { await proxy?.dispose(); await rm(configPath, { force: true }); }
 }
 
@@ -73,6 +81,8 @@ catch (error) {
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
  // A populated destination names its table or bucket: schema names, never row data.
  const occupied = error instanceof PortabilityError && /^(target|bucket)_not_empty:/.test(error.code) ? error.code.slice(error.code.indexOf(':') + 1) : undefined;
+ // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
+ const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), ...(native ? { native } : {}), exitCode });
 }
