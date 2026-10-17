@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, realpath, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { buildPackage } from '../scripts/rer-package.mjs';
@@ -266,6 +266,17 @@ test('no-turn attestation is explicit, exact and holds the runner lock', { skip:
  await writeFile(join(worktree, 'source'), 'original');
  ownerGit(worktree, 'add', '.'); ownerGit(worktree, 'commit', '-q', '-m', 'base');
  const baseCommit = ownerGit(worktree, 'rev-parse', 'HEAD');
+ // Even a clean, approved legacy checkout must not be accepted through a symlink.
+ const ordinary = join(root, 'ordinary-worktree');
+ await rename(worktree, ordinary);
+ await symlink(ordinary, worktree);
+ await writeFile(join(state, 'state.json'), JSON.stringify({
+  mappings: { [projectId]: { repository, checkout: ordinary, remote: origin } }, outbox: [],
+  active: { job: { id: jobId, repository, project_id: projectId, base_commit: baseCommit }, status: 'needs_reconciliation' },
+ }), { mode: 0o600 });
+ assert.equal((await companion(['confirm-unstarted', jobId, '--confirm-no-executor-started'], { home, state })).code, 1, 'legacy attestation refuses a symlinked worktree');
+ await rm(worktree);
+ await rename(ordinary, worktree);
  await mkdir(join(worktree, 'node_modules'));
  await writeFile(join(worktree, 'node_modules/dependency'), 'retained');
  // Setup ran repository code that planted a Git clean filter in the retained

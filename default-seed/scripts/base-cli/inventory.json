@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.50-dev.g795cd0e0",
+  "cliVersion": "0.2.50-dev.g99e6f185",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -587,7 +587,7 @@
     },
     "cli/companion/recovery.mjs": {
       "source": "cli/companion/recovery.mjs",
-      "sha256": "130200a1cbeea2e5bdb99c7044b6f0dfff9095c80fa3ff7358502e0d8c4334cd"
+      "sha256": "2fc9c501f50162d2147fb619483c06659dc598ea76e13ac643d05f668f06a120"
     },
     "cli/companion/runner.mjs": {
       "source": "cli/companion/runner.mjs",

@@ -25,8 +25,9 @@ export async function confirmUnstarted(root,state,jobId,confirmed) {
     throw new Error('Only an exact legacy preparation failure without executor or pending-control state can be attested.');
   let workspace;
   const worktree=join(root,'worktrees',jobId);
-  const retained=await lstat(worktree).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;});
-  if(retained) {
+  const info=await lstat(worktree).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+  if(info) {
+    if(!info.isDirectory() || info.isSymbolicLink())throw new Error('Retained worktree must be an ordinary directory.');
     const mapping=state.mappings[active.job.project_id];
     if(!mapping || mapping.repository!==active.job.repository || !/^[a-f0-9]{40}$/.test(active.job.base_commit||''))throw new Error('Retained worktree cannot be verified against approved mapping.');
     const inside=retainedGit(root,worktree);
