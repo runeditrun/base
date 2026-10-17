@@ -22,7 +22,7 @@ import { publicOrigin } from './public-origin.mjs';
 const segment = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const STATE_KIND = 'rer-deploy-owner-state';
 export const KINDS = ['d1','r2','kv','queues'];
-const DECLARATION_KEYS = ['version','project','compatibilityDate','compatibilityFlags','d1','r2','kv','queues','durableObjects','secrets','crons','vars','originVar','publicOriginSetting','services','workersDev','platforms','container','deployGuide'];
+const DECLARATION_KEYS = ['version','project','compatibilityDate','compatibilityFlags','d1','r2','kv','queues','durableObjects','secrets','crons','vars','originVar','publicOriginSetting','publicSettings','services','workersDev','platforms','container','deployGuide'];
 const ENTRY_KEYS = {d1:['binding'],r2:['binding','locationHint'],kv:['binding'],queues:['binding','consumer','deadLetterQueue'],durableObjects:['binding','className','storage'],secrets:['binding','environment','verifyStandIn','optional'],services:['binding','project','entrypoint','allowedHosts','grant']};
 
 export function refuse(code, kind, name) { const error = new Error(code); error.resource = `${kind}:${name}`; return error; }
@@ -114,6 +114,7 @@ export function localOnlyBinding(declaration, localOnlyKeys = []) {
 /** A seed declares bindings, never names. Migrations come from the packaged artifact. */
 export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], env = {} } = {}) {
   assert(declaration?.version === 1 && typeof declaration === 'object' && Object.keys(declaration).every(key => DECLARATION_KEYS.includes(key)), 'invalid-owner-declaration');
+  assert(declaration.publicSettings === undefined || Array.isArray(declaration.publicSettings) && new Set(declaration.publicSettings).size === declaration.publicSettings.length && declaration.publicSettings.every(name => typeof name === 'string' && /^[A-Z][A-Z0-9_]*$/.test(name)), 'invalid-public-settings');
   if (declaration.platforms !== undefined) assert(Array.isArray(declaration.platforms) && declaration.platforms.length > 0 && new Set(declaration.platforms).size === declaration.platforms.length && declaration.platforms.every(item => ['workers','container'].includes(item)), 'invalid-platforms');
   if (declaration.container !== undefined) {
     const config=declaration.container;

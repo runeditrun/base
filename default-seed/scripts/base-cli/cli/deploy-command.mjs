@@ -17,6 +17,7 @@ import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.m
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
+import { settingKinds } from './deploy-settings.mjs';
 import { deployGuide, neededForRealDeploy, reportNeeded } from './deploy-needs.mjs';
 import { keepHookSecrets } from './deploy-secrets.mjs';
 import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
@@ -82,10 +83,11 @@ export async function deployCommand(context) {
  await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
  const sourceSha = options.dryRun ? undefined : committedSource(root, options);
  const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
- const { createRedaction, credentialValues } = await shared('redaction.mjs');
+ const { createRedaction } = await shared('redaction.mjs');
  const redaction = createRedaction();
+ const kinds = await settingKinds({ declaration, setupManifest });
  const addSecret = value => { redaction.addSecrets([value]); store.addSecrets?.([value]); };
- for (const value of [...credentialValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment])].filter(Boolean)) addSecret(value);
+ for (const value of [...kinds.privateValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment])].filter(Boolean)) addSecret(value);
  const environment = options.environment ?? 'production';
  // The hook uploads every value it is given: a generated secret it gets is the one the Worker keeps.
  if (!options.dryRun) await keepHookSecrets({ root, environment, declaration, setupManifest, env, generated, reused, rotated, again: deployAgain(options), report: line => store.report(line) });
