@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.46
+
+- **`rer companion` pairs your computer with a Run Edit Run app and runs its change requests here.** The local companion is now a `rer` verb: `map` approves one Git checkout whose `origin` is exactly the app's GitHub repository, `pair` redeems the one-use code from the app's Devices page, `codex-auth` or `claude-auth` sets up a dedicated executor home, `commands` approves setup and verify argv lists, and `run` takes jobs from the app. Each job starts from the exact commit the app names in a separate detached checkout, and the provider runs inside a macOS `sandbox-exec` boundary with no GitHub, Cloudflare or MCP credentials; on other systems `run` refuses before it asks for work. It makes outbound HTTPS requests only and opens no local server. State lives in `~/.rer-local` (`RER_LOCAL_HOME` picks another folder), the device key in a 0600 file. `status` prints the paired device, mapped projects, active job and pending events, never the key. Revoke a device in the app under Settings › Devices (#202).
+- **A native demo frees its capacity place before it erases the visitor's storage.** Cancel, sign-out, expiry and a failed start now stop the copy and release its place first, then erase; a retry alarm repeats the erasure until it finishes. Before, a failing or slow erase (an upload still streaming into storage) held the place for up to an hour, so the next visitor could be refused. A start also re-checks that it was not ended while it extended its reservation (#213).
+
 ## 0.2.45
 
 - **`RER_SERVER_LIMIT_FILE` sets the server limit from a file.** A start that sees it reads the positive integer in the named file and uses that as the limit, over its own `RER_SERVER_LIMIT` and over the limits running servers recorded, in both the launcher's check and the dispatcher's registry. A fleet's launcher points every run at one file, so a long-lived run that still exports an older `RER_SERVER_LIMIT` can no longer cap the rest. An unreadable file or a non-integer refuses the start naming the file; the limit refusal names it when it set the cap. Without the variable nothing changes (#205).
