@@ -66,9 +66,15 @@ export async function main(argv = process.argv.slice(2)) {
   else result = await (await import('./lifecycle.mjs')).runCommand(project, options, out);
   out.result(true, 0, result); return 0;
  } catch (error) {
-  const failure = error instanceof RerError ? error : new RerError('command_failed', 'Command failed; inspect the project operating documentation.', 1);
+  const failure = error instanceof RerError ? error : unexpectedFailure(error);
   out.error(failure); out.result(false, failure.exitCode, failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }); return failure.exitCode;
  }
+}
+
+// A failure rer did not classify keeps its own first line; the hint is the next step.
+function unexpectedFailure(error) {
+ const message = String(error?.message ?? error).split('\n')[0].trim().slice(0, 300);
+ return new RerError('command_failed', `${message || 'Command failed.'}\nUnexpected failure: run the command again, and if it repeats inspect the project operating documentation.`, 1);
 }
 
 function showHelp(options,out) {
