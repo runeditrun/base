@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.41
+
+- **A run site's custom-domain readback waits for the domains to go live.** After `rer deploy --site` attaches its custom domains, it now polls the zone's Custom Domain list inside the deploy's readiness window until every hostname is listed on the site's Worker. The wait starts at 2 seconds and doubles up to 10 seconds. A hostname already on another Worker is still refused at once. A hostname still missing when the window ends fails as `domain-readback-mismatch` and names it. Before, the deploy read the list once, so a new zone's normal lag failed a deploy that would have gone live (#183).
+- **A native demo's start passes the visitor's address to the seed.** When a native hosted demo starts, its seeding request to the seed's `/health` now carries `cf-connecting-ip` with the visitor's client address, as every later request does. Seeds that admit requests by client address, as Dial does, now start without workarounds in the seed (#188).
+- **Base's docs lead with the one-line start.** The foundation template's README, ONBOARDING and OPERATIONS, and RUN-LOCALLY.md in the default seed and the export, now open with `npx -y @runeditrun/rer dev just-every/<repo>`. They give `rer setup` for setting up without starting, and the installer form `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/<repo>` for a machine without Node 22. Composed editions name their own `run-<edition>` repository (#185).
+- **The publication scan accepts rer-project.json alone.** A seed's destination is valid with rer-project.json alone, edition.json alone, or both. Each manifest that is present binds its id, and rer-project.json also binds `sourceRepository`. Before, the 13 seeds whose edition.json was removed in the rer-project.json rollout failed `publish-check` with `destination.invalid` (#187).
+
 ## 0.2.40
 
 - **The /contract clause table keeps clause IDs whole.** A clause ID or kind never breaks across lines. The ID column is sized from the longest clause ID in the contract, so a long ID like `DEPENDENCY-001` fits on one line. Titles wrap only between words, and only evidence paths and gap text may break inside a word. The kind now sits under the clause ID instead of in a column of its own.
