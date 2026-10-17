@@ -436,7 +436,7 @@ test('owner identifiers refuse the run site without stopping a healthy dev app',
  // A short name must be protected too; its occurrence inside another word is
  // still public example text, as is an email belonging to a different mailbox.
  await writeFile(answers, JSON.stringify({OWNER_EMAIL: 'managed-owner@example.test', displayName: 'Jo'}), {mode: 0o600});
- const render = text => writeFile(entry, original.replace('html: siteHomeHtml(identity, run)', `html: siteHomeHtml(identity, run).replace('</main>', ${JSON.stringify('<p>' + text + '</p></main>')})`));
+ const render = text => writeFile(entry, original.replace('html: siteHomeHtml(identity, run, contract)', `html: siteHomeHtml(identity, run, contract).replace('</main>', ${JSON.stringify('<p>' + text + '</p></main>')})`));
  let dev;
  try {
   await render('Joins: co-managed-owner@example.test and managed-owner@example.test.invalid');
