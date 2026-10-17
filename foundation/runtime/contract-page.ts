@@ -44,10 +44,11 @@ function stacked(counts: Counts, labelled: boolean): string {
   return order.filter(status => counts[status]).map(status => `<span class="seg ${status}" style="flex-grow:${counts[status]}">`
     + (labelled ? `<span class="pct">${share[status]}<span class="cnt"> (${counts[status]})</span></span>` : '') + '</span>').join('')
 }
-const split = (counts: Counts) => order.map(status => `<span class="ink-${status}">${counts[status]} ${status}</span>`).join(' · ')
+const split = (counts: Counts) => order.map(status => `<span class="ink-${status}">${counts[status]} ${status}</span>`).join('<span class="sep"> · </span>')
 const plainCounts = (counts: Counts) => order.map(status => `${counts[status]} ${status}`).join(' · ')
 const areaCount = (n: number) => `${n} ${n === 1 ? 'area' : 'areas'}`
 const pathHtml = (path: string) => escape(path).replaceAll('/', '/<wbr>')
+const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'push further' : clause.kind
 
 function clauseRow(clause: ContractClause, contractUrl: string): string {
   const line = `${contractUrl}?plain=1#L${clause.line}`
@@ -55,8 +56,7 @@ function clauseRow(clause: ContractClause, contractUrl: string): string {
   const evidence = clause.status === 'missing' ? '' : clause.evidence.map(path => `<code class="path">${pathHtml(path)}</code>`).join('')
   const gap = clause.status === 'done' || !clause.gap ? '' : `<span class="gap">Gap: ${clause.gap === 'see the clause' ? `<a href="${escape(line)}">see the clause</a>` : escape(clause.gap)}</span>`
   return `<tr class="clause" data-id="${escape(clause.id)}" data-status="${clause.status}" data-kind="${clause.kind}" data-area="${escape(clause.area)}" data-find="${escape(find)}">`
-    + `<td class="id"><a href="${escape(line)}">${escape(clause.id)}</a></td><td class="title">${escape(clause.title)}</td>`
-    + `<td class="kind">${clause.kind === 'push-further' ? 'push further' : clause.kind}</td>`
+    + `<td class="id"><a href="${escape(line)}">${escape(clause.id)}</a><span class="kind">${kindWord(clause)}</span></td><td class="title">${escape(clause.title)}</td>`
     + `<td class="status"><span class="st ink-${clause.status}">${glyph(clause.status, 16)}${word[clause.status]}</span></td><td class="ev">${evidence}${gap}</td></tr>`
 }
 
@@ -92,15 +92,17 @@ export function contractPageHtml(identity: EditionIdentity, run: RunData, contra
         + `<span class="mini" aria-hidden="true">${stacked(area, false)}</span></a></li>`).join('') + '</ul>').join('')
     + '</section>'
 
-  const bodies = contract.areas.map(area => `<tbody class="area" data-area="${escape(area.name)}"><tr class="group" id="area-${area.slug}"><th colspan="5" scope="colgroup"><span class="group-name">${escape(area.name)}</span> <span class="group-counts">${plainCounts(area)}</span></th></tr>`
+  // The clause column holds the longest ID (or kind word) whole, in the mono face's ch.
+  const idWidth = Math.max(...clauses.map(clause => Math.max(clause.id.length, kindWord(clause).length)))
+  const bodies = contract.areas.map(area => `<tbody class="area" data-area="${escape(area.name)}"><tr class="group" id="area-${area.slug}"><th colspan="4" scope="colgroup"><span class="group-name">${escape(area.name)}</span> <span class="group-counts">${plainCounts(area)}</span></th></tr>`
     + clauses.filter(clause => clause.area === area.name).map(clause => clauseRow(clause, contractUrl)).join('') + '</tbody>').join('')
   const chips = [['all', 'All', ''], ...order.map(status => [status, word[status], glyph(status, 14)])].map(([status, label, icon]) => `<button type="button" data-status="${status}" aria-pressed="${status === 'all'}">${icon}${label} <b>${status === 'all' ? counts.total : counts[status as ClauseStatus]}</b></button>`).join('')
   const clauseCard = `<section class="card clauses" id="clauses" aria-labelledby="clauses-title"><div class="card-head"><h2 id="clauses-title">All clauses</h2>`
     + `<label class="search" hidden data-enhance><span class="vh">Find a clause</span><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg><input type="search" placeholder="Find a clause" autocomplete="off"></label></div>`
     + `<div class="chips" role="group" aria-label="Filter by status" hidden data-enhance>${chips}</div>`
     + `<p class="live" aria-live="polite" hidden data-enhance>Showing ${counts.total} of ${counts.total} clauses</p>`
-    + `<table><colgroup><col class="c-id"><col><col class="c-kind"><col class="c-status"><col class="c-ev"></colgroup><thead><tr><th scope="col">Clause</th><th scope="col">Title</th><th scope="col">Kind</th><th scope="col">Status</th><th scope="col">Evidence or gap</th></tr></thead>`
-    + `${bodies}<tbody class="empty" hidden><tr><td colspan="5"><span class="empty-text"></span> <button type="button" class="clear">Clear filters</button></td></tr></tbody></table></section>`
+    + `<table><colgroup><col class="c-id" style="width:calc(${idWidth}ch + 18px)"><col><col class="c-status"><col class="c-ev"></colgroup><thead><tr><th scope="col">Clause</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Evidence or gap</th></tr></thead>`
+    + `${bodies}<tbody class="empty" hidden><tr><td colspan="4"><span class="empty-text"></span> <button type="button" class="clear">Clear filters</button></td></tr></tbody></table></section>`
 
   const judging = `<section class="card judging" id="how-judged" aria-labelledby="judged-title"><h2 id="judged-title">How statuses are judged</h2><dl>`
     + `<div><dt class="ink-done">${glyph('done', 24)}Done</dt><dd>It ships in the default install, and a cited test or journey exercises it.</dd></div>`
