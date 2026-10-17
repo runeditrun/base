@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.51
+
+- **The Run page keeps commands clear of Copy.** Command blocks wrap beside the button while there is room and below it at narrower widths. The dev sign-in hand-off page now shows the seed’s own logo, or its product name when it declares no logo (#236).
+- **Missing scripts and mail credentials are named.** `rer run X` checks the checkout’s scripts before fetching or spawning pnpm, names a missing script and the available scripts, and exits 2. Setup and deploy dry runs list the declared mail provider’s own API key alongside `MAIL_API_KEY` and link the project’s deploy guide (#237).
+- **Commands keep the caller’s tool order and explain failures.** Rer preserves PATH order while selecting its pinned Node and pnpm explicitly. A failed command names the executable, exit code or signal, a redacted output tail, and the retained full log (#240).
+- **Deploy accepts migration history with gaps in name order.** Applied rows must each name a build migration once and match its recorded bytes, including reviewed rewrites. Rer applies the missing migrations in name order and verifies the final ledger by name and digest. Unknown names, changed bytes and unconfirmed claims remain refused. This supports HappyToHelp’s production upgrade when newer migrations sort below already applied rows (#241).
+
+- **Companion recovery checks retained paths.** A legacy recovery confirmation refuses a symlinked retained checkout before reading it. Verify now exercises the companion OS boundary on macOS while retaining portable Linux coverage (#239).
+
 ## 0.2.50
 
 - **Seeds can declare an owner sign-in route.** The delivery producer, in Base and in each seed's vendored copy, now accepts an optional `surfaces.app.signIn.ownerSignIn` path, such as `"/auth/owner-signin"`. This is the route that accepts the platform's owner sign-in grant. The platform binds `RER_PREVIEW_OWNER_SIGNIN` to the declared path, and only when a seed declares it. The path follows the same rules as `signIn.path`, and the producer still refuses unknown keys and values such as `//evil` or `https://x` (#234).
