@@ -54,7 +54,9 @@ with exit 3 and a message naming the field.
   reattach or to finish an install or setup that stopped. A second `rer dev`
   reprints the ready lines.
 - **Server limit.** Up to 10 dev or preview servers run on one computer. Set
-  `RER_SERVER_LIMIT=N` to change it.
+  `RER_SERVER_LIMIT=N` to change it. A fleet can instead set `RER_SERVER_LIMIT_FILE=PATH`,
+  a file holding the limit, read at every start and overriding `RER_SERVER_LIMIT`
+  and the limits other running servers recorded.
 - **Idle timeout.** A server stops after 12 hours (43200 seconds) without
   activity. Set `--idle-timeout SECONDS` or `RER_SERVER_IDLE_SECONDS=N` to change
   it.

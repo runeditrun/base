@@ -8,6 +8,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveServers, stopCommand } from '../registry.mjs';
+import { RerError } from '../../cli/errors.mjs';
+import { serverLimitFile } from '../../cli/server-limit-file.mjs';
 import { LaunchFailure } from './failure.mjs';
 
 export const personDefaults = { limit: 10, idleSeconds: 43200 };
@@ -44,7 +46,8 @@ export function personEnvironment(env, args, pin) {
 const listing = record => `  ${record.mode} on port ${record.port ?? '(starting)'} in ${record.checkout} (PID ${record.owner?.pid})\n    stop it with: ${stopCommand(record)}`;
 
 // Refuse in seconds, before any install or setup, when the pinned dispatcher
-// would refuse the start for the server limit. Returns this checkout's own
+// would refuse the start for the server limit. RER_SERVER_LIMIT_FILE, when set,
+// is the cap alone, as in the dispatcher's registry. Returns this checkout's own
 // running server when there is one.
 export async function checkCapacity(checkout, env, pin) {
  const running = await liveServers(env);
@@ -52,8 +55,9 @@ export async function checkCapacity(checkout, env, pin) {
  if (own) return { own };
  if (env.RER_SERVER_JOURNEY === '1') return {};
  const counted = running.filter(record => !record.journey);
- const limit = Number(env.RER_SERVER_LIMIT ?? pin.limit);
- const binding = pin.explicitOnly ? counted.filter(record => record.explicit) : counted;
+ const file = await serverLimitFile(env).catch(error => { throw error instanceof RerError ? new LaunchFailure(error.exitCode, error.message) : error; });
+ const limit = file ? file.limit : Number(env.RER_SERVER_LIMIT ?? pin.limit);
+ const binding = file ? [] : pin.explicitOnly ? counted.filter(record => record.explicit) : counted;
  const cap = Math.min(limit, ...binding.map(record => record.limit));
  if (counted.length < cap) return {};
  const holders = cap < limit ? binding.filter(record => record.limit === cap) : [];
@@ -67,6 +71,7 @@ export async function checkCapacity(checkout, env, pin) {
  throw new LaunchFailure(4, [
   `Not started: ${counted.length} dev or preview ${counted.length === 1 ? 'server is' : 'servers are'} running on this computer and the limit is ${cap}.`,
   'Running now:', ...counted.map(listing),
-  `To make room, stop one with its command above, or start this one with a higher limit, for example RER_SERVER_LIMIT=${cap * 2} rer dev.`,
+  file ? `The limit is ${cap} because ${file.path} (RER_SERVER_LIMIT_FILE) says ${cap}. To make room, stop one with its command above, or raise the number in that file.`
+   : `To make room, stop one with its command above, or start this one with a higher limit, for example RER_SERVER_LIMIT=${cap * 2} rer dev.`,
  ].join('\n'));
 }

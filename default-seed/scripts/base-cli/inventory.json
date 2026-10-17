@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.44-dev.gfa489a90",
+  "cliVersion": "0.2.44-dev.g48a25993",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -347,7 +347,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "a80f4e8f3464be09370c6cdd328deb9a46dd56cdc342b22d849c639a078b2438"
+      "sha256": "e70d5b978a32b0a84f836f753f002cbd07cc48a404ed9611d7667aa2b4b7a0b7"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -849,13 +849,17 @@
       "source": "cli/server-activity.mjs",
       "sha256": "c018244e61ad7a064a9fa8b8363ef37f2b897161c4961d016fb518f2e551912c"
     },
+    "cli/server-limit-file.mjs": {
+      "source": "cli/server-limit-file.mjs",
+      "sha256": "7bc06e994a59074b24d6479e76f137286694b180db04ec2ea04c6f78a800c99a"
+    },
     "cli/server-proxy.mjs": {
       "source": "cli/server-proxy.mjs",
       "sha256": "3593ce42e24e2e02bd85c72ae2155fc85616311bae7ba1ac68cf92f68ed3e093"
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
-      "sha256": "8c9312c86a6cd834197b9d5c3e46db7f4416b7fa1b7f5c9a4b7badec4adde617"
+      "sha256": "ac78ec2731dc13af63885eddc40e1dee703dbc3765e900a5533dac9ce1a58e1a"
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",

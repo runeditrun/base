@@ -617,7 +617,7 @@ Combined cap: 10 servers per computer by default. Set `RER_SERVER_LIMIT=N`
 precede ports/heavy work and count toward capacity. A start that sets
 `RER_SERVER_LIMIT` is capped by that value, higher or lower, whatever running
 servers recorded; a start that sets nothing is capped by the lowest limit a
-running server's person set explicitly; a recorded default never lowers the cap. At capacity refuse 4 with a plain message giving
+running server's person set explicitly; a recorded default never lowers the cap. `RER_SERVER_LIMIT_FILE`, when set, names a file holding a positive integer that is read at each start and is the cap, over `RER_SERVER_LIMIT` and every recorded limit; an unreadable file or a non-integer refuses the start naming the file. At capacity refuse 4 with a plain message giving
 the count and the limit, each running server's checkout, mode, port and exact
 stop command, and how to raise the limit; a load refusal states the load, the
 threshold and how to override it. A

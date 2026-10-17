@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **`RER_SERVER_LIMIT_FILE` sets the server limit from a file.** A start that sees it reads the positive integer in the named file and uses that as the limit, over its own `RER_SERVER_LIMIT` and over the limits running servers recorded, in both the launcher's check and the dispatcher's registry. A fleet's launcher points every run at one file, so a long-lived run that still exports an older `RER_SERVER_LIMIT` can no longer cap the rest. An unreadable file or a non-integer refuses the start naming the file; the limit refusal names it when it set the cap. Without the variable nothing changes.
+
 ## 0.2.44
 
 - **Under `rer dev`, a seed can link to another local seed over http.** The dependencies module accepts a provider address of `http://127.0.0.1`, `http://[::1]` or `http://localhost`, on any port, for the RER auth preset, but only when the app runs under `rer dev`. That lets a local Balm link to a local Auth. Every other `http` address, and every hosted deploy, still requires https (#196).
