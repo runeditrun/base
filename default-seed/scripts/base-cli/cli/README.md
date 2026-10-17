@@ -332,7 +332,9 @@ upload.
 child build environment and are redacted; the caller environment is restored
 on success and failure. `--remove`, `--set-secret` and `--unset-secret` always go
 through the owner-account controller, without invoking the application's build
-or deploy hook. Failure reports distinguish deployment, owner claim and token
+or deploy hook. `--set-secret A,B` (or the flag repeated) changes several
+secrets in one Worker version or none, after checking that each is declared
+and, when set, has its value. Failure reports distinguish deployment, owner claim and token
 retirement and preserve the environment, checkout and env-file in recovery
 commands. Retirement can be finished with `rer deploy --unset-secret SETUP_TOKEN`
 plus the same `--environment`, `--env-file` and `--cwd` arguments.

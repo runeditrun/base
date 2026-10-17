@@ -36,14 +36,16 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
    const suggestion=[...allowed].sort((a,b)=>distance(flag,a)-distance(flag,b))[0];
    throw invalid(`Unsupported flag ${/^--[a-zA-Z-]{1,40}$/.test(flag)?flag:'(invalid)'} for ${verb}.${suggestion?` Did you mean ${suggestion}?`:''} Run rer ${verb} --help.`);
   }
-  if (options.supplied.has(flag)) throw invalid(`Repeated flag ${flag} for ${verb}. Run rer ${verb} --help.`);
+  // Several secrets change in one deploy: --set-secret A --set-secret B is --set-secret A,B.
+  const listed = ['--set-secret', '--unset-secret'].includes(flag);
+  if (options.supplied.has(flag) && !listed) throw invalid(`Repeated flag ${flag} for ${verb}. Run rer ${verb} --help.`);
   options.supplied.add(flag);
   const key = flag.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
   if (booleans.has(flag)) options[key] = true;
   else {
    const value = args[++i];
    if (value === undefined || value.startsWith('--') || !value.trim()) throw invalid(`A value is required for ${flag}.`);
-   options[key] = value;
+   options[key] = listed && options[key] !== undefined ? `${options[key]},${value}` : value;
   }
  }
  if (options.help) return options;
@@ -83,7 +85,11 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if (options.target !== undefined && !['local', 'remote'].includes(options.target)) throw invalid('Target must be local or remote.');
  if (options.profile !== undefined && options.profile !== 'first-party') throw invalid('The supported explicit profile is first-party.');
  if (options.environment !== undefined && !/^[a-z][a-z0-9-]{0,39}$/.test(options.environment)) throw invalid('Provide a valid deployment environment name.');
- for (const key of ['setSecret', 'unsetSecret']) if (options[key] !== undefined && !/^[A-Z][A-Z0-9_]{0,63}$/.test(options[key])) throw invalid('Name a declared secret binding, such as SESSION_SECRET.');
+ for (const key of ['setSecret', 'unsetSecret']) if (options[key] !== undefined) {
+  const names = [...new Set(options[key].split(','))];
+  if (names.length > 16 || !names.every(name => /^[A-Z][A-Z0-9_]{0,63}$/.test(name))) throw invalid(`--${key === 'setSecret' ? '' : 'un'}set-secret names declared secret bindings, repeated or separated by commas, such as SESSION_SECRET or MAIL_API_KEY,MAIL_FROM.`);
+  options[key] = names.join(',');
+ }
  if (options.rotateSecret !== undefined && !/^[A-Z][A-Z0-9_]{0,63}(?:,[A-Z][A-Z0-9_]{0,63}){0,15}$/.test(options.rotateSecret)) throw invalid('--rotate-secret names generated secret bindings, separated by commas, such as SESSION_SECRET.');
  if(verb==='deploy'&&options.demo&&(options.site||['platform','image','bindAddress','httpPort','httpsPort','envFile','host','setSecret','unsetSecret','rotateSecret'].some(key=>options[key]!==undefined)))throw invalid('--demo takes only --environment, --dry-run and --remove --yes: the hosted demo is its own Worker on demo.<domain>.');
  if(verb==='deploy'&&options.demo&&options.remove&&(options.dryRun||!options.yes))throw invalid(options.dryRun?'Use --remove and --dry-run on separate runs.':'deploy --demo --remove deletes the hosted demo\'s Worker, its demo.<domain> Custom Domain. Add --yes to confirm.');

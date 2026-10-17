@@ -58,6 +58,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    return { dryRun: true, deployed: false };
   }
   const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
+  if (options.setSecret || options.unsetSecret) secretChangeInputs(declaration, options, env, again);
   const kept = keptSecrets(declaration, setupManifest);
   if (cloudflareCredentials.some(name => !env[name]?.trim())) throw missing(missingCredentialsMessage(declaration, env));
   const { main } = await import('../modules/deploy-kit/owner-cli.mjs');
@@ -93,10 +94,10 @@ export function ownerDeploy(declarationPath, lifecycle) {
    }
    if (change.length) {
     step = 'secrets';
-    const binding = options.setSecret ?? options.unsetSecret;
-    await owner('secret', [options.setSecret ? '--set' : '--unset', binding, ...(state ? ['--state', state] : [])]);
-    store.report(`${options.setSecret ? `Set ${binding}` : `Removed ${binding}`} on this environment's Worker, recorded its new version and verified hosted readiness.`);
-    return { binding, present: Boolean(options.setSecret), deployed: false };
+    const bindings = (options.setSecret ?? options.unsetSecret).split(','), flag = options.setSecret ? '--set' : '--unset';
+    await owner('secret', [...bindings.flatMap(binding => [flag, binding]), ...(state ? ['--state', state] : [])]);
+    store.report(`${options.setSecret ? 'Set' : 'Removed'} ${bindings.join(', ')} on this environment's Worker as one new version, recorded it and verified hosted readiness.`);
+    return { bindings, present: Boolean(options.setSecret), deployed: false };
    }
    store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
    deployed = await owner('deploy', [], env, { notice: line => store.report(line), onCreated: resource => created.push(redaction.redact(resource)) });
@@ -129,6 +130,18 @@ export function ownerDeploy(declarationPath, lifecycle) {
    throw commandFailure(failureText({ error, step, created, again, retry, secretChange: Boolean(change.length && !options.remove), deployed, redact: redaction.redact }));
   }
  }, { declaration: declarationPath, managesHostedOwner: true });
+}
+
+// Every secret named in --set-secret or --unset-secret is declared, and each one set has its
+// value, before any provider request: a group of secrets is changed whole or not at all.
+function secretChangeInputs(declaration, options, env, again) {
+ const declared = Array.isArray(declaration.secrets) ? declaration.secrets : [], flag = options.setSecret ? '--set-secret' : '--unset-secret';
+ const named = (options.setSecret ?? options.unsetSecret).split(',');
+ const undeclared = named.filter(name => !declared.some(item => item?.binding === name));
+ if (undeclared.length) throw invalid(`${flag} names ${undeclared.join(', ')}, which the deploy declaration does not list as ${undeclared.length > 1 ? 'secrets' : 'a secret'}${declared.length ? ` (it declares ${declared.map(item => item.binding).join(', ')})` : ''}. Nothing was changed.`);
+ if (!options.setSecret) return;
+ const absent = named.map(name => declared.find(item => item.binding === name).environment).filter(name => !env[name]?.trim());
+ if (absent.length) throw missing(`${flag} ${options.setSecret} needs a value for each secret; ${absent.join(', ')} ${absent.length > 1 ? 'are' : 'is'} not set. Set ${absent.length > 1 ? 'them' : 'it'} in the environment or in an --env-file file (owned, mode 0600, one line per secret), then run ${again} ${flag} ${options.setSecret} again. Nothing was changed.`);
 }
 
 // The failing step, its redacted cause, what this run created and the command that continues.
