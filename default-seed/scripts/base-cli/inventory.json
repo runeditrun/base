@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.44-dev.g622177c7",
+  "cliVersion": "0.2.44-dev.g52103539",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -173,7 +173,7 @@
     },
     "port-probe.mjs": {
       "source": "onboarding/port-probe.mjs",
-      "sha256": "505fce33f771474c2c9e1a41bd03bc0e828b97c27d1cf84eea6030bc113abb0a"
+      "sha256": "2528167e285c18179a2d8d6c7715b3c0ba03693b23dfa13ed2f3707398dda7fa"
     },
     "prefill.mjs": {
       "source": "onboarding/prefill.mjs",
@@ -193,7 +193,7 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "5ab774583c23209913d24f27a985f038bb3cbc9aef1fa34dd86dcf81545e0565"
+      "sha256": "1fbbe4868a69e5cc4eeb2b57c4a10347203812cad09762d71253a51f44801435"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
@@ -799,7 +799,7 @@
     },
     "cli/port.mjs": {
       "source": "cli/port.mjs",
-      "sha256": "b65a8de007506be8282583383f33934642ba5437a2c57c52f64c079c0b7e36d6"
+      "sha256": "0295871a1cde053267a3ef4589b2e6bebaafc6423b49032a9e80942f691ef8ae"
     },
     "cli/portability-policy.mjs": {
       "source": "cli/portability-policy.mjs",

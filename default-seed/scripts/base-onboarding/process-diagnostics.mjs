@@ -13,8 +13,9 @@ const exec=promisify(execFile);
 const lsof=process.platform==='darwin'?'/usr/sbin/lsof':'lsof';
 // One monotonic budget covers every command in an ownership decision.
 export const inspectionContext=({budgetMs=15000,...details}={})=>({deadline:performance.now()+budgetMs,budgetMs,...details});
-// A free-port search on a busy computer gets longer, still bounded: the budget
-// grows with the 1-minute load per CPU, up to four times.
+// The ownership check of one free-port candidate on a busy computer gets longer,
+// still bounded: the budget grows with the 1-minute load per CPU, up to four
+// times. The search itself is bounded by its candidate count, not by this.
 export const searchContext=(details={})=>inspectionContext({budgetMs:Math.round(15000*Math.min(4,Math.max(1,loadavg()[0]/availableParallelism()))),...details});
 export const uncheckedInspection=error=>approvedFailure(error)?.ownershipUnchecked===true;
 const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,noMatch=false,positiveResult}={})=>{
