@@ -8,17 +8,29 @@ import { transaction } from './storage.mjs';
 import { sampleResources } from './resources.mjs';
 import { execute, signalExit } from './command.mjs';
 import { stopGroup } from './processes.mjs';
+import { sharedSlots } from './slots.mjs';
 
 const WAIT_REPORT_INTERVAL_MS = 15_000;
 
 export async function createQueue(options = {}) {
   const config = await configuration(options), lifetime = await identity();
   const sampler = options.sampler ?? sampleResources;
-  let active = 0, closed = false;
-  const mutate = action => {
+  const member = { owner: lifetime.info, slots: config.slots, directory: config.directory };
+  let active = 0, closed = false, lastSlotNotice;
+  const mutate = async action => {
     if (closed) throw Error('Job queue is closed');
-    return transaction(config.directory, lifetime.info, action);
+    const result = await transaction(config.directory, lifetime.info, async state => {
+      config.slots = await sharedSlots(state, member);
+      return action(state);
+    });
+    if (config.slots !== member.slots && config.slots !== lastSlotNotice) {
+      console.error(`Job queue uses ${config.slots} slots (this client requested ${member.slots}); set "slots" in ${config.directory}/config.json to change the shared limit.`);
+      lastSlotNotice = config.slots;
+    }
+    return result;
   };
+  try { await mutate(() => {}); }
+  catch (error) { await lifetime.close(); throw error; }
   async function reclaim(state) {
     for (const key of ['queued', 'running']) {
       const kept = [];
@@ -38,7 +50,7 @@ export async function createQueue(options = {}) {
       const resources = await sampler();
       const describe = ({ command, membership, owner: { token, socket, ...owner }, ...job }) => ({ ...job, owner,
         elapsedSeconds: Math.floor((Date.now() - (job.startedAt ?? job.enqueuedAt)) / 1000) });
-      return { running: state.running.map(describe), queued: ordered(state.queued).map(describe), resources, config,
+      return { running: state.running.map(describe), queued: ordered(state.queued).map(describe), resources, config: { ...config },
         admissionReason: state.queued.length ? admissionDetails(state.running.length, config, resources)?.reason ?? 'ready' : 'queue empty' };
     });
   }
@@ -128,6 +140,9 @@ export async function createQueue(options = {}) {
   }
   return { config, run, status, drain, async close() {
     if (active) throw Error('Cannot close a queue with active jobs');
-    closed = true; await lifetime.close();
+    if (closed) return;
+    closed = true;
+    try { await transaction(config.directory, lifetime.info, state => sharedSlots(state, member, false)); }
+    finally { await lifetime.close(); }
   } };
 }
