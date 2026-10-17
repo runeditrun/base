@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.40-dev.g9b08b7b8",
+  "cliVersion": "0.2.40-dev.g002e287e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2735,7 +2735,7 @@
     },
     "scripts/publish-check/destination.py": {
       "source": "scripts/publish-check/destination.py",
-      "sha256": "3020b0d197f3e757749eccdbb1db37abf168ed7622d79bab353138d56fed5b8d"
+      "sha256": "eb72cbd9bf5f4657fc4fecb517b38e87e02b16de6eb059747288bfd98a49175f"
     },
     "scripts/publish-check/env_values.py": {
       "source": "scripts/publish-check/env_values.py",
