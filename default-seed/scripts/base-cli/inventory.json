@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.47-dev.g4689454a",
+  "cliVersion": "0.2.47-dev.g9a4ba9eb",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1263,11 +1263,11 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "4f5309c5dbb42be6f773e7574dfddff9f0755729ab24a8b3744ecd636427886f"
+      "sha256": "e38e0df243f07d685ddd8a6d132fe06d4c09b929a642e7e8c153814fbe433079"
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
-      "sha256": "0168f1b1a8f2357149a8c473215c7caaba222ec7c15b4d8dd8c5b259053cb87c"
+      "sha256": "5d87ec65986d68d87ceea5748031298755e7f52c57960bb9b990ae2569c5f19c"
     },
     "modules/demo-host/capacity.mjs": {
       "source": "modules/demo-host/capacity.mjs",
@@ -1303,7 +1303,7 @@
     },
     "modules/demo-host/native/config.mjs": {
       "source": "modules/demo-host/native/config.mjs",
-      "sha256": "152da97ca3d11bffd24ac908e185dd1e2c7d46290372a986c665a4017e501418"
+      "sha256": "1cde49856979c55b03449ae20ee4342fb97093240ac52cde4c1edb2060b8dcfb"
     },
     "modules/demo-host/native/cron.mjs": {
       "source": "modules/demo-host/native/cron.mjs",
@@ -1331,7 +1331,7 @@
     },
     "modules/demo-host/native/prepare.mjs": {
       "source": "modules/demo-host/native/prepare.mjs",
-      "sha256": "f3d2a6a7c2e12e57fd0714900746ad5e06915a9563ca614821048424be1fd869"
+      "sha256": "604c99201a9c3e4cec619d056262e0e7cc60a956dee3aebf5074769bc75d6e7e"
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
@@ -1367,7 +1367,7 @@
     },
     "modules/demo-host/native/warm.mjs": {
       "source": "modules/demo-host/native/warm.mjs",
-      "sha256": "457ab7f2faa2c63fe56adea33d10ec0cfc34250d40ed4d3e409de7b3dc157eba"
+      "sha256": "7d170bbf0a572879c233be9cc88ef5a7a193558a583a86959b331bc2fe386909"
     },
     "modules/demo-host/native/worker.mjs": {
       "source": "modules/demo-host/native/worker.mjs",

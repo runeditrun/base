@@ -2,7 +2,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { HASHED_ASSET } from './config.mjs';
+import { hashedAsset } from './config.mjs';
 
 // The start page prefetches the console's hashed JS and CSS while the visitor
 // waits for the human check and sign-in, so each view's first visit finds its
@@ -16,10 +16,22 @@ const segments = path => path.split('/').filter(Boolean);
 const dynamic = path => segments(path).filter(part => part.startsWith('$')).length;
 const within = (path, root) => path === root || path.startsWith(root.endsWith('/') ? root : root + '/');
 
+// The hashed JS and CSS the client build produced: the files its Vite manifest
+// names (build.manifest), else everything under the configured build.assetsDir
+// (Vite's default is 'assets'). Never source maps or unhashed files.
+const MANIFESTS = ['.vite/manifest.json', 'manifest.json'];
+function builtChunks(files, assetsDir) {
+  const manifest = files.find(file => MANIFESTS.includes(file.path));
+  const paths = (manifest
+    ? Object.values(JSON.parse(Buffer.from(manifest.base64, 'base64'))).flatMap(entry => [entry.file, ...(entry.css ?? [])]).map(path => '/' + path)
+    : files.map(file => '/' + file.path).filter(path => hashedAsset(assetsDir).test(path)));
+  return new Set(paths.filter(path => /-[\w-]{8,}\.(js|css)$/.test(path)));
+}
+
 // TanStack Start's route manifest from the server build: each route's CSS and
 // the chunks it preloads.
-async function startRoutes(server) {
-  const directory = join(server, 'assets');
+async function startRoutes(server, assetsDir) {
+  const directory = join(server, assetsDir);
   const file = (await readdir(directory).catch(() => [])).find(name => /^_tanstack-start-manifest_v-[\w-]+\.js$/.test(name));
   if (!file) return {};
   const { tsrStartManifest } = await import(pathToFileURL(join(directory, file)));
@@ -36,10 +48,10 @@ function routeOrder(routes, consolePath) {
 }
 
 /** The ordered, size-capped paths the start page prefetches, from dist/client's files and the server build. */
-export async function warmList(files, server, consolePath = '/app') {
-  const sizes = new Map(files.map(file => ['/' + file.path, file]).filter(([path]) => HASHED_ASSET.test(path) && /\.(js|css)$/.test(path))
-    .map(([path, file]) => [path, gzipSync(Buffer.from(file.base64, 'base64')).length]));
-  const routes = await startRoutes(server);
+export async function warmList(files, server, consolePath = '/app', assetsDir = 'assets') {
+  const chunks = builtChunks(files, assetsDir);
+  const sizes = new Map(files.filter(file => chunks.has('/' + file.path)).map(file => ['/' + file.path, gzipSync(Buffer.from(file.base64, 'base64')).length]));
+  const routes = await startRoutes(server, assetsDir);
   const ordered = new Set();
   for (const id of routeOrder(routes, consolePath)) for (const path of [...(routes[id].css ?? []), ...(routes[id].preloads ?? [])]) if (sizes.has(path)) ordered.add(path);
   for (const path of [...sizes.keys()].sort((a, b) => sizes.get(a) - sizes.get(b))) ordered.add(path);
