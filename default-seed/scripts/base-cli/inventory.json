@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.46-dev.g609b55db",
+  "cliVersion": "0.2.46-dev.gf633b18a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -157,7 +157,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "50f31eb8aebd3dc11e38119791230112f565de6cd77f7b32040b2a4f478bfb0b"
+      "sha256": "ca8ca54a856c8466d27f0a7dcc8838e5b15b42010823c30695c5b2a6e4c7f75e"
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
@@ -237,7 +237,7 @@
     },
     "queue.mjs": {
       "source": "onboarding/queue.mjs",
-      "sha256": "512262dab5f7294ccef686289045a11e69ebeb222bb7712803108645b42042b7"
+      "sha256": "0d4bd9b8488b210b8b66cdee5ce7ea3c93ee0cb1ea2fa9bd6cd807d735370acf"
     },
     "queued-entry.mjs": {
       "source": "onboarding/queued-entry.mjs",

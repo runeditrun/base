@@ -1,6 +1,7 @@
 // rer run SCRIPT [ARGS]: `pnpm run SCRIPT ARGS` in a checkout, with the pnpm
 // and Node it pins. rer keeps both in its own cache, off PATH, so a project's
 // documented `pnpm run ...` works as `rer run ...` right after rer install.
+// --silent drops pnpm's "> package@version script" banner; the script's own output and errors stay.
 // A script that runs Playwright gets the checkout's browser first, on first need.
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -52,7 +53,7 @@ export async function runScript(args) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, ['run']);
   if (code !== undefined) return code;
  }
- const child = spawn('pnpm', ['run', ...args], { cwd: target.root, env: process.env, stdio: 'inherit' });
+ const child = spawn('pnpm', ['run', '--silent', ...args], { cwd: target.root, env: process.env, stdio: 'inherit' });
  const forward = new Map(['SIGINT', 'SIGTERM', 'SIGHUP'].map(signal => [signal, () => child.kill(signal)]));
  for (const [signal, handler] of forward) process.on(signal, handler);
  try {
