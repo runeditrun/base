@@ -415,7 +415,8 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     return result;
   }};
   const receipt = await deploy({api:observed, plan, artifact, artifactSha256:hash(artifact), previousReceipt:state.receipt ?? undefined,
-    createResources:false, uploadWithoutReceipt:true, env, fetch, healthOptions, readiness, declaredSecrets,
+    // Migrations run inside this run's state lock: no other deploy of this install is running.
+    createResources:false, uploadWithoutReceipt:true, locked:true, env, fetch, healthOptions, readiness, declaredSecrets,
     onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; delete state.pendingSecret; await save(); } },
     // Keep each first-health attempt beside the identity it belongs to.
     onHealth: async candidate => { if (candidate.changed) { state.receipt = candidate; await save(); } }});

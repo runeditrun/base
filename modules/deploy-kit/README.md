@@ -203,7 +203,7 @@ No Single Redirect (dynamic redirect ruleset) permission is needed. Base's refer
 
 SQL files have ordered unique names and SHA-256 identities. `d1_migrations` holds controller history with ordered IDs, names, timestamps, SHA-256 hashes and states. Native archives already exclude this installation table. Standard Wrangler name-only inserts remain possible, but their missing hashes/states block subsequent Base deployment pending reviewed adoption. Applied entries must be an unchanged prefix of the desired set. A new migration gets an `applying` claim before its SQL and completion marker are submitted together through the [Cloudflare D1 SQL import API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/import/), using the same whole-file protocol as Wrangler to preserve compound trigger bodies and atomic SQL/completion. Uploads use bounded HTTPS R2 destinations, without account credentials; polling is bounded and signed URLs are never diagnostic output. A failed import keeps Cloudflare's own codes and messages on the error (`providerRefusal`, which `rer deploy` prints, with credentials and URLs removed and each message cut to 300 characters) and names the migration it was running.
 
-An import that did not complete leaves its `applying` claim. The next deploy of the same migration bytes runs it again only when it proves none of it applied (`migration-retry.mjs`): the import is atomic, so the migration's effects that would make a second run fail (a CREATE without IF NOT EXISTS, ADD COLUMN, RENAME) and that last to the end of the file must all be absent. Then no attempt committed, and one that commits late makes the re-run fail whole instead of applying twice. A migration with no such effect, or with any of them present, stays refused as `uncertain-migration-claim`; the message names the migration, what is present, and the exact step: undo what is present and deploy again, or confirm by hand and delete or complete its claim with `wrangler d1 execute`. The kit never re-runs a migration whose effects may be present, rolls back user data, or marks an unknown outcome successful. Any other unconfirmed or changed history is still `changed-or-uncertain-migration-history`. Readback checks every final identity.
+An import that did not complete leaves its `applying` claim. The next deploy of the same migration bytes runs it again only when it proves none of it applied (`migration-retry.mjs`): the import is atomic, so the migration's effects that would make a second run fail (a CREATE without IF NOT EXISTS, ADD COLUMN, RENAME) and that last to the end of the file must all be absent. Then no attempt committed, and one that commits late makes the re-run fail whole instead of applying twice. A name the file drops or renames away existed before it ran, so a table it rebuilds under the same name, and that table's indexes, are not checked. A migration with no such effect, or with any of them present, stays refused as `uncertain-migration-claim`; the message names the migration, what is present, and the exact step: undo what is present and deploy again, or confirm by hand and delete or complete its claim with `wrangler d1 execute`. The kit never re-runs a migration whose effects may be present, rolls back user data, or marks an unknown outcome successful. Any other unconfirmed or changed history is still `changed-or-uncertain-migration-history`. Readback checks every final identity.
 
 A seed that had to rewrite a migration it already released declares the rewrite
 in `migrations/rewrites.json`: `{ "version": 1, "rewrites": [{ "migration":
@@ -215,6 +215,20 @@ released bytes. The record is refused unless `reviewed` is `true`, it names a
 migration in the set, and `to` is that migration's current bytes; every other
 change to applied history is still refused. Keep the record for as long as any
 installation may hold the released digest.
+
+An `applying` claim on `from`, left when D1 rolled back an import of the released
+bytes, is retried with the current bytes by `rer deploy`, which runs migrations
+inside its `<state file>.lock` (One run at a time), so no other deploy of that
+install is running. The same proof as above must hold for the current bytes, and the
+completion marker moves the claim to the current digest only as that import
+commits. The deploy prints `Migrations: retried <name>: the earlier attempt was
+rolled back (D1 <database>).` A caller without that lock keeps the refusal. An
+`applying` claim on any other bytes stays `changed-or-uncertain-migration-history`,
+and the message gives the `wrangler d1 execute ... DELETE FROM d1_migrations WHERE
+name=... AND sha256=... AND state='applying'` command with the database and
+migration filled in. It is safe once that attempt has ended and no other deploy of
+the environment is running: the claim and the migration commit together, so a claim
+still `applying` means none of it applied.
 
 Completion preserves the original SQL bytes and always starts on a new line.
 Comment-only migrations are rejected before any provider request or ledger claim.

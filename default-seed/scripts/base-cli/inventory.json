@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.44-dev.g48a25993",
+  "cliVersion": "0.2.44-dev.g6b36eade",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -643,7 +643,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "10efd3a4c085af44d0c2b2edf7674af06dce0e8b0c56acd4800e7067dbe8a3f8"
+      "sha256": "e3c1763e3f17d256b61c3f509be797794e0ce629fdec73bff93961c252a73d56"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -1423,7 +1423,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "52f0c6f3cdcc1ab13d393b44c990b5c04c0e0cb748d37f995d0f87f9589c363d"
+      "sha256": "c304de22cad7a43cbc5dde525cd11f5b8ac6abbb125693ab5d9e77f180aa7916"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1459,11 +1459,11 @@
     },
     "modules/deploy-kit/deploy.mjs": {
       "source": "modules/deploy-kit/deploy.mjs",
-      "sha256": "38f010f246200760c820c11b3c8a676b4c11dd51ed1ab84539ae934474dbc4ae"
+      "sha256": "b820eb83043ac998b2121c5051b469c9ff1d6ab1baf2f4c6adb621788b6bac68"
     },
     "modules/deploy-kit/diagnostics.mjs": {
       "source": "modules/deploy-kit/diagnostics.mjs",
-      "sha256": "067f6db3a2528b75748fc7498727ea08920d22647db1081cc9b8f287100ca04c"
+      "sha256": "383f33fa4532c12c5e6415e7f59f21d05e3c1648786446c71d04ced4f155d872"
     },
     "modules/deploy-kit/env-file.mjs": {
       "source": "modules/deploy-kit/env-file.mjs",
@@ -1487,19 +1487,19 @@
     },
     "modules/deploy-kit/migration-ledger.mjs": {
       "source": "modules/deploy-kit/migration-ledger.mjs",
-      "sha256": "cfeeafdea124fa0b1a7172c7509e3a6eceabf8127cb222ac9fa345e4399b4a45"
+      "sha256": "935be7dee1ce802d8bd3059b06ffaa7751213876039f387cdf8fa44b4ea699ba"
     },
     "modules/deploy-kit/migration-retry.mjs": {
       "source": "modules/deploy-kit/migration-retry.mjs",
-      "sha256": "e3ab84dec298aa49a15f1096f5b2a2680e848c7f4e1e077bf822fb988d863e29"
+      "sha256": "ae0537b0c1872241f3cb79101a65d961999b40679e9663f2c0c21ec5d0495047"
     },
     "modules/deploy-kit/migrations.mjs": {
       "source": "modules/deploy-kit/migrations.mjs",
-      "sha256": "b939e8c38fa3278ff25e0ef265d104a7a5054acd5ddea7ee7eb5569a1ad3023c"
+      "sha256": "b2e5ce514b770a9898a9226b024e0fbb710d4d380b3c4ee6a0d53e3d8ad6e914"
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "344049d41d92bf00cb8b7659340322b85027e19a4cc6ad212f4bc2158f4d81be"
+      "sha256": "f9547d21556222ed12687a69cea0103edcab069f1eaecdad561a824a93ec8f9f"
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
@@ -1523,7 +1523,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "e6d3d4cee9f9c9073c3d526deb3dfb87f0792a04d9ed966133f797b5b6e795c1"
+      "sha256": "d9c8c4f359bb0c22919ff82a9f6c9ddcbbb8c20b777607987e286c0093d78d50"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
