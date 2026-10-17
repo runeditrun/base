@@ -2715,7 +2715,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "ec4ee0717d14455d10f9db6a99c0edf8812ba22a4474aecf69e2f2e1bb080eb7"
+      "sha256": "b4f11bb7319db8915bd1a812e9a13b0db1ea0dd32495b42aba18281927e397bf"
     },
     "scripts/publish-check/c2pa.py": {
       "source": "scripts/publish-check/c2pa.py",
@@ -2775,7 +2775,7 @@
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
-      "sha256": "4aac2eab5789f7a3bb190550b788903316775217699a5838582e9c1ff0adbb90"
+      "sha256": "2bcc18b36162af8e29ef463704b2cbf85147286eeecf86f8c909c24a9c0adee7"
     },
     "scripts/publish-check/gitleaks.py": {
       "source": "scripts/publish-check/gitleaks.py",
@@ -2787,7 +2787,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "ab84993ab7159b8728212d51d02bf5c538f24c752d9ccabbf7eb23a637c58bfd"
+      "sha256": "77805885f571f2f7972bb925391881e7855feb8ab053efd7eac574377b15be57"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",
@@ -2847,7 +2847,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "81a974d75511ac29fc396a0296416668327b9d55693b90a76fa399daf822bad4"
+      "sha256": "985cbf70e00667c744fce9b75496d8fda95d59f29f33e774332ad579d7826347"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",
@@ -2883,7 +2883,7 @@
     },
     "scripts/publish-check/tree_scan.py": {
       "source": "scripts/publish-check/tree_scan.py",
-      "sha256": "5ddfadbc73ab9257faafc72f1fbe421d4fd2795b2a2862cbab69baa26670c97e"
+      "sha256": "a7487424894ab1bc5753040c5533c3036e1c46869eb1bc2e3fd6fab9d0a74743"
     },
     "scripts/publish-check/trust_bundle.py": {
       "source": "scripts/publish-check/trust_bundle.py",

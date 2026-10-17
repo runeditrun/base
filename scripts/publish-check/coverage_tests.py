@@ -6,8 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
-from test_repo import ROOT, RepositoryFixture, LICENSE, generic_credential
+from test_repo import ROOT, RepositoryFixture, resolving, LICENSE, generic_credential
 
 
 class HygieneTests(RepositoryFixture, unittest.TestCase):
@@ -125,7 +124,7 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
             'roots release the Cargo.lock does not lock': ('tls/egress.wasm', lambda: self.write(
                 'tls/trust-bundle.json', json.dumps(dict(manifest, roots=dict(manifest['roots'], version='1.0.8'))))),
         }
-        with patch('github_refs.GitHubResolver.resolve', return_value='public'):
+        with resolving('public'):
             self.assertEqual(self.report()['status'], 'PASS')
             for case, (path, plant) in cases.items():
                 with self.subTest(case=case):
@@ -139,19 +138,19 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         self.deleted('notes.txt', '\n'.join(['/' + 'home/person/code', '/' + 'Users/person/code', 'C:' + '\\Users\\person\\code']), 'hygiene.local-path')
 
     def test_private_repository_in_history(self):
-        with patch('github_refs.GitHubResolver.resolve', return_value='private'):
+        with resolving('private'):
             self.deleted('source.txt', 'https://github.com/' + 'owner/private-app', 'hygiene.github-private')
 
     def test_missing_reference(self):
-        with patch('github_refs.GitHubResolver.resolve', return_value='missing'):
+        with resolving('missing'):
             self.deleted('source.txt', 'https://github.com/' + 'owner/absent-app', 'hygiene.github-missing')
 
     def test_archive_path_in_code_span_is_not_a_repository(self):
         self.write('GUIDE.md', 'Save archives at `exports/x.rer`.')
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', return_value='missing') as resolver:
+        with resolving('missing') as asked:
             self.assertEqual(self.report()['status'], 'PASS')
-            resolver.assert_not_called()
+            self.assertEqual(asked, set())
             self.write('GUIDE.md', 'Save archives at `exports/x.rer`. Clone `owner/absent-app` first.')
             self.commit()
             report = self.report()
@@ -160,9 +159,9 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
     def test_local_directory_in_code_span_is_a_path_but_a_real_repository_is_not(self):
         self.write('GUIDE.md', '`rer deploy` uploads `dist/client` and reads `src/base/x.ts`, `docs/a` and `scripts/b`.')
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', return_value='missing') as resolver:
+        with resolving('missing') as asked:
             self.assertEqual(self.report()['status'], 'PASS')
-            resolver.assert_not_called()
+            self.assertEqual(asked, set())
             self.write('GUIDE.md', 'Uploads `dist/client`. Clone `acme-org/real-app` first.')
             self.write('PROSE.md', 'Fork from github: acme-org/other-app, then build.')
             self.commit()
@@ -176,15 +175,15 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         self.assertTrue(intended)
         self.write('source.txt', '\n'.join('https://github.com/' + repo for repo in intended))
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', return_value='missing') as resolver:
+        with resolving('missing') as asked:
             self.assertEqual(self.report()['status'], 'PASS')
-            resolver.assert_not_called()
+            self.assertEqual(asked, set())
         owner = intended[0].split('/')[0]
         private, missing = owner + '/unlisted-private-fixture', owner + '/unlisted-missing-fixture'
         self.write('private.txt', 'https://github.com/' + private)
         self.write('missing.txt', 'https://github.com/' + missing)
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', side_effect=lambda repo: 'private' if repo == private else 'missing'):
+        with resolving(lambda repo: 'private' if repo == private else 'missing'):
             report = self.report()
         self.assertEqual(report['status'], 'FAIL')
         self.assertEqual({(finding['path'], finding['rule']) for finding in report['findings']},
@@ -193,7 +192,7 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
     def test_unresolved_reference_is_incomplete(self):
         self.write('source.txt', 'https://github.com/' + 'owner/app')
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', return_value='incomplete'):
+        with resolving('incomplete'):
             self.assertEqual(self.report()['status'], 'INCOMPLETE')
 
     def test_declared_public_email(self):
@@ -216,7 +215,7 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
             files={'copied.txt': hashlib.sha256(b'Source content\n').hexdigest()}, modes={'copied.txt': '100644'})])
         self.write('copies.json', json.dumps(record))
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', return_value='private'):
+        with resolving('private'):
             report = self.report()
             self.assertEqual(report['status'], 'PASS')
             self.assertTrue(any(item['path'] == 'copies.json' and item['rule'] == 'provenance.declared-source' for item in report['info']))

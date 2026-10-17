@@ -37,15 +37,16 @@ def context(history, commit, config):
             'trustBundles': trust}, invalid
 
 
-def text_rules(data, path, config, resolver, env_hashes, *, commit_message=False):
-    rules, provenance = inspect(data, path, config, resolver, commit_message=commit_message)
-    path_rules, _ = inspect(path.encode('utf-8', 'surrogateescape'), '@path', config, resolver)
+def text_rules(data, path, config, env_hashes, *, commit_message=False):
+    """Rules, provenance and the repository references whose rules wait for one bulk resolution."""
+    rules, provenance, references = inspect(data, path, config, commit_message=commit_message)
+    path_rules, _, path_references = inspect(path.encode('utf-8', 'surrogateescape'), '@path', config)
     rules.update(path_rules)
     if env_hashes and (environment_match(data, env_hashes) or environment_match(path.encode(), env_hashes)):
         rules.add('secret.env-match')
     if data.startswith(b'version https://git-lfs.github.com/spec/v1'):
         rules.add('scan.lfs-uninspected')
-    return rules, provenance
+    return rules, provenance, references | path_references
 
 
 def working_files(repo):
