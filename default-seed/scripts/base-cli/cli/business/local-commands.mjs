@@ -4,7 +4,7 @@ import { loadState, saveState, stateDirectory, credentialHandle } from './state.
 import { createCredentialStore, readSecret } from './keychain.mjs';
 import { removeService, serviceStatus } from './service.mjs';
 import { removePermissions } from './permissions.mjs';
-import { pause } from './api.mjs';
+import { Api, pause } from './api.mjs';
 import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
 
@@ -50,6 +50,15 @@ async function stopSupervisor(directory) {
 
 export async function disconnect() {
  const state = await loadState(), directory = stateDirectory();
+ if (state?.origin) {
+  const credential = await createCredentialStore().get(credentialHandle(state.origin));
+  if (credential) {
+   try {
+    const result = await new Api(state.origin, credential).delete('/api/business/executors/self');
+    if (result?.revoked !== true) throw Error('Business server did not confirm revocation. Local credentials were kept; retry disconnect.');
+   } catch (error) { if (error.status !== 401) throw error; }
+  }
+ }
  await removeService();
  await stopSupervisor(directory);
  await removePermissions();
@@ -61,7 +70,7 @@ export async function disconnect() {
  await rm(directory, { recursive: true, force: true });
  // Remove only an empty parent; other rer commands may own it.
  await rmdir(dirname(directory)).catch(error => { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; });
- process.stdout.write('Business disconnected. Local service, credentials and added permissions removed.\n');
+ process.stdout.write('Business disconnected. Device revoked; local service, credentials and added permissions removed.\n');
 }
 
 export async function status({ json = false } = {}) {

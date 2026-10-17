@@ -62,7 +62,7 @@ export class Lease {
   clearInterval(this.timer);
   await this.tail;
   if (!this.bearer) await this.token();
-  return this.post(taskPath(this.claim.task.id, 'release'), { reason, checkpoint: this.checkpoint }, { releasing: true });
+  return this.post(taskPath(this.claim.task.id, 'release'), { reason, checkpoint: { ...this.checkpoint, ...(reason === 'failed' ? { status: 'failed' } : {}) } }, { releasing: true });
  }
  async close() { clearInterval(this.timer); clearInterval(this.deadline); await this.tail; }
 }
