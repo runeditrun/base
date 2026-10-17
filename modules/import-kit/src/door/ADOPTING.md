@@ -8,8 +8,9 @@ Owner history and undo must include jobs from either authority.
 
 ## Add to the seed
 
-1. **Schema and copies.** Vendor `modules/import-kit/src` and its sibling
-   `modules/d1-transport` with relative paths intact; record copies using the
+1. **Schema and copies.** Vendor `modules/import-kit/src`, its schema JSON in
+   `modules/import-kit/schema`, and sibling `modules/d1-transport` with relative
+   paths intact; record copies using the
    seed's existing Base provenance workflow. Install the D1 kit schemas from
    `modules/import-kit/src/d1/database.ts` (`d1Schema` and the additional
    schemas used by `initializeD1ImportStorage`) and applicable evolutions, then
@@ -88,7 +89,8 @@ and `context.ts`; settings/history in `business-routes.ts` and
 `tests/archive.mjs`. These paths are in Spool. Its Sentry parser and adapter are
 reused, imports remain historical, and project erasure withdraws duplicate door
 custody. That PR still keeps `/api/imports/sentry`: finishing single-path adoption
-requires replacing that caller with the operator mount and deleting that route.
+requires replacing that caller with the operator mount and deleting the old
+HTTP importer in `src/domain/sentry-import/routes.ts`.
 Do not copy its older vendored door instead of current Base.
 
 ## Copyable public HTTP conformance
