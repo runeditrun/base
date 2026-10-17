@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.40
+
+- **The /contract clause table keeps clause IDs whole.** A clause ID or kind never breaks across lines. The ID column is sized from the longest clause ID in the contract, so a long ID like `DEPENDENCY-001` fits on one line. Titles wrap only between words, and only evidence paths and gap text may break inside a word. The kind now sits under the clause ID instead of in a column of its own.
+- **The /contract page is denser and easier to scan.** Rows are tighter. The split by kind fits on one line on a desktop and shows one count per line on a phone. On a phone, clause cards use the full width. When the sticky "Progress by area" card holds more than fits, a shadow at its edge shows there is more to scroll.
+- These changes are to `contract-page.ts` and `contract-style.ts`, which a seed carries in `src/base` from Base. A seed's site entry needs no change.
+
 ## 0.2.39
 
 - **A seed's CONTRACT.md is parsed and checked.** `rer check` and `rer build --site` now parse a seed's CONTRACT.md with one parser: its clauses, the `## Status` table (judged-at line, header, one row per defined clause, kind, status, evidence and gap), the summary counts and the Product target. Clause IDs follow one rule, shared with the release catalogue: `AREA-NN(N)`, or the legacy `A1` form. `rer check` reports each problem as a failing `CONTRACT.status` clause naming the line, and reports each cited evidence path missing from the checkout as `CONTRACT.evidence.<ID>`.
