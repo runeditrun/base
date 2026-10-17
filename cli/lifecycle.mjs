@@ -167,7 +167,8 @@ async function runLifecycle(project, options, out, deployRedaction) {
    try { await close(); } catch (error) { unclosed.push(store?.redact?.(String(error?.message)) ?? 'unknown cause'); }
   }
   if (unclosed.length && !failed) out.progress(`Local cleanup could not confirm that every helper process stopped (${unclosed.join('; ')}). The ${options.verb} itself finished.\n`);
-  if (temporary) await rm(temporary, { recursive: true, force: true });
+  // A failed independent command's diagnostic points here for its full output.
+  if (temporary && !failed) await rm(temporary, { recursive: true, force: true });
   for (const [name, handler] of handlers) process.removeListener(name, handler);
   if (termination) throw new RerError('cancelled', `Stopped by ${termination} after owned children were stopped.`, termination === 'SIGINT' ? 130 : 143);
  }

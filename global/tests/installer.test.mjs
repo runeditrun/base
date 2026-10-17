@@ -77,10 +77,19 @@ test('install.sh and rer update install verified registry releases, the Run page
  // The Run page's step 2 runs on what install.sh put on PATH and nothing else:
  // no npx and no Node on PATH. The private Node install.sh downloads when there
  // is none stands in as its runtime link.
- const commands = await runPageCommands(), installLine = commands.findIndex(command => /\| *sh$/.test(command));
- assert.ok(installLine >= 0 && commands.length > installLine + 1, `the Run page installs rer, then starts the seed: ${commands.join(' / ')}`);
  const runtime = join(home, '.local/share/rer/node'), installedOnly = { ...env, PATH: join(home, '.local/bin') };
  await symlink(dirname(dirname(process.execPath)), runtime);
+ // The managed launcher uses its private Node without making that Node's
+ // sibling tools replace tools already selected by the caller.
+ await writeFile(join(bin, 'npm'), '#!/bin/sh\nprintf "caller-npm\\n"\n', { mode: 0o755 });
+ const checkTool = `import { execFileSync } from 'node:child_process';
+if (execFileSync('npm', [], { env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8' }).trim() !== 'caller-npm') throw Error('caller npm was shadowed');`;
+ const callerTools = { ...env, NODE_OPTIONS: `--import=data:text/javascript,${encodeURIComponent(checkTool)}` };
+ const managed = await run(rer, ['--version'], callerTools);
+ assert.equal(managed.code, 0, managed.stderr);
+ await rm(join(bin, 'npm'));
+ const commands = await runPageCommands(), installLine = commands.findIndex(command => /\| *sh$/.test(command));
+ assert.ok(installLine >= 0 && commands.length > installLine + 1, `the Run page installs rer, then starts the seed: ${commands.join(' / ')}`);
  for (const command of commands.slice(installLine + 1)) {
   const program = command.split(/\s+/)[0], found = await run('/bin/sh', ['-c', `command -v '${program}'`], installedOnly);
   assert.equal(found.code, 0, `${program} (from "${command}") is not on the PATH install.sh gives`);

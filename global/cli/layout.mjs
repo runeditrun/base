@@ -22,14 +22,17 @@ ${marker}
 # It uses the installer's private Node when present, otherwise Node on PATH.
 root=${quote(data)}
 if [ -x "$root/node/bin/node" ]; then
- PATH="$root/node/bin:$PATH"
+ node="$root/node/bin/node"
+ PATH="$PATH:$root/node/bin"
  export PATH
+else
+ node=$(command -v node) || node=
 fi
-if ! command -v node >/dev/null 2>&1; then
+if [ -z "$node" ]; then
  echo "rer: Node is missing. Run: curl -fsSL https://runeditrun.com/install.sh | sh" >&2
  exit 127
 fi
-exec node "$root/current/global/rer.mjs" "$@"
+exec "$node" "$root/current/global/rer.mjs" "$@"
 `;
 }
 

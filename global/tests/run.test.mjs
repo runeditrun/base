@@ -50,6 +50,15 @@ globalThis.fetch = async url => new Response(String(url).endsWith('.tgz') ? read
  assert.match(result.stdout, new RegExp(`exported to ${checkout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} with -- --remote --out x`));
  assert.doesNotMatch(result.stdout, /^> /m, 'no pnpm banner naming the package');
  await access(join(home, '.rer/pnpm', `pnpm-${pin}`));
+ // A different pnpm earlier on the caller's PATH must not replace the pin,
+ // while tools that the package script runs keep the caller's ordering.
+ await writeFile(join(bin, 'pnpm'), '#!/bin/sh\nif [ "$1" = --version ]; then echo 1.0.0; else exit 91; fi\n', { mode: 0o755 });
+ await writeFile(join(bin, 'npm'), '#!/bin/sh\necho caller-tool-ran\n', { mode: 0o755 });
+ await writeFile(join(checkout, 'package.json'), JSON.stringify({ packageManager: `pnpm@${pin}`, scripts: { check: 'npm' } }));
+ const callerPath = await run(process.execPath, [rer, 'run', 'check'], { cwd: checkout, env });
+ assert.equal(callerPath.code, 0, callerPath.stderr);
+ assert.match(callerPath.stdout, /caller-tool-ran/);
+
  const outside = await run(process.execPath, [rer, 'run', 'export:data'], { cwd: directory, env });
  assert.equal(outside.code, 2, 'outside a checkout it names where it runs');
 });

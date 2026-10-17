@@ -58,10 +58,9 @@ async function ensure(root, { env = process.env, signal, report = () => {}, stor
    throw missing(`pnpm ${pin} could not be fetched (${error.message}). Retry with a working connection, or run in this shell: npm install --prefix ${shellQuote(prefix)} --no-save pnpm@${pin} && export PATH=${shellQuote(join(prefix, 'node_modules/.bin'))}:"$PATH"`);
   }
  }
- // Select the verified pnpm before any tool beside Node. Its shim still finds
- // this process's Node before the caller's PATH, but cannot be shadowed by a
- // different pnpm installed in that Node's bin directory.
- const supplied = { ...env, PATH: [directory, dirname(process.execPath), env.PATH].filter(Boolean).join(delimiter) };
+ // The runner invokes this verified entry with its exact Node. Added tool
+ // directories remain after the caller's tools, including their Git.
+ const supplied = { ...env, RER_PNPM_ENTRY: join(directory, '..', 'bin', 'pnpm.cjs'), PATH: [env.PATH, directory, dirname(process.execPath)].filter(value => value !== undefined).join(delimiter) };
  // A fresh pnpm's first run can stall or fail once (a cold start on a busy
  // machine): the check settles with a bounded retry, then names what failed.
  let result;

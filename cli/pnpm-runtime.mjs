@@ -85,8 +85,7 @@ export async function downloadPnpm(version, cancellation, { registry = 'https://
   const extracted = join(temporary, 'package');
   if (JSON.parse(await readFile(join(extracted, 'package.json'), 'utf8')).version !== version) throw Error('Verified pnpm release did not name the project pin.');
   await mkdir(join(extracted, 'shim'), { mode: 0o700 });
-  // `node` is rer's own: the command puts its Node first on PATH beside this.
-  await writeFile(join(extracted, 'shim', 'pnpm'), `#!/bin/sh\nexec node ${shellQuote(entry(version, env))} "$@"\n`, { mode: 0o700 });
+  await writeFile(join(extracted, 'shim', 'pnpm'), `#!/bin/sh\nexec ${shellQuote(process.execPath)} ${shellQuote(entry(version, env))} "$@"\n`, { mode: 0o700 });
   await writeFile(join(extracted, '.rer-verified.json'), JSON.stringify({ version, integrity, entrySha256: await digest(join(extracted, 'bin', 'pnpm.cjs'), 'sha256', 'hex') }) + '\n', { flag: 'wx', mode: 0o600 });
   await chmod(extracted, 0o700);
   try { await rename(extracted, directoryOf(version, env)); }

@@ -43,14 +43,15 @@ main() {
  trap 'exit 130' INT TERM
 
  # Bootstrap before reading npm metadata; no npm global install or PATH links.
- if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+ node_binary=$(command -v node) || node_binary=
+ if [ -z "$node_binary" ] || ! "$node_binary" -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
   install_node
  fi
 
  curl -fsSL --proto '=http,https' -H 'Accept: application/json' "$registry/@runeditrun%2frer" -o "$work/metadata.json" \
   || fail "could not read $package from $registry."
  # Writes version, tarball URL, integrity, file count and unpacked size, one per line.
- node - "$work/metadata.json" "${RER_VERSION:-}" >"$work/release" <<'NODE' || exit 1
+ "$node_binary" - "$work/metadata.json" "${RER_VERSION:-}" >"$work/release" <<'NODE' || exit 1
 var fs = require('fs');
 var wanted = process.argv[3];
 function stop(message) { process.stderr.write('rer install: ' + message + '\n'); process.exit(1); }
@@ -75,7 +76,7 @@ NODE
  printf 'Downloading rer %s from %s\n' "$version" "$registry"
  curl -fsSL --proto '=http,https' "$tarball" -o "$work/rer.tgz" || fail "could not download $tarball."
  # The exact bytes the registry names, and nothing tar could write outside its folder.
- node - "$work/rer.tgz" "$integrity" "$files" "$size" <<'NODE' || fail "the download of rer $version was refused; nothing was installed."
+ "$node_binary" - "$work/rer.tgz" "$integrity" "$files" "$size" <<'NODE' || fail "the download of rer $version was refused; nothing was installed."
 var fs = require('fs'), hashes = require('crypto'), zlib = require('zlib');
 function stop(message) { process.stderr.write('rer install: ' + message + '\n'); process.exit(1); }
 var bytes = fs.readFileSync(process.argv[2]);
@@ -144,10 +145,10 @@ NODE
  # the exact line that puts it there (no npx: Node may be rer's own).
  no_next=
  if [ "$#" -gt 0 ]; then no_next=1; fi
- RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next node "$work/stage/package/global/rer.mjs" cli install </dev/null \
+ RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
  if [ "$#" -eq 0 ]; then return; fi
- PATH="$HOME/.local/bin:$PATH"
+ PATH="$PATH:$HOME/.local/bin"
  export PATH
  "$HOME/.local/bin/rer" "$@"
 }
@@ -196,7 +197,8 @@ try {
  fs.renameSync(temporary, path.join(root, 'node'));
 } finally { try { fs.unlinkSync(temporary); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
 NODE
- PATH="$node_home/bin:$PATH"
+ node_binary="$node_home/bin/node"
+ PATH="$PATH:$node_home/bin"
  export PATH
 }
 

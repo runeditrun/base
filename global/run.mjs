@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { constants } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { locate } from './checkout.mjs';
+import { shared } from '../cli/shared.mjs';
 
 export const runUsage = `Usage: rer run [--cwd DIR] [SCRIPT [ARGS...]]
 Runs a package.json script of this checkout as pnpm run SCRIPT ARGS would, with the
@@ -25,7 +26,8 @@ async function projectNode(root, env) {
  let binary = await installedRuntime(version);
  try { binary ??= await downloadRuntime(version); }
  catch (error) { if (error instanceof RerError) throw error; throw missing(`This project pins Node ${version}, which could not be fetched (${error.message}). Retry with a working connection, or set RER_NODE_AUTO=0 to use Node ${process.versions.node}.`); }
- env.PATH = [dirname(binary), env.PATH].filter(Boolean).join(delimiter);
+ env.RER_NODE_BINARY = binary;
+ env.PATH = [env.PATH, dirname(binary)].filter(value => value !== undefined).join(delimiter);
 }
 
 export async function runScript(args) {
@@ -53,7 +55,9 @@ export async function runScript(args) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, ['run']);
   if (code !== undefined) return code;
  }
- const child = spawn('pnpm', ['run', '--silent', ...args], { cwd: target.root, env: process.env, stdio: 'inherit' });
+ const { toolCommand } = await shared('tool-command.mjs');
+ const [program, parameters] = toolCommand('pnpm', ['run', '--silent', ...args], process.env);
+ const child = spawn(program, parameters, { cwd: target.root, env: process.env, stdio: 'inherit' });
  const forward = new Map(['SIGINT', 'SIGTERM', 'SIGHUP'].map(signal => [signal, () => child.kill(signal)]));
  for (const [signal, handler] of forward) process.on(signal, handler);
  try {
