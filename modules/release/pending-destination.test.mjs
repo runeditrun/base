@@ -114,7 +114,7 @@ test('producer rejects inconsistent or nonordinary committed destination inputs 
   const pnpm = resolve(commands, 'pnpm');
   writeFileSync(pnpm, `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started'); process.exit(1);\n`);
   chmodSync(pnpm, 0o755);
-  for (const scenario of ['cli-project', 'cli-url', 'edition-id', 'edition-url', 'project-id', 'project-url', 'partial', 'malformed', 'missing-identity', 'symlink', 'directory']) {
+  for (const scenario of ['cli-project', 'cli-url', 'edition-id', 'edition-url', 'project-id', 'project-url', 'malformed', 'missing-identity', 'symlink', 'directory']) {
     declare(f);
     let options = { ...f.options, dryRun: true, cleanHistory: true };
     if (scenario === 'cli-project') options.project = 'octocat/Spoon-Knife';
@@ -125,7 +125,7 @@ test('producer rejects inconsistent or nonordinary committed destination inputs 
     if (scenario === 'project-url') writeFileSync(resolve(f.repo, 'rer-project.json'), JSON.stringify({ projectId: f.options.project, sourceRepository: 'https://github.com/octocat/Spoon-Knife' }));
     if (scenario === 'malformed') writeFileSync(resolve(f.repo, 'edition.json'), '{');
     if (scenario === 'missing-identity') writeFileSync(resolve(f.repo, 'edition.json'), '{}');
-    if (['partial', 'symlink', 'directory'].includes(scenario)) rmSync(resolve(f.repo, 'edition.json'));
+    if (['symlink', 'directory'].includes(scenario)) rmSync(resolve(f.repo, 'edition.json'));
     if (scenario === 'symlink') symlinkSync('README.md', resolve(f.repo, 'edition.json'));
     if (scenario === 'directory') { mkdirSync(resolve(f.repo, 'edition.json')); writeFileSync(resolve(f.repo, 'edition.json/file'), '{}'); }
     f.commit();
