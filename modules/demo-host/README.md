@@ -15,7 +15,9 @@ host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
 - `native/warm.mjs`: the start page's prefetch list, built from `dist/client`
   (the Vite manifest if the build wrote one, else the build's `assetsDir`, else
   `assets`) and TanStack Start's route manifest, the console's views first,
-  capped by compressed size.
+  capped by compressed size. The same built chunks (`bundle.immutable`) are
+  what `native/worker.mjs` serves with an immutable `cache-control`, besides
+  hashed files under `/assets/`.
 - `capacity.mjs`: concurrent visitor admission and operator diagnostics. This
   is used by the native host as well as retained during legacy upgrades.
 - `upgrade.mjs`: verifies ownership, removes the old Container application and
