@@ -3,8 +3,7 @@ import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { searchContext } from '../../onboarding/process-diagnostics.mjs';
-import { probePort } from '../../onboarding/port-probe.mjs';
+import { probePort, searchPort } from '../../onboarding/port-probe.mjs';
 import { LaunchFailure } from './failure.mjs';
 
 const run = promisify(execFile);
@@ -69,24 +68,17 @@ export async function portTaken(port) {
  return Boolean((await probePort('127.0.0.1', port, { hosts: ['127.0.0.1', '::1'], anyAddress: true })).listener);
 }
 
-// The first port from 8787 (RER_DEV_PORT_FROM moves the start) that is not
-// `held` (by a registered server, or saved by another checkout that is stopped),
-// nothing listens on, binds on both 127.0.0.1 and ::1 (a browser that tries
-// ::1 first never reaches another server) and that `claim` secures against
-// another launch choosing it at the same time.
+// The first port from 8787 (RER_DEV_PORT_FROM moves the start), among the next
+// `searchCandidates` ports, that is not `held` (by a registered server, or saved
+// by another checkout that is stopped), nothing listens on, binds on both
+// 127.0.0.1 and ::1 (a browser that tries ::1 first never reaches another
+// server) and that `claim` secures against another launch choosing it at the
+// same time. The search is bounded by that count, never by time or load.
 export async function freePort(ports, claim, env = process.env) {
  const from = Number(env.RER_DEV_PORT_FROM ?? 8787);
  if (!Number.isInteger(from) || from < 1 || from > 65535) throw new LaunchFailure(2, 'RER_DEV_PORT_FROM must be a port number.');
- const held = new Set(ports.filter(Boolean)), context = searchContext();
- for (let port = from; port <= 65535; port++) {
-  if (held.has(port)) continue;
-  const result = await probePort('127.0.0.1', port, { context, hosts: ['127.0.0.1', '::1'], anyAddress: true, searching: true });
-  if (!result.available) {
-   if (performance.now() >= context.deadline) throw new LaunchFailure(4, `Could not find a free port from ${from} in time (system busy). Run rer dev again or pass rer dev --port PORT with a free port.`);
-   continue;
-  }
-  const claimed = await claim(port);
-  if (claimed) return { port, ...claimed };
- }
- throw new LaunchFailure(4, `No free port from ${from} upward. Pass one with rer dev --port PORT.`);
+ const held = new Set(ports.filter(Boolean));
+ const found = await searchPort({ host: '127.0.0.1', from, hosts: ['127.0.0.1', '::1'], skip: port => held.has(port), claim, verb: 'dev' });
+ if (found.port !== undefined) return found;
+ throw new LaunchFailure(4, `No free port from ${found.range[0]} to ${found.range[1]}: all ${found.tried} ports tried were in use. Stop something that holds one, or pass rer dev --port PORT with a free port.`);
 }

@@ -1,6 +1,6 @@
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
-import { inspectionContext, portListener, uncheckedInspection } from './process-diagnostics.mjs';
+import { inspectionContext, portListener, searchContext, uncheckedInspection } from './process-diagnostics.mjs';
 
 async function bind(host, port) {
  const socket = createServer();
@@ -37,4 +37,26 @@ export async function probePort(host, port, { context = inspectionContext({ port
   if (remaining <= 0) return { ...bound, unchecked };
   await delay(Math.min(100, remaining));
  } while (true);
+}
+
+// How many ports a free-port search tries, counting from its first one. The
+// search is bounded by this count and by nothing else: a busy computer makes
+// each bind slower, and the search waits for every bind's answer.
+export const searchCandidates = 1000;
+
+// The first port from `from` that probePort finds available and `claim` secures
+// (claim may be omitted), among the next `searchCandidates` ports. A port in
+// `skip` counts as tried and in use. Each candidate's ownership check has its
+// own load-scaled budget, so no candidate can spend another's. Without a free
+// port, the result says what was tried: { range: [first, last], tried }.
+export async function searchPort({ host, from, hosts, skip = () => false, claim = async () => ({}), verb }) {
+ const last = Math.min(65535, from + searchCandidates - 1);
+ for (let port = from; port <= last; port++) {
+  if (skip(port)) continue;
+  const context = searchContext({ port, verb });
+  if (!(await probePort(host, port, { context, hosts, anyAddress: true, searching: true })).available) continue;
+  const claimed = await claim(port);
+  if (claimed) return { port, ...claimed };
+ }
+ return { range: [from, last], tried: last - from + 1 };
 }

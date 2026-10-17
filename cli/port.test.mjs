@@ -5,10 +5,15 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {createServer} from 'node:net';
+import net,{createServer} from 'node:net';
+import os from 'node:os';
+import {syncBuiltinESMExports} from 'node:module';
 import {once} from 'node:events';
 import {selectedOrigin} from './local.mjs';
 import {prepareSettings} from '../onboarding/adapter-settings.mjs';
+import {searchCandidates} from '../onboarding/port-probe.mjs';
+import {firstFreePort} from './port.mjs';
+import {freePort as devPort} from '../global/launch/facts.mjs';
 
 // A separate process listening on every address, the way another checkout's server may.
 async function wildcardListener(t,host='0.0.0.0'){
@@ -44,6 +49,53 @@ test('on a busy computer, where checking who holds a port is slow, the free-port
  const holder=await wildcardListener(t,'127.0.0.1'),root=await directory(t);
  const {stdout}=await promisify(execFile)(process.execPath,[join(import.meta.dirname,'fixtures/port-inspection.mjs'),'late','select',String(holder.pid),String(holder.port),root],{timeout:30000});
  assert.ok(Number(stdout.trim())>holder.port+1,stdout);
+});
+
+// A computer at 1-minute load 30 where every bind takes longer than any
+// time allowance, at the network edge only: ports for which `busy` is true
+// refuse the bind (EADDRINUSE), every bind advances a fake clock by 70 s (the
+// longest old allowance was 60 s) and waits that bind's own answer, and the
+// other ports bind for real on a port the OS picks. Nothing loads this machine.
+function busyComputer(t,busy){
+ const bind=net.Server.prototype.listen,now=performance.now.bind(performance),load=os.loadavg,parallelism=os.availableParallelism;
+ let skew=0;
+ t.mock.method(performance,'now',()=>now()+skew);
+ os.loadavg=()=>[30,30,30];os.availableParallelism=()=>4;syncBuiltinESMExports();
+ t.after(()=>{os.loadavg=load;os.availableParallelism=parallelism;syncBuiltinESMExports();});
+ t.mock.method(net.Server.prototype,'listen',function(options,callback){
+  setTimeout(()=>{
+   skew+=70_000;
+   if(busy(options.port))this.emit('error',Object.assign(Error(`listen EADDRINUSE: address already in use ${options.host}:${options.port}`),{code:'EADDRINUSE'}));
+   else bind.call(this,{...options,port:0},callback);
+  },1);
+  return this;
+ });
+}
+const freeSeen=async()=>{const server=createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});const {port}=server.address();await new Promise(resolve=>server.close(resolve));return port;};
+
+test('at load 30, with binds slower than any time allowance, setup and rer dev still find the one free port late in their range',async t=>{
+ const from=20000,last=from+searchCandidates-1;
+ busyComputer(t,port=>port!==last);
+ assert.equal(await firstFreePort('127.0.0.1',from),last);
+ assert.deepEqual(await devPort([],async port=>({port,release(){}}),{RER_DEV_PORT_FROM:String(from)}).then(({port})=>port),last);
+});
+
+test('when every port in the range is in use, setup and rer dev refuse naming the range and how many ports they tried',async t=>{
+ const from=30000,last=from+searchCandidates-1;
+ busyComputer(t,()=>true);
+ const named=message=>{assert.ok(message.includes(`${from} to ${last}`),message);assert.ok(message.includes(`all ${searchCandidates} ports`),message);return true;};
+ await assert.rejects(firstFreePort('127.0.0.1',from),error=>error.exitCode===4&&named(error.message));
+ await assert.rejects(devPort([],async port=>({port}),{RER_DEV_PORT_FROM:String(from)}),error=>error.exitCode===4&&named(error.message));
+});
+
+test('on a quiet computer the search takes the first free port, and skips one a server holds and one rer dev already holds',async t=>{
+ const first=await freeSeen(),holder=createServer();
+ await new Promise((resolve,reject)=>{holder.once('error',reject);holder.listen(first,'127.0.0.1',resolve);});
+ t.after(()=>new Promise(resolve=>holder.close(resolve)));
+ const setup=await firstFreePort('127.0.0.1',first);
+ assert.ok(setup>first&&setup<first+searchCandidates);
+ const held=await devPort([first+1],async port=>({port}),{RER_DEV_PORT_FROM:String(first)});
+ assert.ok(held.port>first&&held.port!==first+1);
 });
 
 test('setup --port on a saved checkout moves its saved origin and keeps its other settings',async t=>{

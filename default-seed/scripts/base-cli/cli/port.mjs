@@ -4,21 +4,20 @@ import { createServer } from 'node:net';
 import { readJson } from '../modules/job-queue/storage.mjs';
 import { serversDirectory, stopInstruction } from './server-registry.mjs';
 import { shared } from './shared.mjs';
+import { refuse } from './errors.mjs';
 
 export const defaultPort = 8787;
 
 // The first port from `from` that nothing listens on, on any address, and that
-// this host can bind. Another checkout's server may listen on every address,
-// which a bind to 127.0.0.1 alone does not notice.
-export async function firstFreePort(host, from = defaultPort, context) {
- const { searchContext } = await shared('process-diagnostics.mjs');
- const { probePort } = await shared('port-probe.mjs');
- context ??= searchContext({verb:'setup'});
- for (let port = from; port <= 65535; port++) {
-  if ((await probePort(host, port, { context, anyAddress: true, searching: true })).available) return port;
-  if (performance.now() >= context.deadline) throw Error('Could not find a free port in time (system busy). Run rer setup again.');
- }
- throw Error(`No free port from ${from} upward.`);
+// this host can bind, among the next `searchCandidates` ports. Another
+// checkout's server may listen on every address, which a bind to 127.0.0.1
+// alone does not notice. Only a port in use is skipped; the search never gives
+// up for time or load, only after every candidate was refused.
+export async function firstFreePort(host, from = defaultPort) {
+ const { searchPort } = await shared('port-probe.mjs');
+ const found = await searchPort({ host, from, verb: 'setup' });
+ if (found.port !== undefined) return found.port;
+ throw refuse(`No free port from ${found.range[0]} to ${found.range[1]}: all ${found.tried} ports tried were in use. Stop something that holds one, or run rer setup --port PORT with a free port.`);
 }
 
 // Who holds a port: a server another checkout registered (its path and the
