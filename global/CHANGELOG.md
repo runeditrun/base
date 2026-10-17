@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.50
+
+- **Seeds can declare an owner sign-in route.** The delivery producer, in Base and in each seed's vendored copy, now accepts an optional `surfaces.app.signIn.ownerSignIn` path, such as `"/auth/owner-signin"`. This is the route that accepts the platform's owner sign-in grant. The platform binds `RER_PREVIEW_OWNER_SIGNIN` to the declared path, and only when a seed declares it. The path follows the same rules as `signIn.path`, and the producer still refuses unknown keys and values such as `//evil` or `https://x` (#234).
+- **`rer dev` says when the computer is busy.** When the job queue or the machine's load holds a setup step until its wait runs out, `rer dev` (and setup, build, preview, deploy and verify) now prints "Not started: this computer is busy" with the measured 1-minute load, the threshold and what to do next: run the same command again, or raise `RER_JOBS_LOAD_THRESHOLD`. It exits 4, like the server load guard. Before, the hold was reported as "Local migrations failed". A real migration failure keeps its own message and captured output. The job queue's `maxWait` now bounds only a blocked wait, so a job the machine can run is admitted even when the queue's first lock, reclaim and sample pass takes longer than `maxWait` (#221).
+
 ## 0.2.49
 
 - **Large imports no longer fail with D1's request limit.** The import kit sized each D1 batch from the data statements alone and left out the authority, progress, scope and return checks that `atomic()` adds to the same request. A large import could therefore build one request just over D1's limit and stop with 409 `IMPORT_D1_REQUEST_LIMIT`: Nook's 3,547-entry Slack import stopped at checkpoint 51, where the estimate said 524 statements and the request held 573 against 572 remaining. Each batch is now sized with `atomicCount()`, the same count `atomic()` sends. The apply, reverse and fenced-reversal planners share it, because undo had the same gap. Nook's import now applies all 3,547 entries in 78 saved batches (#230).
