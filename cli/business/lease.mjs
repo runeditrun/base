@@ -43,7 +43,7 @@ export class Lease {
    this.expires = expires;
    this.cursor = Number.isSafeInteger(result.cursor) ? result.cursor : this.cursor;
    if (result.cancel_requested || result.controls?.some(control => control.kind === 'cancel' || control.instruction === 'pause')) {
-    this.controller.abort(Error('Business task was paused or cancelled in the browser.'));
+    this.controller.abort(Error('Business task was paused or canceled in the browser.'));
     this.signal.throwIfAborted();
    }
    // Controls contain only closed enums. A requested checkpoint is already

@@ -67,7 +67,7 @@ function inputFor(key, value) {
 }
 function appendInput(container, key, input, value) {
   if (input.type === 'color') {
-    const wrap = node('div', 'colour-control'), selected = fields[key].valid(value), caption = node('span', 'colour-caption', selected ? value : 'Choose a colour');
+    const wrap = node('div', 'colour-control'), selected = fields[key].valid(value), caption = node('span', 'colour-caption', selected ? value : 'Choose a color');
     wrap.append(input, caption); input.addEventListener('input', () => { caption.textContent = input.value; });
     container.append(wrap);
   } else if (input.tagName === 'SELECT') { const wrap = node('div', 'select-wrap'); wrap.append(input); container.append(wrap); }

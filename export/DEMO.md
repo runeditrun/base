@@ -104,7 +104,10 @@ ended page with "Start a new demo".
    locked dependencies and invokes `rer deploy --demo`; Docker is unnecessary.
    Set `RUN_DEMO_DEPLOY=true` to deploy on pushes to main. The manual `test_only`
    input targets `demo.test.<domain>` in the separate `demo-test` environment,
-   using Turnstile's always-passing test keys. Test starts require the private
+   using Turnstile's always-passing test keys. It moves the declaration's domain
+   to `test.<domain>` and every `settings` host under `demo.<domain>` (such as
+   a `container.hostVariables` host like `page.demo.<domain>`) to the same name
+   under `demo.test.<domain>`; production is unchanged. Test starts require the private
    measurement token, passed as `rer_demo_measure` cookie or
    `x-rer-demo-measurement` header. Do not commit that token.
 4. In the `run-demo` GitHub environment, set `CLOUDFLARE_ACCOUNT_ID`,

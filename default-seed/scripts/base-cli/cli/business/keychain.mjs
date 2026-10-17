@@ -94,7 +94,7 @@ export async function readSecret({ input = process.stdin, output = process.stder
    input.setRawMode(Boolean(wasRaw)); if (!wasFlowing) input.pause(); output.write('\n');
    if (error) reject(error); else { try { resolve(checkedSecret(secret)); } catch (e) { reject(e); } }
   }
-  const interrupted = () => finish(new Error('Credential entry cancelled.'));
+  const interrupted = () => finish(new Error('Credential entry canceled.'));
   const terminated = () => finish(new Error('Credential entry interrupted.'));
   const ended = () => finish(new Error('Credential input ended before confirmation.'));
   function data(chunk) {

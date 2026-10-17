@@ -42,7 +42,7 @@ export function catalogue(source, project, repository, gates, dryRun) {
     if (typeof s[key] !== 'string' || !s[key]) throw Error('Incomplete seed listing metadata');
   const contract = clauses(source.bytes('CONTRACT.md').toString());
   const licence = source.bytes('LICENSE').toString();
-  if (!licence.includes('Permission is hereby granted, free of charge')) throw Error('Declare a supported listing licence');
+  if (!licence.includes('Permission is hereby granted, free of charge')) throw Error('Declare a supported listing license');
   const docs = ['seed.json', 'CONTRACT.md', 'AGENTS.md', 'LICENSE', 'RELEASE.json',
     ...['README.md', 'BASELINE.md', 'OPERATIONS.md', 'ACCEPTANCE.md'].filter(path => source.entries.has(path))];
   const artifacts = docs.map(path => ({ path: `documents/${path}`, target: `agents/seeds/${s.id}/${path}`, sha256: sha256(source.bytes(path)) }));

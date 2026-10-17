@@ -87,7 +87,7 @@ export function readTheme(css, file = 'rer-theme.css') {
     const kind = themeTokens[name];
     if (!kind) throw Error(`${file}: ${name} is not a theme token. Use ${Object.keys(themeTokens).join(', ')}.`);
     if (Object.hasOwn(tokens, name)) throw Error(`${file}: ${name} is declared twice.`);
-    if (kind === 'colour' && !colour.test(value)) throw Error(`${file}: ${name} must be a #rgb or #rrggbb colour.`);
+    if (kind === 'colour' && !colour.test(value)) throw Error(`${file}: ${name} must be a #rgb or #rrggbb color.`);
     if (kind === 'stack' && !stack.test(value)) throw Error(`${file}: ${name} must be a font stack of family names.`);
     if (kind === 'radius' && !/^\d{1,2}(?:\.\d+)?(?:px|rem)$/.test(value)) throw Error(`${file}: ${name} must be a length in px or rem.`);
     if (kind === 'logo') assets.add(asset(value, /\.(?:svg|png|webp)$/, name));
