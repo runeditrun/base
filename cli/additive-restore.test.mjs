@@ -11,7 +11,7 @@ CREATE INDEX computed_entries_priority ON computed_entries(priority);`;
 // An owner's backup outlives the release that made it: later migrations that only
 // add tables, defaulted columns or indexes must not strand it. Any other schema
 // difference is still refused before anything is written.
-test('an archive made before later additive migrations restores into the upgraded installation; other differences are refused', { timeout: 15 * 60_000 }, async t => {
+test('an archive made before later additive migrations restores into the upgraded installation, over rows the migrations seed; other differences are refused', { timeout: 15 * 60_000 }, async t => {
  const seed = await portabilityFixture(t);
  const migration = name => join(seed.root, 'migrations/core', name);
  await seed.run(['export', '--output', 'exports/empty.rer']);
@@ -73,4 +73,27 @@ test('an archive made before later additive migrations restores into the upgrade
  await seed.run(['export', '--output', 'exports/newer.rer']);
  await unlink(migration('1001_index.sql'));
  await refused('exports/newer.rer', /schema_mismatch/);
+
+ // A fresh installation holds the rows its own migrations insert, as a seed's
+ // default settings: they are not the owner's data and do not block a restore.
+ await writeFile(migration('1002_settings.sql'), "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);\nINSERT INTO app_settings VALUES('currency','USD'),('week_start','monday');");
+ const settings = 'SELECT key,value FROM app_settings ORDER BY key', defaults = [{ key: 'currency', value: 'USD' }, { key: 'week_start', value: 'monday' }];
+ await seed.run(['reset', '--yes']);
+ // An archive made before the settings table restores and keeps its seeded rows.
+ assert.deepEqual((await seed.run(['import', '--input', 'exports/current.rer', '--yes'])).at(-1).bridged.tables, ['app_settings']);
+ assert.deepEqual((await seed.data(settings))[0].results, defaults);
+ // The owner's changed setting in an archive replaces the fresh installation's default.
+ await seed.data("UPDATE app_settings SET value='EUR' WHERE key='currency'");
+ const edited = (await seed.run(['export', '--output', 'exports/settings.rer'])).at(-1);
+ await seed.run(['reset', '--yes']);
+ assert.equal((await seed.run(['import', '--input', 'exports/settings.rer', '--yes'])).at(-1).contentHash, edited.contentHash);
+ assert.deepEqual((await seed.data(settings))[0].results, [{ key: 'currency', value: 'EUR' }, defaults[1]]);
+ assert.deepEqual((await seed.data(original))[0].results, rows);
+ // A row the migrations did not insert still refuses, naming its table and the next step.
+ // The refused newer archive leaves a reset, migrated installation.
+ await refused('exports/newer.rer', /schema_mismatch/);
+ await seed.data("INSERT INTO app_settings VALUES('locale','en-AU')");
+ const occupied = await seed.run(['import', '--input', 'exports/settings.rer', '--yes'], 4);
+ assert.match(occupied.find(event => event.event === 'error').message, /^Restore refused \(target_not_empty\): table app_settings in this installation already holds rows its migrations did not insert, .*rer reset --yes and rer import --input exports\/settings\.rer --yes again\.$/);
+ assert.deepEqual((await seed.data(settings))[0].results, [{ key: 'currency', value: 'USD' }, { key: 'locale', value: 'en-AU' }, defaults[1]]);
 });
