@@ -2,12 +2,13 @@ import { completeFirstRun } from '../operator-auth/first-run.mjs'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import { emittedRuntime, owner, setupToken } from '../operator-auth/emitted-runtime.mjs'
+import { assertSelectChevron } from './select-chevron.mjs'
 
 export async function privateResponseBrowser(functions) {
   const runtime = await emittedRuntime({ noMail: true })
   let browser
   try {
-    browser = await chromium.launch({ headless: true })
+    browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
     const signed = await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Browser Cache Owner' } })
     assert.equal(signed.status, 303)
     await completeFirstRun(runtime.origin, signed.headers.get('set-cookie').split(';')[0])
@@ -31,6 +32,7 @@ export async function privateResponseBrowser(functions) {
         assert.equal(response.status(), 200)
         assert.equal(response.headers()['cache-control'], 'no-store, no-transform')
         await page.getByText(`${owner} · owner`, { exact: true }).waitFor()
+        assert.ok(await assertSelectChevron(page, `${width}px /app`) > 0, 'the operator app renders its role selects')
         // Start a fresh public document before testing client navigation, so the
         // private loaders cannot be satisfied by the first document's router cache.
         await page.goto(`${runtime.origin}/records`, { waitUntil: 'networkidle' })

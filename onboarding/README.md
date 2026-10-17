@@ -114,6 +114,54 @@ Declare the theme in two places that name the same file:
 Without a theme every page is unchanged. `default-seed/public/rer-theme.css`
 and the foundation template's `public/rer-theme.css` are worked examples.
 
+### Select chevron
+
+Every dropdown on Base's own screens draws its chevron 14px in from the right
+border and keeps 40px of end padding so text never runs under it. One rule
+does this, and a seed's own pages adopt it too:
+
+```css
+select:not([multiple],[size]:not([size="1"])){
+  --rer-select-ink:var(--rer-muted,light-dark(#475569,#a8b3c4));
+  appearance:none;
+  background-image:
+    linear-gradient(to top right,transparent calc(50% - 1.1px),var(--rer-select-ink) calc(50% - .55px),var(--rer-select-ink) calc(50% + .55px),transparent calc(50% + 1.1px)),
+    linear-gradient(to top left,transparent calc(50% - 1.1px),var(--rer-select-ink) calc(50% - .55px),var(--rer-select-ink) calc(50% + .55px),transparent calc(50% + 1.1px));
+  background-repeat:no-repeat;
+  background-position:right 20px center,right 14px center;
+  background-size:6px 6px;
+  padding-inline-end:40px;
+}
+```
+
+The two gradient strokes form one 12px chevron whose right edge is 14px from
+the border. The full rule also carries the `:focus-visible`, `:disabled`,
+right-to-left and `forced-colors` variants. Multi-selects and `size` lists keep
+their native look.
+
+- **Adopt it by copying.** Copy the whole rule from
+  `foundation/runtime/select-style.ts` (exported as `selectStyle`, which both
+  exporters place at `src/base/select-style.ts`). A seed whose pages use
+  `pageStyle` already has it. A seed with its own stylesheet pastes the CSS
+  into it, or imports `selectStyle` into a `<style>` tag. The installer's copy
+  is in `ui/style.css`. A seed rule that sets `padding-right` on selects
+  with higher specificity than the rule's `select:not(...)` (a `#id` selector,
+  say) overrides the 40px end padding: keep it at 36px or more.
+- **Recolour it with the theme.** The chevron reads `--rer-muted`, so a seed
+  that declares its theme tokens needs nothing else: the installer, `/app` and
+  every page using the rule draw it in that colour. A seed that wants another
+  colour sets `--rer-select-ink` on `:root` (or one container); focus switches
+  it to `--rer-text` and a disabled select dims it. For a dark scheme, declare
+  `color-scheme: light dark` and dark values for `--rer-muted` and
+  `--rer-text`; the neutral fallbacks use `light-dark()` and follow it. The
+  chevron is drawn with gradients so it can read a variable; an SVG data URI
+  cannot.
+- **Keep the rule's geometry.** The browser checks (the installer's
+  `ui/browser-check.mjs` and the default seed's private-response browser test)
+  assert, at 1440 and 390, that every visible single select has no native
+  appearance, at least 36px of right padding and its chevron 10-16px from the
+  right edge.
+
 ## Setup behavior and custody
 
 Setup validates answers before effects, then uses the declared lifecycle to
