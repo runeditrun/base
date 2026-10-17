@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.42
+
+- **`rer export` never exports the local copy under a hosted address.** `rer export --origin <hosted address>` used to ignore the address and export this computer's books, so an owner who believed the hosted books were saved could take them down and lose them. Now `--origin` or `--target remote` stops before anything runs (exit 2) and saves nothing. The message says this exports only the local copy and to keep the hosted install until its data is saved. It also names the command that exports each hosted database the checkout deployed, run with the Cloudflare credentials that deployed it: `npx wrangler d1 export <database> --remote --output exports/<database>.sql`. It lists the R2 buckets that command does not cover. A finished export's last line names the copy: "Exported the local copy to exports/x.rer (…)". RUN-LOCALLY.md now says to save the hosted data this way before `rer deploy --remove --yes` (#194).
+- **`MAIL_FROM` takes a display name.** `rer deploy` accepts `MAIL_FROM=Your Business <billing@example.com>`, quoted or not, as well as a bare address. These are the forms the mail runtime sends from. An invalid sender names both accepted forms instead of only "missing or invalid: MAIL_FROM" (#194).
+- **`rer dev --as <email>` names the people it takes.** An email that is no one in the local database no longer gets "Unknown dev persona". The message lists every persona with its email, and every invited or active person. It also says that someone added only to the app's own records can sign in once the app invites them, which sends no mail locally (#194).
+
 ## 0.2.41
 
 - **A run site's custom-domain readback waits for the domains to go live.** After `rer deploy --site` attaches its custom domains, it now polls the zone's Custom Domain list inside the deploy's readiness window until every hostname is listed on the site's Worker. The wait starts at 2 seconds and doubles up to 10 seconds. A hostname already on another Worker is still refused at once. A hostname still missing when the window ends fails as `domain-readback-mismatch` and names it. Before, the deploy read the list once, so a new zone's normal lag failed a deploy that would have gone live (#183).
