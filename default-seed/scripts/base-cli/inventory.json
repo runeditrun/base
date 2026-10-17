@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.43-dev.g4a82167e",
+  "cliVersion": "0.2.43-dev.gfa489a90",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -859,7 +859,7 @@
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",
-      "sha256": "740d46db44afbee4bea04d5d270ea2017e570bde17510c9351943a66996f758c"
+      "sha256": "896d8049c07db150ecc29d90d0627e02b3f981a213331a2d03ae9c8e8819a084"
     },
     "cli/settings.mjs": {
       "source": "cli/settings.mjs",

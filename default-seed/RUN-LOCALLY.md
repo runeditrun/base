@@ -210,6 +210,9 @@ servers with the command that stops each; start with `RER_SERVER_LIMIT=N` to
 allow more. Machine load alone never refuses a start or holds heavy work; a
 fleet that wants a load guard sets `RER_SERVERS_LOAD_THRESHOLD=N` and
 `RER_JOBS_LOAD_THRESHOLD=N` (the 1-minute load) in its own environment.
+A start needs 15 GiB free on the checkout and temporary volumes;
+`RER_SERVERS_DISK_FLOOR_GIB=N` changes that floor. A CI runner on a small disk
+may set it lower (for example 4); people should not.
 
 A new server is refused only when available memory is below 1.5 GiB. An idle
 dev server holds about 0.5-1.3 GiB and a preview about 0.4-0.8 GiB. The message

@@ -185,7 +185,9 @@ unless you set `RER_SERVER_LIMIT`, `RER_SERVER_IDLE_SECONDS` or `--idle-timeout`
 or does not report its own (`rer describe` reports `defaults`), so a current
 checkout never records a limit you did not set.
 A start is never refused for machine load alone unless `RER_SERVERS_LOAD_THRESHOLD`
-or `RER_JOBS_LOAD_THRESHOLD` is set; memory and disk guards stay.
+or `RER_JOBS_LOAD_THRESHOLD` is set; memory and disk guards stay. The disk guard
+needs 15 GiB free; `RER_SERVERS_DISK_FLOOR_GIB=N` changes it (CI runners may set
+it lower, for example 4; people should not).
 
 ## The front door
 

@@ -9,6 +9,7 @@ import {promisify} from 'node:util';
 import {fixture, freePort, pause} from './fixtures/reference.mjs';
 import {processTree, remainingProcesses} from './fixtures/process-tree.mjs';
 import {queuedCommands} from './fixtures/queued-commands.mjs';
+import {serverResources} from './server-resources.mjs';
 import {createHash} from 'node:crypto';
 
 // Three seed-author journeys. Exercise the public dispatcher and real reference;
@@ -196,6 +197,22 @@ for (const mode of ['dev', 'preview']) test(`rer ${mode} runs the declared sched
   await pause(1500);
   assert.equal(scheduled().length, finished, `no run is reported after ${mode} stops`);
  } finally {await writeFile(config, original);}
+});
+
+// The disk floor is 15 GiB unless a CI or managed build runner sets
+// RER_SERVERS_DISK_FLOOR_GIB; the refusal says which floor and path it measured.
+test('server startup refuses below the disk floor, naming the floor, the free space and the variable', async () => {
+ const gib = 1024n ** 3n, volume = free => async () => ({bavail: free / 4096n, bsize: 4096n});
+ const admitted = (free, env) => serverResources(f.root, {disk: volume(free), env});
+ await assert.rejects(admitted(14n * gib, {}), error => error.exitCode === 4 && /requires 15 GiB free[^]*14\.0 GiB free[^]*RER_SERVERS_DISK_FLOOR_GIB/.test(error.message) && error.message.includes(f.root));
+ await assert.doesNotReject(admitted(14n * gib, {RER_SERVERS_DISK_FLOOR_GIB: '4'}));
+ await assert.rejects(admitted(3n * gib, {RER_SERVERS_DISK_FLOOR_GIB: '3.5'}), error => /requires 3\.5 GiB free/.test(error.message));
+ for (const value of ['', 'lots', '-1', '4GiB', '1e3']) await assert.rejects(admitted(100n * gib, {RER_SERVERS_DISK_FLOOR_GIB: value}), error => error.exitCode === 4 && error.message.includes('RER_SERVERS_DISK_FLOOR_GIB'), value);
+ // Through the real command: an invalid value refuses before anything starts.
+ const invalid = f.launch(['scripts/rer.mjs', 'dev', '--json'], process.execPath, {RER_SERVERS_DISK_FLOOR_GIB: 'lots'});
+ assert.equal(await invalid.done, 4);
+ assert.match(events(invalid).find(row => row.event === 'error').message, /RER_SERVERS_DISK_FLOOR_GIB/);
+ assert.ok(!events(invalid).some(row => row.event === 'ready'));
 });
 
 test('rer dev caches font bytes without changing document or module policies', {timeout: 240000}, async () => {
