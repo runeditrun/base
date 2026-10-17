@@ -53,7 +53,7 @@ export class NativeDemo extends DurableObject {
       if (claimed.status !== 303) throw new Error(`owner-claim-${claimed.status}: ${(await claimed.text()).slice(0, 500)}`);
       await claimed.body?.cancel();
       const cookies = claimed.headers.getSetCookie();
-      const seeded = await app.fetch(new Request(origin + '/health', { headers: { cookie: cookies.map(cookie => cookie.split(';')[0]).join('; ') } }));
+      const seeded = await app.fetch(new Request(origin + '/health', { headers: { 'cf-connecting-ip': clientIp, cookie: cookies.map(cookie => cookie.split(';')[0]).join('; ') } }));
       await seeded.arrayBuffer();
       if (!seeded.ok) throw new Error(`demo-seed-${seeded.status}`);
       if (this.state?.phase !== 'starting') throw new Error('demo-ended-during-start');
