@@ -613,7 +613,7 @@ traffic alone do not count. Real application WebSocket data messages do count.
 Private registry: OS home `~/.rer/servers`, with `RER_SERVERS_DIR` override.
 Combined cap: 10 servers per computer by default. Set `RER_SERVER_LIMIT=N`
 (positive integer) to change it. Load is no guard by default; a fleet sets
-`RER_SERVERS_LOAD_THRESHOLD=N` (the 1-minute load) in its own environment. Atomic reservations
+`RER_SERVERS_LOAD_THRESHOLD=N` (the 1-minute load) in its own environment. A start needs 15 GiB free on the checkout and temporary volumes; `RER_SERVERS_DISK_FLOOR_GIB=N` (GiB, decimals allowed, default 15) changes that floor: a CI runner may set it lower (for example 4), people should not. Atomic reservations
 precede ports/heavy work and count toward capacity. A start that sets
 `RER_SERVER_LIMIT` is capped by that value, higher or lower, whatever running
 servers recorded; a start that sets nothing is capped by the lowest limit a
