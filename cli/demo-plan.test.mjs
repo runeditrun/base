@@ -73,6 +73,13 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  assert.deepEqual(summary.hostnames, hostnames);
  assert.deepEqual(summary.routes, config.routes);
 
+ // The template's own "Scope the test host" step, run on the production declaration, yields this one: the secondary hosts move under demo.test.
+ const step = (await readFile(new URL('../export/run-demo.yml', import.meta.url), 'utf8')).match(/- name: Scope the test host\n(?:.*\n)*?\s+run: \|\n((?: {10}.*\n)+)/)[1].replace(/^ {10}/gm, '');
+ await configure({ ...JSON.parse(JSON.stringify(declaration).replaceAll('demo.test.', 'demo.')), domain: 'run-fixture.test' });
+ await execute('bash', ['-c', step], { cwd: root });
+ assert.deepEqual(JSON.parse(await readFile(join(root, 'deploy-demo.json'), 'utf8')), declaration);
+ await configure();
+
  const workerConfig = JSON.parse(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ ...workerConfig, durable_objects: { bindings: [{ name: 'COUNTER', class_name: 'MissingCounter' }] } }));
  const missingClass = await rer();
