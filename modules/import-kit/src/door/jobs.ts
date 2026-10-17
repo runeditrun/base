@@ -7,6 +7,7 @@ import { inspectRecords } from './inventory.ts';
 import { DoorError } from './grants.ts';
 import { assertion, authorized, lineage, loadSnapshot, planRow, sql, transact } from './store.ts';
 import { text } from './uploads.ts';
+import { approvalCaption, failedPlan, recordApplyFailure, requireNewPlan } from './failures.ts';
 
 /** Creation and indexing may be separate commits; the immutable operation key
  * makes a queued job recoverable even if its response or index update was lost. */
@@ -23,6 +24,8 @@ export async function apply(request: DoorRequest, input: Record<string,unknown>)
   if (Object.keys(input).some(k=>!['planId','reviewedFingerprint'].includes(k))) throw new DoorError('invalid_apply_input',400);
   const row = await associated(request,await planRow(request,text(input.planId,'plan_id')));
   if (input.reviewedFingerprint !== row.fingerprint || request.grant.fingerprint !== row.fingerprint) throw new DoorError('review_fingerprint_mismatch');
+  const failure = await failedPlan(request,row.id);
+  if (failure) requireNewPlan(row.id,failure);
   const snapshot = await loadSnapshot(request,row), context = kitContext(request,snapshot);
   const current = await lineage(request);
   if (current.head_id === row.id && row.job_id) {
@@ -36,7 +39,9 @@ export async function apply(request: DoorRequest, input: Record<string,unknown>)
     sql('UPDATE ik_door_plans SET job_id=? WHERE id=? AND (job_id IS NULL OR job_id=?)',job.id,row.id,job.id),
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_plans WHERE id=? AND job_id=?)',row.id,job.id)),
   ]);
-  const result = await applyD1ImportBatches(job.id,context);
+  let result;
+  try { result = await applyD1ImportBatches(job.id,context); }
+  catch (error) { return recordApplyFailure(request,snapshot,job,error); }
   await lineage(request);
   return {planId:row.id,job:result};
 }
@@ -45,8 +50,9 @@ export async function status(request: DoorRequest, input: Record<string,unknown>
   const job = row.job_id ? await readD1ImportJob(row.job_id,kitContext(request,snapshot)) : null;
   await lineage(request);
   const approval = await request.options.database.prepare('SELECT owner,approved_at,approval_id,reviewer FROM ik_door_approvals WHERE plan_id=?').bind(row.id).first();
-  return {planId:row.id,fingerprint:row.fingerprint,job,approval,
-    caption:approval?`approved via Business by ${approval.owner} at ${approval.approved_at}, fingerprint ${row.fingerprint}`:null};
+  const failureCode = await failedPlan(request,row.id);
+  return {planId:row.id,fingerprint:row.fingerprint,job,approval,failureCode,
+    caption:approval?approvalCaption(approval.owner,approval.approved_at,row.fingerprint,failureCode):null};
 }
 export async function reconcile(request: DoorRequest, input: Record<string,unknown>) {
   const row = await associated(request,await planRow(request,text(input.planId,'plan_id'))), snapshot = await loadSnapshot(request,row);

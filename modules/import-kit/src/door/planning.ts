@@ -21,7 +21,8 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
   if (Object.keys(input).some(k=>!['uploadId','catchup'].includes(k)) || (input.catchup !== undefined && typeof input.catchup !== 'boolean')) throw new DoorError('invalid_plan_input',400);
   const upload = await uploadRow(request,text(input.uploadId,'upload_id'));
   const current = await lineage(request);
-  const existing = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE installation_id=? AND namespace=? AND bundle_sha256=?')
+  const existing = await request.options.database.prepare(`SELECT p.* FROM ik_door_plans p WHERE installation_id=? AND namespace=? AND bundle_sha256=?
+    AND NOT EXISTS(SELECT 1 FROM ik_door_apply_failures f WHERE f.plan_id=p.id)`)
     .bind(request.grant.installationId,request.grant.namespace,upload.bundle_sha256).first<DoorPlanRow>();
   if (existing) {
     if (!existing.complete) throw new DoorError('plan_staging_interrupted_cancel_and_replan',409,{planId:existing.id});
@@ -36,7 +37,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
   if (previous && input.catchup !== true) throw new DoorError('catchup_required',409);
   if (!previous && (input.catchup === true || request.grant.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
   const bytes = await bundleBytes(request,upload), options = request.options;
-  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256]));
+  const planId = randomUUID(), kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256,planId]));
   const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
     {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.grant.maxBytes,request.grant.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.grant.maxRecords,request.grant.maxRecords)});
   const prior = new Map((previous?.records ?? []).map(r=>[recordKey(r),r]));
@@ -45,7 +46,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     const found = await importedTarget(request,target);
     revisions.set(canonicalJson([target.kind,target.id]),{revision:found.provenance.appliedRevision,matches:found.matches});
   }
-  const snapshot: DoorSnapshot = {id:randomUUID(),namespace:request.grant.namespace,bundleSha256:upload.bundle_sha256,kitNamespace,
+  const snapshot: DoorSnapshot = {id:planId,namespace:request.grant.namespace,bundleSha256:upload.bundle_sha256,kitNamespace,
     previous:previous?.id ?? null,records:[],sourceCount:0,plan:{} as ImportPlan,
     differences:{additions:[],replacements:[],unchanged:[],gone:[],conflicts:[]},
     standingApproval:request.grant.catchup==='bounded'?{id:request.grant.approvalRecordId!,at:request.grant.approvedAt!}:null};

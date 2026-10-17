@@ -1,3 +1,40 @@
+function planTables(suffix = ''): string[] {
+  return [
+    `CREATE TABLE IF NOT EXISTS ik_door_plans${suffix} (
+      id TEXT PRIMARY KEY, installation_id TEXT NOT NULL, namespace TEXT NOT NULL,
+      bundle_sha256 TEXT NOT NULL, fingerprint TEXT NOT NULL, previous_id TEXT,
+      job_id TEXT UNIQUE, snapshot_hash TEXT NOT NULL,
+      complete INTEGER NOT NULL DEFAULT 0 CHECK(complete IN (0,1)))`,
+    `CREATE TABLE IF NOT EXISTS ik_door_plan_chunks${suffix} (
+      plan_id TEXT NOT NULL REFERENCES ik_door_plans${suffix}(id), ordinal INTEGER NOT NULL,
+      body TEXT NOT NULL, PRIMARY KEY(plan_id,ordinal))`,
+    `CREATE TABLE IF NOT EXISTS ik_door_approvals${suffix} (
+      plan_id TEXT PRIMARY KEY REFERENCES ik_door_plans${suffix}(id), approval_id TEXT NOT NULL,
+      owner TEXT NOT NULL, approved_at TEXT NOT NULL, fingerprint TEXT NOT NULL,
+      reviewer TEXT NOT NULL)`,
+  ];
+}
+const failureSchema = [
+  `CREATE INDEX IF NOT EXISTS ik_door_plan_bundle ON ik_door_plans(installation_id,namespace,bundle_sha256)`,
+  `CREATE TABLE IF NOT EXISTS ik_door_apply_failures (
+    plan_id TEXT PRIMARY KEY REFERENCES ik_door_plans(id), reason_code TEXT NOT NULL)`,
+];
+/** For doors installed before apply-failure support: run ONCE in a new numbered
+ * migration, in one database.batch(). Copy children before dropping parents so
+ * foreign keys stay enabled and every retained approval/snapshot survives. */
+export const importDoorApplyFailureMigration = [
+  ...planTables('_apply_failure'),
+  'INSERT INTO ik_door_plans_apply_failure SELECT * FROM ik_door_plans',
+  'INSERT INTO ik_door_plan_chunks_apply_failure SELECT * FROM ik_door_plan_chunks',
+  'INSERT INTO ik_door_approvals_apply_failure SELECT * FROM ik_door_approvals',
+  'DROP TABLE ik_door_approvals',
+  'DROP TABLE ik_door_plan_chunks',
+  'DROP TABLE ik_door_plans',
+  'ALTER TABLE ik_door_plans_apply_failure RENAME TO ik_door_plans',
+  'ALTER TABLE ik_door_plan_chunks_apply_failure RENAME TO ik_door_plan_chunks',
+  'ALTER TABLE ik_door_approvals_apply_failure RENAME TO ik_door_approvals',
+  ...failureSchema,
+];
 /** Add these statements as a new seed migration, after the D1 import-kit schema.
  * Installing the schema never enables the door. No seed is bound automatically. */
 export const importDoorSchema = [
@@ -20,17 +57,6 @@ export const importDoorSchema = [
   `CREATE TABLE IF NOT EXISTS ik_door_namespaces (
     installation_id TEXT NOT NULL, namespace TEXT NOT NULL, head_id TEXT, pending_id TEXT,
     PRIMARY KEY(installation_id,namespace))`,
-  `CREATE TABLE IF NOT EXISTS ik_door_plans (
-    id TEXT PRIMARY KEY, installation_id TEXT NOT NULL, namespace TEXT NOT NULL,
-    bundle_sha256 TEXT NOT NULL, fingerprint TEXT NOT NULL, previous_id TEXT,
-    job_id TEXT UNIQUE, snapshot_hash TEXT NOT NULL,
-    complete INTEGER NOT NULL DEFAULT 0 CHECK(complete IN (0,1)),
-    UNIQUE(installation_id,namespace,bundle_sha256))`,
-  `CREATE TABLE IF NOT EXISTS ik_door_plan_chunks (
-    plan_id TEXT NOT NULL REFERENCES ik_door_plans(id), ordinal INTEGER NOT NULL,
-    body TEXT NOT NULL, PRIMARY KEY(plan_id,ordinal))`,
-  `CREATE TABLE IF NOT EXISTS ik_door_approvals (
-    plan_id TEXT PRIMARY KEY REFERENCES ik_door_plans(id), approval_id TEXT NOT NULL,
-    owner TEXT NOT NULL, approved_at TEXT NOT NULL, fingerprint TEXT NOT NULL,
-    reviewer TEXT NOT NULL)`,
+  ...planTables(),
+  ...failureSchema,
 ];
