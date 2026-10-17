@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
 const portable = basename(dirname(fileURLToPath(import.meta.url))) === 'base-onboarding';
 const queueURL = new URL(portable ? '../base-cli/modules/job-queue/' : '../modules/job-queue/', import.meta.url);
+export const maxWaitSeconds = 1200;
 export const heavyVerbs = new Set(['install', 'setup', 'build', 'verify', 'dev', 'preview', 'deploy', 'release', 'export', 'import', 'installer']);
 export const verificationBoundary = verb => verb === 'release' || verb === 'verify' || verb?.startsWith('verify:');
 // The seed's display name (seed.json `name`, else its folder name) for terminal lines,
@@ -43,9 +44,9 @@ export async function queuedCommand(command, args, options) {
   }
   return null;
  }
- const queue = await createQueue();
+ const queue = await createQueue(options.queueOptions);
  try {
-  const result = await queue.run([command, ...args], { ...options, kind: 'heavy', maxWait: 1200,
+  const result = await queue.run([command, ...args], { ...options, kind: 'heavy', maxWait: options.maxWait ?? maxWaitSeconds,
    onWaiting: (reason, detail) => {
     const wait = { ...(detail ?? { reason }), statusCommand, statusCommandText };
     if (typeof options.onWaiting === 'function') return options.onWaiting(wait);

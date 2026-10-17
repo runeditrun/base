@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.47-dev.ge9e5ee80",
+  "cliVersion": "0.2.47-dev.g31d247a6",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "c0b7b20c0421bec4cd21775454b03d8d228bd590fd4697900150f9480740ab54"
+      "sha256": "7f67c68e5f0aa2a0519fc06fa4bbb77280cb37bf07eef4c5b6e70efa442618f2"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -51,6 +51,10 @@
       "source": "onboarding/archive-output.mjs",
       "sha256": "de7d105c421e75a5915c6e2fe192a86ab7c9fc58f961c25f64adc33d06d745d7"
     },
+    "busy.mjs": {
+      "source": "onboarding/busy.mjs",
+      "sha256": "8bc1c242b498bb4f37073a151f0cc128b9fd30e0f54c266712528abc08110346"
+    },
     "command-custody.mjs": {
       "source": "onboarding/command-custody.mjs",
       "sha256": "60c2be80991054feb4c9d56205e65ed0c8d01cfbe10dec698eb312bf90faecf6"
@@ -61,7 +65,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "bfafd2bfd23824c7793632b03324e23d5648174e5d4d54ef95648370175e36fe"
+      "sha256": "a8a2af610cb15332b3178950718ba52247696ac68361f9f386135b5e58e9e8df"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -81,7 +85,7 @@
     },
     "failures.mjs": {
       "source": "onboarding/failures.mjs",
-      "sha256": "aa813bdbb06f1d3afa89ff65d9ab77c74f00e4d8250943e63bd024e6a7ea21fd"
+      "sha256": "64e4edbd9002f0cb4eb084a49f32f84709c9b3f16c87a77a7614172ce96878e7"
     },
     "input-limits.mjs": {
       "source": "onboarding/input-limits.mjs",
@@ -237,7 +241,7 @@
     },
     "queue.mjs": {
       "source": "onboarding/queue.mjs",
-      "sha256": "0d4bd9b8488b210b8b66cdee5ce7ea3c93ee0cb1ea2fa9bd6cd807d735370acf"
+      "sha256": "d06bc38421b6c8378d9ced3d75ee982cda4b6fcbc3768bd735d31c2a2af96d04"
     },
     "queued-entry.mjs": {
       "source": "onboarding/queued-entry.mjs",
@@ -735,7 +739,7 @@
     },
     "cli/errors.mjs": {
       "source": "cli/errors.mjs",
-      "sha256": "bd452892ccc3e5c6a5e65435b9637f389d272598814b6b62b5a70bd79d507291"
+      "sha256": "aed5b5be4faab90d7901154d02d547685d2a5543788bfa7ca13fff38dddb31f1"
     },
     "cli/export-summary.mjs": {
       "source": "cli/export-summary.mjs",
@@ -799,7 +803,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "35ffc6a61e729736cd2b89f09c49235560d54bd5472cb116a2a887dc0fb2d48d"
+      "sha256": "e7f59887f4d1649185af9d98d0f064f2bebe3377898c3e5db9618495dc5b0764"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -1859,7 +1863,7 @@
     },
     "modules/job-queue/index.mjs": {
       "source": "modules/job-queue/index.mjs",
-      "sha256": "57075271ca17c3ce6ee3233cc67afe6d5cebc2c2ba95dc6870ef699371794089"
+      "sha256": "db726562e168337494f6736850e24318b9ad3fa967eba26baeba3c4a6b2cd4da"
     },
     "modules/job-queue/load-admission.mjs": {
       "source": "modules/job-queue/load-admission.mjs",

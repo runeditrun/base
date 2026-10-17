@@ -37,6 +37,13 @@ export function commandFailure(message, details = {}) {
  const error=new Error(message);approved.set(error,{code:'captured_command_failed',message,details:{...details}});return error;
 }
 
+// The job queue held a step until its wait ran out. The message names the load, the
+// limit and the next step; callers show it as a refusal, never as a failed command.
+export function busyFailure(message) {
+ const error=new Error(message);approved.set(error,{code:'machine_busy',message,details:{exitCode:4}});return error;
+}
+export const isBusyFailure = error => approved.get(error)?.code==='machine_busy';
+
 // Terminal callers may expose only diagnostics approved at the capture boundary.
 // A prior diagnostic's metadata must not replace the current composed message.
 export const approvedFailure = error => { const value=approved.get(error); return value ? {...value.details,...value} : undefined; };
