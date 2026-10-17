@@ -141,11 +141,13 @@ if (process.argv[5] !== '' && Number(process.argv[5]) !== total) stop('the archi
 NODE
  mkdir "$work/stage"
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
- # It ends with the next step and, when rer is not on PATH in new terminals,
- # the exact line that puts it there (no npx: Node may be rer's own).
+ # A supplied command replaces the app next step. Business connect runs the
+ # launcher directly, so it also needs no PATH advice.
  no_next=
+ no_path=
  if [ "$#" -gt 0 ]; then no_next=1; fi
- RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
+ if [ "${1:-}" = business ] && [ "${2:-}" = connect ]; then no_path=1; fi
+ RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next RER_INSTALL_NO_PATH=$no_path "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
  if [ "$#" -eq 0 ]; then return; fi
  PATH="$PATH:$HOME/.local/bin"

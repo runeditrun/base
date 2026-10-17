@@ -2,7 +2,7 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildPackage } from '../scripts/rer-package.mjs';
@@ -21,7 +21,7 @@ before(async () => {
 });
 after(() => directory && rm(directory, { recursive: true, force: true }));
 
-async function cli(home, args, { terminal = false, input = '', approve, columns = 120, onSpawn } = {}) {
+async function cli(home, args, { terminal = false, input = '', columns = 120, onSpawn } = {}) {
  await mkdir(home, { recursive: true });
  const env = { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns) };
  return new Promise((resolveRun, reject) => {
@@ -29,12 +29,9 @@ async function cli(home, args, { terminal = false, input = '', approve, columns 
   const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : [launcher, ...args];
   const child = spawn(command, parameters, { cwd: home, env, stdio: ['pipe','pipe','pipe'] });
   onSpawn?.(child);
-  let stdout = '', stderr = '', approving = false;
+  let stdout = '', stderr = '';
   const timer = setTimeout(() => child.kill('SIGKILL'), 40000);
-  child.stdout.on('data', chunk => {
-   stdout += chunk;
-   if (approve && !approving && stdout.includes('246810')) { approving = true; void approve(); }
-  });
+  child.stdout.on('data', chunk => { stdout += chunk; });
   child.stderr.on('data', chunk => { stderr += chunk; });
   child.once('error', error => { clearTimeout(timer); reject(error); });
   child.once('close', code => { clearTimeout(timer); resolveRun({ code, stdout, stderr }); });
@@ -42,9 +39,23 @@ async function cli(home, args, { terminal = false, input = '', approve, columns 
  });
 }
 async function connect(home, remote, options = {}) {
- const result = await cli(home, ['business','connect','--code','ABCD-1234','--origin',remote.origin], {
-  ...options, approve: () => fetch(remote.origin + '/api/business/biz/pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, confirmation_number: '246810' }) }),
- });
+ const starts = () => remote.state.requests.filter(entry => entry.route === '/api/business/executors/pair' && entry.body.code).length;
+ const before = starts();
+ const pending = await cli(home, ['business','connect','--code','ABCD-1234','--origin',remote.origin]);
+ assert.equal(pending.code, 0, pending.stderr);
+ assert.ok(pending.stdout.includes('246810'));
+ assert.equal(remote.state.active, false, 'an unapproved computer is not active');
+ assert.equal((await stat(join(home, '.rer/business/pairing.json'))).mode & 0o777, 0o600);
+ await fetch(remote.origin + '/api/business/biz/pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, confirmation_number: '246810' }) });
+ assert.equal(remote.state.active, false, 'browser approval alone does not activate a computer');
+ remote.state.onSelf = async () => {
+  const saved = JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8'));
+  assert.equal(saved.executorId, 'executor1');
+  assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'credential is stored before activation');
+ };
+ const result = await cli(home, ['business','connect','--origin',remote.origin], options);
+ assert.equal(starts(), before + 1, 'later connect resumes the same server pairing instead of redeeming another code');
+ assert.ok(result.stdout.includes('246810'), 'the browser comparison number survives the turn boundary');
  assert.equal(result.code, 0, `CLI pairs after browser number approval; approved=${remote.state.approved}; printed_number=${result.stdout.includes('Confirmation number:')}; paired=${result.stdout.includes('Business paired.')}; credential_error=${result.stderr.includes('OS credential storage')}; generic=${result.stderr.includes('Business command failed')}`);
  assert.ok(!result.stdout.includes(remote.device) && !result.stderr.includes(remote.device), 'device credential stays out of both streams');
  return result;
@@ -60,13 +71,35 @@ test('packed CLI pairs only after number approval and keeps keys and untrusted t
  await writeFile(join(remote.state.root, '.github/workflows/deploy-stage.yml'), 'jobs:\n  deploy:\n    env:\n      TOKEN: ${{ secrets.FIXTURE_CI_API_TOKEN }}\n');
  await writeFile(join(remote.state.root, '.env'), 'FIXTURE_PROVIDER_KEY=fixture-env-never-export');
  await writeFile(join(remote.state.root, 'secrets/credential.json'), 'fixture-denied-value-never-export');
- remote.state.tasks = [{ task_id: 'discover1', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ remote.state.tasks = [{ task_id: 'biz:discover-local', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ remote.state.destination = '/api/business/tasks/biz:discover-local/uploads';
  const discovered = await cli(home, ['business','run','--once']);
  assert.equal(discovered.code, 0, discovered.stderr); assert.equal(remote.state.phase, 'done');
  const outbound = JSON.stringify(remote.state.requests) + discovered.stdout + discovered.stderr;
  for (const canary of ['fixture-private-version-never-export','fixture-env-never-export','fixture-denied-value-never-export']) assert.ok(!outbound.includes(canary), 'private canary values stay out of uploads, events and both output streams');
  assert.ok(remote.state.uploads.some(document => document.signals.some(signal => signal.value === 'fixture-library')));
  assert.ok(remote.state.uploads.some(document => document.signals.some(signal => signal.value === 'FIXTURE_CI_API_TOKEN')), 'ordinary workflow paths survive scanner and upload detection');
+ delete remote.state.destination;
+ remote.state.tasks = [{ task_id: 'biz:encoded-local', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ assert.equal((await cli(home, ['business','run','--once'])).code, 0, 'percent-encoded task upload destination also works');
+ for (const destination of [
+  'https://other.invalid/api/business/tasks/biz:bad-local/uploads',
+  remote.origin + '/api/business/tasks/biz:bad-local/uploads',
+  '/api/business/tasks/another-task/uploads', '/api/business/tasks/biz:bad-local/events',
+  '/api/business/tasks/biz:bad-local%2Fuploads', '/api/business/tasks/biz:bad-local/uploads?extra=1',
+  '/api/business/tasks/biz:bad-local/uploads#extra', '/api/business/tasks/biz%ZZ/uploads',
+ ]) {
+  remote.state.tasks = [{ task_id: 'biz:bad-local', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+  remote.state.destination = destination;
+  const uploaded = remote.state.uploads.length;
+  const refused = await cli(home, ['business','run','--once']);
+  assert.equal(refused.code, 1);
+  assert.match(refused.stderr, /invalid upload destination/, `refused ${destination}; phase=${remote.state.phase}; released=${remote.state.released?.reason}`);
+  assert.equal(remote.state.uploads.length, uploaded);
+  assert.equal(remote.state.released.reason, 'failed', 'invalid destinations are reported through the failure call');
+  assert.equal(remote.state.phase, 'failed', 'failed tasks do not stay leased');
+ }
+ delete remote.state.destination;
  const key = 'fixture-vendor-secret-never-output';
  const added = await cli(home, ['business','vendor-key','add','sentry'], { terminal: true, input: key + '\n' });
  assert.equal(added.code, 0); assert.ok(added.stdout.includes('sentry:read'));
@@ -166,19 +199,74 @@ test('a killed packed supervisor resumes a lapsed lease from its acknowledged sc
  assert.equal((await cli(home, ['business','disconnect'])).code, 0);
 });
 
-test('terminal consent installs a user service and disconnect removes all additions while preserving preexisting Claude settings', async t => {
+test('browser opt-ins work without terminal prompts, failed storage never activates, and disconnect revokes before removing local additions', async t => {
  const remote = await server(t);
+ const pendingHome = join(directory, 'pending-home');
+ const pendingArgs = ['business','connect','--code','ABCD-1234','--origin',remote.origin];
+ assert.equal((await cli(pendingHome, pendingArgs)).code, 0);
+ const savedPending = JSON.parse(await readFile(join(pendingHome, '.rer/business/pairing.json'), 'utf8'));
+ const repeated = await cli(pendingHome, ['business','connect']);
+ assert.equal(repeated.code, 0); assert.ok(repeated.stdout.includes(savedPending.confirmation_number));
+ assert.equal(remote.state.requests.filter(entry => entry.body.code).length, 1);
+ remote.state.pairingRefused = true;
+ assert.equal((await cli(pendingHome, ['business','connect'])).code, 1);
+ assert.ok(!(await readdir(join(pendingHome, '.rer/business'))).includes('pairing.json'));
+ remote.state.pairingRefused = false;
+ await cli(pendingHome, pendingArgs);
+ const expired = JSON.parse(await readFile(join(pendingHome, '.rer/business/pairing.json'), 'utf8'));
+ expired.expires_at = new Date(Date.now() - 1000).toISOString();
+ await writeFile(join(pendingHome, '.rer/business/pairing.json'), JSON.stringify(expired));
+ const beforeExpiry = remote.state.requests.length;
+ assert.equal((await cli(pendingHome, ['business','connect'])).code, 1);
+ assert.equal(remote.state.requests.length, beforeExpiry, 'expired pairing is never polled or silently replaced');
+ assert.equal((await cli(pendingHome, ['business','disconnect'])).code, 0);
+
+ const failedHome = join(directory, 'storage-failed-home');
+ await mkdir(failedHome); await writeFile(join(failedHome, 'fail-credential-store'), '');
+ await cli(failedHome, pendingArgs);
+ remote.state.approved = true;
+ const authenticated = () => remote.state.requests.filter(entry => entry.authorization === `Bearer ${remote.device}`).length;
+ const beforeFailure = authenticated();
+ const failed = await cli(failedHome, ['business','connect']);
+ assert.equal(failed.code, 1); assert.match(failed.stderr, /OS credential storage/);
+ assert.equal(authenticated(), beforeFailure, 'failed credential storage sends no activation or other device-authenticated request');
+ assert.equal(remote.state.active, false);
+ assert.equal((await cli(failedHome, ['business','disconnect'])).code, 0);
+
+ const undecidedHome = join(directory, 'undecided-home');
+ remote.state.selfMissing = true;
+ const undecided = await connect(undecidedHome, remote);
+ assert.ok(undecided.stdout.includes(remote.origin + '/business/biz/settings'));
+ assert.ok(!(await readdir(undecidedHome)).includes('.claude'));
+ assert.equal((await cli(undecidedHome, ['business','status','--json'])).stdout.includes('not_installed'), true);
+ remote.state.selfMissing = false;
+ remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false };
+ const declined = await cli(undecidedHome, ['business','connect']);
+ assert.equal(declined.code, 0); assert.ok(!declined.stdout.includes('[yes/no]'));
+ assert.ok(!(await readdir(undecidedHome)).includes('.claude'));
+ assert.equal(JSON.parse(await readFile(join(undecidedHome, '.rer/business/state.json'), 'utf8')).awakeConsent, false);
+ assert.equal((await cli(undecidedHome, ['business','disconnect'])).code, 0);
+
+ remote.state.optIns = { installPermissions: true, awakeConsent: true, installService: true };
  for (const columns of [160, 43]) {
   const home = join(directory, `cleanup-${columns}-home`);
   await mkdir(join(home, '.claude'), { recursive: true });
   const prior = { permissions: { deny: ['Read(existing/**)'] }, theme: 'dark' };
   await writeFile(join(home, '.claude/settings.json'), JSON.stringify(prior));
   const baseline = await readdir(home);
-  await connect(home, remote, { terminal: true, columns });
+  const optedIn = await connect(home, remote, { terminal: columns === 43, columns });
+  assert.ok(!optedIn.stdout.includes('[yes/no]'), 'browser decisions never need terminal answers');
+  assert.equal(JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8')).awakeConsent, true);
   const status = await cli(home, ['business','status','--json']);
   assert.equal(status.code, 0); assert.equal(JSON.parse(status.stdout).service, 'running');
   assert.equal((await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: 'fixture-read-only-vendor-key\n' })).code, 0);
+  remote.state.revokeRefused = true;
+  assert.equal((await cli(home, ['business','disconnect'])).code, 1);
+  assert.equal(remote.state.revoked, false);
+  assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'failed server revocation preserves the credential for retry');
+  remote.state.revokeRefused = false;
   assert.equal((await cli(home, ['business','disconnect'])).code, 0);
+  assert.equal(remote.state.revoked, true);
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
  }

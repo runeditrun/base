@@ -27,6 +27,7 @@ else if (binary.endsWith('launchctl') || binary === 'systemctl') {
  if (action === 'get') {
   if (Object.hasOwn(values, handle)) process.stdout.write(values[handle] + '\n'); else process.exitCode = binary.endsWith('security') ? 44 : 1;
  } else {
+  if (action === 'set' && await exists(join(root, 'fail-credential-store'))) { process.exit(1); }
   if (action === 'set') values[handle] = value; else delete values[handle];
   if (Object.keys(values).length) await writeFile(path, JSON.stringify(values), { mode: 0o600 }); else await unlink(path).catch(() => {});
  }
