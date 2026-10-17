@@ -335,6 +335,8 @@ test('owner-account hosting keeps local work offline and refuses failed deployme
 
 // rer dev's migration step runs through the machine-load job queue. The queue is
 // given a sampled load (never real load) and a short wait, with the jobs limit at 36.
+// The first sample takes longer than that wait, as the first lock/reclaim/sample pass does
+// on a slow runner: the outcome must follow the load, never how fast that pass was.
 async function devRun(t, f, { load, migrate }) {
  const saved = { ...process.env };
  Object.assign(process.env, { RER_JOBS_DIR: join(f.root, 'jobs'), RER_JOBS_LOAD_THRESHOLD: '36', RER_JOBS_MIN_FREE_MEMORY_BYTES: '0', RER_JOBS_SLOTS: '1' });
@@ -344,7 +346,11 @@ async function devRun(t, f, { load, migrate }) {
  assert.equal(first.store.state.phase, 'complete', first.store.state.error);
  await first.store.stop(first.app);
  const store = await f.open();
- await store.configureQueue({ verb: 'dev', maxWait: 0.2, sampler: () => ({ load, freeMemoryBytes: 1, availableMemoryBytes: 1024 ** 4 }) });
+ const maxWait = 0.2; let sampled = false;
+ await store.configureQueue({ verb: 'dev', maxWait, sampler: async () => {
+  if (!sampled) { sampled = true; await new Promise(resolve => setTimeout(resolve, maxWait * 1000 * 1.5)); }
+  return { load, freeMemoryBytes: 1, availableMemoryBytes: 1024 ** 4 };
+ } });
  let app;
  const outcome = await localInstaller(hooks(migrate ? { migrate } : {})).run(f.root, input, store, child => { app = child; }, undefined, { verb: 'dev' }).then(() => null, error => error);
  t.after(async () => { if (app) await store.stop(app); });

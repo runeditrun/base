@@ -13,8 +13,9 @@ host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
 - `worker.mjs`, `pages.mjs`, `start-script.mjs`: Turnstile start, progress,
   cancellation and visitor routing. Static assets are served at the edge.
 - `native/warm.mjs`: the start page's prefetch list, built from `dist/client`
-  and TanStack Start's route manifest, the console's views first, capped by
-  compressed size.
+  (the Vite manifest if the build wrote one, else the build's `assetsDir`, else
+  `assets`) and TanStack Start's route manifest, the console's views first,
+  capped by compressed size.
 - `capacity.mjs`: concurrent visitor admission and operator diagnostics. This
   is used by the native host as well as retained during legacy upgrades.
 - `upgrade.mjs`: verifies ownership, removes the old Container application and

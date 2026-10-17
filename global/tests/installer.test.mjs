@@ -70,6 +70,7 @@ test('install.sh and rer update install verified registry releases, the Run page
  const activate = output => { const last = output.trimEnd().split('\n').at(-1).trim(); return last.includes('.local/bin') ? last : undefined; };
  const hint = activate(installed.stdout);
  assert.ok(hint, installed.stdout);
+ assert.equal(installed.stdout.match(/^Next, /gm)?.length, 1, `one next step, not two: ${installed.stdout}`);
  assert.equal((await run('sh', ['-c', `${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
  assert.equal((await run('sh', ['-l', '-c', 'rer --version'], env)).stdout.trim(), manifest.version, 'a new shell finds rer after the line ran once');
 

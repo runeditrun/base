@@ -79,10 +79,8 @@ export async function createQueue(options = {}) {
           if (blockers.length) return { reason: blockers.join('; '), blockers, reasonCodes, position, ahead,
             queued: waiting.length, running: state.running.length, resources,
             limits: { slots: config.slots, loadThreshold: config.loadThreshold, minFreeMemoryBytes: config.minFreeMemoryBytes } };
-          if (opts.maxWait > 0 && performance.now() - start >= opts.maxWait * 1000)
-            return { reason: 'max-wait elapsed before admission', blockers: ['max-wait elapsed before admission'],
-              reasonCodes: ['max_wait'], position, queued: waiting.length, running: state.running.length, resources,
-              limits: { slots: config.slots, loadThreshold: config.loadThreshold, minFreeMemoryBytes: config.minFreeMemoryBytes } };
+          // maxWait bounds how long a blocked job waits. A job this pass finds admissible is admitted
+          // however long the pass itself took (lock, reclaim, sample), so a slow pass never refuses a free machine.
           state.queued = state.queued.filter(item => item.id !== job.id);
           job.startedAt = Date.now(); state.running.push(job);
           return null;

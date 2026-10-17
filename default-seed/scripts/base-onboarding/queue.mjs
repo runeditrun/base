@@ -7,16 +7,16 @@ const queueURL = new URL(portable ? '../base-cli/modules/job-queue/' : '../modul
 export const maxWaitSeconds = 1200;
 export const heavyVerbs = new Set(['install', 'setup', 'build', 'verify', 'dev', 'preview', 'deploy', 'release', 'export', 'import', 'installer']);
 export const verificationBoundary = verb => verb === 'release' || verb === 'verify' || verb?.startsWith('verify:');
+// The seed's display name (seed.json `name`, else its folder name) for terminal lines,
+// never its package or project id; the hash tells two checkouts of one seed apart.
 export async function queueLabel(root, verb, phase) {
  root = await realpath(root);
- let project='project';
- for(const file of ['OPERATIONS.json','package.json']){
-  try{const value=JSON.parse(await readFile(join(root,file),'utf8')),name=value.project??value.name;
-   if(typeof name==='string'&&/^@?[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)?$/.test(name)){project=name;break;}
-  }catch{}
- }
-
- return `${project} ${verb}:${phase} [${createHash('sha256').update(root).digest('hex').slice(0, 12)}]`;
+ let name = basename(root);
+ try {
+  const value = JSON.parse(await readFile(join(root, 'seed.json'), 'utf8')).name;
+  if (typeof value === 'string' && value.trim() && !/[\p{Cc}]/u.test(value) && value.length <= 80) name = value.trim();
+ } catch {}
+ return `${name} ${verb}:${phase} [${createHash('sha256').update(root).digest('hex').slice(0, 12)}]`;
 }
 
 function shellQuote(value) {

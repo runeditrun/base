@@ -73,17 +73,18 @@ async function nativeWorker(store,direction,input,signal) {
   const child = store.spawn(`${direction === 'policy-preflight' ? 'Checking archive policy' : direction === 'legacy-preflight' ? 'Checking empty recovery destination' : direction === 'export' ? 'Exporting' : 'Restoring'} local installation data`, process.execPath,
    ['--import', notice, worker, direction, JSON.stringify(input)], { cwd: input.root, signal, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   let receipt;
-  child.once('message', message => { receipt = message; });
+  // Progress lines come first, as {progress}; the last message is the receipt.
+  child.on('message', message => { if (typeof message?.progress === 'string') store.report(message.progress); else receipt = message; });
   const closed = new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));
   await new Promise(resolve => { child.once('exit', resolve); child.once('error', resolve); });
   await store.stop(child);
   const status = await closed;
-  if (!receipt || typeof receipt !== 'object') throw new RerError('transfer_failed', 'Local portability did not return a complete receipt.', 1);
+  if (!receipt || typeof receipt !== 'object') throw new RerError('transfer_failed', `Local portability ended before it finished (${status.signal ? `signal ${status.signal}` : `exit code ${status.code}`}). Run the same command again; it starts over${direction === 'import' ? ' and first cleans up anything this attempt staged' : ''}.`, 1);
   if (status.code !== 0 || !receipt.ok) throw new RerError(receipt.code ?? 'transfer_failed', receipt.reason==='legacy_restored_export_failed'
    ? 'Legacy data was restored and audited, but its v2 export failed. Preserve this installation, resolve the output problem, then run rer export --output FILE. Do not reset it to retry recovery.'
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`
    : receipt.occupied ? `Restore refused (${receipt.reason}): ${receipt.reason === 'bucket_not_empty' ? `storage bucket ${receipt.occupied} in this installation already holds files` : `table ${receipt.occupied} in this installation already holds rows its migrations did not insert`}, and a restore only goes into an empty installation. To replace this installation's data with the archive, keep a copy with rer export --output exports/before-restore.rer, then run rer reset --yes and rer import --input ${relative(input.root, input.path)} --yes again.`
-   : `The portability module refused or failed the archive operation (${receipt.reason ?? 'incomplete'}).`, receipt.exitCode ?? 1);
+   : `The portability module refused or failed the archive operation (${receipt.reason ?? 'incomplete'}${receipt.native ? `: ${receipt.native.class}${receipt.native.code && receipt.native.code !== receipt.reason ? `, code ${receipt.native.code}` : ''}` : ''}).${receipt.native && receipt.exitCode === 1 ? ' Run the same command again; it starts over.' : ''}`, receipt.exitCode ?? 1);
   delete receipt.ok;
   return receipt;
 }

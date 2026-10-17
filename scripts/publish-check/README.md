@@ -11,7 +11,11 @@ entropy or English stopword filters. Both assignment rules go through the same
 location-bound Source/module identity classification; provider and environment findings
 remain independent.
 `tree_scan.py` applies the kept text and licence policy. `history_scan.py`
-assigns release, working-tree and historical scopes. The Node entry point bounds
+assigns release, working-tree and historical scopes. Inspection returns each
+text's repository references instead of resolving them; `history_scan.py`
+resolves the whole scan's references at once through `github_refs.py`
+(GraphQL batches, a REST lookup for any repository a batch leaves in doubt) and
+then adds their rules. The Node entry point bounds
 the whole operation and stops its private process group on timeout/cancellation.
 
 Git message records carry their kind explicitly. Only commit records enable the

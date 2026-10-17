@@ -8,8 +8,7 @@ import subprocess
 import tempfile
 import unittest
 import zlib
-from unittest.mock import patch
-from test_repo import ROOT, RepositoryFixture, generic_credential
+from test_repo import ROOT, RepositoryFixture, resolving, generic_credential
 from history_scan import scan
 from test_copy_digests import CopyDigestTests
 
@@ -175,14 +174,14 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
         self.write('transport.mjs', 'export const remote = `git@github.com:${repository}`;')
         self.write('NOTES.md', 'Release receipts identify source\ncommit/tree and lock hash. The protocol stays `rer-delegation/1`; fonts came from `dmsans/v17`.')
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', return_value='missing'):
+        with resolving('missing'):
             self.assertEqual(self.report()['status'], 'PASS')
 
         def plant(path, data, resolver='missing', rule='hygiene.email'):
             self.git('reset', '-q', '--hard', 'HEAD')
             self.write(path, data)
             self.commit()
-            with patch('github_refs.GitHubResolver.resolve', side_effect=lambda repository: resolver if repository.endswith('-app') else 'missing'):
+            with resolving(lambda repository: resolver if repository.endswith('-app') else 'missing'):
                 self.assert_fails(rule, path)
             self.git('reset', '-q', '--hard', 'HEAD~1')
         mailbox = f'{secrets.token_hex(8)}@{secrets.token_hex(8)}.com'
@@ -201,11 +200,70 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
         self.write('rer-project.json', json.dumps(dict(schema=1, projectId=project, name='Absent',
                                                        sourceRepository=repository, license='MIT')))
         self.commit()
-        with patch('github_refs.GitHubResolver.resolve', return_value='missing'):
+        with resolving('missing'):
             report = self.report(project=project, repository=repository)
         self.assertEqual(report['status'], 'PASS')
         self.assertEqual(report['findings'], [])
         self.assertTrue(any(f['rule'] == 'pending-public-destination' for f in report['info']))
+
+    def test_repository_references_resolve_in_graphql_batches_with_rest_verdicts(self):
+        # GitHub's answers per repository: REST and GraphQL tell the same truth,
+        # except that GraphQL refuses the SAML-protected one, which REST still
+        # answers. Only this network edge is fake; the CLI, Git and Gitleaks are real.
+        public = [f'acme-org/public-{index}-app' for index in range(147)]
+        truth = {**dict.fromkeys(public, 'public'), 'acme-org/vault-app': 'private',
+                 'acme-org/absent-app': 'missing', 'acme-org/saml-app': 'private'}
+        fake = """#!/usr/bin/env python3
+import json, os, sys
+truth, args = json.loads(os.environ['FAKE_GITHUB']), sys.argv[1:]
+with open(os.environ['FAKE_GITHUB_LOG'], 'a') as log:
+    log.write(json.dumps(args) + '\\n')
+if 'graphql' in args:
+    fields = dict(args[i + 1].split('=', 1) for i, arg in enumerate(args) if arg == '-f')
+    data, errors = {}, []
+    for key in sorted(k for k in fields if k.startswith('o')):
+        alias, repository = 'r' + key[1:], fields[key] + '/' + fields['n' + key[1:]]
+        state = truth.get(repository, 'missing')
+        data[alias] = None if state == 'missing' or repository.endswith('saml-app') else dict(
+            isPrivate=state == 'private', isDisabled=False, isLocked=False)
+        if repository.endswith('saml-app'):
+            errors.append(dict(type='FORBIDDEN', path=[alias], message='Resource protected by organization SAML enforcement.'))
+        elif state == 'missing':
+            errors.append(dict(type='NOT_FOUND', path=[alias], message=f"Could not resolve to a Repository with the name '{repository}'."))
+    print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(data=data, errors=errors) if errors else dict(data=data)))
+    sys.exit(1 if errors else 0)
+state = truth.get(args[-1].removeprefix('repos/'), 'missing')
+if state == 'missing':
+    print('HTTP/2.0 404 Not Found\\n\\n' + json.dumps(dict(message='Not Found', documentation_url='https://docs.github.com/rest/repos/repos#get-a-repository', status='404')))
+    sys.exit(1)
+print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
+"""
+        self.write('public.md', '\n'.join('https://github.com/' + repository for repository in public))
+        for name in ('vault', 'absent', 'saml'):
+            self.write(f'{name}.md', f'https://github.com/acme-org/{name}-app')
+        self.commit()
+        with tempfile.TemporaryDirectory() as network:
+            gh, log = os.path.join(network, 'gh'), os.path.join(network, 'calls.jsonl')
+            with open(gh, 'w') as file:
+                file.write(fake)
+            os.chmod(gh, 0o700)
+            result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
+                capture_output=True, text=True, timeout=120,
+                env={**os.environ, 'PATH': network + os.pathsep + os.environ['PATH'],
+                     'FAKE_GITHUB': json.dumps(truth), 'FAKE_GITHUB_LOG': log})
+            with open(log) as file:
+                calls = [json.loads(line) for line in file]
+        report = json.loads(result.stdout)
+        # The REST verdicts: no finding for public, one each for private and
+        # missing, and the SAML-protected repository is private.
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertEqual({(f['path'], f['rule']) for f in report['findings']},
+                         {('vault.md', 'hygiene.github-private'), ('absent.md', 'hygiene.github-missing'),
+                          ('saml.md', 'hygiene.github-private')})
+        graphql = [call for call in calls if 'graphql' in call]
+        self.assertLessEqual(len(graphql), -(-len(truth) // 100))
+        # Only the repository GraphQL answered with doubt takes the REST lookup.
+        self.assertEqual([call[-1] for call in calls if 'graphql' not in call], ['repos/acme-org/saml-app'])
 
     def test_module_git_pins_preserve_credential_findings(self):
         revision = secrets.token_hex(20)

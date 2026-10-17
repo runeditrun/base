@@ -11,6 +11,7 @@ from licenses import EXCEPTIONS, exceptions, license_rules, registry
 from reviewed import REVIEWED, load_reviewed
 from report import new_report, Findings, finish
 from tree_scan import context, text_rules, working_files, working_regular
+from public_hygiene import reference_rules
 from content_identities import ContentIdentities, candidate as identity_candidate
 from checksum_maps import ChecksumMaps
 
@@ -36,7 +37,6 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             add(INVALID, 'edition.json', history.commit)
             config['pendingDestination'] = None
         recorded = registry() + exceptions(history.selected(EXCEPTIONS))
-        resolver = GitHubResolver()
         public_blobs = {e['oid'] for c in history.public_commits for e in history.entries(c)}
         # A file byte-identical to the same path on the public base is already public.
         public_paths = {e['path']: e['oid'] for e in history.entries(history.public_commit)
@@ -45,6 +45,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         report['history']['newlyPublicCommits'] = [c for c in history.commits if c not in history.public_commits]
         seen_trees, seen_blobs, inspected = set(), set(), {}
         entries_by_commit, dependencies = {}, {}
+        # Repository references wait here so that the whole scan resolves them in bulk.
+        deferred = []
         release_license_good = not license_rules(history.selected('LICENSE'), recorded)
         for commit in history.commits:
             entries = history.entries(commit)
@@ -74,11 +76,13 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                 local = dependencies[pair] & config_tree['localPaths']
                 key = (path, oid, signature, local)
                 if key not in inspected:
-                    inspected[key] = text_rules(history.blob(oid), path, config_tree, resolver, hashes)
-                rules, provenance = inspected[key]
+                    inspected[key] = text_rules(history.blob(oid), path, config_tree, hashes)
+                rules, provenance, references = inspected[key]
                 entry_scope = 'pre-existing' if (scope != 'release-tree' and oid in public_blobs) or public_paths.get(path) == oid else scope
                 for rule in rules:
                     add(rule, path, commit, oid, entry_scope)
+                if references:
+                    deferred.append((references, path, commit, oid, entry_scope))
                 if provenance:
                     add('provenance.declared-source', path, commit, oid, entry_scope)
         report['history'].update(commits=len(history.commits), trees=len(seen_trees), blobs=len(seen_blobs))
@@ -94,11 +98,13 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             # their known immutable identity; new bytes have no history identity.
             entry = entries_by_commit[history.commit].get(path)
             oid = entry['oid'] if entry and entry['kind'] == 'blob' and history.blob(entry['oid']) == data else None
-            rules, _ = text_rules(data, path, selected_context, resolver, hashes)
+            rules, _, references = text_rules(data, path, selected_context, hashes)
             public_oid = public_paths.get(path)
             scope = 'pre-existing' if public_oid and (public_oid == oid or history.blob(public_oid) == data) else 'working-tree'
             for rule in rules:
                 add(rule, path, history.commit, oid, scope)
+            if references:
+                deferred.append((references, path, history.commit, oid, scope))
             if path == 'LICENSE':
                 for rule in license_rules(data, recorded):
                     add(rule, path, history.commit, oid, 'working-tree')
@@ -159,11 +165,13 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         for message_type, commit, data in history.messages():
             path = '@' + message_type + '-message'
             report['history']['tagMessages' if message_type == 'tag' else 'commitMessages'] += 1
-            rules, _ = text_rules(data, path, selected_context, resolver, hashes,
-                                  commit_message=message_type == 'commit')
+            rules, _, references = text_rules(data, path, selected_context, hashes,
+                                              commit_message=message_type == 'commit')
             scope = 'pre-existing' if commit in history.public_commits or commit in history.public_tags else 'release-tree' if commit == history.commit else 'newly-public'
             for rule in rules:
                 add(rule, path, commit, scope=scope)
+            if references:
+                deferred.append((references, path, commit, None, scope))
             messages.append(data + b'\n')
             length = (data + b'\n').count(b'\n')
             lines.append((count, count + length, path, commit, scope))
@@ -172,6 +180,10 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             line = hit.get('StartLine', 0)
             location = next(((p, c, s) for start, end, p, c, s in lines if start <= line < end), ('@message', None, 'newly-public'))
             add(secret_rule(hit['RuleID']), location[0], location[1], scope=location[2], scanner_rule=hit['RuleID'])
+        states = GitHubResolver().resolve_all({repository for references, *_ in deferred for repository, _, _ in references})
+        for references, path, commit, oid, scope in deferred:
+            for rule in reference_rules(references, states):
+                add(rule, path, commit, oid, scope)
     except PublicBaseError:
         add('scan.public-base-rejected', '.')
     except InspectionError as error:

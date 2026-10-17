@@ -200,14 +200,18 @@ def response_constant(value):
     raise ValueError('nonstandard API JSON constant')
 
 
-def visibility(output, exit_code):
+def response(output):
+    """Split `gh api --include` output into its HTTP status and strict JSON document."""
     headers, body = re.split(r'\r?\n\r?\n', output, maxsplit=1)
     status = re.fullmatch(r'HTTP/(?:1\.[01]|2(?:\.0)?|3(?:\.0)?) (\d{3})(?: [^\r\n]*)?',
                           headers.splitlines()[0])
     if not status:
-        return 'incomplete'
-    code = int(status.group(1))
-    document = json.loads(body, object_pairs_hook=response_object, parse_constant=response_constant)
+        raise ValueError('no HTTP status line')
+    return int(status.group(1)), json.loads(body, object_pairs_hook=response_object, parse_constant=response_constant)
+
+
+def visibility(output, exit_code):
+    code, document = response(output)
     if not isinstance(document, dict):
         return 'incomplete'
     if code == 200 and exit_code == 0 and type(document.get('private')) is bool:
@@ -221,22 +225,89 @@ def visibility(output, exit_code):
     return 'incomplete'
 
 
+BATCH = 100
+FIELDS = frozenset({'isPrivate', 'isDisabled', 'isLocked'})
+
+
+def bulk_query(repositories):
+    """One aliased GraphQL query; owners and names travel as variables, never as query text."""
+    variables, fields, arguments = [], [], []
+    for index, repository in enumerate(repositories):
+        owner, name = repository.split('/')
+        variables.append(f'$o{index}:String!,$n{index}:String!')
+        fields.append(f'r{index}:repository(owner:$o{index},name:$n{index}){{{" ".join(sorted(FIELDS))}}}')
+        arguments += ['-f', f'o{index}={owner}', '-f', f'n{index}={name}']
+    return ['-f', 'query=query(' + ','.join(variables) + '){' + ' '.join(fields) + '}', *arguments]
+
+
+def bulk_visibility(repositories, output, exit_code):
+    """Return only the verdicts the batch states without doubt.
+
+    A repository left out takes today's single REST lookup: a disabled or locked
+    repository, an error other than GitHub's own not-found for exactly that name
+    (no access through SAML or an IP allow list, a rate limit), or any response
+    that is not a complete HTTP 200 GraphQL document for exactly this batch.
+    """
+    code, document = response(output)
+    aliases = {f'r{index}': repository for index, repository in enumerate(repositories)}
+    if code != 200 or not isinstance(document, dict) or not set(document) <= {'data', 'errors'}:
+        return {}
+    data, errors = document.get('data'), document.get('errors', [])
+    # gh exits 1 exactly when the document carries errors.
+    if not isinstance(data, dict) or set(data) != set(aliases) or not isinstance(errors, list) or exit_code != (1 if errors else 0):
+        return {}
+    reported = {}
+    for error in errors:
+        path = error.get('path') if isinstance(error, dict) else None
+        if not (isinstance(path, list) and len(path) == 1 and path[0] in aliases):
+            return {}
+        reported.setdefault(path[0], []).append(error)
+    states = {}
+    for alias, repository in aliases.items():
+        node, problems = data[alias], reported.get(alias, [])
+        if (not problems and isinstance(node, dict) and set(node) == FIELDS and type(node['isPrivate']) is bool and
+                node['isDisabled'] is False and node['isLocked'] is False):
+            states[repository] = 'private' if node['isPrivate'] else 'public'
+        elif (node is None and len(problems) == 1 and set(problems[0]) <= {'type', 'path', 'locations', 'message'} and
+              problems[0].get('type') == 'NOT_FOUND' and
+              problems[0].get('message') == f"Could not resolve to a Repository with the name '{repository}'."):
+            states[repository] = 'missing'
+    return states
+
+
+def gh(arguments):
+    # No disk cache, auth arguments, diagnostic output or response metadata.
+    # Disable gh debug logging even if inherited from the calling shell.
+    env = {k: v for k, v in os.environ.items() if k not in ('GH_DEBUG', 'DEBUG')}
+    env['GH_PROMPT_DISABLED'] = '1'
+    response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', *arguments],
+                              env=env, capture_output=True, timeout=60)
+    return response.stdout.decode('utf-8'), response.returncode
+
+
 class GitHubResolver:
+    """Verdicts for one run only: no disk cache can carry a stale or planted answer."""
     def __init__(self, spool=None):
         self.cache = {}
+
+    def resolve_all(self, repositories):
+        """Resolve in GraphQL batches; a repository its batch leaves in doubt takes the REST lookup."""
+        pending = sorted(set(repositories) - self.cache.keys())
+        for start in range(0, len(pending), BATCH):
+            batch = pending[start:start + BATCH]
+            try:
+                states = bulk_visibility(batch, *gh(['graphql', *bulk_query(batch)]))
+            except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+                states = {}
+            for repository in batch:
+                self.cache[repository] = states[repository] if repository in states else self.resolve(repository)
+        return {repository: self.cache[repository] for repository in repositories}
 
     def resolve(self, repository):
         if repository in self.cache:
             return self.cache[repository]
-        # No disk cache, auth arguments, diagnostic output or response metadata.
-        # Disable gh debug logging even if inherited from the calling shell.
-        env = {k: v for k, v in os.environ.items() if k not in ('GH_DEBUG', 'DEBUG')}
-        env['GH_PROMPT_DISABLED'] = '1'
         try:
-            response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', 'repos/' + repository],
-                                      env=env, capture_output=True, timeout=60)
-            output = response.stdout.decode('utf-8')
-            result = visibility(output, response.returncode)
+            result = visibility(*gh(['repos/' + repository]))
         except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
             result = 'incomplete'
         self.cache[repository] = result
