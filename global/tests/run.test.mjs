@@ -50,6 +50,14 @@ globalThis.fetch = async url => new Response(String(url).endsWith('.tgz') ? read
  assert.match(result.stdout, new RegExp(`exported to ${checkout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} with -- --remote --out x`));
  assert.doesNotMatch(result.stdout, /^> /m, 'no pnpm banner naming the package');
  await access(join(home, '.rer/pnpm', `pnpm-${pin}`));
+
+ const outside = await run(process.execPath, [rer, 'run', 'export:data'], { cwd: directory, env });
+ assert.equal(outside.code, 2, 'outside a checkout it names where it runs');
+ const missingScript = await run(process.execPath, [rer, 'run', 'hosted-backup', '--', '--remote'], { cwd: join(checkout, 'nested'), env });
+ assert.equal(missingScript.code, 2, missingScript.stdout + missingScript.stderr);
+ assert.equal(missingScript.stderr.trim(), 'No script named hosted-backup in this checkout. Scripts: export:data, fails');
+ assert.equal(missingScript.stdout, '');
+ assert.equal((await run(process.execPath, [rer, 'run', 'fails'], { cwd: join(checkout, 'nested'), env })).code, 7, 'a script that exists keeps its own exit code');
  // A different pnpm earlier on the caller's PATH must not replace the pin,
  // while tools that the package script runs keep the caller's ordering.
  await writeFile(join(bin, 'pnpm'), '#!/bin/sh\nif [ "$1" = --version ]; then echo 1.0.0; else exit 91; fi\n', { mode: 0o755 });
@@ -59,11 +67,4 @@ globalThis.fetch = async url => new Response(String(url).endsWith('.tgz') ? read
  assert.equal(callerPath.code, 0, callerPath.stderr);
  assert.match(callerPath.stdout, /caller-tool-ran/);
 
- const outside = await run(process.execPath, [rer, 'run', 'export:data'], { cwd: directory, env });
- assert.equal(outside.code, 2, 'outside a checkout it names where it runs');
- const missingScript = await run(process.execPath, [rer, 'run', 'hosted-backup', '--', '--remote'], { cwd: join(checkout, 'nested'), env });
- assert.equal(missingScript.code, 2, missingScript.stdout + missingScript.stderr);
- assert.equal(missingScript.stderr.trim(), 'No script named hosted-backup in this checkout. Scripts: export:data, fails');
- assert.equal(missingScript.stdout, '');
- assert.equal((await run(process.execPath, [rer, 'run', 'fails'], { cwd: join(checkout, 'nested'), env })).code, 7, 'a script that exists keeps its own exit code');
 });
