@@ -104,7 +104,16 @@ write. Settings contain `enabled` and optional `revokedKids`; revoked key ids
 remain revoked permanently, so rotation uses a new id. These controls are not
 public door routes. `readImportDoorHistory(database, installationId,
 ownerPredicate)` joins approval metadata to the real kit jobs, with the caption
-"approved via Business by <owner> at <time>, fingerprint <x>". Configure
+"approved via Business by <owner> at <time>, fingerprint <x>". Failed target
+applies end the job as `failed`, with an allowlisted reason in `job.error`:
+`import_door_apply_constraint` (409), `import_door_apply_transient` (503), or
+`import_door_apply_failed` (409). Status/history include a durable `failureCode`
+and caption the approval as "approved, then failed". The failed atomic batch
+leaves no native effects. Its approval and consumed nonce remain audit facts;
+the failed plan and its approval cannot authorise a retry. Replan the retained
+upload for a fresh fingerprint and owner approval; roll back earlier committed
+batches first. Existing adopters apply `importDoorApplyFailureMigration` in one
+new atomic numbered migration; fresh adopters use `importDoorSchema`. Configure
 `ownerPrincipalId` as the seed owner's actual principal, and use that same
 principal in its ordinary history and undo context. The door does not rebind
 existing operator jobs or weaken their authority predicates.

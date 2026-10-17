@@ -40,9 +40,10 @@ export async function lineage(request: DoorRequest): Promise<{ head_id: string |
   for (;;) {
     const candidate = current.pending_id ?? current.head_id;
     if (!candidate) return current;
-    const row = await db.prepare('SELECT p.previous_id,j.state FROM ik_door_plans p LEFT JOIN ik_jobs j ON j.id=p.job_id WHERE p.id=?').bind(candidate).first();
+    const row = await db.prepare('SELECT p.previous_id,j.state,j.checkpoint FROM ik_door_plans p LEFT JOIN ik_jobs j ON j.id=p.job_id WHERE p.id=?').bind(candidate).first();
     let next: {head_id:string|null;pending_id:string|null} = current;
     if (current.pending_id && row?.state === 'completed') next = { head_id: candidate, pending_id: null };
+    else if (current.pending_id && row?.state === 'failed' && row.checkpoint === 0) next = { head_id: current.head_id, pending_id: null };
     else if (row && ['undone', 'rolled_back'].includes(row.state)) next = { head_id: current.pending_id ? current.head_id : row.previous_id, pending_id: null };
     if (next === current) return current;
     await transact(db, request.authority, [sql('UPDATE ik_door_namespaces SET head_id=?,pending_id=? WHERE installation_id=? AND namespace=? AND head_id IS ? AND pending_id IS ?', next.head_id, next.pending_id, installation, namespace, current.head_id, current.pending_id)]);

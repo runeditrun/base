@@ -32,7 +32,10 @@ writes; removal is unsupported. Rotate to a new `kid` to grant access again.
 
 Call `readImportDoorHistory(database, installationId, ownerPredicate)` to show
 approval metadata joined to real kit jobs. The caption is
-"approved via Business by <owner> at <time>, fingerprint <x>". Keep the ordinary
+"approved via Business by <owner> at <time>, fingerprint <x>" for a job without
+an apply failure. A failed apply is captioned "approved, then failed (<reason>)
+via Business by …"; `state`, `error` and the durable `failureCode` accompany it.
+Keep the ordinary
 seed history and undo flow, using the configured owner principal and its current
 owner-session predicate. Existing operator job binding remains unchanged.
 
@@ -99,7 +102,7 @@ their revision was unchanged. Gone source records are reported without deletion.
 
 Only one plan may remain pending per logical namespace until applied or undone.
 Committed kit state recovers lineage after an interrupted call. Repeating a
-bundle reuses its exact retained plan; use a fresh explicit namespace and review
+bundle reuses its exact retained plan unless that plan's apply failed; use a fresh explicit namespace and review
 for a different mapping. Undo snapshots newest first, including undo from the
 seed's ordinary owner history.
 
@@ -108,6 +111,33 @@ An interrupted private plan preparation reports
 to cancel its private preparation, then plan the retained upload again. A
 preparation with no kit job cancels without native effects. Once a job exists,
 the same route uses the kit's guarded rollback/undo instead.
+
+An exception during the target apply ends that job as `failed`. Its native
+batch is atomic: no writes from the failed batch remain. The approval and a
+separate failure fact remain for audit, including after an owner rollback.
+Status returns `job.state`, `job.error` and `failureCode`; history exposes the
+same reason. Provider messages and customer records are never stored as reasons.
+
+| Apply reason / HTTP status | Meaning |
+| --- | --- |
+| `import_door_apply_constraint` / 409 | A database constraint refused the batch. Correct the data or native writer before proposing another plan. |
+| `import_door_apply_transient` / 503 | The provider reported busy, locked, interrupted or unavailable service. A fresh reviewed attempt can be proposed after recovery. |
+| `import_door_apply_failed` / 409 | Another apply error. Inspect the seed's adapter before proposing another plan. |
+
+Every failed plan is terminal: further applies return
+`import_door_plan_failed`, even with a new grant or approval. The consumed grant
+nonce stays consumed. A retry needs a new plan, fingerprint and approval record;
+the approval associated with the failure cannot approve a retry, including a
+standing catch-up approval. When checkpoint is zero, `plan` can immediately
+prepare the same retained upload again in the same logical namespace. If earlier
+batches committed, first finish `undo` (guarded rollback) before replanning.
+The old job, immutable snapshot, approval and failure fact remain readable.
+
+Seeds that installed the earlier door schema must apply the exported
+`importDoorApplyFailureMigration` once in a new numbered migration, using a
+single atomic `database.batch()`. It preserves all plan ids, chunks and approvals
+while removing the old per-bundle uniqueness constraint and adding the failure
+table. Keep foreign keys enabled. Fresh installations use `importDoorSchema`.
 
 Bounded catch-up requires an existing nonempty baseline and standing owner
 approval. It refuses gone, conflicting, rejected or unmapped records. Additions
