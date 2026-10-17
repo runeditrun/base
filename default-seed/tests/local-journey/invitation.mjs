@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 // Use the live rer dev HTTP door and the real invitation screen. The browser's
 // request client shares its key cookie, exactly as the one-click action does.
 export async function invitedPerson(page, runtime) {
-  await page.locator('input[name="displayName"]').fill('Alex Morgan')
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Alex Morgan')
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill('alex@example.test')
   await page.getByRole('button', { name: 'Send invitation', exact: true }).click()
   const action = page.getByRole('link', { name: 'Sign in as Alex Morgan', exact: true })
