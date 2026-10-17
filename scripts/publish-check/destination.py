@@ -63,17 +63,21 @@ def destination(history, project=None, repository=None):
     if not present:
         identity(project)
         return None  # Legacy sources retain strict reference inspection.
-    documents = []
+    # Either manifest alone, or both, declares the destination; each present one binds.
+    documents = {}
     for name in MANIFESTS:
-        entry = named.get(name)
+        if name not in named:
+            continue
+        entry = named[name]
         if not ordinary_document(entry):
             raise ValueError('destination manifest must be an ordinary committed file')
         document = json.loads(history.blob(entry['oid']), object_pairs_hook=unique_object,
                               parse_constant=reject_constant)
         if not isinstance(document, dict):
             raise ValueError('destination manifest must be an object')
-        documents.append(document)
-    edition, project_document = documents
+        documents[name] = document
+    edition = documents.get('edition.json', {})
+    project_document = documents.get('rer-project.json')
     if 'identityKind' in edition:
         logical, invalid = tree_identity(history, named.values())
         if invalid or logical is None or project != logical:
@@ -84,9 +88,10 @@ def destination(history, project=None, repository=None):
         repository_value = repository_identity
     else:
         project_value = identity(project)
-        project_values = [identity(edition.get('id')), identity(project_document.get('projectId'))]
+        project_values = [identity(document.get(FIELDS[name])) for name, document in documents.items()]
         repository_value = lambda value: identity(value, url=True)
-    repository_values = [repository_value(project_document.get('sourceRepository'))]
+    repository_values = ([] if project_document is None else
+                         [repository_value(project_document.get('sourceRepository'))])
     if 'custody' in edition:
         custody = edition['custody']
         if not isinstance(custody, dict):

@@ -195,6 +195,18 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
         plant('GUIDE.md', 'Built from `acme-org/vault-app` internals.', resolver='private', rule='hygiene.github-private')
         plant('absent.mjs', "export const baseline = { '0006_missing_auth.sql': '" + secrets.token_hex(32) + "' };\n", rule='secret.assignment')
 
+    def test_destination_from_project_manifest_without_edition(self):
+        project = 'acme-org/absent-app'
+        repository = 'https://github.com/' + project
+        self.write('rer-project.json', json.dumps(dict(schema=1, projectId=project, name='Absent',
+                                                       sourceRepository=repository, license='MIT')))
+        self.commit()
+        with patch('github_refs.GitHubResolver.resolve', return_value='missing'):
+            report = self.report(project=project, repository=repository)
+        self.assertEqual(report['status'], 'PASS')
+        self.assertEqual(report['findings'], [])
+        self.assertTrue(any(f['rule'] == 'pending-public-destination' for f in report['info']))
+
     def test_module_git_pins_preserve_credential_findings(self):
         revision = secrets.token_hex(20)
         pins = {'auth-module': revision}
