@@ -333,6 +333,59 @@ test('owner-account hosting keeps local work offline and refuses failed deployme
  assert.throws(() => ownerAccountHosting({}), { name: 'TypeError' });
 });
 
+// rer dev's migration step runs through the machine-load job queue. The queue is
+// given a sampled load (never real load) and a short wait, with the jobs limit at 36.
+// The first sample takes longer than that wait, as the first lock/reclaim/sample pass does
+// on a slow runner: the outcome must follow the load, never how fast that pass was.
+async function devRun(t, f, { load, migrate }) {
+ const saved = { ...process.env };
+ Object.assign(process.env, { RER_JOBS_DIR: join(f.root, 'jobs'), RER_JOBS_LOAD_THRESHOLD: '36', RER_JOBS_MIN_FREE_MEMORY_BYTES: '0', RER_JOBS_SLOTS: '1' });
+ for (const key of ['CI', 'RER_JOB_POLICY', 'RER_JOB_MEMBERSHIP']) delete process.env[key];
+ t.after(() => { for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); });
+ const first = await installOnce(f, localInstaller(hooks()));
+ assert.equal(first.store.state.phase, 'complete', first.store.state.error);
+ await first.store.stop(first.app);
+ const store = await f.open();
+ const maxWait = 0.2; let sampled = false;
+ await store.configureQueue({ verb: 'dev', maxWait, sampler: async () => {
+  if (!sampled) { sampled = true; await new Promise(resolve => setTimeout(resolve, maxWait * 1000 * 1.5)); }
+  return { load, freeMemoryBytes: 1, availableMemoryBytes: 1024 ** 4 };
+ } });
+ let app;
+ const outcome = await localInstaller(hooks(migrate ? { migrate } : {})).run(f.root, input, store, child => { app = child; }, undefined, { verb: 'dev' }).then(() => null, error => error);
+ t.after(async () => { if (app) await store.stop(app); });
+ return { store, outcome, app };
+}
+
+test('a dev start held by the machine-load queue says the computer is busy, not that migrations failed', async t => {
+ const f = await fixture(t);
+ const { store, outcome, app } = await devRun(t, f, { load: 40 });
+ assert.ok(outcome, 'the dev start is refused');
+ const message = store.redact(outcome.message);
+ assert.match(message, /^Not started: this computer is busy\. Its 1-minute load is 40\.0 and jobs start only at 36 or below/);
+ assert.match(message, /running rer dev again/); assert.match(message, /RER_JOBS_LOAD_THRESHOLD=80 rer dev/);
+ assert.doesNotMatch(message, /Local migrations failed|Installation stopped/);
+ assert.equal(app, undefined, 'nothing started');
+ assert.equal(await readFile(join(f.root, 'migrations.log'), 'utf8'), 'applied\n', 'the held migration did not run again');
+});
+
+test('a dev start whose migration really fails keeps its own message with the command output', async t => {
+ const f = await fixture(t);
+ const { outcome } = await devRun(t, f, { load: 1, migrate: [node, ['-e', "console.error('no such table: widgets'); process.exit(1)"]] });
+ assert.match(outcome.message, /Applying database migrations: exit 1, signal none\./);
+ assert.match(outcome.message, /no such table: widgets/);
+ assert.match(outcome.message, /Local migrations failed\. Fix the error and run rer setup/);
+ assert.doesNotMatch(outcome.message, /machine is busy|this computer is busy/);
+});
+
+test('a dev start under the load limit applies migrations and starts the application', async t => {
+ const f = await fixture(t);
+ const { store, outcome, app } = await devRun(t, f, { load: 1 });
+ assert.equal(outcome, null);
+ assert.equal(await readFile(join(f.root, 'migrations.log'), 'utf8'), 'applied\napplied\n');
+ assert.equal(app.exitCode, null);
+});
+
 async function readdirSafe(path) {
  const { readdir } = await import('node:fs/promises');
  try { return await readdir(path); } catch (error) { if (error.code === 'ENOENT') return []; throw error; }

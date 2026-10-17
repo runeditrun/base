@@ -14,5 +14,5 @@ export async function lifecycleError(error, store) {
  const {shared}=await import('./shared.mjs');
  const {approvedFailure}=await shared('failures.mjs');
  const approved=approvedFailure(error);
- return new RerError(approved?.code==='owner_conflict'?'safety_refusal':'command_failed', approved?.message ?? `${store?.state?.step ?? 'Local lifecycle'} failed. Inspect the private redacted capture log.`, approved?.exitCode ?? 1, {childExitCode:approved?.childExitCode,signal:approved?.signal});
+ return new RerError(['owner_conflict','machine_busy'].includes(approved?.code)?'safety_refusal':'command_failed', approved?.message ?? `${store?.state?.step ?? 'Local lifecycle'} failed. Inspect the private redacted capture log.`, approved?.exitCode ?? 1, {childExitCode:approved?.childExitCode,signal:approved?.signal});
 }

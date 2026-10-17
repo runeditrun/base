@@ -184,6 +184,8 @@ async function hostedNeeds(project) {
 // full log. A step that stopped outside a command still names the step and log.
 async function installStepError(error, store, root) {
  const { approvedFailure } = await shared('failures.mjs');
+ // A step the job queue never admitted is a busy machine; its message already says what to do.
+ if (approvedFailure(error)?.code === 'machine_busy') return error;
  const { checkoutPath, stepDiagnostic, stepFailureText } = await shared('step-failure.mjs');
  const step = approvedFailure(error)?.step ?? stepDiagnostic({ name: store.state.step, output: store.state.logs, log: store.redact(checkoutPath(root, store.logPath)) });
  // Only a RerError's message or a symbolic error code is safe to show; a native message can hold private data.

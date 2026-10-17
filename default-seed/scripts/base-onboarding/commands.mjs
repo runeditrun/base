@@ -1,4 +1,5 @@
-import { queuedCommand, queueLabel, commandPolicy } from './queue.mjs';
+import { queuedCommand, queueLabel, commandPolicy, maxWaitSeconds } from './queue.mjs';
+import { busyRefusal } from './busy.mjs';
 import { spawn as spawnChild } from 'node:child_process';
 import { writeSync } from 'node:fs';
 import { join } from 'node:path';
@@ -148,8 +149,9 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
     let queuedChild;
     const commandSignal=signal&&options.signal?AbortSignal.any([signal,options.signal]):options.signal||signal;
     const result = await queuedCommand(command,args,{...options,verb:queuePolicy.verb,signal:commandSignal,originalCI:policy.ci,
-     label:await queueLabel(options.cwd??process.cwd(),queuePolicy.verb,options.phase??'command'),report,onWaiting,
+     label:await queueLabel(options.cwd??process.cwd(),queuePolicy.verb,options.phase??'command'),report,onWaiting,maxWait:queuePolicy.maxWait,queueOptions:queuePolicy.sampler?{sampler:queuePolicy.sampler}:undefined,
      spawn:(program,argv,native)=>(queuedChild=spawnCommand(label,program,argv,{...native,onChild:options.onChild,display:options.display})),cleanup:async(child,result)=>{await stopCommand(child);await options.afterCommand?.(result);}});
+    if(result?.timedOut)throw busyRefusal({...result,reason:redaction.redact(String(result.reason))},{verb:queuePolicy.verb,maxWait:queuePolicy.maxWait??maxWaitSeconds});
     if(result){if(result.code!==0)throw failure(label,result,captures.get(queuedChild));return result;}
    }
    let child;try{child=spawnCommand(label,command,args,options);}catch{throw failure(label,options.signal?.aborted||signal?.aborted?{reason:'cancel'}:{error:true});}

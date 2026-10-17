@@ -212,6 +212,7 @@ servers with the command that stops each; start with `RER_SERVER_LIMIT=N` to
 allow more. Machine load alone never refuses a start or holds heavy work; a
 fleet that wants a load guard sets `RER_SERVERS_LOAD_THRESHOLD=N` and
 `RER_JOBS_LOAD_THRESHOLD=N` (the 1-minute load) in its own environment.
+When `rer dev` or `rer setup` holds a step 20 minutes for that guard, it stops with `Not started: this computer is busy`, the measured load, the threshold and the next step (run the same command again, or raise `RER_JOBS_LOAD_THRESHOLD`); it is never reported as a failed migration.
 A start needs 15 GiB free on the checkout and temporary volumes;
 `RER_SERVERS_DISK_FLOOR_GIB=N` changes that floor. A CI runner on a small disk
 may set it lower (for example 4); people should not.

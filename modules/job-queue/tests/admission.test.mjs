@@ -60,3 +60,13 @@ for (const [name, sampler, pattern, limits] of [
   const state = await recordedState(directory).read();
   assert.deepEqual(state.queued, []); assert.deepEqual(state.running, []);
 });
+test('a slow first admission pass still admits a job the machine can run', async t => {
+  let sampled = false;
+  const { queue } = await setup(t, { sampler: async () => {
+    if (!sampled) { sampled = true; await new Promise(resolve => setTimeout(resolve, 150)); }
+    return { load: 0, availableMemoryBytes: 1024 ** 4 };
+  } });
+  let started = false;
+  const result = await queue.run([process.execPath, '-e', 'process.exit(0)'], { maxWait: .05, onStarted: () => { started = true; } });
+  assert.equal(result.code, 0); assert.equal(started, true);
+});
