@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.46-dev.g609b55db",
+  "cliVersion": "0.2.46",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -815,7 +815,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "e9d2a8d99a5a4d98ac5c432962a3e2f934c1c3ede7cd9e20f62545eb8cc5cebd"
+      "sha256": "844804a8ac75e8f4e0df806d3e0d6eb70c1759b45b1f7d7be925230fba4ab4f1"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -1855,7 +1855,7 @@
     },
     "modules/job-queue/identity.mjs": {
       "source": "modules/job-queue/identity.mjs",
-      "sha256": "5a860e5a80227c3a552c25d5917e58c7b04a01004e4313f8c09c300c7add1b1e"
+      "sha256": "6846f930bb008594602e96bdb18e4b2ed043dc4cb6ccfd52225099b55c6ff605"
     },
     "modules/job-queue/index.mjs": {
       "source": "modules/job-queue/index.mjs",
