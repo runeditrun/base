@@ -56,8 +56,10 @@ export class NativeDemo extends DurableObject {
       const seeded = await app.fetch(new Request(origin + '/health', { headers: { 'cf-connecting-ip': clientIp, cookie: cookies.map(cookie => cookie.split(';')[0]).join('; ') } }));
       await seeded.arrayBuffer();
       if (!seeded.ok) throw new Error(`demo-seed-${seeded.status}`);
-      if (this.state?.phase !== 'starting') throw new Error('demo-ended-during-start');
       if (!await this.capacity().extend(id, ends)) throw new Error('start-reservation-expired');
+      // Checked after the extend, right before ready: an end that ran meanwhile
+      // released this place, and the copy must not outlive it.
+      if (this.state?.phase !== 'starting') throw new Error('demo-ended-during-start');
       this.state = { ...this.state, phase: 'ready', cookies, location: claimed.headers.get('location'), timing: { migrationsMs: migrated - at, claimAndSeedMs: Date.now() - migrated, totalMs: Date.now() - started } };
       await this.save();
       await this.schedule(await nextQueue(this));
@@ -125,8 +127,9 @@ export class NativeDemo extends DurableObject {
     if (!current || current > at) await this.ctx.storage.setAlarm(at);
   }
   async alarm() {
-    if (this.state?.phase === 'ending') return this.end();
-    try { await this.active(); } catch { return; }
+    // An ending copy's alarm finishes its erasure; a failed attempt keeps the retry alarm.
+    if (this.state?.phase === 'ending') { await this.end(); return this.erasing; }
+    try { await this.active(); } catch { return this.erasing; }
     try {
       if (this.state.phase === 'ready') {
         const now = Date.now(), minute = Math.floor(now / 60_000);
@@ -143,18 +146,28 @@ export class NativeDemo extends DurableObject {
       }
     } finally { await this.schedule(await nextQueue(this)); }
   }
+  // Cancel, sign-out, expiry and a failed start all end here. The copy stops
+  // serving and frees its place first, so the next visitor is admitted at once
+  // however long erasing its storage takes (an upload still streaming into R2
+  // holds that). Concurrent ends share one release; a later one finds the copy
+  // already erasing. Erasure follows, and the retry alarm repeats it until done.
   end() {
-    if (!this.ending) this.ending = this.erase().finally(() => { this.ending = undefined; });
+    if (this.erasing) return Promise.resolve();
+    this.ending ??= this.retire().finally(() => { this.ending = undefined; });
     return this.ending;
   }
-  async erase() {
+  async retire() {
     if (this.state) { this.state.phase = 'ending'; await this.save(); }
-    // Keep a retry alarm until external objects have actually been erased.
     await this.ctx.storage.setAlarm(Date.now() + 10_000);
+    await this.capacity().release(this.ctx.id.toString());
+    this.erasing = this.erase()
+      .catch(error => console.error(JSON.stringify({ event: 'native-demo-erase-failed', message: error.message })))
+      .finally(() => { this.erasing = undefined; });
+  }
+  async erase() {
     await eraseResources(this);
     await this.ctx.storage.deleteAll();
     await this.ctx.storage.deleteAlarm();
     this.state = undefined;
-    await this.capacity().release(this.ctx.id.toString());
   }
 }

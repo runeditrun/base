@@ -130,8 +130,9 @@ async function start(request, env, ctx) {
 }
 
 // The visitor explicitly abandons this copy before running a fresh human check.
-// Wait for destruction and place release; a failed cleanup must retain the cookie
-// so another click can finish it instead of silently leaking a reservation.
+// Wait until the copy has stopped and released its place (its storage is erased
+// after); a failure must retain the cookie so another click can finish it
+// instead of silently leaking a reservation.
 async function cancel(request, env) {
   if (request.headers.get('origin') !== env.DEMO_ORIGIN) return refusal(request, env, 403, 'Start the demo from this page.');
   const id = demoId(request, env);
