@@ -31,14 +31,15 @@ export async function alive(owner) {
   return new Promise((resolve, reject) => {
     const connection = createConnection(owner.socket);
     let body = '';
-    connection.setTimeout(3000, () => connection.destroy(Error('Owner identity probe timed out; refusing admission')));
+    connection.setTimeout(3000, () => connection.destroy(Object.assign(Error('Owner identity probe timed out'), { code: 'PROBE_TIMEOUT' })));
     connection.on('data', data => { body += data; if (body.length > 128) connection.destroy(Error('Invalid owner identity')); });
     connection.on('end', () => resolve(body === owner.token));
     connection.on('error', async error => {
       if (['ENOENT', 'ECONNREFUSED'].includes(error.code)) resolve(false);
-      else if (error.code === 'ECONNRESET') {
-        // Listener shutdown can reset a probe after the initial PID check.
-        // Reclaim proven death; otherwise retain the owner until the next sample.
+      else if (['ECONNRESET', 'PROBE_TIMEOUT'].includes(error.code)) {
+        // Listener shutdown can reset a probe after the initial PID check, and a
+        // busy owner can answer late. Neither proves death: reclaim only a process
+        // that is gone; otherwise retain the owner until the next sample.
         try {
           const after = await processInfo(owner.pid);
           resolve(Boolean(after && !after.zombie && after.start === owner.start));

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { setup, until, worker } from './helpers.mjs';
-import { atomicJson } from '../storage.mjs';
+import { atomicJson, transaction } from '../storage.mjs';
 import { processInfo } from '../processes.mjs';
 import { identity, alive } from '../identity.mjs';
 import { recordedState } from './state.mjs';
@@ -116,4 +117,35 @@ test('process identity is stable across sessions with different TZ settings', as
     process.env.TZ = 'Australia/Brisbane'; const brisbane = await processInfo(process.pid);
     assert.equal(utc.start, brisbane.start);
   } finally { if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous; }
+});
+
+// A running lease whose owner is this live process, answering its identity probe as `answer` says.
+async function occupiedBy(t, directory, answer) {
+  const token = 'owner-token', socket = join(directory, 'owner.sock'), connections = [];
+  const server = createServer(connection => { connections.push(connection); answer(connection, token, connections.length); });
+  await new Promise(resolve => server.listen(socket, resolve));
+  t.after(async () => { connections.forEach(connection => connection.destroy()); await new Promise(resolve => server.close(resolve)); });
+  const current = await processInfo(process.pid);
+  await atomicJson(join(directory, 'state.json'), { version: 1, sequence: 1, queued: [],
+    running: [{ id: 'busy', label: 'busy', sequence: 1, priority: 'normal', owner: { ...current, pgid: process.pid, token, socket } }] });
+  return { connections };
+}
+
+test('a waiting job keeps waiting when the occupying owner is slow to answer its identity probe, and is admitted once the slot frees', async t => {
+  const { directory, queue } = await setup(t);
+  // The first probe is never answered (a busy owner); later ones are.
+  const { connections } = await occupiedBy(t, directory, (connection, token, count) => { if (count > 1) connection.end(token); });
+  const pending = queue.run([process.execPath, '-e', 'process.exit(0)']);
+  const outcome = await Promise.race([pending.then(result => ({ result }), error => ({ error })),
+    until(() => connections.length > 1).then(() => 'resampled')]);
+  assert.equal(outcome, 'resampled', `the probe timeout aborted the waiting job: ${outcome.error?.message}`);
+  const releaser = await identity();
+  try { await transaction(directory, releaser.info, state => { state.running = []; }); } finally { await releaser.close(); }
+  assert.equal((await pending).code, 0);
+});
+
+test('a probe that proves the occupying owner gone frees the slot for the waiting job', async t => {
+  const { directory, queue } = await setup(t);
+  await occupiedBy(t, directory, (connection, token) => connection.end(`not-${token}`));
+  assert.equal((await queue.run([process.execPath, '-e', 'process.exit(0)'])).code, 0);
 });

@@ -39,3 +39,20 @@ test('a rer command whose job supervisor is killed ends with one message, no lea
  await assert.rejects(access(job.owner.socket),{code:'ENOENT'});
  assert.ok(await until(()=>gone(task),'the job process survived its supervisor'));
 });
+
+// A queue failure rer did not classify must reach the person with its own message.
+test('a rer command whose job queue fails for an unclassified reason says why, not a generic failure',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'rer-queue-failure-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const env=await isolatedQueue(t,{...process.env,RER_JOBS_SLOTS:'1'});delete env.CI;
+ await writeFile(join(root,'OPERATIONS.json'),JSON.stringify({version:2,project:'example/queue-failure',runtime:{requirements:[]},requiredEnvironment:[],
+  commands:{verify:{argv:[process.execPath,'task.mjs'],inputs:['task.mjs'],effects:'Never starts.'}}}));
+ await writeFile(join(root,'task.mjs'),"process.exit(0);\n");
+ await writeFile(join(env.RER_JOBS_DIR,'state.json'),JSON.stringify({version:2}));
+ const result=await new Promise((resolve,reject)=>{
+  const client=spawn(process.execPath,[entry,'verify'],{cwd:root,env,stdio:['ignore','pipe','pipe']});
+  let stderr='';client.stderr.on('data',chunk=>stderr+=chunk);client.once('error',reject);client.once('close',code=>resolve({code,stderr}));
+ });
+ assert.equal(result.code,1);
+ assert.match(result.stderr,/Invalid job queue state/);
+ assert.doesNotMatch(result.stderr,/^Command failed; inspect/m);
+});

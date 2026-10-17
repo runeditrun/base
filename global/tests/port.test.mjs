@@ -7,7 +7,7 @@
 // program on the computer would.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -73,8 +73,14 @@ process.exitCode = await main();
  const saved = Number(env.RER_DEV_PORT_FROM), other = launchPath(join(directory, 'other'), env);
  await mkdir(other, { recursive: true });
  await writeFile(join(other, 'setup.json'), JSON.stringify({ state: 'done', port: saved, owner: 'owner@other.test', at: Date.now() }));
+ // An earlier launch's install failed, and the dependencies were repaired after it (node_modules is linked and
+ // neither pnpm-lock.yaml nor package.json is newer): this launch uses them instead of installing again.
+ const own = launchPath(await realpath(root), env);
+ await mkdir(own, { recursive: true });
+ await writeFile(join(own, 'install.json'), JSON.stringify({ state: 'failed', at: Date.now() }));
  const launched = await rer(['dev']);
  assert.equal(launched.code, 0, launched.stderr + launched.stdout);
+ assert.doesNotMatch(launched.stderr + launched.stdout, /installing dependencies/, 'a failed install is not retried while its dependencies are current');
  const taken = Number(await readFile(join(directory, 'taken-port'), 'utf8'));
  const ready = new URL(launched.stdout.match(/^RER_READY (\S+)$/m)?.[1] ?? 'http://invalid');
  assert.ok(taken !== saved && Number(ready.port) !== saved, 'the launch never chooses the stopped checkout\'s port');

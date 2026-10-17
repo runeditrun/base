@@ -20,17 +20,24 @@ export async function describeCheckout(root, entry, env, signal) {
  }
 }
 
-// Install when the last install did not finish or the lockfile changed since.
-// pnpm writes node_modules/.modules.yaml only once dependencies are linked and
-// built, so a stopped install leaves it absent. An install this launcher ran
-// is finished only when its record says so: that also covers the project's
-// own install hooks, which pnpm runs after writing the manifest.
+// Install when the last install was killed, nothing is linked, or the lockfile
+// changed since. pnpm writes node_modules/.modules.yaml only once dependencies
+// are linked and built, so a stopped install leaves it absent. An install this
+// launcher ran is finished only when its record says so: that also covers the
+// project's own install hooks, which pnpm runs after writing the manifest. A
+// recorded failed install is retried only when the lockfile or package.json is
+// newer than both that attempt and what is installed; dependencies repaired
+// since are current, and the next launch uses them.
 export async function needsInstall(root, last) {
- if (last && last.state !== 'done') return true;
- const manifest = await mtime(join(root, 'node_modules/.modules.yaml'));
- if (manifest === undefined) return true;
- const lock = await mtime(join(root, 'pnpm-lock.yaml'));
- return lock !== undefined && Math.max(manifest, last?.at ?? 0) < lock;
+ if (last?.state === 'running') return true;
+ const linked = await mtime(join(root, 'node_modules/.modules.yaml'));
+ if (linked === undefined) return true;
+ const since = Math.max(linked, last?.at ?? 0);
+ for (const file of last?.state === 'failed' ? ['pnpm-lock.yaml', 'package.json'] : ['pnpm-lock.yaml']) {
+  const changed = await mtime(join(root, file));
+  if (changed !== undefined && changed > since) return true;
+ }
+ return false;
 }
 
 // A checkout is set up when its pin's describe says so (`local.prepared`, from
