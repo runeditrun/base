@@ -7,7 +7,9 @@
 // entry's CSS imports compile to. The optional site config is a Vite config
 // naming the plugins the site pages need (a docs virtual module, a CSS
 // toolchain); the app's own Vite config is never loaded, because its Worker
-// plugins do not run in Node. It reads no installation data.
+// plugins do not run in Node. It reads no installation data. A seed with a
+// CONTRACT.md gets it parsed as sitePages({ contract }), for its /contract
+// page; one that does not parse stops the build, naming its lines.
 // Usage: node site-render.mjs ROOT ENTRY OUTPUT [CONFIG]
 import { cp, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -15,6 +17,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { buildClients, writeSiteAsset } from './site-client.mjs';
 import { redactSiteOutput, siteBuildDiagnostic } from './site-diagnostics.mjs';
+import { ContractError, parseContract } from '../foundation/runtime/seed-contract.mjs';
 
 redactSiteOutput();
 
@@ -29,6 +32,13 @@ let vite;
 try { vite = await import(pathToFileURL(createRequire(join(root, 'package.json')).resolve('vite')).href); }
 catch { fail('The run site renders with the checkout\'s own Vite. Run rer install first.'); }
 process.env.NODE_ENV ??= 'production';
+
+let contract;
+try { contract = parseContract(await readFile(join(root, 'CONTRACT.md'), 'utf8')); }
+catch (error) {
+ if (error instanceof ContractError) fail(`The run site's /contract page is built from CONTRACT.md, which does not parse:\n${error.message}`);
+ if (error.code !== 'ENOENT') throw error;
+}
 
 // The Node bundle sits beside the output, inside the checkout, so its external
 // imports resolve from the checkout's node_modules. It never enters the site.
@@ -52,7 +62,7 @@ try {
  if (typeof module.sitePages !== 'function') fail(`${entry} must export sitePages(), returning { pages: [{ path, html }], assets: [public paths] }.`);
  const clientBuild = await buildClients(vite, root, output, clientJSON ? JSON.parse(clientJSON) : {}), clients = clientBuild.clients;
  styles = [...new Set([...styles,...clientBuild.styles])];
- const build = await module.sitePages({ styles, clients });
+ const build = await module.sitePages({ styles, clients, ...(contract ? { contract } : {}) });
  if (!Array.isArray(build?.pages) || !Array.isArray(build.assets)) fail('sitePages() returns { pages, assets }.');
 
  const written = new Set();

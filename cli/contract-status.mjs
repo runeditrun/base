@@ -20,7 +20,7 @@ export async function contractStatusClauses(root) {
   const inside = !isAbsolute(path) && !normalize(path).split(sep).includes('..');
   let exists = false;
   if (inside) try { await lstat(join(root, path)); exists = true; } catch {}
-  clauses.push({ id: `CONTRACT.evidence.${clause.id}`, ok: exists, ...(!exists ? { message: `${file}:${clause.line}: ${clause.id} is ${clause.status} with evidence ${path}, which ${inside ? 'is not in this checkout' : 'is outside this repository'}.` } : {}) });
+  clauses.push({ id: `CONTRACT.evidence.${clause.id}`, ok: exists, ...(!exists ? { message: `${file}:${clause.row}: ${clause.id} is ${clause.status} with evidence ${path}, which ${inside ? 'is not in this checkout' : 'is outside this repository'}.` } : {}) });
  }
  return clauses;
 }

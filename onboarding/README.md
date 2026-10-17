@@ -79,11 +79,15 @@ font files the app already serves; anything else is refused.
 | `--rer-font-body`, `--rer-font-heading` | font stack (optional) | text; headings and product name |
 | `--rer-radius` | `px` or `rem` length (optional) | cards, inputs, buttons |
 | `--rer-logo` | `url("/path")` to an svg, png or webp the app serves (optional) | mark beside the product name |
+| `--rer-done`, `--rer-partial`, `--rer-missing` | colour (optional; Base has defaults) | status fills on the run site's `/contract` |
+| `--rer-done-ink`, `--rer-partial-ink`, `--rer-missing-ink` | colour (optional) | status words and counts on `/contract` |
+| `--rer-on-done`, `--rer-on-partial`, `--rer-on-missing` | colour (optional) | labels printed on each status fill |
 
 Contrast is checked against the declared colours before the installer starts:
 text on page and surface, muted text on page and surface, links on surface and
-accent text on accent need 4.5:1; focus on page and surface and borders on
-surface need 3:1. A failing pair is named with its ratio. Every `url()` must
+accent text on accent need 4.5:1, as do each declared status ink on page and
+surface and each `--rer-on-*` label on its declared fill; focus on page and
+surface and borders on surface need 3:1. A failing pair is named with its ratio. Every `url()` must
 name a same-origin file under the served directory.
 
 The app must serve the file at `/rer-theme.css` with its fonts and logo; a

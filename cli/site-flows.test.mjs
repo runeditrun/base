@@ -148,3 +148,39 @@ test('site build refuses private data reached by a browser island', async t => {
  assert.match(result.stdout, /site_private_input/);
  await assert.rejects(readFile(join(f.root, 'dist/site/index.html')), {code:'ENOENT'});
 });
+
+test('site build renders /contract from CONTRACT.md, links it only when it exists and refuses a malformed contract', async t => {
+ const f = await seed(t), page = name => readFile(join(f.root, 'dist/site', name), 'utf8');
+ let result = await f.build();
+ assert.equal(result.code, 0, result.stdout + result.stderr);
+ await assert.rejects(page('contract.html'), {code:'ENOENT'});
+ for (const name of ['index.html', 'run.html', '404.html']) assert.doesNotMatch(await page(name), /href="\/contract"/);
+ const rows = [['HOME-001', 'Public landing', 'published', 'done', '`src/site/pages.ts`', ''], ['HOME-002', 'Owner sign-in', 'published', 'partial', '`src/core/app/identity.ts`', 'no second factor'], ['SYNC-001', 'Offline edits', 'target', 'missing', '', 'not implemented']];
+ const contract = rows => ['# Contract', '', '## Product target', '', '| | |', '| --- | --- |', '| Category | Team notes |', '| Incumbents a buyer switches from | Notion, Confluence |', '| First buyer | A small US team |', '',
+  '## Pages', '', '- **HOME-001 — Public landing.** The homepage.', '- **HOME-002 — Owner sign-in.** The owner signs in.', '', '## Target clauses', '', '### Working offline', '', '- **SYNC-001 — Offline edits.** Edits merge.', '',
+  '## Status', '', 'Judged from the code and tests at commit `0123abcd` (16 October 2026).', '', '| Clause | Title | Kind | Status | Evidence | Gap |', '| --- | --- | --- | --- | --- | --- |', ...rows.map(row => `| ${row.join(' | ')} |`), ''].join('\n');
+ const counts = async () => Object.fromEntries(['done', 'partial', 'missing', 'total'].map(key => [key, Number(/<section id="progress"[^>]*>/.exec(html)[0].match(new RegExp(`data-${key}="(\\d+)"`))[1])]));
+ const { parseContract } = await import('../foundation/runtime/seed-contract.mjs');
+ let html;
+ for (const [index, status, gap] of [[-1], [0, 'missing', 'not shipped']]) {
+  if (index >= 0) Object.assign(rows[index], { 3: status, 4: '', 5: gap });
+  const text = contract(rows);
+  await writeFile(join(f.root, 'CONTRACT.md'), text);
+  result = await f.build();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  html = await page('contract.html');
+  const parsed = parseContract(text).counts;
+  assert.deepEqual(await counts(), parsed);
+  assert.match(html, new RegExp(`${parsed.done} of ${parsed.total} clauses done`));
+  assert.equal([...html.matchAll(/<tr class="clause"[^>]*data-status="missing"/g)].length, parsed.missing);
+  for (const name of ['index.html', 'run.html', '404.html', 'contract.html']) assert.match(await page(name), /href="\/contract"/);
+ }
+ assert.deepEqual(await counts(), { done: 0, partial: 1, missing: 2, total: 3 });
+ const broken = contract(rows).replace('| HOME-002 | Owner sign-in | published | partial |', '| HOME-002 | Owner sign-in | published |');
+ await writeFile(join(f.root, 'CONTRACT.md'), broken);
+ result = await f.build();
+ assert.notEqual(result.code, 0);
+ const line = broken.split('\n').findIndex(text => text.startsWith('| HOME-002')) + 1;
+ assert.match(result.stdout + result.stderr, new RegExp(`CONTRACT\\.md:${line}: A Status row has 6 cells`));
+ assert.match(await page('contract.html'), /0 of 3 clauses done/);
+});

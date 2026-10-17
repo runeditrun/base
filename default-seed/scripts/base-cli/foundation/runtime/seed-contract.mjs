@@ -93,14 +93,31 @@ function readTarget(lines, headings, problems) {
     const text = lines[line - 1]
     if (!isTableLine(text) || isDivider(text)) continue
     const [label = '', value = ''] = cells(text), name = plainText(label).toLowerCase()
-    const key = name === 'category' ? 'category' : name.startsWith('incumbents') ? 'incumbents' : name === 'first buyer' ? 'firstBuyer' : undefined
+    const key = name === 'category' ? 'category' : name.startsWith('incumbents') ? 'incumbents' : name === 'first buyer' ? 'firstBuyer' : /\balso beat\b/.test(name) ? 'alsoBeats' : undefined
     if (key && !found[key]) found[key] = { value: plainText(value), line }
   }
   for (const [key, label] of [['category', 'Category'], ['incumbents', 'Incumbents a buyer switches from'], ['firstBuyer', 'First buyer']])
     if (!found[key]?.value) problems.push({ line: found[key]?.line ?? section.line, message: `The Product target table needs a non-empty "${label}" row.` })
   if (!found.category?.value || !found.incumbents?.value || !found.firstBuyer?.value) return undefined
   const incumbents = found.incumbents.value.split(/\s*,\s*|\s+(?:and|or)\s+/).map(name => name.trim()).filter(Boolean)
-  return { category: found.category.value, incumbents, firstBuyer: found.firstBuyer.value }
+  return { category: found.category.value, incumbents, replaces: found.incumbents.value, alsoBeats: found.alsoBeats?.value || null, firstBuyer: found.firstBuyer.value }
+}
+
+/** An area's anchor: "Archive, trash and deletion" -> "archive-trash-and-deletion". */
+export function areaSlug(name) {
+  return name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+// Target and push-further areas sit under (or are) a heading starting
+// "Target clauses" or "Push further"; every other area is published.
+const targetSection = /^(?:Target clauses|Push further)\b/i
+function areaGroup(headings, area) {
+  let level = area.level + 1
+  for (const entry of headings.filter(other => other.line <= area.line).reverse()) {
+    if (entry.level >= level) continue
+    if (targetSection.test(entry.text)) return 'target'
+    level = entry.level
+  }
+  return 'published'
 }
 
 // Clause definitions everywhere except the Status section and retired-ID
@@ -108,7 +125,7 @@ function readTarget(lines, headings, problems) {
 // A clause's own "*Status:* partial." line, kept beside its text, is recorded
 // so a row that disagrees with it is refused.
 function readDefinitions(lines, headings, skipped, problems) {
-  const defined = new Map(), areaNames = []
+  const defined = new Map(), areas = new Map(), slugs = new Map()
   let fence, current
   lines.forEach((text, index) => {
     const line = index + 1
@@ -128,9 +145,16 @@ function readDefinitions(lines, headings, skipped, problems) {
     if (!area) { problems.push({ line, message: `${clause} is defined above every section heading, so it has no area.` }); return }
     current = { id: clause, title: cleanTitle(title), area: area.text, line }
     defined.set(clause, current)
-    if (!areaNames.includes(area.text)) areaNames.push(area.text)
+    const group = areaGroup(headings, area), known = areas.get(area.text)
+    if (known && known.group !== group) problems.push({ line: area.line, message: `Area "${area.text}" is a ${group} area here but a ${known.group} area at line ${known.line}; give one of them its own name.` })
+    if (known) return
+    const slug = areaSlug(area.text)
+    if (!slug) problems.push({ line: area.line, message: `Area "${area.text}" has no letters or digits to make its #area- link from.` })
+    else if (slugs.has(slug)) problems.push({ line: area.line, message: `Area "${area.text}" has the same link (#area-${slug}) as "${slugs.get(slug).text}" at line ${slugs.get(slug).line}; rename one.` })
+    else slugs.set(slug, area)
+    areas.set(area.text, { name: area.text, slug, group, line: area.line })
   })
-  return { defined, areaNames }
+  return { defined, areas }
 }
 
 function readSummary(lines, start, problems) {
@@ -183,7 +207,7 @@ export function parseContract(text, { file = 'CONTRACT.md' } = {}) {
   const status = statusHeading[0], statusEnd = sectionEnd(headings, status, lines.length)
   const skipped = [[status.line, statusEnd], ...headings.filter(entry => /^Retired\b/i.test(entry.text)).map(entry => [entry.line, sectionEnd(headings, entry, lines.length)])]
   const target = readTarget(lines, headings, problems)
-  const { defined, areaNames } = readDefinitions(lines, headings, skipped, problems)
+  const { defined, areas: areaHeadings } = readDefinitions(lines, headings, skipped, problems)
 
   // The judged-at line opens the section.
   let commit, date
@@ -213,6 +237,7 @@ export function parseContract(text, { file = 'CONTRACT.md' } = {}) {
     else if (header.join('|') !== statusHeader.join('|')) { wrongHeader = true; problems.push({ line, message: `The Status table header is | ${statusHeader.join(' | ')} |, not | ${header.join(' | ')} |.` }) }
     else {
       tableLine = line
+      if (end < line + 2) problems.push({ line, message: 'The Status table has no rows: it holds one row per clause the contract defines.' })
       for (let rowLine = line + 2; rowLine <= end; rowLine++) {
         const row = cells(lines[rowLine - 1])
         if (row.length !== statusHeader.length) { problems.push({ line: rowLine, message: `A Status row has ${statusHeader.length} cells (${statusHeader.join(', ')}); this one has ${row.length}.` }); continue }
@@ -231,7 +256,7 @@ export function parseContract(text, { file = 'CONTRACT.md' } = {}) {
         if (state === 'done' && !evidence.length) problems.push({ line: rowLine, message: `${clause} is done, so its Evidence names the repository path that proves it, in backticks.` })
         if (state === 'partial' && !evidence.length) problems.push({ line: rowLine, message: `${clause} is partial, so its Evidence names the repository path that backs it, in backticks.` })
         if ((state === 'partial' || state === 'missing') && !gap) problems.push({ line: rowLine, message: `${clause} is ${state}, so its Gap says what is missing.` })
-        if (definition && kinds.includes(kind) && statuses.includes(state)) clauses.push({ id: clause, title, kind, status: state, evidence, gap, area: definition.area, line: rowLine })
+        if (definition && kinds.includes(kind) && statuses.includes(state)) clauses.push({ id: clause, title, kind, status: state, evidence, gap, area: definition.area, line: definition.line, row: rowLine })
       }
     }
     line = end
@@ -241,8 +266,15 @@ export function parseContract(text, { file = 'CONTRACT.md' } = {}) {
   if (!problems.length) checkSummaries(summaries, sentences, clauses, problems)
   if (problems.length) throw new ContractError(file, problems.sort((a, b) => a.line - b.line))
 
-  const areas = areaNames.map(name => ({ name, clauses: clauses.filter(clause => clause.area === name).map(clause => clause.id) })).filter(area => area.clauses.length)
-  const counts = { done: 0, partial: 0, missing: 0, total: clauses.length }
-  for (const clause of clauses) counts[clause.status]++
+  const tally = rows => {
+    const counts = { done: 0, partial: 0, missing: 0, total: rows.length }
+    for (const row of rows) counts[row.status]++
+    return counts
+  }
+  const areas = [...areaHeadings.values()].map(({ name, slug, group }) => {
+    const own = clauses.filter(clause => clause.area === name).sort((a, b) => a.line - b.line)
+    return { name, slug, group, clauses: own.map(clause => clause.id), ...tally(own) }
+  }).filter(area => area.total)
+  const counts = tally(clauses)
   return { commit, date, target, areas, clauses, counts }
 }
