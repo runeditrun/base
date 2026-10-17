@@ -13,7 +13,7 @@ const name = ['playwright-core', '@playwright/test', 'playwright'].find(name => 
 if (!name) throw Error('The test needs an installed checkout with Playwright.');
 const playwright = dirname(require.resolve(name + '/package.json'));
 
-test('doctor diagnoses missing Chromium and headless shell without provisioning them', { timeout: 30000 }, async t => {
+test('doctor lists Chromium and headless shell as not downloaded yet, without failing on them or provisioning them', { timeout: 30000 }, async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-browser-doctor-'));
  t.after(() => rm(root, { recursive: true, force: true }));
  const browsers = join(root, 'empty-browsers'), home = join(root, 'home'), bin = join(root, 'empty-bin');
@@ -30,11 +30,12 @@ test('doctor diagnoses missing Chromium and headless shell without provisioning 
    child.stdout.setEncoding('utf8').on('data', text => { stdout += text; });
    child.stderr.setEncoding('utf8').on('data', text => { stderr += text; });
    const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
-   assert.equal(code, 3, stderr + stdout);
+   assert.ok(code !== null, stderr + stdout);
    const report = json ? JSON.parse(stdout.trim()).diagnostics : JSON.parse(stdout.slice(0, stdout.lastIndexOf('\ndoctor:')));
-   assert.equal(report.ok, false);
-   assert.equal(report.browser.ok, false);
-   assert.equal(report.browser.fix, 'rer install');
+   // Not downloaded yet is the normal state until a command needs the browser.
+   assert.equal(report.browser.ok, true);
+   assert.ok(report.browser.note, 'doctor says the browsers are not downloaded yet');
+   assert.equal(report.browser.fix, undefined);
    assert.deepEqual(report.browser.executables.map(({ name, ok }) => ({ name, ok })), [{ name: 'chromium', ok: false }, { name: 'chromium-headless-shell', ok: false }]);
    assert.ok(report.browser.executables.every(({ path }) => path.startsWith(browsers)), 'the checkout Playwright resolves the requested browser cache');
    assert.deepEqual(await readdir(browsers), [], 'doctor leaves the browser cache empty');

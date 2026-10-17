@@ -1,3 +1,4 @@
+import './sqlite-notice.mjs';
 import { parse, help } from './parse.mjs';
 import { output } from './output.mjs';
 import { invalid, RerError } from './errors.mjs';

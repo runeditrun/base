@@ -16,13 +16,15 @@ async function bind(host, port) {
 // A failed diagnostic is unknown, never evidence of a foreign owner. A real
 // bind can still prove availability. If a bind loses a race but inspection
 // finds no listener, retry the bind within the same inspection deadline.
-export async function probePort(host, port, { context = inspectionContext({ port }), hosts = [host], anyAddress = false } = {}) {
+// A free-port search (`searching`) only needs to move on from a port in use:
+// it skips one on the failed bind alone, without the slow ownership check.
+export async function probePort(host, port, { context = inspectionContext({ port }), hosts = [host], anyAddress = false, searching = false } = {}) {
  const bindings = async () => {
   for (const address of hosts) { const result = await bind(address, port); if (!result.available) return result; }
   return { available: true };
  };
  let bound = await bindings(), listener, unchecked;
- if (!bound.available && bound.code !== 'EADDRINUSE') return bound;
+ if (!bound.available && (bound.code !== 'EADDRINUSE' || searching)) return bound;
  try { listener = await portListener(port, anyAddress ? undefined : host, context); }
  catch (error) { if (!uncheckedInspection(error)) throw error; unchecked = error; }
  if (listener) return { available: false, listener };

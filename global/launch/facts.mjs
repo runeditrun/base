@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { inspectionContext } from '../../onboarding/process-diagnostics.mjs';
+import { searchContext } from '../../onboarding/process-diagnostics.mjs';
 import { probePort } from '../../onboarding/port-probe.mjs';
 import { LaunchFailure } from './failure.mjs';
 
@@ -77,10 +77,10 @@ export async function portTaken(port) {
 export async function freePort(ports, claim, env = process.env) {
  const from = Number(env.RER_DEV_PORT_FROM ?? 8787);
  if (!Number.isInteger(from) || from < 1 || from > 65535) throw new LaunchFailure(2, 'RER_DEV_PORT_FROM must be a port number.');
- const held = new Set(ports.filter(Boolean)), context = inspectionContext();
+ const held = new Set(ports.filter(Boolean)), context = searchContext();
  for (let port = from; port <= 65535; port++) {
   if (held.has(port)) continue;
-  const result = await probePort('127.0.0.1', port, { context, hosts: ['127.0.0.1', '::1'], anyAddress: true });
+  const result = await probePort('127.0.0.1', port, { context, hosts: ['127.0.0.1', '::1'], anyAddress: true, searching: true });
   if (!result.available) {
    if (performance.now() >= context.deadline) throw new LaunchFailure(4, `Could not find a free port from ${from} in time (system busy). Run rer dev again or pass rer dev --port PORT with a free port.`);
    continue;

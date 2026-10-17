@@ -26,7 +26,7 @@ if (process.platform === 'win32') {
  process.stderr.write('rer needs Node ' + minimum + ' or later; this is Node ' + process.versions.node + '. Install a newer Node, then run rer again.\n');
  process.exitCode = 1;
 } else {
- import('./main.mjs').then(function (module) { return module.main(process.argv.slice(2)); }).then(function (code) {
+ import('../cli/sqlite-notice.mjs').then(function () { return import('./main.mjs'); }).then(function (module) { return module.main(process.argv.slice(2)); }).then(function (code) {
   if (code !== undefined) process.exitCode = code;
  });
 }

@@ -39,6 +39,13 @@ test('setup picks a free port and never one another process listens on, even on 
  assert.notEqual(Number(stdout.trim()),holder.port);
 });
 
+test('on a busy computer, where checking who holds a port is slow, the free-port search moves past ports in use instead of failing',async t=>{
+ // Both held ports refuse the bind; each ownership check costs the whole budget.
+ const holder=await wildcardListener(t,'127.0.0.1'),root=await directory(t);
+ const {stdout}=await promisify(execFile)(process.execPath,[join(import.meta.dirname,'fixtures/port-inspection.mjs'),'late','select',String(holder.pid),String(holder.port),root],{timeout:30000});
+ assert.ok(Number(stdout.trim())>holder.port+1,stdout);
+});
+
 test('setup --port on a saved checkout moves its saved origin and keeps its other settings',async t=>{
  const root=await directory(t),file=join(root,'.dev.vars');
  await writeFile(file,'OWNER_EMAIL=owner@example.test\nAUTH_ORIGIN=http://127.0.0.1:8787\nSESSION_SECRET=kept-secret\n',{mode:0o600});

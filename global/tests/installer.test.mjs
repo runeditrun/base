@@ -41,7 +41,7 @@ function repack(entries, version, extra = []) {
  return tarball([...files, ...extra], 0);
 }
 
-test('install.sh and rer update install verified registry releases, the Run page starts a seed on what install.sh installed, and a bad download leaves the current one', { timeout: 5 * 60_000 }, async t => {
+test('install.sh and rer update install verified registry releases, the Run page starts an app on what install.sh installed and its last line puts rer on PATH for new shells, and a bad download leaves the current one', { timeout: 5 * 60_000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-installer-')), home = join(directory, 'home');
  const registry = await localRegistry();
  t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true }); });
@@ -65,10 +65,13 @@ test('install.sh and rer update install verified registry releases, the Run page
  assert.equal(installed.code, 0, installed.stderr);
  assert.equal(await selected(), manifest.version);
  assert.deepEqual(await readdir(bin), ['node'], 'installation never writes into another writable PATH directory');
- const activate = output => output.split('\n').find(line => line.includes('export PATH='))?.split('export PATH=')[1];
+ // The installer's last line puts rer on PATH: in the shell that runs it, and
+ // in a new login shell of the person's SHELL that starts without it.
+ const activate = output => { const last = output.trimEnd().split('\n').at(-1).trim(); return last.includes('.local/bin') ? last : undefined; };
  const hint = activate(installed.stdout);
  assert.ok(hint, installed.stdout);
- assert.equal((await run('sh', ['-c', `export PATH=${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
+ assert.equal((await run('sh', ['-c', `${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
+ assert.equal((await run('sh', ['-l', '-c', 'rer --version'], env)).stdout.trim(), manifest.version, 'a new shell finds rer after the line ran once');
 
  // The Run page's step 2 runs on what install.sh put on PATH and nothing else:
  // no npx and no Node on PATH. The private Node install.sh downloads when there
@@ -131,12 +134,13 @@ test('install.sh and rer update install verified registry releases, the Run page
  const line = activate(activation.stdout);
  assert.ok(line, activation.stdout);
  assert.ok(activation.stdout.includes(join(foreignBin, 'rer')), 'installation names the existing command it leaves alone');
- assert.equal((await run('sh', ['-c', `export PATH=${line}\nrer --version`], isolated)).stdout.trim(), release);
+ assert.equal((await run('sh', ['-c', `${line}\nrer --version`], isolated)).stdout.trim(), release);
+ assert.equal((await run('sh', ['-l', '-c', 'rer --version'], isolated)).stdout.trim(), release, 'a new shell puts the installed rer before the foreign one');
  assert.equal((await run(join(foreignBin, 'rer'), [], isolated)).stdout.trim(), 'foreign');
  const activeEnv = { ...isolated, PATH: `${join(isolated.HOME, '.local/bin')}:${isolated.PATH}` };
  const active = await run('sh', [installer], activeEnv);
  assert.equal(active.code, 0, active.stderr);
- assert.equal(activate(active.stdout), undefined, 'no activation needed when the installed launcher is first');
+ assert.equal(activate(active.stdout), undefined, 'no line when the installed launcher is first now and in new shells');
  assert.ok(active.stdout.includes(join(foreignBin, 'rer')), 'a later existing command is also named and preserved');
  assert.deepEqual(await readdir(bin), ['node']);
  // Uninstall removes only recorded links still pointing at this canonical launcher.

@@ -64,7 +64,10 @@ export async function checkoutRepository({ url, root, directory }) {
   }
  }
  await mkdir(resolve(root, '..'), { recursive: true });
- const code = await runCommand('git', ['clone', '--depth', '1', '--', url, root]);
+ // Every commit and release tag, so `git checkout <tag>` adopts an older
+ // release; file contents arrive when a checkout needs them (a host without
+ // partial clone sends them all).
+ const code = await runCommand('git', ['clone', '--filter=blob:none', '--', url, root]);
  if (code !== 0) throw refuse(`Could not clone into ${directory}. Check the git URL and access, then rerun the command.`);
 }
 
