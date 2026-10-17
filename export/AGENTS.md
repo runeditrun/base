@@ -116,6 +116,10 @@ modules needed to deliver that complete product. Preserve recorded requirements,
 including requirements intended for another edition. A family-wide incumbent
 superset is not a prerequisite for shipping a useful edition.
 
+A change that ships or alters a contract clause updates that clause's row in
+`CONTRACT.md`'s Status table in the same PR; `rer check` refuses a table that
+disagrees with the contract.
+
 Optimise total work, cost, elapsed time and owner attention to reach and keep the
 accepted product as capable agent development approaches zero cost. Trust the
 owner's agent to implement and maintain complex changes. Diagnose instructions,

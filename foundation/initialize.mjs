@@ -1,5 +1,6 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { commit, select, sha256, tree } from '../composition/git-source.mjs'
 import { sourceRoots } from '../cli/export.mjs'
 import { stampedVersion } from '../cli/version.mjs'
@@ -59,6 +60,10 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     const versionSource = tree(baseRepo, revision).some(entry => entry.path === 'global/package.json') && select(baseRepo, revision, 'global/package.json')[0]
     const cliVersion = versionSource ? stampedVersion(baseRepo, JSON.parse(versionSource.bytes).version, revision) : undefined
     await json(`editions/${edition}/scripts/base-cli/inventory.json`, { version: 1, ...(cliVersion ? { cliVersion } : {}), onboarding: '../base-onboarding', onboardingFiles:Object.fromEntries(select(baseRepo, revision, 'onboarding', {includeTests:false}).map(file=>[file.relative,{source:file.path,sha256:sha256(file.bytes)}])), files: Object.fromEntries(cliFiles.map(file => [file.path, { source: file.path, sha256: sha256(file.bytes) }]).sort(([a], [b]) => a.localeCompare(b))) })
+    // The template contract's statuses were judged at the Base revision it comes from.
+    const contract = files.find(f => f.relative === 'CONTRACT.md')
+    const judged = execFileSync('git', ['-C', baseRepo, 'show', '-s', '--format=%cs', revision], { encoding: 'utf8' }).trim()
+    await put(`editions/${edition}/CONTRACT.md`, contract.bytes.toString().replace('`BASE_COMMIT` (BASE_DATE)', `\`${revision.slice(0, 12)}\` (${judged})`), contract.path)
     const guide = files.find(f => f.relative === 'AGENTS.md')
     await put(`editions/${edition}/AGENTS.md`, guide.bytes.toString() + `\nPinned reference: https://github.com/runeditrun/base/blob/${revision}/TANSTACK-START-MIGRATION.md\nNative-session/runtime evidence: https://github.com/runeditrun/base/tree/${revision}/default-seed\n`, guide.path)
     const pkg = JSON.parse(files.find(f => f.relative === 'package.json').bytes)

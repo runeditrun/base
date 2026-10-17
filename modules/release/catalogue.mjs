@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { clauseIdSource } from '../../foundation/runtime/seed-contract.mjs';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = value => JSON.stringify(value, null, 2) + '\n';
@@ -14,7 +15,7 @@ function clauses(text) {
     if (body) result.push({ id: current.id, title: current.title, text: body });
     current = null;
   };
-  const clauseLine = /^- \*\*([A-Z][A-Z0-9-]*-\d{3})\s+[—–-]\s+(.+?)\.?\*\*[ \t]*(.*)$/;
+  const clauseLine = new RegExp(`^- \\*\\*(${clauseIdSource})\\s+[—–-]\\s+(.+?)\\.?\\*\\*[ \\t]*(.*)$`);
   for (const line of text.split(/\r\n|\n|\r/)) {
     const match = clauseLine.exec(line);
     if (match) {

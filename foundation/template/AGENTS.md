@@ -111,6 +111,10 @@ Choose and verify the edition UX before adding product functionality. This
 source includes minimal real owner/operator auth, D1 and silent development
 mail suppression. It has no product domain or background jobs.
 
+A change that ships or alters a contract clause updates that clause's row in
+`CONTRACT.md`'s Status table in the same PR; `rer check` refuses a table that
+disagrees with the contract.
+
 When adding private HTTP routes or Start functions, reuse native sessions and
 enforce authorization in every server function handler, including direct
 transport calls; route guards alone are insufficient. Use server-only modules

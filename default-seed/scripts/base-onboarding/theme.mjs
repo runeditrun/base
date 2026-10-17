@@ -12,6 +12,10 @@ export const themeTokens = Object.freeze({
  '--rer-page': 'colour', '--rer-surface': 'colour', '--rer-text': 'colour', '--rer-muted': 'colour',
  '--rer-border': 'colour', '--rer-focus': 'colour', '--rer-accent': 'colour', '--rer-accent-text': 'colour',
  '--rer-link': 'colour', '--rer-font-body': 'stack', '--rer-font-heading': 'stack', '--rer-radius': 'radius', '--rer-logo': 'logo',
+ // The run site's /contract statuses: fills, text inks and the labels printed on fills. Base has defaults for each.
+ '--rer-done': 'colour', '--rer-partial': 'colour', '--rer-missing': 'colour',
+ '--rer-done-ink': 'colour', '--rer-partial-ink': 'colour', '--rer-missing-ink': 'colour',
+ '--rer-on-done': 'colour', '--rer-on-partial': 'colour', '--rer-on-missing': 'colour',
 });
 const required = ['--rer-page', '--rer-surface', '--rer-text', '--rer-muted', '--rer-border', '--rer-focus'];
 
@@ -20,6 +24,7 @@ const pairs = [
  ['--rer-text', '--rer-page', 4.5], ['--rer-text', '--rer-surface', 4.5], ['--rer-muted', '--rer-surface', 4.5], ['--rer-muted', '--rer-page', 4.5],
  ['--rer-link', '--rer-surface', 4.5], ['--rer-accent-text', '--rer-accent', 4.5],
  ['--rer-focus', '--rer-page', 3], ['--rer-focus', '--rer-surface', 3], ['--rer-border', '--rer-surface', 3],
+ ...['done', 'partial', 'missing'].flatMap(status => [[`--rer-${status}-ink`, '--rer-page', 4.5], [`--rer-${status}-ink`, '--rer-surface', 4.5], [`--rer-on-${status}`, `--rer-${status}`, 4.5]]),
 ];
 
 const faceDescriptors = {
