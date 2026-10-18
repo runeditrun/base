@@ -54,16 +54,17 @@ async function history() {
 }
 function showJob(data) {
   const job = data.job
+  const reversed = ['undone', 'rolled_back'].includes(job.state)
   element('review').hidden = true
   element('result').hidden = false
-  element('result-title').textContent = job.state === 'completed' ? 'Import completed' : job.state === 'undone' ? 'Import undone' : job.state === 'failed' ? 'Import failed' : 'Import in progress'
+  element('result-title').textContent = job.state === 'completed' ? 'Import completed' : reversed ? 'Import undone' : job.state === 'failed' ? 'Import failed' : 'Import in progress'
   element('result-description').textContent = job.state === 'failed'
     ? `This approval cannot be applied again. ${failureMessage(data.failureCode || job.error)} Undo any applied records, then upload and review a new plan.`
     : job.state === 'completed' ? 'The imported people are ready to inspect. Reconcile checks them against native data; Undo removes unchanged imported records.'
-    : job.state === 'undone' ? 'Undo finished. Native edits are protected by the import engine.' : 'Continue from the saved job. Each request applies a bounded batch.'
+    : reversed ? 'Undo finished. Native edits are protected by the import engine.' : 'Continue from the saved job. Each request applies a bounded batch.'
   element('resume').hidden = !['queued', 'applying'].includes(job.state)
   element('reconcile').hidden = job.state !== 'completed'
-  element('undo').hidden = job.state === 'undone'
+  element('undo').hidden = reversed
 }
 async function status() { showJob(await door('status', { planId: plan.planId })); await history() }
 async function apply() {
@@ -115,7 +116,7 @@ element('reconcile').onclick = () => { void run(async () => {
 element('undo').onclick = () => { void run(async () => {
   for (let batch = 0; batch < 100; batch++) {
     const data = await door('undo', { planId: plan.planId }); showJob(data)
-    if (data.job.state === 'undone') { notice('Import undone.'); await history(); return }
+    if (['undone', 'rolled_back'].includes(data.job.state)) { notice('Import undone.'); await history(); return }
   }
   notice('Undo progress saved. Choose Undo import to continue.')
 }) }
