@@ -4,10 +4,16 @@ import type { DoorRequest, DoorSnapshot, ImportDoorOptions } from './types.ts';
 import { DoorError, verifyImportGrant, type DoorAction } from './grants.ts';
 import { assertion, sql, statement, transact } from './store.ts';
 import { approvalCaption } from './failures.ts';
+import { importDoorSchemaCheck } from './schema.ts';
 
+/** Opt-in and schema state in one read. A door whose seed has not applied
+ * importDoorApplyFailureMigration must refuse loudly rather than misbehave. */
 export async function enabled(options: ImportDoorOptions): Promise<boolean> {
-  const row = await options.database.prepare('SELECT enabled FROM ik_door_settings WHERE installation_id=?').bind(options.claim.installationId).first();
-  return row?.enabled === 1;
+  const row = await options.database.prepare(`SELECT (SELECT enabled FROM ik_door_settings WHERE installation_id=?) AS enabled,(${importDoorSchemaCheck}) AS current`)
+    .bind(options.claim.installationId).first();
+  if (row?.enabled !== 1) return false;
+  if (row.current !== 1) throw new DoorError('import_door_schema_outdated', 503);
+  return true;
 }
 export async function admit(options: ImportDoorOptions, request: Request, action: DoorAction): Promise<DoorRequest> {
   const authorization = request.headers.get('Authorization');

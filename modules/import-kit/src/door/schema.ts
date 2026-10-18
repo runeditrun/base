@@ -14,6 +14,11 @@ function planTables(suffix = ''): string[] {
       reviewer TEXT NOT NULL)`,
   ];
 }
+/** True while ik_door_plans keeps the pre-apply-failure rule of one plan per
+ * uploaded bundle, which blocks the documented replan after a failed apply. */
+const outdatedPlans = `EXISTS(SELECT 1 FROM pragma_index_list('ik_door_plans') l WHERE l."unique"=1 AND (SELECT group_concat(name) FROM pragma_index_info(l.name))='installation_id,namespace,bundle_sha256')`;
+/** One row, `current` 1 only when the failure table exists and the old rule is gone. */
+export const importDoorSchemaCheck = `SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='ik_door_apply_failures') AND NOT ${outdatedPlans} AS current`;
 const failureSchema = [
   `CREATE INDEX IF NOT EXISTS ik_door_plan_bundle ON ik_door_plans(installation_id,namespace,bundle_sha256)`,
   `CREATE TABLE IF NOT EXISTS ik_door_apply_failures (
@@ -36,8 +41,12 @@ export const importDoorApplyFailureMigration = [
   ...failureSchema,
 ];
 /** Add these statements as a new seed migration, after the D1 import-kit schema.
- * Installing the schema never enables the door. No seed is bound automatically. */
+ * Installing the schema never enables the door. No seed is bound automatically.
+ * The first statement refuses the migration on a door installed before
+ * apply-failure support, whose CREATE TABLE IF NOT EXISTS would otherwise keep
+ * the old plan table: such seeds apply importDoorApplyFailureMigration instead. */
 export const importDoorSchema = [
+  `INSERT INTO ik_d1_assertions(ok) SELECT 0 WHERE ${outdatedPlans}`,
   `CREATE TABLE IF NOT EXISTS ik_door_settings (
     installation_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)))`,
   `CREATE TABLE IF NOT EXISTS ik_door_revoked_keys (

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
-import { importDoorApplyFailureMigration, readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
+import { importDoorApplyFailureMigration, importDoorSchema, readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
 import { readD1ImportOriginals, undoD1Import } from '../src/d1/index.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
 import { sqliteTargets } from './d1/sqlite-runtime.ts';
@@ -128,13 +128,35 @@ test('HTTP grants and bounded catch-up fail closed while valid snapshot replacem
 });
 
 test('HTTP failed target writes keep approval evidence, roll back the batch and require a fresh plan and approval',async t=>{
-  for (const transient of [false,true]) {
+  const d1=(message:string)=>new Error('D1_ERROR: '+message);
+  // null is a real insert-only constraint failure; the rest are provider errors.
+  const failures:[Error|null,string][]=[
+    [null,'import_door_apply_constraint'],
+    [new Error('test provider error',{cause:Object.assign(new Error('database is locked'),{code:'SQLITE_BUSY'})}),'import_door_apply_transient'],
+    [Object.assign(new Error('database table is locked'),{code:'SQLITE_LOCKED'}),'import_door_apply_transient'],
+    [d1('Network connection lost.'),'import_door_apply_transient'],
+    [d1('D1 DB reset because its code was updated.'),'import_door_apply_transient'],
+    [d1('Internal error in D1 DB storage caused object to be reset.'),'import_door_apply_transient'],
+    [d1('Cannot resolve D1 DB due to transient issue on remote node.'),'import_door_apply_transient'],
+    [d1('D1 DB is overloaded. Requests queued for too long.'),'import_door_apply_transient'],
+    [d1('D1 DB is overloaded. Too many requests queued.'),'import_door_apply_transient'],
+    [d1('D1 DB storage operation exceeded timeout which caused object to be reset.'),'import_door_apply_transient'],
+    [d1('UNIQUE constraint failed: native_records.id: SQLITE_CONSTRAINT'),'import_door_apply_constraint'],
+    [d1('no such column: legacy_title: SQLITE_ERROR'),'import_door_apply_failed'],
+  ];
+  for (const [providerError,reason] of failures) {
     const d=await door(t);await d.enable();
     const records=documents(2),baseline=await d.plan(records);assert.equal(baseline.status,200);await d.apply(baseline.body);
     // Exercise the upgrade with populated plans, chunks, approvals and enabled
     // foreign keys. The original schema's bundle uniqueness must be removed.
     d.runtime.native().exec('DROP TABLE ik_door_apply_failures; CREATE UNIQUE INDEX legacy_bundle ON ik_door_plans(installation_id,namespace,bundle_sha256)');
+    // An outdated schema fails loudly: the door refuses every route, and
+    // re-applying importDoorSchema instead of the migration is refused whole.
+    assert.deepEqual(await d.call('status',{planId:baseline.body.planId}),{status:503,body:{error:'import_door_schema_outdated'}});
+    await assert.rejects(d.db.batch(importDoorSchema.map(q=>d.db.prepare(q))),/IMPORT_ATOMIC_GUARD/);
+    assert.equal(d.runtime.native().prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='ik_door_apply_failures'").get()!.n,0);
     await d.db.batch(importDoorApplyFailureMigration.map(q=>d.db.prepare(q)));
+    await d.db.batch(importDoorSchema.map(q=>d.db.prepare(q)));
     assert.deepEqual(d.runtime.native().prepare('PRAGMA foreign_key_check').all(),[]);
     assert.equal((await d.call('status',{planId:baseline.body.planId})).body.job.state,'completed');
     const before=d.runtime.native().prepare('SELECT * FROM native_records ORDER BY id').all();
@@ -144,15 +166,15 @@ test('HTTP failed target writes keep approval evidence, roll back the batch and 
     d.options.targets={...sqliteTargets,write(row) {
       writes++;
       if(row.targetId!=='0') return sqliteTargets.write(row);
-      if(transient) throw new Error('test provider error',{cause:Object.assign(new Error('database is locked'),{code:'SQLITE_BUSY'})});
+      if(providerError) throw providerError;
       // An insert-only adopter cannot replace this existing native id. SQLite
       // must roll back the addition earlier in the same real apply batch too.
       return [{sql:'INSERT INTO native_records VALUES(?,?,?,?,?)',params:[row.destination,row.targetKind,row.targetId,row.revision,canonicalJson(row.value)]}];
     }};
     const input={planId:planned.body.planId,reviewedFingerprint:planned.body.fingerprint};
     const grant={fingerprint:planned.body.fingerprint,...d.approval},signed=await d.token('apply',grant);
-    const failed=await d.call('apply',input,{},signed),reason=transient?'import_door_apply_transient':'import_door_apply_constraint';
-    assert.equal(failed.status,transient?503:409,JSON.stringify(failed.body));assert.equal(failed.body.error,reason);
+    const failed=await d.call('apply',input,{},signed);
+    assert.equal(failed.status,reason==='import_door_apply_transient'?503:409,JSON.stringify(failed.body));assert.equal(failed.body.error,reason);
     assert.deepEqual(d.runtime.native().prepare('SELECT * FROM native_records ORDER BY id').all(),before);
     const status=await d.call('status',{planId:planned.body.planId});assert.equal(status.status,200);
     assert.equal(status.body.job.state,'failed');assert.equal(status.body.job.error,reason);assert.equal(status.body.job.checkpoint,0);

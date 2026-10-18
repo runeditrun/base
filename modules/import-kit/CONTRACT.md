@@ -113,7 +113,12 @@ leaves no native effects. Its approval and consumed nonce remain audit facts;
 the failed plan and its approval cannot authorise a retry. Replan the retained
 upload for a fresh fingerprint and owner approval; roll back earlier committed
 batches first. Existing adopters apply `importDoorApplyFailureMigration` in one
-new atomic numbered migration; fresh adopters use `importDoorSchema`. Configure
+new atomic numbered migration; fresh adopters use `importDoorSchema`, whose
+first statement refuses the older door schema so a wrong upgrade fails at
+deploy. An enabled door on an outdated schema (old per-bundle uniqueness or no
+failure table) answers 503 `import_door_schema_outdated`. Retryable D1 errors
+(storage resets, code updates, lost connections, overload, timeouts) and SQLite
+busy/locked classify as `import_door_apply_transient`. Configure
 `ownerPrincipalId` as the seed owner's actual principal, and use that same
 principal in its ordinary history and undo context. The door does not rebind
 existing operator jobs or weaken their authority predicates.

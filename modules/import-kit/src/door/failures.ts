@@ -3,6 +3,14 @@ import type { DoorRequest, DoorSnapshot } from './types.ts';
 import { DoorError } from './grants.ts';
 import { assertion, sql, transact } from './store.ts';
 
+/** SQLite busy/locked wording, plus the retryable errors Cloudflare D1 reports
+ * (storage resets, code updates, lost connections, overload and timeouts). */
+const transient = new RegExp([
+  String.raw`\bSQLITE_(?:BUSY|LOCKED|INTERRUPT)(?:_\w+)?\b`, String.raw`\bdatabase (?:table )?(?:is )?(?:busy|locked|unavailable)`,
+  'query timed out', 'database worker stopped', 'Network connection lost', 'reset because its code was updated',
+  'caused object to be reset', 'Replica disconnected', 'transient issue on remote node', 'client disconnected',
+  'D1 DB is overloaded', 'exceeded timeout',
+].join('|'),'i');
 /** Only persist allowlisted classifications, never adapter/SQL messages that
  * may contain customer records. Providers can wrap SQLite errors in causes. */
 function reasonCode(error: unknown): string {
@@ -11,7 +19,7 @@ function reasonCode(error: unknown): string {
     seen.add(cause);
     const value = cause as {code?: unknown; message?: unknown; cause?: unknown};
     const text = `${typeof value.code === 'string' ? value.code : ''} ${typeof value.message === 'string' ? value.message : ''}`;
-    if (/\bSQLITE_(BUSY|LOCKED|INTERRUPT)(?:_\w+)?\b|\bdatabase (?:is )?(?:busy|locked|unavailable)|\bquery timed out\b|\bdatabase worker stopped\b/i.test(text)) return 'import_door_apply_transient';
+    if (transient.test(text)) return 'import_door_apply_transient';
     if (/\bSQLITE_CONSTRAINT(?:_\w+)?\b|\bconstraint failed\b/i.test(text)) return 'import_door_apply_constraint';
     cause = value.cause;
   }

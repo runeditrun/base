@@ -121,7 +121,7 @@ same reason. Provider messages and customer records are never stored as reasons.
 | Apply reason / HTTP status | Meaning |
 | --- | --- |
 | `import_door_apply_constraint` / 409 | A database constraint refused the batch. Correct the data or native writer before proposing another plan. |
-| `import_door_apply_transient` / 503 | The provider reported busy, locked, interrupted or unavailable service. A fresh reviewed attempt can be proposed after recovery. |
+| `import_door_apply_transient` / 503 | The provider reported busy, locked, interrupted or unavailable service, including D1's retryable errors (storage or code-update resets, lost connections, overload, timeouts). A fresh reviewed attempt can be proposed after recovery. |
 | `import_door_apply_failed` / 409 | Another apply error. Inspect the seed's adapter before proposing another plan. |
 
 Every failed plan is terminal: further applies return
@@ -138,6 +138,10 @@ Seeds that installed the earlier door schema must apply the exported
 single atomic `database.batch()`. It preserves all plan ids, chunks and approvals
 while removing the old per-bundle uniqueness constraint and adding the failure
 table. Keep foreign keys enabled. Fresh installations use `importDoorSchema`.
+Its first statement refuses an installation that still has the earlier schema,
+so re-applying it instead of the migration fails the deploy. Until the
+migration runs, an enabled door answers every route with 503
+`import_door_schema_outdated`.
 
 Bounded catch-up requires an existing nonempty baseline and standing owner
 approval. It refuses gone, conflicting, rejected or unmapped records. Additions
