@@ -12,6 +12,7 @@ import { chromium } from '@playwright/test'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
 import { freePort } from '../ports.mjs'
 import { readableActivity, refreshSafeCreate } from './people-page.mjs'
+import { freshSeedImportDoor } from './import-door.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const email = 'operator@example.test'
@@ -72,7 +73,7 @@ async function serverFunctionId(name) {
 }
 
 async function browserNavigationCheck(baseUrl, cookie) {
-  const browser = await chromium.launch({ headless: true })
+  const browser = await chromium.launch({ headless: true, args: ["--use-mock-keychain", "--password-store=basic"] })
   try {
     const context = await browser.newContext()
     const page = await context.newPage()
@@ -219,6 +220,8 @@ async function main() {
     const cookie = sessionCookie(signIn, port)
     await completeFirstRun(baseUrl, cookie)
 
+    const importDoor = await freshSeedImportDoor({ baseUrl, cookie })
+
     const authenticatedPrivate = await fetch(`${baseUrl}/app`, { headers: { cookie } })
     assert.equal(authenticatedPrivate.status, 200)
     assert.match(await authenticatedPrivate.text(), /Native session protected operator app/)
@@ -273,6 +276,7 @@ async function main() {
       privateTransport: '/_serverFn/<generated-id>',
       queueCompleted: true,
       cronPersisted: true,
+      importDoor,
       refreshSafe,
       activity,
       browser,

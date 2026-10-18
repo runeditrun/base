@@ -1,5 +1,23 @@
 # Run it locally
 
+For a product that offers data move-in, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
+This technical foundation has no product import screen or product data yet.
+When adding data move-in, mount the shared door and build `/app/import` before
+publishing that workflow; do not add a separate importer. Follow Base's
+[door adoption guide](https://github.com/runeditrun/base/blob/main/modules/import-kit/src/door/ADOPTING.md).
+
 Base's repository root is the authoring workspace, not a runnable edition. To
 run the maintained reference, enter `default-seed`. A newly composed foundation
 is runnable from its edition checkout; a family authoring folder is composition
@@ -45,8 +63,9 @@ for example `{"OWNER_EMAIL":"owner@example.com"}`. Secret values stay in
 private inputs and never go in command arguments. A setup rerun with the saved
 owner and origin preserves existing owner/data and exact private settings.
 Conflicting saved identity or origin reports an actionable recovery path.
-Review reset's exact removal inventory before confirmation; export domain data
-first if it should be restored, and import only into an empty destination.
+Review reset's exact removal inventory before confirmation. If data must be
+kept, back up this installation first; restore that archive
+only into an empty destination.
 
 Queue waits report immediately with a reason and numeric one-based position,
 then refresh about every 15 seconds while waiting. From the runnable project
@@ -66,13 +85,23 @@ verification.
 ```sh
 node scripts/rer.mjs verify
 node scripts/rer.mjs reset --yes
-node scripts/rer.mjs export --output exports/installation.rer
-node scripts/rer.mjs import --input exports/installation.rer --yes
 node scripts/rer.mjs deploy
 node scripts/rer.mjs describe
 ```
 
-Reset removes declared local state and settings. Import requires an empty
+To back up and restore this installation, use:
+
+```sh
+node scripts/rer.mjs export --output exports/installation.rer
+node scripts/rer.mjs import --input exports/installation.rer --yes
+```
+
+These commands save and restore a supported installation archive. They do not
+use the reviewed import door or provide its plan, reconciliation and Undo.
+Archive restore requires an empty destination and explicit confirmation. Use
+the signed-in import door when bringing records in.
+
+Reset removes declared local state and settings. Archive restore requires an empty
 destination and explicit confirmation. Local export/import covers the supported
 resources; each first-party seed verifies an export/import/export round trip.
 Remote transfer is available only where the adapter declares complete resource
@@ -137,10 +166,13 @@ Fresh foundation generation assigns distinct migration ordinals, including
 `0013_erasure.sql`. This only defines the generated starting history; existing
 owner and edition checkouts keep their already-applied migration names.
 
-The default foundation leaves optional import-kit out because the module exposes
-no single canonical complete D1 migration schema for generating a numbered
-migration. Defer module selection until that schema API exists; a product
-importer still needs its own authorized target adapter and product integration.
+The technical foundation leaves import-kit out until the product has native
+records to map. Add data move-in through the shared import door using
+[the adoption guide](../modules/import-kit/src/door/ADOPTING.md): it lists the
+ordered schemas and door migrations. Supply the product's authorized native
+target adapter, supported source readers and signed-in `/app/import` screen;
+keep upload, plan, reviewed apply, reconciliation, history and Undo on that one
+pipeline.
 
 For private Start handlers, enforce native session authorization in every
 server function, including direct transport calls; route guards alone are

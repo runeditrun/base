@@ -7,7 +7,7 @@ import { sessionForRequest } from '../../platform/auth/session.server'
 import { operatorMail } from '../../platform/auth/mail.server.mjs'
 import { newUlid } from '../../platform/identifiers.server'
 import { custodyCheckpoint, peopleErasure } from './erasure'
-import { importRoutes } from './import-routes'
+import { journalRoutes } from './journal-routes'
 import { retireD1ImportCustody } from '../../../../../modules/import-kit/src/d1/index.ts'
 import type { D1CustodyRetirement, D1ImportContext } from '../../../../../modules/import-kit/src/d1/index.ts'
 import { peopleImportContext, PERSON, personSet } from './imports.server'
@@ -172,7 +172,7 @@ export function peopleRoutes() {
   // Guard the whole namespaces before route matching, including unknown members.
   for (const path of ['/api/people', '/api/people/*', '/api/erasures/*']) app.use(path, operatorOnly)
   app.onError((error, context) => failed(error) ?? context.json({ error: 'service_unavailable' }, 503))
-  importRoutes(app)
+  journalRoutes(app)
   app.post('/api/people', async (context) => {
     const parsed = personInput.safeParse(await context.req.json().catch(() => null))
     if (!parsed.success) return context.json({ error: 'invalid_person' }, 400)
