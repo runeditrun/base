@@ -1,7 +1,7 @@
 import { canonicalJson, sha256, attachmentHash } from '../provenance/identity.ts';
 import type { ProvenanceRow, TargetRow } from '../types.ts';
 import type { DoorPlanRow, DoorRecord, DoorRequest, DoorTarget } from './types.ts';
-import { DoorError } from './grants.ts';
+import { DoorError } from './protocol.ts';
 import { readD1PersistedImport } from '../d1/index.ts';
 
 export const recordKey = (r: {kind:string;sourceId:string}) => canonicalJson([r.kind,r.sourceId]);
@@ -9,7 +9,7 @@ export interface ImportedTarget { provenance: ProvenanceRow; matches: boolean }
 /** Each distinct owning plan, in one read. */
 async function ownerPlans(request: DoorRequest, ids: string[]): Promise<Map<string, DoorPlanRow>> {
   const {results} = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE id IN (SELECT value FROM json_each(?)) AND installation_id=? AND namespace=? AND complete=1')
-    .bind(JSON.stringify(ids), request.grant.installationId, request.grant.namespace).all<DoorPlanRow>();
+    .bind(JSON.stringify(ids), request.access.installationId, request.access.namespace).all<DoorPlanRow>();
   return new Map(results.map(row => [row.id, row]));
 }
 /** Product lineage only locates evidence. The kit's immutable plan/provenance
@@ -26,7 +26,7 @@ export async function importedTargets(request: DoorRequest, targets: DoorTarget[
     if (!owner.job_id) throw new DoorError('import_lineage_incomplete', 409);
   }
   const destination = request.options.destination;
-  const persisted = await readD1PersistedImport({destination,namespace:request.grant.namespace,mappingVersion:request.options.mapping.version,
+  const persisted = await readD1PersistedImport({destination,namespace:request.access.namespace,mappingVersion:request.options.mapping.version,
     storage:{database:request.options.database,targets:request.options.targets},
     authorization:{principalId:request.options.ownerPrincipalId,predicate:action=>action==='read'?request.authority:{sql:'0'}}});
   const live = new Map<string, ProvenanceRow>();

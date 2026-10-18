@@ -2,7 +2,8 @@ import { canonicalJson, sha256 } from '../provenance/identity.ts';
 import { planFingerprint } from '../plan/index.ts';
 import type { D1Database, D1Sql } from '../d1/types.ts';
 import type { DoorPlanRow, DoorRequest, DoorSnapshot } from './types.ts';
-import { DoorError } from './grants.ts';
+import { DoorError } from './protocol.ts';
+import { importDoorSchemaCheck } from './schema.ts';
 
 export const sql = (sql: string, ...params: unknown[]): D1Sql => ({ sql, params });
 export const statement = (db: D1Database, query: D1Sql) => db.prepare(query.sql).bind(...query.params ?? []);
@@ -12,11 +13,11 @@ export async function transact(db: D1Database, authority: D1Sql, queries: D1Sql[
 }
 export async function authorized(request: DoorRequest): Promise<void> {
   const row = await statement(request.options.database, sql(`SELECT CASE WHEN (${request.authority.sql}) THEN 1 ELSE 0 END AS ok`, ...request.authority.params ?? [])).first();
-  if (row?.ok !== 1) throw new DoorError('grant_revoked_or_expired');
+  if (row?.ok !== 1) throw new DoorError(request.via === 'operator' ? 'owner_required' : 'grant_revoked_or_expired');
 }
 export async function planRow(request: DoorRequest, id: string): Promise<DoorPlanRow> {
   const row = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE id=? AND installation_id=? AND namespace=? AND complete=1')
-    .bind(id, request.grant.installationId, request.grant.namespace).first<DoorPlanRow>();
+    .bind(id, request.access.installationId, request.access.namespace).first<DoorPlanRow>();
   if (!row) throw new DoorError('plan_not_found', 404);
   return row;
 }
@@ -37,7 +38,7 @@ export async function loadSnapshot(request: DoorRequest, row: DoorPlanRow): Prom
 /** Recover indexing after a committed kit batch or an owner undo through the seed.
  * Kit state remains authoritative. Never hide a partially applied pending import. */
 export async function lineage(request: DoorRequest): Promise<{ head_id: string | null; pending_id: string | null }> {
-  const db = request.options.database, installation = request.grant.installationId, namespace = request.grant.namespace;
+  const db = request.options.database, installation = request.access.installationId, namespace = request.access.namespace;
   let current = await db.prepare('SELECT head_id,pending_id FROM ik_door_namespaces WHERE installation_id=? AND namespace=?').bind(installation, namespace).first<{head_id:string|null;pending_id:string|null}>();
   if (!current) return { head_id: null, pending_id: null };
   for (;;) {
@@ -82,7 +83,7 @@ function packRows(rows: unknown[]): {json: string; count: number}[] {
   return packed;
 }
 export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot, upload: {id: string}): Promise<void> {
-  const db = request.options.database, g = request.grant;
+  const db = request.options.database, g = request.access;
   await transact(db, request.authority, [
     sql('INSERT OR IGNORE INTO ik_door_namespaces(installation_id,namespace) VALUES(?,?)', g.installationId, g.namespace),
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_namespaces WHERE installation_id=? AND namespace=? AND head_id IS ? AND pending_id IS NULL)', g.installationId, g.namespace, snapshot.previous)),
@@ -114,4 +115,25 @@ export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot,
     written += packed.count;
   }
   await batch(written, [sql('UPDATE ik_door_plans SET complete=1 WHERE id=?', snapshot.id)]);
+}
+/** The owner-session mount has no opt-in, and refuses an outdated schema just as loudly. */
+export async function schemaCurrent(database: D1Database): Promise<boolean> {
+  const row = await database.prepare(importDoorSchemaCheck).first();
+  if (row?.current !== 1) throw new DoorError('import_door_schema_outdated', 503);
+  return true;
+}
+export const erasures = async (database: D1Database, destination: string): Promise<number> =>
+  Number((await database.prepare('SELECT count(*) AS n FROM ik_d1_erasure_journal WHERE destination=?').bind(destination).first<{n: number}>())?.n ?? 0);
+/** Whether an erasure in this destination committed after the request was admitted. */
+export const erasedSince = async (request: DoorRequest): Promise<boolean> => await erasures(request.options.database, request.options.destination) !== request.epoch;
+/** What every batch of a door request asserts, whoever admitted it: the
+ * destination's erasure count at admission (an erasure committed meanwhile
+ * wins), and that the logical namespace belongs to this destination alone. */
+export function doorFence(key: string, namespace: string, destination: string, epoch: number): D1Sql {
+  return sql(`(SELECT count(*) FROM ik_d1_erasure_journal WHERE destination=?)=?
+    AND NOT EXISTS(SELECT 1 FROM ik_door_scopes WHERE installation_id=? AND namespace=? AND destination<>?)
+    AND NOT EXISTS(SELECT 1 FROM ik_door_plans p JOIN ik_jobs j
+      ON j.id=p.job_id OR (p.job_id IS NULL AND j.operation_key='door:'||p.id)
+      WHERE p.installation_id=? AND p.namespace=? AND j.destination<>?)`,
+    destination, epoch, key, namespace, destination, key, namespace, destination);
 }

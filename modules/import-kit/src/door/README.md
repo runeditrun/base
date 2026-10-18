@@ -1,5 +1,8 @@
 # Optional D1 import door
 
+See [ADOPTING.md](ADOPTING.md) for the single-path adoption checklist, the
+owner-session mount without owner-claim, and public HTTP conformance.
+
 Import `createImportDoorHandler`, `importDoorSchema`,
 `importDoorApplyFailureMigration`, `importDoorScopesMigration`,
 `writeImportDoorSettings` and `readImportDoorHistory` from `./index.ts`.
@@ -13,9 +16,11 @@ Construct the handler with these seed-owned options:
 | --- | --- |
 | `database`, `targets` | D1 database and its real `D1TargetAdapter`. |
 | `claim` | The same server-owned `OwnerClaimConfig` and trusted key ring used by owner-claim. |
+| `installationId` | Optional permanent door key for settings, lineage and history; defaults to `claim.installationId`. Use the owner-session mount's key when RER's claim id differs. |
 | `ownerPrincipalId` | Actual owner principal used by the seed's ordinary import history and undo context. |
 | `destination`, `mapping` | Product destination and reviewed `ImportMapping`. |
 | `format`, `parse` | `'json'` or `'ndjson'`, and the product's parser of source records. |
+| `source` | Instead of `parse`/`mapping`, for several sources: `source(namespace)` returns that namespace's `{parse, mapping, ownerPrincipalId?}` from the seed's server-owned allow-list, or `null`. It runs after grant verification and before any write; `null` is refused with 403 `unknown_import_source`. |
 | `limits` | Optional reader limits; grant quotas still apply. |
 
 A fresh installation applies the statements in `importDoorSchema: string[]`
@@ -36,7 +41,9 @@ earlier door's plan table, so re-applying it fails the deploy):
 2. `importDoorScopesMigration`, the additive `ik_door_scopes` table.
 
 Until both have run, an enabled door answers every route with 503
-`import_door_schema_outdated`; a disabled door still answers 404.
+`import_door_schema_outdated`; a disabled grant door still answers 404. The
+owner-session mount (`createImportOperatorHandler` in `operator.ts`, which
+exports the same schema and migrations) has no opt-in and answers 503 too.
 
 `ik_door_scopes` binds each logical namespace to the product destination on
 the first uploaded chunk, before a plan/job exists. Old applied namespaces remain scoped through their kit job id
@@ -66,7 +73,8 @@ on a completed import still answers its job. Every door batch, and every kit
 batch a door request runs, also asserts that the destination's erasure journal
 count is unchanged since the request was admitted, so any other request an
 erasure overtakes (an upload chunk, say) answers 410 `erased_during_request`
-and leaves nothing behind. `plan` refuses a bundle holding an erased record
+and leaves nothing behind. Owner-session requests run under the same fence
+and answer the same 410s. `plan` refuses a bundle holding an erased record
 with 409 `source_erased` and deletes that upload, whatever else would refuse
 that plan first: a withdrawn snapshot, a pending import, interrupted staging,
 the catch-up shape or a bound. Any other bundle keeps that refusal and stays.
@@ -79,7 +87,7 @@ reads; a retry then erases it too.
 Later imports start a new namespace, or a new baseline after `undo`.
 Enablement, key revocations and grant replay protection survive.
 
-The door starts disabled and returns 404 until explicitly enabled. From the
+The grant door starts disabled and returns 404 until explicitly enabled. From the
 seed's server-only owner control, call
 `writeImportDoorSettings(database, installationId, { enabled, revokedKids? },
 ownerPredicate)`. The `D1Sql` predicate must check the existing owner session,
@@ -207,7 +215,9 @@ The old job, immutable snapshot, approval and failure fact remain readable.
 
 An erasure that overtakes an apply is not an apply failure: no failure fact is
 recorded, the job keeps its state for `undo`, and the apply answers the
-erasure's 410 (`snapshot_withdrawn` or `erased_during_request`).
+erasure's 410 (`snapshot_withdrawn` or `erased_during_request`). Nor is a kit
+size or request limit, which refuses before its batch writes: the apply
+answers 413 `import_door_too_large` and the plan stays applicable.
 
 Seeds that installed an earlier door apply `importDoorApplyFailureMigration`
 and then `importDoorScopesMigration`, as set out at the top of this document.

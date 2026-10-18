@@ -7,7 +7,7 @@ import type { ImportPlan, MappingResult } from '../types.ts';
 import type { DoorPlanRow, DoorRecord, DoorRequest, DoorSnapshot } from './types.ts';
 import { kitContext } from './authority.ts';
 import { importedTargets, recordKey } from './inventory.ts';
-import { DoorError } from './grants.ts';
+import { DoorError } from './protocol.ts';
 import { lineage, loadSnapshot, planRow, saveSnapshot, sql, statement, transact } from './store.ts';
 import { bundleBytes, text, uploadRow, type UploadRow } from './uploads.ts';
 
@@ -35,28 +35,28 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   const current = await lineage(request);
   const existing = await request.options.database.prepare(`SELECT p.* FROM ik_door_plans p WHERE installation_id=? AND namespace=? AND bundle_sha256=?
     AND NOT EXISTS(SELECT 1 FROM ik_door_apply_failures f WHERE f.plan_id=p.id)`)
-    .bind(request.grant.installationId,request.grant.namespace,upload.bundle_sha256).first<DoorPlanRow>();
+    .bind(request.access.installationId,request.access.namespace,upload.bundle_sha256).first<DoorPlanRow>();
   if (existing) {
     if (!existing.complete) throw new DoorError('plan_staging_interrupted_cancel_and_replan',409,{planId:existing.id});
     const snapshot = await loadSnapshot(request,existing);
-    if (snapshot.sourceCount > request.grant.maxRecords) throw new DoorError('plan_exceeds_grant_quota');
+    if (snapshot.sourceCount > request.access.maxRecords) throw new DoorError('plan_exceeds_grant_quota');
     if (snapshot.plan.mappingVersion !== request.options.mapping.version) throw new DoorError('snapshot_mapping_changed_use_new_namespace',409);
-    if (request.grant.catchup === 'bounded' && (!snapshot.standingApproval || snapshot.standingApproval.id !== request.grant.approvalRecordId || snapshot.standingApproval.at !== request.grant.approvedAt)) throw new DoorError('standing_approval_mismatch');
+    if (request.access.catchup === 'bounded' && (!snapshot.standingApproval || snapshot.standingApproval.id !== request.access.approvalRecordId || snapshot.standingApproval.at !== request.access.approvedAt)) throw new DoorError('standing_approval_mismatch');
     return preview(snapshot);
   }
   if (current.pending_id) throw new DoorError('namespace_has_pending_import',409);
   const previous = current.head_id ? await loadSnapshot(request,await planRow(request,current.head_id)) : null;
   if (previous && input.catchup !== true) throw new DoorError('catchup_required',409);
-  if (!previous && (input.catchup === true || request.grant.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
+  if (!previous && (input.catchup === true || request.access.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
   const planId = randomUUID(), options = request.options, {kitNamespace,source} = await readUpload(request,upload,planId);
   const prior = new Map((previous?.records ?? []).map(r=>[recordKey(r),r]));
   const revisions = new Map<string,{revision:string;matches:boolean}>();
   const priorTargets = [...prior.values()].flatMap(record=>record.targets), found = await importedTargets(request,priorTargets);
   priorTargets.forEach((target,i)=>revisions.set(canonicalJson([target.kind,target.id]),{revision:found[i].provenance.appliedRevision,matches:found[i].matches}));
-  const snapshot: DoorSnapshot = {id:planId,namespace:request.grant.namespace,bundleSha256:upload.bundle_sha256,kitNamespace,
+  const snapshot: DoorSnapshot = {id:planId,namespace:request.access.namespace,bundleSha256:upload.bundle_sha256,kitNamespace,
     previous:previous?.id ?? null,records:[],sourceCount:0,plan:{} as ImportPlan,
     differences:{additions:[],replacements:[],unchanged:[],gone:[],conflicts:[]},
-    standingApproval:request.grant.catchup==='bounded'?{id:request.grant.approvalRecordId!,at:request.grant.approvedAt!}:null};
+    standingApproval:request.access.catchup==='bounded'?{id:request.access.approvalRecordId!,at:request.access.approvedAt!}:null};
   const mapping = {version:options.mapping.version,map(record:typeof source.records[number]):MappingResult {
     const key = recordKey(record), old = prior.get(key);
     let result: MappingResult;
@@ -96,7 +96,7 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
     snapshot.differences.gone.push(key);
     snapshot.records.push({...old,explanation:'Absent from source snapshot; retained in the seed. No deletion proposed.'});
   }
-  if (request.grant.catchup === 'bounded') assertBounded(snapshot,previous!);
+  if (request.access.catchup === 'bounded') assertBounded(snapshot,previous!);
   await refuseErased(request,upload,snapshot.plan);
   await saveSnapshot(request,snapshot,upload);
   return preview(snapshot);
@@ -105,9 +105,9 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
  * meets the failed job's kit namespace. */
 async function readUpload(request: DoorRequest, upload: UploadRow, planId: string) {
   const bytes = await bundleBytes(request,upload), options = request.options;
-  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256,planId]));
+  const kitNamespace = 'door:' + sha256(canonicalJson([request.access.namespace,upload.bundle_sha256,planId]));
   const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
-    {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.grant.maxBytes,request.grant.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.grant.maxRecords,request.grant.maxRecords)});
+    {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.access.maxBytes,request.access.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.access.maxRecords,request.access.maxRecords)});
   return {kitNamespace,source};
 }
 /** The kit never stages an erased record, and neither does the door: an upload

@@ -1,6 +1,6 @@
 import type { ImportJob } from '../types.ts';
 import type { DoorRequest, DoorSnapshot } from './types.ts';
-import { DoorError } from './grants.ts';
+import { DoorError } from './protocol.ts';
 import { assertion, snapshotHeld, sql, transact } from './store.ts';
 
 /** SQLite busy/locked wording, plus the retryable errors Cloudflare D1 reports
@@ -33,21 +33,24 @@ export function requireNewPlan(planId: string, reason: string): never {
   throw new DoorError('import_door_plan_failed', 409, {planId, reasonCode: reason, requiresNewPlan: true, requiresNewApproval: true});
 }
 export async function recordApplyFailure(request: DoorRequest, snapshot: DoorSnapshot, job: ImportJob, error: unknown): Promise<never> {
-  const g = request.grant, reason = reasonCode(error);
+  const g = request.access, reason = reasonCode(error);
   // This is server bookkeeping for an already accepted attempt, including when
   // its key was revoked/expired during apply. It grants no further native writes.
   // Fence on the pre-batch job: a concurrent publication must never be failed.
   // An erasure that overtook the request, or withdrew the snapshot, is not an
   // apply failure: this batch is then refused and the erasure's 410 answers.
   const unerased = sql('(SELECT count(*) FROM ik_d1_erasure_journal WHERE destination=?)=?', request.options.destination, request.epoch);
-  const accepted = sql(`EXISTS(SELECT 1 FROM ik_door_grants WHERE installation_id=? AND jti=? AND action='apply' AND namespace=? AND kid=?)
-    AND EXISTS(SELECT 1 FROM ik_door_plans p JOIN ik_door_approvals a ON a.plan_id=p.id JOIN ik_jobs j ON j.id=p.job_id
+  // A grant request proves its accepted nonce; an owner-session request was
+  // authorised at admission and carries none.
+  const issued = request.nonce ? sql(`EXISTS(SELECT 1 FROM ik_door_grants WHERE installation_id=? AND jti=? AND action='apply' AND namespace=? AND kid=?)`,
+    g.installationId, request.nonce.jti, g.namespace, request.nonce.kid) : sql('1');
+  const accepted = sql(`EXISTS(SELECT 1 FROM ik_door_plans p JOIN ik_door_approvals a ON a.plan_id=p.id JOIN ik_jobs j ON j.id=p.job_id
       WHERE p.id=? AND p.installation_id=? AND p.namespace=? AND p.fingerprint=? AND a.fingerprint=p.fingerprint
       AND a.approval_id=? AND a.owner=? AND a.approved_at=? AND j.id=? AND j.fence=? AND j.checkpoint=? AND j.state IN ('queued','applying'))`,
-  g.installationId, g.jti, g.namespace, request.kid, snapshot.id, g.installationId, g.namespace, g.fingerprint,
+  snapshot.id, g.installationId, g.namespace, g.fingerprint,
   g.approvalRecordId, g.email, g.approvedAt, job.id, job.fence, job.checkpoint);
   await transact(request.options.database, sql('1'), [
-    assertion(unerased), assertion(snapshotHeld(snapshot.id)), assertion(accepted),
+    assertion(unerased), assertion(snapshotHeld(snapshot.id)), assertion(issued), assertion(accepted),
     sql('INSERT INTO ik_door_apply_failures(plan_id,reason_code) VALUES(?,?)', snapshot.id, reason),
     sql("UPDATE ik_jobs SET state='failed',error=?,fence=fence+1 WHERE id=?", reason, job.id),
     assertion(sql("EXISTS(SELECT 1 FROM ik_jobs WHERE id=? AND state='failed' AND error=? AND fence=?)", job.id, reason, job.fence + 1)),
@@ -55,6 +58,8 @@ export async function recordApplyFailure(request: DoorRequest, snapshot: DoorSna
   throw new DoorError(reason, reason === 'import_door_apply_transient' ? 503 : 409,
     {planId:snapshot.id, jobId:job.id, requiresNewPlan:true, requiresNewApproval:true});
 }
-export function approvalCaption(owner: unknown, at: unknown, fingerprint: unknown, failure: unknown): string {
-  return `${failure ? `approved, then failed (${failure})` : 'approved'} via Business by ${owner} at ${at}, fingerprint ${fingerprint}`;
+/** "via Business" only when Business's own approval record reviewed it; an
+ * owner-session apply is reviewed by `operator`. */
+export function approvalCaption(approval: {owner: unknown; approved_at: unknown; approval_id: unknown; reviewer: unknown}, fingerprint: unknown, failure: unknown): string {
+  return `${failure ? `approved, then failed (${failure})` : 'approved'}${approval.reviewer !== approval.approval_id ? '' : ' via Business'} by ${approval.owner} at ${approval.approved_at}, fingerprint ${fingerprint}`;
 }
