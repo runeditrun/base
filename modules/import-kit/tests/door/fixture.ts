@@ -7,24 +7,33 @@ import { createImportDoorHandler, importDoorSchema, writeImportDoorSettings } fr
 import { sha256 } from '../../src/provenance/identity.ts';
 import type { DoorAction, DoorGrant } from '../../src/door/grants.ts';
 import type { Json } from '../../src/types.ts';
+import type { D1Database } from '../../src/d1/types.ts';
 
 export async function door(t: TestContext) {
   const runtime = await sqliteRuntime(t), db = runtime.db();
   await db.batch(importDoorSchema.map(q=>db.prepare(q)));
+  // Test-side counter of every statement the door executes, batch members included.
+  let statements = 0;
+  const requests: {action:string;status:number;statements:number}[] = [];
+  const counted = (s:any):any => ({query:s.query,values:s.values,bind:(...v:any[])=>counted(s.bind(...v)),first:()=>{statements++;return s.first();},all:()=>{statements++;return s.all();}});
+  const database: D1Database = {prepare:query=>counted(db.prepare(query)),batch:async members=>{statements+=members.length;return db.batch(members);}};
   const keys = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
   const publicKey = await crypto.subtle.exportKey('jwk',keys.publicKey);
   let handler: ReturnType<typeof createImportDoorHandler>;
   const server = createServer(async (req,res)=>{
     const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const request = new Request(origin+(req.url ?? '/'),{method:req.method,headers:req.headers as Record<string,string>,...(req.method==='POST'?{body:Buffer.concat(chunks)}:{})});
-    const response = await handler(request) ?? new Response('Not found',{status:404});
+    statements = 0;
+    const handled = await handler(request);
+    if (handled) requests.push({action:new URL(request.url).pathname.split('/').pop()!,status:handled.status,statements});
+    const response = handled ?? new Response('Not found',{status:404});
     res.writeHead(response.status,Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
   });
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise<void>((resolve,reject)=>{server.closeAllConnections();server.close(error=>error?reject(error):resolve());}));
   const address = server.address(); if (!address || typeof address==='string') throw new Error('no_address');
   const origin = `http://127.0.0.1:${address.port}`;
-  const options = {database:db,targets:sqliteTargets,claim:{issuer:'https://business.example.test',installationId:'test-installation',appOrigin:origin,expectedEmail:'owner@example.test',publicKeys:{test:publicKey}},
+  const options = {database,targets:sqliteTargets,claim:{issuer:'https://business.example.test',installationId:'test-installation',appOrigin:origin,expectedEmail:'owner@example.test',publicKeys:{test:publicKey}},
     ownerPrincipalId:'owner',destination:'workspace',format:'json' as const,
     parse(value:Json) {const record=value as {id:string;title:string};return {kind:'document',sourceId:record.id,payload:value};},
     mapping:{version:'v1',map:(record:any)=>record.payload.reject?{effects:[],rejection:'Unsupported source record'}:{effects:[{targetKind:'record',targetId:record.sourceId,value:record.payload}]}},
@@ -70,7 +79,7 @@ export async function door(t: TestContext) {
     do {result=await call('undo',{planId});assert.equal(result.status,200,JSON.stringify(result.body));} while(!['undone','rolled_back'].includes(result.body.job.state));
     return result;
   }
-  return {runtime,db,options,ownerPredicate,approval,call,token,upload,plan,apply,undo,
+  return {runtime,db,options,requests,ownerPredicate,approval,call,token,upload,plan,apply,undo,
     enable:()=>writeImportDoorSettings(db,options.claim.installationId,{enabled:true},ownerPredicate)};
 }
 export const documents = (count:number,large=false) => Array.from({length:count},(_,i)=>({id:String(i),title:`Knowledge article ${i}`,body:large?'Reviewed historical knowledge. '.repeat(55):'Historical knowledge.'}));

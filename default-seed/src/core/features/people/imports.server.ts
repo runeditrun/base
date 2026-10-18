@@ -11,12 +11,37 @@ type Value = { name: string; email: string; details: Record<string, unknown> }
 
 const sql = (text: string, ...params: unknown[]): D1Sql => ({ sql: text, params })
 const value = (row: TargetRow) => row.value as unknown as Value
+type PersonRow = { id: string; name: string; email: string; details: string; import_revision: string | null }
+const personRow = (row: PersonRow): TargetRow => ({ destination: 'people', targetKind: PERSON, targetId: row.id, revision: row.import_revision ?? '', value: { name: row.name, email: row.email, details: JSON.parse(row.details) } })
+
+const utf8 = new TextEncoder()
+const hex = (text: string) => { let out = ''; for (const byte of utf8.encode(text)) out += byte.toString(16).toUpperCase().padStart(2, '0'); return out }
+const field = (text: string) => `${utf8.encode(text).length}:${text}`
+const fieldsSql = ['id', 'name', 'email', 'details', 'import_revision'].map(column => `length(CAST(${column} AS BLOB))||':'||${column}`).join('||')
+// SQLite orders TEXT by its UTF-8 bytes.
+const byteOrder = (a: string, b: string) => {
+  const x = utf8.encode(a), y = utf8.encode(b)
+  for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i] - y[i]
+  return x.length - y.length
+}
+/** The whole imported set as two exact predicates, however many people it holds:
+ * its count, and every field of every row as length-prefixed UTF-8 bytes in id
+ * order, compared as hex so no byte (U+0000 included) is lost in transport. */
+export function personSet(rows: TargetRow[], where?: D1Sql): D1Sql[] {
+  const scope = `import_revision IS NOT NULL${where ? ` AND ${where.sql}` : ''}`, params = where?.params ?? []
+  const text = [...rows].sort((a, b) => byteOrder(a.targetId, b.targetId))
+    .map(row => [row.targetId, String(value(row).name), String(value(row).email), canonicalJson(value(row).details), row.revision].map(field).join('')).join('')
+  return [
+    sql(`(SELECT count(*) FROM people WHERE ${scope})=?`, ...params, rows.length),
+    sql(`(SELECT hex(CAST(coalesce(group_concat(${fieldsSql},'' ORDER BY id),'') AS BLOB)) FROM people WHERE ${scope})=?`, ...params, hex(text)),
+  ]
+}
 
 export const personTargets: D1TargetAdapter = {
   async read(db, _destination, kind, id) {
     if (kind !== PERSON) return undefined
-    const row = await db.prepare('SELECT id,name,email,details,import_revision FROM people WHERE id=?').bind(id).first<{ name: string; email: string; details: string; import_revision: string | null }>()
-    return row ? { destination: 'people', targetKind: PERSON, targetId: id, revision: row.import_revision ?? '', value: { name: row.name, email: row.email, details: JSON.parse(row.details) } } : undefined
+    const row = await db.prepare('SELECT id,name,email,details,import_revision FROM people WHERE id=?').bind(id).first<PersonRow>()
+    return row ? personRow(row) : undefined
   },
   matches(row, _destination, _kind, id) {
     return row
@@ -24,6 +49,7 @@ export const personTargets: D1TargetAdapter = {
       : sql('NOT EXISTS(SELECT 1 FROM people WHERE id=?)', id)
   },
   matchesCount(count) { return sql('(SELECT count(*) FROM people WHERE import_revision IS NOT NULL)=?', count) },
+  matchesMany: (rows) => personSet(rows),
   write(row) {
     const { name, email, details } = value(row)
     return [sql("INSERT INTO people(id,name,email,details,created_at,import_revision) VALUES(?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,email=excluded.email,details=excluded.details,import_revision=excluded.import_revision",
@@ -31,9 +57,10 @@ export const personTargets: D1TargetAdapter = {
   },
   remove(_destination, _kind, id) { return [sql('DELETE FROM people WHERE id=?', id)] },
   redaction: (db, _destination, fields) => personRedaction(db, fields),
+  // One query for the whole imported set, however many people it holds.
   async list(db) {
-    const { results } = await db.prepare('SELECT id FROM people WHERE import_revision IS NOT NULL ORDER BY id').all<{ id: string }>()
-    return Promise.all(results.map(async ({ id }) => (await this.read(db, 'people', PERSON, id))!))
+    const { results } = await db.prepare('SELECT id,name,email,details,import_revision FROM people WHERE import_revision IS NOT NULL ORDER BY id').all<PersonRow>()
+    return results.map(personRow)
   },
 }
 

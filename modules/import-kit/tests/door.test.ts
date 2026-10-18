@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
+import { sqliteTargets } from './d1/sqlite-runtime.ts';
 import { readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
 import { readD1ImportOriginals, undoD1Import } from '../src/d1/index.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
@@ -157,4 +158,35 @@ test('HTTP door names a native snapshot too large for one read instead of a bare
     assert.doesNotMatch(JSON.stringify(response.body),/Archived knowledge/);
   }
   await d.undo(planned.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+});
+
+test('HTTP reconcile and catch-up planning cost fewer statements than the records imported, and fail closed on a native edit between reads',async t=>{
+  const d=await door(t);await d.enable();
+  // Before, each imported target cost its own plan and native reads: about 1,200 statements here.
+  const records=documents(600),base=await d.plan(records);assert.equal(base.status,200,JSON.stringify(base.body));await d.apply(base.body);
+  const statements=()=>d.requests.at(-1)!.statements;
+  const reconciled=await d.call('reconcile',{planId:base.body.planId});assert.equal(reconciled.status,200,JSON.stringify(reconciled.body));
+  assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,600);
+  const reconcile=statements();
+  // The native rows reconcile and planning report are the ones the atomic read fenced.
+  const original=d.runtime.native().prepare("SELECT value_json FROM native_records WHERE id='1'").get()!.value_json;
+  let edits=0;
+  d.options.targets={...sqliteTargets,async list(db,destination){
+    const rows=await sqliteTargets.list(db,destination);
+    d.runtime.native().prepare("UPDATE native_records SET value_json=? WHERE id='1'").run(canonicalJson({local:`owner edit ${++edits} between reads`}));
+    return rows;
+  }};
+  const changed=[...records.map(r=>r.id==='0'?{...r,title:'Updated at source'}:r),{id:'600',title:'New source article'}];
+  for (const raced of [await d.call('reconcile',{planId:base.body.planId}),await d.plan(changed,{catchup:true})]) {
+    assert.equal(raced.status,409,JSON.stringify(raced.body));assert.equal(raced.body.error,'import_door_conflict');
+  }
+  d.options.targets=sqliteTargets;
+  d.runtime.native().prepare("UPDATE native_records SET value_json=? WHERE id='1'").run(original);
+  const planned=await d.plan(changed,{catchup:true});assert.equal(planned.status,200,JSON.stringify(planned.body));
+  assert.equal(planned.body.summary.updated,1);assert.equal(planned.body.summary.created,1);assert.equal(planned.body.differences.conflicts.length,0);
+  const catchup=statements();
+  for (const count of [reconcile,catchup]) assert.ok(count<records.length,`${count} statements for ${records.length} imported records`);
+  await d.apply(planned.body);
+  const caughtUp=await d.call('reconcile',{planId:planned.body.planId});assert.equal(caughtUp.body.ok,true);assert.equal(caughtUp.body.counts.present,601);
+  assert.ok(statements()<records.length);
 });

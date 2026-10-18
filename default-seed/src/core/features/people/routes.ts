@@ -10,7 +10,7 @@ import { custodyCheckpoint, peopleErasure } from './erasure'
 import { importRoutes } from './import-routes'
 import { retireD1ImportCustody } from '../../../../../modules/import-kit/src/d1/index.ts'
 import type { D1CustodyRetirement, D1ImportContext } from '../../../../../modules/import-kit/src/d1/index.ts'
-import { peopleImportContext, PERSON } from './imports.server'
+import { peopleImportContext, PERSON, personSet } from './imports.server'
 import { personRedaction } from './person-redaction.server'
 import { CommandKeyError, commandKey, runOnce } from '../../../../../foundation/runtime/command-receipts'
 import { addNote, attachFile, createPerson, erasureRequestedStatement, exportPerson, personExists } from './repository.server'
@@ -67,6 +67,7 @@ function retiringPeopleContext(context: D1ImportContext, subject: string): D1Imp
     matchesCount(count) {
       return { sql: `(SELECT count(*) FROM people WHERE import_revision IS NOT NULL AND NOT(id=? AND ${retired}))=?`, params: [subject, subject, count] }
     },
+    matchesMany: (rows) => personSet(rows, { sql: `NOT(id=? AND ${retired})`, params: [subject, subject] }),
     async list(db, destination) {
       const rows = await targets.list(db, destination)
       return await isRetired(db) ? rows.filter(row => row.targetKind !== PERSON || row.targetId !== subject) : rows

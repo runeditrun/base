@@ -3,6 +3,7 @@ import type { ImportAction } from '../types.ts';
 import type { DoorRequest, DoorSnapshot, ImportDoorOptions } from './types.ts';
 import { DoorError, verifyImportGrant, type DoorAction } from './grants.ts';
 import { assertion, sql, statement, transact } from './store.ts';
+import { reserveReturn } from '../d1/budget.ts';
 
 export async function enabled(options: ImportDoorOptions): Promise<boolean> {
   const row = await options.database.prepare('SELECT enabled FROM ik_door_settings WHERE installation_id=?').bind(options.claim.installationId).first();
@@ -26,9 +27,12 @@ const actions: Record<DoorAction, ImportAction[]> = {
   uploads: [], plan: ['plan', 'read'], apply: ['create', 'apply', 'read'],
   status: ['read'], reconcile: ['read'], undo: ['read', 'undo', 'rollback'],
 };
+/** Statements the door runs after a kit call returns (lineage recovery and the
+ * final authority check), kept out of the kit's self-sized batches. */
+const DOOR_RETURN_STATEMENTS = 16;
 export function kitContext(request: DoorRequest, snapshot: Pick<DoorSnapshot, 'kitNamespace'|'plan'|'id'>) {
   const {options, grant} = request;
-  return {
+  return reserveReturn({
     destination: options.destination, namespace: snapshot.kitNamespace,
     mappingVersion: snapshot.plan.mappingVersion,
     operationKey: 'door:' + snapshot.id,
@@ -44,7 +48,7 @@ export function kitContext(request: DoorRequest, snapshot: Pick<DoorSnapshot, 'k
         return sql(`(${request.authority.sql}) AND (${fingerprint.sql})`, ...request.authority.params ?? [], ...fingerprint.params ?? []);
       },
     },
-  };
+  }, DOOR_RETURN_STATEMENTS);
 }
 /** Server-only integration hook. The predicate must consult the seed's CURRENT
  * owner session or the owner's provisioning approval in this same database. */

@@ -4,6 +4,7 @@ import { DoorError } from './grants.ts';
 import { admit, enabled } from './authority.ts';
 import { authorized } from './store.ts';
 import { sizeLimitError } from './limits.ts';
+import { requestDatabase } from '../d1/budget.ts';
 import { uploads } from './uploads.ts';
 import { plan } from './planning.ts';
 import { apply, status, reconcile, undo } from './jobs.ts';
@@ -40,13 +41,16 @@ export function createImportDoorHandler(options: ImportDoorOptions): (request: R
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/rer/import/')) return null;
     try {
+      // Every statement of this request, the door's own and each kit call's,
+      // counts in one D1 request budget; exhausting it is a named 413.
+      const budgeted = {...options,database:requestDatabase(options.database)};
       // Check opt-in before revealing routes, authentication, or parser behavior.
-      if (!await enabled(options)) return Response.json({error:'not_found'},{status:404,headers});
+      if (!await enabled(budgeted)) return Response.json({error:'not_found'},{status:404,headers});
       const action = url.pathname.slice('/api/rer/import/'.length) as DoorAction;
       if (!Object.hasOwn(routes,action)) return Response.json({error:'not_found'},{status:404,headers});
       if (request.method!=='POST') return Response.json({error:'method_not_allowed'},{status:405,headers:{...headers,Allow:'POST'}});
       if (url.search || url.hash) throw new DoorError('query_transport_forbidden',400);
-      const admitted = await admit(options,request,action), input = await readInput(request);
+      const admitted = await admit(budgeted,request,action), input = await readInput(request);
       if (['status','reconcile','undo'].includes(action) && Object.keys(input).some(k=>k!=='planId')) throw new DoorError('invalid_input',400);
       const result = await routes[action](admitted,input);
       await authorized(admitted);

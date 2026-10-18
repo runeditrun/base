@@ -1,6 +1,6 @@
 import type { OwnerClaimConfig } from '../../../owner-claim/index.mjs';
 import type { D1Database, D1Sql, D1TargetAdapter } from '../d1/types.ts';
-import type { ImportMapping, ImportPlan, Json, ParsedRecord, ReaderLimits, PersistedImport } from '../types.ts';
+import type { ImportMapping, ImportPlan, Json, ParsedRecord, ReaderLimits } from '../types.ts';
 import type { DoorGrant } from './grants.ts';
 
 export interface ImportDoorOptions {
@@ -39,5 +39,4 @@ export interface DoorPlanRow {
 export interface DoorRequest {
   options: ImportDoorOptions; grant: Readonly<DoorGrant>; kid: string;
   authority: D1Sql;
-  persisted?: Promise<PersistedImport>;
 }

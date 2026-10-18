@@ -50,6 +50,17 @@ export async function lineage(request: DoorRequest): Promise<{ head_id: string |
     if (!current) throw new DoorError('lineage_conflict', 409);
   }
 }
+/** JSON arrays of rows of at most ~1.9 MB each, the kit's own packing ceiling. */
+function packRows(rows: unknown[]): string[] {
+  const packed: string[] = []; let parts: string[] = [], size = 2;
+  for (const row of rows) {
+    const value = JSON.stringify(row), bytes = new TextEncoder().encode(value).length + 1;
+    if (parts.length && size + bytes > 1_900_000) { packed.push(`[${parts.join(',')}]`); parts = []; size = 2; }
+    parts.push(value); size += bytes;
+  }
+  if (parts.length) packed.push(`[${parts.join(',')}]`);
+  return packed;
+}
 export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot): Promise<void> {
   const db = request.options.database, g = request.grant;
   await transact(db, request.authority, [
@@ -59,14 +70,18 @@ export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot)
     sql('UPDATE ik_door_namespaces SET pending_id=? WHERE installation_id=? AND namespace=?', snapshot.id, g.installationId, g.namespace),
   ]);
   // Private staging remains visibly pending until every immutable chunk is stored.
-  // Small batches keep D1 bindings and transport bounded; no domain effect occurs.
-  const body = canonicalJson(snapshot), chunks: D1Sql[] = [];
-  for (let offset = 0, ordinal = 0; offset < body.length; ordinal++) {
+  // Each statement inserts up to ~1.9 MB of 32,000-character rows, as the kit
+  // packs its own plan chunks, so storing a snapshot costs one statement per
+  // ~1.9 MB rather than per row; no domain effect occurs.
+  const body = canonicalJson(snapshot), rows: {ordinal: number; body: string}[] = [];
+  for (let offset = 0; offset < body.length;) {
     let end = Math.min(offset + 32_000,body.length);
     if (end < body.length && /[\uD800-\uDBFF]/.test(body[end-1])) end--;
-    chunks.push(sql('INSERT INTO ik_door_plan_chunks(plan_id,ordinal,body) VALUES(?,?,?)', snapshot.id, ordinal, body.slice(offset,end)));
+    rows.push({ordinal: rows.length, body: body.slice(offset,end)});
     offset = end;
   }
-  for (let i = 0; i < chunks.length; i += 8) await transact(db, request.authority, chunks.slice(i, i + 8));
+  for (const packed of packRows(rows)) await transact(db, request.authority, [
+    sql("INSERT INTO ik_door_plan_chunks(plan_id,ordinal,body) SELECT ?,json_extract(value,'$.ordinal'),json_extract(value,'$.body') FROM json_each(?)", snapshot.id, packed),
+  ]);
   await transact(db, request.authority, [sql('UPDATE ik_door_plans SET complete=1 WHERE id=?', snapshot.id)]);
 }
