@@ -1,6 +1,7 @@
 # Optional D1 import door
 
 Import `createImportDoorHandler`, `importDoorSchema`,
+`importDoorApplyFailureMigration`, `importDoorScopesMigration`,
 `writeImportDoorSettings` and `readImportDoorHistory` from `./index.ts`.
 The handler returns `(request: Request) => Promise<Response | null>`; pass
 unhandled requests to the seed's existing router. Only POST routes under
@@ -17,16 +18,28 @@ Construct the handler with these seed-owned options:
 | `format`, `parse` | `'json'` or `'ndjson'`, and the product's parser of source records. |
 | `limits` | Optional reader limits; grant quotas still apply. |
 
-Apply the statements in `importDoorSchema: string[]` in a new product-owned
-numbered migration after the D1 import-kit schemas. Preserve existing applied
-migration names. Copy the import-kit runtime and its sibling owner-claim and
-D1 transport dependencies with their relative topology intact.
+A fresh installation applies the statements in `importDoorSchema: string[]`
+in a new product-owned numbered migration after the D1 import-kit schemas.
+Preserve existing applied migration names. Copy the import-kit runtime and its
+sibling owner-claim and D1 transport dependencies with their relative topology
+intact.
 
-Upgrading an installed door also requires a new numbered migration containing
-the additive `CREATE TABLE IF NOT EXISTS ik_door_scopes` statement from
-`importDoorSchema` (or all of its idempotent statements). It binds each logical
-namespace to the product destination on the first uploaded chunk, before a
-plan/job exists. Old applied namespaces remain scoped through their kit job id
+A seed that installed an earlier door upgrades by applying the door
+migrations once each, in this order, each in its own new numbered migration,
+never by re-applying `importDoorSchema` (its first statement refuses an
+earlier door's plan table, so re-applying it fails the deploy):
+
+1. `importDoorApplyFailureMigration`, in a single atomic `database.batch()`
+   with foreign keys enabled. It preserves every plan id, chunk and approval,
+   removes the old one-plan-per-bundle uniqueness constraint and adds the
+   `ik_door_apply_failures` table (see "Catch-up and recovery").
+2. `importDoorScopesMigration`, the additive `ik_door_scopes` table.
+
+Until both have run, an enabled door answers every route with 503
+`import_door_schema_outdated`; a disabled door still answers 404.
+
+`ik_door_scopes` binds each logical namespace to the product destination on
+the first uploaded chunk, before a plan/job exists. Old applied namespaces remain scoped through their kit job id
 or the recoverable `door:<plan id>` operation key. Rows the previous door wrote
 in a namespace with neither link (an unplanned upload, a plan never applied,
 or rows a rolled-back previous Worker keeps writing) were never applied by any
@@ -39,8 +52,8 @@ uploaded chunks, upload headers and saved snapshot bodies, including unapplied
 uploads. The journal counts the withdrawn rows. Withdrawing door content fences
 the erasure, so a values-only erasure that touches it requires the restore
 checkpoint (`IMPORT_RETIREMENT_CHECKPOINT_REQUIRED` without one). Plans,
-approvals, namespace heads and namespace bindings hold no record content and
-stay, so the seed's history still lists a surviving import "via Business",
+approvals, namespace heads, namespace bindings and apply-failure facts (a plan
+id and an allowlisted reason code) hold no record content and stay, so the seed's history still lists a surviving import "via Business",
 and `status` and `undo` keep working through its kit job. Where a withdrawn
 snapshot is needed (`reconcile`, catch-up `plan`, an `apply` that has not
 completed) the door answers 410 `snapshot_withdrawn` with `details.planId`.
@@ -76,7 +89,10 @@ writes; removal is unsupported. Rotate to a new `kid` to grant access again.
 
 Call `readImportDoorHistory(database, installationId, ownerPredicate)` to show
 approval metadata joined to real kit jobs. The caption is
-"approved via Business by <owner> at <time>, fingerprint <x>". Keep the ordinary
+"approved via Business by <owner> at <time>, fingerprint <x>" for a job without
+an apply failure. A failed apply is captioned "approved, then failed (<reason>)
+via Business by …"; `state`, `error` and the durable `failureCode` accompany it.
+Keep the ordinary
 seed history and undo flow, using the configured owner principal and its current
 owner-session predicate. Existing operator job binding remains unchanged.
 
@@ -135,7 +151,7 @@ acceptance evidence; this module has no external side effects.
 ## Catch-up and recovery
 
 A logical namespace tracks a lineage of snapshots; each snapshot's kit namespace
-derives from the logical namespace and exact bundle SHA-256. Original source ids
+derives from the logical namespace, the exact bundle SHA-256 and its plan id. Original source ids
 remain intact. Unchanged records produce no effects but remain accounted for.
 Replacements use the revision in original import provenance as
 `expectedRevision`, and compare native values too, protecting edits even when
@@ -143,7 +159,7 @@ their revision was unchanged. Gone source records are reported without deletion.
 
 Only one plan may remain pending per logical namespace until applied or undone.
 Committed kit state recovers lineage after an interrupted call. Repeating a
-bundle reuses its exact retained plan; use a fresh explicit namespace and review
+bundle reuses its exact retained plan unless that plan's apply failed; use a fresh explicit namespace and review
 for a different mapping. Undo snapshots newest first, including undo from the
 seed's ordinary owner history.
 
@@ -152,6 +168,34 @@ An interrupted private plan preparation reports
 to cancel its private preparation, then plan the retained upload again. A
 preparation with no kit job cancels without native effects. Once a job exists,
 the same route uses the kit's guarded rollback/undo instead.
+
+An exception during the target apply ends that job as `failed`. Its native
+batch is atomic: no writes from the failed batch remain. The approval and a
+separate failure fact remain for audit, including after an owner rollback.
+Status returns `job.state`, `job.error` and `failureCode`; history exposes the
+same reason. Provider messages and customer records are never stored as reasons.
+
+| Apply reason / HTTP status | Meaning |
+| --- | --- |
+| `import_door_apply_constraint` / 409 | A database constraint refused the batch. Correct the data or native writer before proposing another plan. |
+| `import_door_apply_transient` / 503 | The provider reported busy, locked, interrupted or unavailable service, including D1's retryable errors (storage or code-update resets, lost connections, overload, timeouts). A fresh reviewed attempt can be proposed after recovery. |
+| `import_door_apply_failed` / 409 | Another apply error. Inspect the seed's adapter before proposing another plan. |
+
+Every failed plan is terminal: further applies return
+`import_door_plan_failed`, even with a new grant or approval. The consumed grant
+nonce stays consumed. A retry needs a new plan, fingerprint and approval record;
+the approval associated with the failure cannot approve a retry, including a
+standing catch-up approval. When checkpoint is zero, `plan` can immediately
+prepare the same retained upload again in the same logical namespace. If earlier
+batches committed, first finish `undo` (guarded rollback) before replanning.
+The old job, immutable snapshot, approval and failure fact remain readable.
+
+An erasure that overtakes an apply is not an apply failure: no failure fact is
+recorded, the job keeps its state for `undo`, and the apply answers the
+erasure's 410 (`snapshot_withdrawn` or `erased_during_request`).
+
+Seeds that installed an earlier door apply `importDoorApplyFailureMigration`
+and then `importDoorScopesMigration`, as set out at the top of this document.
 
 Bounded catch-up requires an existing nonempty baseline and standing owner
 approval. It refuses gone, conflicting, rejected or unmapped records. Additions

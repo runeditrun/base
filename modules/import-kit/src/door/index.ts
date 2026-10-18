@@ -9,7 +9,7 @@ import { apply, status, reconcile, undo } from './jobs.ts';
 export type * from './types.ts';
 export type { DoorAction, DoorGrant } from './grants.ts';
 export { verifyImportGrant, DoorError } from './grants.ts';
-export { importDoorSchema } from './schema.ts';
+export { importDoorSchema, importDoorApplyFailureMigration, importDoorScopesMigration } from './schema.ts';
 export { writeImportDoorSettings, readImportDoorHistory } from './authority.ts';
 
 const routes = {uploads,plan,apply,status,reconcile,undo};

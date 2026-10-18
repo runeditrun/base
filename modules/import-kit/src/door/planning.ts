@@ -33,7 +33,8 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
 }
 async function planUpload(request: DoorRequest, input: Record<string, unknown>, upload: UploadRow) {
   const current = await lineage(request);
-  const existing = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE installation_id=? AND namespace=? AND bundle_sha256=?')
+  const existing = await request.options.database.prepare(`SELECT p.* FROM ik_door_plans p WHERE installation_id=? AND namespace=? AND bundle_sha256=?
+    AND NOT EXISTS(SELECT 1 FROM ik_door_apply_failures f WHERE f.plan_id=p.id)`)
     .bind(request.grant.installationId,request.grant.namespace,upload.bundle_sha256).first<DoorPlanRow>();
   if (existing) {
     if (!existing.complete) throw new DoorError('plan_staging_interrupted_cancel_and_replan',409,{planId:existing.id});
@@ -47,14 +48,14 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   const previous = current.head_id ? await loadSnapshot(request,await planRow(request,current.head_id)) : null;
   if (previous && input.catchup !== true) throw new DoorError('catchup_required',409);
   if (!previous && (input.catchup === true || request.grant.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
-  const options = request.options, {kitNamespace,source} = await readUpload(request,upload);
+  const planId = randomUUID(), options = request.options, {kitNamespace,source} = await readUpload(request,upload,planId);
   const prior = new Map((previous?.records ?? []).map(r=>[recordKey(r),r]));
   const revisions = new Map<string,{revision:string;matches:boolean}>();
   for (const record of prior.values()) for (const target of record.targets) {
     const found = await importedTarget(request,target);
     revisions.set(canonicalJson([target.kind,target.id]),{revision:found.provenance.appliedRevision,matches:found.matches});
   }
-  const snapshot: DoorSnapshot = {id:randomUUID(),namespace:request.grant.namespace,bundleSha256:upload.bundle_sha256,kitNamespace,
+  const snapshot: DoorSnapshot = {id:planId,namespace:request.grant.namespace,bundleSha256:upload.bundle_sha256,kitNamespace,
     previous:previous?.id ?? null,records:[],sourceCount:0,plan:{} as ImportPlan,
     differences:{additions:[],replacements:[],unchanged:[],gone:[],conflicts:[]},
     standingApproval:request.grant.catchup==='bounded'?{id:request.grant.approvalRecordId!,at:request.grant.approvedAt!}:null};
@@ -102,9 +103,11 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   await saveSnapshot(request,snapshot,upload);
   return preview(snapshot);
 }
-async function readUpload(request: DoorRequest, upload: UploadRow) {
+/** Each plan has its own kit namespace, so a replan after a failed apply never
+ * meets the failed job's kit namespace. */
+async function readUpload(request: DoorRequest, upload: UploadRow, planId: string) {
   const bytes = await bundleBytes(request,upload), options = request.options;
-  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256]));
+  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256,planId]));
   const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
     {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.grant.maxBytes,request.grant.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.grant.maxRecords,request.grant.maxRecords)});
   return {kitNamespace,source};
@@ -120,8 +123,8 @@ async function refuseErased(request: DoorRequest, upload: UploadRow, plan: Impor
 }
 /** The upload planned on its own with the plain mapping: one holding an erased record is refused and goes. */
 async function screen(request: DoorRequest, upload: UploadRow): Promise<void> {
-  const {kitNamespace,source} = await readUpload(request,upload), mapping = request.options.mapping;
-  await refuseErased(request,upload,await planD1Import(source,mapping,kitContext(request,{id:randomUUID(),kitNamespace,plan:{mappingVersion:mapping.version} as ImportPlan})));
+  const id = randomUUID(), {kitNamespace,source} = await readUpload(request,upload,id), mapping = request.options.mapping;
+  await refuseErased(request,upload,await planD1Import(source,mapping,kitContext(request,{id,kitNamespace,plan:{mappingVersion:mapping.version} as ImportPlan})));
 }
 export function assertBounded(snapshot: DoorSnapshot, previous: DoorSnapshot): void {
   const d = snapshot.differences, changed = d.additions.length + d.replacements.length;
