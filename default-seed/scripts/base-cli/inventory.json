@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.61",
+  "cliVersion": "0.2.61-dev.g3478fc15",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1319,7 +1319,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "c79b56d1032110054bc914952453b977309568db359eececdc5f0b4cf935c1d8"
+      "sha256": "075ab2c56e70814f9432ea65470f3f988e5c20bafe15a5650e322f3fb1fc111a"
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
@@ -1387,7 +1387,7 @@
     },
     "modules/demo-host/native/prepare.mjs": {
       "source": "modules/demo-host/native/prepare.mjs",
-      "sha256": "515bf6cb2dfcaef3506e0a43c44b15893852910f460deabe8036ef186452fa47"
+      "sha256": "80c0a58f3967b8e51db865d183ce772bed75baa5d4e97a02eeec8c44d41bcd8a"
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
@@ -1435,11 +1435,11 @@
     },
     "modules/demo-host/page-style.mjs": {
       "source": "modules/demo-host/page-style.mjs",
-      "sha256": "4a83b41dbdfc8637547587e54ee7a542e947a93cf74bed06c510ed1723aee127"
+      "sha256": "6a2ab271d26fd9a5c1343106d6247500cb3c58f83d5fd8dae109bd637217485e"
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "754516b430475d89350c925d076eff8d81d88bb3e5150fef6fac343cd7f7bfa0"
+      "sha256": "a6e6cfa5eb152d252e7995c7da83b6421000353d3467818b35ffcd5861f687bd"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
@@ -1451,15 +1451,19 @@
     },
     "modules/demo-host/start-script.mjs": {
       "source": "modules/demo-host/start-script.mjs",
-      "sha256": "6934c6e4c0db3b95becebc6d77e75d1957e73dacc7484ec347301c82a3f2117f"
+      "sha256": "7426442f03b717a779784accf567ded58b215e19bd23dcb6f824eca43f3c1568"
+    },
+    "modules/demo-host/theme-css.mjs": {
+      "source": "modules/demo-host/theme-css.mjs",
+      "sha256": "9a72fe34559cad7c98f24fd857874784617d366af8ba7cfdadfc007ebbb3715a"
     },
     "modules/demo-host/theme-script.mjs": {
       "source": "modules/demo-host/theme-script.mjs",
-      "sha256": "1b78c0c1bbf171149d872bcc1c4a4d11091f659c1bbebd691f797c2a778c151b"
+      "sha256": "a3c756912832b6625c0a88e7368e15248b3f6d978662087062701f61cc14229c"
     },
     "modules/demo-host/theme.mjs": {
       "source": "modules/demo-host/theme.mjs",
-      "sha256": "bd7dd21de2ee56f24b045d1749380a338322de3e6e44c720bab3aa31706a42b8"
+      "sha256": "0b3c3d78ad9fcbefd4816a530cf3e78ce5c4ab7becedfa80ffdbbb31945901ee"
     },
     "modules/demo-host/upgrade.mjs": {
       "source": "modules/demo-host/upgrade.mjs",

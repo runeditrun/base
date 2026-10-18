@@ -40,7 +40,7 @@ export async function prepareNative(folder) {
   const bundle = { iconHead, compatibilityDate: config.compatibility_date, compatibilityFlags: [...new Set([...(config.compatibility_flags ?? []), 'nodejs_compat'])], modules,
     bindings, migrations: manifest.migrations, vars: config.vars ?? {}, crons: config.triggers?.crons ?? [],
     assetPaths: [...assets.filter(file => !file.path.split('/').some(part => part.startsWith('.'))).map(file => '/' + file.path), ...theme.paths],
-    theme: theme.stylesheets,
+    theme: theme.css,
     immutable: [...builtChunks(assets, manifest.assetsDir)].sort(),
     warm: (await warmList(assets, root, manifest.operatorPath, manifest.assetsDir)).paths };
   bundle.digest = createHash('sha256').update(JSON.stringify(bundle)).digest('hex');
