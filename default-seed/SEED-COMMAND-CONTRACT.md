@@ -58,8 +58,15 @@ candidates and `--verify-workflow` remedy. This optional declaration does not
 change `operations.verify`, the seed's local command.
 
 The selected workflow must have a completed successful `push` or
-`workflow_dispatch` run for the exact source SHA in the same repository, on its
-default branch or the release tag when that tag resolves to the same commit.
+`workflow_dispatch` run for the exact source SHA, with both run and head
+repository matching the source repository, on its default branch, an authorized
+release branch, or the release tag when that tag resolves to the same commit.
+Authorized release branches match exactly
+`^release/(?:v[0-9]+(?:\.[0-9]+)?|[0-9]+\.[0-9]+\.x)$`.
+For example, the Git refs `refs/heads/release/v0`, `refs/heads/release/v0.4`
+and `refs/heads/release/0.4.x` qualify. The branch's current GitHub head
+must equal the source commit, or the version's release tag, when present, must
+resolve to it. A moved or missing branch without that pinned tag is refused.
 `gates.verify` in the receipt and site provenance records `workflowFile`,
 `workflowName`, `workflowId`, `runId` and `runUrl`. `--local-verify` explicitly
 runs frozen installation and the seed's local verification targets instead.

@@ -26,11 +26,16 @@ export async function source(t, { localPass = false, portable = false, buildFail
   }
   f.sha = f.commit();
   execFileSync('git', ['-C', f.repo, 'remote', 'add', 'origin', `git@github.com:${repository}.git`]);
+  // Publication history is a real local Git remote. Keep these API-boundary
+  // tests offline instead of inferring/fetching GitHub's public default branch.
+  const publicRepo = join(f.temporary, 'public.git');
+  execFileSync('git', ['clone', '--bare', '--no-hardlinks', '--', f.repo, publicRepo], { stdio: 'pipe' });
+  execFileSync('git', ['-C', publicRepo, 'update-ref', 'refs/heads/main', f.sha], { stdio: 'pipe' });
   const commands = join(f.temporary, 'commands'); mkdirSync(commands);
   const responses = join(f.temporary, 'responses.json'), calls = join(f.temporary, 'calls.jsonl');
   writeFileSync(calls, '');
   const gh = join(commands, 'gh');
-  // The only fake is GitHub's network boundary, shared with publication scan.
+  // GitHub's API boundary is shared with publication scan.
   writeFileSync(gh, `#!${process.execPath}
 const fs = require('node:fs'), args = process.argv.slice(2), path = args.at(-1);
 fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
@@ -59,7 +64,8 @@ else { process.stderr.write('unexpected API request'); process.exitCode = 1; }
     }));
     const output = join(f.temporary, 'release-' + attempt++);
     const result = spawnSync(process.execPath, [cli, 'release', '--repo', f.repo, '--project', repository,
-      '--repository', 'https://github.com/' + repository, '--ref', f.sha, '--output', output, '--dry-run', ...flags],
+      '--repository', 'https://github.com/' + repository, '--ref', f.sha, '--output', output,
+      '--public-base', publicRepo + '#main', '--dry-run', ...flags],
     { cwd: f.temporary, env, encoding: 'utf8', timeout: 120000 });
     assert.equal(result.stderr, '', result.stderr);
     return { result, receipt: JSON.parse(result.stdout), output };

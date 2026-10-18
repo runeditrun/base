@@ -3,6 +3,7 @@ import { git } from './source.mjs';
 import { verifyWorkflow } from './verify-workflow.mjs';
 
 const same = (left, right) => typeof left === 'string' && left.toLowerCase() === right.toLowerCase();
+const releaseBranch = /^release\/(?:v[0-9]+(?:\.[0-9]+)?|[0-9]+\.[0-9]+\.x)$/;
 function identity(value) {
   if (typeof value !== 'string') return undefined;
   const scp = /^git@github\.com:([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/i.exec(value);
@@ -30,8 +31,14 @@ function api(path, paginated = false) {
   { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 16 * 1024 * 1024 }));
 }
 
-function tagCommit(repository, tag) {
-  let object = api(`repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`).object;
+function matchingRef(repository, namespace, name) {
+  return api(`repos/${repository}/git/matching-refs/${namespace}/${encodeURIComponent(name)}`)
+    .find(ref => ref.ref === `refs/${namespace}/${name}`)?.object;
+}
+
+function tagCommit(repository, tag, optional = false) {
+  let object = optional ? matchingRef(repository, 'tags', tag)
+    : api(`repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`).object;
   // A tag can point at another annotated tag. Bound malformed/cyclic replies.
   for (let depth = 0; object?.type === 'tag' && depth < 8; depth++) {
     if (!/^[a-f0-9]{40}$/.test(object.sha)) return null;
@@ -43,7 +50,7 @@ function tagCommit(repository, tag) {
 export function githubVerify(source, repository, selector) {
   const result = { status: 'FAIL', provider: 'github', repository, commit: source.commit,
     reason: 'github-verify-not-successful',
-    message: `No successful Verify run exists for ${repository} at exact source commit ${source.commit}. Push this commit to the default branch or release tag, or re-run Verify for this SHA with workflow_dispatch. Use --local-verify to run verification locally.` };
+    message: `No successful Verify run exists for ${repository} at exact source commit ${source.commit}. Push this commit to the default branch, an authorized release branch or release tag, or re-run Verify for this SHA with workflow_dispatch. Use --local-verify to run verification locally.` };
   try {
     const metadata = api(`repos/${repository}`);
     if (!same(metadata.full_name, repository) || typeof metadata.default_branch !== 'string' || !metadata.default_branch) throw Error('repository');
@@ -54,6 +61,7 @@ export function githubVerify(source, repository, selector) {
     const workflow = selected.workflow;
     Object.assign(result, { workflowId: workflow.id, workflowFile: workflow.path, workflowName: workflow.name });
     const rejected = new Set();
+    const branchHeads = new Map();
     let checkedTag = false, tagSHA;
     const runs = api(`repos/${repository}/actions/workflows/${workflow.id}/runs?head_sha=${source.commit}&per_page=100`, true)
       .flatMap(page => page.workflow_runs);
@@ -69,9 +77,22 @@ export function githubVerify(source, repository, selector) {
         continue;
       }
       if (run.head_branch !== metadata.default_branch) {
-        if (run.head_branch !== source.tag) { rejected.add('neither default branch nor release tag'); continue; }
-        if (!checkedTag) { tagSHA = tagCommit(repository, source.tag); checkedTag = true; }
-        if (tagSHA !== source.commit) { rejected.add('release tag points at a different commit'); continue; }
+        if (run.head_branch === source.tag) {
+          if (!checkedTag) { tagSHA = tagCommit(repository, source.tag); checkedTag = true; }
+          if (tagSHA !== source.commit) { rejected.add('release tag points at a different commit'); continue; }
+        } else if (releaseBranch.test(run.head_branch)) {
+          if (!branchHeads.has(run.head_branch)) {
+            const head = matchingRef(repository, 'heads', run.head_branch);
+            branchHeads.set(run.head_branch, head?.type === 'commit' ? head.sha : null);
+          }
+          if (branchHeads.get(run.head_branch) !== source.commit) {
+            if (!checkedTag) { tagSHA = tagCommit(repository, source.tag, true); checkedTag = true; }
+            if (tagSHA !== source.commit) {
+              rejected.add('release branch head is missing or points at a different commit, and release tag does not point at the source commit');
+              continue;
+            }
+          }
+        } else { rejected.add('neither default branch nor release tag'); continue; }
       }
       if (!Number.isSafeInteger(run.id) || run.id <= 0) throw Error('run');
       return { status: 'PASS', provider: 'github', repository: metadata.full_name, commit: source.commit,
