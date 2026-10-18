@@ -384,19 +384,33 @@ connect pairs but leaves those optional changes off. Background services use
 absolute Node and CLI paths.
 
 Connect also asks once which supported CLI should answer agent questions:
-Claude, Codex or `none`. Detection reads only absolute PATH entries, resolves
-each candidate's real path and skips files that group or others can modify.
-It checks their help in a throwaway home without credentials and records the
-chosen absolute executable, its pinned cheaper-tier model (Claude: `sonnet`;
-Codex: the smallest current model in the catalog the installed Codex ships)
-and device capabilities. Noninteractive connect chooses `none`, preserving
-interactive `next` / `answer` use. Reconnect to change the choice. `status`
-shows the recorded questions CLI, model and limits.
+Claude, Codex or `none`. Detection reads only absolute PATH entries and skips a
+candidate unless every link, the file and every folder above them, on the PATH
+entry and on the resolved path, belong to you or root. Folders that group or
+others can write are refused unless they are root's sticky folders (such as
+`/tmp`), and so is a file they can modify. It checks the resolved file's help
+in a throwaway home without credentials and records that resolved path (the
+one that runs), its pinned cheaper-tier model (Claude: `sonnet`; Codex: the
+smallest current model in the catalog the installed Codex ships) and device
+capabilities. Noninteractive connect chooses `none`, preserving interactive
+`next` / `answer` use. Reconnect to change the choice. `status` shows the
+recorded questions CLI, model and limits.
 
-Spend limits stay on the computer: at most 30 model questions an hour (the
-supervisor pauses questions at the limit and keeps working other tasks) and at
-most $0.05 per Claude question (`--max-budget-usd`). `connect
---questions-per-hour N` and `--max-budget-usd USD` can only lower them.
+Limits stay on the computer. At most 30 model questions an hour: the
+supervisor pauses questions at the limit and keeps working other tasks. Each
+question runs at most 120 seconds and holds at most 256 vendor ids. Claude runs
+with `--effort low`, thinking off and at most 1024 output tokens per model turn
+(`CLAUDE_CODE_DISABLE_THINKING`, `CLAUDE_CODE_MAX_OUTPUT_TOKENS`). Its
+`--max-budget-usd 0.05` is checked after each turn, so it stops a question
+once the cost passes $0.05 rather than capping the turn that crosses it. Codex
+runs with low reasoning effort and has no per-question dollar limit. `connect
+--questions-per-hour N` and `--max-budget-usd USD` can only lower the hourly
+and dollar limits.
+
+Each question's records live in `~/.rer/business/classifier/`, including Codex's
+private home with its copy of your Codex login. If the supervisor is killed
+mid-question, its next start stops any classifier still running from that
+question and removes the folder; `disconnect` does the same.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.

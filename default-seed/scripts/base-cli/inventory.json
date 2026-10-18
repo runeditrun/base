@@ -395,11 +395,15 @@
     },
     "cli/business/classification.mjs": {
       "source": "cli/business/classification.mjs",
-      "sha256": "5f7c9b82985e71ee86a56bf2d9b46e541a72868775e6438ab198431ccd907984"
+      "sha256": "44a24fc0039804568fa3d7b98a9db09d8a84a2a28e373b04c6731ae5ca1d0c45"
+    },
+    "cli/business/classifier-runs.mjs": {
+      "source": "cli/business/classifier-runs.mjs",
+      "sha256": "9ebd3661a1d21d982fea0cc3341d9e0ba449cdf2ef86b8db28d69f964eca1c52"
     },
     "cli/business/codex-home.mjs": {
       "source": "cli/business/codex-home.mjs",
-      "sha256": "0a0927de5b29224ef6ea9c0f3426610fff118df642361c99fbdedee021b494e9"
+      "sha256": "329e8f6742e46a47b8b777aafa2524a93c6ef07951a775512d98b5d26d9680d5"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
@@ -435,19 +439,19 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "bb4b1eb30535e5656ea1004cbde8abb784553b91aa2b468d217eb2a9c2956e03"
+      "sha256": "d85a8d6b07aa48a1f85ee1e8d35fe444c4f76999a0a7bbae89eaa8f20461c971"
     },
     "cli/business/model-cli.mjs": {
       "source": "cli/business/model-cli.mjs",
-      "sha256": "6ee2e6744d3cd615c6b6b821498706f450c91bb2a005f5bd968943c31f7345cf"
+      "sha256": "9d40f0bd36a02e65c90e056faad9f5ceef38bf235bd437705805ae4e5dfd0144"
     },
     "cli/business/model-env.mjs": {
       "source": "cli/business/model-env.mjs",
-      "sha256": "5ac242b19700ec160bdb4d7a269a1aeb8b350a083c1c6ad92b8ccb4f3b7f76b9"
+      "sha256": "08d680370c38d5fb90922e44c0ec9b31693f3b957ee07f3e6ed0a38141e85412"
     },
     "cli/business/model-process.mjs": {
       "source": "cli/business/model-process.mjs",
-      "sha256": "e61afa01d26b9117062d001253ab1c309971abd5e4675aa7b3f35098d3aefbf6"
+      "sha256": "32f7438308205684c1a79e6d74c1a18228d18597c3a400971aadf007e1934aa7"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -527,7 +531,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "2a365d3add48011af418992d78f209697395105220b6c3dde452930c8c18cad9"
+      "sha256": "b006110205c1d6301cb75a58777452fa7960ebfe29778be88a427d571d99ee83"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

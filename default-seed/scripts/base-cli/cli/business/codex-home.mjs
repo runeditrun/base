@@ -1,10 +1,11 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 const userCodexHome = () => isAbsolute(process.env.CODEX_HOME ?? '') ? process.env.CODEX_HOME : join(homedir(), '.codex');
+const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const uncopyable = () => Error('Business classifier could not copy Codex credentials. Sign Codex in with file-stored credentials or set OPENAI_API_KEY. Task released.');
 
 async function authFile(path) {
@@ -18,6 +19,7 @@ async function authFile(path) {
 // Copy only the customer's Codex auth file into the private CODEX_HOME. Their
 // config, MCP servers, hooks, rules, skills and global AGENTS.md stay behind.
 // Without a copyable file, only an OpenAI API key in the environment works.
+// Returns the digest of the copied bytes, which a later sweep can also use.
 export async function copyCodexCredentials(codexHome) {
  const source = join(userCodexHome(), 'auth.json');
  let bytes;
@@ -27,20 +29,22 @@ export async function copyCodexCredentials(codexHome) {
   throw uncopyable();
  }
  await writeFile(join(codexHome, 'auth.json'), bytes, { mode: 0o600, flag: 'wx' });
- return { source, bytes };
+ return digest(bytes);
 }
 
 // Codex rotates ChatGPT refresh tokens when it refreshes them. Return a
 // refreshed copy to the customer's file, unless their own Codex changed it.
-export async function returnRefreshedCredentials(copy, codexHome) {
- if (!copy) return;
+export async function returnRefreshedCredentials(copied, codexHome) {
+ if (!copied) return;
  const refreshed = await authFile(join(codexHome, 'auth.json')).catch(() => null);
- if (!refreshed || refreshed.equals(copy.bytes)) return;
- if (!(await readFile(copy.source)).equals(copy.bytes)) return;
- const temporary = join(dirname(copy.source), `.auth.json.${randomUUID()}.tmp`);
+ if (!refreshed || digest(refreshed) === copied) return;
+ const source = join(userCodexHome(), 'auth.json');
+ const current = await readFile(source).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+ if (!current || digest(current) !== copied) return;
+ const temporary = join(dirname(source), `.auth.json.${randomUUID()}.tmp`);
  try {
   await writeFile(temporary, refreshed, { mode: 0o600, flag: 'wx' });
-  await rename(temporary, copy.source);
+  await rename(temporary, source);
  } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
 

@@ -8,6 +8,7 @@ import { pause } from './api.mjs';
 import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
 import { questionLimits } from './question-budget.mjs';
+import { sweepRuns } from './classifier-runs.mjs';
 
 export async function paired() {
  const state = await loadState();
@@ -53,6 +54,8 @@ export async function disconnect() {
  const state = await loadState(), directory = stateDirectory();
  await removeService();
  await stopSupervisor(directory);
+ // With the supervisor gone, stop any classifier a killed one left behind.
+ await sweepRuns();
  await removePermissions();
  if (state) {
   const store = createCredentialStore();
@@ -71,6 +74,11 @@ function questionSettings(state) {
  return { questions_model: state.classifier.model ?? null, questions_per_hour: limits.questionsPerHour, max_budget_usd: state.classifier.name === 'claude' ? limits.maxBudgetUsd : null };
 }
 
+// What this computer enforces per model question, as status reports it.
+const limitText = (classifier, settings) => classifier.name === 'claude'
+ ? `low effort, no thinking, 1024 output tokens a turn; at most ${settings.questions_per_hour} questions an hour; a question stops after a turn passes $${settings.max_budget_usd}`
+ : `low reasoning effort; at most ${settings.questions_per_hour} questions an hour`;
+
 export async function status({ json = false } = {}) {
  const state = await loadState();
  if (!state) {
@@ -85,7 +93,7 @@ export async function status({ json = false } = {}) {
  }
  process.stdout.write(`Business: ${stored ? 'paired' : 'credential missing'}.\nService: ${service.running ? 'running' : service.installed ? 'installed, stopped' : 'not installed'}.\n`);
  const settings = questionSettings(state);
- process.stdout.write(`Questions CLI: ${state.classifier ? `${state.classifier.name} (model ${settings.questions_model}; at most ${settings.questions_per_hour} questions an hour${settings.max_budget_usd ? `; at most $${settings.max_budget_usd} per question` : ''})` : 'none'}.\n`);
+ process.stdout.write(`Questions CLI: ${state.classifier ? `${state.classifier.name} (model ${settings.questions_model}, ${limitText(state.classifier, settings)}; 120 seconds a question)` : 'none'}.\n`);
  process.stdout.write(`Task: ${['discover.local', 'export.vendor', 'classify.row'].includes(active?.kind) ? active.kind : 'none'}.\n`);
  process.stdout.write(`Checkpoint: ${active?.checkpoint ? 'saved' : 'none'}${Number.isSafeInteger(active?.uploadedBytes) ? `; ${active.uploadedBytes} bytes uploaded` : ''}.\n`);
 }

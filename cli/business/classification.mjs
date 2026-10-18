@@ -7,8 +7,9 @@ const object = value => value && typeof value === 'object' && !Array.isArray(val
 const closed = (value, keys) => object(value) && Object.keys(value).every(key => keys.includes(key));
 const same = (values, expected) => Array.isArray(values) && values.length === expected.length && expected.every(value => values.includes(value));
 // Catalog ids are short slugs. Anything longer or wordier could carry
-// instructions into the prompt, so the question is refused instead.
-export const maximumVendors = 50;
+// instructions into the prompt, so the question is refused instead. A model
+// question holds at most 256 of them (the merged catalogue sends 166).
+export const maximumModelVendors = 256;
 export const catalogVendorId = value => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/.test(value) && value.split('-').length <= 3 && !sensitive(value);
 // Two decimals is all a suggestion needs; more digits would be a channel out.
 export const roundConfidence = value => Math.round(value * 100) / 100;
@@ -19,7 +20,6 @@ export function classification(task) {
  const toolId = identifier(task.question?.tool_id), vendorId = task.question?.vendor_id;
  const schema = task.question?.answer_schema, properties = schema?.properties;
  const vendors = properties?.vendor_id?.enum;
- if (Array.isArray(vendors) && vendors.length > maximumVendors) throw Error(`Business classification question refused: more than ${maximumVendors} vendors.`);
  if (Array.isArray(vendors) && !vendors.every(catalogVendorId)) throw Error('Business classification question refused: a vendor id is not a catalog id of at most 32 characters and 2 hyphens.');
  if (!closed(schema, ['type', 'additionalProperties', 'required', 'properties']) || schema.type !== 'object' || schema.additionalProperties !== false
   || !same(schema.required, ['vendor_id', 'usage', 'confidence']) || !closed(properties, ['vendor_id', 'usage', 'confidence'])
@@ -45,7 +45,15 @@ export function validateClassification(task, answer) {
  return { vendor_id: answer.vendor_id, usage: answer.usage, confidence: roundConfidence(answer.confidence) };
 }
 
+// The model path alone bounds the vendor count; next and answer accept any
+// catalogue-shaped question.
+export function modelClassification(task) {
+ const question = classification(task);
+ if (question.vendors.length > maximumModelVendors) throw Error(`Business classification question refused: more than ${maximumModelVendors} vendors for a model question.`);
+ return question;
+}
+
 export function classificationPrompt(task) {
- const { vendorId, vendors } = classification(task);
+ const { vendorId, vendors } = modelClassification(task);
  return `Suggest how this tool is used. The owner confirms in the browser.\nSuggested vendor: ${vendorId}\nVendors: ${vendors.join(' | ')}\nUsage: ${classifications.join(' | ')}\nReturn only vendor_id, usage and confidence (0 to 1) matching the answer schema.\n`;
 }

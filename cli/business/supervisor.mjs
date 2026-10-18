@@ -12,6 +12,7 @@ import { classify } from './model-cli.mjs';
 import { ownerKinds } from './classification.mjs';
 import { QuestionsPaused, questionLimits, questionsLeft, takeQuestion } from './question-budget.mjs';
 import { runDiscovery } from './discovery-task.mjs';
+import { sweepRuns } from './classifier-runs.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
 const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-installation', 'installation-import-origin-unavailable', 'installation-owner-claim-unconfigured', 'connected-seed-import-required']);
@@ -31,6 +32,9 @@ export async function run({ once = false } = {}) {
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(interrupted, () => {}); }, 250);
  let progress;
  try {
+  // Under the lock: stop classifiers a killed supervisor left running and
+  // remove their records, scratch folders and Codex credential copies.
+  await sweepRuns();
   progress = await loadProgress();
   await unlink(join(directory, 'disconnect')).catch(error => { if (error.code !== 'ENOENT') throw error; });
   do {
