@@ -150,8 +150,12 @@ NODE
  RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next RER_INSTALL_NO_PATH=$no_path "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
  if [ "$#" -eq 0 ]; then return; fi
+ # The command can tell the person how to run rer again from their own shell,
+ # where ~/.local/bin may not be on PATH yet.
+ RER_INVOKED_AS="$HOME/.local/bin/rer"
+ if [ "$(command -v rer 2>/dev/null || true)" = "$RER_INVOKED_AS" ]; then RER_INVOKED_AS=rer; fi
  PATH="$PATH:$HOME/.local/bin"
- export PATH
+ export PATH RER_INVOKED_AS
  "$HOME/.local/bin/rer" "$@"
 }
 

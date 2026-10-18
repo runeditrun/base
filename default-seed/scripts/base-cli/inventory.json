@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.52-dev.g2474a8c3",
+  "cliVersion": "0.2.52-dev.g0814ad0e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -403,7 +403,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "3372049f834ea28f3fd7602fe60096271cc7ce491fdf59d90db188f1f99ae6be"
+      "sha256": "745b4e9a9334f81d8ae908be8442b978596e6b3f428a9b1d0ee79611fcdcb5a8"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -417,6 +417,10 @@
       "source": "cli/business/files.mjs",
       "sha256": "6baeb92fe718208680b1b0360c416b7badd11626aaaa6f66cede63f58a420838"
     },
+    "cli/business/invocation.mjs": {
+      "source": "cli/business/invocation.mjs",
+      "sha256": "ce7843af8f88a4febcdfaf95705db4fbfc42b29383ec43599a2c97b54cc01865"
+    },
     "cli/business/keychain.mjs": {
       "source": "cli/business/keychain.mjs",
       "sha256": "ab3770ed33f7078fcfefc00046f3785ec20aef7a46ff09a293cdbfccb3012af7"
@@ -427,11 +431,11 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "4478c62cd34846e88105e0017c35734964acfd08f705e887533bb7f7df545d48"
+      "sha256": "e33d0ffe71bbe14d2200ec99c206dd486899bef26b73bd7d7426aac0f6fb393a"
     },
     "cli/business/opt-ins.mjs": {
       "source": "cli/business/opt-ins.mjs",
-      "sha256": "1619f9d58b869801efc884c9568d3a821a6ae7a172bd5bf8e8d60e39f58ff7ba"
+      "sha256": "e8b66d15f4510198f11250cb6124ba9b8f48d16d66c9e75e4c75657e95422804"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",

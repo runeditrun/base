@@ -4,6 +4,12 @@ import { Api, originUrl, identifier, pause } from './api.mjs';
 import { loadState, saveState, credentialHandle, loadPending, savePending, clearPending } from './state.mjs';
 import { createCredentialStore } from './keychain.mjs';
 import { applyOptIns } from './opt-ins.mjs';
+import { rerCommand } from './invocation.mjs';
+
+// Approval moves the server's pairing expiry to ten minutes after approval, and
+// approval can come up to the code's own expiry. Keep the pending pairing until
+// then and let the server decide whether it was approved in time.
+const approvalWindow = 600_000;
 
 export const capabilities = ['discover.local', 'export.vendor:sentry', 'export.vendor:uptimerobot', 'export.vendor:pagerduty', 'export.vendor:calendly'];
 
@@ -20,15 +26,19 @@ export async function connect({ code, origin } = {}) {
  }
  if (pending && Date.parse(pending.expires_at) <= Date.now()) { await clearPending(); pending = null; }
  if (pending && (pending.origin !== origin || code && pending.code !== code)) throw Error('Business has a pending pairing. Resume it or disconnect before using another code or origin.');
+ if (!pending && !code) throw Error(`Business needs a browser pairing code. Open ${origin}/business, then run ${rerCommand()} business connect --code CODE --origin ${origin}.`);
+ const store = createCredentialStore(), handle = credentialHandle(origin);
+ // Refuse before redeeming the one-use code or collecting an approval when the
+ // OS credential store cannot hold the device credential.
+ await store.get(handle);
  const api = new Api(origin);
  if (!pending) {
-  if (!code) throw Error(`Business needs a browser pairing code. Open ${origin}/business, then run rer business connect --code CODE --origin ${origin}.`);
   const response = await api.post('/api/business/executors/pair', {
    code, os: process.platform === 'darwin' ? 'macos' : 'linux', agent_kind: process.env.CODEX_HOME ? 'codex' : process.env.CLAUDECODE ? 'claude' : 'other', capabilities,
   });
   const expires = Math.min(Date.now() + 600_000, Date.parse(response?.expires_at));
   if (response?.status !== 'pending_approval' || !/^\d{6}$/.test(response.confirmation_number) || typeof response.pairing_token !== 'string' || !response.pairing_token || !Number.isFinite(expires) || expires <= Date.now()) throw Error('Business server returned an invalid pairing response.');
-  pending = { origin, code, pairing_token: response.pairing_token, confirmation_number: response.confirmation_number, expires_at: new Date(expires).toISOString() };
+  pending = { origin, code, pairing_token: response.pairing_token, confirmation_number: response.confirmation_number, expires_at: new Date(expires + approvalWindow).toISOString() };
   await savePending(pending);
  }
  process.stdout.write(`Confirmation number: ${pending.confirmation_number}\nCompare this number in the browser that created the code, then approve.\n`);
@@ -42,7 +52,6 @@ export async function connect({ code, origin } = {}) {
   if (result?.status === 'paired') {
    if (typeof result.device_credential !== 'string') throw Error('Business server returned an invalid device credential.');
    const state = { version: 1, origin, businessId: identifier(result.business_id), executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false };
-   const store = createCredentialStore(), handle = credentialHandle(origin);
    // No authenticated request (including activation) before both durable writes.
    await store.set(handle, result.device_credential);
    try { await saveState(state); } catch (error) { await store.delete(handle); throw error; }
@@ -56,7 +65,7 @@ export async function connect({ code, origin } = {}) {
   }
   if (result?.status !== 'authorization_pending') throw Error('Business server returned an invalid pairing status.');
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-   process.stdout.write(`Waiting for the owner in ${origin}/business. After approval, run rer business connect --origin ${origin} again to resume this pairing.\n`);
+   process.stdout.write(`Waiting for the owner in ${origin}/business. After approval, run ${rerCommand()} business connect --origin ${origin} again to resume this pairing.\n`);
    return;
   }
   await pause(Math.max(1, Math.min(5, Number(result.interval) || 5)) * 1000);

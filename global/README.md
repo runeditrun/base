@@ -375,10 +375,14 @@ redeems a browser-created code and prints a six-digit confirmation number for
 approval in the browser that created it. Without a terminal it returns while
 approval is pending. Run `rer business connect` again in a later turn to resume
 the same pairing and number; a new server pairing is never started until the
-old one is refused, expired or disconnected. Pending tokens are kept in the
-private CLI config directory for at most ten minutes. Device credentials stay in macOS
-Keychain or Linux Secret Service. A missing or locked Secret Service refuses;
-there is no plaintext credential store. Linux needs `secret-tool` and an
+old one is refused, expired or disconnected. The waiting line names the command
+that works from the agent's own shell: `rer` when it is on PATH, the launcher
+install.sh wrote, or `npx -y @runeditrun/rer` after an npx run. Pending tokens
+are kept in the private CLI config directory until the code's expiry plus the
+ten minutes the server allows after an approval, so an approval near the code's
+end can still be collected. Device credentials stay in macOS
+Keychain or Linux Secret Service. A missing or locked store refuses before the
+one-use code is redeemed; there is no plaintext credential store. Linux needs `secret-tool` and an
 unlocked desktop Secret Service session.
 
 The owner chooses Claude Code user Read deny rules, export-scoped macOS wake
@@ -386,7 +390,7 @@ prevention, and a launchd or systemd user service in the browser. Connect reads
 `optIns` from device-authenticated `GET /api/business/executors/self`, with keys
 `installPermissions`, `awakeConsent` and `installService`. Only `true` enables
 an option. Undecided (`null`) options print a browser link; an older server
-without this route leaves all options undecided. Run connect again after the
+without this route (it answers 403 or 404) leaves all options undecided. Run connect again after the
 owner decides. The first device-authenticated request happens after both the
 credential and local pairing state are stored, so a storage failure cannot
 activate the computer. Background services use
@@ -422,8 +426,13 @@ to the MCP client and do not paste it into an agent transcript.
 printing checkpoints or vendor data. `rer business disconnect` revokes this
 device through device-authenticated `DELETE /api/business/executors/self` before
 removing its service, device and vendor credentials, state and introduced Claude
-rules, preserving preexisting settings and unrelated edits. If the server
-cannot confirm revocation, local credentials stay available for a retry.
+rules, preserving preexisting settings and unrelated edits. It says "Device
+revoked" only after the server confirms (`{"revoked":true}`, or 401 for a device
+already revoked). A server without that route (403 or 404) leaves the computer
+connected: disconnect says so, names the browser page to revoke it in and keeps
+everything for a later disconnect. Any other failure exits 1 and also keeps the
+credential for a retry. With no stored device credential, nothing is sent and
+disconnect removes the local additions without claiming a revocation.
 
 `rer business run` performs consented `discover.local` tasks through claims,
 short-lived task bearers, quota-bound uploads, 60-second heartbeats and server

@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { buildPackage } from '../scripts/rer-package.mjs';
 import { integrity } from '../scripts/rer-package/registry.mjs';
@@ -21,9 +22,9 @@ before(async () => {
 });
 after(() => directory && rm(directory, { recursive: true, force: true }));
 
-async function cli(home, args, { terminal = false, input = '', columns = 120, onSpawn } = {}) {
+async function cli(home, args, { terminal = false, input = '', columns = 120, onSpawn, path = process.env.PATH } = {}) {
  await mkdir(home, { recursive: true });
- const env = { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns) };
+ const env = { PATH: path, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns) };
  return new Promise((resolveRun, reject) => {
   const command = terminal ? 'python3' : process.execPath;
   const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : [launcher, ...args];
@@ -221,6 +222,42 @@ test('browser opt-ins work without terminal prompts, failed storage never activa
  assert.equal(remote.state.requests.length, beforeExpiry, 'expired pairing is never polled or silently replaced');
  assert.equal((await cli(pendingHome, ['business','disconnect'])).code, 0);
 
+ // A later turn is told the command that works from its own shell.
+ const onPath = join(directory, 'rer-on-path');
+ await mkdir(onPath, { recursive: true }); await writeFile(join(onPath, 'rer'), '#!/bin/sh\n', { mode: 0o755 });
+ const withoutRer = await cli(pendingHome, pendingArgs, { path: '/usr/bin:/bin' });
+ assert.ok(withoutRer.stdout.includes(`run npx -y @runeditrun/rer business connect --origin ${remote.origin} again`), withoutRer.stdout);
+ const withRer = await cli(pendingHome, ['business','connect'], { path: `${onPath}:/usr/bin:/bin` });
+ assert.ok(withRer.stdout.includes(`run rer business connect --origin ${remote.origin} again`), withRer.stdout);
+ assert.equal((await cli(pendingHome, ['business','disconnect'])).code, 0);
+
+ // Without an OS credential store the one-use code is never redeemed.
+ const lockedHome = join(directory, 'no-store-home');
+ await mkdir(lockedHome); await writeFile(join(lockedHome, 'no-credential-store'), '');
+ const redemptions = () => remote.state.requests.filter(entry => entry.body.code).length;
+ const beforeLocked = redemptions();
+ const locked = await cli(lockedHome, pendingArgs);
+ assert.equal(locked.code, 1); assert.match(locked.stderr, /OS credential storage/);
+ assert.equal(redemptions(), beforeLocked, 'the code is not redeemed when its credential could not be stored');
+ assert.deepEqual(await readdir(lockedHome), ['no-credential-store']);
+ await rm(join(lockedHome, 'no-credential-store'));
+ const unlocked = await cli(lockedHome, pendingArgs);
+ assert.equal(unlocked.code, 0, unlocked.stderr); assert.ok(unlocked.stdout.includes('246810'), 'the same code still pairs once the store is available');
+ assert.equal((await cli(lockedHome, ['business','disconnect'])).code, 0);
+
+ // An approval near the code's end extends the server's expiry; a later turn still collects it.
+ const lateHome = join(directory, 'late-approval-home');
+ remote.state.pairingSeconds = 5;
+ assert.equal((await cli(lateHome, pendingArgs)).code, 0);
+ const redeemed = Date.now();
+ const late = await fetch(remote.origin + '/api/business/biz/pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, confirmation_number: '246810' }) });
+ assert.equal(late.status, 200);
+ delete remote.state.pairingSeconds;
+ await delay(Math.max(0, redeemed + 5500 - Date.now()));
+ const collected = await cli(lateHome, ['business','connect']);
+ assert.equal(collected.code, 0, collected.stderr); assert.ok(collected.stdout.includes('Business paired.'));
+ assert.equal((await cli(lateHome, ['business','disconnect'])).code, 0);
+
  const failedHome = join(directory, 'storage-failed-home');
  await mkdir(failedHome); await writeFile(join(failedHome, 'fail-credential-store'), '');
  await cli(failedHome, pendingArgs);
@@ -231,7 +268,9 @@ test('browser opt-ins work without terminal prompts, failed storage never activa
  assert.equal(failed.code, 1); assert.match(failed.stderr, /OS credential storage/);
  assert.equal(authenticated(), beforeFailure, 'failed credential storage sends no activation or other device-authenticated request');
  assert.equal(remote.state.active, false);
- assert.equal((await cli(failedHome, ['business','disconnect'])).code, 0);
+ const unrevoked = await cli(failedHome, ['business','disconnect']);
+ assert.equal(unrevoked.code, 0);
+ assert.ok(!unrevoked.stdout.includes('Device revoked') && unrevoked.stdout.includes(`${remote.origin}/business`), 'without a stored credential nothing is revoked, and the browser is named for it');
 
  const undecidedHome = join(directory, 'undecided-home');
  remote.state.selfMissing = true;
@@ -239,6 +278,12 @@ test('browser opt-ins work without terminal prompts, failed storage never activa
  assert.ok(undecided.stdout.includes(remote.origin + '/business/biz/settings'));
  assert.ok(!(await readdir(undecidedHome)).includes('.claude'));
  assert.equal((await cli(undecidedHome, ['business','status','--json'])).stdout.includes('not_installed'), true);
+ assert.equal((await cli(undecidedHome, ['business','connect'])).code, 0, 'connect again on a server without the route stays undecided');
+ const unsupported = await cli(undecidedHome, ['business','disconnect']);
+ assert.equal(unsupported.code, 0, unsupported.stderr);
+ assert.ok(unsupported.stdout.includes('still connected') && unsupported.stdout.includes(remote.origin + '/business/biz/settings') && !unsupported.stdout.includes('Device revoked'));
+ assert.equal(remote.state.revoked, false);
+ assert.ok((await readFile(join(undecidedHome, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'an unrevoked device keeps its credential');
  remote.state.selfMissing = false;
  remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false };
  const declined = await cli(undecidedHome, ['business','connect']);
@@ -261,11 +306,14 @@ test('browser opt-ins work without terminal prompts, failed storage never activa
   assert.equal(status.code, 0); assert.equal(JSON.parse(status.stdout).service, 'running');
   assert.equal((await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: 'fixture-read-only-vendor-key\n' })).code, 0);
   remote.state.revokeRefused = true;
-  assert.equal((await cli(home, ['business','disconnect'])).code, 1);
+  const refused = await cli(home, ['business','disconnect']);
+  assert.equal(refused.code, 1);
+  assert.ok(refused.stderr.includes('still connected') && !(refused.stdout + refused.stderr).includes('Device revoked'));
   assert.equal(remote.state.revoked, false);
   assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'failed server revocation preserves the credential for retry');
   remote.state.revokeRefused = false;
-  assert.equal((await cli(home, ['business','disconnect'])).code, 0);
+  const revoked = await cli(home, ['business','disconnect']);
+  assert.equal(revoked.code, 0); assert.ok(revoked.stdout.includes('Device revoked'));
   assert.equal(remote.state.revoked, true);
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');

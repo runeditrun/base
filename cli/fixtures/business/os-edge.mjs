@@ -12,6 +12,8 @@ else if (binary.endsWith('launchctl') || binary === 'systemctl') {
  else if (['bootstrap','enable'].includes(command)) await writeFile(manager, 'running');
  else if (['bootout','disable'].includes(command)) await unlink(manager).catch(() => {});
 } else {
+ // No usable OS store: no Secret Service session, or a locked keychain.
+ if (await exists(join(root, 'no-credential-store'))) { process.stderr.write('fixture: no OS credential store\n'); process.exit(1); }
  let values = {}; if (await exists(path)) values = JSON.parse(await readFile(path, 'utf8'));
  let handle, value, action;
  if (binary.endsWith('security')) {

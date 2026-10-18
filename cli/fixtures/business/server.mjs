@@ -15,7 +15,7 @@ export async function server(t) {
  const state = { approved: false, requests: [], tasks: [], released: null, checkpoint: {}, uploads: [], phase: 'ready', fence: 0, grants: new Map(), claims: new Map() };
  const device = 'bz_device_fixture-credential';
  const tokens = new Map(), tasks = taskStore(state);
- let redeemed = false, issued = false, tokenSequence = 0, origin;
+ let redeemed = false, issued = false, tokenSequence = 0, origin, pairingExpires = 0;
  function requireDevice(request) {
   requireValue(issued && !state.revoked && request.headers.authorization === `Bearer ${device}`, 401);
  }
@@ -45,7 +45,7 @@ export async function server(t) {
   if (body.pairing_token !== undefined) {
    closed(body, ['pairing_token']);
    requireValue(typeof body.pairing_token === 'string' && body.pairing_token.length <= 200);
-   requireValue(redeemed && !issued && body.pairing_token === 'fixture-pairing-poll', 401);
+   requireValue(redeemed && !issued && body.pairing_token === 'fixture-pairing-poll' && Date.now() < pairingExpires, 401);
    if (!state.approved) return [{ status: 'authorization_pending', interval: 5 }, 202];
    issued = true;
    return [{ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: 'biz', idle_expires_at: later(30 * 24 * 3600) }, 200];
@@ -56,8 +56,10 @@ export async function server(t) {
   requireValue(['macos', 'linux', 'wsl', 'windows', 'other'].includes(body.os) && ['codex', 'claude', 'other'].includes(body.agent_kind));
   requireValue(Array.isArray(body.capabilities) && body.capabilities.length <= 100 && body.capabilities.every(value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,100}$/.test(value)));
   // Each explicit pairing starts a fresh browser-created fixture pairing.
+  // Like the platform, the code's own expiry applies until approval.
   redeemed = true; issued = false; state.approved = false; state.revoked = false; state.active = false;
-  return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(600), interval: 5 }, 202];
+  const seconds = state.pairingSeconds ?? 600; pairingExpires = Date.now() + seconds * 1000;
+  return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(seconds), interval: 5 }, 202];
  }
  function tool(token, name, args) {
   object(args);
@@ -126,8 +128,9 @@ export async function server(t) {
    state.requests.push({ route, body, authorization: request.headers.authorization, method: request.method });
    if (route === '/api/business/executors/self') {
     requireDevice(request);
+    // A platform without these routes answers a valid device credential 403.
+    if (state.selfMissing) return send({}, 403);
     if (request.method === 'GET') {
-     if (state.selfMissing) return send({}, 404);
      await state.onSelf?.(); state.active = true;
      return send({ optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
     }
@@ -138,8 +141,9 @@ export async function server(t) {
    requireValue(request.method === 'POST', 405);
    if (route === '/api/business/biz/pairings/pair1/approve') {
     closed(body, ['confirmation_number', 'confirmed']);
-    requireValue(redeemed && !issued && body.confirmation_number === '246810' && body.confirmed === true, 403);
-    state.approved = true; return send({ approved: true });
+    requireValue(redeemed && !issued && Date.now() < pairingExpires && body.confirmation_number === '246810' && body.confirmed === true, 403);
+    // Approval gives the computer ten more minutes to collect its credential.
+    state.approved = true; pairingExpires = Date.now() + 600_000; return send({ approved: true });
    }
    if (route === '/api/business/executors/pair') {
     if (body.pairing_token && state.pairingRefused) return send({}, 401);
