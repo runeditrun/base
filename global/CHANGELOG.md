@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.54
+
+- **Dev launch handoffs keep the requested lifetime.** An explicit `rer dev --foreground` or `--detach` survives preparation that installs a checkout’s pinned rer and hands off to its launcher. The default terminal behavior stays the same (#258).
+- **Hosted installs keep the setup owner name.** Deploy carries the name saved by setup into hosted owner bootstrap. When a declared name is missing, interactive deploy asks once and saves it; unattended deploy requires `--owner-name` before uploading. Installers without a name field keep their existing behavior (#257).
+
 ## 0.2.53
 
 - **Dropdowns share one themed chevron rule.** Base's operator app and installer draw a 12 px chevron 14 px from the right border with 40 px end padding. Exported seeds can copy `selectStyle` from `src/base/select-style.ts`; its gradient strokes follow the theme color and work under the seed's content security policy. Focus, disabled, right-to-left and forced-color states are included (#247).

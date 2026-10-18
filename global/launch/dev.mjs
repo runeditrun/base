@@ -35,7 +35,7 @@ export async function launchDev(target) {
  }
  // An invocation the pinned dispatcher refuses goes straight to it, so the
  // refusal is its own, with nothing prepared first.
- if (!await accepted(target.root, devArgs)) return delegate(target, ['dev', ...devArgs]);
+ if (!await accepted(target.root, devArgs)) return delegateDev(target);
  const checkout = await realpath(target.root), directory = await launchDirectory(checkout);
  if (devArgs.includes('--stop')) {
   try { return await stopLaunch(target, devArgs, { checkout, directory }); }
@@ -45,6 +45,14 @@ export async function launchDev(target) {
  const out = printer({ json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
  const detach = args.includes('--detach') || (!args.includes('--foreground') && !process.stdout.isTTY);
  return detach ? detached(target, devArgs, directory, out, doorStart) : foreground(target, devArgs, directory, out, doorStart);
+}
+
+// Preparation can install a pin whose entry is another global launcher. Keep
+// the caller's lifetime flags across that handoff. The internal front-door
+// marker reaches other launchers, but never the public dispatcher.
+function delegateDev(target) {
+ const { launcher } = dispatcher(target.root);
+ return delegate(target, launcher ? target.args : target.args.filter(arg => arg !== '--door-start'));
 }
 
 async function doorCapable(root) {
@@ -72,7 +80,7 @@ async function foreground(target, devArgs, directory, out, doorStart) {
  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; out.failure(failure); return failure.exitCode; }
  finally { clearInterval(heartbeat); log.end(); }
  Object.assign(process.env, prepared.added);
- return delegate(target, ['dev', ...devArgs]);
+ return delegateDev(target);
 }
 
 async function detached(target, devArgs, directory, out, doorStart) {
