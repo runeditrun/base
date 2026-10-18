@@ -1,4 +1,5 @@
 import { scan } from './scan.mjs';
+import { localCause } from './errors.mjs';
 
 const usage = 'Usage: rer business scan [DIR...] [--json]\nNames-only local discovery; returns rer-business-signals/1 JSON. No network calls.\n';
 
@@ -19,9 +20,11 @@ export async function scanCommand(argv) {
   const result = await scan(directories.length ? directories : [process.cwd()]);
   process.stdout.write(JSON.stringify(result) + '\n');
   return 0;
- } catch {
-  // Node/format errors can contain input paths, keys or source excerpts.
-  process.stderr.write('Business scan could not read a local input. No scan document was emitted.\n');
+ } catch (error) {
+  // Node/format errors can contain input paths, keys or source excerpts, so
+  // only the system cause is named.
+  const cause = localCause(error);
+  process.stderr.write(`Business scan could not read a local input${cause ? ` (${cause})` : ', or one was not in a format it reads'}. No scan document was emitted.\n`);
   return 1;
  }
 }
