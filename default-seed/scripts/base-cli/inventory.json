@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.61",
+  "cliVersion": "0.2.61-dev.g7b3b1bb1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -883,7 +883,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "87f23bf3aafdaaba7d127c4118ad51d29396482dce690a4783b82534c73a9436"
+      "sha256": "b7c8b656007815e3b2bfe0a35df6340d760c33857a03d33fe7708a74b587bf8f"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",

@@ -106,7 +106,8 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 export function help(verb) {
  if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys(verbs).join(', ')}, signin, release\nRun rer VERB --help for flags.\n`;
  const known = verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
- return `Usage: rer ${verb} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
+ const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
+ return `${door}Usage: rer ${verb} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
 }
 
 function distance(a,b){let row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(next[j-1]+1,row[j]+1,row[j-1]+(a[i-1]===b[j-1]?0:1));row=next;}return row[b.length];}
