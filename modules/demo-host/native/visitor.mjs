@@ -98,7 +98,7 @@ export class NativeDemo extends DurableObject {
       return this.object(binding, id, 'fetch', [new Request(request, { headers })]);
     }
     const runtime = await this.session();
-    if (!runtime) return endedPage(this.env, { headers: { 'set-cookie': clearCookie(this.env) } });
+    if (!runtime) return endedPage({ ...this.env, DEMO_ICON_HEAD: bundle.iconHead }, { headers: { 'set-cookie': clearCookie(this.env) } });
     return application(this.env, this.ctx, this.ctx.id.toString(), runtime).fetch(request);
   }
   // The seed signs the visitor out, then the copy ends as an expired one does.
@@ -106,12 +106,12 @@ export class NativeDemo extends DurableObject {
   // its next page load finds the ended page.
   async signOut(request) {
     const runtime = await this.session();
-    if (!runtime) return endedPage(this.env, { headers: { 'set-cookie': clearCookie(this.env) } });
+    if (!runtime) return endedPage({ ...this.env, DEMO_ICON_HEAD: bundle.iconHead }, { headers: { 'set-cookie': clearCookie(this.env) } });
     const response = await application(this.env, this.ctx, this.ctx.id.toString(), runtime).fetch(request);
     if (response.status >= 400) return response;
     const body = await response.arrayBuffer();
     await this.end();
-    if (/text\/html/.test(request.headers.get('accept') ?? '')) return endedPage(this.env, { headers: { 'set-cookie': clearCookie(this.env) } });
+    if (/text\/html/.test(request.headers.get('accept') ?? '')) return endedPage({ ...this.env, DEMO_ICON_HEAD: bundle.iconHead }, { headers: { 'set-cookie': clearCookie(this.env) } });
     return new Response(response.status === 204 ? null : body, response);
   }
   database(binding, method, args) { return database(this, binding, method, args); }

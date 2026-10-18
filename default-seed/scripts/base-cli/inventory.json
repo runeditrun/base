@@ -87,6 +87,14 @@
       "source": "onboarding/failures.mjs",
       "sha256": "64e4edbd9002f0cb4eb084a49f32f84709c9b3f16c87a77a7614172ce96878e7"
     },
+    "icon-files.d.mts": {
+      "source": "onboarding/icon-files.d.mts",
+      "sha256": "e798191c2522e2a6742726d239d5fed240e6f217d8ea7410edfb040bf2851285"
+    },
+    "icon-files.mjs": {
+      "source": "onboarding/icon-files.mjs",
+      "sha256": "70df34ac2fa8c84b614eefee394e4bbca158b7d4faf08aa63eea0f30e76e50be"
+    },
     "input-limits.mjs": {
       "source": "onboarding/input-limits.mjs",
       "sha256": "a6995a5ff62f052f48b6d3677759db235165d153644730c7489dbd4e7ce8de6a"
@@ -281,7 +289,7 @@
     },
     "server.mjs": {
       "source": "onboarding/server.mjs",
-      "sha256": "d783907c80c1e55b0e254ba07510f37ee5ac86d8e43ff630a40587077fb80fff"
+      "sha256": "307ea35fa6791bc6359ace47d81debd09813183190b470744c54719a479324c4"
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
@@ -1035,7 +1043,7 @@
     },
     "cli/site-render.mjs": {
       "source": "cli/site-render.mjs",
-      "sha256": "668ae6d2d8690c20edf0a026538d4dd1e014cbcc9e1ee69d8759511bea1e54d5"
+      "sha256": "202a7dec9e8fc9662ceb83df0e7857774e753fcc733eeb68e9137856121e5e97"
     },
     "cli/site-syntax.mjs": {
       "source": "cli/site-syntax.mjs",
@@ -1359,7 +1367,7 @@
     },
     "modules/demo-host/native/prepare.mjs": {
       "source": "modules/demo-host/native/prepare.mjs",
-      "sha256": "237ad533f11ff31e6c861c93a78b8bbcf27606f4f64b614ab5daf184da0d6e9a"
+      "sha256": "29f5ea516aa78ab22a19356a0740cf0fbbe0e394de3cf1be634fb12bc5131a8b"
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
@@ -1391,7 +1399,7 @@
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",
-      "sha256": "52ccbe1bd7fa65dd9d54af1d86dc657139a8608c2599bd69d6a1b0ab19f2b675"
+      "sha256": "7c2ffd79e021f83fdf4b7a2d57936127610a23a45af1020fb1cf1cd1d7c14b47"
     },
     "modules/demo-host/native/warm.mjs": {
       "source": "modules/demo-host/native/warm.mjs",
@@ -1399,7 +1407,7 @@
     },
     "modules/demo-host/native/worker.mjs": {
       "source": "modules/demo-host/native/worker.mjs",
-      "sha256": "f9f75483d4320745a6478421f97eb0a6b5014fff46f16c52354f11dcbd90764c"
+      "sha256": "779e047c2a520e8380cc688fc5bf4319741d602690195696dacf5d0494d042fa"
     },
     "modules/demo-host/operator.mjs": {
       "source": "modules/demo-host/operator.mjs",
@@ -1407,7 +1415,7 @@
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "ad1e4f91386b5804bf6d009debf5e365edce6ed025e0a64c1216e85c44a426b9"
+      "sha256": "dd12cb2f6c5338f505a79565dd78a915a69a6c0fe0505c66cdef0e27a9dfd021"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
@@ -2339,7 +2347,7 @@
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
-      "sha256": "c547b2cfa6a400ab76fd625aefa82a8ed97ecb37bb5f7535ac50bb98c8c54875"
+      "sha256": "c51e890a64226af10b3d672a5a79905ec6452e4355819923f6d20bbc241864e1"
     },
     "modules/operator-auth/dev/cli-session.mjs": {
       "source": "modules/operator-auth/dev/cli-session.mjs",
@@ -2388,6 +2396,14 @@
     "modules/operator-auth/http.mjs": {
       "source": "modules/operator-auth/http.mjs",
       "sha256": "caf5ddf8b50070b1339afd6f19e3ef3c73677cc7726a355fbac5cda371f09b53"
+    },
+    "modules/operator-auth/icon-head.d.mts": {
+      "source": "modules/operator-auth/icon-head.d.mts",
+      "sha256": "34287e49079ce872172a8c6d72e9d2b79fe50e5381919aa265f60d6ed574e7ff"
+    },
+    "modules/operator-auth/icon-head.mjs": {
+      "source": "modules/operator-auth/icon-head.mjs",
+      "sha256": "f9be2dab471d011cec8ba5da66bdb8b1974a65edfd6050679cf18f7893e6a941"
     },
     "modules/operator-auth/identity/admission.mjs": {
       "source": "modules/operator-auth/identity/admission.mjs",
@@ -2503,7 +2519,7 @@
     },
     "modules/operator-auth/page.mjs": {
       "source": "modules/operator-auth/page.mjs",
-      "sha256": "5a6e74e3e1861dbe6906ab2e0219b498f1943c11e9c88a779819563ec32e7322"
+      "sha256": "3fa120d55b8ff80c613e53d4df3fb4a249cadf508b2b3144f94fd89afbdd22e4"
     },
     "modules/operator-auth/policy.d.mts": {
       "source": "modules/operator-auth/policy.d.mts",
@@ -2555,7 +2571,7 @@
     },
     "modules/owner-claim/page.mjs": {
       "source": "modules/owner-claim/page.mjs",
-      "sha256": "1e03cd872c5bf95a2672e782153b71272f90f1cea7f10ee70f971fae0432e929"
+      "sha256": "98f76844f55e2726654a1ff5030268b4a8327f7cf460a446856964989dfb4542"
     },
     "modules/owner-claim/schema/idp.sql": {
       "source": "modules/owner-claim/schema/idp.sql",

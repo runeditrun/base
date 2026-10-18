@@ -1,3 +1,4 @@
+import { readIconFiles } from './icon-files.mjs';
 import { loadInstallerSeed } from './setup-manifest.mjs';
 import { readSettings } from './adapter-settings.mjs';
 import { createAppProcesses } from './app-processes.mjs';
@@ -27,6 +28,7 @@ export async function startInstaller(root,{seed,port=0,answers,secretInput,noPre
  const accent=seed.branding?.accent;
  const accentStyle=/^#[0-9a-f]{6}$/i.test(accent||'')?`<style>:root{--installer-accent:${accent};--installer-accent-text:${[1,3,5].map((start,i)=>parseInt(accent.slice(start,start+2),16)*[.299,.587,.114][i]).reduce((a,b)=>a+b,0)>150?'#173753':'#ffffff'}}</style>`:'';
  const theme=seed.theme?await loadSeedTheme(root,seed.theme):null;
+ const icons=await readIconFiles(join(root,'public'));
  const uiRoot=fileURLToPath(new URL('./ui/',import.meta.url));
  if(resume&&noPrefill)throw Error('--resume cannot be combined with --no-prefill.');
  const store=await createState(root,seed),token=randomBytes(32).toString('hex'),cookie=randomBytes(32).toString('hex');let origin,work,connection,starting=false,mutations=0;const apps=createAppProcesses();const abort=new AbortController();let attemptAbort,attemptProcesses;
@@ -175,11 +177,13 @@ export async function startInstaller(root,{seed,port=0,answers,secretInput,noPre
    if(req.method==='GET'&&path==='/rer-setup.json'){res.writeHead(200,{'Content-Type':'application/json'});res.end(seed.manifestBytes);return;}
    if(req.method==='GET'&&path==='/SETUP.schema.json'){res.writeHead(200,{'Content-Type':'application/json'});res.end(seed.schemaBytes);return;}
    if(req.method==='GET'&&path==='/model-options.json'){json(200,seed.modelOptions);return;}
+   const iconFile=req.method==='GET'&&icons.files.get(path);
+   if(iconFile){res.writeHead(200,{'Content-Type':iconFile.type});res.end(iconFile.bytes);return;}
    const themeFile=req.method==='GET'&&theme?.files.get(path);
    if(themeFile){res.writeHead(200,{'Content-Type':themeFile.type});res.end(themeFile.bytes);return;}
    if(req.method!=='GET'||!assets[path]||(path==='/theme.css'&&!theme))return json(404,{error:'Not found.'});
    const [file,type]=assets[path];let content=await readFile(file?(path==='/seed.mjs'?join(root,file):join(uiRoot,file)):join(root,seed.background));
-   if(path==='/'){content=content.toString().replaceAll('{{product}}',String(seed.product).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))).replace('</head>',`${accentStyle}<meta name="installer-token" content="${token}"></head>`);if(theme)content=content.replace('<html lang="en">','<html lang="en" class="rer-themed">').replace('<link rel="stylesheet" href="/style.css">','<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/rer-theme.css"><link rel="stylesheet" href="/theme.css">');res.setHeader('Set-Cookie',`rer_installer=${cookie}; Path=/; HttpOnly; SameSite=Strict`);res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'")}
+   if(path==='/'){content=content.toString().replaceAll('{{product}}',String(seed.product).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))).replace('</head>',`${icons.links}${accentStyle}<meta name="installer-token" content="${token}"></head>`);if(theme)content=content.replace('<html lang="en">','<html lang="en" class="rer-themed">').replace('<link rel="stylesheet" href="/style.css">','<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/rer-theme.css"><link rel="stylesheet" href="/theme.css">');res.setHeader('Set-Cookie',`rer_installer=${cookie}; Path=/; HttpOnly; SameSite=Strict`);res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'")}
    res.writeHead(200,{'Content-Type':type});res.end(content);
   }catch{json(500,{error:'The installer could not complete this request.'})}finally{if(mutation)mutations--;}
  });

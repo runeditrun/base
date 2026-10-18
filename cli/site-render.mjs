@@ -11,6 +11,8 @@
 // CONTRACT.md gets it parsed as sitePages({ contract }), for its /contract
 // page; one that does not parse stops the build, naming its lines.
 // Usage: node site-render.mjs ROOT ENTRY OUTPUT [CONFIG]
+import { shared } from './shared.mjs';
+const { seedIcons, readIconFiles } = await shared('icon-files.mjs');
 import { cp, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -46,6 +48,7 @@ const server = `${output}.render`;
 let module, styles = [], files = [];
 try {
  const built = await vite.build({
+  plugins: [seedIcons()],
   root, configFile: config ? resolve(root, config) : false, envFile: false, logLevel: 'error', mode: 'production',
   build: {
    ssr: resolve(root, entry), outDir: server, emptyOutDir: true, copyPublicDir: false, ssrEmitAssets: true,
@@ -81,6 +84,12 @@ try {
   if (asset === ASSETS || asset.startsWith(`${ASSETS}/`)) fail(`public/${ASSETS} is reserved for the run site's compiled styles; rename it.`);
   await lstat(source).catch(() => fail(`Missing site asset public/${asset}.`));
   await cp(source, join(output, asset), { recursive: true, errorOnExist: true, force: false, verbatimSymlinks: true });
+ }
+ const icons = await readIconFiles(publicDirectory);
+ for (const [path, { bytes }] of icons.files) {
+  const target = join(output, path.slice(1));
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, bytes);
  }
  // Only the emitted files: the Node chunks share the folder and never ship.
  for (const file of files) {
