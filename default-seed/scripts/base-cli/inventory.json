@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.52-dev.g5e85ac5c",
+  "cliVersion": "0.2.52-dev.g2c1767f5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2687,7 +2687,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "4ddb21c8e335d0b0be78e41d9b1c0d3351f40da6707b19c46c3a5a5d779e85b4"
+      "sha256": "0bfb3e7b9333ceda6d9afad2d183f37fde7accff8637506f38a5bbc8d82b29a4"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",

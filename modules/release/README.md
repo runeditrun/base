@@ -54,8 +54,9 @@ committed `rer-project.json.sourceRepository` when no GitHub origin is present;
 it is independent of the publication destination. Only a completed successful
 `push` or `workflow_dispatch` run on the default branch, an authorized release
 branch, or the version's release tag qualifies. Authorized release branches match
-exactly `^release/(?:v[0-9]+(?:\.[0-9]+)?|[0-9]+\.[0-9]+\.x)$`, for example
-`release/v0`, `release/v0.4` or `release/0.4.x`. A release-branch run requires
+exactly `^release/(?:v[0-9]+(?:\.[0-9]+)?|[0-9]+\.[0-9]+\.x)$`.
+For example, the Git refs `refs/heads/release/v0`, `refs/heads/release/v0.4`
+and `refs/heads/release/0.4.x` qualify. A release-branch run requires
 that branch's current head on GitHub to equal the source commit, or the version's
 release tag, when present, to resolve remotely to that commit. A moved or missing
 branch without that pinned tag is refused. The run and head repository must both
