@@ -12,7 +12,7 @@ import {RerError} from './errors.mjs';
 // enter this boundary.
 export async function boundedCommand(project,options,argv,out){
  if(!['install','setup','build','verify','deploy','export','import'].includes(options.verb))return null;
- const {commandPolicy,queuedCommand,queueLabel}=await shared('queue.mjs');
+ const {commandPolicy,queuedCommand,queueLabel,maxWaitSeconds}=await shared('queue.mjs');
  const policy=await commandPolicy();
  const childArgs=[...argv];const cwdIndex=childArgs.indexOf('--cwd');if(cwdIndex>=0&&(childArgs.indexOf('--')<0||cwdIndex<childArgs.indexOf('--')))childArgs[cwdIndex+1]=project.root;
  const directory=await mkdtemp(join(tmpdir(),'rer-bounded-'));
@@ -64,6 +64,10 @@ export async function boundedCommand(project,options,argv,out){
  const exitCode=termination?(termination==='SIGINT'?130:143):result.code;
  if(termination){
   out.error(new RerError('cancelled',`Stopped by ${termination} after owned children were stopped.`,exitCode));
+  out.result(false,exitCode);
+ }else if(result.timedOut){
+  const {busyMessage}=await shared('busy.mjs');
+  out.error(new RerError('safety_refusal',busyMessage({...result,reason:store.redact(String(result.reason))},{verb:options.verb,maxWait:maxWaitSeconds}),exitCode));
   out.result(false,exitCode);
  }else if(finalEvent&&finalEvent.exitCode===exitCode){
   if(errorEvent){

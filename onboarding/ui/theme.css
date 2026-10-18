@@ -12,7 +12,6 @@
 .rer-themed .input{border-color:var(--rer-border);background:var(--rer-surface);color:var(--rer-text);border-radius:calc(var(--rer-radius,20px) / 2)}
 .rer-themed .input:focus-visible,.rer-themed button:focus-visible,.rer-themed a:focus-visible,.rer-themed summary:focus-visible,.rer-themed .target-choice:has(input:focus-visible){outline-color:var(--rer-focus)}
 .rer-themed .help,.rer-themed .status,.rer-themed .step-progress,.rer-themed .advanced summary,.rer-themed .target-choice .help,.rer-themed .failure-log-path,.rer-themed .agent-activity-history,.rer-themed .known-editor .help{color:var(--rer-muted)}
-.rer-themed .select-wrap:after{border-color:var(--rer-muted)}
 .rer-themed .edit,.rer-themed .field .edit,.rer-themed .panel .edit,.rer-themed .help-link,.rer-themed #known-summary .known-group .edit,.rer-themed .editor-actions button{color:var(--rer-link,var(--rer-text))}
 .rer-themed .primary,.rer-themed .secondary,.rer-themed .agent-connect{font-family:inherit;border-radius:var(--rer-radius,25px)}
 .rer-themed .primary{background:var(--rer-accent,var(--installer-accent,#7542d3));color:var(--rer-accent-text,var(--installer-accent-text,#fff));box-shadow:none}

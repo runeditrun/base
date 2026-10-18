@@ -3,7 +3,7 @@ import { busyFailure } from './failures.mjs';
 // A queued step the job queue never admitted is a busy machine, not a failed
 // command: say what held it, the limit and the next step, in the same plain form
 // as the server load guard (cli/server-resources.mjs).
-const commandNames = new Set(['dev', 'setup', 'preview', 'build', 'deploy', 'verify']);
+const commandNames = new Set(['install', 'setup', 'dev', 'preview', 'build', 'verify', 'deploy', 'export', 'import']);
 
 function waited(seconds) {
  return seconds >= 60 ? `${Math.round(seconds / 60)} minutes` : `${Math.round(seconds)} seconds`;
