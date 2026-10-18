@@ -118,6 +118,20 @@ test('real D1: a REPLACE between the persisted read\'s custody capture and its f
     return db.prepare(`UPDATE OR REPLACE ${table} SET ${update}`).bind(...params).run();
   };
   const liveClaim=async(s:Scene)=>s.r.db().prepare('SELECT * FROM ik_sources WHERE identity=?').bind((await firstRow(s.r.db(),'ik_provenance',s.A)).source_identity).first();
+  // SQLite's rowid is one more unique key of every custody table: naming an existing rowid replaces that row.
+  const rowidOf=async(s:Scene,table:string,where:string,...params:unknown[])=>(await s.r.db().prepare(`SELECT rowid AS r FROM ${table} WHERE ${where} ORDER BY rowid LIMIT 1`).bind(...params).first()).r as number;
+  const replaceRowid=async(s:Scene,table:string,where:string,param:unknown,row:Record<string,unknown>)=>replace(s.r.db(),table,{rowid:await rowidOf(s,table,where,param),...row});
+  const queuedRows:Record<string,(s:Scene,row:any)=>Record<string,unknown>>={
+    ik_d1_plan_index:s=>({job_id:s.C,ordinal:900,source_identity:'queued-source',target_identity:'queued-target'}),
+    ik_d1_entries:s=>({job_id:s.C,ordinal:900,source_identity:'queued-source',owner_job_id:s.C,effects_hash:'queued'}),
+    ik_batches:s=>({job_id:s.C,action:'apply',position:900,end_position:901,fence:0}),
+    ik_originals:s=>({job_id:s.C,kind:'artifact',original_key:'queued-original',name:'queued',sha256:'queued',size:0}),
+    ik_d1_original_chunks:s=>({job_id:s.C,kind:'artifact',original_key:'queued-original',ordinal:900,bytes:new Uint8Array([1])}),
+    ik_original_sets:(s,row)=>({job_id:s.C,version:row.version}),
+    ik_d1_indexed_jobs:(s,row)=>({job_id:s.C,fingerprint:row.fingerprint}),
+  };
+  // A's first plan index row's source and target are erased (tombstones the read's job owns through its plan index).
+  const tombstones=async(s:Scene)=>{const db=s.r.db(),index=await firstRow(db,'ik_d1_plan_index',s.A);await db.batch([db.prepare('INSERT INTO ik_d1_erased_sources(destination,identity) VALUES(?,?)').bind(s.ctx.destination,index.source_identity),db.prepare('INSERT INTO ik_d1_erased_targets(destination,identity) VALUES(?,?)').bind(s.ctx.destination,index.target_identity)]);return index;};
   const cases:Record<string,(s:Scene)=>Promise<unknown>>={
     'a live claim moved to the queued job':async s=>replace(s.r.db(),'ik_sources',{...await firstRow(s.r.db(),'ik_sources',s.A),job_id:s.C}),
     'a live provenance row moved to the queued job':async s=>replace(s.r.db(),'ik_provenance',{...await firstRow(s.r.db(),'ik_provenance',s.A),job_id:s.C}),
@@ -141,11 +155,36 @@ test('real D1: a REPLACE between the persisted read\'s custody capture and its f
       await s.r.db().prepare("INSERT INTO ik_d1_streams(id,destination,namespace,mapping_version,principal_id,fingerprint,operation_key,total,layout_hash,state) VALUES('queued-stream','workspace','archive','v1','owner','f','queued-op',1,'l','open')").run();
       return updateOnto(s,'ik_d1_stream_pages',{stream_id:'queued-stream',ordinal:0,total:1},"stream_id='stream' WHERE stream_id='queued-stream'");
     },
+    'the live claim replaced by rowid':async s=>{const claim=await liveClaim(s);return replaceRowid(s,'ik_sources','identity=?',claim.identity,{...claim,identity:'queued-claim',job_id:s.C});},
+    'the live claim taken over by a rowid update':async s=>{const claim=await liveClaim(s);return updateOnto(s,'ik_sources',{...claim,identity:'queued-claim'},"rowid=? WHERE identity='queued-claim'",await rowidOf(s,'ik_sources','identity=?',claim.identity));},
+    'a live provenance row replaced by rowid':async s=>{const row=await firstRow(s.r.db(),'ik_provenance',s.A);return replaceRowid(s,'ik_provenance','id=?',row.id,{...row,id:'queued-row',ordinal:900,target_id:'queued-target',job_id:s.C});},
+    'a live provenance row taken over by a rowid update':async s=>{const row=await firstRow(s.r.db(),'ik_provenance',s.A);return updateOnto(s,'ik_provenance',{...row,id:'queued-row',ordinal:900,target_id:'queued-target',reversed:1},"rowid=?,reversed=0 WHERE id='queued-row'",await rowidOf(s,'ik_provenance','id=?',row.id));},
+    'a history row replaced by rowid':async s=>{const row=await firstRow(s.r.db(),'ik_d1_history',s.A);return replaceRowid(s,'ik_d1_history','id=?',row.id,{...row,id:'queued-history',ordinal:900,successor_id:'queued-successor',job_id:s.C});},
+    'a history row taken over by a rowid update':async s=>{const row=await firstRow(s.r.db(),'ik_d1_history',s.A);return updateOnto(s,'ik_d1_history',{...row,id:'queued-history',ordinal:900,successor_id:'queued-successor'},"rowid=? WHERE id='queued-history'",await rowidOf(s,'ik_d1_history','id=?',row.id));},
+    'a stream page replaced by rowid':async s=>replaceRowid(s,'ik_d1_stream_pages','job_id=?',s.B,{stream_id:'stream',ordinal:7,job_id:s.C,total:1}),
+    'a stream page taken over by a rowid update':async s=>{
+      await s.r.db().prepare("INSERT INTO ik_d1_streams(id,destination,namespace,mapping_version,principal_id,fingerprint,operation_key,total,layout_hash,state) VALUES('queued-stream','workspace','archive','v1','owner','f','queued-op',1,'l','open')").run();
+      return updateOnto(s,'ik_d1_stream_pages',{stream_id:'queued-stream',ordinal:0,total:1},"rowid=? WHERE stream_id='queued-stream'",await rowidOf(s,'ik_d1_stream_pages','job_id=?',s.B));
+    },
+    ...Object.fromEntries(Object.entries(queuedRows).map(([table,row])=>[`an ${table} row replaced by rowid`,async(s:Scene)=>replaceRowid(s,table,'job_id=?',s.A,row(s,await firstRow(s.r.db(),table,s.A)))])),
+    'a source tombstone replaced by rowid':async s=>replaceRowid(s,'ik_d1_erased_sources','identity=?',(await firstRow(s.r.db(),'ik_d1_plan_index',s.A)).source_identity,{destination:s.ctx.destination,identity:'queued-erased'}),
+    'a target tombstone taken over by a rowid update':async s=>{
+      const db=s.r.db(),victim=await rowidOf(s,'ik_d1_erased_targets','identity=?',(await firstRow(db,'ik_d1_plan_index',s.A)).target_identity);
+      await db.prepare("INSERT INTO ik_d1_erased_targets(destination,identity) VALUES(?,'queued-erased')").bind(s.ctx.destination).run();
+      return db.prepare("UPDATE OR REPLACE ik_d1_erased_targets SET rowid=? WHERE identity='queued-erased'").bind(victim).run();
+    },
+    'a custody write, then its counter replaced through another counter\'s rowid':async s=>{
+      const db=s.r.db(),captured=await custodyRevision(db,s.A);
+      await db.prepare("UPDATE ik_provenance SET record_json=json_set(record_json,'$.tampered',1) WHERE id=?").bind((await firstRow(db,'ik_provenance',s.A)).id).run();
+      await assert.rejects(db.prepare('UPDATE OR REPLACE ik_d1_custody_states SET rowid=?,revision=revision+1 WHERE job_id=?').bind(await rowidOf(s,'ik_d1_custody_states','job_id=?',s.A),s.C).run(),/IMPORT_CUSTODY_STATE_CHANGED/);
+      await db.prepare('INSERT INTO ik_d1_custody_states(job_id,revision) VALUES(?,?)').bind(s.A,captured).run();
+    },
   };
   const r=await runtime(t),outcomes:Record<string,string>={};
   for(const [name,change] of Object.entries(cases)){
     const s=await chain(r);
     if(name.startsWith('a stream'))await stream(s);
+    if(name.includes('tombstone'))await tombstones(s);
     assert.ok((await readD1PersistedImport(s.ctx)).provenance.length>0,name);
     outcomes[name]=await readWith(s,()=>change(s));
   }

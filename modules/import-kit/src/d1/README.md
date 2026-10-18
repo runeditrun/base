@@ -1100,12 +1100,16 @@ Prior jobs receive counters without changes to their public bytes. SQLite's
 REPLACE deletes the row it conflicts with without firing DELETE triggers, so apply
 the additive `d1CustodyStateReplaceSchema` as a new numbered migration after
 `d1CustodyStateSchema` and `d1RetirementSchema` (`initializeD1ImportStorage`
-applies it last). It ignores an insert over an existing counter (the backfill's
-`INSERT OR IGNORE` still adds missing ones), refuses an `ik_jobs` id that exists
-or was retired with `IMPORT_JOB_ID_REUSED`, and makes an insert or update (`UPDATE
-OR REPLACE` deletes a colliding row the same way) that would replace a claim,
-provenance row (by id or live target), history row (by id or successor), stream
-page or stream advance the revision of every job owning the replaced row.
+applies it last). It ignores an insert over an existing counter, by job id or
+by rowid (the backfill's `INSERT OR IGNORE` still adds missing ones), refuses to
+change a counter's rowid with `IMPORT_CUSTODY_STATE_CHANGED`, refuses an `ik_jobs`
+id that exists or was retired with `IMPORT_JOB_ID_REUSED`, and makes an insert or
+update (`UPDATE OR REPLACE` deletes a colliding row the same way) that would
+replace a claim, provenance row (by id or live target), history row (by id or
+successor), stream page or stream advance the revision of every job owning the
+replaced row. SQLite's rowid is one more unique key of every custody table and
+tombstone, so a row replaced by rowid advances its owners too (a tombstone's
+owners are found through the plan index, as its own triggers find them).
 A counter is
 captured before each retained report is validated; old cross-effect evidence is
 never copied into private transport. The report's existing policy and content
