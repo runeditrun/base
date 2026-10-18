@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.60
+
+- **Hosted demo gates wear each seed’s theme.** Start and ended pages load the seed’s mark, palette, fonts and focus styles, with Base theme assets when absent (#284).
+- **Portability leaves platform bookkeeping behind.** Exports never carry rer-owned tables such as `rer_migrations`, and `includeTables` cannot re-add them. Fresh migrated targets can restore seed data; old archives keep their integrity checks while skipping platform rows with one clear CLI line (#285).
+
 ## 0.2.59
 
 - **Release publication scans complete on large seeds and partial clones.** `rer release` hydrates missing history blobs in one fetch and inspects the staged release annotation in the same scan. Orbit finishes in 82 seconds instead of exceeding the 300-second budget, with identical findings. A seed must adopt the new rer through its pin for its release command to use it (#278).
