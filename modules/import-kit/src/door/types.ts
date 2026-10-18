@@ -23,6 +23,10 @@ export interface ImportDoorClaimConfig {
 }
 export interface ImportDoorOptions extends ImportDoorRuntimeOptions {
   claim: ImportDoorClaimConfig;
+  /** Permanent door key for settings, lineage and history. Defaults to
+   * `claim.installationId`. Set it to the operator mount's `installationId`
+   * when RER assigns a different claim installation id later. */
+  installationId?: string;
 }
 export type DoorAccess = Pick<DoorGrant, 'action' | 'installationId' | 'email' | 'namespace'
   | 'maxBytes' | 'maxChunks' | 'maxRecords' | 'fingerprint' | 'approvalRecordId' | 'approvedAt' | 'catchup'>;

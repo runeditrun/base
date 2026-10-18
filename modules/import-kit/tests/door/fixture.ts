@@ -17,11 +17,14 @@ export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant')
   await db.batch(importDoorSchema.map(q=>db.prepare(q)));
   const keys = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
   const publicKey = await crypto.subtle.exportKey('jwk',keys.publicKey);
-  let handler: ReturnType<typeof createImportDoorHandler>;
+  type Handler = (request: Request) => Promise<Response | null>;
+  let handlers: Handler[] = [];
   const server = createServer(async (req,res)=>{
     const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const request = new Request(origin+(req.url ?? '/'),{method:req.method,headers:req.headers as Record<string,string>,...(req.method==='POST'?{body:Buffer.concat(chunks)}:{})});
-    const response = await handler(request) ?? new Response('Not found',{status:404});
+    let response: Response | null = null;
+    for (const handler of handlers) if ((response = await handler(request))) break;
+    response ??= new Response('Not found',{status:404});
     res.writeHead(response.status,Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
   });
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -35,6 +38,9 @@ export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant')
   };
   const ownerPredicate = {sql:"EXISTS(SELECT 1 FROM native_authority WHERE id='owner' AND enabled=1)"};
   const approval = {approvalRecordId:'test-owner-approval',approvedAt:new Date().toISOString()};
+  const state = {via:mode,claimInstallationId:options.claim.installationId,headers:{} as Record<string,string>};
+  const {claim,...runtimeOptions} = options;
+  let operator: (overrides?: Record<string, unknown>) => Handler = () => { throw new Error('operator_mode_only'); };
   if (mode === 'operator') {
     // An independently copied seed has NO sibling owner-claim or operator-auth.
     const copy = await mkdtemp(join(tmpdir(),'door-without-claim-'));
@@ -44,22 +50,27 @@ export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant')
     // The guide's operator-only source inventory excludes optional grant code.
     for (const file of ['index.ts','admission.ts','grants.ts']) await rm(join(copy,'import-kit/src/door',file));
     const {createImportOperatorHandler} = await import(pathToFileURL(join(copy,'import-kit/src/door/operator.ts')).href);
-    const {claim,...runtimeOptions} = options;
-    handler = createImportOperatorHandler({...runtimeOptions,installationId:claim.installationId,
+    operator = (overrides = {}) => createImportOperatorHandler({...runtimeOptions,installationId:claim.installationId,
       appOrigin:origin,ownerEmail:claim.expectedEmail,namespace:'knowledge',
-      authorize:async (request:Request)=>request.headers.get('Cookie')==='test-owner-session' ? ownerPredicate : null});
+      authorize:async (request:Request)=>request.headers.get('Cookie')==='test-owner-session' ? ownerPredicate : null,...overrides});
+    handlers = [operator()];
     await writeImportDoorSettings(db,claim.installationId,{enabled:false},ownerPredicate);
-  } else handler = createImportDoorHandler(options);
+  } else handlers = [createImportDoorHandler(options)];
+  /** Add Business later: a grant mount for RER's claim installation id, keyed to the existing door. */
+  function addGrants(claimInstallationId: string) {
+    handlers = [createImportDoorHandler({...options,claim:{...claim,installationId:claimInstallationId},installationId:claim.installationId}),...handlers];
+    state.claimInstallationId = claimInstallationId; state.via = 'grant';
+  }
 
   async function token(action:DoorAction,overrides:Partial<DoorGrant>={},privateKey=keys.privateKey) {
     const now=Math.floor(Date.now()/1000);
-    const payload:DoorGrant={v:1,iss:options.claim.issuer,aud:origin,installationId:options.claim.installationId,email:options.claim.expectedEmail,jti:randomUUID(),iat:now,exp:now+300,action,namespace:'knowledge',maxBytes:2_000_000,maxChunks:32,maxRecords:1000,...overrides};
+    const payload:DoorGrant={v:1,iss:options.claim.issuer,aud:origin,installationId:state.claimInstallationId,email:options.claim.expectedEmail,jti:randomUUID(),iat:now,exp:now+300,action,namespace:'knowledge',maxBytes:2_000_000,maxChunks:32,maxRecords:1000,...overrides};
     const header=Buffer.from(JSON.stringify({alg:'ES256',typ:'rer-import-grant+jwt',kid:'test'})).toString('base64url'),body=Buffer.from(JSON.stringify(payload)).toString('base64url');
     const signature=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},privateKey,new TextEncoder().encode(header+'.'+body));
     return header+'.'+body+'.'+Buffer.from(signature).toString('base64url');
   }
   async function call(action:DoorAction,body:unknown,overrides:Partial<DoorGrant>={},signed?:string) {
-    const response=await fetch(origin+(mode==='operator'?'/api/operator/import/':'/api/rer/import/')+action,{method:'POST',headers:{'Content-Type':'application/json',...(mode==='operator'?{Origin:origin,Cookie:'test-owner-session'}:{Authorization:'Bearer '+(signed ?? await token(action,overrides))})},body:JSON.stringify(body)});
+    const response=await fetch(origin+(state.via==='operator'?'/api/operator/import/':'/api/rer/import/')+action,{method:'POST',headers:{'Content-Type':'application/json',...state.headers,...(state.via==='operator'?{Origin:origin,Cookie:'test-owner-session'}:{Authorization:'Bearer '+(signed ?? await token(action,overrides))})},body:JSON.stringify(body)});
     return {status:response.status,body:await response.json() as any};
   }
   async function upload(records:unknown[],overrides:Partial<DoorGrant>={}) {
@@ -89,7 +100,8 @@ export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant')
     do {result=await call('undo',{planId});assert.equal(result.status,200,JSON.stringify(result.body));} while(!['undone','rolled_back'].includes(result.body.job.state));
     return result;
   }
-  return {origin,runtime,db,options,ownerPredicate,approval,call,token,upload,plan,apply,undo,
+  return {origin,runtime,db,options,ownerPredicate,approval,call,token,upload,plan,apply,undo,state,operator,addGrants,
+    mount:(...next:Handler[])=>{handlers=next;},
     enable:()=>writeImportDoorSettings(db,options.claim.installationId,{enabled:true},ownerPredicate)};
 }
 export const documents = (count:number,large=false) => Array.from({length:count},(_,i)=>({id:String(i),title:`Knowledge article ${i}`,body:large?'Reviewed historical knowledge. '.repeat(55):'Historical knowledge.'}));

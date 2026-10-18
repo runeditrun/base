@@ -15,14 +15,18 @@ Owner history and undo must include jobs from either authority.
    `modules/import-kit/src/d1/database.ts` (`d1Schema` and the additional
    schemas used by `initializeD1ImportStorage`) and applicable evolutions, then
    `importDoorSchema` from `modules/import-kit/src/door/schema.ts` in the next
-   numbered seed migration. Never rename applied migrations.
+   numbered seed migration. Never rename applied migrations. Later door schema
+   changes ship as their own exported migrations: apply each in order (see
+   Pitfalls).
 2. **Native adapter.** Supply the seed's real `D1TargetAdapter`, parser,
    `ImportMapping`, destination and actual owner principal. Read/write/remove
    guards must protect native revisions and values in the same D1 transaction.
    Mapping only creates inert native records: importing cannot send mail, page
    someone, activate monitors or grant access. Keep any activation as a separate
    owner-approved product action. Declare unsupported records as rejections or
-   explained omissions; never fabricate success.
+   explained omissions; never fabricate success. `write` must also replace an
+   already-imported target for catch-up, and large imports need a compact
+   `matchesMany` (see Pitfalls).
 3. **Operator mount.** Import `createImportOperatorHandler` from
    `modules/import-kit/src/door/operator.ts`. Supply the runtime options in
    `types.ts`, plus server-owned `installationId`, `appOrigin`, `ownerEmail`,
@@ -32,12 +36,35 @@ Owner history and undo must include jobs from either authority.
    return `null` for other callers. The predicate is rechecked inside mutations.
    Mount the handler before ordinary route rejection, including the host router
    and body-size boundary; pass its `null` response to the next dispatcher.
+   `installationId` is the **permanent door key** for settings, lineage and
+   history: pick one stable server-owned value (the RER owner-claim installation
+   id when the seed already has it, otherwise a fixed seed value) and never
+   change it.
+
+   **Several import sources.** One namespace per source (for example one per
+   vendor). Build the handler per request: choose the namespace from a
+   server-side allow-list and refuse anything else before the door runs. The
+   same place supplies per-source `parse`/`mapping`, a mapping that needs that
+   request's whole parsed bundle, or a per-request owner principal. Construction
+   is cheap and stateless; plans and uploads are reachable only in their own
+   namespace. The move-in screen sends the source on every call.
+   ```ts
+   const sources = {pagerduty: pagerDutyImport, opsgenie: opsgenieImport}; // server-owned
+   export async function importDoor(request: Request, env: Env) {
+     if (!new URL(request.url).pathname.startsWith('/api/operator/import/')) return null;
+     const name = request.headers.get('X-Import-Source') ?? '';
+     if (!Object.hasOwn(sources, name)) return Response.json({error: 'unknown_import_source'}, {status: 400});
+     return createImportOperatorHandler({...runtime(env), ...sources[name], namespace: name})(request);
+   }
+   ```
 4. **Settings and grants.** Create the installation settings row with
    `writeImportDoorSettings(db, installationId, {enabled:false}, ownerPredicate)`.
    This flag controls Business grants, not the owner's own imports. If the seed
    has owner-claim, additionally mount `createImportDoorHandler` from `index.ts`
-   with the **same** server-owned claim/key-ring configuration. Dispatch this
-   grant handler **before** the operator handler. Enable only through an owner
+   with the **same** server-owned claim/key-ring configuration and
+   `installationId` set to the operator mount's door key (it defaults to
+   `claim.installationId`). Dispatch this grant handler **before** the operator
+   handler. Enable only through an owner
    settings action or the owner's provisioning approval. Keep durable key
    revocations and show them in that settings row; re-enabling never unrevokes.
 5. **Move-in screen.** Call POST `/api/operator/import/{uploads,plan,apply,status,
@@ -48,14 +75,14 @@ Owner history and undo must include jobs from either authority.
    Repeat bounded apply calls with that fingerprint until `job.state` is
    `completed`; reconcile from native data and expose Undo. Never mint an import
    grant for this screen. Use `readImportDoorHistory` with the current owner
-   predicate for approval metadata; local approvals are labelled `approved by`,
-   Business approvals `approved via Business by`.
+   predicate and the door key for approval metadata; local approvals are
+   labelled `approved by`, Business approvals `approved via Business by`.
 6. **Erasure.** Include retained uploads/chunks, plan snapshots/chunks, approvals,
    namespace lineage and grant metadata in the seed's erasure/custody inventory,
    alongside ordinary kit originals/provenance. Withdraw an indivisible bundle
    when erasing any contained subject; preserve unrelated native records. Keep
-   installation settings and permanent revoked keys. Exercise the **existing
-   public erasure route with door tables installed**, even with grants disabled.
+   installation settings and permanent revoked keys. Exercise **every erase
+   path with door rows present** (see Pitfalls), even with grants disabled.
    Do not omit tables from retirement tallies to hide retained personal data.
 7. **Tests.** Extend existing HTTP journeys within the seed's 200-test cap. Use
    its actual migrated Worker, real sign-in, synthetic exports and public native
@@ -72,10 +99,41 @@ Do not vendor owner-claim or operator-auth merely for imports: the operator
 runtime has no dependency on either;
 use the seed's existing owner authentication. All `/api/rer/import/*` requests
 return 404 through that mount. No signer, dummy claim configuration or grant is
-needed. To add Business later, add those three grant files and owner-claim's
-verifier dependencies, then
-configure its trusted ring, mount the grant handler first and explicitly opt in.
-The existing grant signature, nonce, scope, expiry and approval rules do not change.
+needed. Keep the `installationId` you chose: it stays the door key. To add
+Business later, add those three grant files, `modules/owner-claim/verify.mjs`
+and its dependency `modules/operator-auth/loopback.mjs`, then configure its
+trusted ring with RER's claim installation id, pass your existing door key as
+the grant mount's `installationId`, mount the grant handler first and explicitly
+opt in. Earlier owner imports then stay in history, and Business catches up on
+their lineage instead of re-creating them. The existing grant signature, nonce,
+scope, expiry and approval rules do not change.
+
+## Pitfalls found in adoptions
+
+- **Export custody.** A seed whose export policy excludes import custody
+  (`excludeTables`) must also exclude `ik_door_%`; door uploads and plans hold
+  original source bytes.
+- **Catch-up writes.** Catch-up replaces imported targets; the kit guards each
+  replacement with `expectedRevision` from the import's provenance and the full
+  before-image. `write` must upsert the target, replace the child rows it owns
+  and set its new revision in the same statements, without cascading deletes
+  into rows that reference it. An insert-only writer fails every catch-up apply
+  with 409 `import_door_conflict`.
+- **Large imports.** Reconcile and catch-up planning guard the destination's
+  whole native set in one read capped at 2 MiB. Without `matchesMany`, guards
+  that inline row values hit `IMPORT_D1_TRANSPORT_LIMIT` (reported as 409
+  `import_door_conflict`); Lamp's 124-record Statuspage fixture did. Implement a
+  compact exact `matchesMany(rows, destination)`: counts per kind, revision
+  markers and an in-SQL digest of each entity's owned rows compared with the
+  hash of its listed value. Test reconcile and catch-up on the seed's largest
+  fixture.
+- **Erasure.** Run every erase path (each public erasure route, account,
+  project or workspace deletion, retirement) with door rows present (an applied
+  import's uploads, plans and approvals), not only with the tables installed.
+- **Door migrations.** Apply every door migration Base ships, each once, in
+  order, in its own new numbered seed migration. Never re-apply an updated
+  `importDoorSchema` to an installed door: its `CREATE TABLE IF NOT EXISTS`
+  statements silently skip changed tables.
 
 ## Real integration example: Spool
 

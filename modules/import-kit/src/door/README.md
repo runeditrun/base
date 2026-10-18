@@ -15,6 +15,7 @@ Construct the handler with these seed-owned options:
 | --- | --- |
 | `database`, `targets` | D1 database and its real `D1TargetAdapter`. |
 | `claim` | The same server-owned `OwnerClaimConfig` and trusted key ring used by owner-claim. |
+| `installationId` | Optional permanent door key for settings, lineage and history; defaults to `claim.installationId`. Use the owner-session mount's key when RER's claim id differs. |
 | `ownerPrincipalId` | Actual owner principal used by the seed's ordinary import history and undo context. |
 | `destination`, `mapping` | Product destination and reviewed `ImportMapping`. |
 | `format`, `parse` | `'json'` or `'ndjson'`, and the product's parser of source records. |
