@@ -2,8 +2,8 @@
 // the CLI implementation. Invalid requests must fail before mutating state.
 export const usage = ['uses', 'sells', 'both', 'product-dependency'];
 export const reasons = ['handover', 'paused', 'cancelled', 'failed'];
-export function requireValue(condition, status = 400) {
- if (!condition) throw Object.assign(Error('Fixture contract rejected the request'), { status });
+export function requireValue(condition, status = 400, reason) {
+ if (!condition) throw Object.assign(Error('Fixture contract rejected the request'), { status, reason });
 }
 export function object(value) {
  requireValue(value !== null && typeof value === 'object' && !Array.isArray(value));

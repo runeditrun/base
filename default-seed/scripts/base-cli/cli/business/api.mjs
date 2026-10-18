@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { redact } from './errors.mjs';
 
 export function originUrl(value = 'https://app.runeditrun.com') {
  let url;
@@ -10,11 +11,44 @@ export function originUrl(value = 'https://app.runeditrun.com') {
  return url.origin;
 }
 
+// The server's own reason travels with its status: platform errors answer
+// {error, requestId}. It is shown as one bounded line of text, never as markup.
 export class ApiError extends Error {
- constructor(status) {
-  super(status === 401 ? 'Business pairing was revoked or expired. Reconnect in your browser.' : `Business server refused the request (HTTP ${status}).`);
-  this.status = status;
+ constructor(status, reason = null, requestId = null) {
+  const said = reason ? ` The server said: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
+  const reference = requestId ? ` Reference ${requestId}.` : '';
+  super((status === 401 ? 'Business pairing was revoked or expired. Reconnect in your browser.' : `Business server refused the request (HTTP ${status}).`) + said + reference);
+  this.status = status; this.reason = reason; this.requestId = requestId;
  }
+}
+
+async function refusal(response) {
+ let text = '';
+ try { text = (await response.text()).slice(0, 4096); } catch { /* The status alone is the reason. */ }
+ let body = null;
+ try { body = JSON.parse(text); } catch { /* A plain-text reason is used as it is. */ }
+ const line = value => typeof value === 'string' && value.trim() ? redact(value).replace(/\s+/g, ' ').trim().slice(0, 300) : null;
+ const reason = body && typeof body === 'object' ? line(body.error) ?? line(body.message) : /^\s*</.test(text) ? null : line(text);
+ const requestId = body && typeof body === 'object' && typeof body.requestId === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(body.requestId) ? body.requestId : null;
+ return new ApiError(response.status, reason, requestId);
+}
+
+const network = {
+ ECONNREFUSED: 'the connection was refused; check that the server is running',
+ ENOTFOUND: 'its name did not resolve; network access may be off in this session',
+ EAI_AGAIN: 'its name did not resolve; network access may be off in this session',
+ EPERM: 'the network was blocked (Operation not permitted); allow network access for this session',
+ EACCES: 'the network was blocked (permission denied); allow network access for this session',
+ ECONNRESET: 'the connection was reset',
+ ETIMEDOUT: 'the connection timed out',
+ EHOSTUNREACH: 'the host is unreachable',
+ ENETUNREACH: 'the network is unreachable',
+};
+function unreachable(origin, error) {
+ const code = error?.cause?.code ?? error?.code;
+ const cause = error?.name === 'TimeoutError' ? 'it did not answer within 30 seconds'
+  : network[code] ?? (code ? `the request failed (${code})` : `the request failed (${error?.cause?.message ?? error?.message ?? 'no reason given'})`);
+ return Error(`Could not reach the Business server at ${origin}: ${redact(cause)}.`);
 }
 
 export class Api {
@@ -42,9 +76,9 @@ export class Api {
     headers: { ...headers, 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
    });
-  } catch (error) { if (signal?.aborted) throw signal.reason; throw Error('Could not reach the Business server.'); }
-  if (!response.ok) { await response.body?.cancel(); throw new ApiError(response.status); }
-  // Never print server errors or evidence; even successful bodies are untrusted.
+  } catch (error) { if (signal?.aborted) throw signal.reason; throw unreachable(this.origin, error); }
+  if (!response.ok) throw await refusal(response);
+  // Successful bodies are untrusted: callers validate them and print only fields they template.
   if (response.status === 202 && response.headers.get('content-length') === '0' || response.status === 204) return null;
   const text = await response.text();
   if (!text) return null;

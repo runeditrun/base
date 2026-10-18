@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile, unlink, rename, lstat, open, rmdir } from '
 import { homedir } from 'node:os';
 import { join, dirname, isAbsolute } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { stateDirectory } from './state.mjs';
 
 export const BUSINESS_DENY_RULES = Object.freeze([
  'Read(**/secrets/**)', 'Read(**/.ssh/**)', 'Read(**/.aws/**)', 'Read(**/.gnupg/**)',
@@ -16,7 +17,8 @@ export const BUSINESS_DENY_RULES = Object.freeze([
 
 const hash = text => text === null ? null : createHash('sha256').update(text).digest('hex');
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-function paths({ home = homedir(), stateDir = join(home, '.rer', 'business') } = {}) {
+function paths(input = {}) {
+ const home = input.home ?? homedir(), stateDir = input.stateDir ?? (input.home === undefined ? stateDirectory() : join(home, '.rer', 'business'));
  if (!isAbsolute(home) || !isAbsolute(stateDir)) throw new Error('Business permission paths must be absolute.');
  return { settings: join(home, '.claude', 'settings.json'), receipt: join(stateDir, 'permissions.json'), stateDir };
 }

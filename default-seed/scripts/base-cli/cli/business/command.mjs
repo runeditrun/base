@@ -3,11 +3,13 @@ import { connect } from './connect.mjs';
 import { vendorKey, disconnect, status } from './local-commands.mjs';
 import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
+import { describe } from './errors.mjs';
 
 const usage = `Usage: rer business VERB
   scan [DIR...] [--json]          Names-only local discovery
   connect [--code CODE] [--origin URL]
-                                 Pair or resume; the owner approves and chooses opt-ins in the browser
+                                 Pair this computer, waiting until the owner approves in the browser
+                                 (up to the code's 10 minutes); run it again to resume
   run [--once]                   Run consented local discovery; vendor upload integration pending
   next                           Return one templated question or nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
@@ -17,6 +19,8 @@ const usage = `Usage: rer business VERB
   status [--json]                Pairing, service, current task and checkpoint
   disconnect                     Revoke this computer, then remove local credentials and additions
 Vendors: sentry, uptimerobot, pagerduty, calendly. Owner approvals stay in the browser.
+State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
+In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
 `;
 
 export async function businessCommand(argv) {
@@ -41,11 +45,9 @@ export async function businessCommand(argv) {
   else return invalid();
   return 0;
  } catch (error) {
-  // All messages emitted here are authored by this CLI, never server/vendor or
-  // OS diagnostics. Unexpected errors can contain paths or credential material.
-  const message = error instanceof Error && /^(?:Business |This computer |This item |Choose |OS credential |Enter |Credential |A terminal |Installing |Changing |Keeping |Could not (?:reach the Business|keep this Mac|start the Business|stop the Business|reload the Business)|Claude |The Business |A Business |Another process |Run rer )/.test(error.message)
-   ? error.message : 'Business command failed. Check pairing, OS credential storage and browser task requirements.';
-  process.stderr.write(message + '\n'); return 1;
+  // Name the cause: the server's reason, the local cause or this CLI's own
+  // explanation. Bearers are redacted from every message.
+  process.stderr.write(describe(error) + '\n'); return error?.exitCode ?? 1;
  }
 }
 function invalid() { process.stderr.write(usage); return 2; }
