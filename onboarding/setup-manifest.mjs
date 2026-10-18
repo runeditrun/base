@@ -1,4 +1,4 @@
-import {parseSetupManifestBytes, validateSetupManifest, setupConditionMatches, validateSetupValue} from './schema/setup-validation.mjs';
+import {parseSetupManifestBytes, validateSetupManifest, setupConditionMatches, validateSetupValue, setupFieldAudience} from './schema/setup-validation.mjs';
 import {createModel} from './ui/model-core.mjs';
 import {installerInputs} from './installer-inputs.mjs';
 
@@ -41,6 +41,7 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  for(const field of manifest.fields){
   fields[field.name]={
    ...field,type:field.kind==='secret'?'password':field.kind==='colour'?'color':field.kind==='email'?'email':field.kind==='url'?'url':'text',
+   ...(field.kind==='secret'?{}:{audience:setupFieldAudience(field,manifest.groups)}),
    artwork:field.name===nameKey||['url','colour'].includes(field.kind),
    autocomplete:field.kind==='secret'&&field.input==='entered'?'new-password':'off',
    optional:!field.required,options:field.options?.map(option=>[option.value,option.label]),
@@ -55,7 +56,7 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  const groupIds=new Set(manifest.groups.map(group=>group.id));
  const generatedId=preferred=>{let id=preferred,index=1;while(groupIds.has(id))id=preferred+'-'+index++;groupIds.add(id);return id;};
  const groups=[...(manifest.fields.some(field=>!field.group)?[{id:generatedId('ungrouped'),title:manifest.title,keys:manifest.fields.filter(field=>!field.group).map(field=>field.name)}]:[]),
-  ...manifest.groups.map(group=>({...group,title:group.label,keys:manifest.fields.filter(field=>field.group===group.id).map(field=>field.name)})),...own.groups.map(group=>({...group,id:generatedId(group.id)}))];
+  ...manifest.groups.map(group=>({...group,audience:group.audience??'owner',title:group.label,keys:manifest.fields.filter(field=>field.group===group.id).map(field=>field.name)})),...own.groups.map(group=>({...group,id:generatedId(group.id)}))];
  const safeKeys=Object.keys(fields).filter(key=>fields[key].type!=='password');
  const defaults=Object.fromEntries(manifest.fields.filter(field=>field.kind!=='secret'&&field.default!==undefined).map(field=>[field.name,field.default]));
  const internal={...presentation,product:presentation.product??{name:manifest.title},fields,safeKeys,secretScopes,setupGroups:groups,
@@ -69,7 +70,7 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  model.fieldDefinition=(key,draft)=>fields[key]?.definition?.(draft)??fields[key];
  const originalSummaryKeys=model.summaryKeys;
  model.summaryKeys=(draft,state)=>originalSummaryKeys(draft,state).filter(key=>model.fieldVisible(key,draft));
- model.groupDefinition=(group,draft)=>{const variant=group.presentations?.find(item=>setupConditionMatches(item.when,draft));return {...group,...variant,title:variant?.label??group.title};};
+ model.groupDefinition=(group,draft)=>{const variant=group.presentations?.find(item=>setupConditionMatches(item.when,draft));return {...group,audience:group.audience??'owner',...variant,title:variant?.label??group.title};};
  model.groupKeys=(group,draft)=>group.keys.filter(key=>model.fieldVisible(key,draft)).map((key,index)=>({key,index,order:model.fieldDefinition(key,draft).order??index})).sort((a,b)=>a.order-b.order||a.index-b.index).map(item=>item.key);
  model.validateInput=(input,known={})=>{
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Provide setup inputs from rer-setup.json.');
