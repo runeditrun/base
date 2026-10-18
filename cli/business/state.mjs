@@ -136,7 +136,11 @@ export async function lockSupervisor() {
    refresh.unref();
    const exit = () => { try { if (readFileSync(path, 'utf8') === String(process.pid)) unlinkSync(path); } catch { /* Already gone. */ } };
    process.once('exit', exit);
-   return async () => { clearInterval(refresh); process.off('exit', exit); exit(); };
+   const release = async () => { clearInterval(refresh); process.off('exit', exit); exit(); };
+   // A signal is often followed closely by SIGKILL (an agent closing its
+   // terminal), so a signal handler removes the lock synchronously at once.
+   release.now = exit;
+   return release;
   } catch (error) {
    if (error.code !== 'EEXIST') throw error;
    const pid = await liveSupervisor(path);

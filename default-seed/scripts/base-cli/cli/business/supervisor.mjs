@@ -21,7 +21,7 @@ const checkIn = 25_000;
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
  const parked = new Set(), unlock = await lockSupervisor(), stop = new AbortController();
- const interrupted = signal => () => stop.abort(Object.assign(Error('Business supervisor stopped.'), { signal }));
+ const interrupted = signal => () => { unlock.now(); stop.abort(Object.assign(Error('Business supervisor stopped.'), { signal })); };
  const handlers = Object.fromEntries(['SIGTERM', 'SIGINT', 'SIGHUP'].map(signal => [signal, interrupted(signal)]));
  for (const [signal, handler] of Object.entries(handlers)) process.once(signal, handler);
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(() => stop.abort(Error('Business supervisor stopped for disconnect.')), () => {}); }, 250);
