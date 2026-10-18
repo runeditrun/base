@@ -300,6 +300,9 @@ test('Erasing one person keeps the surviving door import history, status and und
   assert.equal(history.length,1);assert.equal(history[0].jobId,job.id);assert.match(history[0].caption,/^approved via Business by owner@example\.test/);
   const status=await d.call('status',{planId:planned.body.planId});
   assert.equal(status.status,200,JSON.stringify(status.body));assert.equal(status.body.job.state,'completed');assert.match(status.body.caption,/via Business/);
+  // Replaying apply after a lost response answers the completed job, still bound to the reviewed plan and approval.
+  const replay=await d.call('apply',{planId:planned.body.planId,reviewedFingerprint:planned.body.fingerprint},{fingerprint:planned.body.fingerprint,...d.approval});
+  assert.deepEqual([replay.status,replay.body.job?.id,replay.body.job?.state],[200,job.id,'completed'],JSON.stringify(replay.body));
   const reconcile=await d.call('reconcile',{planId:planned.body.planId});
   assert.equal(reconcile.status,410);assert.equal(reconcile.body.error,'snapshot_withdrawn');
   const catchup=await d.call('plan',{uploadId:await d.upload([{id:'kept',title:'history-kept'},{id:'new',title:'New'}]),catchup:true});
@@ -310,4 +313,39 @@ test('Erasing one person keeps the surviving door import history, status and und
   assert.equal((await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate))[0].state,'undone');
   // Undo moved the namespace head back, so a new baseline plans there again.
   const again=await d.plan([{id:'kept',title:'history-kept'}]);assert.equal(again.status,200,JSON.stringify(again.body));
+});
+
+test('A person erased while a catch-up plan for their import is being saved never comes back',async t=>{
+  for (const when of [1,2]) {
+    const d=await door(t);await d.enable();
+    const native=d.runtime.native(),secret='catchup-erased-secret';
+    // Padding makes the snapshot span several chunk batches.
+    const base=[{id:'person',title:secret},{id:'kept',title:'catchup-kept'},...Array.from({length:40},(_,i)=>({id:'pad'+i,title:'pad '+i,body:'x'.repeat(7000)}))];
+    const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
+    const uploadId=await d.upload([...base,{id:'new',title:'catchup-new'}]);
+    // The erasure commits as a separate request between the door's own batches, as D1 allows.
+    let batches=0,staged=false,fired=false;
+    const database=new Proxy(d.db,{get(target,prop) {
+      if (prop==='prepare') return (query:string)=>{if (query.startsWith('INSERT INTO ik_door_plan_chunks')) staged=true;return target.prepare(query);};
+      if (prop==='batch') return async (statements:Parameters<typeof target.batch>[0])=>{
+        if (staged && ++batches===when && !fired) {
+          fired=true;
+          let erased;do {erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},[{sql:"DELETE FROM native_records WHERE id='person'"}],d.runtime.context(),checkpoint);} while(erased.phase==='pending');
+        }
+        staged=false;return target.batch(statements);
+      };
+      const value=Reflect.get(target,prop);return typeof value==='function'?value.bind(target):value;
+    }});
+    const handler=createImportDoorHandler({...d.options,database});
+    const response=await handler(new Request(d.options.claim.appOrigin+'/api/rer/import/plan',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await d.token('plan')},body:JSON.stringify({uploadId,catchup:true})}));
+    const body=await response!.json() as any;
+    assert.ok(fired);assert.equal((await readD1ErasureJournal(d.runtime.context())).length,1);
+    assert.equal(response!.status,410,JSON.stringify(body));assert.equal(body.error,'snapshot_withdrawn');
+    for (const {name} of native.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) {
+      for (const row of native.prepare(`SELECT * FROM "${name}"`).all()) assert.ok(!JSON.stringify(row).includes(secret),`${name} holds the erased value`);
+    }
+    // The interrupted staging cancels, and the surviving import keeps its status.
+    assert.equal((await d.call('undo',{planId:body.details.planId})).body.state,'cancelled');
+    assert.equal((await d.call('status',{planId:baseline.body.planId})).body.job.state,'completed');
+  }
 });

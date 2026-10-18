@@ -44,6 +44,12 @@ stay, so the seed's history still lists a surviving import "via Business",
 and `status` and `undo` keep working through its kit job. Where a withdrawn
 snapshot is needed (`reconcile`, catch-up `plan`, an `apply` that has not
 completed) the door answers 410 `snapshot_withdrawn` with `details.planId`.
+Door work already in flight is fenced against the erasure: every snapshot
+batch and the batch completing a plan require the source upload, a catch-up's
+previous snapshot and the chunks before it, and every kit batch an `apply`
+writes requires the plan's snapshot. A `plan` or `apply` racing an erasure
+answers the same 410 and never writes withdrawn content back; replaying `apply`
+on a completed import still answers its job.
 Later imports start a new namespace, or a new baseline after `undo`.
 Enablement, key revocations and grant replay protection survive.
 

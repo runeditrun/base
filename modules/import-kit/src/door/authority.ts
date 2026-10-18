@@ -2,7 +2,7 @@ import type { D1Database, D1Sql } from '../d1/types.ts';
 import type { ImportAction } from '../types.ts';
 import type { DoorRequest, DoorSnapshot, ImportDoorOptions } from './types.ts';
 import { DoorError, verifyImportGrant, type DoorAction } from './grants.ts';
-import { assertion, sql, statement, transact } from './store.ts';
+import { assertion, snapshotHeld, sql, statement, transact } from './store.ts';
 
 export async function enabled(options: ImportDoorOptions): Promise<boolean> {
   const row = await options.database.prepare('SELECT enabled FROM ik_door_settings WHERE installation_id=?').bind(options.claim.installationId).first();
@@ -45,8 +45,11 @@ export function kitContext(request: DoorRequest, snapshot: Pick<DoorSnapshot, 'k
       principalId: options.ownerPrincipalId,
       predicate(action: ImportAction, destination: string): D1Sql {
         if (destination !== options.destination || !actions[grant.action].includes(action)) return sql('0');
-        const fingerprint = grant.action === 'apply' ? sql(`EXISTS(SELECT 1 FROM ik_door_plans p JOIN ik_door_approvals a ON a.plan_id=p.id
-          WHERE p.id=? AND p.fingerprint=? AND p.complete=1 AND a.approval_id=? AND a.owner=? AND a.approved_at=? AND a.fingerprint=p.fingerprint)`, snapshot.id, grant.fingerprint, grant.approvalRecordId, grant.email, grant.approvedAt) : sql('1');
+        if (grant.action !== 'apply') return request.authority;
+        const approved = sql(`EXISTS(SELECT 1 FROM ik_door_plans p JOIN ik_door_approvals a ON a.plan_id=p.id
+          WHERE p.id=? AND p.fingerprint=? AND p.complete=1 AND a.approval_id=? AND a.owner=? AND a.approved_at=? AND a.fingerprint=p.fingerprint)`, snapshot.id, grant.fingerprint, grant.approvalRecordId, grant.email, grant.approvedAt);
+        // Writing from the reviewed snapshot needs it still held; reading the job does not.
+        const held = snapshotHeld(snapshot.id), fingerprint = action === 'read' ? approved : sql(`(${approved.sql}) AND (${held.sql})`, ...approved.params ?? [], ...held.params ?? []);
         return sql(`(${request.authority.sql}) AND (${fingerprint.sql})`, ...request.authority.params ?? [], ...fingerprint.params ?? []);
       },
     },
@@ -81,6 +84,7 @@ export async function reserveApply(request: DoorRequest, snapshot: DoorSnapshot)
   if (!snapshot.standingApproval && g.catchup === 'bounded') throw new DoorError('standing_approval_mismatch');
   await transact(request.options.database, request.authority, [
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_namespaces WHERE installation_id=? AND namespace=? AND pending_id=? AND head_id IS ?)', g.installationId, g.namespace, snapshot.id, snapshot.previous)),
+    assertion(snapshotHeld(snapshot.id)),
     sql('INSERT OR IGNORE INTO ik_door_approvals(plan_id,approval_id,owner,approved_at,fingerprint,reviewer) VALUES(?,?,?,?,?,?)', snapshot.id, g.approvalRecordId, g.email, g.approvedAt, g.fingerprint, snapshot.standingApproval?.id ?? g.approvalRecordId),
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_approvals WHERE plan_id=? AND approval_id=? AND owner=? AND approved_at=? AND fingerprint=?)', snapshot.id, g.approvalRecordId, g.email, g.approvedAt, g.fingerprint)),
   ]);

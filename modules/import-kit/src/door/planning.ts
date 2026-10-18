@@ -89,7 +89,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     snapshot.records.push({...old,explanation:'Absent from source snapshot; retained in the seed. No deletion proposed.'});
   }
   if (request.grant.catchup === 'bounded') assertBounded(snapshot,previous!);
-  await saveSnapshot(request,snapshot);
+  await saveSnapshot(request,snapshot,upload);
   return preview(snapshot);
 }
 export function assertBounded(snapshot: DoorSnapshot, previous: DoorSnapshot): void {

@@ -6,7 +6,7 @@ import type { DoorPlanRow, DoorRequest, DoorSnapshot } from './types.ts';
 import { kitContext, reserveApply } from './authority.ts';
 import { inspectRecords } from './inventory.ts';
 import { DoorError } from './grants.ts';
-import { assertion, authorized, lineage, loadSnapshot, planRow, sql, transact } from './store.ts';
+import { assertion, authorized, fenced, lineage, loadSnapshot, planRow, snapshotHeld, sql, transact } from './store.ts';
 import { text } from './uploads.ts';
 
 /** Whether this kit job holds the plan the owner reviewed. A person's erasure
@@ -17,12 +17,14 @@ async function reviewedJob(request: DoorRequest, row: DoorPlanRow, job: Record<s
   return plan?.erasure?.reviewedFingerprint === row.fingerprint;
 }
 /** The kit context for a plan's own job. It needs no snapshot, so it still
- * works after an erasure withdrew one; the kit job binds the same plan. */
+ * works after an erasure withdrew one; the kit job binds the same plan. An
+ * erasure re-fingerprints the job, so reviewedJob, not the kit, binds it to
+ * the reviewed fingerprint. */
 async function jobContext(request: DoorRequest, row: DoorPlanRow & {job_id: string}) {
   const job = await request.options.database.prepare('SELECT id,namespace,mapping_version,destination,principal_id,operation_key,fingerprint,plan_json FROM ik_jobs WHERE id=?').bind(row.job_id).first();
   if (!job || job.destination !== request.options.destination || job.principal_id !== request.options.ownerPrincipalId
     || job.operation_key !== 'door:' + row.id || !await reviewedJob(request,row,job)) throw new DoorError('plan_custody_mismatch', 409);
-  return kitContext(request, {id: row.id, kitNamespace: job.namespace, plan: {mappingVersion: job.mapping_version} as DoorSnapshot['plan']});
+  return {...kitContext(request, {id: row.id, kitNamespace: job.namespace, plan: {mappingVersion: job.mapping_version} as DoorSnapshot['plan']}), reviewedFingerprint: undefined};
 }
 /** Creation and indexing may be separate commits; the immutable operation key
  * makes a queued job recoverable even if its response or index update was lost. */
@@ -46,13 +48,16 @@ export async function apply(request: DoorRequest, input: Record<string,unknown>)
     return {planId:row.id,job:await readD1ImportJob(row.job_id,await jobContext(request,{...row,job_id:row.job_id}))};
   }
   const snapshot = await loadSnapshot(request,row), context = kitContext(request,snapshot);
-  await reserveApply(request,snapshot);
-  const job = await createD1ImportJob(snapshot.plan,context);
-  await transact(request.options.database,request.authority,[
-    sql('UPDATE ik_door_plans SET job_id=? WHERE id=? AND (job_id IS NULL OR job_id=?)',job.id,row.id,job.id),
-    assertion(sql('EXISTS(SELECT 1 FROM ik_door_plans WHERE id=? AND job_id=?)',row.id,job.id)),
-  ]);
-  const result = await applyD1ImportBatches(job.id,context);
+  // The kit asserts the snapshot is still held at both ends of every batch.
+  const result = await fenced(request,row.id,snapshotHeld(row.id),async()=>{
+    await reserveApply(request,snapshot);
+    const job = await createD1ImportJob(snapshot.plan,context);
+    await transact(request.options.database,request.authority,[
+      sql('UPDATE ik_door_plans SET job_id=? WHERE id=? AND (job_id IS NULL OR job_id=?)',job.id,row.id,job.id),
+      assertion(sql('EXISTS(SELECT 1 FROM ik_door_plans WHERE id=? AND job_id=?)',row.id,job.id)),
+    ]);
+    return applyD1ImportBatches(job.id,context);
+  });
   await lineage(request);
   return {planId:row.id,job:result};
 }
