@@ -48,6 +48,9 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   const previous = current.head_id ? await loadSnapshot(request,await planRow(request,current.head_id)) : null;
   if (previous && input.catchup !== true) throw new DoorError('catchup_required',409);
   if (!previous && (input.catchup === true || request.access.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
+  // A catch-up reads the destination's whole native set, which a large destination
+  // refuses (413); an upload holding an erased record is refused and goes first.
+  if (previous) await screen(request,upload);
   const planId = randomUUID(), options = request.options, {kitNamespace,source} = await readUpload(request,upload,planId);
   const prior = new Map((previous?.records ?? []).map(r=>[recordKey(r),r]));
   const revisions = new Map<string,{revision:string;matches:boolean}>();
