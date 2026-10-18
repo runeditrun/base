@@ -9,6 +9,7 @@ import { stageD1ImportErasure } from './erasure-stage.ts';
 import { erasureRequestContext, erasureStatementBinding, type D1ErasurePending, type D1ErasureStepOptions } from './erasure-progress.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
 import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw } from './retirement-tally.ts';
+import { doorCustodyInScope } from './retirement-door.ts';
 
 /** Retire headers and erase records over bounded requests. Only the final
  * publication changes public custody, native rows and the restore checkpoint.
@@ -29,7 +30,11 @@ export async function retireD1ImportCustodyStep(person: D1ImportPerson, nativeSt
   const result = await stageD1ImportErasure(nested, options, binding, async (id, bounded) => {
     const db = bounded.storage.database, destination = bounded.destination;
     const scope = await retirementScope(db, destination, person.values!), retiring = new Set(scope.jobs);
-    const fenced = !!person.target || !!fields.length || Object.values(scope).some(ids => ids.length > 0);
+    // The stage is transport, not erased custody. Its private before-images
+    // would inflate the tally and retain values after a completed publication.
+    const stores = (await tallyStores(db)).filter(store => !/^ik_d1_native_staging/.test(store.name));
+    // Withdrawn door content is custody too: a values-only erasure that removes it is fenced.
+    const fenced = !!person.target || !!fields.length || Object.values(scope).some(ids => ids.length > 0) || await doorCustodyInScope(db, destination, stores);
     if (fenced && !checkpoint.length) throw new Error('IMPORT_RETIREMENT_CHECKPOINT_REQUIRED');
     if (native.length && !fenced) throw new Error('IMPORT_RETIREMENT_NATIVE_REQUIRES_CHECKPOINT');
     const selection = await prepareErasureSelection(person, native, bounded, id, retiring);
@@ -37,9 +42,6 @@ export async function retireD1ImportCustodyStep(person: D1ImportPerson, nativeSt
     const absence = headerAbsence(destination, person.values!);
     const retired = [sql('NOT EXISTS(SELECT 1 FROM ik_jobs WHERE id IN (SELECT value FROM json_each(?)))', JSON.stringify(scope.jobs)),
       sql('NOT EXISTS(SELECT 1 FROM ik_d1_streams WHERE id IN (SELECT value FROM json_each(?)))', JSON.stringify(scope.streams))];
-    // The stage is transport, not erased custody. Its private before-images
-    // would inflate the tally and retain values after a completed publication.
-    const stores = (await tallyStores(db)).filter(store => !/^ik_d1_native_staging/.test(store.name));
     return { ...selection, resultKeys: keys, direct: !scope.jobs.length,
       snapshotGuards: [...selection.snapshotGuards, ...closure],
       survivingJobs: compiler => [...compiler.jobs.keys()].filter(job => !retiring.has(job)),

@@ -27,14 +27,25 @@ the additive `CREATE TABLE IF NOT EXISTS ik_door_scopes` statement from
 `importDoorSchema` (or all of its idempotent statements). It binds each logical
 namespace to the product destination on the first uploaded chunk, before a
 plan/job exists. Old applied namespaces remain scoped through their kit job id
-or the recoverable `door:<plan id>` operation key. Legacy uploads in a namespace
-that never had a job have no stored destination: the seed must bind those
-namespaces to their actual destination in this migration before erasure.
+or the recoverable `door:<plan id>` operation key. Rows the previous door wrote
+in a namespace with neither link (an unplanned upload, a plan never applied,
+or rows a rolled-back previous Worker keeps writing) were never applied by any
+destination, so every destination's erasure withdraws them. No seed migration
+has to bind them.
 
-Import-kit custody retirement withdraws the destination's uploaded bundles and
-saved door snapshots whole, including unapplied uploads, in the same D1 batch as
-native erasure, the restore checkpoint and the journal. The journal counts the
-withdrawn rows. Enablement, key revocations and grant replay protection survive.
+Import-kit custody retirement withdraws the record content in scope whole, in
+the same D1 batch as native erasure, the restore checkpoint and the journal:
+uploaded chunks, upload headers and saved snapshot bodies, including unapplied
+uploads. The journal counts the withdrawn rows. Withdrawing door content fences
+the erasure, so a values-only erasure that touches it requires the restore
+checkpoint (`IMPORT_RETIREMENT_CHECKPOINT_REQUIRED` without one). Plans,
+approvals, namespace heads and namespace bindings hold no record content and
+stay, so the seed's history still lists a surviving import "via Business",
+and `status` and `undo` keep working through its kit job. Where a withdrawn
+snapshot is needed (`reconcile`, catch-up `plan`, an `apply` that has not
+completed) the door answers 410 `snapshot_withdrawn` with `details.planId`.
+Later imports start a new namespace, or a new baseline after `undo`.
+Enablement, key revocations and grant replay protection survive.
 
 The door starts disabled and returns 404 until explicitly enabled. From the
 seed's server-only owner control, call
