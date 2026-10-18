@@ -1,16 +1,17 @@
 import { readFile, writeFile, unlink, rm, rmdir, lstat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { loadState, saveState, stateDirectory, credentialHandle } from './state.mjs';
+import { loadState, loadPending, saveState, stateDirectory, credentialHandle } from './state.mjs';
 import { createCredentialStore, readSecret } from './keychain.mjs';
 import { removeService, serviceStatus } from './service.mjs';
 import { removePermissions } from './permissions.mjs';
-import { pause } from './api.mjs';
+import { Api, pause } from './api.mjs';
 import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
+import { rerCommand } from './invocation.mjs';
 
 export async function paired() {
  const state = await loadState();
- if (!state?.origin || !state.businessId || !state.executorId) throw Error('This computer is not paired. Run rer business connect --code CODE.');
+ if (!state?.origin || !state.businessId || !state.executorId) throw Error(`This computer is not paired. Run ${rerCommand()} business connect --code CODE.`);
  const credential = await createCredentialStore().get(credentialHandle(state.origin));
  if (!credential) throw Error('Business device credential is missing. Reconnect in your browser.');
  return { state, credential };
@@ -48,8 +49,27 @@ async function stopSupervisor(directory) {
  throw Error('Business supervisor is still stopping. Retry disconnect shortly.');
 }
 
+// 'revoked' once the server confirms, or answers 401 for a device it already
+// revoked; 'unsupported' when it refuses device revocation (403 or 404, as a
+// server without this route does); otherwise 'unconfirmed'.
+async function revoke(origin, credential) {
+ try { return (await new Api(origin, credential).delete('/api/business/executors/self'))?.revoked === true ? 'revoked' : 'unconfirmed'; }
+ catch (error) { return error.status === 401 ? 'revoked' : [403, 404].includes(error.status) ? 'unsupported' : 'unconfirmed'; }
+}
+
 export async function disconnect() {
  const state = await loadState(), directory = stateDirectory();
+ const origin = state?.origin ?? (await loadPending())?.origin;
+ const page = origin && (state?.businessId ? `${origin}/business/${encodeURIComponent(state.businessId)}/settings` : `${origin}/business`);
+ const credential = state?.origin ? await createCredentialStore().get(credentialHandle(state.origin)) : null;
+ const revocation = credential ? await revoke(state.origin, credential) : 'not_sent';
+ // Until the server confirms, the device stays connected: keep its credential
+ // and everything else so disconnect can run again after browser revocation.
+ if (revocation === 'unsupported') {
+  process.stdout.write(`This computer is still connected to Business: the server would not revoke it from this computer. Revoke it in ${page}, then run ${rerCommand()} business disconnect again to remove its local service, credentials and added permissions.\n`);
+  return;
+ }
+ if (revocation === 'unconfirmed') throw Error(`Business did not confirm revocation, so this computer is still connected and its credentials were kept. Retry ${rerCommand()} business disconnect, or revoke it in ${page} and then run disconnect again.`);
  await removeService();
  await stopSupervisor(directory);
  await removePermissions();
@@ -61,7 +81,9 @@ export async function disconnect() {
  await rm(directory, { recursive: true, force: true });
  // Remove only an empty parent; other rer commands may own it.
  await rmdir(dirname(directory)).catch(error => { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; });
- process.stdout.write('Business disconnected. Local service, credentials and added permissions removed.\n');
+ process.stdout.write(revocation === 'revoked'
+  ? 'Business disconnected. Device revoked; local service, credentials and added permissions removed.\n'
+  : `Business disconnected on this computer: local service, credentials and added permissions removed. Nothing was revoked: no device credential was stored here${page ? `. If this computer still shows in ${page}, revoke it there` : ''}.\n`);
 }
 
 export async function status({ json = false } = {}) {

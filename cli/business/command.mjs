@@ -6,8 +6,8 @@ import { run } from './supervisor.mjs';
 
 const usage = `Usage: rer business VERB
   scan [DIR...] [--json]          Names-only local discovery
-  connect --code CODE [--origin URL]
-                                 Pair, compare a number in your browser, then opt in to a service
+  connect [--code CODE] [--origin URL]
+                                 Pair or resume; the owner approves and chooses opt-ins in the browser
   run [--once]                   Run consented local discovery; vendor upload integration pending
   next                           Return one templated question or nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
@@ -15,7 +15,7 @@ const usage = `Usage: rer business VERB
   vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
-  disconnect                     Remove local service, credentials and added permissions
+  disconnect                     Revoke this computer, then remove local credentials and additions
 Vendors: sentry, uptimerobot, pagerduty, calendly. Owner approvals stay in the browser.
 `;
 
@@ -31,7 +31,7 @@ export async function businessCommand(argv) {
     if (!['--code', '--origin'].includes(name) || !args[index + 1] || args[index + 1].startsWith('--') || Object.hasOwn(options, name.slice(2))) return invalid();
     options[name.slice(2)] = args[index + 1];
    }
-   if (typeof options.code !== 'string' || !/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(options.code)) return invalid();
+   if (options.code !== undefined && !/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(options.code)) return invalid();
    await connect(options);
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
