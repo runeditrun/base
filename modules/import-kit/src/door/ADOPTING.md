@@ -148,20 +148,21 @@ scope, expiry and approval rules do not change.
   before-image. `write` must upsert the target, replace the child rows it owns
   and set its new revision in the same statements, without cascading deletes
   into rows that reference it. An insert-only writer fails every catch-up apply
-  with 409 `import_door_conflict`.
+  with 409 `import_door_apply_constraint`; that plan is then terminal, so fix
+  `write` and plan again for a fresh approval.
 - **Large imports.** Reconcile and catch-up planning guard the destination's
   whole native set in one read capped at 2 MiB. Without `matchesMany`, guards
-  that inline row values hit `IMPORT_D1_TRANSPORT_LIMIT` (reported as 409
-  `import_door_conflict`); Lamp's 124-record Statuspage fixture did. Implement a
-  compact exact `matchesMany(rows, destination)`: counts per kind, revision
-  markers and an in-SQL digest of each entity's owned rows compared with the
-  hash of its listed value (Base's default seed `personSet` in
-  `default-seed/src/core/features/people/imports.server.ts` is one). Past that
-  read the door answers 413 `import_door_too_large`, naming the target kind.
-  Every statement of one door request also counts in one 1,000-statement
-  budget, so `list` must read the native set in a fixed number of queries, not
-  one per row; past the budget the door answers the same 413. Test reconcile
-  and catch-up on the seed's largest fixture.
+  that inline row values exceed that read (Lamp's 124-record Statuspage fixture
+  did), and the door answers 413 `import_door_too_large`, naming the target
+  kind. Implement a compact exact `matchesMany(rows, destination)`: counts per
+  kind, revision markers and an in-SQL digest of each entity's owned rows
+  compared with the hash of its listed value (Base's default seed `personSet` in
+  `default-seed/src/core/features/people/imports.server.ts` is one). A native
+  set still past that read gets the same 413. Every statement of one door
+  request also counts in one 1,000-statement budget, so `list` must read the
+  native set in a fixed number of queries, not one per row; past the budget the
+  door answers the same 413. Test reconcile and catch-up on the seed's largest
+  fixture.
 - **Erasure.** Run every erase path (each public erasure route, account,
   project or workspace deletion, retirement) with door rows present (an applied
   import's uploads, plans and approvals), not only with the tables installed.
