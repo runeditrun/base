@@ -39,6 +39,9 @@ class History:
                 raise PublicBaseError('public-base.fetch-failed') from None
         public_revisions = [self.public_commit, *sorted(self.public_tags)] if public_base else []
         self.revisions = [self.commit, *public_revisions] if public_base else ['--all', self.commit]
+        from history_hydration import prepare
+        self.hydration = prepare(self)
+        self.env['GIT_NO_LAZY_FETCH'] = '1'
         self.commits = self.run('rev-list', *self.revisions).decode().splitlines()
         self.public_commits = set(self.run('rev-list', *public_revisions).decode().splitlines()) if public_base else set()
         self.trees = {}

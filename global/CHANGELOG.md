@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.59
+
+- **Release publication scans complete on large seeds and partial clones.** `rer release` hydrates missing history blobs in one fetch and inspects the staged release annotation in the same scan. Orbit finishes in 82 seconds instead of exceeding the 300-second budget, with identical findings. A seed must adopt the new rer through its pin for its release command to use it (#278).
+- **Native demos decode binary modules when needed.** WebAssembly and data modules decode lazily inside the Worker Loader factory with native base64 support, reducing host startup work while preserving their bytes (#280).
+
 ## 0.2.58
 
 - **Deploy dry runs validate required target secrets.** `rer deploy --dry-run` uses the real deploy secret-binding resolver and refuses with the same exit and message when required bindings are missing. It names every missing binding and its environment input, accepts secrets already held by the Worker, and makes no target writes. Missing credentials or read permission also refuse (#275).

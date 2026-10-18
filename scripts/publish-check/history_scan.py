@@ -1,5 +1,7 @@
 """Scan current files and full history using native Git and pinned Gitleaks."""
 from pathlib import Path
+from scan_timings import Timings
+import staged_annotation
 from git_history import History, InspectionError
 from public_base import PublicBaseError
 from gitleaks import executable, inspect as secrets, rule as secret_rule
@@ -16,15 +18,18 @@ from content_identities import ContentIdentities, candidate as identity_candidat
 from checksum_maps import ChecksumMaps
 
 
-def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, repository=None, *, cache_dir=None, timeout=300):
+def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, repository=None, *, cache_dir=None, timeout=300, annotation_file=None):
     report = new_report(public_base is not None)
-    history = None
+    timings = Timings(report)
+    history = staged = None
     add = Findings(report, {}, frozenset()).add
     try:
         hashes = load_hashes(env_file)
         report['guarantees']['environmentChecked'] = env_file is not None
         binary = executable()
-        history = History(repo, ref, public_base)
+        history = timings.call('history.prepare', History, repo, ref, public_base)
+        report['history']['hydration'] = history.hydration
+        staged = staged_annotation.load(annotation_file, history.commit)
         report['source'] = dict(commit=history.commit, tree=history.commit_tree(history.commit).decode())
         report['publicBase'] = dict(ref=history.public_label, commit=history.public_commit) if public_base else None
         config = load_config(history.selected(CONFIG))
@@ -54,7 +59,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             tree = history.commit_tree(commit).decode()
             seen_trees.add(tree)
             scope = 'release-tree' if commit == history.commit else 'pre-existing' if commit in history.public_commits else 'newly-public'
-            config_tree, invalid = context(history, commit, config)
+            config_tree, invalid = timings.call('history.context', context, history, commit, config)
             for path in invalid:
                 add(INVALID if (project is not None or repository is not None) and path == 'edition.json' else 'scan.identity-invalid', path, commit, scope=scope)
             license_entry = entries_by_commit[commit].get('LICENSE')
@@ -76,7 +81,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                 local = dependencies[pair] & config_tree['localPaths']
                 key = (path, oid, signature, local)
                 if key not in inspected:
-                    inspected[key] = text_rules(history.blob(oid), path, config_tree, hashes)
+                    inspected[key] = timings.call('history.text', text_rules, history.blob(oid), path, config_tree, hashes)
                 rules, provenance, references = inspected[key]
                 entry_scope = 'pre-existing' if (scope != 'release-tree' and oid in public_blobs) or public_paths.get(path) == oid else scope
                 for rule in rules:
@@ -86,7 +91,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                 if provenance:
                     add('provenance.declared-source', path, commit, oid, entry_scope)
         report['history'].update(commits=len(history.commits), trees=len(seen_trees), blobs=len(seen_blobs))
-        selected_context, _ = context(history, history.commit, config)
+        selected_context, _ = timings.call('working-tree.context', context, history, history.commit, config)
         working_paths = []
         working_identities = {}
         for path, data in working_files(Path(history.repo)):
@@ -98,7 +103,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             # their known immutable identity; new bytes have no history identity.
             entry = entries_by_commit[history.commit].get(path)
             oid = entry['oid'] if entry and entry['kind'] == 'blob' and history.blob(entry['oid']) == data else None
-            rules, _, references = text_rules(data, path, selected_context, hashes)
+            rules, _, references = timings.call('working-tree.text', text_rules, data, path, selected_context, hashes)
             public_oid = public_paths.get(path)
             scope = 'pre-existing' if public_oid and (public_oid == oid or history.blob(public_oid) == data) else 'working-tree'
             for rule in rules:
@@ -110,11 +115,11 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                     add(rule, path, history.commit, oid, 'working-tree')
         if not (Path(history.repo) / 'LICENSE').is_file():
             add('license.missing', 'LICENSE', scope='working-tree')
-        identities = {'working-tree': ContentIdentities(working_identities,
+        identities = {'working-tree': timings.call('identities.prepare', ContentIdentities, working_identities,
             lambda path: working_regular(Path(history.repo), path))}
         checksums = {}
         for mode in ('git', 'dir'):
-            for hit in secrets(binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
+            for hit in timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
                 path, commit = hit.get('File', '.'), hit.get('Commit') or history.commit
                 if mode == 'dir' and Path(path).is_absolute():
                     path = Path(path).resolve().relative_to(Path(history.repo).resolve()).as_posix()
@@ -133,12 +138,12 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                         entry = scoped_entries.get(path)
                         return (history.blob(entry['oid']), entry['mode']) if entry and entry['kind'] == 'blob' and entry['mode'] in ('100644', '100755') else None
                     if identity_scope not in checksums:
-                        checksums[identity_scope] = ChecksumMaps(
+                        checksums[identity_scope] = timings.call('checksums.prepare', ChecksumMaps,
                             working_paths if mode == 'dir' else scoped_entries,
                             (lambda path: working_regular(Path(history.repo), path)) if mode == 'dir' else read_regular)
                     if identity_candidate(path):
                         if identity_scope not in identities:
-                            identities[identity_scope] = ContentIdentities({
+                            identities[identity_scope] = timings.call('identities.prepare', ContentIdentities, {
                                 p: history.blob(e['oid']) for p, e in scoped_entries.items()
                                 if identity_candidate(p) and e['kind'] == 'blob' and e['mode'] in ('100644', '100755')}, read_regular)
                         if identities[identity_scope].matches(path, hit):
@@ -162,10 +167,10 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             scope = 'working-tree' if path in working_paths else 'pre-existing' if commit in history.public_commits else 'newly-public'
             lines.append((count, count + length, path, commit, scope))
             count += length
-        for message_type, commit, data in history.messages():
+        for message_type, commit, data in staged_annotation.messages(history, staged):
             path = '@' + message_type + '-message'
             report['history']['tagMessages' if message_type == 'tag' else 'commitMessages'] += 1
-            rules, _, references = text_rules(data, path, selected_context, hashes,
+            rules, _, references = timings.call('messages.text', text_rules, data, path, selected_context, hashes,
                                               commit_message=message_type == 'commit')
             scope = 'pre-existing' if commit in history.public_commits or commit in history.public_tags else 'release-tree' if commit == history.commit else 'newly-public'
             for rule in rules:
@@ -176,11 +181,12 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             length = (data + b'\n').count(b'\n')
             lines.append((count, count + length, path, commit, scope))
             count += length
-        for hit in secrets(binary, 'stdin', data=b''.join(messages), timeout=timeout):
+        for hit in timings.call('gitleaks.messages', secrets, binary, 'stdin', data=b''.join(messages), timeout=timeout):
             line = hit.get('StartLine', 0)
             location = next(((p, c, s) for start, end, p, c, s in lines if start <= line < end), ('@message', None, 'newly-public'))
             add(secret_rule(hit['RuleID']), location[0], location[1], scope=location[2], scanner_rule=hit['RuleID'])
-        states = GitHubResolver().resolve_all({repository for references, *_ in deferred for repository, _, _ in references})
+        states = timings.call('github.references', GitHubResolver().resolve_all,
+                              {repository for references, *_ in deferred for repository, _, _ in references})
         for references, path, commit, oid, scope in deferred:
             for rule in reference_rules(references, states):
                 add(rule, path, commit, oid, scope)
@@ -197,4 +203,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
     finally:
         if history:
             history.close()
-    return finish(report)
+        timings.finish()
+    finish(report)
+    staged_annotation.summary(report, staged)
+    return report
