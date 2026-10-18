@@ -54,8 +54,9 @@ batch a door request runs, also asserts that the destination's erasure journal
 count is unchanged since the request was admitted, so any other request an
 erasure overtakes (an upload chunk, say) answers 410 `erased_during_request`
 and leaves nothing behind. `plan` refuses a bundle holding an erased record
-with 409 `source_erased` and deletes that upload, also in a namespace whose
-snapshot the erasure withdrew (where any other bundle answers 410).
+with 409 `source_erased` and deletes that upload, whatever else would refuse
+that plan first: a withdrawn snapshot, a pending import, interrupted staging,
+the catch-up shape or a bound. Any other bundle keeps that refusal and stays.
 A catch-up keeps each unchanged record as a zero-effect entry in its own kit
 job. Erasing a target a door import wrote severs the same source record in every
 kit job of that door namespace, and withdraws the originals that hold it. A

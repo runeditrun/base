@@ -492,3 +492,29 @@ test('After an erasure, a plan of an upload holding the erased person deletes it
   assert.deepEqual([withdrawn.status,withdrawn.body.error],[410,'snapshot_withdrawn'],JSON.stringify(withdrawn.body));
   assert.equal((await d.call('uploads',{uploadId})).status,200);
 });
+
+test('After an erasure withdraws a pending catch-up, a plan of an upload holding the erased person deletes it; a clean upload keeps the refusal',async t=>{
+  const d=await door(t);await d.enable();
+  const native=d.runtime.native(),secret='pending-catchup-secret';
+  const base=[{id:'person',title:secret},{id:'kept',title:'pending-kept'}];
+  const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
+  // Business plans the next catch-up; the owner has not approved it when the person is erased.
+  const pending=await d.plan([...base,{id:'new',title:'pending-new'}],{catchup:true});assert.equal(pending.status,200,JSON.stringify(pending.body));
+  const erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},[{sql:"DELETE FROM native_records WHERE id='person'"}],d.runtime.context(),checkpoint);
+  assert.equal(erased.phase,'complete');
+  // Each day's catch-up bundle still holds the person, under a plain and a bounded grant.
+  const bounded={catchup:'bounded' as const,approvalRecordId:'test-standing-approval',approvedAt:d.approval.approvedAt};
+  for (const [day,grant] of [[1,{}],[2,bounded]] as const) {
+    const uploadId=await d.upload([...base,{id:'new',title:'pending-new'},{id:'day-'+day,title:'pending-day-'+day}]);
+    const planned=await d.call('plan',{uploadId,catchup:true},grant);
+    assert.deepEqual([planned.status,planned.body.error],[409,'source_erased'],JSON.stringify(planned.body));
+    assert.equal((await d.call('uploads',{uploadId})).status,404,'the upload holding the erased person goes');
+  }
+  assertNowhere(native,[secret]);
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_chunks').get()!.n,0);
+  // A bundle without the person keeps the pending-import refusal and stays.
+  const uploadId=await d.upload([{id:'kept',title:'pending-kept'},{id:'new',title:'pending-new'}]);
+  const refused=await d.call('plan',{uploadId,catchup:true});
+  assert.deepEqual([refused.status,refused.body.error],[409,'namespace_has_pending_import'],JSON.stringify(refused.body));
+  assert.equal((await d.call('uploads',{uploadId})).status,200);
+});

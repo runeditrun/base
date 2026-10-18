@@ -21,19 +21,30 @@ export function preview(snapshot: DoorSnapshot) {
 export async function plan(request: DoorRequest, input: Record<string, unknown>) {
   if (Object.keys(input).some(k=>!['uploadId','catchup'].includes(k)) || (input.catchup !== undefined && typeof input.catchup !== 'boolean')) throw new DoorError('invalid_plan_input',400);
   const upload = await uploadRow(request,text(input.uploadId,'upload_id'));
+  try { return await planUpload(request,input,upload); }
+  catch (error) {
+    // Whatever refuses this plan first (a pending import, interrupted staging, a
+    // withdrawn snapshot, the catch-up shape or a bound), an upload holding an
+    // erased record is refused for that instead, and goes. A failing screen leaves
+    // the original refusal standing.
+    if (error instanceof DoorError && error.code !== 'source_erased') await screen(request,upload).catch(screened => { if (screened instanceof DoorError && screened.code === 'source_erased') throw screened; });
+    throw error;
+  }
+}
+async function planUpload(request: DoorRequest, input: Record<string, unknown>, upload: UploadRow) {
   const current = await lineage(request);
   const existing = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE installation_id=? AND namespace=? AND bundle_sha256=?')
     .bind(request.grant.installationId,request.grant.namespace,upload.bundle_sha256).first<DoorPlanRow>();
   if (existing) {
     if (!existing.complete) throw new DoorError('plan_staging_interrupted_cancel_and_replan',409,{planId:existing.id});
-    const snapshot = await withdrawn(request,upload,()=>loadSnapshot(request,existing));
+    const snapshot = await loadSnapshot(request,existing);
     if (snapshot.sourceCount > request.grant.maxRecords) throw new DoorError('plan_exceeds_grant_quota');
     if (snapshot.plan.mappingVersion !== request.options.mapping.version) throw new DoorError('snapshot_mapping_changed_use_new_namespace',409);
     if (request.grant.catchup === 'bounded' && (!snapshot.standingApproval || snapshot.standingApproval.id !== request.grant.approvalRecordId || snapshot.standingApproval.at !== request.grant.approvedAt)) throw new DoorError('standing_approval_mismatch');
     return preview(snapshot);
   }
   if (current.pending_id) throw new DoorError('namespace_has_pending_import',409);
-  const previous = current.head_id ? await withdrawn(request,upload,async ()=>loadSnapshot(request,await planRow(request,current.head_id!))) : null;
+  const previous = current.head_id ? await loadSnapshot(request,await planRow(request,current.head_id)) : null;
   if (previous && input.catchup !== true) throw new DoorError('catchup_required',409);
   if (!previous && (input.catchup === true || request.grant.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
   const options = request.options, {kitNamespace,source} = await readUpload(request,upload);
@@ -107,16 +118,10 @@ async function refuseErased(request: DoorRequest, upload: UploadRow, plan: Impor
     throw new DoorError('source_erased', 409);
   }
 }
-/** An erasure withdraws the namespace's snapshots. Before refusing for that, the
- * upload is planned on its own: one holding an erased record is refused and goes. */
-async function withdrawn<T>(request: DoorRequest, upload: UploadRow, load: () => Promise<T>): Promise<T> {
-  try { return await load(); }
-  catch (error) {
-    if (!(error instanceof DoorError) || error.code !== 'snapshot_withdrawn') throw error;
-    const {kitNamespace,source} = await readUpload(request,upload), mapping = request.options.mapping;
-    await refuseErased(request,upload,await planD1Import(source,mapping,kitContext(request,{id:randomUUID(),kitNamespace,plan:{mappingVersion:mapping.version} as ImportPlan})));
-    throw error;
-  }
+/** The upload planned on its own with the plain mapping: one holding an erased record is refused and goes. */
+async function screen(request: DoorRequest, upload: UploadRow): Promise<void> {
+  const {kitNamespace,source} = await readUpload(request,upload), mapping = request.options.mapping;
+  await refuseErased(request,upload,await planD1Import(source,mapping,kitContext(request,{id:randomUUID(),kitNamespace,plan:{mappingVersion:mapping.version} as ImportPlan})));
 }
 export function assertBounded(snapshot: DoorSnapshot, previous: DoorSnapshot): void {
   const d = snapshot.differences, changed = d.additions.length + d.replacements.length;
