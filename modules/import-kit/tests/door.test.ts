@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
 import { createImportDoorHandler, importDoorApplyFailureMigration, importDoorSchema, readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
-import { readD1ImportOriginals, readD1ErasureJournal, retireD1ImportCustody, undoD1Import } from '../src/d1/index.ts';
+import { d1RequestContext, readD1ImportOriginals, readD1ErasureJournal, retireD1ImportCustody, undoD1Import } from '../src/d1/index.ts';
+import { limitStatements } from '../src/d1/budget.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
 import { sqliteTargets } from './d1/sqlite-runtime.ts';
 import type { Json } from '../src/types.ts';
@@ -370,22 +371,32 @@ function assertNowhere(native:Native,values:string[]) {
 }
 
 test('Erasing a person unchanged in a door catch-up leaves no copy in the catch-up job, which keeps its status and undo',async t=>{
-  for (const variant of ['target','seed-shaped','after-undo','bounded'] as const) {
+  // A long lineage: daily catch-ups that keep a copy of the unchanged person in every job, more than one request can sever.
+  const days=12,limit=200;
+  for (const variant of ['target','seed-shaped','after-undo','bounded','long-lineage'] as const) {
     const d=await door(t);await d.enable();
     const native=d.runtime.native(),secret='catchup-unchanged-'+variant;
     const base=[{id:'person',title:secret},{id:'kept',title:'catchup-kept'}];
     const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
-    const catchup=await d.plan([...base,{id:'new',title:'catchup-new'}],{catchup:true});assert.equal(catchup.status,200,JSON.stringify(catchup.body));
+    let catchup=await d.plan([...base,{id:'new',title:'catchup-new'}],{catchup:true});assert.equal(catchup.status,200,JSON.stringify(catchup.body));
     assert.deepEqual(catchup.body.summary,{sourceRecords:3,created:1,updated:0,unchanged:2,gone:0});
     const job=await d.apply(catchup.body);
+    let created='new';
+    if (variant==='long-lineage') for (let day=1;day<=days;day++) {
+      catchup=await d.plan([...base,{id:'new',title:'catchup-new'},{id:created='day-'+day,title:'catchup-day-'+day}],{catchup:true});
+      assert.equal(catchup.status,200,JSON.stringify(catchup.body));await d.apply(catchup.body);
+    }
     if (variant==='after-undo') await d.undo(catchup.body.planId);
     const remove=[{sql:"DELETE FROM native_records WHERE id='person'"}];
     let erased;
-    if (variant==='seed-shaped') {
+    if (variant==='seed-shaped' || variant==='long-lineage') {
       // The default seed's own call: target, the email as a value, optional reference fields, resumable redaction.
       const person={target:{kind:'record',id:'person'},values:['person@example.test'],related:{fields:[{path:['details','reactions','*','users','*'],value:'person',optional:true}]}};
-      let continuation:string|undefined;
-      do {erased=await retireD1ImportCustody(person,remove,d.runtime.context(),checkpoint,{resumable:true,continuation});continuation=erased.continuation;} while(erased.phase==='redacting');
+      // Each call is its own request; the long lineage's requests may run at most `limit` statements.
+      const request=()=>variant==='long-lineage'?limitStatements(d1RequestContext(d.runtime.context()),limit):d.runtime.context();
+      let continuation:string|undefined,calls=0;
+      do {erased=await retireD1ImportCustody(person,remove,request(),checkpoint,{resumable:true,continuation});continuation=erased.continuation;calls++;} while(erased.phase==='redacting');
+      if (variant==='long-lineage') assert.ok(calls>2,`the lineage of ${days+2} jobs is severed in bounded steps (${calls} calls)`);
     } else do {erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},remove,d.runtime.context(),checkpoint,variant==='bounded'?{operationKey:'catchup-erasure'}:{});} while(erased.phase==='pending');
     assert.equal(erased.phase,'complete',variant);
     assertNowhere(native,[secret]);
@@ -396,7 +407,7 @@ test('Erasing a person unchanged in a door catch-up leaves no copy in the catch-
     assert.equal(status.status,200,JSON.stringify(status.body));assert.equal(status.body.job.state,variant==='after-undo'?'undone':'completed');
     if (variant!=='after-undo') {
       await d.undo(catchup.body.planId);
-      assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='new'").get()!.n,0,'the catch-up undoes');
+      assert.equal(native.prepare('SELECT count(*) n FROM native_records WHERE id=?').get(created)!.n,0,'the catch-up undoes');
     }
     assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='kept'").get()!.n,1);
     // Every job stays indexed, so the next person's erasure needs no index upgrade.

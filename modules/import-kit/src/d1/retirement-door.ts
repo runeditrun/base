@@ -57,24 +57,30 @@ export async function doorCustodyInScope(db: D1Database, destination: string, st
 
 const jobLink = "j.id=p.job_id OR (p.job_id IS NULL AND j.operation_key='door:'||p.id)";
 /** What an erasure severs of a door import's lineage: the merged selector, the
- * kit jobs that hold it (a resumable step must scan them, even ones an earlier
- * step read), and a fence: predicates that fail the erasure if a kit job joins
- * one of those door namespaces after this read, with copies it never selected. */
-export interface DoorLineage { person: D1ImportPerson; jobs: string[]; fence: D1Sql[] }
+ * kit jobs that may hold a copy, and a fence: predicates that fail the erasure
+ * if a kit job joins one of those door namespaces after this read, with copies
+ * it never selected. `select` is the lineage's own selector, and `sources` names
+ * the severed source records by door namespace, kind and source id: a resumable
+ * erasure severs copies in steps, and a step's work stands only while they are
+ * unchanged. */
+export interface DoorLineage { person: D1ImportPerson; jobs: string[]; fence: D1Sql[]; sources: string[]; select?: (record: SourceRecord) => boolean }
 /** A door catch-up keeps each unchanged (or refused) record as a zero-effect
  * entry in its own kit job, under a new kit namespace, with the record's payload
  * and the bundle original. Erasing a target that a door import wrote severs those
  * copies too: the same kind and source id in any kit job of the same door
  * namespace is the same source record. Merged with the caller's own selector. */
 export async function doorLineage(person: D1ImportPerson, db: D1Database, destination: string, codec?: D1PlanCodec): Promise<DoorLineage> {
-  const none: DoorLineage = { person, jobs: [], fence: [] };
+  const none: DoorLineage = { person, jobs: [], fence: [], sources: [] };
   if (!person.target || !await db.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='ik_door_plans'").first()) return none;
+  // An erased entry (its source identity is a tombstone) holds nothing to follow,
+  // so copies an earlier step severed and bound to this target are not read again.
   const { results } = await db.prepare(`SELECT DISTINCT j.*,i.ordinal AS entry_ordinal,p.installation_id AS door_installation,p.namespace AS door_namespace FROM ik_d1_plan_index i
-    JOIN ik_jobs j ON j.id=i.job_id JOIN ik_door_plans p ON ${jobLink} WHERE j.destination=? AND i.target_identity=? ORDER BY j.id,i.ordinal`)
+    JOIN ik_jobs j ON j.id=i.job_id JOIN ik_door_plans p ON ${jobLink} WHERE j.destination=? AND i.target_identity=?
+    AND NOT EXISTS(SELECT 1 FROM ik_d1_erased_sources s WHERE s.destination=j.destination AND s.identity=i.source_identity) ORDER BY j.id,i.ordinal`)
     .bind(destination, targetIdentity(destination, person.target.kind, person.target.id)).all<any>();
   if (!results.length) return none;
   const plans = await loadPlans([...new Map(results.map(row => [row.id, row])).values()], db, codec);
-  const lineages = new Map<string, { id: string; namespace: string }[]>(), keys = new Set<string>(), jobs = new Set<string>(), fence: D1Sql[] = [];
+  const lineages = new Map<string, { id: string; namespace: string }[]>(), keys = new Set<string>(), sources = new Set<string>(), jobs = new Set<string>(), fence: D1Sql[] = [];
   for (const row of results) {
     const entry = plans.get(row.id)?.entries[row.entry_ordinal];
     if (!entry || entry.erased) continue;
@@ -87,10 +93,11 @@ export async function doorLineage(person: D1ImportPerson, db: D1Database, destin
       fence.push(sql(`NOT EXISTS(SELECT 1 FROM ik_door_plans p JOIN ik_jobs j ON ${jobLink} WHERE p.installation_id=? AND p.namespace=? AND j.destination=? AND j.id NOT IN (SELECT value FROM json_each(?)))`,
         row.door_installation, row.door_namespace, destination, JSON.stringify(members.map(member => member.id))));
     }
+    sources.add(canonicalJson([row.door_installation, row.door_namespace, entry.source.kind, entry.source.sourceId]));
     for (const member of lineages.get(door)!) keys.add(canonicalJson([member.namespace, entry.source.kind, entry.source.sourceId]));
   }
   if (!keys.size) return none;
   const own = person.related?.source;
   const lineage = (record: SourceRecord) => keys.has(canonicalJson([record.namespace, record.kind, record.sourceId]));
-  return { person: { ...person, related: { ...person.related, source: own ? record => own(record) || lineage(record) : lineage } }, jobs: [...jobs].sort(), fence };
+  return { person: { ...person, related: { ...person.related, source: own ? record => own(record) || lineage(record) : lineage } }, jobs: [...jobs].sort(), fence, sources: [...sources].sort(), select: lineage };
 }

@@ -81,9 +81,11 @@ the catch-up shape or a bound. Any other bundle keeps that refusal and stays.
 A catch-up keeps each unchanged record as a zero-effect entry in its own kit
 job. Erasing a target a door import wrote severs the same source record in every
 kit job of that door namespace, and withdraws the originals that hold it. A
-resumable erasure's final step reads those jobs even when an earlier step read
-them, and an erasure fails closed if a catch-up joins that namespace while it
-reads; a retry then erases it too.
+resumable erasure severs those copies in the bounded steps that read their jobs,
+so a lineage of any length erases within the request budget, and its final step
+reads only the jobs no step has read since they last changed. A step or an
+erasure fails closed if a catch-up joins that namespace while it reads; a retry
+then erases it too.
 Later imports start a new namespace, or a new baseline after `undo`.
 Enablement, key revocations and grant replay protection survive.
 

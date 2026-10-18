@@ -52,8 +52,11 @@ export async function eraseD1ImportTarget(kind: string, id: string, nativeStatem
 
 /** Restricts one bounded step of a resumable redaction: only `selection` jobs are
  * read, and with `owned` only the native rows their active provenance owns are
- * rewritten. `matched` carries match counts from earlier steps. */
-export interface ErasureStep { selection: JobSelection; owned?: boolean; matched?: D1FieldMatch[] }
+ * rewritten. `matched` carries match counts from earlier steps. `sever`, in a
+ * step with no target, is the erased target's digest: the related source copies
+ * the step finds are severed and bound to it, while the target's own records
+ * (indexed to it) wait for the final step and its native erasure. */
+export interface ErasureStep { selection: JobSelection; owned?: boolean; matched?: D1FieldMatch[]; sever?: string }
 
 /** The unbounded erasure of one target (or, with no target, only of the related
  * fields) as guards before the native statements and writes after them. Jobs in
@@ -64,16 +67,25 @@ export async function targetErasure(target: { kind: string; id: string } | undef
   const kind = target?.kind ?? '', id = target?.id ?? '';
   if (await db.prepare(`${unindexedJobs} LIMIT 1`).bind(context.destination).first()) throw new Error('IMPORT_ERASURE_INDEX_UPGRADE_REQUIRED');
   const digest = target ? targetIdentity(context.destination, kind, id) : undefined;
-  const targetRows = digest ? await selectKeys(db, 'ik_d1_plan_index', 'target_identity', [digest]) : [];
+  const indexed = digest ? await selectKeys(db, 'ik_d1_plan_index', 'target_identity', [digest]) : [];
+  // Copies earlier steps severed are tombstones bound to this target: a step's
+  // job selection, not this index, decides which jobs it reads.
+  const targetRows = step && digest ? await liveRows(db, context.destination, indexed) : indexed;
   const scan = related ? await relatedSelection(context, related, step?.selection) : undefined;
-  const identities = new Set<string>([...targetRows.map(row => row.source_identity), ...digest ? await stagedSourceIdentities(digest, context) : [], ...scan?.identities ?? []]);
-  const severed: RelatedPlanErasure = { identities: new Set([...scan?.identities ?? []].filter(identity => !targetRows.some(row => row.source_identity === identity))), target: digest ?? '' };
+  let identities = new Set<string>([...targetRows.map(row => row.source_identity), ...digest ? await stagedSourceIdentities(digest, context) : [], ...scan?.identities ?? []]);
+  let sourceRows = await selectKeys(db, 'ik_d1_plan_index', 'source_identity', [...identities]);
+  if (!digest && step?.sever) {
+    const own = new Set(sourceRows.filter(row => row.target_identity === step.sever).map(row => row.source_identity));
+    identities = new Set([...identities].filter(identity => !own.has(identity)));
+    sourceRows = sourceRows.filter(row => !own.has(row.source_identity));
+  }
+  const bound = digest ?? step?.sever ?? '';
+  const severed: RelatedPlanErasure = { identities: new Set([...scan?.identities ?? []].filter(identity => identities.has(identity) && !targetRows.some(row => row.source_identity === identity))), target: bound };
   const privateErasure = digest ? stageErasure(context.destination, digest, [...identities]) : { before: [], after: [] };
-  const sourceRows = await selectKeys(db, 'ik_d1_plan_index', 'source_identity', [...identities]);
   const ids = [...new Set([...sourceRows.map(row => row.job_id), ...scan?.originals.keys() ?? [], ...scan?.redactedJobs ?? []])];
   const snapshot = await readInventorySnapshot(ids, db, targets.planCodec);
   const before: D1Sql[] = [indexedDestinationGuard(context.destination), ...privateErasure.before, ...scan?.guards ?? [],
-    ...digest ? selectedCounts('ik_d1_plan_index', 'target_identity', [digest], targetRows) : [],
+    ...digest ? selectedCounts('ik_d1_plan_index', 'target_identity', [digest], indexed) : [],
     ...selectedCounts('ik_d1_plan_index', 'source_identity', [...identities], sourceRows),
     ...exactRows('ik_d1_plan_index', ['job_id','ordinal','source_identity','target_identity'], sourceRows)];
   const after: D1Sql[] = [], final: D1Sql[] = [], changedJobs: ErasedJob[] = [], decisions: ErasedDecision[] = [], redactions: ErasedDecision[] = [];
@@ -137,6 +149,17 @@ export async function targetErasure(target: { kind: string; id: string } | undef
     const current = await targets.read(db, context.destination, kind, id);
     before.push(...targetGuards(targets,current ?? null, context.destination, kind, id));
     after.push(...targetGuards(targets,null, context.destination, kind, id));
-  }
+  } else if (bound && identities.size) after.push(sql('INSERT OR IGNORE INTO ik_d1_erased_targets(destination,identity) VALUES(?,?)', context.destination, bound));
   return { before, after, final, decisions, jobs: ids, fieldMatches: scan?.fieldMatches ?? [] };
+}
+
+/** Index rows whose source is not an erased tombstone already. A tombstone's
+ * job is fenced like any other: by the step's selection or its clean revision. */
+async function liveRows(db: D1ImportContext['storage']['database'], destination: string, rows: any[]): Promise<any[]> {
+  const erased = new Set<string>();
+  for (const chunk of jsonChunks([...new Set(rows.map(row => row.source_identity as string))])) {
+    const { results } = await db.prepare('SELECT identity FROM ik_d1_erased_sources WHERE destination=? AND identity IN (SELECT value FROM json_each(?))').bind(destination, chunk).all<{ identity: string }>();
+    for (const row of results) erased.add(row.identity);
+  }
+  return rows.filter(row => !erased.has(row.source_identity));
 }
