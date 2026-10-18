@@ -1,6 +1,6 @@
 import type { OwnerClaimConfig } from '../../../owner-claim/index.mjs';
 import type { D1Database, D1Sql, D1TargetAdapter } from '../d1/types.ts';
-import type { ImportMapping, ImportPlan, Json, ParsedRecord, ReaderLimits, PersistedImport } from '../types.ts';
+import type { ImportMapping, ImportPlan, Json, ParsedRecord, ReaderLimits } from '../types.ts';
 import type { DoorGrant } from './grants.ts';
 
 export interface ImportDoorOptions {
@@ -41,5 +41,4 @@ export interface DoorRequest {
   authority: D1Sql;
   /** The destination's erasure journal rows when the request was admitted. */
   epoch: number;
-  persisted?: Promise<PersistedImport>;
 }

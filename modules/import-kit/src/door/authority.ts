@@ -5,6 +5,7 @@ import { DoorError, verifyImportGrant, type DoorAction } from './grants.ts';
 import { assertion, snapshotHeld, sql, statement, transact } from './store.ts';
 import { approvalCaption } from './failures.ts';
 import { importDoorSchemaCheck } from './schema.ts';
+import { reserveReturn } from '../d1/budget.ts';
 
 /** Opt-in and schema state in one read. A door whose seed has not applied
  * importDoorApplyFailureMigration must refuse loudly rather than misbehave. */
@@ -49,9 +50,12 @@ const actions: Record<DoorAction, ImportAction[]> = {
   uploads: [], plan: ['plan', 'read'], apply: ['create', 'apply', 'read'],
   status: ['read'], reconcile: ['read'], undo: ['read', 'undo', 'rollback'],
 };
+/** Statements the door runs after a kit call returns (lineage recovery and the
+ * final authority check), kept out of the kit's self-sized batches. */
+const DOOR_RETURN_STATEMENTS = 16;
 export function kitContext(request: DoorRequest, snapshot: Pick<DoorSnapshot, 'kitNamespace'|'plan'|'id'>) {
   const {options, grant} = request;
-  return {
+  return reserveReturn({
     destination: options.destination, namespace: snapshot.kitNamespace,
     mappingVersion: snapshot.plan.mappingVersion,
     operationKey: 'door:' + snapshot.id,
@@ -72,7 +76,7 @@ export function kitContext(request: DoorRequest, snapshot: Pick<DoorSnapshot, 'k
         return sql(`(${request.authority.sql}) AND (${fingerprint.sql})`, ...request.authority.params ?? [], ...fingerprint.params ?? []);
       },
     },
-  };
+  }, DOOR_RETURN_STATEMENTS);
 }
 /** Server-only integration hook. The predicate must consult the seed's CURRENT
  * owner session or the owner's provisioning approval in this same database. */

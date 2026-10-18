@@ -149,6 +149,15 @@ read, and per-row `matches` or `matchesParts` guards repeat every row in full. A
 native set too large for that read answers 413 `import_door_too_large`, with
 `details.targetKinds` and `details.reason` naming the target kind.
 
+Every statement a door request runs, the door's own, the adapter's and each kit
+call's, counts in one 1,000-statement budget (hosted D1's per-invocation limit
+on Workers Paid). A request that would exceed it answers 413
+`import_door_too_large` instead of a provider error. Reconcile and catch-up
+planning take each target's current state from the native rows the persisted
+read fenced under its atomic guard, and read every owning plan in one query, so
+their statement count does not grow with the records imported. An adapter's
+`list` must read its native set in a fixed number of queries, not one per row.
+
 Uploaded bytes and retained originals remain in the seed; RER retains receipts
 only. Parsing and mapping are product-owned and cannot send, enqueue or activate
 access. An adopting seed supplies its native field sampling and integrated

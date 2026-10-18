@@ -6,7 +6,7 @@ import { erasedSourcePredicates } from '../d1/erasure-claims.ts';
 import type { ImportPlan, MappingResult } from '../types.ts';
 import type { DoorPlanRow, DoorRecord, DoorRequest, DoorSnapshot } from './types.ts';
 import { kitContext } from './authority.ts';
-import { importedTarget, recordKey } from './inventory.ts';
+import { importedTargets, recordKey } from './inventory.ts';
 import { DoorError } from './grants.ts';
 import { lineage, loadSnapshot, planRow, saveSnapshot, sql, statement, transact } from './store.ts';
 import { bundleBytes, text, uploadRow, type UploadRow } from './uploads.ts';
@@ -51,10 +51,8 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   const planId = randomUUID(), options = request.options, {kitNamespace,source} = await readUpload(request,upload,planId);
   const prior = new Map((previous?.records ?? []).map(r=>[recordKey(r),r]));
   const revisions = new Map<string,{revision:string;matches:boolean}>();
-  for (const record of prior.values()) for (const target of record.targets) {
-    const found = await importedTarget(request,target);
-    revisions.set(canonicalJson([target.kind,target.id]),{revision:found.provenance.appliedRevision,matches:found.matches});
-  }
+  const priorTargets = [...prior.values()].flatMap(record=>record.targets), found = await importedTargets(request,priorTargets);
+  priorTargets.forEach((target,i)=>revisions.set(canonicalJson([target.kind,target.id]),{revision:found[i].provenance.appliedRevision,matches:found[i].matches}));
   const snapshot: DoorSnapshot = {id:planId,namespace:request.grant.namespace,bundleSha256:upload.bundle_sha256,kitNamespace,
     previous:previous?.id ?? null,records:[],sourceCount:0,plan:{} as ImportPlan,
     differences:{additions:[],replacements:[],unchanged:[],gone:[],conflicts:[]},

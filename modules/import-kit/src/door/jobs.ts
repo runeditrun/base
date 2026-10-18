@@ -9,6 +9,7 @@ import { DoorError } from './grants.ts';
 import { assertion, authorized, fenced, lineage, loadSnapshot, planRow, snapshotHeld, sql, transact } from './store.ts';
 import { text } from './uploads.ts';
 import { approvalCaption, failedPlan, recordApplyFailure, requireNewPlan } from './failures.ts';
+import { sizeLimitError } from './limits.ts';
 
 /** Whether this kit job holds the plan the owner reviewed. A person's erasure
  * re-fingerprints the job's plan and keeps the reviewed fingerprint inside it. */
@@ -63,7 +64,12 @@ export async function apply(request: DoorRequest, input: Record<string,unknown>)
     // snapshot is held; otherwise the record batch is refused and the erasure's
     // 410 (snapshot_withdrawn or erased_during_request) answers instead.
     try { return await applyD1ImportBatches(job.id,context); }
-    catch (error) { return recordApplyFailure(request,snapshot,job,error); }
+    catch (error) {
+      // A kit size or request limit refuses before its batch writes anything: it
+      // answers the named 413 and is not an apply failure.
+      if (sizeLimitError(error)) throw error;
+      return recordApplyFailure(request,snapshot,job,error);
+    }
   });
   await lineage(request);
   return {planId:row.id,job:result};
