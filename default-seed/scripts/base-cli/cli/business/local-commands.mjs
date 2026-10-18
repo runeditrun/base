@@ -1,6 +1,6 @@
-import { readFile, writeFile, unlink, rm, rmdir, lstat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { loadState, loadPending, saveState, stateDirectory, credentialHandle } from './state.mjs';
+import { readFile, writeFile, unlink, lstat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { loadState, loadPending, saveState, stateDirectory, removeStateDirectory, credentialHandle } from './state.mjs';
 import { createCredentialStore, readSecret } from './keychain.mjs';
 import { removeService, serviceStatus } from './service.mjs';
 import { removePermissions } from './permissions.mjs';
@@ -13,7 +13,7 @@ export async function paired() {
  const state = await loadState();
  if (!state?.origin || !state.businessId || !state.executorId) throw Error(`This computer is not paired. Run ${rerCommand()} business connect --code CODE.`);
  const credential = await createCredentialStore().get(credentialHandle(state.origin));
- if (!credential) throw Error('Business device credential is missing. Reconnect in your browser.');
+ if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then connect again with a new code from ${state.origin}/business.`);
  return { state, credential };
 }
 
@@ -78,9 +78,7 @@ export async function disconnect() {
   for (const handle of state.vendorHandles ?? []) await store.delete(handle);
   if (state.origin) await store.delete(credentialHandle(state.origin));
  }
- await rm(directory, { recursive: true, force: true });
- // Remove only an empty parent; other rer commands may own it.
- await rmdir(dirname(directory)).catch(error => { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; });
+ await removeStateDirectory();
  process.stdout.write(revocation === 'revoked'
   ? 'Business disconnected. Device revoked; local service, credentials and added permissions removed.\n'
   : `Business disconnected on this computer: local service, credentials and added permissions removed. Nothing was revoked: no device credential was stored here${page ? `. If this computer still shows in ${page}, revoke it there` : ''}.\n`);

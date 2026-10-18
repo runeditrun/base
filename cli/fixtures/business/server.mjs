@@ -45,21 +45,24 @@ export async function server(t) {
   if (body.pairing_token !== undefined) {
    closed(body, ['pairing_token']);
    requireValue(typeof body.pairing_token === 'string' && body.pairing_token.length <= 200);
-   requireValue(redeemed && !issued && body.pairing_token === 'fixture-pairing-poll' && Date.now() < pairingExpires, 401);
-   if (!state.approved) return [{ status: 'authorization_pending', interval: 5 }, 202];
+   requireValue(redeemed && !issued && body.pairing_token === 'fixture-pairing-poll' && Date.now() < pairingExpires, 401, 'Pairing expired or used');
+   if (!state.approved) return [{ status: 'authorization_pending', interval: state.pollSeconds ?? 5 }, 202];
    issued = true;
    return [{ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: 'biz', idle_expires_at: later(30 * 24 * 3600) }, 200];
   }
-  closed(body, ['code', 'os', 'agent_kind', 'capabilities']);
+  closed(body, ['code', 'device_name', 'working_folder', 'os', 'agent_kind', 'capabilities']);
   requireValue(typeof body.code === 'string' && body.code.length <= 100);
-  requireValue(body.code === 'ABCD-1234', 401);
+  // The platform's own limits: a short single-line name, and an absolute folder.
+  requireValue(body.device_name === undefined || typeof body.device_name === 'string' && body.device_name.trim() && body.device_name.length <= 200 && !/[\r\n\x00-\x1f]/.test(body.device_name));
+  requireValue(body.working_folder === undefined || typeof body.working_folder === 'string' && body.working_folder.length <= 1000 && !/[\x00-\x1f\x7f]/.test(body.working_folder) && (body.working_folder.startsWith('/') || body.working_folder.startsWith('~/')));
+  requireValue(body.code === 'ABCD-1234', 401, 'Pairing expired or used');
   requireValue(['macos', 'linux', 'wsl', 'windows', 'other'].includes(body.os) && ['codex', 'claude', 'other'].includes(body.agent_kind));
   requireValue(Array.isArray(body.capabilities) && body.capabilities.length <= 100 && body.capabilities.every(value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,100}$/.test(value)));
   // Each explicit pairing starts a fresh browser-created fixture pairing.
   // Like the platform, the code's own expiry applies until approval.
   redeemed = true; issued = false; state.approved = false; state.revoked = false; state.active = false;
   const seconds = state.pairingSeconds ?? 600; pairingExpires = Date.now() + seconds * 1000;
-  return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(seconds), interval: 5 }, 202];
+  return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(seconds), interval: state.pollSeconds ?? 5 }, 202];
  }
  function tool(token, name, args) {
   object(args);
@@ -128,12 +131,12 @@ export async function server(t) {
    state.requests.push({ route, body, authorization: request.headers.authorization, method: request.method });
    if (route === '/api/business/executors/self') {
     requireDevice(request);
-    // A platform without these routes answers a valid device credential 403.
+    // Like the platform, the first device-authenticated request activates the
+    // computer, including on a platform without these routes (it answers 403).
+    if (request.method === 'GET') await state.onSelf?.();
+    state.active = true;
     if (state.selfMissing) return send({}, 403);
-    if (request.method === 'GET') {
-     await state.onSelf?.(); state.active = true;
-     return send({ optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
-    }
+    if (request.method === 'GET') return send({ optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
     requireValue(request.method === 'DELETE', 405);
     if (state.revokeRefused) return send({}, 503);
     state.revoked = true; return send({ revoked: true });
@@ -146,7 +149,7 @@ export async function server(t) {
     state.approved = true; pairingExpires = Date.now() + 600_000; return send({ approved: true });
    }
    if (route === '/api/business/executors/pair') {
-    if (body.pairing_token && state.pairingRefused) return send({}, 401);
+    if (body.pairing_token && state.pairingRefused) return send({ error: 'Pairing expired or used', requestId: 'fixture-request' }, 401);
     return send(...pair(body));
    }
    if (route === '/api/business/executors/token') return send(mint(request, body));
@@ -159,7 +162,7 @@ export async function server(t) {
     return send(tasks.action(id, match[2], body));
    }
    return send({}, 404);
-  } catch (error) { send({ error: 'Fixture request refused' }, error.status ?? 500); }
+  } catch (error) { send({ error: error.reason ?? 'Fixture request refused' }, error.status ?? 500); }
  });
  await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
  origin = `http://127.0.0.1:${http.address().port}`;
