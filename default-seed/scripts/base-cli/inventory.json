@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.61-dev.g6bdfc35e",
+  "cliVersion": "0.2.61-dev.g55d89bc5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -499,7 +499,7 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "14da6697b94483407f264f35e1d4ecd8e0d09f06c1f9192f2fb10ce5fddb964d"
+      "sha256": "0c20997aa9a1023c9732179636d7cf90086bf42de22aa63b83715168b633ff2e"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",
@@ -523,7 +523,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "a94b2c4c6a50a80f86b20daa88dcdf86e005bdfc5cf02374fb87da326ee37ce7"
+      "sha256": "3b88d16e5092d6f213c354dc46a68cfe2d2b505cb1d85fa07581d68c5a388e9c"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

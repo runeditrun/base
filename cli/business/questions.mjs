@@ -3,6 +3,7 @@ import { Api, identifier } from './api.mjs';
 import { sensitive } from './detector.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
 import { applyChoices } from './choices.mjs';
+import { businessCommand } from './invocation.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
@@ -37,6 +38,18 @@ export async function nextQuestions(api, signal) {
 const ownerKinds = new Set(['signup.checkout','connect.cloudflare','connect.github','consent.grant','confirm.inventory','plan.review','wave.approve','switchoff.cancel','cutover.billing','rollback.billing']);
 export const ownerLink = state => `${state.origin}/business/${encodeURIComponent(identifier(state.businessId))}`;
 
+// What this computer is waiting for, in the owner's terms. Until its own
+// folder scan has finished, that is the owner's scan permission for the folder
+// connect ran in; afterwards it is the owner's next step in the browser.
+export function waitingFor(state) {
+ if (!state.discovered) {
+  const folder = state.workingFolder ?? process.cwd();
+  return `Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${ownerLink(state)}/tools`;
+ }
+ return `Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${ownerLink(state)}`;
+}
+const runWork = { 'discover.local': "this computer's names-only scan of the folders the owner allowed" };
+
 function classification(task) {
  const toolId = identifier(task.question?.tool_id), vendorId = task.question?.vendor_id;
  const schema = task.question?.answer_schema, vendors = schema?.properties?.vendor_id?.enum;
@@ -62,7 +75,12 @@ export async function next() {
   throw Error(`Business pairing expired or was revoked. This computer was ${revokedText(await revokedByServer(state))}`);
  }
  const item = tasks.find(task => task.kind === 'classify.row' || task.runner === 'owner' || ownerKinds.has(task.kind));
- if (!item) { process.stdout.write('Nothing yet.\n'); return; }
+ if (!item) {
+  // Nothing to answer here; say whether run has work, or what it waits for.
+  const work = tasks.find(task => Object.hasOwn(runWork, task.kind) && task.state === 'ready');
+  process.stdout.write(work ? `Ready for run: ${runWork[work.kind]}. Start it with: ${businessCommand('run')}\n` : `${waitingFor(state)}\n`);
+  process.stdout.write('Nothing yet.\n'); return;
+ }
  const id = identifier(item.task_id);
  if (sensitive(id)) throw Error('Business task identifier was refused by the outbound detector.');
  if (item.runner === 'owner' || ownerKinds.has(item.kind)) {

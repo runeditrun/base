@@ -3,7 +3,7 @@ import { access, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Api, taskPath, pause } from './api.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
-import { nextQuestions, ownerLink } from './questions.mjs';
+import { nextQuestions, ownerLink, waitingFor } from './questions.mjs';
 import { lockSupervisor, stateDirectory, saveState } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
@@ -14,17 +14,6 @@ import { businessCommand } from './invocation.mjs';
 const kinds = new Set(['discover.local', 'export.vendor']);
 const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-installation', 'installation-import-origin-unavailable', 'installation-owner-claim-unconfigured', 'connected-seed-import-required']);
 const checkIn = 25_000;
-
-// What this computer is waiting for, in the owner's terms. Until its own
-// folder scan has finished, that is the owner's scan permission for the folder
-// connect ran in; afterwards it is the owner's next step in the browser.
-function waitingFor(state) {
- if (!state.discovered) {
-  const folder = state.workingFolder ?? process.cwd();
-  return `Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${ownerLink(state)}/tools`;
- }
- return `Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${ownerLink(state)}`;
-}
 
 /** Work this computer's tasks. It says what it is doing and what it waits
  * for, applies the owner's choices at every check-in, and removes run.lock on

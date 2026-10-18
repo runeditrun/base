@@ -443,7 +443,7 @@ test('inside an agent sandbox run and next apply the owner\'s choices and say wh
  assert.equal(next.code, 0, next.stderr);
  assert.ok(next.stdout.includes("Applied the owner's choices for this computer:\n  - Keep this computer awake while it works: allowed") && next.stdout.includes('Install the background service: not allowed'), next.stdout);
  assert.match(next.stdout, /Not applied yet: Add rules so Claude Code never reads your secret files\. Business could not \w+ \S*\.claude\S*: .*\(E[A-Z]+\)\. The run and next commands try again at each check-in/);
- assert.ok(next.stdout.includes(`RER_BUSINESS_STATE_DIR=${stateDir} `) && next.stdout.endsWith('Nothing yet.\n'), next.stdout);
+ assert.ok(next.stdout.includes(`RER_BUSINESS_STATE_DIR=${stateDir} `) && next.stdout.endsWith(`Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${remote.origin}/business/biz/tools\nNothing yet.\n`), next.stdout);
  assert.equal(JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8')).awakeConsent, true);
  await rm(join(home, '.claude'));
  const appliedRun = await cli(home, ['business','run','--once'], { env });
@@ -473,6 +473,9 @@ test('inside an agent sandbox run and next apply the owner\'s choices and say wh
  remote.state.root = join(home, 'project'); await mkdir(remote.state.root);
  await writeFile(join(remote.state.root, 'package.json'), JSON.stringify({ dependencies: { algoliasearch: '5.0.0' } }));
  remote.state.tasks = [{ task_id: 'sandbox-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ // next has nothing to answer, and says run has work and how to start it.
+ const ready = await cli(home, ['business','next'], { env }), escaped = stateDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+ assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run\nNothing yet\\.\n$`));
  const scanned = await cli(home, ['business','run','--once'], { env });
  assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
  assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);
