@@ -16,11 +16,13 @@ import type { D1Database } from '../../src/d1/types.ts';
 export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant') {
   const runtime = await sqliteRuntime(t), db = runtime.db();
   await db.batch(importDoorSchema.map(q=>db.prepare(q)));
-  // Test-side counter of every statement the door executes, batch members included.
-  let statements = 0;
-  const requests: {action:string;status:number;statements:number}[] = [];
-  const counted = (s:any):any => ({query:s.query,values:s.values,bind:(...v:any[])=>counted(s.bind(...v)),first:()=>{statements++;return s.first();},all:()=>{statements++;return s.all();}});
-  const database: D1Database = {prepare:query=>counted(db.prepare(query)),batch:async members=>{statements+=members.length;return db.batch(members);}};
+  // Test-side counter of every statement the door executes, batch members included,
+  // and of the bytes their results carry back.
+  let statements = 0, bytes = 0;
+  const requests: {action:string;status:number;statements:number;bytes:number}[] = [];
+  const read = <T,>(result:T):T => { bytes += Buffer.byteLength(JSON.stringify(result) ?? ''); return result; };
+  const counted = (s:any):any => ({query:s.query,values:s.values,bind:(...v:any[])=>counted(s.bind(...v)),first:async()=>{statements++;return read(await s.first());},all:async()=>{statements++;return read(await s.all());}});
+  const database: D1Database = {prepare:query=>counted(db.prepare(query)),batch:async members=>{statements+=members.length;return read(await db.batch(members));}};
   const keys = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
   const publicKey = await crypto.subtle.exportKey('jwk',keys.publicKey);
   type Handler = (request: Request) => Promise<Response | null>;
@@ -28,10 +30,10 @@ export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant')
   const server = createServer(async (req,res)=>{
     const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const request = new Request(origin+(req.url ?? '/'),{method:req.method,headers:req.headers as Record<string,string>,...(req.method==='POST'?{body:Buffer.concat(chunks)}:{})});
-    statements = 0;
+    statements = 0; bytes = 0;
     let response: Response | null = null;
     for (const handler of handlers) if ((response = await handler(request))) break;
-    if (response) requests.push({action:new URL(request.url).pathname.split('/').pop()!,status:response.status,statements});
+    if (response) requests.push({action:new URL(request.url).pathname.split('/').pop()!,status:response.status,statements,bytes});
     response ??= new Response('Not found',{status:404});
     res.writeHead(response.status,Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
   });

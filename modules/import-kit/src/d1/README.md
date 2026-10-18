@@ -64,7 +64,16 @@ their existing atomic admission. `readD1PersistedImport` keeps one complete
 atomic native snapshot capped at 2 MiB even when its caller omits a limit. It
 reads each destination job's `ik_d1_custody_states` revision (the same additive
 schema) before any custody and fences those revisions instead of resending
-plans, so its read grows by one revision per job, not by a plan per catch-up. An oversized snapshot raises
+plans, so its read grows by one revision per job, not by a plan per catch-up.
+Under that fence it checks each owner job by its stored plan header and
+fingerprint and returns only the plan entries its live provenance references,
+parsed inside D1: from an inline plan, or from the run of whole entries a chunked
+plan's entry locator names (the `entries` member of its `d1Plan` 1 envelope,
+which every full plan load checks against the chunks). No SQL value grows past
+one run, so each owner job costs fixed statements and bytes however long a
+catch-up chain grows. A plan without a locator (compressed, staged, or stored
+before locators) and a preserved job with a reversal report still decode their
+whole plan. An oversized snapshot raises
 `ImportSizeLimitError` (its message is the size code) naming `targetKinds`.
 Reads change neither tables nor SQLite `total_changes()` and work with SQLite
 `PRAGMA query_only=ON`. Mutation batches retain inside-transaction CHECK assertions

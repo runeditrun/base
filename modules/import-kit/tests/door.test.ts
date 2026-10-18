@@ -635,15 +635,29 @@ test('HTTP catch-ups keep planning and reconciling however long the chain grows'
   let records=documents(50,true);
   const base=await d.plan(records);assert.equal(base.status,200,JSON.stringify(base.body));await d.apply(base.body);
   const bounded={catchup:'bounded' as const,approvalRecordId:'test-standing-approval',approvedAt:d.approval.approvedAt};
+  // A first catch-up revises every record, so each live row already holds its
+  // before image and the bytes measured below grow only with the chain.
+  records=records.map(r=>({...r,body:`${r.body} Revised.`}));
+  const revised=await d.plan(records,{catchup:true});assert.equal(revised.status,200,JSON.stringify(revised.body));
+  assert.equal(revised.body.summary.updated,50);await d.apply(revised.body);
   // Each catch-up owns two live records, so every job stays in the persisted read.
+  const cost:Record<'plan'|'reconcile',{statements:number;bytes:number}[]>={plan:[],reconcile:[]};
+  const last=(action:'plan'|'reconcile')=>{const {statements,bytes}=d.requests.findLast(r=>r.action===action)!;cost[action].push({statements,bytes});};
   for (let step=1;step<=10;step++) {
     const changed=[String(2*step-2),String(2*step-1)],grant=step>7?bounded:{};
     records=records.map(r=>changed.includes(r.id)?{...r,title:`${r.title}, revision ${step}`}:r);
-    const planned=await d.plan(records,{catchup:true},grant);assert.equal(planned.status,200,`step ${step}: ${JSON.stringify(planned.body)}`);
+    const planned=await d.plan(records,{catchup:true},grant);assert.equal(planned.status,200,`step ${step}: ${JSON.stringify(planned.body)}`);last('plan');
     assert.equal(planned.body.summary.updated,2);assert.equal(planned.body.summary.unchanged,48);
     await d.apply(planned.body,grant);
-    const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.status,200,`step ${step}: ${JSON.stringify(reconciled.body)}`);
+    const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.status,200,`step ${step}: ${JSON.stringify(reconciled.body)}`);last('reconcile');
     assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,50);assert.equal(reconciled.body.counts.nativeTargets,50);
+  }
+  // Per request, catch-up planning and reconcile cost the same statements at every
+  // step, and read only each job's fixed custody rows more: never another plan.
+  t.diagnostic(JSON.stringify(cost));
+  for (const [action,series] of Object.entries(cost)) {
+    assert.deepEqual(series.map(c=>c.statements),series.map(()=>series[0].statements),`${action} statements per catch-up`);
+    for (let step=1;step<series.length;step++) assert.ok(series[step].bytes-series[step-1].bytes<2048,`${action} reads ${series[step].bytes-series[step-1].bytes} more bytes at catch-up ${step+1}`);
   }
   const titles=d.runtime.native().prepare("SELECT id,json_extract(value_json,'$.title') AS title FROM native_records WHERE id IN ('0','19','20')").all();
   assert.deepEqual(Object.fromEntries(titles.map(r=>[r.id,r.title])),{'0':'Knowledge article 0, revision 1','19':'Knowledge article 19, revision 10','20':'Knowledge article 20'});
