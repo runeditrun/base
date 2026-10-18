@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.63-dev.gb70dbba0",
+  "cliVersion": "0.2.63-dev.geef5cd4c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2767,15 +2767,11 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "119f2e4fee2270eb6e95e8f94862dfefd1dc51ea1d7b9ee664e49a04ab6338de"
+      "sha256": "63a18fe36d57483f5e4415f2be31a0bb257c75d439ccb88cdf09e6a7ffb6e63d"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
-      "sha256": "b43c5f522946c13626a571255a3843047e0b541500ba3b03337cb4470f4959d3"
-    },
-    "modules/release/contract-judgment.mjs": {
-      "source": "modules/release/contract-judgment.mjs",
-      "sha256": "c908a24123b571961e7407104d1fa1da8449e1815afd21679ec2f489233d2480"
+      "sha256": "05165a21d6836289ac07b093e10b2b9ae7a9c39c5f0ae1c6226fec7b32d24a8f"
     },
     "modules/release/export.mjs": {
       "source": "modules/release/export.mjs",
@@ -2785,17 +2781,13 @@
       "source": "modules/release/github-verify.mjs",
       "sha256": "19e2cf4495b035ae86fb8cba9dc8d0949e070c331c3ecfc18e2a2b78ea96e935"
     },
-    "modules/release/historical-clauses.mjs": {
-      "source": "modules/release/historical-clauses.mjs",
-      "sha256": "05c35b2216071c67063baae52078a853e9f945c8c10352b5b64e1de2d68af1ae"
-    },
     "modules/release/keygen.mjs": {
       "source": "modules/release/keygen.mjs",
       "sha256": "f64597ba811a35994a74008a65641a29c5d742d23cb01843b628e224757ed43a"
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "828d8768b550987c23cff0257ffd45f157a394dd00215d16054fec469bf3952a"
+      "sha256": "1c68d5edff030f17556a023b9543fb349ab8e798b59a4199780c7b5be96c58dd"
     },
     "modules/release/public-base.mjs": {
       "source": "modules/release/public-base.mjs",
@@ -2855,7 +2847,7 @@
     },
     "modules/release/tag-adoption.mjs": {
       "source": "modules/release/tag-adoption.mjs",
-      "sha256": "b30783d7ba96df9057faf9c9bfb2d957f66a79f8defb9d39b2f8a67f45bd2353"
+      "sha256": "6db9cd2764cda62f63f50b9900c15b4201d5fe16acc7e4deb783620feba77de5"
     },
     "modules/release/test-summary.mjs": {
       "source": "modules/release/test-summary.mjs",

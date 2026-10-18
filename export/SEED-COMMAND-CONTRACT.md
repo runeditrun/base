@@ -78,15 +78,17 @@ The producer may adopt that remote annotated tag only when it directly targets
 the selected commit, its embedded name and requested tag both equal the committed
 version tag, and its annotation message bytes match the generated message.
 Lightweight or nested tags and differing commits, names or messages are refused;
-existing tags are never rewritten. The receipt retains the adopted tag object ID.
+existing tags are never rewritten. The producer captures one immutable object
+and direct source commit, checks the staged and imported identities before tag
+mutation and before reporting RELEASED, and refuses if any tag changed. The
+receipt retains the adopted tag object ID.
 This changes neither the exact-SHA GitHub Verify gate nor the other release gates.
 
-Contract validation may be inherited only for a stable patch from the latest lower
-stable tag on an ancestor commit in the same major/minor series, with coherent
-committed version metadata and identical `CONTRACT.md` blob bytes. Changed
-contracts, first releases, minor/major releases and prereleases use the full
-contract parser. The catalogue still reads the committed contract's published
-clauses.
+Every release, including an unchanged stable patch, validates the selected
+commit's `CONTRACT.md` with the current parser. Predecessor tags cannot authorize
+inheritance: existing release records contain no authenticated fresh contract
+PASS to inherit. Older contracts need a current-format refresh before release.
+The catalogue reads the validated contract's published clauses.
 
 `--no-queue` is available only on the heavy commands that list it and only
 when the original caller has `CI=true`. The actual descriptor is authoritative

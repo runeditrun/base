@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { release } from './produce.mjs';
 import { fixture } from './test-fixture.mjs';
+import { contractText } from './contract-fixture.mjs';
 
 // The fixture has an empty dependency graph. Forbid package-manager acquisition
 // and registry access, including in the producer's real frozen install.
@@ -46,7 +47,7 @@ async function refused(f) {
   assert.equal(existsSync(f.options.output), false);
 }
 
-test('unchanged legacy patch contract inherits judgment and publishes actual clauses', async t => {
+test('unchanged legacy patch contract refuses inheritance without a recorded published judgment', async t => {
   const f = prior(t);
   // Historical parser code is data only, including code from the chosen tag.
   git(f.repo, 'checkout', '--detach', f.previous.commit);
@@ -57,19 +58,12 @@ test('unchanged legacy patch contract inherits judgment and publishes actual cla
   version(f, '1.2.3'); f.commit(); f.previous.commit = historical;
   for (const cleanHistory of [false, true]) {
     const output = resolve(f.temporary, cleanHistory ? 'clean-release' : 'release');
-    const receipt = await release({ ...f.options, output, dryRun: true, cleanHistory });
-    assert.equal(receipt.status, 'DRY_RUN', JSON.stringify(receipt));
-    const manifest = JSON.parse(readFileSync(resolve(output, receipt.siteRelease.path)));
-    assert.deepEqual(manifest.provenance.contractJudgment, { status: 'PASS', mode: 'inherited', ...f.previous });
-    assert.deepEqual(manifest.listing.clauses, [
-      { id: 'TEST-001', title: 'Exact bytes', text: 'Export the verified committed bytes. Preserve continuation text.' },
-      { id: 'TEST-002', title: 'Paragraph', text: 'Keep paragraph text.' },
-      { id: 'TEST-003', title: 'Heading', text: 'Keep heading text.' },
-    ]);
+    await assert.rejects(release({ ...f.options, output, dryRun: true, cleanHistory }), /CONTRACT\.md/);
+    assert.equal(existsSync(output), false);
   }
 });
 
-test('unchanged patch uses highest available lower stable tag when patch numbers have gaps', async t => {
+test('unchanged patch cannot invent a judgment from lower stable tags with patch gaps', async t => {
   const f = prior(t, '1.2.9', '1.2.11');
   // There need not be a preceding integer patch or any modern Status schema.
   const text = legacy.slice(0, legacy.indexOf('## Future work'));
@@ -78,12 +72,21 @@ test('unchanged patch uses highest available lower stable tag when patch numbers
   const commit = f.commit(); git(f.repo, 'tag', '-f', '-a', 'v1.2.9', '-m', 'v1.2.9');
   git(f.repo, 'tag', 'v1.2.8');
   version(f, '1.2.11'); f.commit();
+  assert.equal(git(f.repo, 'rev-parse', 'v1.2.9^{commit}'), commit);
+  await refused(f);
+});
+
+test('a patch with a current valid contract still publishes its actual clauses', async t => {
+  const f = prior(t);
+  writeFileSync(resolve(f.repo, 'CONTRACT.md'), contractText());
+  f.commit();
   const receipt = await release({ ...f.options, dryRun: true });
   assert.equal(receipt.status, 'DRY_RUN', JSON.stringify(receipt));
   const manifest = JSON.parse(readFileSync(resolve(f.options.output, receipt.siteRelease.path)));
-  assert.equal(manifest.provenance.contractJudgment.tag, 'v1.2.9');
-  assert.equal(manifest.provenance.contractJudgment.commit, commit);
-  assert.deepEqual(manifest.listing.clauses.map(clause => clause.id), ['TEST-001', 'TEST-002', 'TEST-003']);
+  assert.equal(manifest.provenance.contractJudgment, undefined);
+  assert.deepEqual(manifest.listing.clauses, [
+    { id: 'TEST-001', title: 'Exact bytes', text: 'Export the verified committed bytes.' },
+  ]);
 });
 
 test('changed legacy patch contract requires current judgment', async t => {

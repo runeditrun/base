@@ -158,17 +158,19 @@ selected source commit, its embedded tag name and the requested tag both match
 `v<version>`, and its message bytes exactly match the generated annotation. A
 lightweight tag, nested tag, different commit, name or message is refused. The
 receipt records the adopted tag object ID; the producer preserves that object
-instead of recreating it. This does not relax GitHub Verify selection or any
+instead of recreating it. Before importing a tag and before reporting RELEASED,
+the producer requires the captured tag object and its direct source commit to
+remain identical, including the staged ref used during the build. A changed
+remote, local or staged tag refuses release. This does not relax GitHub Verify selection or any
 publication, installation, build or integrity gate. Parentless and public-child
 exports retain their separate source/export identities described below.
 
-A stable patch may inherit contract validation from the latest lower stable tag on
-an ancestor commit in the same major/minor series only when that tag's committed
-version metadata agrees and the `CONTRACT.md` blob bytes are identical. A changed
-contract, first release, minor or major release uses the full contract parser.
-Prereleases do not take this stable-patch path. The catalogue still derives its
-published clauses from the committed contract; inheritance does not waive the
-other release gates.
+Every release uses the current contract parser on the selected commit's
+`CONTRACT.md`, including stable patches with unchanged contract bytes. Existing
+release artifacts do not record an authenticated fresh contract PASS that could
+authorize inheritance. A local or published predecessor tag alone cannot supply
+that judgment. Older contracts must be refreshed to the current format before
+release; the catalogue derives its published clauses from that validated contract.
 
 `--dry-run` performs the selected verification path, local artifact steps and history scan and suppresses
 tag creation even with `--tag`. `--tag --dry-run` also prepares the source archive

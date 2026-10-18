@@ -9,7 +9,7 @@ import { publicationScan, sourcePublicationScan, validatePublicationDestination 
 import { publicDestination, requirePublicDestination, remotePublicHead, publicChild, assertPublicTree } from './public-child.mjs';
 import { writePublishHandoff } from './publish-handoff.mjs';
 import { releasePublicBase } from './public-base.mjs';
-import { prepareTagAdoption, confirmTagAdoption } from './tag-adoption.mjs';
+import { prepareTagAdoption, confirmTagAdoption, assertTagAdoption } from './tag-adoption.mjs';
 import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark.mjs';
 
 // Failure output belongs to the private receipt, not the site preview.
@@ -83,7 +83,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       publicExport: null, siteRelease: null };
     // A blocked preview may prepare the site metadata/docs for local review.
     // Its provenance explicitly records blocked gates; it is never a release.
-    const publicSource = exported ? { ...source, commit: exported.commit, contractSourceCommit: source.commit, publicTagStaged: Boolean(destination && tag) } : source;
+    const publicSource = exported ? { ...source, commit: exported.commit, publicTagStaged: Boolean(destination && tag) } : source;
     if (passed || preview) receipt.siteRelease = writeCatalogue(publicSource, output, catalogue(publicSource, project, repository, withoutOutput(gates), preview));
     if (passed) {
       if (tag) {
@@ -118,6 +118,12 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       }
     }
     if (passed && tag && destination) writePublishHandoff(output, destination, receipt);
+    if (passed && adopted) {
+      assertTagAdoption(source, adopted, { imported: true });
+      if (receipt.tag.object !== adopted.object || receipt.publicExport.tagObject !== adopted.object ||
+          receipt.publicExport.commit !== adopted.commit || receipt.source.commit !== adopted.commit)
+        throw Error('Adopted release tag identity does not match the release receipt');
+    }
     writeFileSync(resolve(output, 'release-receipt.json'), json(receipt), { flag: 'wx' });
     if (passed && destination) {
       requirePublicDestination(destination);
