@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.53
+
+- **Dropdowns share one themed chevron rule.** Base's operator app and installer draw a 12 px chevron 14 px from the right border with 40 px end padding. Exported seeds can copy `selectStyle` from `src/base/select-style.ts`; its gradient strokes follow the theme color and work under the seed's content security policy. Focus, disabled, right-to-left and forced-color states are included (#247).
+- **Queue wait timeouts explain the refusal.** Bounded build, deploy, install, setup, verify, export and import commands that reach the job queue's max wait say why they did not start and name the retry command, in terminal text and JSON, while keeping exit 75 (#253).
+
 ## 0.2.52
 
 - **Shared job queues use one slot limit.** Every client sharing a queue directory admits against the same limit, so an older shell requesting three slots no longer holds up a five-slot queue. A live `config.json` slot limit is authoritative; otherwise the largest live client request sets the limit. Clients requesting a different limit see the queue's effective limit and configuration path. FIFO ordering, load admission and available-memory admission stay in place (#244).
