@@ -110,6 +110,14 @@ test('real D1: a REPLACE between the persisted read\'s custody capture and its f
   type Scene=Awaited<ReturnType<typeof chain>>;
   // B is the only page of an open stream; the read uses B's custody, so its stream is part of it.
   const stream=async(s:Scene)=>{const db=s.r.db();await db.batch(["INSERT INTO ik_d1_streams(id,destination,namespace,mapping_version,principal_id,fingerprint,operation_key,total,layout_hash,state) VALUES('stream','workspace','archive','v1','owner','f','stream-op',1,'l','open')",`INSERT INTO ik_d1_stream_pages(stream_id,ordinal,job_id,total) VALUES('stream',0,'${s.B}',1)`].map((q:string)=>db.prepare(q)));};
+  // UPDATE OR REPLACE deletes the row its new key collides with the same way: a row of the queued
+  // job, which the read never fences, is inserted under its own key and then updated onto a fenced one.
+  const updateOnto=async(s:Scene,table:string,row:Record<string,unknown>,update:string,...params:unknown[])=>{
+    const db=s.r.db(),queued={...row,job_id:s.C};
+    await db.prepare(`INSERT INTO ${table}(${Object.keys(queued)}) VALUES(${Object.keys(queued).map(()=>'?')})`).bind(...Object.values(queued)).run();
+    return db.prepare(`UPDATE OR REPLACE ${table} SET ${update}`).bind(...params).run();
+  };
+  const liveClaim=async(s:Scene)=>s.r.db().prepare('SELECT * FROM ik_sources WHERE identity=?').bind((await firstRow(s.r.db(),'ik_provenance',s.A)).source_identity).first();
   const cases:Record<string,(s:Scene)=>Promise<unknown>>={
     'a live claim moved to the queued job':async s=>replace(s.r.db(),'ik_sources',{...await firstRow(s.r.db(),'ik_sources',s.A),job_id:s.C}),
     'a live provenance row moved to the queued job':async s=>replace(s.r.db(),'ik_provenance',{...await firstRow(s.r.db(),'ik_provenance',s.A),job_id:s.C}),
@@ -122,6 +130,16 @@ test('real D1: a REPLACE between the persisted read\'s custody capture and its f
       const db=s.r.db(),captured=await custodyRevision(db,s.A);
       await db.prepare("UPDATE ik_provenance SET record_json=json_set(record_json,'$.tampered',1) WHERE id=?").bind((await firstRow(db,'ik_provenance',s.A)).id).run();
       await db.prepare('INSERT OR REPLACE INTO ik_d1_custody_states(job_id,revision) VALUES(?,?)').bind(s.A,captured).run();
+    },
+    'a claim taken over by an update':async s=>{const claim=await firstRow(s.r.db(),'ik_sources',s.A);return updateOnto(s,'ik_sources',{...claim,identity:'queued-claim'},"identity=? WHERE identity='queued-claim'",claim.identity);},
+    'the live claim taken over by an update':async s=>{const claim=await liveClaim(s);return updateOnto(s,'ik_sources',{...claim,identity:'queued-claim'},"identity=? WHERE identity='queued-claim'",claim.identity);},
+    'a live provenance row taken over by an update':async s=>{const row=await firstRow(s.r.db(),'ik_provenance',s.A);return updateOnto(s,'ik_provenance',{...row,id:'queued-row',ordinal:900,target_id:'queued-target',reversed:1},"id=?,reversed=0 WHERE id='queued-row'",row.id);},
+    'a live provenance target taken over by an update':async s=>{const row=await firstRow(s.r.db(),'ik_provenance',s.A);return updateOnto(s,'ik_provenance',{...row,id:'queued-row',ordinal:900,reversed:1},"reversed=0 WHERE id='queued-row'");},
+    'a history row taken over by an update':async s=>{const row=await firstRow(s.r.db(),'ik_d1_history',s.A);return updateOnto(s,'ik_d1_history',{...row,id:'queued-history',ordinal:900,successor_id:'queued-successor'},"id=? WHERE id='queued-history'",row.id);},
+    'a history successor taken over by an update':async s=>{const row=await firstRow(s.r.db(),'ik_d1_history',s.A);return updateOnto(s,'ik_d1_history',{...row,id:'queued-history',ordinal:900,successor_id:'queued-successor'},"successor_id=? WHERE id='queued-history'",row.successor_id);},
+    'a stream page taken over by an update':async s=>{
+      await s.r.db().prepare("INSERT INTO ik_d1_streams(id,destination,namespace,mapping_version,principal_id,fingerprint,operation_key,total,layout_hash,state) VALUES('queued-stream','workspace','archive','v1','owner','f','queued-op',1,'l','open')").run();
+      return updateOnto(s,'ik_d1_stream_pages',{stream_id:'queued-stream',ordinal:0,total:1},"stream_id='stream' WHERE stream_id='queued-stream'");
     },
   };
   const r=await runtime(t),outcomes:Record<string,string>={};
