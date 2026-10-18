@@ -104,7 +104,7 @@ test('site build bundles declared client islands and their imports for the brows
  assert.equal(result.code, 0, result.stdout + result.stderr);
  const home = await readFile(join(f.root,'dist/site/index.html'),'utf8'), source = /src="([^"]+)"/.exec(home)?.[1];
  assert.ok(source?.startsWith('/site-assets/'), 'page receives the emitted client URL');
- const preview = await sitePreview(join(f.root,'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true});
+ const preview = await sitePreview(join(f.root,'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const page = await browser.newPage();
   await page.goto(preview.url);

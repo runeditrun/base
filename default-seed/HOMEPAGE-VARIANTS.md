@@ -274,8 +274,7 @@ Mango's `/subscribe` stay on their own paths; those seeds use the Lobby.
 
 ### Browser icons on Base pages
 
-The app Vite config includes `seedIcons()` from
-`scripts/base-onboarding/icon-files.mjs` (package mode: `@runeditrun/rer/seed-icons`);
+The app Vite config includes `seedIcons()` from `@runeditrun/rer/seed-icons`;
 `rer build --site` includes it itself.
 It reads public files at build time and freezes same-origin links into the
 Lobby, Run/Contract/site heads, setup and sign-in pages, and the local gate.

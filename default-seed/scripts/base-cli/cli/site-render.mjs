@@ -18,6 +18,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { buildClients, writeSiteAsset } from './site-client.mjs';
+import { htmlElements } from './site-markup.mjs';
 import { redactSiteOutput, siteBuildDiagnostic } from './site-diagnostics.mjs';
 import { ContractError, parseContract } from '../foundation/runtime/seed-contract.mjs';
 
@@ -86,7 +87,13 @@ try {
   await cp(source, join(output, asset), { recursive: true, errorOnExist: true, force: false, verbatimSymlinks: true });
  }
  const icons = await readIconFiles(publicDirectory);
+ // A custom site entry may not use Base's head. Export selected icons only
+ // when a generated page actually links them, like its other public assets.
+ const linkedIcons = new Set(build.pages.flatMap(({ html }) => htmlElements(html)
+  .filter(({ tag, attributes }) => tag === 'link' && (attributes.get('rel') ?? '').toLowerCase().split(/\s+/).some(rel => ['icon', 'apple-touch-icon'].includes(rel)))
+  .map(({ attributes }) => attributes.get('href')?.split(/[?#]/)[0])));
  for (const [path, { bytes }] of icons.files) {
+  if (!linkedIcons.has(path)) continue;
   const target = join(output, path.slice(1));
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, bytes);
