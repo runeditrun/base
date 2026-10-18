@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ownerDeploy } from './deploy.mjs';
 
-test('owner deploy dry run validates the kit artifact and declaration with zero fetch requests',async t=>{
+test('owner deploy dry run validates the kit artifact and declaration with only provider reads',async t=>{
  // Kit artifact data only; real application acceptance is in reference-journey.
  const root=await realpath(await mkdtemp(join(tmpdir(),'rer-deploy-kit-')));t.after(()=>rm(root,{recursive:true,force:true}));
  for(const path of ['dist/server','dist/client','migrations/core'])await mkdir(join(root,path),{recursive:true});
@@ -14,15 +14,18 @@ test('owner deploy dry run validates the kit artifact and declaration with zero 
  await writeFile(join(root,'migrations/core/0001_owner.sql'),'CREATE TABLE owner(id TEXT PRIMARY KEY);');
  const declaration={version:1,project:'tests/fixture',compatibilityDate:'2026-09-08',d1:[{binding:'DB'}]};
  await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
- let builds=0,requests=0;const store={report:()=>{}};
+ const {account}=await import('./fixtures/owner-deploy.mjs');
+ const {provider}=account(t);
+ let builds=0;const store={report:()=>{}};
  // The caller's local operation: the build runs nested under it.
  const {localOperation}=await import('../onboarding/local/operation.mjs');const lock=await localOperation(root);t.after(()=>lock.release());
- t.mock.method(globalThis,'fetch',()=>{requests++;throw Error('Provider request forbidden in dry run');});
  const deploy=ownerDeploy('deploy.json',{run:async(...args)=>{builds++;assert.equal(args.at(-1).verb,'build');assert.equal(args.at(-1).operationToken,lock.token);}});
  const args={root,options:{dryRun:true},store,signal:new AbortController().signal,operationToken:lock.token};
- assert.deepEqual(await deploy(args),{dryRun:true,deployed:false});assert.equal(builds,1);assert.equal(requests,0);
+ assert.deepEqual(await deploy(args),{dryRun:true,deployed:false});assert.equal(builds,1);assert.equal(provider.state.writes.length,0);
+ assert.ok(provider.state.calls.length>0);assert.ok(provider.state.calls.every(call=>call.method==='GET'));
+ const requests=provider.state.calls.length;
  await writeFile(join(root,'deploy.json'),JSON.stringify({...declaration,d1:[]}));
- await assert.rejects(deploy(args),/undeclared-migration-binding/);assert.equal(requests,0);
+ await assert.rejects(deploy(args),/undeclared-migration-binding/);assert.equal(provider.state.calls.length,requests);
 });
 
 test('owner deploy reports the failed provider step and completed creates without exposing credentials',async t=>{

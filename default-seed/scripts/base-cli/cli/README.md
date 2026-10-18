@@ -79,6 +79,17 @@ destination refuses rows erased since. Erasure-fence refusals (`erased_row`,
 available only when the adapter declares complete resource coverage; an
 unsupported target exits 4.
 
+Import defaults to `--target local`. An explicit `--origin` is accepted for a
+local import only when it uses HTTP, its host is exactly `localhost`,
+`127.0.0.1` or `[::1]`, and its port matches this checkout's configured local
+dev port. Use the checkout's saved port, not an assumed 8787; without a saved
+origin the local default is 8787. Every HTTPS origin, other host (including a
+front-door `NAME.localhost`) or different port requires `--target remote`.
+Otherwise import refuses before archive access or preparation hooks run.
+Omitting `--origin`, or supplying a matching local origin, keeps the existing
+local restore behavior. Explicit remote selection still requires an adapter
+that supports complete remote import; it does not enable that capability.
+
 Local D1 transfer includes SQLite VIRTUAL and STORED generated columns. Archives
 retain their schema and carry only writable base cells; native expressions and
 indexes in the migrated destination recompute on restore. The public runner's

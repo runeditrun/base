@@ -5,7 +5,7 @@ import { inspectSource, newOutput, git } from './source.mjs';
 import { verifySource } from './source-verification.mjs';
 import { catalogue, writeCatalogue, sha256, json } from './catalogue.mjs';
 import { publicExport, cleanHistory, annotate, releaseMessage } from './export.mjs';
-import { publicationScan, validatePublicationDestination } from './publication-scan.mjs';
+import { publicationScan, sourcePublicationScan, validatePublicationDestination } from './publication-scan.mjs';
 import { publicDestination, requirePublicDestination, remotePublicHead, publicChild, assertPublicTree } from './public-child.mjs';
 import { writePublishHandoff } from './publish-handoff.mjs';
 import { releasePublicBase } from './public-base.mjs';
@@ -53,28 +53,9 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
     // when available, retaining the selected source commit and tag identity.
     const exported = destination ? publicChild(source, temporary, destination, publicParent, Boolean(tag))
       : clean ? cleanHistory(source, temporary, Boolean(tag)) : null;
-    const scanRepo = exported?.repo ?? source.repo;
-    const scanRef = exported?.commit ?? source.commit;
-    let report = publicationScan(scanRepo, scanRef, envFile, project, repository, scanBase);
-    if (!exported && tag && report.status === 'PASS') {
-      // Stage the exact final annotation before any source tag or distributable
-      // artifact exists, in a fresh clone of the selected commit: verification
-      // left build output in its checkout, which is not release source. Source
-      // history was scanned above, including refs a checkout clone leaves out.
-      const candidate = resolve(temporary, 'annotation');
-      git(source.repo, 'clone', '--no-hardlinks', '--no-checkout', '--', source.repo, candidate);
-      git(candidate, 'checkout', '--detach', source.commit);
-      const staged = git(candidate, 'tag', '--list', source.tag).toString().trim();
-      annotate(candidate, source, source.commit, staged ? `${source.tag}-publication-candidate` : source.tag);
-      const annotations = publicationScan(candidate, source.commit, envFile, project, repository, scanBase);
-      report.annotationInspection = annotations;
-      if (annotations.status !== 'PASS') {
-        report.status = annotations.status;
-        report.complete = annotations.complete;
-        report.guarantees.historyScanned = annotations.complete;
-        report.findings.push(...annotations.findings);
-      }
-    }
+    let report = exported
+      ? publicationScan(exported.repo, exported.commit, envFile, project, repository, scanBase)
+      : sourcePublicationScan(source, temporary, envFile, project, repository, scanBase, Boolean(tag));
     if (destination) {
       assertPublicTree(exported.repo, exported.commit, source.tree);
       if (report.status === 'PASS' && (report.complete !== true || report.guarantees?.historyScanned !== true ||

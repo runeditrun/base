@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { contained } from './project.mjs';
 import { invalid, refuse, RerError } from './errors.mjs';
 import { ownerDeploy } from './deploy.mjs';
+import { secretFailureMessage } from './deploy-secret-error.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
 import { deployOwnerInput } from './deploy-owner-input.mjs';
@@ -78,11 +79,11 @@ export async function deployCommand(context) {
  if (local) throw refuse(`${path} names the local-only key ${local} as a deploy binding or secret. Remove it; local dev keys never reach a deployment.`);
  deployGuide(declaration);
  const settings = adapter.hooks?.secrets ?? adapter.settings;
- // What a dry run went ahead without, listed when it completes.
+ // Required secrets have been checked; retain the production sign-in guidance.
  const dryRun = async result => {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
   const { signIn } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
-  const needed = neededForRealDeploy({ declaration, env: production.env, signIn });
+  const needed = neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: true });
   reportNeeded(store, needed);
   return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
  };
@@ -134,7 +135,10 @@ export async function deployCommand(context) {
    }
    hookReturned = true;
    await refuseLocalEnvOutput(root, adapter.devIdentity?.output, { uploaded: !options.dryRun });
-   if (options.dryRun) return dryRun(deployed);
+   if (options.dryRun) {
+    await command('dry-run');
+    return dryRun(deployed);
+   }
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
    const origin = hookOrigin(deployed, deployAgain(options));
@@ -163,6 +167,9 @@ export async function deployCommand(context) {
  } catch (error) {
   const again = deployAgain(options);
   const { commandFailure } = await shared('failures.mjs');
+  const secrets = secretFailureMessage(error);
+  if (secrets) throw commandFailure(secrets);
+  if (options.dryRun && error.message === 'missing-input') throw new RerError('missing_input', `Dry run cannot read the target secret bindings without ${error.inputs.join(' and ')}. Set the Cloudflare credentials in the environment or an owned 0600 --env-file, then run the same command again.`, 3);
   if (error.hookFailure) throw commandFailure(store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message));
   if (error instanceof RerError && !deployed?.deployed && !recorded) { error.message = store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message); throw error; }
   const outcome = error.owner ?? claimed ?? observedClaims.at(-1)?.outcome;

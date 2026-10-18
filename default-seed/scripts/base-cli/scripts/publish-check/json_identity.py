@@ -14,6 +14,16 @@ class Document:
         self.data = data
         text = data.decode('utf-8')
         self.spans = {}
+        char_at = byte_at = 0
+
+        def byte_offset(at):
+            nonlocal char_at, byte_at
+            # Parsing visits string spans in source order. Encode each intervening
+            # segment once, including UTF-8 in keys and non-identity values.
+            byte_at += len(text[char_at:at].encode('utf-8'))
+            char_at = at
+            return byte_at
+
         def invalid_constant(_):
             raise ValueError('Non-JSON constant')
 
@@ -57,7 +67,7 @@ class Document:
                     at = whitespace(at + 1)
             value, end = decoder.raw_decode(text, at)
             if isinstance(value, str) and (HEX.fullmatch(value) or GIT_REVISION.fullmatch(value)):
-                self.spans[pointer] = (len(text[:at].encode('utf-8')), len(text[:end].encode('utf-8')), value)
+                self.spans[pointer] = (byte_offset(at), byte_offset(end), value)
             return value, end
 
         self.value, end = parse(0, ())

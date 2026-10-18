@@ -52,5 +52,7 @@ test('ordinary producer retains source scan and records inspection of its staged
   assert.equal(report.source.commit, f.sha);
   assert.equal(report.annotationInspection.status, 'PASS');
   assert.equal(report.annotationInspection.history.tagMessages, 1);
+  assert.equal(report.invocation.scans, 1);
+  assert.equal(report.invocation.stagedAnnotation, true);
   assert.equal(git(f.repo, 'for-each-ref', '--format=%(contents)', 'refs/tags/v1.2.3'), 'v1.2.3');
 });

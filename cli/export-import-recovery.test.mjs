@@ -1,11 +1,63 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, copyFile, link, readFile, stat, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, link, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { parseJsonc } from './jsonc.mjs';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
 import {createServer} from 'node:net';
 import {localOperation} from '../onboarding/local/operation.mjs';
+import { createHash } from 'node:crypto';
+
+test('import requires an explicit remote target for a non-local origin and leaves the checkout untouched', { timeout: 10 * 60_000 }, async t => {
+ const seed = await portabilityFixture(t);
+ await seed.run(['export', '--output', 'exports/empty.rer']);
+ await seed.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('backup',3,125,'Saved invoice')");
+ await seed.run(['export', '--output', 'exports/saved.rer']);
+ await seed.run(['reset', '--yes']);
+ await seed.run(['export', '--output', 'exports/destination.rer']);
+ // A configured port, rather than the default, determines which loopback origins are local.
+ await writeFile(join(seed.root, '.dev.vars'), 'AUTH_ORIGIN=http://127.0.0.1:18987\n', { mode: 0o600 });
+ const snapshot = async () => {
+  const hashes = {};
+  for (const name of (await readdir(seed.root, { recursive: true })).sort()) {
+   if (!['.wrangler/', '.seed/', '.rer/', '.dev.vars'].some(prefix => name.startsWith(prefix))) continue;
+   const path = join(seed.root, name);
+   if ((await stat(path)).isFile()) hashes[name] = createHash('sha256').update(await readFile(path)).digest('hex');
+  }
+  return hashes;
+ };
+ const before = await snapshot();
+ for (const origin of ['https://example.invalid', 'http://example.invalid:18987', 'https://localhost:18987', 'http://127.0.0.1:8787', 'http://localhost:18988', 'http://[::1]:18988', 'http://other.localhost:18987']) {
+  for (const target of [[], ['--target', 'local']]) {
+   const args = ['import', '--origin', origin, ...target, '--input', 'exports/saved.rer', '--yes'];
+   const plain = await seed.text(args, 4);
+   assert.equal(plain.stdout, '');
+   assert.equal(plain.stderr.trimEnd().split('\n').length, 1);
+   assert.ok(plain.stderr.includes(new URL(origin).origin));
+   assert.match(plain.stderr, /--target remote/);
+   const events = await seed.run(args, 4);
+   assert.deepEqual(events.map(row => row.event), ['error', 'result']);
+   assert.equal(events[0].message, plain.stderr.trimEnd());
+   assert.equal(events[1].ok, false);
+   assert.deepEqual(await snapshot(), before, 'refusal must not touch local data, settings or lifecycle state');
+  }
+ }
+ // Even missing archive/session/journal files are not inspected before the origin refusal.
+ const missing = await seed.run(['import', '--origin', 'https://example.invalid', '--input', 'missing.rer', '--session-file', 'missing.session', '--journal', 'missing-journal.rer', '--yes'], 4);
+ assert.match(missing[0].message, /--target remote/);
+ assert.deepEqual(await snapshot(), before);
+ assert.equal((await seed.data('SELECT COUNT(*) AS count FROM computed_entries'))[0].results[0].count, 0);
+ // An explicitly remote request still reaches the existing adapter capability refusal.
+ const remote = await seed.run(['import', '--origin', 'https://example.invalid', '--target', 'remote', '--input', 'exports/saved.rer', '--yes'], 4);
+ assert.match(remote.find(row => row.event === 'error').message, /Complete remote import is unsupported/);
+ // All direct loopback spellings at the configured port, and an omitted origin, still restore.
+ for (const origin of ['http://127.0.0.1:18987', 'http://localhost:18987', 'http://[::1]:18987', undefined]) {
+  await seed.run(['reset', '--yes']);
+  await writeFile(join(seed.root, '.dev.vars'), 'AUTH_ORIGIN=http://127.0.0.1:18987\n', { mode: 0o600 });
+  await seed.run(['import', ...(origin ? ['--origin', origin] : []), '--input', 'exports/saved.rer', '--yes']);
+  assert.deepEqual((await seed.data('SELECT id, label FROM computed_entries'))[0].results, [{ id: 'backup', label: 'Saved invoice' }]);
+ }
+});
 
 // The documented recovery path: export, reset, import the very file that export
 // produced, and export again. The same file must always be accepted in place.

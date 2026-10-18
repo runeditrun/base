@@ -159,12 +159,12 @@ The public runner also exposes these operations:
 | Reset local state | `rer reset --yes --non-interactive` |
 | Export an archive | `rer export --output exports/installation.rer` |
 | Import into an empty destination | `rer import --input exports/installation.rer --yes --non-interactive` |
-| Validate a deploy without provider requests | `rer deploy --dry-run` |
+| Validate a deploy and target secrets | `rer deploy --dry-run` |
 | Inspect supported commands and effects | `rer describe` |
 
 Review the inventory before `rer reset --yes`. Export an
 archive before a reset if domain data should be restored; import requires an
-empty destination. A dry-run deploy makes no provider request. See
+empty destination. An application dry run reads target secret bindings with Cloudflare credentials and makes no provider writes. See
 [run it on your computer](export/RUN-LOCALLY.md) for transfer and recovery
 steps, bounded local ports, queued-work progress and the runnable queue-status
 command. Bounded waits immediately explain the reason and numeric one-based
