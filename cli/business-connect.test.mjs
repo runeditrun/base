@@ -499,9 +499,11 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  remote.state.onHeartbeat = () => { if (remote.state.checkpoint.page === 1) { remote.state.onHeartbeat = null; process.kill(-group.pid, 'SIGINT'); } };
  remote.state.onRelease = () => { remote.state.onRelease = null; process.kill(-group.pid, 'SIGINT'); };
  const npm = { 'npm_config_@runeditrun:registry': `${registry.url}/`, npm_config_cache: join(directory, 'npm-cache'), npm_config_update_notifier: 'false' };
+ // npx's own exit status is npm's, and on Linux npm can exit by the signal
+ // while run is still handing its lease back, so the test reads run's own
+ // output, which is complete once every process holding it has exited.
  const interrupted = await cli(home, ['business','run'], { npx: true, env: { ...env, ...npm }, onSpawn: child => { group = child; } });
- assert.equal(interrupted.code, 0, `npx and run exit 0 after Ctrl-C:\n${interrupted.stdout}\n${interrupted.stderr}`);
- assert.ok(interrupted.stdout.includes(`Business supervisor stopped (SIGINT); run.lock removed. Run RER_BUSINESS_STATE_DIR=${stateDir} npx -y @runeditrun/rer business run again`), interrupted.stdout);
+ assert.ok(interrupted.stdout.includes('Scanning this computer\'s allowed folders') && interrupted.stdout.endsWith(`Business supervisor stopped (SIGINT); run.lock removed. Run RER_BUSINESS_STATE_DIR=${stateDir} npx -y @runeditrun/rer business run again to continue from the saved checkpoint.\n`), `${interrupted.stdout}\n${interrupted.stderr}`);
  assert.equal(remote.state.released?.reason, 'handover', 'the lease is handed back');
  assert.equal(remote.state.phase, 'ready');
  await assert.rejects(stat(lock), { code: 'ENOENT' });
