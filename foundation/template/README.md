@@ -135,7 +135,7 @@ equivalence across its supported resources. Preserve applied migration history
 and require forward migrations for schema changes. Remote transfer is supported
 only when the adapter covers all required resources.
 
-`deploy --dry-run` builds and validates locally without provider requests. Real
+`deploy --dry-run` builds and validates locally, then reads target secret bindings without provider writes. Real
 deployment uses the owner-account procedure and requires its private account
 credentials, declared migrations and a real verified mail configuration. Local
 verification does not establish hosted acceptance, remote health or mail

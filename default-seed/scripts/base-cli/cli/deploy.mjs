@@ -5,8 +5,8 @@ import { shared } from './shared.mjs';
 import { settingKinds } from './deploy-settings.mjs';
 import { contained } from './project.mjs';
 import { missing, invalid, refuse, RerError } from './errors.mjs';
-import { ownerPlan, ownerWorkerName, localOnlyBinding } from '../modules/deploy-kit/owner.mjs';
-import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
+import { localOnlyBinding } from '../modules/deploy-kit/owner.mjs';
+import { secretFailureMessage } from './deploy-secret-error.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
@@ -38,31 +38,20 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const recordedState = change.length ? await deploymentRecord(root, options) : undefined;
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
-  let production, ownerInput;
+  let production, ownerInput, signIn;
   if (!change.length) {
    production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
-   await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options });
+   ({signIn} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options }) ?? {});
    if (!options.dryRun) committedSource(root, options);
    ownerInput = await deployOwnerInput({ root, adapter, setupSeed, options, signal });
    await withoutLocalSettings(root, { settings: lifecycle.settings, operationToken }, () => lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken }));
    await checkBuild();
    await refuseLocalEnvOutput(root);
   }
-  if (options.dryRun) {
-   // Locally validate the real declaration/artifact without ownerTarget's
-   // account lookup. This synthetic target is validation data, not a provider.
-   const worker = ownerWorkerName(declaration.project, environment);
-   const artifact = await packageBuild({ root, source: { sha: '0'.repeat(40), tree: '0'.repeat(40) }, runIdentity: { id: '0', attempt: '1' }, productDirectory: '' });
-   ownerPlan({ project: declaration.project, environment, worker, origin: `https://${worker}.example.invalid` }, declaration, artifact, { localOnlyKeys, env: production.env });
-   const optional = (Array.isArray(declaration.secrets) ? declaration.secrets : []).filter(item => item?.optional && !production.env[item.environment]?.trim()).map(item => item.binding);
-   if (optional.length) store.report(`deploy: optional secrets not supplied: ${optional.join(', ')}. A Worker that does not hold one deploys without it.`);
-   store.report('deploy: dry run complete; no deployment occurred and no provider request was made.');
-   return { dryRun: true, deployed: false };
-  }
   const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
   if (options.setSecret || options.unsetSecret) secretChangeInputs(declaration, options, env, again);
   const kept = keptSecrets(declaration, setupManifest);
-  if (cloudflareCredentials.some(name => !env[name]?.trim())) throw missing(missingCredentialsMessage(declaration, env));
+  if (cloudflareCredentials.some(name => !env[name]?.trim())) throw missing(missingCredentialsMessage(declaration, env, {dryRun:options.dryRun,signIn}));
   const { main } = await import('../modules/deploy-kit/owner-cli.mjs');
   const { createRedaction } = await shared('redaction.mjs');
   const redaction = createRedaction();
@@ -74,6 +63,12 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const created = [];
   let step = 'deploy', deployed;
   try {
+   if (options.dryRun) {
+    const {optionalUnset} = await owner('dry-run');
+    if (optionalUnset.length) store.report(`deploy: optional secrets not supplied: ${optionalUnset.join(', ')}. A Worker that does not hold one deploys without it.`);
+    store.report('deploy: dry run complete; target secret bindings checked; no deployment occurred.');
+    return { dryRun: true, deployed: false };
+   }
    // A custom hook's own state file, when its deploy named one.
    const state = change.length ? recordedState : await hookState(root, environment);
    if (options.remove) {
@@ -164,8 +159,8 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  const diagnostic = deployDiagnostic(error, redact);
  const code = diagnostic?.code ?? (/^[a-zA-Z0-9_-]{1,120}$/.test(error.message) ? redact(error.message) : 'deploy-failed');
  const at = step === 'deploy' ? diagnostic?.step ?? 'prepare deploy' : step;
- const input = /^missing-secret-([A-Z][A-Z0-9_]*)$/.exec(code)?.[1];
- if (input) return `Deploy needs ${input}, which the deploy declaration lists as a secret and the Worker does not hold it. Set ${input} in the environment or in an --env-file file (an owned 0600 file of KEY=VALUE lines), then run the same command again. Nothing was uploaded.${created.length ? ` Resources created this attempt: ${created.join(', ')}.` : ''}`;
+ const secrets = secretFailureMessage(error);
+ if (secrets) return secrets;
  if (code === 'nothing-to-remove') return `The deployment record selected by ${again} has no resources that rer owns, so --remove deletes nothing.`;
  if (code === 'owner-token-retirement-failed') return `The application is deployed at ${deployed?.origin}; owner ${error.owner}; setup token retirement failed (${redact(String(error.cause))}${providerFailure(error,redact) ? `; ${providerFailure(error,redact)}` : ''}). Run ${again} --unset-secret ${error.tokenKey ?? 'SETUP_TOKEN'} using the same environment credentials, or run ${again} again to finish.`;
  if (code === 'owner-claim-failed') return `The application is deployed at ${deployed?.origin}, but claiming its owner failed: ${redact(String(error.cause))}. Owner claim and setup token retirement are not confirmed; run ${again} again using the same environment credentials to finish.`;
