@@ -25,13 +25,17 @@ async function readInput(request: Request): Promise<Record<string,unknown>> {
   if (!value || typeof value!=='object' || Array.isArray(value)) throw new DoorError('invalid_input',400);
   return value;
 }
+/** Refuses a mount, or a resolved source, missing what the pipeline needs. */
+export function runtimeOptions<T extends Partial<ImportDoorRuntimeOptions>>(options: T): T & ImportDoorRuntimeOptions {
+  if (!options.ownerPrincipalId?.trim() || !options.destination?.trim() || !options.mapping?.version || typeof options.parse!=='function') throw new DoorError('invalid_configuration',503);
+  return options as T & ImportDoorRuntimeOptions;
+}
 /** Server-side mount only. A null response belongs to another dispatcher. */
-export function createDoorHandler(options: ImportDoorRuntimeOptions, prefix: string,
+export function createDoorHandler(prefix: string,
   admit: (request: Request, action: DoorAction) => Promise<DoorRequest | null>,
   review: (request: DoorRequest, input: Record<string, unknown>) => Promise<DoorRequest> = async request => request,
   available: () => Promise<boolean> = async () => true,
 ): (request: Request)=>Promise<Response|null> {
-  if (!options.ownerPrincipalId?.trim() || !options.destination?.trim() || !options.mapping?.version || typeof options.parse!=='function') throw new DoorError('invalid_configuration',503);
   return async request => {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/rer/import/') && prefix !== '/api/rer/import/') return Response.json({error:'not_found'},{status:404,headers});

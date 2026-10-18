@@ -1,6 +1,6 @@
 import type { DoorRequest, ImportOperatorOptions } from './types.ts';
 import { DoorError } from './protocol.ts';
-import { createDoorHandler } from './handler.ts';
+import { createDoorHandler, runtimeOptions } from './handler.ts';
 import { authorized } from './store.ts';
 export { importDoorSchema } from './schema.ts';
 export { writeImportDoorSettings, readImportDoorHistory } from './authority.ts';
@@ -10,7 +10,8 @@ export type { ImportOperatorOptions } from './types.ts';
 export function createImportOperatorHandler(options: ImportOperatorOptions) {
   if (!options.installationId?.trim() || !options.ownerEmail?.trim() || !options.namespace?.trim()
     || new URL(options.appOrigin).origin !== options.appOrigin || typeof options.authorize !== 'function') throw new DoorError('invalid_configuration',503);
-  return createDoorHandler(options, '/api/operator/import/', async (request,action) => {
+  runtimeOptions(options);
+  return createDoorHandler('/api/operator/import/', async (request,action) => {
     if (new URL(request.url).origin !== options.appOrigin || request.headers.get('Origin') !== options.appOrigin) throw new DoorError('origin_required');
     const authority = await options.authorize(request,action);
     if (!authority) throw new DoorError('owner_required',401);

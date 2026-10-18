@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
-import { readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
+import { createImportDoorHandler, readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
 import { readD1ImportOriginals, undoD1Import } from '../src/d1/index.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
 import type { Json } from '../src/types.ts';
@@ -193,17 +193,26 @@ test('Business added later under a different RER claim id keeps the door key, ow
 
 test('one owner-session mount serves several import sources chosen per request from a server-side allow-list',async t=>{
   const d=await door(t,'operator'),count=(table:string)=>d.runtime.native().prepare(`SELECT COUNT(*) n FROM ${table}`).get()!.n;
-  // ADOPTING.md step 3: one handler per request, namespace and parser from the allow-list entry.
+  // ADOPTING.md steps 3 and 4: one server-owned allow-list picks namespace, parser and mapping for both mounts.
   const sources:Record<string,{parse(value:Json):{kind:string;sourceId:string;payload:Json}}>={
     wiki:{parse:value=>({kind:'document',sourceId:(value as {id:string}).id,payload:value})},
     tickets:{parse:value=>({kind:'ticket',sourceId:'t'+(value as {id:string}).id,payload:value})},
   };
-  d.mount(async request=>{
-    if (!new URL(request.url).pathname.startsWith('/api/operator/import/')) return null;
-    const source=request.headers.get('X-Import-Source') ?? '';
-    if (!Object.hasOwn(sources,source)) return Response.json({error:'unknown_import_source'},{status:400});
-    return d.operator({namespace:source,parse:sources[source].parse})(request);
-  });
+  const importSource=(name:string)=>Object.hasOwn(sources,name)?{...sources[name],mapping:d.options.mapping}:null;
+  const importDoor=async (request:Request)=>{
+    const path=new URL(request.url).pathname;
+    if (path.startsWith('/api/rer/import/')) return Response.json({error:'not_found'},{status:404});
+    if (!path.startsWith('/api/operator/import/')) return null;
+    const name=request.headers.get('X-Import-Source') ?? '',source=importSource(name);
+    if (!source) return Response.json({error:'unknown_import_source'},{status:400});
+    return d.operator({...source,namespace:name})(request);
+  };
+  d.mount(importDoor);
+  // Until a grant mount with a key ring runs first, the door's grant routes answer 404, not the seed router.
+  for (const action of ['uploads','plan','apply','status','reconcile','undo']) {
+    const response=await fetch(d.origin+'/api/rer/import/'+action,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await d.token(action as 'plan',{namespace:'wiki'})},body:'{}'});
+    assert.equal(response.status,404);assert.deepEqual(await response.json(),{error:'not_found'});
+  }
   for (const headers of [{},{'X-Import-Source':'other'},{'X-Import-Source':'__proto__'}] as Record<string,string>[]) {
     d.state.headers=headers;
     assert.equal((await d.call('uploads',{name:'x.json'})).status,400);assert.equal((await d.call('plan',{uploadId:'x'})).body.error,'unknown_import_source');
@@ -223,6 +232,40 @@ test('one owner-session mount serves several import sources chosen per request f
   assert.deepEqual(d.runtime.native().prepare('SELECT namespace FROM ik_door_namespaces ORDER BY namespace').all().map(r=>r.namespace),['tickets','wiki']);
   const history=await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate);
   assert.deepEqual(history.map(h=>h.namespace).sort(),['tickets','wiki']);
-  await d.undo(wiki.body.planId);assert.equal(count('native_records'),3);
-  d.state.headers={'X-Import-Source':'tickets'};await d.undo(tickets.body.planId);assert.equal(count('native_records'),0);
+  // Business arrives: the grant mount runs first and resolves each verified grant's namespace through the same allow-list.
+  const {parse:_parse,mapping:_mapping,...mount}=d.options;
+  d.mount(createImportDoorHandler({...mount,installationId:d.options.claim.installationId,source:importSource}),importDoor);
+  await d.enable();d.state.via='grant';d.state.headers={};
+  const rows=()=>['ik_door_grants','ik_door_uploads','ik_door_chunks','ik_door_plans','ik_door_namespaces','ik_jobs','native_records'].map(count);
+  const before=rows();
+  for (const namespace of ['other','knowledge','__proto__','toString','Tickets']) {
+    const refused=await d.call('uploads',{name:'x.json'},{namespace});
+    assert.equal(refused.status,403,namespace);assert.equal(refused.body.error,'unknown_import_source');
+    assert.equal((await d.call('plan',{uploadId:ticketUpload},{namespace})).body.error,'unknown_import_source');
+    assert.equal((await d.call('status',{planId:tickets.body.planId},{namespace})).status,403);
+  }
+  assert.deepEqual(rows(),before,'an unlisted namespace writes no grant, upload, plan, lineage, job or native row');
+  // A tickets grant is parsed with the tickets parser: it catches up on the owner's tickets lineage.
+  const ticketsGrant=await d.upload(documents(4),{namespace:'tickets'});
+  assert.equal((await d.call('plan',{uploadId:ticketsGrant},{namespace:'tickets'})).body.error,'catchup_required');
+  const businessTickets=await d.call('plan',{uploadId:ticketsGrant,catchup:true},{namespace:'tickets'});
+  assert.equal(businessTickets.status,200,JSON.stringify(businessTickets.body));
+  assert.deepEqual(businessTickets.body.summary,{sourceRecords:4,created:1,updated:0,unchanged:3,gone:0});
+  assert.deepEqual(businessTickets.body.differences.additions,[canonicalJson(['ticket','t3'])]);
+  await d.apply(businessTickets.body,{namespace:'tickets'});
+  const wikiGrant=await d.upload(documents(6),{namespace:'wiki'});
+  const businessWiki=await d.call('plan',{uploadId:wikiGrant,catchup:true},{namespace:'wiki'});
+  assert.deepEqual(businessWiki.body.summary,{sourceRecords:6,created:1,updated:0,unchanged:5,gone:0});
+  await d.apply(businessWiki.body,{namespace:'wiki'});
+  assert.deepEqual(d.runtime.native().prepare("SELECT id FROM native_records ORDER BY id").all().map(r=>r.id),['0','1','2','3','4','5','t0','t1','t2','t3']);
+  assert.deepEqual(d.runtime.native().prepare('SELECT DISTINCT namespace FROM ik_door_grants ORDER BY namespace').all().map(r=>r.namespace),['tickets','wiki']);
+  // Each owner mount adopts only the plan its own source parsed.
+  d.state.via='operator';d.state.headers={'X-Import-Source':'tickets'};
+  const adopted=await d.call('status',{planId:businessTickets.body.planId});
+  assert.equal(adopted.body.job.state,'completed');assert.match(adopted.body.caption,/^approved via Business by /);
+  assert.equal((await d.call('status',{planId:businessWiki.body.planId})).status,404);
+  d.state.headers={'X-Import-Source':'wiki'};
+  assert.equal((await d.call('status',{planId:businessTickets.body.planId})).status,404);
+  await d.undo(businessWiki.body.planId);await d.undo(wiki.body.planId);assert.equal(count('native_records'),4);
+  d.state.headers={'X-Import-Source':'tickets'};await d.undo(businessTickets.body.planId);await d.undo(tickets.body.planId);assert.equal(count('native_records'),0);
 });

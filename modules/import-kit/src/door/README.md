@@ -19,6 +19,7 @@ Construct the handler with these seed-owned options:
 | `ownerPrincipalId` | Actual owner principal used by the seed's ordinary import history and undo context. |
 | `destination`, `mapping` | Product destination and reviewed `ImportMapping`. |
 | `format`, `parse` | `'json'` or `'ndjson'`, and the product's parser of source records. |
+| `source` | Instead of `parse`/`mapping`, for several sources: `source(namespace)` returns that namespace's `{parse, mapping, ownerPrincipalId?}` from the seed's server-owned allow-list, or `null`. It runs after grant verification and before any write; `null` is refused with 403 `unknown_import_source`. |
 | `limits` | Optional reader limits; grant quotas still apply. |
 
 Apply the statements in `importDoorSchema: string[]` in a new product-owned

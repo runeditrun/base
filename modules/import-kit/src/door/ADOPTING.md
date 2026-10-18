@@ -42,19 +42,25 @@ Owner history and undo must include jobs from either authority.
    change it.
 
    **Several import sources.** One namespace per source (for example one per
-   vendor). Build the handler per request: choose the namespace from a
-   server-side allow-list and refuse anything else before the door runs. The
-   same place supplies per-source `parse`/`mapping`, a mapping that needs that
-   request's whole parsed bundle, or a per-request owner principal. Construction
-   is cheap and stateless; plans and uploads are reachable only in their own
-   namespace. The move-in screen sends the source on every call.
+   vendor). Keep **one** server-owned allow-list, `importSource(name)`, that
+   returns a fresh `{parse, mapping, ownerPrincipalId?}` for a listed name and
+   `null` otherwise; step 4 passes the same function to the grant mount. Build
+   the owner handler per request from it and refuse anything else before the
+   door runs. An entry may supply a mapping that needs that request's whole
+   parsed bundle, or a per-request owner principal. Construction is cheap and
+   stateless; plans and uploads are reachable only in their own namespace. The
+   move-in screen sends the source on every call. Answer `/api/rer/import/*`
+   with 404 here: a configured grant mount (step 4) runs before this handler.
    ```ts
-   const sources = {pagerduty: pagerDutyImport, opsgenie: opsgenieImport}; // server-owned
+   const sources = {pagerduty: pagerDutyImport, opsgenie: opsgenieImport}; // server-owned factories
+   export const importSource = (name: string) => Object.hasOwn(sources, name) ? sources[name]() : null;
    export async function importDoor(request: Request, env: Env) {
-     if (!new URL(request.url).pathname.startsWith('/api/operator/import/')) return null;
-     const name = request.headers.get('X-Import-Source') ?? '';
-     if (!Object.hasOwn(sources, name)) return Response.json({error: 'unknown_import_source'}, {status: 400});
-     return createImportOperatorHandler({...runtime(env), ...sources[name], namespace: name})(request);
+     const path = new URL(request.url).pathname;
+     if (path.startsWith('/api/rer/import/')) return Response.json({error: 'not_found'}, {status: 404});
+     if (!path.startsWith('/api/operator/import/')) return null;
+     const name = request.headers.get('X-Import-Source') ?? '', source = importSource(name);
+     if (!source) return Response.json({error: 'unknown_import_source'}, {status: 400});
+     return createImportOperatorHandler({...runtime(env), ...source, namespace: name})(request);
    }
    ```
 4. **Settings and grants.** Create the installation settings row with
@@ -63,7 +69,11 @@ Owner history and undo must include jobs from either authority.
    has owner-claim, additionally mount `createImportDoorHandler` from `index.ts`
    with the **same** server-owned claim/key-ring configuration and
    `installationId` set to the operator mount's door key (it defaults to
-   `claim.installationId`). Dispatch this grant handler **before** the operator
+   `claim.installationId`). With several sources, pass `source: importSource`
+   (step 3's allow-list) instead of `parse`/`mapping`: the door calls it with
+   each verified grant's namespace before writing anything, parses with that
+   entry, and refuses an unlisted namespace with 403 `unknown_import_source`.
+   Dispatch this grant handler **before** the operator
    handler. Enable only through an owner
    settings action or the owner's provisioning approval. Keep durable key
    revocations and show them in that settings row; re-enabling never unrevokes.
@@ -103,7 +113,8 @@ needed. Keep the `installationId` you chose: it stays the door key. To add
 Business later, add those three grant files, `modules/owner-claim/verify.mjs`
 and its dependency `modules/operator-auth/loopback.mjs`, then configure its
 trusted ring with RER's claim installation id, pass your existing door key as
-the grant mount's `installationId`, mount the grant handler first and explicitly
+the grant mount's `installationId` (and, with several sources, your
+`importSource` as its `source`), mount the grant handler first and explicitly
 opt in. Earlier owner imports then stay in history, and Business catches up on
 their lineage instead of re-creating them. The existing grant signature, nonce,
 scope, expiry and approval rules do not change.
