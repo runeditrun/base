@@ -52,8 +52,11 @@ test('rer release refuses absent, unsuccessful or untrusted GitHub evidence with
     assert.equal(existsSync(f.env.BUILD_MARKER), false);
     assert.equal(existsSync(f.env.VERIFY_MARKER), false);
   });
+  const absent = await source(t, { workflows: {} });
+  const missing = absent.invoke([], [], { [`repos/${repository}/actions/workflows?per_page=100`]: [{ workflows: [] }] });
+  assert.equal(missing.result.status, 1, missing.result.stdout);
+  assert.match(missing.receipt.gates.verify.details, /No Verify workflow/);
   for (const [extra, reason] of [
-    [{ [`repos/${repository}/actions/workflows?per_page=100`]: [{ workflows: [] }] }, /No Verify workflow/],
     [{ [`repos/${repository}`]: {} }, /gh authentication/],
   ]) {
     const { result, receipt } = f.invoke([], [], extra);

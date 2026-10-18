@@ -14,11 +14,25 @@ from tree_scan import context, text_rules, working_files, working_regular
 from public_hygiene import reference_rules
 from content_identities import ContentIdentities, candidate as identity_candidate
 from checksum_maps import ChecksumMaps
+from policy import safe_path
+
+
+def diagnostic(error, hashes, config):
+    """Apply the report's existing redaction to native command diagnostics."""
+    details = getattr(error, 'diagnostic', None)
+    if not details:
+        return {}
+    patterns = config.get('internalReferencePatterns', ())
+    def redact(value):
+        return safe_path(value, hashes, patterns) if isinstance(value, str) else value
+    return {'git': {key: [redact(arg) for arg in value] if isinstance(value, list) else redact(value)
+                    for key, value in details.items()}}
 
 
 def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, repository=None, *, cache_dir=None, timeout=300):
     report = new_report(public_base is not None)
     history = None
+    hashes, config = frozenset(), {}
     add = Findings(report, {}, frozenset()).add
     try:
         hashes = load_hashes(env_file)
@@ -184,14 +198,16 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         for references, path, commit, oid, scope in deferred:
             for rule in reference_rules(references, states):
                 add(rule, path, commit, oid, scope)
-    except PublicBaseError:
+    except PublicBaseError as error:
         add('scan.public-base-rejected', '.')
+        report['findings'][-1].update(diagnostic(error, hashes, config))
     except InspectionError as error:
         if str(error).startswith('scan.'):
             add(str(error), '.')
         else:
             add('scan.history-incomplete', '.')
             report['findings'][-1]['reason'] = str(error)
+            report['findings'][-1].update(diagnostic(error, hashes, config))
     except (OSError, ValueError, TypeError, KeyError, UnicodeError):
         add('scan.configuration-incomplete', '.')
     finally:

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.57",
+  "cliVersion": "0.2.57-dev.ge9cf787a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2699,7 +2699,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "45604c333cb19e673365991c7503c9e3377fdd93027601e031766422eed7c7ca"
+      "sha256": "f68fd0d33371d2f79d8d0d489cbc12565c452d53a53bff481410c41f20202283"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -2711,7 +2711,7 @@
     },
     "modules/release/github-verify.mjs": {
       "source": "modules/release/github-verify.mjs",
-      "sha256": "19e2cf4495b035ae86fb8cba9dc8d0949e070c331c3ecfc18e2a2b78ea96e935"
+      "sha256": "d7fde5c3ec1150f5d1218651e0e8eae69dcfabe69bd38ee003877114a4c6e324"
     },
     "modules/release/keygen.mjs": {
       "source": "modules/release/keygen.mjs",
@@ -2791,11 +2791,15 @@
     },
     "modules/release/verify-workflow.mjs": {
       "source": "modules/release/verify-workflow.mjs",
-      "sha256": "fcd08ec68af440c6e500cde3e43cc9694f42f005f044feb06098a3be10a0eb77"
+      "sha256": "b4890324a3ec5aa978729c64c0aff64465191ff797d14552ac3281f5a70302f2"
     },
     "modules/release/verify.mjs": {
       "source": "modules/release/verify.mjs",
       "sha256": "d670d91c016d25e33c2c5f7716e4d081513960a90ec540ac48ead9ef8ebb4c0a"
+    },
+    "modules/release/workflow-name.mjs": {
+      "source": "modules/release/workflow-name.mjs",
+      "sha256": "3359b0e456f6304e17591a5ae99a5eb7c8ab7db0ec883337202fd0b23d4d055f"
     },
     "operations/README.md": {
       "source": "operations/README.md",
@@ -2871,7 +2875,7 @@
     },
     "scripts/publish-check/git_history.py": {
       "source": "scripts/publish-check/git_history.py",
-      "sha256": "3dff349d0ec166450a14364ac9dad5b760276f61d9501784781d52787a2cb507"
+      "sha256": "73d1edffe57d828b89d1d313bbfe1bd45f3c938604112e77fd9a599e16449656"
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
@@ -2887,7 +2891,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "77805885f571f2f7972bb925391881e7855feb8ab053efd7eac574377b15be57"
+      "sha256": "e31e7b7680f49df34646c6c3766f78a30e1e414bf16a874eb34ebd4098e32252"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",
