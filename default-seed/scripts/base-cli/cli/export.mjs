@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, writeFile, lstat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, dirname, relative } from 'node:path';
 import { testSource } from '../composition/git-source.mjs';
@@ -6,7 +6,7 @@ import { cliVersion } from './version.mjs';
 
 // Copy whole maintained source/tooling directories. Python publication scans
 // load sibling modules and data dynamically; they belong in the inventory too.
-export const sourceRoots = ['bin/rer.mjs', 'cli', 'modules/delivery-producer/declarations.mjs', 'modules/delivery-producer/bindings.mjs', 'modules/delivery-producer/migrations.mjs', 'modules/delivery-producer/mail.mjs', 'modules/job-queue', 'modules/release', 'modules/deploy-kit', 'modules/container', 'modules/demo-host', 'modules/demo', 'modules/integrations/core', 'modules/mail', 'modules/ai', 'modules/portability', 'modules/d1-transport', 'modules/erasure', 'modules/dependencies', 'modules/operator-auth', 'modules/owner-claim', 'operations', 'scripts/publish-check', 'scripts/publish-check.mjs', 'composition/git-source.mjs', 'edition-authoring/manifest.mjs', 'edition-authoring/files.mjs', 'foundation/runtime/seed-contract.mjs'];
+export const sourceRoots = ['default-seed/public/rer-theme.css', 'default-seed/public/brand/mark.svg', 'default-seed/public/fonts/outfit', 'bin/rer.mjs', 'cli', 'modules/delivery-producer/declarations.mjs', 'modules/delivery-producer/bindings.mjs', 'modules/delivery-producer/migrations.mjs', 'modules/delivery-producer/mail.mjs', 'modules/job-queue', 'modules/release', 'modules/deploy-kit', 'modules/container', 'modules/demo-host', 'modules/demo', 'modules/integrations/core', 'modules/mail', 'modules/ai', 'modules/portability', 'modules/d1-transport', 'modules/erasure', 'modules/dependencies', 'modules/operator-auth', 'modules/owner-claim', 'operations', 'scripts/publish-check', 'scripts/publish-check.mjs', 'composition/git-source.mjs', 'edition-authoring/manifest.mjs', 'edition-authoring/files.mjs', 'foundation/runtime/seed-contract.mjs'];
 export async function inventory(base, roots = sourceRoots) {
  const files = [];
  async function walk(path) {
@@ -19,7 +19,12 @@ export async function inventory(base, roots = sourceRoots) {
    else throw Error('Non-file CLI export source');
   }
  }
- for (const source of roots) { if (source.endsWith('.mjs')) files.push(source); else await walk(source); }
+ for (const source of roots) {
+  const stat = await lstat(resolve(base, source));
+  if (stat.isFile()) files.push(source);
+  else if (stat.isDirectory()) await walk(source);
+  else throw Error('Non-file CLI export source');
+ }
  return files.sort();
 }
 

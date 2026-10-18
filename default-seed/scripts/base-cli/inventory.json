@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.59",
+  "cliVersion": "0.2.59-dev.gcd1fb59a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -763,7 +763,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "ce524682bb80a2311d6b6c828f28b531e3bf2debaa57cf548f0e45b1191d47e0"
+      "sha256": "ac266c9c1295bcb659adb6a4edbc4adfcdf3ee4b8df06ac6df74b12f9de05a75"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1065,6 +1065,26 @@
       "source": "composition/git-source.mjs",
       "sha256": "ccc04366daca482983510e8c0c24feab6eab7b7086604f71d4bb6f5529c47c04"
     },
+    "default-seed/public/brand/mark.svg": {
+      "source": "default-seed/public/brand/mark.svg",
+      "sha256": "c1b85847849ac99d07be1203befca23c5cc7650757ce9372222c6819de72b097"
+    },
+    "default-seed/public/fonts/outfit/LICENSE.txt": {
+      "source": "default-seed/public/fonts/outfit/LICENSE.txt",
+      "sha256": "0e5fcef5d93bfcae273c11c00f0bb453d3b5491860e1ac8b658767b7577c938f"
+    },
+    "default-seed/public/fonts/outfit/outfit-latin-ext-wght-normal.woff2": {
+      "source": "default-seed/public/fonts/outfit/outfit-latin-ext-wght-normal.woff2",
+      "sha256": "0f53d1c03b3918d744a843b5039001ee31695ca1e255e3914188df81beb461e9"
+    },
+    "default-seed/public/fonts/outfit/outfit-latin-wght-normal.woff2": {
+      "source": "default-seed/public/fonts/outfit/outfit-latin-wght-normal.woff2",
+      "sha256": "6c18d579fd87c3776be068b762cbc83fde3acb543d49eabd3ade842eb987e887"
+    },
+    "default-seed/public/rer-theme.css": {
+      "source": "default-seed/public/rer-theme.css",
+      "sha256": "670e280580f073bee9236f2bf2ab3165ccf5ccc3499f79ac077c4388105a491f"
+    },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
       "sha256": "eb0b8a0b9958c4ed84735d85f5298f3d1307ef60ddee1c2a3329c6ed7af0902e"
@@ -1291,7 +1311,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "caf78788e620cb04104800435797ccd0c1816a45c2828651526d93cde7db70ab"
+      "sha256": "c79b56d1032110054bc914952453b977309568db359eececdc5f0b4cf935c1d8"
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
@@ -1359,7 +1379,7 @@
     },
     "modules/demo-host/native/prepare.mjs": {
       "source": "modules/demo-host/native/prepare.mjs",
-      "sha256": "237ad533f11ff31e6c861c93a78b8bbcf27606f4f64b614ab5daf184da0d6e9a"
+      "sha256": "85a333a56776540c633f2dc0751c1c5b99dde31e99cab9e6ef66edf155944d61"
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
@@ -1391,7 +1411,7 @@
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",
-      "sha256": "52ccbe1bd7fa65dd9d54af1d86dc657139a8608c2599bd69d6a1b0ab19f2b675"
+      "sha256": "e32dca683aa6772479b53d76c63f97ab0c47fad5eacb0209c1a7dd519f1a1233"
     },
     "modules/demo-host/native/warm.mjs": {
       "source": "modules/demo-host/native/warm.mjs",
@@ -1399,19 +1419,23 @@
     },
     "modules/demo-host/native/worker.mjs": {
       "source": "modules/demo-host/native/worker.mjs",
-      "sha256": "f9f75483d4320745a6478421f97eb0a6b5014fff46f16c52354f11dcbd90764c"
+      "sha256": "5809333b4248636d0e5d317e9f60b82de06d9082c7d7baf01e9611aa55384bd8"
     },
     "modules/demo-host/operator.mjs": {
       "source": "modules/demo-host/operator.mjs",
       "sha256": "24a0a516d46c41c8896f96ea3746e1f949f00f52f1ae78d00aa6b65382da38bf"
     },
+    "modules/demo-host/page-style.mjs": {
+      "source": "modules/demo-host/page-style.mjs",
+      "sha256": "4a83b41dbdfc8637547587e54ee7a542e947a93cf74bed06c510ed1723aee127"
+    },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "ad1e4f91386b5804bf6d009debf5e365edce6ed025e0a64c1216e85c44a426b9"
+      "sha256": "cc64db2aeb40e3f6bf9919bdcbd0aaec419da54fdd34882f6b4de9ee541e046f"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
-      "sha256": "c7957081f5d69d746c038bc54d7bcdcb0b536fddcc8cb975ff7cf75714f6f8fa"
+      "sha256": "6b96d57ba6fa087d2b90a3171b55fe1b5376f426da585f51c0b3d28ba18e5cb8"
     },
     "modules/demo-host/remove.mjs": {
       "source": "modules/demo-host/remove.mjs",
@@ -1420,6 +1444,14 @@
     "modules/demo-host/start-script.mjs": {
       "source": "modules/demo-host/start-script.mjs",
       "sha256": "6934c6e4c0db3b95becebc6d77e75d1957e73dacc7484ec347301c82a3f2117f"
+    },
+    "modules/demo-host/theme-script.mjs": {
+      "source": "modules/demo-host/theme-script.mjs",
+      "sha256": "1b78c0c1bbf171149d872bcc1c4a4d11091f659c1bbebd691f797c2a778c151b"
+    },
+    "modules/demo-host/theme.mjs": {
+      "source": "modules/demo-host/theme.mjs",
+      "sha256": "bd7dd21de2ee56f24b045d1749380a338322de3e6e44c720bab3aa31706a42b8"
     },
     "modules/demo-host/upgrade.mjs": {
       "source": "modules/demo-host/upgrade.mjs",

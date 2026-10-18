@@ -5,6 +5,7 @@ import { collectBuildModules } from '../../deploy-kit/build-modules.mjs';
 import { collectFiles, moduleType } from '../../deploy-kit/artifact.mjs';
 import { nativeBindings, ISOLATE_FILES, objectExports } from './config.mjs';
 import { warmList, builtChunks } from './warm.mjs';
+import { prepareTheme } from '../theme.mjs';
 
 // The Worker Loader module kind for each upload type deploy-kit gives a build
 // module, so a demo carries what a normal deploy uploads. Binary kinds travel
@@ -31,13 +32,15 @@ export async function prepareNative(folder) {
     + objectExports(bindings) };
   for (const file of ISOLATE_FILES) modules[`_rer/${file}.js`] = { js: await readFile(new URL(`./${file}.mjs`, import.meta.url), 'utf8') };
   const assets = await collectFiles(join(app, 'dist/client'));
+  await cp(join(app, 'dist/client'), join(folder, 'assets'), { recursive: true });
+  const theme = await prepareTheme(folder, assets);
   const bundle = { compatibilityDate: config.compatibility_date, compatibilityFlags: [...new Set([...(config.compatibility_flags ?? []), 'nodejs_compat'])], modules,
     bindings, migrations: manifest.migrations, vars: config.vars ?? {}, crons: config.triggers?.crons ?? [],
-    assetPaths: assets.filter(file => !file.path.split('/').some(part => part.startsWith('.'))).map(file => '/' + file.path),
+    assetPaths: [...assets.filter(file => !file.path.split('/').some(part => part.startsWith('.'))).map(file => '/' + file.path), ...theme.paths],
+    theme: theme.stylesheets,
     immutable: [...builtChunks(assets, manifest.assetsDir)].sort(),
     warm: (await warmList(assets, root, manifest.operatorPath, manifest.assetsDir)).paths };
   bundle.digest = createHash('sha256').update(JSON.stringify(bundle)).digest('hex');
-  await cp(join(app, 'dist/client'), join(folder, 'assets'), { recursive: true });
   await writeFile(join(folder, 'modules/demo-host/native/bundle.mjs'), `export default ${JSON.stringify(bundle)};\n`);
   return bundle;
 }
