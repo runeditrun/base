@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { catalogueSize, classificationSchema } from './server.mjs';
@@ -87,17 +88,20 @@ const lines = async path => { try { return (await readFile(path, 'utf8')).trim()
 
 export async function classifierJourney({ directory, remote, cli, connect }) {
  // Detection skips relative PATH entries, executables others can modify and
- // executables in folders others can write, without running them. No real
- // CLI is on this PATH.
+ // executables in folders others can write, without running them; on macOS
+ // also a folder whose access list lets everyone add or delete entries. No
+ // real CLI is on this PATH.
  const untrusted = join(directory, 'classifier-untrusted'), relative = await modelShim(join(untrusted, 'relative'), 'claude');
  const writable = await modelShim(join(untrusted, 'writable'), 'codex'), linked = join(untrusted, 'linked');
  await chmod(join(writable, 'codex'), 0o775); await mkdir(linked); await symlink(join(writable, 'codex'), join(linked, 'codex'));
  const shared = await modelShim(join(untrusted, 'shared'), 'claude'); await chmod(join(shared, 'claude'), 0o755); await chmod(shared, 0o777);
+ const acl = await modelShim(join(untrusted, 'acl'), 'claude'); await chmod(join(acl, 'claude'), 0o755);
+ if (process.platform === 'darwin') execFileSync('/bin/chmod', ['+a', 'group:everyone allow add_file,delete_child', acl]);
  const clean = process.env.PATH.split(':').filter(entry => !['claude', 'codex'].some(name => existsSync(join(entry, name))));
- const offered = await connect(untrusted, remote, { terminal: true, questionCli: 'none', path: [relative.slice(untrusted.length + 1), linked, writable, shared, ...clean].join(':') });
+ const offered = await connect(untrusted, remote, { terminal: true, questionCli: 'none', path: [relative.slice(untrusted.length + 1), linked, writable, shared, ...(process.platform === 'darwin' ? [acl] : []), ...clean].join(':') });
  await chmod(shared, 0o755);
  assert.ok(offered.stdout.includes('Questions CLI [none] (none):'), 'untrusted candidates are not offered');
- assert.deepEqual([...await lines(join(untrusted, 'relative/probe-calls.jsonl')), ...await lines(join(untrusted, 'writable/probe-calls.jsonl')), ...await lines(join(untrusted, 'shared/probe-calls.jsonl'))], [], 'untrusted candidates never run');
+ assert.deepEqual([...await lines(join(untrusted, 'relative/probe-calls.jsonl')), ...await lines(join(untrusted, 'writable/probe-calls.jsonl')), ...await lines(join(untrusted, 'shared/probe-calls.jsonl')), ...await lines(join(untrusted, 'acl/probe-calls.jsonl'))], [], 'untrusted candidates never run');
  assert.equal((await cli(untrusted, ['business', 'disconnect'])).code, 0);
  for (const limit of [['--questions-per-hour', '31'], ['--max-budget-usd', '0.06'], ['--questions-per-hour', '0']]) {
   assert.equal((await cli(untrusted, ['business', 'connect', '--code', 'ABCD-1234', '--origin', remote.origin, ...limit])).code, 2, 'limits can only be lowered');
@@ -225,13 +229,25 @@ export async function classifierJourney({ directory, remote, cli, connect }) {
    const killed = cli(home, ['business', 'run', '--once'], { ...options, onSpawn: child => { supervisor = child; } });
    for (let attempt = 0; attempt < 400 && !existsSync(join(home, 'hung.pid')); attempt++) await sleep(50);
    const survivor = Number(await readFile(join(home, 'hung.pid'), 'utf8'));
-   const alive = () => { try { process.kill(survivor, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; } };
+   // This user's own unrelated process, naming the same CLI, that holds a
+   // group id a crashed question recorded with another start time.
+   const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', state.classifier.path], { detached: true, stdio: 'ignore' });
+   const running = pid => { try { process.kill(pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; } };
+   const alive = () => running(survivor);
    try {
     supervisor.kill('SIGKILL'); assert.equal((await killed).code, null);
     const records = join(home, '.rer/business/classifier'), [left] = await readdir(records);
-    const { temporary } = JSON.parse(await readFile(join(records, left, 'run.json'), 'utf8'));
+    const { temporary, groups } = JSON.parse(await readFile(join(records, left, 'run.json'), 'utf8'));
     assert.ok(existsSync(join(records, left, 'home/.codex/auth.json')) && existsSync(temporary), 'the killed question left its credential copy and scratch folder');
+    assert.ok(temporary.startsWith(join(records, left) + '/'), 'the scratch folder lives in the private question record, not a shared temporary folder');
+    assert.ok(groups.length === 3 && groups.every(entry => typeof entry.start === 'string'), 'each group is recorded with its start time');
     assert.ok(alive(), 'Codex outlived its supervisor');
+    // Records another local user could shape: a scratch folder that is not this
+    // user's private folder, and a reused group id.
+    const planted = join(directory, 'shared-tmp/rer-business-classifier-AbC123');
+    await mkdir(planted, { recursive: true, mode: 0o755 }); await writeFile(join(planted, 'keep'), 'not the run\'s');
+    const forged = await mkdtemp(join(records, 'run-'));
+    await writeFile(join(forged, 'run.json'), JSON.stringify({ executable: state.classifier.path, temporary: planted, groups: [{ group: unrelated.pid, start: 'Thu Jan 1 00:00:00 1970' }], codexAuth: null }));
     await writeFile(join(home, 'model-answer.json'), JSON.stringify({ value: valid }));
     const resumed = await cli(home, ['business', 'run', '--once'], options);
     assert.equal(resumed.code, 0, resumed.stderr); assert.deepEqual(remote.state.questionCompleted, valid);
@@ -239,7 +255,9 @@ export async function classifierJourney({ directory, remote, cli, connect }) {
     assert.equal(alive(), false, 'the next start stopped the orphaned Codex');
     assert.deepEqual(await readdir(records), [], 'no question record or credential copy remains');
     assert.equal(existsSync(temporary), false, 'the killed question scratch folder is removed');
-   } finally { if (alive()) process.kill(survivor, 'SIGKILL'); }
+    assert.ok(existsSync(join(planted, 'keep')), 'a recorded folder that is not private to this user is dropped untouched');
+    assert.ok(running(unrelated.pid), 'a reused group id is never signalled');
+   } finally { if (alive()) process.kill(survivor, 'SIGKILL'); if (running(unrelated.pid)) process.kill(unrelated.pid, 'SIGKILL'); }
   }
   assert.equal((await cli(home, ['business', 'disconnect'], options)).code, 0);
   assert.ok(!(await readdir(home)).includes('.rer'), 'classifier pairing and progress are removed');

@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
 import { access, lstat, readlink, realpath, stat } from 'node:fs/promises';
 import { homedir, userInfo } from 'node:os';
@@ -27,9 +28,23 @@ export const codexEnvironment = (home, codexHome) => ({ ...pick(transport), HOME
 
 // Someone who can write a folder above the CLI could swap it. Every link and
 // file must belong to this user or root, and every folder too, writable by
-// group or others only when it is root's sticky folder (such as /tmp).
+// group or others only when it is root's sticky folder (such as /tmp). On
+// macOS an access control list can grant what the mode bits do not, so any
+// entry that allows writing, appending, adding, deleting or changing the
+// owner or the list itself is refused too; deny entries are fine.
 const owned = info => info.uid === process.getuid() || info.uid === 0;
 const safeFolder = info => info.isDirectory() && owned(info) && ((info.mode & 0o022) === 0 || (info.mode & 0o1000) !== 0 && info.uid === 0);
+const granting = new Set(['write', 'append', 'add_file', 'add_subdirectory', 'delete_child', 'delete', 'writesecurity', 'chown']);
+// An entry that does not parse is refused rather than trusted.
+function aclGrantsChange(listing) {
+ return listing.split('\n').some(line => {
+  if (!/^\s*\d+: /.test(line)) return false;
+  const entry = /^\s*\d+: .+? (allow|deny) ([a-z_,]+)$/.exec(line);
+  return !entry || entry[1] === 'allow' && entry[2].split(',').some(right => granting.has(right));
+ });
+}
+// ls -lde reads the entry itself, never following a link.
+const aclSafe = path => process.platform !== 'darwin' || new Promise(resolveSafe => execFile('/bin/ls', ['-lde', path], { env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' } }, (error, stdout) => resolveSafe(!error && !aclGrantsChange(stdout))));
 function ancestors(path) {
  const folders = [];
  for (let folder = dirname(path); ; folder = dirname(folder)) { folders.push(folder); if (folder === dirname(folder)) return folders; }
@@ -40,21 +55,22 @@ async function safeFolders(path) {
  for (const folder of ancestors(path)) {
   const info = await lstat(folder);
   if (info.isSymbolicLink() ? !owned(info) : !safeFolder(info)) return false;
+  if (!(await aclSafe(folder))) return false;
  }
  const real = await realpath(dirname(path));
- for (const folder of [real, ...ancestors(real)]) if (!safeFolder(await stat(folder))) return false;
+ for (const folder of [real, ...ancestors(real)]) if (!safeFolder(await stat(folder)) || !(await aclSafe(folder))) return false;
  return true;
 }
 
 // Follows each link from the PATH entry to an executable regular file that
-// neither group nor others can modify, checking every step. Returns the
-// resolved path, which is what runs, or null.
+// neither group nor others can modify, by mode or access list, checking every
+// step. Returns the resolved path, which is what runs, or null.
 export async function trustedExecutable(path) {
  try {
   if (!isAbsolute(path)) return null;
   for (let current = path, hop = 0; hop < 40; hop++) {
    const info = await lstat(current);
-   if (!owned(info) || !(await safeFolders(current))) return null;
+   if (!owned(info) || !(await aclSafe(current)) || !(await safeFolders(current))) return null;
    if (info.isSymbolicLink()) { current = resolve(dirname(current), await readlink(current)); continue; }
    if (!info.isFile() || (info.mode & 0o022) !== 0) return null;
    await access(current, constants.X_OK);
