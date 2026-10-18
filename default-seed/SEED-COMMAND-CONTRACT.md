@@ -530,6 +530,18 @@ export/import must cover every supported resource. Remote transfer is optional
 and requires complete resource coverage; an unsupported remote target fails
 with exit 4 and names the missing capability.
 
+Import defaults to target `local`. Before archive access or preparation hooks,
+an explicit `--origin` must be HTTP on exactly `localhost`, `127.0.0.1` or
+`[::1]` at this checkout's configured local dev port, unless `--target remote`
+is explicit. The configured port comes from the checkout's saved local origin;
+without a saved origin, the local default is 8787. An omitted HTTP port means
+80. HTTPS origins, all other hosts (including front-door `NAME.localhost`)
+and different ports therefore require `--target remote`, even if `--target
+local` was supplied. No origin and matching local origins preserve existing
+local import behavior. Explicit remote selection does not bypass the adapter's
+complete remote import capability check; unsupported remote import still
+refuses with exit 4.
+
 A seed that imports people through Base import-kit erases a person from import custody with `retireD1ImportCustody({ target, values }, nativeStatements, context, checkpoint)`, not `eraseD1ImportTarget` alone: `target` is the native entity their records were imported into, `values` are their exact identifiers (an email, never a name, never matched as a substring), `nativeStatements` are the erasure module's `nativeStatements(entity, subject)`, and `checkpoint` is portability's `redactionStatements()` mapped through `toD1Sql`, so native rows, the portability fence, the restore checkpoint and import custody commit in one batch before `deleteBlobs`. Records become tombstones and other people's imports keep undo and resume; an import whose header equals a value is retired whole and answers `IMPORT_JOB_RETIRED` with its journal `receiptId`. Apply `d1RetirementSchema` as the next numbered migration after the other import-kit schemas (a seed that already applied it adds `d1RetirementAppendOnly` as its next migration), keep `ik_d1_erasure_journal` and `ik_d1_retirements` in archives, and read the journal with `readD1ErasureJournal`. An archive made before the erasure is refused whole under `--journal LATER_ARCHIVE` on a fresh store, even one that held the person only in import custody. The default seed's people imports (`src/core/features/people/`) are the reference adoption.
 
 For shared imported records, pass `related: { fields: [{ path: ['reactions', '*', 'users', '*'], value: sourceUserId }] }` in that same `retireD1ImportCustody` call. Exact matching array items or object fields are removed; peer entries and explicit aggregate counts remain. Paths are relative to source payloads and effect/native values and apply to undo before-images too (the default seed uses `details.reactions.*.users.*`). The kit atomically sanitizes the adapter's imported native set, rebinds custody/provenance/decision hashes and fingerprints, withdraws affected original artifacts, and cancels destination private preparations; resume and undo use the sanitized retained data. Keep the same restore checkpoint and journal export policy. The adapter must enumerate and exactly fence its complete imported native set; the seed handles references elsewhere and filters erased identities on new source intake. Field selection requires an unbounded context, like other related erasure. Existing D1 erasure/retirement schemas suffice; no rer release or schema evolution is implied. See modules/import-kit/README.md#erasing-fields-in-retained-shared-records.
