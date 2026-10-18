@@ -37,6 +37,10 @@ export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant')
     response ??= new Response('Not found',{status:404});
     res.writeHead(response.status,Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
   });
+  // The kit's node:sqlite work in this same process can run for minutes without
+  // yielding to the event loop; a keep-alive timeout that then fires late resets
+  // the next request on a reused connection. Idle connections stay open instead.
+  server.keepAliveTimeout = 0;
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise<void>((resolve,reject)=>{server.closeAllConnections();server.close(error=>error?reject(error):resolve());}));
   const address = server.address(); if (!address || typeof address==='string') throw new Error('no_address');
