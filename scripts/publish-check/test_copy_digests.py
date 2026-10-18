@@ -9,6 +9,40 @@ from test_source_metadata import public_scan
 
 
 class CopyDigestTests(RepositoryFixture, unittest.TestCase):
+    def test_multibyte_json_offsets_preserve_only_exact_identity_matches(self):
+        files = {'vendor/base/api-key-one.mjs': b'export const first = true;\n',
+                 'vendor/base/api-key-two.mjs': b'export const second = true;\n'}
+        for path, data in files.items():
+            self.write(path, data)
+        revision = secrets.token_hex(20)
+        digests = {path: hashlib.sha256(data).hexdigest() for path, data in files.items()}
+        record = dict(schemaVersion=1, padding='é中🌍 "\\',
+                      moduleCommits={'apiKey': revision}, copies=[dict(
+                          padding='naïve 🌱', path=path, originPath='runtime/' + path.rsplit('/', 1)[-1],
+                          revision=revision, files={path: digest}, modes={path: '100644'})
+                          for path, digest in digests.items()])
+        path = 'base/PROVENANCE.json'
+        for pretty in (True, False):
+            with self.subTest(pretty=pretty):
+                def serialized(value):
+                    return json.dumps(value, ensure_ascii=False, indent=2 if pretty else None,
+                                      separators=None if pretty else (',', ':'))
+                self.write(path, serialized(record))
+                self.commit()
+                hits = inspect(executable(), 'dir', repo=str(self.repo), redact=False)
+                # Real native matches must exercise both digest lengths. PASS
+                # requires the JSON spans to land on their exact UTF-8 bytes.
+                for value in (revision, *digests.values()):
+                    self.assertTrue(any(h['RuleID'] in ('generic-api-key', 'hex-api-key')
+                                        and h['Secret'] == value for h in hits))
+                self.assertEqual(public_scan(self)['status'], 'PASS')
+                self.write(path, serialized({**record, 'between': '雪🌍',
+                                             'apiKey': next(iter(digests.values()))}))
+                report = public_scan(self)
+                self.assertEqual(report['status'], 'FAIL')
+                self.assertTrue(any(f['path'] == path and f['rule'] == 'secret.assignment'
+                                    and 'working-tree' in f['scopes'] for f in report['findings']))
+
     def test_partial_copy_digest_captures_keep_credentials_and_bad_preimages(self):
         name = 'vendor/base/operator-auth/accounts/schema/operator-auth.sql'
         data = b'create table operators(id);\n'

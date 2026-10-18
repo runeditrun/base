@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.55-dev.gadd98ca4",
+  "cliVersion": "0.2.55-dev.gdc2beefc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2903,7 +2903,7 @@
     },
     "scripts/publish-check/json_identity.py": {
       "source": "scripts/publish-check/json_identity.py",
-      "sha256": "655a0104e470babca83d2afcc7891c3a9358751226156c37130a9cf66acbedcc"
+      "sha256": "462f1eaf74d3a1b380af8b85e3529da4f9af24218a16fe73c9ec4e3aa0105b07"
     },
     "scripts/publish-check/license-exceptions.json": {
       "source": "scripts/publish-check/license-exceptions.json",
