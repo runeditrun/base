@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 
-const outputs = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', 'target', 'coverage', '.next', '.nuxt', '.output', '.cache', '.venv', 'venv', '__pycache__', '.terraform', '.pulumi', '.wrangler', '.rer', '.seed', 'playwright-report', 'test-results']);
+const outputs = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', 'target', 'coverage', '.next', '.nuxt', '.output', '.cache', '.venv', 'venv', '__pycache__', '.terraform', '.pulumi', '.wrangler', '.rer', '.rer-business', '.seed', 'playwright-report', 'test-results']);
 const tools = new Set(['.claude', '.codex', '.cursor', '.worktrees', '.idea', '.vscode', '.vscode-insiders', '.windsurf', '.continue', '.zed', '.aider', '.gemini', '.opencode']);
 
 export const toolDirectory = path => path.split('/').some(part => tools.has(part.toLowerCase()));

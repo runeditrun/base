@@ -1,20 +1,33 @@
-import { mkdir, readFile, writeFile, rename, chmod, open, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, readdir, writeFile, rename, chmod, open, unlink, rm, rmdir, lstat } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
+import { localCause } from './errors.mjs';
 
-export const stateDirectory = () => join(homedir(), '.rer', 'business');
+// RER_BUSINESS_STATE_DIR names the folder itself, for agent sandboxes that may write only
+// inside their working folder. Without it the state lives in ~/.rer/business.
+// RER_STATE_DIR belongs to rer demo and is never read here.
+export const chosenStateDirectory = () => Boolean(process.env.RER_BUSINESS_STATE_DIR);
+export function stateDirectory() {
+ const chosen = process.env.RER_BUSINESS_STATE_DIR;
+ if (!chosen) return join(homedir(), '.rer', 'business');
+ if (chosen.includes('\0')) throw Error('RER_BUSINESS_STATE_DIR must name a folder.');
+ return resolve(chosen);
+}
 export const credentialHandle = origin => `device:${createHash('sha256').update(origin).digest('hex')}`;
 
-export async function loadState() {
- try { return JSON.parse(await readFile(join(stateDirectory(), 'state.json'), 'utf8')); }
- catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+async function loadJson(name) {
+ const path = join(stateDirectory(), name);
+ let text;
+ try { text = await readFile(path, 'utf8'); }
+ // Under a path that is not a folder (ENOTDIR) nothing can have been saved yet.
+ catch (error) { if (['ENOENT', 'ENOTDIR'].includes(error.code)) return null; throw error; }
+ try { return JSON.parse(text); }
+ catch { throw Error(`Business could not read ${path}: it is not valid JSON. Remove it, or run rer business disconnect, then connect again.`); }
 }
 
-export async function loadPending() {
- try { return JSON.parse(await readFile(join(stateDirectory(), 'pairing.json'), 'utf8')); }
- catch (error) { if (error.code === 'ENOENT') return null; throw error; }
-}
+export const loadState = () => loadJson('state.json');
+export const loadPending = () => loadJson('pairing.json');
 export const savePending = pending => saveJson('pairing.json', pending);
 export async function clearPending() {
  await unlink(join(stateDirectory(), 'pairing.json')).catch(error => { if (error.code !== 'ENOENT') throw error; });
@@ -37,6 +50,50 @@ async function saveJson(name, value) {
   await writeFile(temporary, JSON.stringify(value) + '\n', { mode: 0o600, flag: 'wx' });
   await rename(temporary, join(directory, name));
  } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
+}
+
+/** Before a one-use code is spent or an approval collected, prove the state
+ * folder takes the same private create, write and replace the pairing needs.
+ * Folders made only for the check are removed again, so a refused connect
+ * leaves nothing behind.
+ */
+export async function checkStateWritable() {
+ const directory = stateDirectory(), probe = join(directory, `${randomUUID()}.tmp`), created = [];
+ for (let path = directory; path !== dirname(path); path = dirname(path)) {
+  try { await lstat(path); break; } catch (error) { if (error.code !== 'ENOENT') break; created.push(path); }
+ }
+ try {
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await chmod(directory, 0o700);
+  await writeFile(probe, '{}\n', { mode: 0o600, flag: 'wx' });
+  await rename(probe, probe + '.check');
+  await unlink(probe + '.check');
+ } catch (error) {
+  await unlink(probe).catch(() => {});
+  const fix = chosenStateDirectory()
+   ? 'Allow writes to that folder in this session, or set RER_BUSINESS_STATE_DIR to a folder this session can write'
+   : 'Allow writes to that folder, or set RER_BUSINESS_STATE_DIR to a folder this session can write (in Codex, one inside the working folder, such as RER_BUSINESS_STATE_DIR="$PWD/.rer-business")';
+  throw Error(`Business cannot save its state in ${directory}: ${localCause(error) ?? error.message}. Nothing was sent, so the pairing code still works. ${fix}, then run connect again.`);
+ } finally {
+  for (const path of created) await rmdir(path).catch(() => {});
+ }
+}
+
+// Files this CLI writes in its state folder. A folder named by RER_BUSINESS_STATE_DIR
+// may hold other things, so only these are removed from it.
+const owned = /^(?:(?:state|pairing|progress|permissions|service)\.json|run\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
+export async function removeStateDirectory() {
+ const directory = stateDirectory();
+ if (!chosenStateDirectory()) {
+  await rm(directory, { recursive: true, force: true });
+  // Remove only an empty parent; other rer commands may own it.
+  await rmdir(dirname(directory)).catch(error => { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; });
+  return;
+ }
+ let entries;
+ try { entries = await readdir(directory); } catch (error) { if (error.code === 'ENOENT') return; throw error; }
+ for (const name of entries) if (owned.test(name)) await rm(join(directory, name), { force: true });
+ await rmdir(directory).catch(error => { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; });
 }
 
 export async function lockSupervisor() {

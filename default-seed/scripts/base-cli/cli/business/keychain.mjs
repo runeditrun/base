@@ -1,22 +1,40 @@
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 
 const service = 'com.runeditrun.business';
-const unavailable = () => new Error('OS credential storage is unavailable or locked. Unlock macOS Keychain or install and unlock Linux Secret Service (secret-tool); otherwise use the wizard or Managed. No credential was written to a file.');
+const sandboxed = 'an agent sandbox blocks this. Run this one command outside the sandbox (in Codex, approve running it outside the sandbox when it asks), or in your own terminal';
+// Causes come from fixed phrases matched in the tool's diagnostics; the
+// diagnostics themselves are never printed.
+function cause(binary, result) {
+ const text = result?.stderr ?? '';
+ if (result?.spawnFailed) return binary === 'secret-tool' ? 'secret-tool is not installed. Install it and unlock a Secret Service session' : `${binary} could not start`;
+ if (/Operation not permitted/.test(text)) return `macOS Keychain refused the write (Operation not permitted); ${sandboxed}`;
+ if (/Unable to obtain authorization/.test(text)) return `macOS Keychain refused authorization; ${sandboxed}`;
+ if (/User interaction is not allowed|interaction is not allowed/i.test(text)) return 'the keychain is locked and cannot ask for its password here. Unlock it, then try again';
+ if (/autolaunch D-Bus|Cannot spawn a message bus|org\.freedesktop\.secrets/.test(text)) return 'no unlocked Secret Service session is running. Unlock one, then try again';
+ if (result?.timedOut) return `${binary} did not answer within 30 seconds`;
+ return `${binary} exited with status ${result?.code ?? 'unknown'}. Unlock macOS Keychain, or install and unlock Linux Secret Service (secret-tool), then try again`;
+}
+const unavailable = (operation, binary, result) => {
+ const error = new Error(`OS credential storage could not ${operation} a credential: ${cause(binary, result)}. No credential was written to a file.`);
+ error.sandboxRefused = /Operation not permitted|Unable to obtain authorization/.test(result?.stderr ?? '');
+ return error;
+};
 
 // All process output stays in memory. In particular, never attach a child error:
 // OS tools may put credential material in their diagnostics.
 function execute(command, args, input, env) {
- return new Promise((resolve, reject) => {
+ return new Promise(resolve => {
   const child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
   const out = [], err = []; let size = 0, failed = false;
   const timer = setTimeout(() => { failed = true; child.kill('SIGKILL'); }, 30000);
   const collect = list => chunk => { size += chunk.length; if (size > 262144) { failed = true; child.kill('SIGKILL'); } else list.push(chunk); };
   child.stdout.on('data', collect(out)); child.stderr.on('data', collect(err));
   child.stdin.on('error', () => {});
-  child.on('error', () => { clearTimeout(timer); reject(unavailable()); });
+  child.on('error', () => { clearTimeout(timer); resolve({ code: null, spawnFailed: true, stdout: '', stderr: '' }); });
   child.on('close', code => {
    clearTimeout(timer);
-   if (failed || code === null) reject(unavailable());
+   if (failed || code === null) resolve({ code: null, timedOut: true, stdout: '', stderr: Buffer.concat(err).toString('utf8') });
    else resolve({ code, stdout: Buffer.concat(out).toString('utf8'), stderr: Buffer.concat(err).toString('utf8') });
   });
   child.stdin.end(input);
@@ -38,44 +56,57 @@ function checkedSecret(secret) {
  */
 export function createCredentialStore({ platform = process.platform, env = process.env, run } = {}) {
  const command = run ?? ((binary, args, input) => execute(binary, args, input, env));
- if (!['darwin', 'linux'].includes(platform)) throw unavailable();
- const call = async (...args) => { try { return await command(...args); } catch { throw unavailable(); } };
+ if (!['darwin', 'linux'].includes(platform)) throw new Error('OS credential storage is available only on macOS (Keychain) and Linux (Secret Service). No credential was written to a file.');
+ const binary = platform === 'darwin' ? 'security' : 'secret-tool';
+ const call = async (operation, ...args) => {
+  let result;
+  try { result = await command(...args); } catch { throw unavailable(operation, binary, { spawnFailed: true }); }
+  if (result.spawnFailed || result.timedOut) throw unavailable(operation, binary, result);
+  return result;
+ };
  const macArgs = handle => ['-s', service, '-a', handle];
  const linuxArgs = handle => ['application', service, 'handle', handle];
  async function get(handle) {
   checkedHandle(handle);
   const result = platform === 'darwin'
-   ? await call('/usr/bin/security', ['find-generic-password', ...macArgs(handle), '-w'])
-   : await call('secret-tool', ['lookup', ...linuxArgs(handle)]);
+   ? await call('read', '/usr/bin/security', ['find-generic-password', ...macArgs(handle), '-w'])
+   : await call('read', 'secret-tool', ['lookup', ...linuxArgs(handle)]);
   if (platform === 'darwin' && result.code === 44 || platform === 'linux' && result.code === 1 && !result.stderr.trim()) return null;
-  if (result.code !== 0) throw unavailable();
+  if (result.code !== 0) throw unavailable('read', binary, result);
   return result.stdout.replace(/\r?\n$/, '');
  }
  return {
   get,
+  /** Write and remove a throwaway item, so a store that reads but refuses
+   * writes (an agent sandbox) is found before anything is redeemed. */
+  async check() {
+   const handle = `probe:${randomUUID()}`;
+   await this.set(handle, randomUUID());
+   await this.delete(handle);
+  },
   async set(handle, secret) {
    checkedHandle(handle); checkedSecret(secret);
    if (platform === 'darwin') {
     // Interactive security receives the hex password on stdin. Hex also avoids
     // its command tokenizer interpreting quotes/backslashes in a vendor key.
     const hex = Buffer.from(secret, 'utf8').toString('hex');
-    const result = await call('/usr/bin/security', ['-q', '-p', ''], `add-generic-password -U -s ${service} -a ${handle} -X ${hex}\n`);
-    if (result.code !== 0 || result.stderr.trim()) throw unavailable();
+    const result = await call('save', '/usr/bin/security', ['-q', '-p', ''], `add-generic-password -U -s ${service} -a ${handle} -X ${hex}\n`);
+    if (result.code !== 0 || result.stderr.trim()) throw unavailable('save', binary, result);
    } else {
-    const result = await call('secret-tool', ['store', '--label=Run Edit Run Business', ...linuxArgs(handle)], secret);
-    if (result.code !== 0) throw unavailable();
+    const result = await call('save', 'secret-tool', ['store', '--label=Run Edit Run Business', ...linuxArgs(handle)], secret);
+    if (result.code !== 0) throw unavailable('save', binary, result);
    }
    // security's interactive exit status alone does not establish command success.
-   if (await get(handle) !== secret) throw unavailable();
+   if (await get(handle) !== secret) throw unavailable('save', binary, { code: 0, stderr: '' });
    return handle;
   },
   async delete(handle) {
    checkedHandle(handle);
    if (await get(handle) === null) return;
    const result = platform === 'darwin'
-    ? await call('/usr/bin/security', ['delete-generic-password', ...macArgs(handle)])
-    : await call('secret-tool', ['clear', ...linuxArgs(handle)]);
-   if (result.code !== 0 && !(platform === 'darwin' && result.code === 44)) throw unavailable();
+    ? await call('remove', '/usr/bin/security', ['delete-generic-password', ...macArgs(handle)])
+    : await call('remove', 'secret-tool', ['clear', ...linuxArgs(handle)]);
+   if (result.code !== 0 && !(platform === 'darwin' && result.code === 44)) throw unavailable('remove', binary, result);
   },
  };
 }

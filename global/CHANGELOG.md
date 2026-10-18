@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.63
+
+- **Business connect waits for approval and keeps durable state (#277).** Pairing resumes after interruption, sends a readable device name and working folder, and accepts an explicit `RER_BUSINESS_STATE_DIR` when the usual state folder is unwritable. A refused macOS Keychain write stops before redeeming the code and explains how to approve the command outside the sandbox. Browser choices remain authoritative.
+- **Setup fields and groups can declare their audience (#297).** Public fields accept `audience: "owner" | "developer"`, inherit group audience, and default to owner. Invalid audiences and an owner field inside a developer group are refused. Local installer and terminal setup keep their existing active-field visibility; managed consumers can use the metadata.
+
 ## 0.2.62
 
 - **Themed demo gates keep waiting visibly disabled (#292).** Waiting, working and other non-actionable buttons use muted outlines from the seed’s theme tokens. Turnstile explicitly follows the card’s painted light/dark scheme, including declared dark media tokens.

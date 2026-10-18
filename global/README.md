@@ -371,36 +371,57 @@ formats and syntax may yield no signals.
 ## Business device commands
 
 `rer business connect --code ABCD-1234 [--origin https://app.runeditrun.com]`
-redeems a browser-created code and prints a six-digit confirmation number for
-approval in the browser that created it. Without a terminal it returns while
-approval is pending. Run `rer business connect` again in a later turn to resume
-the same pairing and number; a new server pairing is never started until the
-old one is refused, expired or disconnected. The waiting line names the command
-that works from the agent's own shell: `rer` when it is on PATH, the launcher
-install.sh wrote, or `npx -y @runeditrun/rer` after an npx run. Pending tokens
-are kept in the private CLI config directory until the code's expiry plus the
-ten minutes the server allows after an approval, so an approval near the code's
-end can still be collected. Device credentials stay in macOS
-Keychain or Linux Secret Service. A missing or locked store refuses before the
-one-use code is redeemed; there is no plaintext credential store. Linux needs `secret-tool` and an
-unlocked desktop Secret Service session.
+redeems a browser-created code, prints a six-digit confirmation number for
+approval in the browser that created it, and waits in the foreground until the
+owner approves or refuses there or the code expires (ten minutes). It exits 0
+only once the computer is active: the credential is stored and the server has
+seen the computer. A refusal or expiry exits 1 with the server's reason.
+Interrupting it (Ctrl-C, or an agent's tool timeout) keeps the redeemed pairing:
+run `rer business connect` again to resume the same pairing and number; a new
+server pairing is never started until the old one is refused, expired or
+disconnected. The waiting line names the command that works from the agent's
+own shell: `rer` when it is on PATH, the launcher install.sh wrote, or
+`npx -y @runeditrun/rer` after an npx run. Pending tokens are kept until the
+code's expiry plus the ten minutes the server allows after an approval, so an
+approval near the code's end can still be collected.
 
-The owner chooses Claude Code user Read deny rules, export-scoped macOS wake
-prevention, and a launchd or systemd user service in the browser. Connect reads
-`optIns` from device-authenticated `GET /api/business/executors/self`, with keys
-`installPermissions`, `awakeConsent` and `installService`. Only `true` enables
-an option. Undecided (`null`) options print a browser link; an older server
-without this route (it answers 403 or 404) leaves all options undecided. Run connect again after the
-owner decides. The first device-authenticated request happens after both the
-credential and local pairing state are stored, so a storage failure cannot
-activate the computer. Background services use
-absolute Node and CLI paths. No model process is started.
+State lives in `$RER_BUSINESS_STATE_DIR` when it is set, and in `~/.rer/business`
+otherwise. `RER_STATE_DIR` is `rer demo`'s variable and Business never reads it.
+Connect also sends the computer's plain name (its host name's first word group,
+without the login name, at most 64 characters) and the folder it runs in, so the
+browser can show which computer this is and prefill the scan folder.
+Before redeeming the code (or collecting an approval), connect proves
+it can write that folder and that OS credential storage accepts a write; if
+either fails it stops, names the folder or the cause, and the code still works.
+Device credentials stay in macOS Keychain or Linux Secret Service; there is no
+plaintext credential store. Linux needs `secret-tool` and an unlocked desktop
+Secret Service session. Every failure names its cause: the server's reason, the
+local system cause, or what to change.
+
+The owner chooses three things on the computer's row in the browser: "Add rules
+so Claude Code never reads your secret files" (Claude Code user Read deny
+rules), "Keep this computer awake while it works" (export-scoped macOS wake
+prevention) and "Install the background service" (a launchd or systemd user
+service). Connect reads them as `optIns` from device-authenticated
+`GET /api/business/executors/self`, with keys `installPermissions`,
+`awakeConsent` and `installService`; the CLI prints only the sentences. Only
+`true` enables an option. Undecided (`null`) options are listed with a browser
+link; an older server without this route (it answers 403 or 404) leaves all
+options undecided. Run connect again after the owner decides. The first
+device-authenticated request happens after both the credential and local
+pairing state are stored, so a storage failure cannot activate the computer.
+A service installed with `RER_BUSINESS_STATE_DIR` set keeps that folder. Background
+services use absolute Node and CLI paths. No model process is started.
 
 An agent can run `npx -y @runeditrun/rer business connect --code ABCD-1234 --origin URL`
 directly, without a global installation. In Codex's workspace-write sandbox,
-allow network access and the CLI's config directory (`~/.rer`), and put npm's
-cache inside the working folder with `npm_config_cache="$PWD/.rer/npm"`.
-Later turns can omit `--code` to resume the saved request. Do not install a
+allow network access, set `RER_BUSINESS_STATE_DIR="$PWD/.rer-business"` so state stays
+inside the working folder, and put npm's cache there too with
+`npm_config_cache="$PWD/.rer/npm"`. macOS refuses Keychain writes from inside
+that sandbox, so connect stops before redeeming and asks for this one command to
+run outside the sandbox (in Codex, approve running that command outside the
+sandbox when it asks); later commands
+only read the credential and run inside the sandbox. Do not install a
 background service or change user settings unless the owner enables those
 options and the sandbox permits their locations.
 
