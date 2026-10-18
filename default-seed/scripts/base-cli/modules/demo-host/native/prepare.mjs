@@ -1,3 +1,4 @@
+import { shared } from '../../../cli/shared.mjs';
 import { readFile, writeFile, cp } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -34,7 +35,9 @@ export async function prepareNative(folder) {
   const assets = await collectFiles(join(app, 'dist/client'));
   await cp(join(app, 'dist/client'), join(folder, 'assets'), { recursive: true });
   const theme = await prepareTheme(folder, assets);
-  const bundle = { compatibilityDate: config.compatibility_date, compatibilityFlags: [...new Set([...(config.compatibility_flags ?? []), 'nodejs_compat'])], modules,
+  const { readIconFiles } = await shared('icon-files.mjs');
+  const { links: iconHead } = await readIconFiles(join(app, 'dist/client'));
+  const bundle = { iconHead, compatibilityDate: config.compatibility_date, compatibilityFlags: [...new Set([...(config.compatibility_flags ?? []), 'nodejs_compat'])], modules,
     bindings, migrations: manifest.migrations, vars: config.vars ?? {}, crons: config.triggers?.crons ?? [],
     assetPaths: [...assets.filter(file => !file.path.split('/').some(part => part.startsWith('.'))).map(file => '/' + file.path), ...theme.paths],
     theme: theme.stylesheets,

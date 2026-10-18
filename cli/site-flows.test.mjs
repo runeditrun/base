@@ -30,13 +30,17 @@ async function seed(t) {
 }
 
 test('built Run page wraps inline code only between words and keeps commands clear of Copy', async t => {
- const f = await seed(t), result = await f.build();
+ const f = await seed(t);
+ await writeFile(join(f.root, 'public/favicon.svg'), await readFile(join(f.root, 'public/brand/mark.svg')));
+ const result = await f.build();
  assert.equal(result.code, 0, result.stdout + result.stderr);
  const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const context = await browser.newContext({permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
   await page.goto(preview.url + '/run');
   await page.evaluate(() => document.fonts.ready);
+  assert.deepEqual(await page.locator('link[rel=icon], link[rel=apple-touch-icon]').evaluateAll(links => links.map(link => ({ href: link.getAttribute('href'), sizes: link.getAttribute('sizes') }))), [{ href: '/favicon.svg', sizes: 'any' }], 'the built shared head selects the existing small icon instead of the full mark');
+  assert.equal((await context.request.get(preview.url + '/favicon.svg')).status(), 200, 'the selected icon is exported with the site');
   assert.ok(await page.locator('p code').count(), 'the built page has inline commands');
   for (let width = 360; width <= 2560; width += 20) {
    await page.setViewportSize({width,height:900});
@@ -100,7 +104,7 @@ test('site build bundles declared client islands and their imports for the brows
  assert.equal(result.code, 0, result.stdout + result.stderr);
  const home = await readFile(join(f.root,'dist/site/index.html'),'utf8'), source = /src="([^"]+)"/.exec(home)?.[1];
  assert.ok(source?.startsWith('/site-assets/'), 'page receives the emitted client URL');
- const preview = await sitePreview(join(f.root,'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true});
+ const preview = await sitePreview(join(f.root,'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const page = await browser.newPage();
   await page.goto(preview.url);

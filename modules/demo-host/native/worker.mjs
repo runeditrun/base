@@ -21,6 +21,6 @@ export default {
       return new Response(response.body, { status: response.status, headers });
     }
     // The start page prefetches the console's chunks while the visitor waits.
-    return front.fetch(request, { ...env, DEMO_WARM: bundle.warm, DEMO_THEME: bundle.theme }, ctx);
+    return front.fetch(request, { ...env, DEMO_WARM: bundle.warm, DEMO_THEME: bundle.theme, DEMO_ICON_HEAD: bundle.iconHead }, ctx);
   },
 };
