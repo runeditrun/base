@@ -528,6 +528,29 @@ test('After an erasure withdraws a pending catch-up, a plan of an upload holding
   assert.equal((await d.call('uploads',{uploadId})).status,200);
 });
 
+test('After an erasure, a catch-up plan that a size limit would refuse deletes an upload holding the erased person; a clean upload keeps its 413',async t=>{
+  const d=await door(t);await d.enable();
+  const native=d.runtime.native(),secret='size-limit-erased-secret';
+  const first=await d.plan([{id:'person',title:secret},{id:'kept',title:'size-limit-kept'}]);assert.equal(first.status,200,JSON.stringify(first.body));await d.apply(first.body);
+  const erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},[{sql:"DELETE FROM native_records WHERE id='person'"}],d.runtime.context(),checkpoint);
+  assert.equal(erased.phase,'complete');assertNowhere(native,[secret]);
+  // A later namespace imports a destination too large for one 2 MiB native read, so its catch-up plan is refused 413 before it reaches the upload's records.
+  const big={namespace:'big',maxBytes:8_000_000,maxChunks:200};
+  const records=Array.from({length:60},(_,i)=>({id:'big'+i,title:'big '+i,body:'z'.repeat(40_000)}));
+  const baseline=await d.call('plan',{uploadId:await d.upload(records,big)},big);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body,big);
+  // A clean catch-up upload in this situation still answers 413 and stays.
+  const cleanId=await d.upload([...records,{id:'new',title:'size-limit-new'}],big);
+  const clean=await d.call('plan',{uploadId:cleanId,catchup:true},big);
+  assert.deepEqual([clean.status,clean.body.error],[413,'import_door_too_large'],JSON.stringify(clean.body).slice(0,300));
+  assert.equal((await d.call('uploads',{uploadId:cleanId},big)).status,200,'a clean upload is kept');
+  // An upload holding the erased person is refused for that first, and goes.
+  const uploadId=await d.upload([...records,{id:'person',title:secret}],big);
+  const planned=await d.call('plan',{uploadId,catchup:true},big);
+  assert.deepEqual([planned.status,planned.body.error],[409,'source_erased'],JSON.stringify(planned.body).slice(0,300));
+  assert.equal((await d.call('uploads',{uploadId},big)).status,404,'the upload holding the erased person goes');
+  assertNowhere(native,[secret]);
+});
+
 test('HTTP failed target writes keep approval evidence, roll back the batch and require a fresh plan and approval',async t=>{
   const d1=(message:string)=>new Error('D1_ERROR: '+message);
   // null is a real insert-only constraint failure; the rest are provider errors.
