@@ -9,6 +9,7 @@ import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { startInstaller } from '../server.mjs';
 import { createOutputRoot, finishOutputRoot } from './browser-output.mjs';
+import { assertSelectChevron } from '../../default-seed/tests/e2e/select-chevron.mjs';
 
 const requireFromDefaultSeed = createRequire(new URL('../../default-seed/package.json', import.meta.url));
 const { chromium } = requireFromDefaultSeed('@playwright/test');
@@ -48,7 +49,7 @@ const seed = {
     await store.phase('complete');
   },
 };
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
 const results = [];
 
 async function checkViewport(width, height) {
@@ -395,7 +396,7 @@ async function checkProgressTransition() {
 }
 
 let passed = false;
-async function checkManifestInputs() {
+async function checkManifestInputs(width, height) {
  const root=await mkdtemp(join(taskTemp,'onboarding-manifest-browser-'));
  let installer,context;
  const manifest={schema:1,title:'Manifest fields',groups:[],fields:[
@@ -408,7 +409,9 @@ async function checkManifestInputs() {
   await writeFile(join(root,'background.svg'),backgroundSource);
   await writeFile(join(root,'rer-setup.json'),JSON.stringify(manifest,null,2)+'\n');
   installer=await startInstaller(root,{seed:{product:'Manifest browser',setup:{manifestFile:'rer-setup.json'},browserModule:'seed.mjs',background:'background.svg',install:async()=>{}},noPrefill:true});
-  context=await browser.newContext();const page=await context.newPage();await page.goto(installer.origin);
+  context=await browser.newContext({viewport:{width,height}});const page=await context.newPage();await page.goto(installer.origin);
+  await page.locator('#MODE').waitFor();
+  assert.equal(await assertSelectChevron(page,`${width}px manifest`),1,'the installer renders its select with the shared chevron');
   await page.locator('#MODE').selectOption('online');
   assert.equal(await page.locator('label[for="PUBLIC_EMAIL"]').textContent(),'Online contact');
   assert.equal(await page.locator('#PUBLIC_EMAIL').getAttribute('required'),'');
@@ -430,7 +433,8 @@ async function checkManifestInputs() {
  } finally {await context?.close();await installer?.close();await rm(root,{recursive:true,force:true});}
 }
 try {
-  await checkManifestInputs();
+  await checkManifestInputs(1440, 1000);
+  await checkManifestInputs(390, 844);
   await checkViewport(1440, 1000);
   await checkViewport(390, 844);
   await checkLifecycleViewport(1440, 1000);
