@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.62
+
+- **Themed demo gates keep waiting visibly disabled (#292).** Waiting, working and other non-actionable buttons use muted outlines from the seed’s theme tokens. Turnstile explicitly follows the card’s painted light/dark scheme, including declared dark media tokens.
+- **First paint returns to the 0.2.59 baseline.** Critical theme/import/font CSS is inline under the existing CSP, font faces use swap or optional, and prefetch lists are unchanged. The reviewed browser-cold local-host Plinth medians for 0.2.59 / 0.2.60 / this fix were 20 / 28 / 20 ms; Default was 20 / 24 / 20 ms. Seeds pick up the fix with rer 0.2.62 and a normal demo refresh.
+
 ## 0.2.61
 
 - **One import path for every seed (#272).** The signed-in move-in screen, rer and Business can share upload → plan → reviewed fingerprint → apply → reconcile → undo, retaining native edit protection, history and erasure across catch-up chains. This integration supersedes #246, #262, #252, #250, #259 and #267.
