@@ -57,6 +57,13 @@ outputs remain unchanged. The artifact-only command validates the selection as
 well, so later build callers cannot skip schema checks. Exported runtimes carry
 the setup schema and both validators they need.
 
+Public setup fields and groups may declare `audience: "owner" | "developer"`.
+Fields inherit their group's audience, defaulting to `"owner"`; an explicit
+owner field in a developer group is invalid. Unknown audiences and audience on
+secrets are refused. This lets owner-facing consumers omit developer settings;
+Base's local installer and `rer setup` continue to show all active public fields.
+See [the setup contract](../../schema/SETUP.md) for inheritance and value rules.
+
 `artifact.specInputs` declares allowed public variable names, required/optional
 secret **names**, migration prefixes and additional migration directories,
 health/recovery policy, provider effects, surfaces and initial setup probes.
