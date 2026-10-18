@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.58
+
+- **Deploy dry runs validate required target secrets.** `rer deploy --dry-run` uses the real deploy secret-binding resolver and refuses with the same exit and message when required bindings are missing. It names every missing binding and its environment input, accepts secrets already held by the Worker, and makes no target writes. Missing credentials or read permission also refuse (#275).
+
 ## 0.2.57
 
 - **Large release scans finish within the publication budget.** The JSON identity pass tracks UTF-8 byte offsets incrementally. Orbit's scan finishes in 79 seconds instead of exceeding the 300-second deadline, with identical findings (#270).
