@@ -22,12 +22,13 @@ export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
  const parked = new Set(), unlock = await lockSupervisor(), stop = new AbortController();
  // A terminal's Ctrl-C reaches npx and this process together, and npx then
- // forwards another SIGINT. The handlers stay until run has finished, so a
- // repeated signal finds them too instead of Node's default exit; each one
- // removes run.lock (again, harmlessly), and the first one stops the run.
+ // forwards another SIGINT, which can arrive at any moment until this process
+ // has exited. So the handlers stay for the rest of the process: a repeated
+ // signal finds them instead of Node's default action, which would end the
+ // process before it hands its lease back, removes run.lock or says it stopped.
+ // Each one removes run.lock (again, harmlessly); the first one stops the run.
  const interrupted = signal => () => { unlock.now(); stop.abort(Object.assign(Error('Business supervisor stopped.'), { signal })); };
- const handlers = Object.fromEntries(['SIGTERM', 'SIGINT', 'SIGHUP'].map(signal => [signal, interrupted(signal)]));
- for (const [signal, handler] of Object.entries(handlers)) process.on(signal, handler);
+ for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, interrupted(signal));
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(() => stop.abort(Error('Business supervisor stopped for disconnect.')), () => {}); }, 250);
  let progress, said = '', held = null;
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
@@ -123,6 +124,5 @@ export async function run({ once = false } = {}) {
   clearInterval(monitor);
   await unlock();
   if (stop.signal.reason?.signal) process.stdout.write(`Business supervisor stopped (${stop.signal.reason.signal}); run.lock removed. Run ${businessCommand('run')} again to continue from the saved checkpoint.\n`);
-  for (const [signal, handler] of Object.entries(handlers)) process.off(signal, handler);
  }
 }
