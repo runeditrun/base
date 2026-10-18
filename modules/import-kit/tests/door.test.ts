@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
-import { createImportDoorHandler, importDoorApplyFailureMigration, importDoorSchema, readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
+import { createImportDoorHandler, DoorError, enableDoorAtFirstClaim, importDoorApplyFailureMigration, importDoorSchema, readImportDoorHistory, verifyRerGrant, writeImportDoorSettings } from '../src/door/index.ts';
 import { d1RequestContext, readD1ImportOriginals, readD1ErasureJournal, retireD1ImportCustody, undoD1Import } from '../src/d1/index.ts';
 import { limitStatements } from '../src/d1/budget.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
@@ -20,6 +20,80 @@ test('HTTP import door is absent until the installation opts in',async t=>{
   delete (d.options.claim.publicKeys as Record<string, JsonWebKey>).test;
   for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
+});
+
+test('A Business install opens its door at the first owner claim and never reopens it after the owner turns it off',async t=>{
+  const d=await door(t),native=d.runtime.native(),key=d.options.claim.installationId;
+  const closed=async ()=>{for (const action of ['uploads','status'] as const) assert.equal((await d.call(action,{})).status,404,action);};
+  // Before any owner exists the claim path cannot enable it, and writes nothing.
+  native.exec("UPDATE native_authority SET enabled=0 WHERE id='owner'");
+  await assert.rejects(enableDoorAtFirstClaim(d.db,key,d.ownerPredicate),(e:unknown)=>e instanceof DoorError&&e.code==='owner_required');
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_settings').get()!.n,0);
+  await closed();
+  // The owner's first claim (RER_IMPORT_DOOR=on) opens the door for RER grants.
+  native.exec("UPDATE native_authority SET enabled=1 WHERE id='owner'");
+  await enableDoorAtFirstClaim(d.db,key,d.ownerPredicate);
+  const uploadId=await d.upload(documents(2));
+  assert.equal((await d.call('uploads',{uploadId})).body.complete,true);
+  await enableDoorAtFirstClaim(d.db,key,d.ownerPredicate);
+  assert.equal((await d.call('uploads',{uploadId})).status,200,'a repeated claim call is harmless');
+  // The owner turns it off; a later claim-path call does not override that.
+  await writeImportDoorSettings(d.db,key,{enabled:false,revokedKids:['retired']},d.ownerPredicate);
+  await enableDoorAtFirstClaim(d.db,key,d.ownerPredicate);
+  await closed();
+  assert.deepEqual(native.prepare('SELECT installation_id,enabled FROM ik_door_settings').all().map(r=>({...r})),[{installation_id:key,enabled:0}]);
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_revoked_keys').get()!.n,1);
+  // A self-hosted install never calls it: its door stays closed after the owner exists.
+  const selfHosted=await door(t);
+  for (const action of ['uploads','status'] as const) assert.equal((await selfHosted.call(action,{})).status,404,action);
+  assert.equal(selfHosted.runtime.native().prepare('SELECT count(*) n FROM ik_door_settings').get()!.n,0);
+});
+
+test('verifyRerGrant accepts only an exact RER-signed read for its route and refuses everything else',async t=>{
+  const d=await door(t),claim=d.options.claim;
+  // A seed route outside the import door, as Uptime mounts POST /api/rer/runner-status.
+  const route=async (request:Request,action='runner-status'):Promise<Response|null>=>{
+    if (new URL(request.url).pathname!=='/api/rer/runner-status') return null;
+    try { const {grant,kid}=await verifyRerGrant(request,claim,action); return Response.json({action:grant.action,installationId:grant.installationId,kid}); }
+    catch (error) { if (error instanceof DoorError) return Response.json({error:error.code},{status:error.status}); throw error; }
+  };
+  d.mount(route,createImportDoorHandler(d.options));
+  const now=Math.floor(Date.now()/1000);
+  const read=(extra:Record<string,unknown>={})=>({v:1,iss:claim.issuer,aud:d.origin,installationId:claim.installationId,email:claim.expectedEmail,jti:crypto.randomUUID(),iat:now,exp:now+300,action:'runner-status',...extra});
+  const post=async (headers:Record<string,string>,path='/api/rer/runner-status')=>{
+    const response=await fetch(d.origin+path,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:'{}'});
+    return {status:response.status,body:await response.json() as any};
+  };
+  const bearer=async (payload:Record<string,unknown>,privateKey?:CryptoKey)=>({Authorization:'Bearer '+await d.sign(payload,privateKey)});
+  const accepted=await post(await bearer(read()));
+  assert.deepEqual(accepted,{status:200,body:{action:'runner-status',installationId:claim.installationId,kid:'test'}});
+  assert.deepEqual(await post({}),{status:401,body:{error:'grant_required'}});
+  const forger=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+  const {exp:_,...noExpiry}=read();
+  for (const [why,payload,key] of [
+    ['forged signature',read(),forger.privateKey],
+    ['another action',read({action:'runner-config'})],
+    ['a door grant',{...read({action:'status'}),namespace:'knowledge',maxBytes:1,maxChunks:1,maxRecords:1}],
+    ['an unknown member',read({namespace:'knowledge'})],
+    ['a missing member',noExpiry],
+    ['expired',read({iat:now-400,exp:now-100})],
+    ['over 300 seconds',read({exp:now+301})],
+    ['another installation',read({installationId:'other-installation'})],
+    ['another owner',read({email:'someone@example.test'})],
+    ['another audience',read({aud:'https://other.example.test'})],
+    ['another issuer',read({iss:'https://rer.example.test'})],
+  ] as [string,Record<string,unknown>,CryptoKey?][]) assert.deepEqual(await post(await bearer(payload,key)),{status:403,body:{error:'invalid_grant'}},why);
+  // A read grant opens nothing in the import door, even when it is enabled.
+  await d.enable();
+  assert.equal((await post(await bearer(read({action:'status'})),'/api/rer/import/status')).status,403);
+  // Bound to the claim's app origin, whatever host the request reached.
+  const elsewhere=await route(new Request('https://elsewhere.example.test/api/rer/runner-status',{method:'POST',headers:await bearer(read())}));
+  assert.deepEqual([elsewhere!.status,await elsewhere!.json()],[403,{error:'grant_binding_mismatch'}]);
+  // Door actions stay the door's, and a malformed action is a configuration error.
+  for (const action of ['status','apply','Runner status','']) {
+    const refused=await route(new Request(d.origin+'/api/rer/runner-status',{method:'POST',headers:await bearer(read({action}))}),action);
+    assert.deepEqual([refused!.status,await refused!.json()],[503,{error:'invalid_configuration'}],action);
+  }
 });
 
 test('HTTP door uploads and applied snapshots erase with their destination in the journal batch',async t=>{

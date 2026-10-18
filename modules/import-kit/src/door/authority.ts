@@ -47,6 +47,26 @@ export async function writeImportDoorSettings(db: D1Database, installationId: st
     ...(changes.revokedKids ?? []).map(kid => sql('INSERT OR IGNORE INTO ik_door_revoked_keys(installation_id,kid) VALUES(?,?)', installationId, kid)),
   ]);
 }
+/** Business-provisioned installs only: the seed calls this when it sees
+ * `RER_IMPORT_DOOR=on`, from the path that completes its first owner claim,
+ * with a predicate that holds once that owner exists. One batch checks the
+ * predicate before and after, and creates the installation's settings row
+ * enabled only when it has none, so it never overrides the owner's later
+ * choice: a door the owner turned off stays off, and revoked keys stay revoked.
+ * A repeat (a retry after the Worker stopped between the claim and this call)
+ * is safe. Without the variable, never call it: the door stays off. */
+export async function enableDoorAtFirstClaim(db: D1Database, installationId: string, ownerPredicate: D1Sql): Promise<void> {
+  if (typeof installationId !== 'string' || !installationId.trim()) throw new DoorError('invalid_settings', 400);
+  try {
+    await transact(db, ownerPredicate, [
+      sql('INSERT INTO ik_door_settings(installation_id,enabled) VALUES(?,1) ON CONFLICT(installation_id) DO NOTHING', installationId),
+    ]);
+  } catch (error) {
+    const owner = await statement(db, sql(`SELECT CASE WHEN (${ownerPredicate.sql}) THEN 1 ELSE 0 END AS ok`, ...ownerPredicate.params ?? [])).first();
+    if (owner?.ok !== 1) throw new DoorError('owner_required');
+    throw error;
+  }
+}
 /** Use alongside the seed's existing owner-bound import list and undo route. */
 export async function readImportDoorHistory(db: D1Database, installationId: string, ownerPredicate: D1Sql) {
   const query = sql(`SELECT p.id AS planId,p.job_id AS jobId,p.namespace,p.fingerprint,j.state,j.error,f.reason_code AS failureCode,
