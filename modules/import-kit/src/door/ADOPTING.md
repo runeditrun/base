@@ -44,6 +44,18 @@ Owner history and undo must include jobs from either authority.
    already-imported target for catch-up, `list` must read the native set in a
    fixed number of queries, and large imports need a compact `matchesMany`
    (see Pitfalls).
+   **Undo policy.** Door jobs use the kit's `strict` undo unless the runtime
+   options set `reversalPolicy`. A seed whose own imports preserve the owner's
+   edits on undo passes `reversalPolicy: 'preserve-conflicts'` to every door
+   mount (operator and grant), and its adapter implements `preparePreservedUndo`
+   (a mount refuses construction with 503 `invalid_configuration` otherwise).
+   Door jobs are then created with that policy: the seed's ordinary history,
+   which reads each import job with its own policy, lists them, and door undo
+   after an owner edit keeps the owner's change and reverses the rest, as the
+   seed's local imports do. Only new door jobs take the option; earlier ones keep
+   the policy they were created with. Strict remains the default, unchanged. A
+   seed that adapted `door/types.ts` and `door/authority.ts` to pass a policy
+   (Lamp) drops that change, re-vendors the door verbatim and passes the option.
 3. **Operator mount.** Import `createImportOperatorHandler` from
    `modules/import-kit/src/door/operator.ts`. Supply the runtime options in
    `types.ts`, plus server-owned `installationId`, `appOrigin`, `ownerEmail`,
@@ -97,7 +109,9 @@ Owner history and undo must include jobs from either authority.
 5. **Move-in screen.** Call POST `/api/operator/import/{uploads,plan,apply,status,
    reconcile,undo}` with the current owner cookie, exact `Origin` and normal
    seed CSRF headers. Bodies and results are in [README.md](README.md). Upload
-   original bytes, show the returned counts, rejections and differences, then
+   original bytes, show the returned counts, rejections, differences and each
+   `CREDENTIAL_REMOVED` diagnostic (a credential value the door removed from that
+   record), and each named source refusal's `details.reason`, then
    require the owner's review before posting `{planId, reviewedFingerprint}`.
    Repeat bounded apply calls with that fingerprint until `job.state` is
    `completed`; reconcile from native data and expose Undo. Never mint an import
@@ -139,6 +153,14 @@ their lineage instead of re-creating them. The existing grant signature, nonce,
 scope, expiry and approval rules do not change.
 
 ## Pitfalls found in adoptions
+
+- **Credential fields in exports.** Vendor exports carry credential-named
+  fields (UptimeRobot's `apiKey: null` on every monitor) and URLs with
+  `user:pass@`. The door reads every upload with the kit's `credentials:
+  'remove'`: null, empty and masked values pass, and a real value is removed
+  from its record, which is kept and noted. The plan holds none, the original
+  bytes are withheld and the upload's chunks are deleted once the plan is saved.
+  Do not drop such records or fields in the seed's parser to get past a refusal.
 
 - **Export custody.** A seed whose export policy excludes import custody
   (`excludeTables`) must also exclude `ik_door_%`; door uploads and plans hold

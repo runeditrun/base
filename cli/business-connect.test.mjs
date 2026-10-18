@@ -319,3 +319,42 @@ test('browser opt-ins work without terminal prompts, failed storage never activa
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
  }
 });
+
+test('vendor exports strip credential values before upload, keeping every record, empty credential fields and pagination', async t => {
+ const { exportVendor } = await import('./business/vendors/index.mjs');
+ const key = 'fixture-vendor-read-key', apiKey = 'fixture-account-api-key-value', password = 'fixture-basic-auth-pass';
+ const secrets = [key, apiKey, password, 'fixture-header-secret', 'fixture-integration-key'];
+ // Uptime's UptimeRobot v3 fixture shape: every monitor carries apiKey, one checks a user:pass@ URL.
+ const monitors = [
+  { id: 9000001, url: 'https://shop.example.com/', customHttpHeaders: null, psps: [{ id: 5, isPasswordSet: false }], apiKey: null },
+  { id: 9000009, url: 'https://api.partner.example.net/v1/health', customHttpHeaders: { 'X-Api-Key': 'fixture-header-secret' }, apiKey: '' },
+  { id: 9000012, url: `https://user:${password}@staging.example.com/`, customHttpHeaders: null, apiKey },
+ ];
+ const responses = new Map(Object.entries({
+  'https://api.uptimerobot.com/v3/monitors?limit=200': { data: monitors.slice(0, 2), nextLink: 'https://api.uptimerobot.com/v3/monitors?cursor=page-2' },
+  'https://api.uptimerobot.com/v3/monitors?cursor=page-2': { data: monitors.slice(2), nextLink: null },
+  'https://api.pagerduty.com/users?limit=100&offset=0': { users: [{ id: 'PUSER01', name: 'Fixture Responder', integration_key: 'fixture-integration-key', html_url: 'https://fixture.pagerduty.com/users/PUSER01' }], limit: 100, offset: 0, more: false },
+  'https://api.pagerduty.com/schedules?limit=100&offset=0': { schedules: [], limit: 100, offset: 0, more: false },
+  'https://api.pagerduty.com/escalation_policies?limit=100&offset=0': { escalation_policies: [], limit: 100, offset: 0, more: false },
+ }));
+ const original = globalThis.fetch;
+ t.after(() => { globalThis.fetch = original; });
+ // The network edge: each vendor API answers its fixed pages.
+ globalThis.fetch = async url => {
+  const body = responses.get(String(url));
+  return body ? new Response(JSON.stringify(body)) : new Response('{}', { status: 404 });
+ };
+ const collect = async (vendor, inputs) => { const items = []; for await (const item of exportVendor(vendor, { key, inputs })) items.push(item); return items; };
+ const uptime = await collect('uptimerobot', {}), text = Buffer.concat(uptime.map(item => item.bytes)).toString();
+ const pages = text.trim().split('\n').map(line => JSON.parse(line));
+ assert.deepEqual(pages.map(page => page.data.map(monitor => monitor.id)), [[9000001, 9000009], [9000012]], 'every record is kept');
+ assert.deepEqual(pages.map(page => page.nextLink), ['https://api.uptimerobot.com/v3/monitors?cursor=page-2', null]);
+ assert.deepEqual([pages[0].data[0].apiKey, pages[0].data[1].apiKey, pages[0].data[0].psps[0].isPasswordSet], [null, '', false], 'empty credential fields stay as they are');
+ assert.equal(pages[0].data[1].customHttpHeaders['X-Api-Key'], '[removed]');
+ assert.deepEqual([pages[1].data[0].url, pages[1].data[0].apiKey], ['https://removed@staging.example.com/', '[removed]']);
+ const pagerduty = await collect('pagerduty', { start: '2026-10-01T00:00:00.000Z', end: '2026-10-08T00:00:00.000Z' });
+ const bundle = JSON.parse(Buffer.concat(pagerduty.map(item => item.bytes)).toString());
+ assert.deepEqual(bundle.users[0].users[0], { id: 'PUSER01', name: 'Fixture Responder', integration_key: '[removed]', html_url: 'https://fixture.pagerduty.com/users/PUSER01' }, 'a credential field no longer refuses the export');
+ const emitted = JSON.stringify([text, bundle, uptime.map(item => item.checkpoint), pagerduty.map(item => item.checkpoint)]);
+ for (const secret of secrets) assert.ok(!emitted.includes(secret), 'no credential value is emitted for upload');
+});

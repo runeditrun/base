@@ -55,7 +55,9 @@ export async function apply(request: DoorRequest, input: Record<string,unknown>)
   // The kit asserts the snapshot is still held at both ends of every batch.
   const result = await fenced(request,row.id,snapshotHeld(row.id),async()=>{
     await reserveApply(request,snapshot);
-    const job = await createD1ImportJob(snapshot.plan,context);
+    // Only creation selects the policy; later calls use the job's durable one.
+    const policy = request.options.reversalPolicy;
+    const job = await createD1ImportJob(snapshot.plan,policy ? {...context,reversalPolicy:policy} : context);
     await transact(request.options.database,request.authority,[
       sql('UPDATE ik_door_plans SET job_id=? WHERE id=? AND (job_id IS NULL OR job_id=?)',job.id,row.id,job.id),
       assertion(sql('EXISTS(SELECT 1 FROM ik_door_plans WHERE id=? AND job_id=?)',row.id,job.id)),

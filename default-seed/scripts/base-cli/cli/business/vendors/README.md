@@ -44,6 +44,17 @@ emission. HTTP errors contain only a fixed code and numeric status; network,
 parsing and unexpected errors never expose response text, URLs or key values.
 429 stops with `RATE_LIMITED`; there is no hidden retry loop.
 
+## Credentials in responses
+
+Every adapter strips credential values from a parsed response before it emits
+bytes for upload, keeping the record. A credential-named field (`apiKey`,
+`password`, `token`, `integration_key`, `X-Api-Key`, `webhook_url` and the like)
+holding a value becomes `"[removed]"`, and a URL's user name and password become
+`removed@`; the seed's import door reports both per record. Null, booleans, empty
+strings and masks such as `****` are not credentials and stay as they are.
+Pagination is read from the response as received, so a credential-bearing
+pagination link is still refused.
+
 ## Inputs and native coverage
 
 * `sentry`: `organization: {id, slug, region: 'us'|'de'}`, `start`, `end`, and
@@ -62,8 +73,8 @@ parsing and unexpected errors never expose response text, URLs or key values.
   with layers/final coverage, overrides for the window and escalation policies.
   Schedule listing only discovers IDs and is not duplicated in the bundle.
   Overrides retain full boundaries with `overflow=true` and add `schedule_id`,
-  as Oncall's documented bundle requires. Credential-bearing response fields
-  refuse the export. Incident history and paging configuration are not fetched.
+  as Oncall's documented bundle requires. Incident history and paging
+  configuration are not fetched.
 * `calendly`: optional `asOf` timestamp (recommended for a repeatable catch-up).
   An omitted timestamp is captured at first invocation and retained on resume.
   Downloads the current user, event types, availability schedules, per-type

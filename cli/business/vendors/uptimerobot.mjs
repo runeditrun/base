@@ -1,4 +1,4 @@
-import { object, list, reference, shape, fail } from './common.mjs';
+import { object, list, reference, shape, fail, withoutCredentials } from './common.mjs';
 
 export const origin = 'https://api.uptimerobot.com';
 export const route = url => url.pathname === '/v3/monitors' && [...url.searchParams.keys()].every(x => ['limit','offset','cursor','page','page_token'].includes(x));
@@ -15,6 +15,6 @@ export async function* run(ctx) {
     if (!Object.hasOwn(body, 'nextLink')) fail();
     state.seen.push(url.href);
     state.next = body.nextLink == null ? null : reference(body.nextLink, origin, /^\/v3\/monitors$/u, ['limit','offset','cursor','page','page_token']).href;
-    yield ctx.item(JSON.stringify(body) + '\n', state);
+    yield ctx.item(JSON.stringify(withoutCredentials(body)) + '\n', state);
   }
 }

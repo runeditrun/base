@@ -10,6 +10,7 @@ import { importedTargets, recordKey } from './inventory.ts';
 import { DoorError } from './protocol.ts';
 import { lineage, loadSnapshot, planRow, saveSnapshot, sql, statement, transact } from './store.ts';
 import { bundleBytes, text, uploadRow, type UploadRow } from './uploads.ts';
+import { sourceRefusal } from './refusals.ts';
 
 export function preview(snapshot: DoorSnapshot) {
   const {plan,differences} = snapshot;
@@ -23,12 +24,16 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
   const upload = await uploadRow(request,text(input.uploadId,'upload_id'));
   try { return await planUpload(request,input,upload); }
   catch (error) {
+    // A reader or bundle-check refusal answers a named 4xx, never a bare conflict.
+    const refused = error instanceof DoorError ? error : sourceRefusal(error);
     // Whatever refuses this plan first (a pending import, interrupted staging, a
-    // withdrawn snapshot, the catch-up shape or a bound), an upload holding an
-    // erased record is refused for that instead, and goes. A failing screen leaves
-    // the original refusal standing.
-    if (error instanceof DoorError && error.code !== 'source_erased') await screen(request,upload).catch(screened => { if (screened instanceof DoorError && screened.code === 'source_erased') throw screened; });
-    throw error;
+    // withdrawn snapshot, the catch-up shape, a bound or the source itself), an
+    // upload holding an erased record is refused for that instead, and goes. A
+    // failing screen leaves the original refusal standing.
+    if (refused && refused.code !== 'source_erased') await screen(request,upload).catch(screened => { if (screened instanceof DoorError && screened.code === 'source_erased') throw screened; });
+    // An upload holding a credential the reader cannot remove is never kept.
+    if (refused?.code === 'source_credential') await forget(request,upload);
+    throw refused ?? error;
   }
 }
 async function planUpload(request: DoorRequest, input: Record<string, unknown>, upload: UploadRow) {
@@ -42,6 +47,7 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
     if (snapshot.sourceCount > request.access.maxRecords) throw new DoorError('plan_exceeds_grant_quota');
     if (snapshot.plan.mappingVersion !== request.options.mapping.version) throw new DoorError('snapshot_mapping_changed_use_new_namespace',409);
     if (request.access.catchup === 'bounded' && (!snapshot.standingApproval || snapshot.standingApproval.id !== request.access.approvalRecordId || snapshot.standingApproval.at !== request.access.approvedAt)) throw new DoorError('standing_approval_mismatch');
+    await dropCredentialBytes(request,snapshot,upload);
     return preview(snapshot);
   }
   if (current.pending_id) throw new DoorError('namespace_has_pending_import',409);
@@ -102,14 +108,23 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   if (request.access.catchup === 'bounded') assertBounded(snapshot,previous!);
   await refuseErased(request,upload,snapshot.plan);
   await saveSnapshot(request,snapshot,upload);
+  await dropCredentialBytes(request,snapshot,upload);
   return preview(snapshot);
+}
+/** The reader removed credential values: the saved plan holds none and withholds
+ * the original, so the uploaded bytes that still hold them go once it is saved.
+ * The upload's header stays, so repeating this plan finds the saved one. */
+async function dropCredentialBytes(request: DoorRequest, snapshot: DoorSnapshot, upload: UploadRow): Promise<void> {
+  if (snapshot.plan.source.artifacts.some(a=>a.original?.status==='unavailable' && a.original.reason==='credentials-removed'))
+    await transact(request.options.database,request.authority,[sql('DELETE FROM ik_door_chunks WHERE upload_id=?',upload.id)]);
 }
 /** Each plan has its own kit namespace, so a replan after a failed apply never
  * meets the failed job's kit namespace. */
 async function readUpload(request: DoorRequest, upload: UploadRow, planId: string) {
   const bytes = await bundleBytes(request,upload), options = request.options;
   const kitNamespace = 'door:' + sha256(canonicalJson([request.access.namespace,upload.bundle_sha256,planId]));
-  const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
+  // Credential values are removed per record, never imported, and never refuse a record.
+  const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse,credentials:'remove'},
     {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.access.maxBytes,request.access.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.access.maxRecords,request.access.maxRecords)});
   return {kitNamespace,source};
 }
@@ -118,10 +133,12 @@ async function readUpload(request: DoorRequest, upload: UploadRow, planId: strin
 async function refuseErased(request: DoorRequest, upload: UploadRow, plan: ImportPlan): Promise<void> {
   const db = request.options.database;
   for (const clear of erasedSourcePredicates(plan)) if ((await statement(db, sql(`SELECT ${clear.sql} AS clear`, ...clear.params ?? [])).first())?.clear !== 1) {
-    await transact(db, request.authority, [sql('DELETE FROM ik_door_chunks WHERE upload_id=?', upload.id), sql('DELETE FROM ik_door_uploads WHERE id=?', upload.id)]);
+    await forget(request, upload);
     throw new DoorError('source_erased', 409);
   }
 }
+const forget = (request: DoorRequest, upload: UploadRow) => transact(request.options.database, request.authority,
+  [sql('DELETE FROM ik_door_chunks WHERE upload_id=?', upload.id), sql('DELETE FROM ik_door_uploads WHERE id=?', upload.id)]);
 /** The upload planned on its own with the plain mapping: one holding an erased record is refused and goes. */
 async function screen(request: DoorRequest, upload: UploadRow): Promise<void> {
   const id = randomUUID(), {kitNamespace,source} = await readUpload(request,upload,id), mapping = request.options.mapping;

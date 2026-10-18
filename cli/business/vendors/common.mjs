@@ -46,6 +46,23 @@ export function reference(value, origin, pathname, allowedQuery = []) {
   if ([...url.searchParams.keys()].some(key => !allowedQuery.includes(key))) fail('INVALID_PAGINATION');
   return url;
 }
+// A field of this name holds a credential unless it is empty: null, a boolean
+// (Calendly's `secret` flag), whitespace or a mask such as "****" or "[redacted]".
+const credentialKey = /^(?:password|passwd|secret|token|credentials?|authorization|cookie)$|(?:api|access|auth|integration|routing|service|signing|private|client|refresh|session)[_-]?(?:key|secret|token)$|^webhook[_-]?(?:url|secret)$|(?:http|web)[_-]?cal[_-]?url$/iu;
+const placeholder = /^(?:\s*|[*\u2022\u25CF\u00B7x#_.-]{1,64}|[<[({]?\s*(?:redacted|hidden|masked|removed|omitted|none|null|n\/a|placeholder)\s*[>\])}]?)$/iu;
+/** What a stripped credential value becomes; the seed's import door reports it per record. */
+export const REMOVED_CREDENTIAL = '[removed]';
+const empty = value => value === null || typeof value === 'boolean' || (typeof value === 'string' && placeholder.test(value));
+/** A copy of a parsed vendor response without credential values, made before any
+ * byte is emitted for upload: a credential-named field's value becomes
+ * REMOVED_CREDENTIAL, and a URL's user name and password become `removed@`, so
+ * the record stays and the seed can say what was removed. */
+export function withoutCredentials(value) {
+  if (Array.isArray(value)) return value.map(withoutCredentials);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, child]) =>
+    [key, credentialKey.test(key) && !empty(child) ? REMOVED_CREDENTIAL : withoutCredentials(child)]));
+  return typeof value === 'string' ? value.replace(/^((?:https?:)?\/\/)[^/?#]*@/iu, '$1removed@') : value;
+}
 export function assertCount(value, max = 1000) {
   if (!Number.isSafeInteger(value) || value < 0 || value > max) fail('INVALID_CHECKPOINT');
   return value;

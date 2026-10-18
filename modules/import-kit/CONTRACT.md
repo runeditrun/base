@@ -233,9 +233,20 @@ rewrites or retires custody carries the product's restore checkpoint, so an
 archive older than the erasure is refused whole under the later journal.
 
 Credential-key validation permits a JSON boolean under the exact key `secret`,
-a common noncredential visibility flag. Every nonboolean value under that key,
-other credential keys and credential-bearing URLs remain forbidden, including in
-raw file/API originals excluded by a parser. Accepted originals remain exact.
+a common noncredential visibility flag, and null, an empty string or a mask
+(`****`, `[redacted]`, `[removed]` and similar) under any credential key: they sit
+where a credential would go but are not one. Every other value under a credential
+key and credential-bearing URLs remain forbidden, including in raw file/API
+originals excluded by a parser. Accepted originals remain exact.
+
+`readFileSource` with `credentials: 'remove'` (the import door's choice) keeps a
+record holding a plain credential value instead: it drops the credential field
+or the URL's user name, password and credential query parameters, reports each
+per record as a `CREDENTIAL_REMOVED` warning diagnostic (field pointer and kind,
+never the value), and withholds the file's original bytes as
+`{ status: 'unavailable', reason: 'credentials-removed' }`. A record that still
+repeats a removed value, or a credential in a form it cannot remove (encoded or
+nested in a query value), still fails.
 
 Public D1 planning is SELECT-only and checks the current SQL `plan` grant before
 mapping and before returning. A different `read` grant cannot substitute for it.

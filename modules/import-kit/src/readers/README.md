@@ -76,11 +76,23 @@ credentials, and **must honor these settings**. Fetch is a suitable transport.
 The reader handles same-origin redirects itself, rejects automatically followed
 redirects, cross-origin links, userinfo, fragments and credential-bearing query
 parameters, and preserves all accepted pagination parameters and request headers.
-It never silently strips URL credentials. Tokens belong in the ephemeral `token`
+The API reader never strips URL credentials. Tokens belong in the ephemeral `token`
 or `headers` arguments. A conflicting Authorization header fails. Credential keys,
 credential URLs and reflected credential values in source data fail, even if a
-parser would omit them. No token, response error text or credential-bearing URL
-is returned in bundle metadata or diagnostics.
+parser would omit them. Null, an empty string or a mask (`****`, `[redacted]`)
+under a credential key is not a credential and passes. No token, response error
+text or credential-bearing URL is returned in bundle metadata or diagnostics; a
+credential refusal names only the field kind in its diagnostic `field`.
+
+`readFileSource` takes `credentials: 'remove'` to keep records that hold a plain
+credential value: the parser sees the value as read, then each record loses its
+credential fields and its URLs' user names, passwords and credential query
+parameters, with one `CREDENTIAL_REMOVED` warning per removal naming the record,
+the field pointer and its kind. The original bytes are then withheld
+(`reason: 'credentials-removed'`). A record still repeating a removed value
+fails with `CREDENTIAL_IN_SOURCE_DATA`; forms it cannot remove still fail as
+above. A field holding `[removed]`, the marker rer's vendor exports leave, is
+reported as removed before upload.
 
 All requests, including redirects/retries, count toward `maxRequests` (default
 1000). Rate limits (429, or 403/503 with Retry-After) allow `maxRetries` (default 3)

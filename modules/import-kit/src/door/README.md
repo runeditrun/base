@@ -22,6 +22,7 @@ Construct the handler with these seed-owned options:
 | `format`, `parse` | `'json'` or `'ndjson'`, and the product's parser of source records. |
 | `source` | Instead of `parse`/`mapping`, for several sources: `source(namespace)` returns that namespace's `{parse, mapping, ownerPrincipalId?}` from the seed's server-owned allow-list, or `null`. It runs after grant verification and before any write; `null` is refused with 403 `unknown_import_source`. |
 | `limits` | Optional reader limits; grant quotas still apply. |
+| `reversalPolicy` | Optional undo policy for new door jobs: `'strict'` (the default) or `'preserve-conflicts'`, which keeps the owner's native edits on undo, as a seed's own preserving imports do, and needs the adapter's `preparePreservedUndo`. Existing jobs keep their policy. See ADOPTING.md. |
 
 A fresh installation applies the statements in `importDoorSchema: string[]`
 in a new product-owned numbered migration after the D1 import-kit schemas.
@@ -154,11 +155,35 @@ All bodies are JSON. Quotas are admission limits, not a hosted capacity promise.
 | --- | --- |
 | `uploads` | `{ uploadId?, name, bundleSha256, totalBytes, totalChunks, index, chunkSha256, base64 }`; decoded chunks are exactly 64 KiB except the final chunk. `totalChunks` must equal `ceil(totalBytes / 65536)`. Omit `uploadId` on the first chunk to receive a server-generated UUID. Reuse it and the same bundle metadata for subsequent chunks. Both chunk and complete bundle SHA-256 are checked before reporting completion. |
 | `uploads` | `{ uploadId }` returns received-chunk inventory for resuming. An identical duplicate chunk is idempotent with a fresh grant. |
-| `plan` | `{ uploadId, catchup?: boolean }` returns `planId`, `fingerprint`, server-derived counts, summary, rejected rows with reasons and differences including gone source ids. Planning makes no native target writes. |
+| `plan` | `{ uploadId, catchup?: boolean }` returns `planId`, `fingerprint`, server-derived counts, summary, rejected rows with reasons, `diagnostics` and differences including gone source ids. Planning makes no native target writes. |
 | `apply` | `{ planId, reviewedFingerprint }` creates or resumes the real kit job in bounded batches. Repeat with a fresh valid grant to continue. |
 | `status` | `{ planId }` reads current job progress. |
 | `reconcile` | `{ planId }` derives source-id disposition/presence and native/provenance revision, value, attachment and count checks on the server. |
 | `undo` | `{ planId }` reverses the newest snapshot's attributed effects in bounded kit work, preserving native edits. |
+
+### Credentials and source refusals
+
+`plan` reads the upload with the kit's `credentials: 'remove'`. A credential
+field holding null, an empty string or a mask is not a credential and imports as
+it is. A real value is removed from its record, which is kept: a credential-named
+field (`apiKey`, `password`, `token` and the like) is dropped, and a URL loses its
+user name, password and credential query parameters. Each removal is a
+`CREDENTIAL_REMOVED` warning in `diagnostics` with the record's `kind`,
+`sourceId`, the field pointer and its kind, never the value; a field holding the
+`[removed]` marker rer's vendor exports leave is reported as removed before
+upload. The plan never holds a removed value: the original bytes are withheld
+(`ORIGINAL_UNAVAILABLE`), and the upload's chunks are deleted once the plan is
+saved, keeping its header so the same plan can be fetched again.
+
+Every refusal from the reader or a bundle check is a named 4xx whose
+`details.reason` is a fixed sentence and whose `details.row`/`details.pointer`
+locate it; no source value is reflected:
+
+| Error / status | Meaning |
+| --- | --- |
+| `source_credential` / 422 | A credential the door cannot remove: one a record repeats elsewhere, an encoded or nested credential URL, or a credential field the mapping proposes. `details.field` names its kind (`credential field "token"`, `URL user name or password`, `URL credential query parameter`, `repeated credential value`). The upload is deleted. |
+| `source_<reader or bundle code>` / 422 | For example `source_malformed_json`, `source_malformed_utf8`, `source_parser_failed`, `source_duplicate_source_conflict`, `source_duplicate_target`, `source_active_effect_forbidden`. |
+| `source_byte_limit`, `source_record_limit`, `source_record_byte_limit`, `source_effect_limit`, `source_import_plan_too_large` / 413 | A source or plan bound. |
 
 Bodies are limited to 100,000 bytes. The 1,024-chunk bound limits one bundle to
 64 MiB even if a grant's byte quota is larger. A smaller grant quota wins.

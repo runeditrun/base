@@ -1,4 +1,4 @@
-import { object, list, id, windowInputs, cursor, assertCount, shape, fail } from './common.mjs';
+import { object, list, id, windowInputs, cursor, assertCount, shape, fail, withoutCredentials } from './common.mjs';
 
 export const origins = Object.freeze({ us: 'https://us.sentry.io', de: 'https://de.sentry.io' });
 export const route = url => /^\/api\/0\/(?:organizations\/[a-zA-Z0-9_-]+\/(?:projects|releases|issues)|projects\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\/events\/[a-fA-F0-9]{32})\/$/u.test(url.pathname) && [...url.searchParams.keys()].every(x => ['per_page','limit','cursor','query','project','start','end','sort'].includes(x));
@@ -73,7 +73,7 @@ export async function* run(ctx) {
     if (next !== null && (next === s.cursor || s.seen.includes(next))) fail('PAGINATION_CYCLE');
     if (++s.page > 100) fail('PAGE_LIMIT');
     let bytes = s.cursor === null ? (s.collections ? ',' : '') + JSON.stringify({kind,project}).slice(0,-1) + ',"pages":[' : ',';
-    bytes += JSON.stringify({ cursor: s.cursor, nextCursor: next, response });
+    bytes += JSON.stringify({ cursor: s.cursor, nextCursor: next, response: withoutCredentials(response) });
     s.cursor = next;
     if (next === null) {
       bytes += ']}'; s.collections++; s.seen = []; s.page = 0; s.event = 0;

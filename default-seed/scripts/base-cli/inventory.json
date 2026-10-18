@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.62",
+  "cliVersion": "0.2.62-dev.g9d371985",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -519,15 +519,15 @@
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
-      "sha256": "5ab50a3aed5f7948baaf444b44e6ba2785320e48c148e7343f35f9d500cee0eb"
+      "sha256": "a07a35d4f7dd210b8dc41d5eb102faa36ce9d595395922e923fa5e3a2bc9e336"
     },
     "cli/business/vendors/calendly.mjs": {
       "source": "cli/business/vendors/calendly.mjs",
-      "sha256": "8badcaeab56c16084f1bc420d1d7454b7fcc5b439598d9f3598a7a5754a913d7"
+      "sha256": "fb67b61f71d37fe89531db0b7dbbfdb90b2bdf3359be6db8d2eeb10378626746"
     },
     "cli/business/vendors/common.mjs": {
       "source": "cli/business/vendors/common.mjs",
-      "sha256": "f07670c758ef1fdef00157ea4bef93369ecb836af6d352ff28c2935ffa8d790a"
+      "sha256": "3a622ca6d9af76fb7893887d684fb56874818187128aa1fffc4a0931545bc9aa"
     },
     "cli/business/vendors/index.mjs": {
       "source": "cli/business/vendors/index.mjs",
@@ -535,15 +535,15 @@
     },
     "cli/business/vendors/pagerduty.mjs": {
       "source": "cli/business/vendors/pagerduty.mjs",
-      "sha256": "313a56ef30c7ead91b0665c810373941d8620bc8f3e1994d509bb2ece4d4a239"
+      "sha256": "fc95a8e1d61a01dca9dc33a138108a899e18745ded23a119e8ba6313542b4ab7"
     },
     "cli/business/vendors/sentry.mjs": {
       "source": "cli/business/vendors/sentry.mjs",
-      "sha256": "851f969f9fa26ac229749b0e3f1cf9bfd3f18e12e7bdc938a73175b9fb904295"
+      "sha256": "7542c62a0dd990527a442e5521500b6b83e16dada9493d93bee9806465c30096"
     },
     "cli/business/vendors/uptimerobot.mjs": {
       "source": "cli/business/vendors/uptimerobot.mjs",
-      "sha256": "a4a3f68046853279600404ade5521c551bea84d57a078569a7eecf5f24ba3dc4"
+      "sha256": "e728d07c54184c2f0c1f67042ca190150b707520b184b76976c1b9d6222bd5a3"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",

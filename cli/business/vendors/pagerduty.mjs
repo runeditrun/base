@@ -1,15 +1,7 @@
-import { object, list, id, windowInputs, assertCount, shape, fail } from './common.mjs';
+import { object, list, id, windowInputs, assertCount, shape, fail, withoutCredentials } from './common.mjs';
 
 export const origin = 'https://api.pagerduty.com';
 export const route = url => /^\/(?:users|escalation_policies|schedules(?:\/[a-zA-Z0-9_-]+(?:\/overrides)?)?)$/u.test(url.pathname) && [...url.searchParams.keys()].every(x => ['limit','offset','since','until','overflow'].includes(x));
-const credential = /^(?:password|passwd|secret|token|credentials?|authorization|cookie)$|(?:api|access|auth|integration|routing|service|signing|private|client|refresh|session)[_-]?(?:key|secret|token)$|^webhook[_-]?(?:url|secret)$|(?:http|web)[_-]?cal[_-]?url$/iu;
-function noCredentials(value) {
-  if (Array.isArray(value)) value.forEach(noCredentials);
-  else if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) {
-    if (credential.test(key)) fail('CREDENTIAL_IN_RESPONSE');
-    noCredentials(child);
-  }
-}
 function advance(body, state) {
   if (typeof body.more !== 'boolean') fail();
   if (body.more) {
@@ -40,8 +32,7 @@ export async function* run(ctx) {
         if (s.schedules.length > 500) fail('RECORD_LIMIT');
         bytes = '';
       } else {
-        noCredentials(body);
-        bytes = (s.first ? (s.phase === 0 ? '{"users":[' : '],"escalation_policies":[') : ',') + JSON.stringify(body);
+        bytes = (s.first ? (s.phase === 0 ? '{"users":[' : '],"escalation_policies":[') : ',') + JSON.stringify(withoutCredentials(body));
         s.first = false;
       }
       if (!advance(body, s)) { s.phase++; s.first = true; }
@@ -49,8 +40,8 @@ export async function* run(ctx) {
       if (s.index === s.schedules.length) { s.phase = 3; s.index = 0; s.first = true; bytes = s.schedules.length ? '' : '],"schedules":['; }
       else {
         const { body } = await ctx.get(`/schedules/${id(s.schedules[s.index])}?${window}`);
-        object(body); object(body.schedule); noCredentials(body); ctx.records(1);
-        bytes = (s.first ? '],"schedules":[' : ',') + JSON.stringify(body);
+        object(body); object(body.schedule); ctx.records(1);
+        bytes = (s.first ? '],"schedules":[' : ',') + JSON.stringify(withoutCredentials(body));
         s.first = false; s.index++;
       }
     } else {
@@ -58,8 +49,8 @@ export async function* run(ctx) {
       else {
         const schedule = id(s.schedules[s.index]);
         const { body } = await ctx.get(`/schedules/${schedule}/overrides?${window}&overflow=true`);
-        object(body); ctx.records(list(body.overrides).length); noCredentials(body);
-        bytes = (s.first ? '],"overrides":[' : ',') + JSON.stringify({ ...body, schedule_id: schedule });
+        object(body); ctx.records(list(body.overrides).length);
+        bytes = (s.first ? '],"overrides":[' : ',') + JSON.stringify(withoutCredentials({ ...body, schedule_id: schedule }));
         s.first = false;
         s.index++;
       }

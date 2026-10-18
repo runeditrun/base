@@ -1,4 +1,4 @@
-import { object, list, id, timestamp, reference, cursor, assertCount, hash, shape, fail } from './common.mjs';
+import { object, list, id, timestamp, reference, cursor, assertCount, hash, shape, fail, withoutCredentials } from './common.mjs';
 
 export const origin = 'https://api.calendly.com';
 const queries = ['user','count','event_type','min_start_time','page_token'];
@@ -66,7 +66,7 @@ export async function* run(ctx) {
     const next = s.phase === 0 ? null : nextToken(body, path, s.token);
     if (next !== null && (next === s.token || s.seen.includes(next))) fail('PAGINATION_CYCLE');
     const name = `${resource}-${String(s.files.length + 1).padStart(6,'0')}.json`;
-    const bytes = Buffer.from(JSON.stringify(body) + '\n');
+    const bytes = Buffer.from(JSON.stringify(withoutCredentials(body)) + '\n');
     if (s.files.length >= 600) fail('FILE_LIMIT');
     s.files.push({ name, resource, page: s.seen.length + 1, size: bytes.length, sha256: hash(bytes), capturedAt: s.asOf });
     s.token = next;

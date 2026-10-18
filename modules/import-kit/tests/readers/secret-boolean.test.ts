@@ -22,10 +22,18 @@ test('public readers and durable planning retain boolean secret semantics with e
     if(original.status==='retained')assert.deepEqual(Buffer.from(original.base64,'base64'),bytes);
     assert.deepEqual((await sqliteTargets.read(r.db(),'workspace','record',source.records[0].sourceId))!.value,source.records[0].payload);
   }
-  for(const secret of ['synthetic-credential',{value:'synthetic-credential'},null,1]){
+  for(const secret of ['synthetic-credential',{value:'synthetic-credential'},1]){
     const bytes=Buffer.from(JSON.stringify({collection:[{uri:'https://source.test/event',secret}]}));
     // Inspect raw originals even when the parser intentionally drops metadata.
     await assert.rejects(readFileSource({namespace:'archive',name:'event.json',format:'json',bytes,parse:()=>[]}),/INVALID_OR_CREDENTIAL_SOURCE_DATA/);
     await assert.rejects(readApiSource({namespace:'archive',url:'https://source.test/events',parsePage:()=>({records:[]})},async()=>new Response(bytes)),/INVALID_OR_CREDENTIAL_SOURCE_DATA/);
+  }
+  // Null, an empty string or a mask where a credential would go is not a credential.
+  for(const secret of [null,'','********']){
+    const bytes=Buffer.from(JSON.stringify({collection:[{uri:`https://source.test/event-${JSON.stringify(secret)}`,secret}]}));
+    const source=await readFileSource({namespace:'archive',name:'event.json',format:'json',bytes,parse});
+    assert.deepEqual(source.records[0].payload,{uri:`https://source.test/event-${JSON.stringify(secret)}`,secret});
+    assert.equal(source.artifacts[0].original?.status,'available');
+    const plan=await planD1Import(source,sqliteMapping,r.context());assert.equal(plan.counts.mapped,1);
   }
 });
