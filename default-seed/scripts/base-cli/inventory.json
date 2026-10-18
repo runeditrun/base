@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.57",
+  "cliVersion": "0.2.57-dev.gc7f3ec97",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2799,7 +2799,7 @@
     },
     "modules/release/workflow-name.mjs": {
       "source": "modules/release/workflow-name.mjs",
-      "sha256": "2650bb32e1018d00ff55463d99f0af90d0de2081a6f7e38fc37c43a754db96aa"
+      "sha256": "3359b0e456f6304e17591a5ae99a5eb7c8ab7db0ec883337202fd0b23d4d055f"
     },
     "operations/README.md": {
       "source": "operations/README.md",

@@ -60,3 +60,23 @@ test('release keeps the current-list workflow id check as well as the exact comm
   assert.equal(refused.result.status, 1, refused.result.stdout);
   assert.match(refused.receipt.gates.verify.details, /different workflow/);
 });
+
+
+test('release resolves complete YAML scalar names without accepting shortened or misfolded names', async t => {
+  for (const [yaml, name, wrong] of [
+    ['name: Verify\n  source', 'Verify source', 'Verify'],
+    ['name: >\n  Verify\n\n  source', 'Verify\nsource\n', 'Verify\n\nsource\n'],
+    ['name: |+\n  Verify\n', 'Verify\n\n', 'Verify\n'],
+  ]) {
+    const f = await source(t, { workflows: { 'check.yml': { yaml } } });
+    const path = '.github/workflows/check.yml';
+    const extra = { [workflowsPath]: [{ workflows: [{ id: 42, name, path }] }] };
+    const run = { ...f.run, path };
+    const refused = f.invoke([run], ['--verify-workflow', wrong], extra);
+    assert.equal(refused.result.status, 1, refused.result.stdout);
+    assert.match(refused.receipt.gates.verify.details, /No Verify workflow matches/);
+    const accepted = f.invoke([run], ['--verify-workflow', name], extra);
+    assert.equal(accepted.result.status, 0, accepted.result.stdout);
+    assert.equal(accepted.receipt.gates.verify.workflowName, name);
+  }
+});

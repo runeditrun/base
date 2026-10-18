@@ -26,7 +26,7 @@ export async function source(t, { localPass = false, portable = false, buildFail
   }
   mkdirSync(join(f.repo, '.github/workflows'), { recursive: true });
   for (const [file, name] of Object.entries(workflows)) {
-    writeFileSync(join(f.repo, '.github/workflows', file), `name: ${JSON.stringify(name)}\non: [push, workflow_dispatch]\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm verify\n`);
+    writeFileSync(join(f.repo, '.github/workflows', file), `${typeof name === 'string' ? 'name: ' + JSON.stringify(name) : name.yaml}\non: [push, workflow_dispatch]\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm verify\n`);
   }
   f.sha = f.commit();
   execFileSync('git', ['-C', f.repo, 'remote', 'add', 'origin', `git@github.com:${repository}.git`]);
