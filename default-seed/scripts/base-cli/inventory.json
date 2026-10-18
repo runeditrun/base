@@ -1351,7 +1351,7 @@
     },
     "modules/demo-host/native/loader.mjs": {
       "source": "modules/demo-host/native/loader.mjs",
-      "sha256": "8733328499a1b33ec97285ca8293678b7be1b87b722db385e488c063245f151a"
+      "sha256": "40c2da859522f95153642337dafb33b23d64cff8ed4d7ecae678f6f3222c60bd"
     },
     "modules/demo-host/native/namespace.mjs": {
       "source": "modules/demo-host/native/namespace.mjs",
