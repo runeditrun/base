@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.56
+
+- **Run pages keep inline words and paths whole.** Inline code wraps only between words, so seed names such as `run-linen`, repository paths and start commands no longer split mid-word. Command blocks stay clear of Copy and copied text keeps its original bytes. Seeds receive the template on their next Base-copy refresh (#266).
+
 ## 0.2.55
 
 - **Business works across agent turns.** `business connect` resumes browser-approved pairing without terminal prompts, prints a runnable npx or installed-launcher resume command, and reads browser opt-ins after credential storage. Local discovery accepts raw and encoded task upload paths and reports failed work. Disconnect revokes the device on the server before removing its local credential; an unsupported or unconfirmed revocation keeps the connection and explains the browser action (#248).

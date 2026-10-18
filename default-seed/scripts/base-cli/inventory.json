@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.55-dev.gadd98ca4",
+  "cliVersion": "0.2.56",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
