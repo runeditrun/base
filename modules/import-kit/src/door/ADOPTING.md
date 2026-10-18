@@ -22,7 +22,8 @@ Owner history and undo must include jobs from either authority.
      `d1CustodyStateSchema`, `d1ReversalFenceSchema`, `d1PreparationSchema`,
      `d1PreparationStepsSchema`, `d1RetirementSchema`,
      `d1CustodyStateReplaceSchema` (Base's default seed ships it as
-     `0026_import_custody_replace.sql`) and `d1ErasureProgressSchema`, plus the
+     `default-seed/migrations/core/0026_import_custody_replace.sql`) and
+     `d1ErasureProgressSchema`, plus the
      kit evolutions in `modules/import-kit/src/d1/README.md` that apply to the
      seed;
    - a seed without a door: `importDoorSchema` from
