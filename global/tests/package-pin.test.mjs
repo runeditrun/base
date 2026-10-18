@@ -15,6 +15,7 @@ import { integrity, localRegistry } from '../../scripts/rer-package/registry.mjs
 import { aliases, pins, verbs } from '../../cli/contract.mjs';
 import { readPackage } from '../update/archive.mjs';
 import { run } from './harness.mjs';
+import { devModes } from './dev-mode.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 const launcher = join(base, 'global/rer.mjs');
@@ -108,6 +109,10 @@ async function recorded(records, kind) {
 }
 
 const installedVersion = async root => JSON.parse(await readFile(join(root, 'node_modules/@runeditrun/rer/package.json'), 'utf8')).version;
+
+test('fresh package checkouts preserve foreground, detach and piped-default launch lifetimes', { timeout: 240_000 }, async t => {
+ await devModes(t, name => seed(name, versions.first), environment());
+});
 
 test('a fresh clone installs dependencies without credentials, and its deploy still receives them', { timeout: 240_000 }, async () => {
  const { root, records } = await seed('fresh', versions.first);
