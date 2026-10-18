@@ -1,5 +1,18 @@
 # Default seed reference
 
+To move people between installations, open the signed-in owner's import door first:
+
+```text
+/app/import
+```
+
+Choose **Export people** on the source, then upload that unchanged JSON file in
+**Move your people in** on the destination. Review the counts, differences and
+rejections, check the approval box, and choose **Apply reviewed import**.
+Reconcile checks the native records; the same history offers Undo. Business
+imports are disabled until the owner enables them, and owner imports work while
+Business is off. See [IMPORTING.md](IMPORTING.md) for the complete local journey.
+
 `pnpm typecheck` (also run by `pnpm run verify`) uses incremental build mode
 with checkout-local, gitignored `.cache/typecheck.tsbuildinfo`; deleting it
 forces a full check, while `pnpm run build` builds the real Worker and assets.
@@ -56,8 +69,8 @@ for example `{"OWNER_EMAIL":"owner@example.com"}`. Secret values stay in
 private inputs and never go in command arguments. A setup rerun with the saved
 owner and origin preserves existing owner/data and exact private settings.
 Conflicting saved identity or origin reports an actionable recovery path.
-Review reset's exact removal inventory before confirmation; export domain data
-first if it should be restored, and import only into an empty destination.
+Review reset's exact removal inventory before confirmation. Back up this
+installation first if needed; restoring an installation requires an empty destination.
 
 Queue waits report immediately with a reason and numeric one-based position,
 then refresh about every 15 seconds while waiting. From the runnable project
@@ -112,9 +125,9 @@ declared local data, owner, bookkeeping and generated settings while
 preserving source, dependencies, archives and deployment receipts. It refuses
 active local operations.
 
-Local export/import uses the shared portability module for supported D1 domain
-data, with explicit auth, credential and transient-state exclusions. Reset
-preserves archives; import requires an empty destination and explicit
+Developer-only installation backup and restore use the shared portability
+module for supported D1 domain data, with explicit auth, credential and transient-state exclusions. Reset
+preserves archives; restoration requires an empty destination and explicit
 confirmation. Each first-party seed verifies export/import/export equivalence
 across all supported resources. Remote transfer is unsupported and fails
 visibly. Setup reads the single root `rer-setup.json` through the shared
@@ -256,8 +269,9 @@ when rolling application code back or pruning expired credentials.
 | `GET /api/people/:id/erasure` | Preview: counts only. |
 | `POST /api/people/:id/erasure` | Erase. The body must be `{"confirmation":"erase <id>"}`. Answers 200 with the completed receipt, or 202 while it continues on the queue. |
 | `GET /api/erasures/:id`, `POST /api/erasures/:id/resume` | Read or resume a receipt. The cron sweep also resumes unfinished erasures. |
-| `POST /api/people/imports` | Import a list (`label`, `people: [{ref, name, email, details}]`) through Base import-kit. The label is the import's operation key; `ref` becomes the person's id. Creates the job without applying it. |
-| `GET /api/people/imports/:id`, `POST /api/people/imports/:id/resume`, `POST /api/people/imports/:id/undo` | Read, apply (`{"batches":N}` applies N people) or undo an import. A retired import answers 410 with its journal `receiptId`. |
+| `POST /api/operator/import/{uploads,plan,apply,status,reconcile,undo}` | The owner's single reviewed import door; see [IMPORTING.md](IMPORTING.md). |
+| `GET /api/operator/import-export` | People JSON accepted unchanged by the door; excludes notes, files and access. |
+| `GET /api/operator/import-history`, `GET/POST /api/operator/import-settings` | Owner-only approvals, disabled-by-default Business imports and permanent key revocations. |
 | `GET /api/erasures/journal` | The import erasure journal: receipt id, stores touched with row counts, time. No erased values. |
 
 Erasure deletes the person, notes, files and their bytes, plus any historical
@@ -271,11 +285,14 @@ journal cannot be recognised.
 Erasing a person also erases them from import custody (migrations
 `0018_import_kit.sql`, `0019_people_imports.sql`,
 `0020_import_erasure_append_only.sql`, `0021_import_preparation_steps.sql`,
-`0022_import_stream_sources.sql` and `0026_import_custody_replace.sql`).
+`0022_import_stream_sources.sql`, `0026_import_custody_replace.sql`,
+`0027_import_erasure_progress.sql` and `0028_import_door.sql`).
 For an imported person the D1 erasure commits with import-kit's
 `retireD1ImportCustody`: their
-records become tombstones, so other people's imports still resume and undo, and
-an import labelled with exactly their email is retired whole (its rows stay, its
+records become tombstones and door snapshots are withdrawn. A pending apply
+then answers `410 snapshot_withdrawn`. A first pending baseline can be rolled
+back before reviewing a clean source; a completed lineage whose head was
+withdrawn still refuses new plans (see [IMPORTING.md](IMPORTING.md)). A source upload named exactly their email is retired whole (its rows stay, its
 undo and resume end). Matching is exact; a name is never used. Each erasure
 appends one journal row, which nothing can rewrite. That batch also writes
 portability's redaction checkpoint, so with `--journal` any archive made before

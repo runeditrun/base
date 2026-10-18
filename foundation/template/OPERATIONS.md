@@ -1,5 +1,23 @@
 # Foundation operations
 
+For a product that offers data move-in, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
+This technical foundation has no product import screen or product data yet.
+When adding data move-in, mount the shared door and build `/app/import` before
+publishing that workflow; do not add a separate importer. Follow Base's
+[door adoption guide](https://github.com/runeditrun/base/blob/main/modules/import-kit/src/door/ADOPTING.md).
+
 Start a fresh copy with one line: `npx -y @runeditrun/rer dev just-every/run-foundation`
 (set up only: `npx -y @runeditrun/rer setup just-every/run-foundation`; without
 Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-foundation`).
@@ -30,11 +48,21 @@ cookie. Mail is silently suppressed; there is no email-reading step.
 ```sh
 rer verify
 rer reset --yes
-rer export --output exports/installation.rer
-rer import --input exports/installation.rer --yes
 rer deploy
 rer describe
 ```
+
+To back up and restore this installation, use:
+
+```sh
+rer export --output exports/installation.rer
+rer import --input exports/installation.rer --yes
+```
+
+These commands save and restore a supported installation archive. They do not
+use the reviewed import door or provide its plan, reconciliation and Undo.
+Archive restore requires an empty destination and explicit confirmation. Use
+the signed-in import door when bringing records in.
 
 Use `rer describe` to inspect the checkout's actual
 capabilities. `rer check --profile first-party` validates the
@@ -52,7 +80,7 @@ Local export creates a private archive with an integrity receipt and explicit
 exclusions. The foundation has no product-domain tables or background jobs; an
 edition's archive contains the supported domain tables and resources that its
 adapter declares. Owner/auth, outbox, bookkeeping, private settings and
-transient runtime state are excluded. Import validates and restores atomically
+transient runtime state are excluded. Archive restore validates and restores atomically
 into an empty destination; confirmed reset preserves export archives. Run setup
 after restore to establish a fresh owner. Each first-party seed verifies local
 export/import/export equivalence across its supported resources. Remote transfer

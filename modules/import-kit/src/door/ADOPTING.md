@@ -1,5 +1,20 @@
 # Adopt one import pipeline
 
+For an owner moving data, start at the seed's signed-in import screen:
+
+```text
+/app/import
+```
+
+Base's [default reference journey](../../../../default-seed/IMPORTING.md) uses
+an exported people JSON file, review, apply, reconcile and undo. The
+[local-run guide](../../../../export/RUN-LOCALLY.md) describes how to launch and
+claim the local app. Installation `.rer` archive recovery is currently a
+separate developer-only mechanism; it is not accepted by this door.
+
+Installation backup/restore keeps its archive integrity and erasure fences. It
+is separate from bringing records in; never claim an archive traverses the door.
+
 The seed's signed-in move-in screen, `rer` and Business must share **upload →
 plan → reviewed fingerprint → apply → reconcile → undo**. Keep source readers,
 mappings and native target adapters; delete the old importer routes, separate

@@ -1,5 +1,18 @@
 # Portable container hosting
 
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
 An image contains the seed's real Vite server/client build, migrations and the
 shared host. Workers remains the default. Opt in with `platforms` in `deploy.json`:
 
@@ -98,7 +111,8 @@ supervises the process; an unexpected runner exit stops the host so Compose can
 restart the complete unit. The runner owns its transport's public-address
 validation and TLS behavior.
 
-Local container export/import uses the same Base archive service and exclusion
+To back up and restore this installation in a local container, use the same
+Base archive service and exclusion
 policy as Workers. Stop the serving process first: one-shot transfers acquire
 the same volume lock. `rer archive diff BEFORE AFTER` verifies both entire
 archives, then reports added/removed/changed row keys, objects and payloads.

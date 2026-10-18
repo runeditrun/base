@@ -1,12 +1,12 @@
-import { canonicalJson, sha256 } from '../../../../../modules/import-kit/src/d1/index.ts'
+import { z } from 'zod'
+import { canonicalJson } from '../../../../../modules/import-kit/src/d1/index.ts'
 import { personRedaction } from './person-redaction.server.ts'
-import type { D1Database as KitDatabase, D1ImportContext, D1Sql, D1TargetAdapter, ImportMapping, Json, SourceBundle, TargetRow } from '../../../../../modules/import-kit/src/d1/index.ts'
+import type { D1Database as KitDatabase, D1ImportContext, D1Sql, D1TargetAdapter, ImportMapping, Json, TargetRow } from '../../../../../modules/import-kit/src/d1/index.ts'
+import type { ParsedRecord } from '../../../../../modules/import-kit/src/types.ts'
 
 /** People arrive through Base import-kit: each source row becomes one `people`
  * row, `import_revision` marks it as imported, and undo removes it again. */
 export const PERSON = 'person'
-// Parsed from a JSON request body, so details are JSON.
-export interface ImportedPerson { ref: string; name: string; email: string; details: Record<string, unknown> }
 type Value = { name: string; email: string; details: Record<string, unknown> }
 
 const sql = (text: string, ...params: unknown[]): D1Sql => ({ sql: text, params })
@@ -64,19 +64,30 @@ export const personTargets: D1TargetAdapter = {
   },
 }
 
-export const peopleMapping: ImportMapping = { version: 'v1', map: (record) => ({ effects: [{ targetKind: PERSON, targetId: record.sourceId, value: record.payload }] }) }
+const personInput = z.object({
+  ref: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+  name: z.string().trim().min(1).max(200), email: z.string().email().max(320),
+  details: z.record(z.string(), z.unknown()).default({}),
+}).strict()
 
-/** One uploaded list: its exact bytes are kept as the import's original. */
-export function peopleSource(people: ImportedPerson[]): SourceBundle {
-  const payloads = people.map(({ name, email, details }) => ({ name, email, details: details as Record<string, Json> }))
-  const bytes = canonicalJson(payloads), hash = sha256(bytes), encoded = new TextEncoder().encode(bytes)
-  let binary = ''
-  for (let i = 0; i < encoded.length; i += 0x8000) binary += String.fromCharCode(...encoded.subarray(i, i + 0x8000))
-  return {
-    diagnostics: [],
-    artifacts: [{ name: 'people.json', sha256: hash, size: encoded.byteLength, original: { status: 'available', base64: btoa(binary) } }],
-    records: payloads.map((payload, index) => ({ namespace: 'people', kind: 'person', sourceId: people[index].ref, payload, payloadHash: sha256(canonicalJson(payload)), artifactHash: hash, location: { artifact: 'people.json', row: index + 1 } })),
+/** Accept the seed's people bundle or individual records in a JSON array.
+ * Unsupported record shapes remain visible as reviewed rejections. */
+export function parsePeople(input: Json, index: number): ParsedRecord | ParsedRecord[] {
+  if (input && !Array.isArray(input) && typeof input === 'object' && Object.keys(input).length === 1 && Array.isArray(input.people)) {
+    return input.people.map((person, row) => parsePerson(person, `${index}:${row}`))
   }
+  return parsePerson(input, String(index))
+}
+function parsePerson(input: Json, index: string): ParsedRecord {
+  const parsed = personInput.safeParse(input)
+  if (!parsed.success) return { kind: 'unsupported', sourceId: `unsupported:${index}`, payload: input }
+  const { ref, name, email, details } = parsed.data
+  return { kind: PERSON, sourceId: ref, payload: { name, email, details: details as Record<string, Json> } }
+}
+export const peopleMapping: ImportMapping = {
+  version: 'v1', map: (record) => record.kind === PERSON
+    ? { effects: [{ targetKind: PERSON, targetId: record.sourceId, value: record.payload }] }
+    : { effects: [], rejection: 'Unsupported record: expected ref, name, email and optional details. Only inert people records are supported.' },
 }
 
 /** Imports belong to an operator role, not to an operator row: an archive carries the jobs

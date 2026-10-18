@@ -14,7 +14,7 @@ import { createPerson } from './repository.server'
 const PATH = '/app/people'
 const personForm = z.object({ name: z.string().trim().min(1).max(200), email: z.string().trim().email().max(320) })
 const escape = (value: string) => value.replace(/[&<>"']/g, character => `&#${character.charCodeAt(0)};`)
-const headers = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex' }
+const headers = { 'cache-control': 'no-store', 'referrer-policy': 'strict-origin', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex' }
 const actions: Record<string, string> = { 'person.created': 'Added a person', 'note.added': 'Added a note', 'file.attached': 'Attached a file', 'person.erasure_requested': 'Asked to erase a person' }
 
 async function page(bindings: Bindings, notice: string, status = 200) {
@@ -23,7 +23,7 @@ async function page(bindings: Bindings, notice: string, status = 200) {
   const events = (await bindings.DB.prepare('SELECT actor,action,details,created_at FROM audit_events ORDER BY created_at DESC, id DESC LIMIT 20').all<{ actor: string; action: string; details: string; created_at: string }>()).results
   const frame = await themeFrame(theme)
   const body = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>People · ${escape(identity.product)}</title>${frame.head}</head><body><main>${frame.brand}
-<h1>People</h1>${notice}
+<h1>People</h1><p><a href="/app/import">Move your people in or export people</a></p>${notice}
 <form method="post" action="${PATH}">${commandKeyInput()}<label>Name<input name="name" required maxlength="200" autocomplete="off"></label><label>Email<input name="email" type="email" required maxlength="320" autocomplete="off"></label><button>Add person</button></form>
 <h2>Everyone</h2>${people.length ? `<ul>${people.map(person => `<li>${escape(person.name)} (${escape(person.email)}) · added ${escape(readableTime(person.created_at, timeZone))}</li>`).join('')}</ul>` : '<p>No people yet.</p>'}
 <h2>Recent activity</h2>${events.length ? events.map(event => `<section><h3>${escape(actions[event.action] ?? fieldLabel(event.action.replaceAll('.', '_')))}</h3><p>${escape(actorLine(directory, event.actor, event.created_at, timeZone))}</p>${evidenceHtml(event.details, { directory, timeZone })}</section>`).join('') : '<p>Nothing has happened yet.</p>'}

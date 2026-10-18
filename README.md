@@ -1,5 +1,18 @@
 # Seed foundations
 
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
 Run Edit Run can manage independently authored software. This Base repository,
 its maintained seed stack, onboarding, launcher and exporter are optional
 convenience paths, not admission requirements for management. A product may
@@ -157,14 +170,17 @@ The public runner also exposes these operations:
 | --- | --- |
 | Verify | `rer verify` |
 | Reset local state | `rer reset --yes --non-interactive` |
-| Export an archive | `rer export --output exports/installation.rer` |
-| Import into an empty destination | `rer import --input exports/installation.rer --yes --non-interactive` |
+| Back up this installation | `rer export --output exports/installation.rer` |
+| Restore this installation into an empty destination | `rer import --input exports/installation.rer --yes --non-interactive` |
 | Validate a deploy and target secrets | `rer deploy --dry-run` |
 | Inspect supported commands and effects | `rer describe` |
 
-Review the inventory before `rer reset --yes`. Export an
-archive before a reset if domain data should be restored; import requires an
-empty destination. An application dry run reads target secret bindings with Cloudflare credentials and makes no provider writes. See
+Review the inventory before `rer reset --yes`. The archive commands above are
+how to back up and restore this installation, separate from bringing records
+in through the reviewed import door. Preserve a backup before a reset if domain
+data should be restored; archive restore requires an empty destination and has
+no door plan or Undo. An application dry run reads target secret bindings with
+Cloudflare credentials and makes no provider writes. See
 [run it on your computer](export/RUN-LOCALLY.md) for transfer and recovery
 steps, bounded local ports, queued-work progress and the runnable queue-status
 command. Bounded waits immediately explain the reason and numeric one-based

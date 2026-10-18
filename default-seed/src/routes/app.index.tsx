@@ -16,6 +16,7 @@ function OperatorApp() {
       <p>Latest job: {dashboard.latestJob?.state ?? 'none'}</p>
       <p>Latest cron: {dashboard.latestSchedule?.cron ?? 'none'}</p>
       <p><a href="/app/people">People and recent activity</a></p>
+      <p><a href="/app/import">Move your people in</a></p>
       <OperatorAccess />
     </section>
   )

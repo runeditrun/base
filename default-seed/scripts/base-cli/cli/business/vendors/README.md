@@ -1,5 +1,18 @@
 # Shipped vendor exports
 
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
 `exportVendor(vendor, {key, inputs, checkpoint, signal})` is an async generator.
 It yields `{name, bytes: Buffer, checkpoint}`. Keys remain in memory and are
 attached only to GET requests on the adapter's fixed HTTPS origin. Redirects,

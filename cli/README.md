@@ -1,5 +1,18 @@
 # Portable command sources
 
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
 `bin/rer.mjs` dispatches `cli/main.mjs`. Parsing/contract declarations, project
 resolution, output/exits, shared lifecycle orchestration, local state/reset,
 transfers, independent argv and diagnostics are separate modules. `dev-identity.mjs`
@@ -32,11 +45,16 @@ names what each mode's command targets are and reads the lockfile entry that
 that still calls the removed copy, which `check` refuses (SC-13.package.calls). `global/README.md` lists the exports and the vendored
 path each replaces.
 
-`node scripts/export-reference.mjs NEW_PATH` creates a standalone copy of the
+## Create a seed from source
+
+`exportReference` / `node scripts/export-reference.mjs NEW_PATH` creates a standalone copy of the
 reference with runtime imports relocated into its own source tree and an explicit
 transformation inventory. It preserves source/tool pins and the real app; it does
 not substitute an application fixture. Frozen dependency installation occurs
-separately. Refresh copied sources with the export tools after shared edits.
+separately. This is seed creation from source, not an export of an installed
+owner's data. Refresh copied sources with the export tools after shared edits.
+
+## Shared command lifecycle
 
 Every first-party seed declares `commandAdapter` alongside its installer hooks.
 `localInstaller.run` supplies shared setup lifecycle behavior; the RER command
@@ -65,6 +83,12 @@ answers with the rest of the local installer state.
 For older installations without an answer record, a runtime selection outside
 the installer field's choices cannot replace an adapter-declared local choice.
 Explicit answers and recorded installer choices still undergo strict validation.
+
+## Back up and restore this installation
+
+Use `rer export` / `rer import` to back up and restore this installation. This
+is separate from bringing records in through the reviewed import door. Archive
+restore has no door plan, reviewed fingerprint, reconciliation or Undo. Keep owner move-in instructions at `/app/import`.
 
 Local `export --output FILE` and `import --input FILE --yes` use the Base
 portability implementation through the shared command runner and real Wrangler
