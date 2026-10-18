@@ -48,13 +48,16 @@ export async function writeImportDoorSettings(db: D1Database, installationId: st
   ]);
 }
 /** Business-provisioned installs only: the seed calls this when it sees
- * `RER_IMPORT_DOOR=on`, from the path that completes its first owner claim,
- * with a predicate that holds once that owner exists. One batch checks the
- * predicate before and after, and creates the installation's settings row
- * enabled only when it has none, so it never overrides the owner's later
- * choice: a door the owner turned off stays off, and revoked keys stay revoked.
- * A repeat (a retry after the Worker stopped between the claim and this call)
- * is safe. Without the variable, never call it: the door stays off. */
+ * `RER_IMPORT_DOOR=on`, from the path that completes its first owner claim and
+ * again from every later owner path (the claim's already-initialized answer,
+ * owner sign-in or session start), with a predicate that holds once that owner
+ * exists. One batch checks the predicate before and after, and creates the
+ * installation's settings row enabled only when it has none, so it never
+ * overrides the owner's later choice: a door the owner turned off stays off, and
+ * revoked keys stay revoked. The claim and this batch are separate commits, and
+ * the claim cannot complete twice, so a failure between them is healed by the
+ * next owner path calling this again; a repeat is always safe. Without the
+ * variable, never call it: the door stays off. */
 export async function enableDoorAtFirstClaim(db: D1Database, installationId: string, ownerPredicate: D1Sql): Promise<void> {
   if (typeof installationId !== 'string' || !installationId.trim()) throw new DoorError('invalid_settings', 400);
   try {

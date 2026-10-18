@@ -32,6 +32,12 @@ test('A Business install opens its door at the first owner claim and never reope
   await closed();
   // The owner's first claim (RER_IMPORT_DOOR=on) opens the door for RER grants.
   native.exec("UPDATE native_authority SET enabled=1 WHERE id='owner'");
+  // The claim committed but the enable batch failed (the claim cannot run twice): the door stays closed ...
+  const flaky={prepare:d.db.prepare.bind(d.db),batch:async()=>{throw new Error('D1_ERROR: Network connection lost');}} as unknown as typeof d.db;
+  await assert.rejects(enableDoorAtFirstClaim(flaky,key,d.ownerPredicate),/Network connection lost/);
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_settings').get()!.n,0);
+  await closed();
+  // ... until the next owner path (sign-in or the claim's already-initialized answer) calls it again.
   await enableDoorAtFirstClaim(d.db,key,d.ownerPredicate);
   const uploadId=await d.upload(documents(2));
   assert.equal((await d.call('uploads',{uploadId})).body.complete,true);

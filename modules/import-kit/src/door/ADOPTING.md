@@ -87,10 +87,15 @@ Owner history and undo must include jobs from either authority.
    install RER provisions for a Business plan, `RER_IMPORT_DOOR` is `on`: when it
    is exactly `on`, call
    `enableDoorAtFirstClaim(db, installationId, ownerPredicate)` from the path
-   that completes the first owner claim (bootstrap or signed), with the door key
-   and a predicate that holds once that owner exists. It enables the door only
-   while no settings row exists, so never write a disabled row before the first
-   claim on such an install; it never reopens a door the owner turned off.
+   that completes the first owner claim (bootstrap or signed) **and** from every
+   later owner path while the variable is `on`: the claim's already-initialized
+   answer, and owner sign-in or session start. Pass the door key and a predicate
+   that holds once that owner exists. The claim and the enable are separate
+   commits and the claim cannot complete twice, so the later calls are what heal
+   a failure between them; without them the door stays closed until the owner
+   turns it on in settings. It enables the door only while no settings row
+   exists, so never write a disabled row before the first claim on such an
+   install; it never reopens a door the owner turned off.
    Self-host `rer deploy` never sets the variable. Read the grant mount's claim
    configuration from `RER_OWNER_CLAIM_ISSUER`, `RER_OWNER_CLAIM_INSTALLATION_ID`,
    `RER_OWNER_CLAIM_APP_ORIGIN`, `RER_OWNER_CLAIM_PUBLIC_KEYS` and the owner

@@ -114,12 +114,17 @@ opted in carries `RER_IMPORT_DOOR=on` alongside its `RER_OWNER_CLAIM_ISSUER`,
 `RER_OWNER_CLAIM_PUBLIC_KEYS` trust, whatever its claim mode (bootstrap or
 signed). When the seed sees exactly `on`, it calls
 `enableDoorAtFirstClaim(database, installationId, ownerPredicate)` from the
-path that completes its first owner claim, with the door key and a predicate
-that holds once that owner exists. One batch checks the predicate before and
-after and creates the settings row enabled only when the installation has no
-settings row yet. So it never overrides the owner: a door the owner turned off
-stays off, revoked keys stay revoked, and a repeated call (a retry after the
-Worker stopped between the claim and this call) changes nothing. Before an
+path that completes its first owner claim and again from every later owner path
+while the variable is `on`: the claim's already-initialized answer, and owner
+sign-in or session start. The call takes the door key and a predicate that holds
+once that owner exists. One batch checks the predicate before and after and
+creates the settings row enabled only when the installation has no settings row
+yet. So it never overrides the owner: a door the owner turned off stays off,
+revoked keys stay revoked, and a repeated call changes nothing. The claim and
+this batch are separate commits and the claim cannot complete twice, so if the
+Worker or D1 fails between them, the next owner path's call is what opens the
+door; without it the door stays closed until the owner turns it on in settings.
+Before an
 owner exists it writes nothing and throws 403 `owner_required`. Self-host
 `rer deploy` never sets `RER_IMPORT_DOOR`, so a self-hosted door stays off until
 its owner opts in.
