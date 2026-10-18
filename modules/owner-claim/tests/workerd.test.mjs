@@ -32,7 +32,7 @@ test('real workerd + D1: GET and every invalid claim have zero durable writes; v
     [await mint({ iss: 'https://another-rer.test' }), 'issuer'],
     [await mint({ email: 'other@example.com' }), 'email'],
     [await mint({ iat: now + 60, exp: now + 300 }), 'future issued'],
-    [await mint({ exp: now + 301 }), 'excess lifetime'],
+    [await mint({ iat: now, exp: now + 301 }), 'excess lifetime'],
     [await mint({}, { kid: 'unknown-key' }), 'unknown kid'],
     [`${valid.slice(0, -5)}AAAAA`, 'tampered signature'],
   ];
