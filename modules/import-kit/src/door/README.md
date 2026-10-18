@@ -1,4 +1,17 @@
-# Optional D1 import door
+# Shared D1 import door
+
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
 
 See [ADOPTING.md](ADOPTING.md) for the single-path adoption checklist, the
 owner-session mount without owner-claim, and public HTTP conformance.

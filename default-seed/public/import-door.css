@@ -1,0 +1,3 @@
+.rer-themed [hidden] { display: none !important; }
+.rer-themed #result button { margin: 12px 0; }
+.rer-themed #notice:empty { display: none; }

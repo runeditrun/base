@@ -1,5 +1,18 @@
 # Agent instructions
 
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
 ## Launch for review
 
 When asked to launch, run or review this app, run this from the checkout root
@@ -68,8 +81,9 @@ for example `{"OWNER_EMAIL":"owner@example.com"}`. Secret values stay in
 private inputs and never go in command arguments. A setup rerun with the saved
 owner and origin preserves existing owner/data and exact private settings.
 Conflicting saved identity or origin reports an actionable recovery path.
-Review reset's exact removal inventory before confirmation; export domain data
-first if it should be restored, and import only into an empty destination.
+Review reset's exact removal inventory before confirmation. If data must be
+kept, back up this installation first; restore that archive
+only into an empty destination.
 
 Queue waits report immediately with a reason and numeric one-based position,
 then refresh about every 15 seconds while waiting. From the runnable project
@@ -85,18 +99,28 @@ with `rer dev --stop` or Ctrl-C, and stop `preview` with
 
 Choose the following optional operations as needed. Export any data you want
 to keep before running reset. Reset is destructive local cleanup; `--yes`
-confirms removal of declared local data and settings. Import requires an empty
+confirms removal of declared local data and settings. Archive restore requires an empty
 destination and `--yes` confirms the restore. Deploy is a separate, deliberate
 deployment operation; run it only when you intend to deploy.
 
 ```sh
 rer verify
 rer reset --yes
-rer export --output exports/installation.rer
-rer import --input exports/installation.rer --yes
 rer deploy
 rer describe
 ```
+
+To back up and restore this installation, use:
+
+```sh
+rer export --output exports/installation.rer
+rer import --input exports/installation.rer --yes
+```
+
+These commands save and restore a supported installation archive. They do not
+use the reviewed import door or provide its plan, reconciliation and Undo.
+Archive restore requires an empty destination and explicit confirmation. Use
+the signed-in import door when bringing records in.
 
 Run `rer describe` to inspect the supported flags and effects before using
 other options.

@@ -1,5 +1,18 @@
 # Shared local setup lifecycle
 
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
 First-party seeds expose public operations through the RER dispatcher. From a
 runnable seed checkout, the supported local sequence begins with
 `rer install`, `rer setup` and
@@ -195,11 +208,13 @@ exports and deployment receipts.
 
 ## Data, deployment and verification
 
-Each first-party adapter declares which resources local export/import supports.
+To back up and restore this installation, use the local archive runner. This
+is separate from bringing records in through the reviewed import door. Each
+first-party adapter declares which resources that archive export/restore supports.
 Every first-party seed verifies a complete local export/import/export round
 trip across those resources. Archives are private and integrity-checked;
 owner/auth, historical development mail, private settings and transient runtime state remain
-excluded. Import validates and restores atomically into an empty destination.
+excluded. Archive restore validates and restores atomically into an empty destination.
 Remote transfer is supported only when every required resource has a complete
 adapter implementation; unsupported targets fail visibly.
 

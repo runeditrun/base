@@ -1,5 +1,23 @@
 # Run it locally
 
+For a product that offers data move-in, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
+
+This technical foundation has no product import screen or product data yet.
+When adding data move-in, mount the shared door and build `/app/import` before
+publishing that workflow; do not add a separate importer. Follow Base's
+[door adoption guide](https://github.com/runeditrun/base/blob/main/modules/import-kit/src/door/ADOPTING.md).
+
 Start it with one line:
 
 ```sh
@@ -59,8 +77,9 @@ for example `{"OWNER_EMAIL":"owner@example.com"}`. Secret values stay in
 private inputs and never go in command arguments. A setup rerun with the saved
 owner and origin preserves existing owner/data and exact private settings.
 Conflicting saved identity or origin reports an actionable recovery path.
-Review reset's exact removal inventory before confirmation; export domain data
-first if it should be restored, and import only into an empty destination.
+Review reset's exact removal inventory before confirmation. If data must be
+kept, back up this installation first; restore that archive
+only into an empty destination.
 
 Queue waits report immediately with a reason and numeric one-based position,
 then refresh about every 15 seconds while waiting. From the runnable project
@@ -79,17 +98,27 @@ compatible repeated invocation reuses the server and exits. Stop `dev` with
 ```sh
 rer verify
 rer reset --yes
-rer export --output exports/installation.rer
-rer import --input exports/installation.rer --yes
 rer deploy
 rer describe
 ```
+
+To back up and restore this installation, use:
+
+```sh
+rer export --output exports/installation.rer
+rer import --input exports/installation.rer --yes
+```
+
+These commands save and restore a supported installation archive. They do not
+use the reviewed import door or provide its plan, reconciliation and Undo.
+Archive restore requires an empty destination and explicit confirmation. Use
+the signed-in import door when bringing records in.
 
 `verify` ends by loading each public page of the production build in Chromium to
 prove its sections hydrate as separate units (`src/base/hydration/README.md`); run
 `pnpm exec playwright install chromium` once on a new machine.
 
-Reset is destructive local cleanup. Import requires an empty destination and
+Reset is destructive local cleanup. Archive restore requires an empty destination and
 explicit confirmation. Use `rer describe` to inspect the
 checkout's actual commands and flags. The maintained pins are Node 22.20.0 and
 pnpm 10.12.4. Read `RUN-LOCALLY.md` for data custody, deploy requirements and
