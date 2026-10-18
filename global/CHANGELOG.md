@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.52
+
+- **Shared job queues use one slot limit.** Every client sharing a queue directory admits against the same limit, so an older shell requesting three slots no longer holds up a five-slot queue. A live `config.json` slot limit is authoritative; otherwise the largest live client request sets the limit. Clients requesting a different limit see the queue's effective limit and configuration path. FIFO ordering, load admission and available-memory admission stay in place (#244).
+
 ## 0.2.51
 
 - **The Run page keeps commands clear of Copy.** Command blocks wrap beside the button while there is room and below it at narrower widths. The dev sign-in hand-off page now shows the seed’s own logo, or its product name when it declares no logo (#236).
