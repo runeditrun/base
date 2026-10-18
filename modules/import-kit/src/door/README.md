@@ -83,6 +83,12 @@ All bodies are JSON. Quotas are admission limits, not a hosted capacity promise.
 Bodies are limited to 100,000 bytes. The 1,024-chunk bound limits one bundle to
 64 MiB even if a grant's byte quota is larger. A smaller grant quota wins.
 
+Adapters for large records must implement a compact `matchesMany`, because plan,
+reconcile and catch-up fence the destination's whole native set in one 2 MiB D1
+read, and per-row `matches` or `matchesParts` guards repeat every row in full. A
+native set too large for that read answers 413 `import_door_too_large`, with
+`details.targetKinds` and `details.reason` naming the target kind.
+
 Uploaded bytes and retained originals remain in the seed; RER retains receipts
 only. Parsing and mapping are product-owned and cannot send, enqueue or activate
 access. An adopting seed supplies its native field sampling and integrated

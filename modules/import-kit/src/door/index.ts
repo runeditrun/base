@@ -3,6 +3,7 @@ import type { DoorAction } from './grants.ts';
 import { DoorError } from './grants.ts';
 import { admit, enabled } from './authority.ts';
 import { authorized } from './store.ts';
+import { sizeLimitError } from './limits.ts';
 import { uploads } from './uploads.ts';
 import { plan } from './planning.ts';
 import { apply, status, reconcile, undo } from './jobs.ts';
@@ -50,8 +51,8 @@ export function createImportDoorHandler(options: ImportDoorOptions): (request: R
       const result = await routes[action](admitted,input);
       await authorized(admitted);
       return Response.json(result,{headers});
-    } catch (error) {
-      const known = error instanceof DoorError;
+    } catch (thrown) {
+      const error = sizeLimitError(thrown) ?? thrown, known = error instanceof DoorError;
       // Never reflect a parser/native adapter error containing customer records.
       return Response.json({error:known?error.code:'import_door_conflict',...(known && error.details?{details:error.details}:{})},{status:known?error.status:409,headers});
     }

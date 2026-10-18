@@ -122,3 +122,39 @@ test('HTTP grants and bounded catch-up fail closed while valid snapshot replacem
   await writeImportDoorSettings(d.db,d.options.claim.installationId,{enabled:true,revokedKids:['test']},d.ownerPredicate);
   assert.equal((await d.call('plan',{})).status,403);
 });
+
+test('HTTP catch-ups keep planning and reconciling however long the chain grows',async t=>{
+  const d=await door(t);await d.enable();
+  let records=documents(50,true);
+  const base=await d.plan(records);assert.equal(base.status,200,JSON.stringify(base.body));await d.apply(base.body);
+  const bounded={catchup:'bounded' as const,approvalRecordId:'test-standing-approval',approvedAt:d.approval.approvedAt};
+  // Each catch-up owns two live records, so every job stays in the persisted read.
+  for (let step=1;step<=10;step++) {
+    const changed=[String(2*step-2),String(2*step-1)],grant=step>7?bounded:{};
+    records=records.map(r=>changed.includes(r.id)?{...r,title:`${r.title}, revision ${step}`}:r);
+    const planned=await d.plan(records,{catchup:true},grant);assert.equal(planned.status,200,`step ${step}: ${JSON.stringify(planned.body)}`);
+    assert.equal(planned.body.summary.updated,2);assert.equal(planned.body.summary.unchanged,48);
+    await d.apply(planned.body,grant);
+    const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.status,200,`step ${step}: ${JSON.stringify(reconciled.body)}`);
+    assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,50);assert.equal(reconciled.body.counts.nativeTargets,50);
+  }
+  const titles=d.runtime.native().prepare("SELECT id,json_extract(value_json,'$.title') AS title FROM native_records WHERE id IN ('0','19','20')").all();
+  assert.deepEqual(Object.fromEntries(titles.map(r=>[r.id,r.title])),{'0':'Knowledge article 0, revision 1','19':'Knowledge article 19, revision 10','20':'Knowledge article 20'});
+});
+
+test('HTTP door names a native snapshot too large for one read instead of a bare conflict',async t=>{
+  const d=await door(t);await d.enable();
+  const quota={maxBytes:3_000_000,maxChunks:64};
+  // Each record fits the reader's 1 MiB record limit; their exact row guards together exceed one read.
+  const records=[0,1,2].map(i=>({id:String(i),title:`Large article ${i}`,body:'Archived knowledge. '.repeat(45_000)}));
+  const planned=await d.call('plan',{uploadId:await d.upload(records,quota)},quota);assert.equal(planned.status,200,JSON.stringify(planned.body));
+  await d.apply(planned.body);
+  const changed=records.map(r=>r.id==='0'?{...r,title:'Large article, updated'}:r);
+  for (const response of [await d.call('reconcile',{planId:planned.body.planId}),await d.call('plan',{uploadId:await d.upload(changed,quota),catchup:true},quota)]) {
+    assert.equal(response.status,413,JSON.stringify(response.body).slice(0,300));
+    assert.equal(response.body.error,'import_door_too_large');
+    assert.deepEqual(response.body.details.targetKinds,['record']);assert.match(response.body.details.reason,/target kind "record"/);
+    assert.doesNotMatch(JSON.stringify(response.body),/Archived knowledge/);
+  }
+  await d.undo(planned.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+});

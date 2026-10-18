@@ -61,7 +61,11 @@ checks the same monotonic custody revisions, including tombstone changes;
 the original plan revision is captured before decoding. This requires the
 additive custody-state schema. Ordinary reads without a transport policy retain
 their existing atomic admission. `readD1PersistedImport` keeps one complete
-atomic native snapshot capped at 2 MiB even when its caller omits a limit.
+atomic native snapshot capped at 2 MiB even when its caller omits a limit. It
+reads each destination job's `ik_d1_custody_states` revision (the same additive
+schema) before any custody and fences those revisions instead of resending
+plans, so its read grows by one revision per job, not by a plan per catch-up. An oversized snapshot raises
+`ImportSizeLimitError` (its message is the size code) naming `targetKinds`.
 Reads change neither tables nor SQLite `total_changes()` and work with SQLite
 `PRAGMA query_only=ON`. Mutation batches retain inside-transaction CHECK assertions
 and rollback. Planning uses its existing `plan` authorization path. The ordinary-job SELECT fence needs no migration; the bounded stream receipt
