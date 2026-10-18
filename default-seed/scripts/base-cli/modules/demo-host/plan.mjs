@@ -4,7 +4,7 @@ import { ownerWorkerName } from '../deploy-kit/owner.mjs';
 import { siteDeclaration } from '../deploy-kit/site.mjs';
 
 // Native Loader front, admission and visitor session support.
-export const DEMO_FILES = ['worker.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'start-script.mjs', 'diagnostics.mjs', 'operator.mjs', 'measurement.mjs'];
+export const DEMO_FILES = ['worker.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'page-style.mjs', 'theme-script.mjs', 'start-script.mjs', 'diagnostics.mjs', 'operator.mjs', 'measurement.mjs'];
 const FRONT_SET = /^(?:RER_.*|SESSION_SECRET|SETUP_TOKEN|OWNER_EMAIL)$/;
 const SECRET = /SECRET|TOKEN|PASSWORD|_KEY$/;
 export function demoDeclaration(value, originVar) {
