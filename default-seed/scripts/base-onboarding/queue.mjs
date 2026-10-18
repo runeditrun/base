@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
 const portable = basename(dirname(fileURLToPath(import.meta.url))) === 'base-onboarding';
 const queueURL = new URL(portable ? '../base-cli/modules/job-queue/' : '../modules/job-queue/', import.meta.url);
-export const maxWaitSeconds = 1200;
+// Keep the operational default while allowing callers to bound admission sooner.
+export const maxWaitSeconds = Number(process.env.RER_JOBS_MAX_WAIT_SECONDS ?? 1200);
 export const heavyVerbs = new Set(['install', 'setup', 'build', 'verify', 'dev', 'preview', 'deploy', 'release', 'export', 'import', 'installer']);
 export const verificationBoundary = verb => verb === 'release' || verb === 'verify' || verb?.startsWith('verify:');
 // The seed's display name (seed.json `name`, else its folder name) for terminal lines,

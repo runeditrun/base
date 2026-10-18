@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "cliVersion": "0.2.52-dev.g0814ad0e",
+  "cliVersion": "0.2.52-dev.g8bd73080",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
       "source": "onboarding/README.md",
-      "sha256": "0c6318c8cbb3a33cb4c1063ef2497a4b58de2b72a3de567d2db514e64cf46cc4"
+      "sha256": "fd414b45bdd58c1e1fd6c4987fad27733b615478fb65bdc9f543a72f3c993f8c"
     },
     "activity.mjs": {
       "source": "onboarding/activity.mjs",
@@ -53,7 +53,7 @@
     },
     "busy.mjs": {
       "source": "onboarding/busy.mjs",
-      "sha256": "8bc1c242b498bb4f37073a151f0cc128b9fd30e0f54c266712528abc08110346"
+      "sha256": "9934cb0d2cd006f52e4fd67a4f6a8d1df32069815f70b9fcb9fc0698dbf92ea9"
     },
     "command-custody.mjs": {
       "source": "onboarding/command-custody.mjs",
@@ -241,7 +241,7 @@
     },
     "queue.mjs": {
       "source": "onboarding/queue.mjs",
-      "sha256": "d06bc38421b6c8378d9ced3d75ee982cda4b6fcbc3768bd735d31c2a2af96d04"
+      "sha256": "6b7ae0ecab337c0ada05cc88aac7efc92107b3d94fb5560af2d5ded8e785553f"
     },
     "queued-entry.mjs": {
       "source": "onboarding/queued-entry.mjs",
@@ -333,11 +333,11 @@
     },
     "ui/style.css": {
       "source": "onboarding/ui/style.css",
-      "sha256": "ab55061f70333fe3e162633003e6d2c13de6ae3685c5adaf5fc6700c8d7e7826"
+      "sha256": "0f389f002fe0454da8a0ccf382f8bcd691ed60a6341c9b6caf7cfacd9d587a05"
     },
     "ui/theme.css": {
       "source": "onboarding/ui/theme.css",
-      "sha256": "32e58ad46a8582f005df40900f2345779990c16acf2d8de8dc526337cb38a4ad"
+      "sha256": "a7a64e574f0d534d256015c03dbe4dc47942253498df712e46ea4d31d2d202a2"
     },
     "ui/workspace-art.js": {
       "source": "onboarding/ui/workspace-art.js",
@@ -383,7 +383,7 @@
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
-      "sha256": "f4065e71025bf205878a727d422200ad5bf8ccd86c8060aebd6dce90012ae7e8"
+      "sha256": "17b4fb00aef63e77b5fb8c8efb3b103682daafd7aeaaa2b00c8781d28da4200a"
     },
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
