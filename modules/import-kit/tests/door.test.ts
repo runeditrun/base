@@ -439,3 +439,56 @@ test('A door upload in flight across an erasure, or holding an erased person, le
     assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='kept'").get()!.n,1);
   }
 });
+
+test('The default seed\'s resumable erasure severs a door catch-up that an earlier redaction step read, on a destination with many jobs',async t=>{
+  // A redaction step reads 25 jobs; the catch-up job must sort among the first step's jobs, which random job ids give most of the time.
+  for (let attempt=0;attempt<12;attempt++) {
+    const d=await door(t);await d.enable();
+    const native=d.runtime.native(),secret='many-jobs-secret-'+attempt;
+    const base=[{id:'person',title:secret},{id:'kept',title:'many-jobs-kept'}];
+    const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
+    const catchup=await d.plan([...base,{id:'new',title:'many-jobs-new'}],{catchup:true});assert.equal(catchup.status,200,JSON.stringify(catchup.body));
+    const job=await d.apply(catchup.body);
+    // Other door imports in this destination, as daily catch-ups and other namespaces produce within a month.
+    for (let i=0;i<26;i++) {
+      const other=await d.call('plan',{uploadId:await d.upload([{id:'other-'+i,title:'other-'+i}],{namespace:'other-'+i})},{namespace:'other-'+i});
+      assert.equal(other.status,200,JSON.stringify(other.body));await d.apply(other.body,{namespace:'other-'+i});
+    }
+    const jobs=native.prepare("SELECT id FROM ik_jobs WHERE destination='workspace' ORDER BY id").all().map(r=>r.id as string);
+    assert.equal(jobs.length,28);
+    if (jobs.indexOf(job.id)>=25) continue;
+    const person={target:{kind:'record',id:'person'},values:['person@example.test'],related:{fields:[{path:['details','reactions','*','users','*'],value:'person',optional:true}]}};
+    let erased,continuation:string|undefined,redacting=0;
+    do {erased=await retireD1ImportCustody(person,[{sql:"DELETE FROM native_records WHERE id='person'"}],d.runtime.context(),checkpoint,{resumable:true,continuation});continuation=erased.continuation;if (erased.phase==='redacting') redacting++;} while(erased.phase==='redacting');
+    assert.equal(erased.phase,'complete');assert.ok(redacting>0,'an earlier step read the catch-up job');
+    assertNowhere(native,[secret]);
+    const namespace=native.prepare('SELECT namespace FROM ik_jobs WHERE id=?').get(job.id)!.namespace as string;
+    assert.ok(!(await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace})).some(o=>o.original?.status==='retained' && Buffer.from(o.original.base64,'base64').toString().includes(secret)));
+    const status=await d.call('status',{planId:catchup.body.planId});
+    assert.equal(status.status,200,JSON.stringify(status.body));assert.equal(status.body.job.state,'completed');
+    return;
+  }
+  assert.fail('no attempt placed the catch-up job in the first redaction step');
+});
+
+test('After an erasure, a plan of an upload holding the erased person deletes it even where the namespace snapshot is withdrawn',async t=>{
+  const d=await door(t);await d.enable();
+  const native=d.runtime.native(),secret='withdrawn-namespace-secret';
+  const base=[{id:'person',title:secret},{id:'kept',title:'withdrawn-kept'}];
+  const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
+  const erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},[{sql:"DELETE FROM native_records WHERE id='person'"}],d.runtime.context(),checkpoint);
+  assert.equal(erased.phase,'complete');
+  // A catch-up, a plain plan, and the baseline's own bundle uploaded again: each holds the person.
+  for (const [records,input] of [[[...base,{id:'new',title:'withdrawn-new'}],{catchup:true}],[[...base,{id:'new',title:'withdrawn-new'}],{}],[base,{}]] as const) {
+    const uploadId=await d.upload(records as unknown[]);
+    const planned=await d.call('plan',{uploadId,...input});
+    assert.deepEqual([planned.status,planned.body.error],[409,'source_erased'],JSON.stringify(planned.body));
+    assert.equal((await d.call('uploads',{uploadId})).status,404,'the upload holding the erased person goes');
+  }
+  assertNowhere(native,[secret]);
+  // A bundle without the person is refused for the withdrawn snapshot and kept.
+  const uploadId=await d.upload([{id:'kept',title:'withdrawn-kept'},{id:'new',title:'withdrawn-new'}]);
+  const withdrawn=await d.call('plan',{uploadId,catchup:true});
+  assert.deepEqual([withdrawn.status,withdrawn.body.error],[410,'snapshot_withdrawn'],JSON.stringify(withdrawn.body));
+  assert.equal((await d.call('uploads',{uploadId})).status,200);
+});

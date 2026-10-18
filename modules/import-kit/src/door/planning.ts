@@ -9,7 +9,7 @@ import { kitContext } from './authority.ts';
 import { importedTarget, recordKey } from './inventory.ts';
 import { DoorError } from './grants.ts';
 import { lineage, loadSnapshot, planRow, saveSnapshot, sql, statement, transact } from './store.ts';
-import { bundleBytes, text, uploadRow } from './uploads.ts';
+import { bundleBytes, text, uploadRow, type UploadRow } from './uploads.ts';
 
 export function preview(snapshot: DoorSnapshot) {
   const {plan,differences} = snapshot;
@@ -26,20 +26,17 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     .bind(request.grant.installationId,request.grant.namespace,upload.bundle_sha256).first<DoorPlanRow>();
   if (existing) {
     if (!existing.complete) throw new DoorError('plan_staging_interrupted_cancel_and_replan',409,{planId:existing.id});
-    const snapshot = await loadSnapshot(request,existing);
+    const snapshot = await withdrawn(request,upload,()=>loadSnapshot(request,existing));
     if (snapshot.sourceCount > request.grant.maxRecords) throw new DoorError('plan_exceeds_grant_quota');
     if (snapshot.plan.mappingVersion !== request.options.mapping.version) throw new DoorError('snapshot_mapping_changed_use_new_namespace',409);
     if (request.grant.catchup === 'bounded' && (!snapshot.standingApproval || snapshot.standingApproval.id !== request.grant.approvalRecordId || snapshot.standingApproval.at !== request.grant.approvedAt)) throw new DoorError('standing_approval_mismatch');
     return preview(snapshot);
   }
   if (current.pending_id) throw new DoorError('namespace_has_pending_import',409);
-  const previous = current.head_id ? await loadSnapshot(request,await planRow(request,current.head_id)) : null;
+  const previous = current.head_id ? await withdrawn(request,upload,async ()=>loadSnapshot(request,await planRow(request,current.head_id!))) : null;
   if (previous && input.catchup !== true) throw new DoorError('catchup_required',409);
   if (!previous && (input.catchup === true || request.grant.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
-  const bytes = await bundleBytes(request,upload), options = request.options;
-  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256]));
-  const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
-    {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.grant.maxBytes,request.grant.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.grant.maxRecords,request.grant.maxRecords)});
+  const options = request.options, {kitNamespace,source} = await readUpload(request,upload);
   const prior = new Map((previous?.records ?? []).map(r=>[recordKey(r),r]));
   const revisions = new Map<string,{revision:string;matches:boolean}>();
   for (const record of prior.values()) for (const target of record.targets) {
@@ -90,14 +87,36 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     snapshot.records.push({...old,explanation:'Absent from source snapshot; retained in the seed. No deletion proposed.'});
   }
   if (request.grant.catchup === 'bounded') assertBounded(snapshot,previous!);
-  // The kit never stages an erased record, and neither does the door: an upload
-  // holding one can never be planned, so it goes too. The epoch fences a later erasure.
-  for (const clear of erasedSourcePredicates(snapshot.plan)) if ((await statement(options.database, sql(`SELECT ${clear.sql} AS clear`, ...clear.params ?? [])).first())?.clear !== 1) {
-    await transact(options.database, request.authority, [sql('DELETE FROM ik_door_chunks WHERE upload_id=?', upload.id), sql('DELETE FROM ik_door_uploads WHERE id=?', upload.id)]);
-    throw new DoorError('source_erased', 409);
-  }
+  await refuseErased(request,upload,snapshot.plan);
   await saveSnapshot(request,snapshot,upload);
   return preview(snapshot);
+}
+async function readUpload(request: DoorRequest, upload: UploadRow) {
+  const bytes = await bundleBytes(request,upload), options = request.options;
+  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256]));
+  const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
+    {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.grant.maxBytes,request.grant.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.grant.maxRecords,request.grant.maxRecords)});
+  return {kitNamespace,source};
+}
+/** The kit never stages an erased record, and neither does the door: an upload
+ * holding one can never be planned, so it goes too. The epoch fences a later erasure. */
+async function refuseErased(request: DoorRequest, upload: UploadRow, plan: ImportPlan): Promise<void> {
+  const db = request.options.database;
+  for (const clear of erasedSourcePredicates(plan)) if ((await statement(db, sql(`SELECT ${clear.sql} AS clear`, ...clear.params ?? [])).first())?.clear !== 1) {
+    await transact(db, request.authority, [sql('DELETE FROM ik_door_chunks WHERE upload_id=?', upload.id), sql('DELETE FROM ik_door_uploads WHERE id=?', upload.id)]);
+    throw new DoorError('source_erased', 409);
+  }
+}
+/** An erasure withdraws the namespace's snapshots. Before refusing for that, the
+ * upload is planned on its own: one holding an erased record is refused and goes. */
+async function withdrawn<T>(request: DoorRequest, upload: UploadRow, load: () => Promise<T>): Promise<T> {
+  try { return await load(); }
+  catch (error) {
+    if (!(error instanceof DoorError) || error.code !== 'snapshot_withdrawn') throw error;
+    const {kitNamespace,source} = await readUpload(request,upload), mapping = request.options.mapping;
+    await refuseErased(request,upload,await planD1Import(source,mapping,kitContext(request,{id:randomUUID(),kitNamespace,plan:{mappingVersion:mapping.version} as ImportPlan})));
+    throw error;
+  }
 }
 export function assertBounded(snapshot: DoorSnapshot, previous: DoorSnapshot): void {
   const d = snapshot.differences, changed = d.additions.length + d.replacements.length;

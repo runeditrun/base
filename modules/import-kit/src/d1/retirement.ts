@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { D1CustodyRetirement, D1ErasureJournalEntry, D1ImportContext, D1ImportPerson, D1RetirementOptions, D1RetirementProgress, D1Sql } from './types.ts';
 import { requestContext, packGuards, remaining, D1RequestLimitError } from './budget.ts';
-import { authority, authorize, finalAuthority, readonlyChecks, prepare, readAtomic, sql } from './database.ts';
+import { authority, authorize, finalAuthority, guard, readonlyChecks, prepare, readAtomic, sql } from './database.ts';
 import { requireText } from '../provenance/identity.ts';
 import { targetErasure, type ErasureStep } from './erasure.ts';
 import { destinationRevisions, readProgress, type JobRevision, type RedactionProgress } from './retirement-steps.ts';
@@ -9,7 +9,7 @@ import { overflow, redactionSteps } from './redaction-step.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
 import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw, type Store } from './retirement-tally.ts';
 import { fieldRedactions } from './field-redaction.ts';
-import { doorCustodyInScope, withDoorLineage } from './retirement-door.ts';
+import { doorCustodyInScope, doorLineage } from './retirement-door.ts';
 import { retireD1ImportCustodyStep } from './retirement-bounded.ts';
 import type { D1ErasurePending, D1ErasureStepOptions } from './erasure-progress.ts';
 
@@ -72,13 +72,17 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
   const start = remaining(context);
   let erasure: Awaited<ReturnType<typeof targetErasure>>, receiptId: string, prefix: D1Sql[], suffix: D1Sql[];
   try {
-    erasure = person.target || fields.length ? await targetErasure(person.target, context, (await withDoorLineage(person, db, destination, context.storage.targets.planCodec)).related, retiring, step) : { before: [], after: [], final: [], decisions: [], jobs: [], fieldMatches: [] };
+    const lineage = await doorLineage(person, db, destination, context.storage.targets.planCodec);
+    // A resumable final step reads only pending jobs; the lineage's jobs join them even when an earlier step read them clean.
+    const unread = step ? lineage.jobs.filter(job => !step!.selection.jobs.includes(job)) : [];
+    if (step && unread.length) step = { ...step, selection: { ...step.selection, jobs: [...step.selection.jobs, ...unread], clean: new Map([...step.selection.clean].filter(([job]) => !unread.includes(job))) } };
+    erasure = person.target || fields.length ? await targetErasure(person.target, context, lineage.person.related, retiring, step) : { before: [], after: [], final: [], decisions: [], jobs: [], fieldMatches: [] };
     receiptId = randomUUID(); const recordedAt = new Date().toISOString();
     const touched = { destination, jobs: [...new Set([...erasure.jobs, ...scope.jobs])].sort(), streams: [] as string[] };
     touched.streams = [...new Set([...scope.anchors, ...await pageStreams(db, touched.jobs)])].sort();
     stores ??= await tallyStores(db);
     const entry = { recordedAt, recordsErased: erasure.decisions.length, jobsRetired: scope.jobs.length, streamsRetired: scope.anchors.length };
-    prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...tallyWithdraw(stores, touched), ...erasure.before, ...scopeGuards(scope)]);
+    prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...tallyWithdraw(stores, touched), ...erasure.before, ...scopeGuards(scope), ...lineage.fence.map(guard)]);
     suffix = [...packGuards([...erasure.after, ...retirementWrites(scope, destination, receiptId, recordedAt), ...headerAbsence(destination, values),
       ...tallyJournal(stores, receiptId, touched, entry, fenced), authority(context, 'erase'), sql('DELETE FROM ik_d1_assertions')]), ...readonlyChecks(erasure.final), finalAuthority(context, 'erase')];
     // One read after the batch returns its journal row.
