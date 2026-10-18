@@ -9,6 +9,7 @@ import { exportReference } from '../scripts/export-reference.mjs';
 import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
 import { freePort } from '../global/tests/harness.mjs';
+import { codeChipBreaksWord, commandBlocks } from './fixtures/run-page.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -27,6 +28,36 @@ async function seed(t) {
  };
  return { root, adapter, original, pages, render, build };
 }
+
+test('built Run page wraps inline code only between words and keeps commands clear of Copy', async t => {
+ const f = await seed(t), result = await f.build();
+ assert.equal(result.code, 0, result.stdout + result.stderr);
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const context = await browser.newContext({permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
+  await page.goto(preview.url + '/run');
+  await page.evaluate(() => document.fonts.ready);
+  assert.ok(await page.locator('p code').count(), 'the built page has inline commands');
+  for (let width = 360; width <= 2560; width += 20) {
+   await page.setViewportSize({width,height:900});
+   assert.deepEqual(await codeChipBreaksWord(page), [], `inline code at ${width}px`);
+   assert.deepEqual((await commandBlocks(page)).filter(block => block.covered || block.clipped), [], `command blocks at ${width}px`);
+   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 0.5), false, `sideways overflow at ${width}px`);
+  }
+  for (const code of await page.locator('p code').all()) {
+   const text = await code.textContent();
+   await code.evaluate(element => { const range = document.createRange(); range.selectNodeContents(element); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); document.execCommand('copy'); });
+   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), text, 'selecting inline code copies its exact text');
+  }
+  for (const button of await page.locator('.copy').all()) {
+   const command = await button.getAttribute('data-copy');
+   await button.click();
+   await page.waitForFunction(async expected => await navigator.clipboard.readText() === expected, command);
+   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), command, 'Copy keeps the command bytes');
+  }
+  await context.close();
+ } finally { await browser.close(); await preview.close(); }
+});
 
 test('site build distinguishes published examples from private identifiers and never exempts secrets', async t => {
  const f = await seed(t);
