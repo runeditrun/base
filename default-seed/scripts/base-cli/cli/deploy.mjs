@@ -10,6 +10,7 @@ import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
+import { deployOwnerInput } from './deploy-owner-input.mjs';
 import { checkHostedSetup, hostedSetupFailure } from './deploy-setup.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { committedSource } from './deploy-source.mjs';
@@ -21,7 +22,7 @@ import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
- return Object.assign(async ({ root, options, store, signal, operationToken, localOnlyKeys = [], checkBuild = async () => {}, setupManifest, setupSeed, linkDependencies }) => {
+ return Object.assign(async ({ root, options, store, signal, operationToken, localOnlyKeys = [], checkBuild = async () => {}, setupManifest, setupSeed, linkDependencies, adapter = lifecycle }) => {
   try { await refuseLocalModels(root); } catch { throw refuse('Deploy refuses the local-only key file .rer/local/models.json. Remove live-dev credentials before deployment.'); }
   const path = await contained(root, declarationPath);
   let declaration; try { declaration = JSON.parse(await readFile(path, 'utf8')); } catch { throw invalid('Malformed owner-account deploy declaration.'); }
@@ -37,11 +38,12 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const recordedState = change.length ? await deploymentRecord(root, options) : undefined;
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
-  let production;
+  let production, ownerInput;
   if (!change.length) {
    production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
    await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options });
    if (!options.dryRun) committedSource(root, options);
+   ownerInput = await deployOwnerInput({ root, adapter, setupSeed, options, signal });
    await withoutLocalSettings(root, { settings: lifecycle.settings, operationToken }, () => lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken }));
    await checkBuild();
    await refuseLocalEnvOutput(root);
@@ -112,7 +114,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    step = 'claim owner';
    const { liveSecrets, retiredSecrets, ownerClaim } = await owner('inspect', [], env, {propagation:deployed.propagation});
    const linked = token => linkDependencies?.(deployed.origin, token);
-   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed: { ...deployed, propagation:deployed.propagation, liveSecrets, retiredSecrets, ownerClaim }, env, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },
+   const claimed = await claimHostedOwner({ hook: lifecycle.hooks?.owner, setupManifest, declaration, deployed: { ...deployed, propagation:deployed.propagation, liveSecrets, retiredSecrets, ownerClaim }, env, ...ownerInput, supplied, addSecret: value => { redaction.addSecrets([value]); store.addSecrets?.([value]); },
     secret: (extra, values) => owner('secret', extra, values), beforeClaim: linked, recordClaim: outcome => owner('record-owner', ['--outcome', outcome]), inspect: () => owner('inspect', [], env, {propagation:deployed.propagation}), store, signal });
    // A seed that claims its owner its own way links with the token it was given.
    if (claimed === undefined) await linked(env[declared(claim?.tokenField ?? 'SETUP_TOKEN')?.environment]);
