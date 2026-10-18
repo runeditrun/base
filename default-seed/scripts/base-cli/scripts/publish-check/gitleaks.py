@@ -41,7 +41,7 @@ def inspect(binary, mode, repo=None, revisions=None, data=None, timeout=300, red
         if repo is not None:
             args.append(repo)
         env = {k: v for k, v in os.environ.items() if not k.startswith(('GITLEAKS_', 'GIT_'))}
-        env.update(GIT_NO_REPLACE_OBJECTS='1', GIT_TERMINAL_PROMPT='0')
+        env.update(GIT_NO_REPLACE_OBJECTS='1', GIT_TERMINAL_PROMPT='0', GIT_NO_LAZY_FETCH='1')
         try:
             result = subprocess.run(args, input=data, capture_output=True, env=env, timeout=timeout)
             if result.returncode not in (0, 1):

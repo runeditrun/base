@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, openSync, closeSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { runningVersion } from '../cli/version.mjs';
 
 const args = process.argv.slice(2);
 let seconds = 300;
@@ -54,5 +55,7 @@ if (reason) report = {
   history: { commits: 0, trees: 0, blobs: 0 },
   guarantees: { historyScanned: false, visualRecognition: false, environmentChecked: false },
 };
+report.implementation ??= {};
+report.implementation.version = runningVersion();
 process.stdout.write(JSON.stringify(report) + '\n');
 process.exitCode = code;
