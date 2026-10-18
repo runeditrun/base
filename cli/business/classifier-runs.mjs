@@ -39,9 +39,9 @@ export async function startRun(executable) {
 }
 
 function processTable() {
- return new Promise((resolveTable, reject) => execFile('/bin/ps', ['-A', '-ww', '-o', 'pgid=,args='], { maxBuffer: 64 * 1024 * 1024 }, (error, stdout) => {
+ return new Promise((resolveTable, reject) => execFile('/bin/ps', ['-A', '-ww', '-o', 'pgid=,stat=,args='], { maxBuffer: 64 * 1024 * 1024 }, (error, stdout) => {
   if (error) reject(Error('Business could not list processes to stop a killed classifier.'));
-  else resolveTable(stdout.split('\n').map(line => /^\s*(\d+)\s+(.*)$/.exec(line)).filter(Boolean).map(([, group, args]) => ({ group: Number(group), args })));
+  else resolveTable(stdout.split('\n').map(line => /^\s*(\d+)\s+(\S+)\s+(.*)$/.exec(line)).filter(Boolean).map(([, group, state, args]) => ({ group: Number(group), zombie: state.startsWith('Z'), args })));
  }));
 }
 
@@ -58,11 +58,12 @@ async function readRun(directory) {
  };
 }
 
-// A killed group disappears once the system reaps its members.
+// A killed group is stopped once only exited members, awaiting the system's
+// reaping, remain (signalling such a group can fail with EPERM on macOS).
 async function stopped(group) {
  for (let attempt = 0; attempt < 100; attempt++) {
-  try { process.kill(-group, 0); } catch (error) { if (error.code === 'ESRCH') return; throw error; }
-  await new Promise(resolveWait => setTimeout(resolveWait, 20));
+  if (!(await processTable()).some(entry => entry.group === group && !entry.zombie)) return;
+  await new Promise(resolveWait => setTimeout(resolveWait, 50));
  }
  throw Error('Business could not stop a killed classifier. Retry shortly.');
 }
@@ -81,7 +82,7 @@ export async function sweepRuns() {
   const table = await processTable();
   for (const { record } of runs) for (const group of record?.groups ?? []) {
    const members = table.filter(entry => entry.group === group);
-   if (!members.some(entry => entry.args.includes(record.executable) || record.temporary && entry.args.includes(record.temporary))) continue;
+   if (!members.some(entry => !entry.zombie && (entry.args.includes(record.executable) || record.temporary && entry.args.includes(record.temporary)))) continue;
    try { process.kill(-group, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
    await stopped(group);
   }

@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { classifierJourney, modelShim } from './fixtures/business/classifier-journey.mjs';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildPackage } from '../scripts/rer-package.mjs';
@@ -11,10 +12,14 @@ import { integrity } from '../scripts/rer-package/registry.mjs';
 import { readPackage, writePackage } from '../global/update/archive.mjs';
 
 const base = resolve(import.meta.dirname, '..');
+// Detection refuses a CLI below any folder that group members can write, so
+// the stand-in CLIs live under the system temporary folder in 0755 folders
+// whatever the runner's umask (GitHub's Ubuntu runners use 002).
+process.umask(0o022);
 const fixture = join(import.meta.dirname, 'fixtures/business');
 let directory, launcher;
 before(async () => {
- directory = await mkdtemp(join(base, '.business-connect-'));
+ directory = await mkdtemp(join(tmpdir(), '.business-connect-'));
  await mkdir(join(directory, 'tmp'));
  await modelShim(join(directory, 'models'), 'claude');
  await modelShim(join(directory, 'models'), 'codex');
