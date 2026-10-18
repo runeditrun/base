@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.55
+
+- **Business works across agent turns.** `business connect` resumes browser-approved pairing without terminal prompts, prints a runnable npx or installed-launcher resume command, and reads browser opt-ins after credential storage. Local discovery accepts raw and encoded task upload paths and reports failed work. Disconnect revokes the device on the server before removing its local credential; an unsupported or unconfirmed revocation keeps the connection and explains the browser action (#248).
+
 ## 0.2.54
 
 - **Dev launch handoffs keep the requested lifetime.** An explicit `rer dev --foreground` or `--detach` survives preparation that installs a checkout’s pinned rer and hands off to its launcher. The default terminal behavior stays the same (#258).
