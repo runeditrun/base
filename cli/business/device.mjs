@@ -20,11 +20,14 @@ export function workingFolder(folder = process.cwd()) {
 }
 
 /** The agent running this command, as the pairing reports it. Codex sets
- * CODEX_THREAD_ID in every command it runs (CODEX_SANDBOX or CODEX_HOME in some
- * set-ups), and a default Codex install never sets CODEX_HOME, so Codex is
- * checked first; Claude Code sets CLAUDECODE. Anything else is "other".
+ * CODEX_THREAD_ID (or CODEX_SANDBOX) in every command it runs, so those two mark
+ * a command Codex itself is running and win; Claude Code sets CLAUDECODE. Only
+ * then does CODEX_HOME count: it is a user setting Codex reads, and anyone who
+ * exports it in a shell profile passes it on to Claude Code and its commands, so
+ * it is no proof of Codex. Anything else is "other".
  */
 export function agentKind(env = process.env) {
- if (env.CODEX_THREAD_ID || env.CODEX_SANDBOX || env.CODEX_HOME) return 'codex';
- return env.CLAUDECODE ? 'claude' : 'other';
+ if (env.CODEX_THREAD_ID || env.CODEX_SANDBOX) return 'codex';
+ if (env.CLAUDECODE) return 'claude';
+ return env.CODEX_HOME ? 'codex' : 'other';
 }

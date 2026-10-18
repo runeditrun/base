@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.63-dev.gc7df788e",
+  "cliVersion": "0.2.64-dev.g05deab68",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -423,7 +423,7 @@
     },
     "cli/business/device.mjs": {
       "source": "cli/business/device.mjs",
-      "sha256": "6c8b4eb785ac60e8d155b292c8bb787afcf9b44251dd43fb1773c0a2a2aa71f1"
+      "sha256": "716f1c32cb9e3fb8834f626540078e9423c80a922283e220c4e80336fce8f1f6"
     },
     "cli/business/discovery-task.mjs": {
       "source": "cli/business/discovery-task.mjs",

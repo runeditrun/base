@@ -426,8 +426,8 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
 });
 
 test('inside an agent sandbox run and next apply the owner\'s choices for its agent and say what they wait for, run.lock never outlives run, and disconnect tells the truth', async t => {
- // A Claude Code computer; the Codex one follows at the end.
- const remote = await fixtureServer(t), home = join(directory, 'sandbox-home'), stateDir = join(home, '.rer-business'), env = { RER_BUSINESS_STATE_DIR: stateDir, CLAUDECODE: '1' };
+ // A Claude Code computer, whose shell profile also exports CODEX_HOME (it still pairs as Claude Code); the Codex one follows at the end.
+ const remote = await fixtureServer(t), home = join(directory, 'sandbox-home'), stateDir = join(home, '.rer-business'), env = { RER_BUSINESS_STATE_DIR: stateDir, CLAUDECODE: '1', CODEX_HOME: join(directory, 'codex-profile-home') };
  await mkdir(home, { recursive: true });
  const folder = await realpath(home), lock = join(stateDir, 'run.lock');
  remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
