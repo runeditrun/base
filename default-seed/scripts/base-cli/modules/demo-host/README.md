@@ -13,8 +13,13 @@ host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
 - `worker.mjs`, `pages.mjs`, `start-script.mjs`: Turnstile start, progress,
   cancellation and visitor routing. Static assets are served at the edge.
 - `theme.mjs`, `page-style.mjs`, `theme-script.mjs`: the start and ended pages
-  link the seed's built `rer-theme.css` and fonts, as the Lobby does. Their
-  colours, type and mark follow its `--rer-*` tokens, including media rules.
+  inline the seed's built `rer-theme.css`, fonts CSS and imports in the same
+  cascade as the Lobby. Their colours, type and mark follow its `--rer-*` tokens,
+  including media rules. Font faces use swap or optional display, so neither
+  CSS fetches nor fonts hold first paint. Disabled buttons use the surface,
+  border and muted-text tokens; only actionable buttons use the accent fill.
+  `theme-script.mjs` sets the page and Turnstile scheme from the painted card's
+  background and text before the widget renders, and updates on preference changes.
   The maintained default seed's theme assets supply missing tokens or an
   absent theme, under `/__demo/theme/`. Styles, fonts and marks stay same-origin;
   a missing mark leaves the product name visible.

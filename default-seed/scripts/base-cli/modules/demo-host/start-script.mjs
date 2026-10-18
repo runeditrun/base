@@ -77,7 +77,7 @@ window.rerDemoExpired=()=>checking()&&waiting();
 window.rerDemoCheckFailed=()=>checking()&&show('failed',{label:'Try again',note:'',live:'',notice:'The human check did not load. Try again.'});
 addEventListener('DOMContentLoaded',()=>{
   if(el().form.dataset.resume==='1')go(true);
-  else if(!el().form.dataset.state)waiting();
+  else if(el().form.dataset.state==='waiting')waiting();
   el().form.addEventListener('submit',event=>{
     event.preventDefault();
     const state=el().form.dataset.state;
