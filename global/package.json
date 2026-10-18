@@ -1,6 +1,6 @@
 {
   "name": "@runeditrun/rer",
-  "version": "0.2.59",
+  "version": "0.2.61",
   "description": "The rer command: install, set up, run and launch Run Edit Run checkouts.",
   "license": "MIT",
   "type": "module",
@@ -42,6 +42,10 @@
     "./production-runtime": "./onboarding/production-runtime.mjs",
     "./production-modules": "./onboarding/production-modules.mjs",
     "./queued-entry": "./onboarding/queued-entry.mjs",
+    "./seed-icons": {
+      "types": "./onboarding/icon-files.d.mts",
+      "default": "./onboarding/icon-files.mjs"
+    },
     "./archive-output": {
       "types": "./onboarding/archive-output.d.mts",
       "default": "./onboarding/archive-output.mjs"

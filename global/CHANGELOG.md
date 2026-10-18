@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.61
+
+- **One import path for every seed (#272).** The signed-in move-in screen, rer and Business can share upload → plan → reviewed fingerprint → apply → reconcile → undo, retaining native edit protection, history and erasure across catch-up chains. This integration supersedes #246, #262, #252, #250, #259 and #267.
+- **Seed adoption and migrations.** Follow [modules/import-kit/src/door/ADOPTING.md](../modules/import-kit/src/door/ADOPTING.md). Vendor the current import-kit source/schema and sibling d1-transport through the seed's Base provenance workflow. Add any missing D1 kit schemas in the order shown there, including `d1CustodyStateReplaceSchema`: Base's default seed supplies the additive `migrations/core/0026_import_custody_replace.sql`. Keep previously applied migration names and bytes. For a new door apply `importDoorSchema` once after the kit migrations. For an existing door, add separate new numbered seed migrations for **`importDoorApplyFailureMigration` as one atomic batch with foreign keys on, then `importDoorScopesMigration`**; never reapply the updated `importDoorSchema`. The door returns 503 `import_door_schema_outdated` until those upgrades are applied. Run the seed's normal local migration path (`rer dev` for Base's default seed), its existing HTTP import conformance and every erasure journey with retained door rows; then run `rer deploy --dry-run` and `rer deploy` through its declared deployment path. Preserve the permanent server-owned `installationId`; mount the operator handler with the seed's real owner session/CSRF checks, replace old importer routes/callers, and explicitly opt in to Business grants only where configured. The copyable `checkDoor` journey and complete adapter/erasure checklist are in ADOPTING.md.
+- **Crisp seed favicons (#287).** Shared Base heads choose existing ICO, small SVG/32px PNG and Apple icons before a full mark. Adopting seeds copy the updated runtime heads, include `seedIcons()` in app Vite configuration (`@runeditrun/rer/seed-icons`), and refresh rer for Run, installer and native-demo heads. Preserve seed-owned layouts such as Plinth's Lobby. Seeds without small assets must supply their own artwork.
+
+## 0.2.60
+
+- **Hosted demo gates wear each seed’s theme.** Start and ended pages load the seed’s mark, palette, fonts and focus styles, with Base theme assets when absent (#284).
+- **Portability leaves platform bookkeeping behind.** Exports never carry rer-owned tables such as `rer_migrations`, and `includeTables` cannot re-add them. Fresh migrated targets can restore seed data; old archives keep their integrity checks while skipping platform rows with one clear CLI line (#285).
+
 ## 0.2.59
 
 - **Release publication scans complete on large seeds and partial clones.** `rer release` hydrates missing history blobs in one fetch and inspects the staged release annotation in the same scan. Orbit finishes in 82 seconds instead of exceeding the 300-second budget, with identical findings. A seed must adopt the new rer through its pin for its release command to use it (#278).

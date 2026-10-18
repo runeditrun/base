@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.59-dev.ga29613df",
+  "cliVersion": "0.2.61-dev.g6bdfc35e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -86,6 +86,14 @@
     "failures.mjs": {
       "source": "onboarding/failures.mjs",
       "sha256": "64e4edbd9002f0cb4eb084a49f32f84709c9b3f16c87a77a7614172ce96878e7"
+    },
+    "icon-files.d.mts": {
+      "source": "onboarding/icon-files.d.mts",
+      "sha256": "e798191c2522e2a6742726d239d5fed240e6f217d8ea7410edfb040bf2851285"
+    },
+    "icon-files.mjs": {
+      "source": "onboarding/icon-files.mjs",
+      "sha256": "70df34ac2fa8c84b614eefee394e4bbca158b7d4faf08aa63eea0f30e76e50be"
     },
     "input-limits.mjs": {
       "source": "onboarding/input-limits.mjs",
@@ -281,7 +289,7 @@
     },
     "server.mjs": {
       "source": "onboarding/server.mjs",
-      "sha256": "d783907c80c1e55b0e254ba07510f37ee5ac86d8e43ff630a40587077fb80fff"
+      "sha256": "307ea35fa6791bc6359ace47d81debd09813183190b470744c54719a479324c4"
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
@@ -771,7 +779,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "ce524682bb80a2311d6b6c828f28b531e3bf2debaa57cf548f0e45b1191d47e0"
+      "sha256": "ac266c9c1295bcb659adb6a4edbc4adfcdf3ee4b8df06ac6df74b12f9de05a75"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1043,7 +1051,7 @@
     },
     "cli/site-render.mjs": {
       "source": "cli/site-render.mjs",
-      "sha256": "668ae6d2d8690c20edf0a026538d4dd1e014cbcc9e1ee69d8759511bea1e54d5"
+      "sha256": "028028076036a8ac9a4ba182344243125ed4143b94bb9ac7cdbde38fe06b7e33"
     },
     "cli/site-syntax.mjs": {
       "source": "cli/site-syntax.mjs",
@@ -1072,6 +1080,26 @@
     "composition/git-source.mjs": {
       "source": "composition/git-source.mjs",
       "sha256": "ccc04366daca482983510e8c0c24feab6eab7b7086604f71d4bb6f5529c47c04"
+    },
+    "default-seed/public/brand/mark.svg": {
+      "source": "default-seed/public/brand/mark.svg",
+      "sha256": "c1b85847849ac99d07be1203befca23c5cc7650757ce9372222c6819de72b097"
+    },
+    "default-seed/public/fonts/outfit/LICENSE.txt": {
+      "source": "default-seed/public/fonts/outfit/LICENSE.txt",
+      "sha256": "0e5fcef5d93bfcae273c11c00f0bb453d3b5491860e1ac8b658767b7577c938f"
+    },
+    "default-seed/public/fonts/outfit/outfit-latin-ext-wght-normal.woff2": {
+      "source": "default-seed/public/fonts/outfit/outfit-latin-ext-wght-normal.woff2",
+      "sha256": "0f53d1c03b3918d744a843b5039001ee31695ca1e255e3914188df81beb461e9"
+    },
+    "default-seed/public/fonts/outfit/outfit-latin-wght-normal.woff2": {
+      "source": "default-seed/public/fonts/outfit/outfit-latin-wght-normal.woff2",
+      "sha256": "6c18d579fd87c3776be068b762cbc83fde3acb543d49eabd3ade842eb987e887"
+    },
+    "default-seed/public/rer-theme.css": {
+      "source": "default-seed/public/rer-theme.css",
+      "sha256": "670e280580f073bee9236f2bf2ab3165ccf5ccc3499f79ac077c4388105a491f"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
@@ -1299,7 +1327,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "caf78788e620cb04104800435797ccd0c1816a45c2828651526d93cde7db70ab"
+      "sha256": "c79b56d1032110054bc914952453b977309568db359eececdc5f0b4cf935c1d8"
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
@@ -1367,7 +1395,7 @@
     },
     "modules/demo-host/native/prepare.mjs": {
       "source": "modules/demo-host/native/prepare.mjs",
-      "sha256": "237ad533f11ff31e6c861c93a78b8bbcf27606f4f64b614ab5daf184da0d6e9a"
+      "sha256": "515bf6cb2dfcaef3506e0a43c44b15893852910f460deabe8036ef186452fa47"
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
@@ -1399,7 +1427,7 @@
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",
-      "sha256": "52ccbe1bd7fa65dd9d54af1d86dc657139a8608c2599bd69d6a1b0ab19f2b675"
+      "sha256": "292ad76af788309a3e9ccb66e29b98a04d9780685cce941d8cf26043352ca339"
     },
     "modules/demo-host/native/warm.mjs": {
       "source": "modules/demo-host/native/warm.mjs",
@@ -1407,19 +1435,23 @@
     },
     "modules/demo-host/native/worker.mjs": {
       "source": "modules/demo-host/native/worker.mjs",
-      "sha256": "f9f75483d4320745a6478421f97eb0a6b5014fff46f16c52354f11dcbd90764c"
+      "sha256": "93b7d4a694b85d1fdab56220d13a773288cc83a6e9b5643ed094fa5c3c3852ba"
     },
     "modules/demo-host/operator.mjs": {
       "source": "modules/demo-host/operator.mjs",
       "sha256": "24a0a516d46c41c8896f96ea3746e1f949f00f52f1ae78d00aa6b65382da38bf"
     },
+    "modules/demo-host/page-style.mjs": {
+      "source": "modules/demo-host/page-style.mjs",
+      "sha256": "4a83b41dbdfc8637547587e54ee7a542e947a93cf74bed06c510ed1723aee127"
+    },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "ad1e4f91386b5804bf6d009debf5e365edce6ed025e0a64c1216e85c44a426b9"
+      "sha256": "754516b430475d89350c925d076eff8d81d88bb3e5150fef6fac343cd7f7bfa0"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
-      "sha256": "c7957081f5d69d746c038bc54d7bcdcb0b536fddcc8cb975ff7cf75714f6f8fa"
+      "sha256": "6b96d57ba6fa087d2b90a3171b55fe1b5376f426da585f51c0b3d28ba18e5cb8"
     },
     "modules/demo-host/remove.mjs": {
       "source": "modules/demo-host/remove.mjs",
@@ -1428,6 +1460,14 @@
     "modules/demo-host/start-script.mjs": {
       "source": "modules/demo-host/start-script.mjs",
       "sha256": "6934c6e4c0db3b95becebc6d77e75d1957e73dacc7484ec347301c82a3f2117f"
+    },
+    "modules/demo-host/theme-script.mjs": {
+      "source": "modules/demo-host/theme-script.mjs",
+      "sha256": "1b78c0c1bbf171149d872bcc1c4a4d11091f659c1bbebd691f797c2a778c151b"
+    },
+    "modules/demo-host/theme.mjs": {
+      "source": "modules/demo-host/theme.mjs",
+      "sha256": "bd7dd21de2ee56f24b045d1749380a338322de3e6e44c720bab3aa31706a42b8"
     },
     "modules/demo-host/upgrade.mjs": {
       "source": "modules/demo-host/upgrade.mjs",
@@ -2347,7 +2387,7 @@
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
-      "sha256": "c547b2cfa6a400ab76fd625aefa82a8ed97ecb37bb5f7535ac50bb98c8c54875"
+      "sha256": "c51e890a64226af10b3d672a5a79905ec6452e4355819923f6d20bbc241864e1"
     },
     "modules/operator-auth/dev/cli-session.mjs": {
       "source": "modules/operator-auth/dev/cli-session.mjs",
@@ -2396,6 +2436,14 @@
     "modules/operator-auth/http.mjs": {
       "source": "modules/operator-auth/http.mjs",
       "sha256": "caf5ddf8b50070b1339afd6f19e3ef3c73677cc7726a355fbac5cda371f09b53"
+    },
+    "modules/operator-auth/icon-head.d.mts": {
+      "source": "modules/operator-auth/icon-head.d.mts",
+      "sha256": "34287e49079ce872172a8c6d72e9d2b79fe50e5381919aa265f60d6ed574e7ff"
+    },
+    "modules/operator-auth/icon-head.mjs": {
+      "source": "modules/operator-auth/icon-head.mjs",
+      "sha256": "f9be2dab471d011cec8ba5da66bdb8b1974a65edfd6050679cf18f7893e6a941"
     },
     "modules/operator-auth/identity/admission.mjs": {
       "source": "modules/operator-auth/identity/admission.mjs",
@@ -2511,7 +2559,7 @@
     },
     "modules/operator-auth/page.mjs": {
       "source": "modules/operator-auth/page.mjs",
-      "sha256": "5a6e74e3e1861dbe6906ab2e0219b498f1943c11e9c88a779819563ec32e7322"
+      "sha256": "3fa120d55b8ff80c613e53d4df3fb4a249cadf508b2b3144f94fd89afbdd22e4"
     },
     "modules/operator-auth/policy.d.mts": {
       "source": "modules/operator-auth/policy.d.mts",
@@ -2563,7 +2611,7 @@
     },
     "modules/owner-claim/page.mjs": {
       "source": "modules/owner-claim/page.mjs",
-      "sha256": "1e03cd872c5bf95a2672e782153b71272f90f1cea7f10ee70f971fae0432e929"
+      "sha256": "98f76844f55e2726654a1ff5030268b4a8327f7cf460a446856964989dfb4542"
     },
     "modules/owner-claim/schema/idp.sql": {
       "source": "modules/owner-claim/schema/idp.sql",
@@ -2587,7 +2635,11 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "3a6d8719fc23b6957abae3653988b9754e946de3777f6b0759173979eb28bc46"
+      "sha256": "c197313c33ed9c77103cc24fc4abf3b8d197559ad87cacd0f6e96076dfb04cd9"
+    },
+    "modules/portability/bookkeeping.mjs": {
+      "source": "modules/portability/bookkeeping.mjs",
+      "sha256": "64bf389143458ed33fb6f62bf63784c466817a22c04106d56c04074514637a0f"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
@@ -2595,7 +2647,7 @@
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
-      "sha256": "bd87f8f0124f9d829f059027ca3022f36208f983e1b4214420deb2a0cf2d2669"
+      "sha256": "7acdde9c59c04d8ed168fd16713e4e4c83e695720ff54bb007f7d4b62fa23bba"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
@@ -2603,7 +2655,7 @@
     },
     "modules/portability/cli.mjs": {
       "source": "modules/portability/cli.mjs",
-      "sha256": "312f5f7b6cc565b6be7a56601303ef619ee802e776470e80803526d312c329c4"
+      "sha256": "c1d832e0f70bad3871902eceddb70ed2e8c2454c4c5ec2a91fad5c0ff726f692"
     },
     "modules/portability/copies.mjs": {
       "source": "modules/portability/copies.mjs",
@@ -2623,7 +2675,7 @@
     },
     "modules/portability/files.mjs": {
       "source": "modules/portability/files.mjs",
-      "sha256": "e191f04d5b7ac3cc26386a083e967cf3841ee62c008e9fe98dfb9daa8679600f"
+      "sha256": "7ae7c63a15926afb3b21b11389757adab77bc8107fd6edb9f8ae8f6341d7029f"
     },
     "modules/portability/format.mjs": {
       "source": "modules/portability/format.mjs",
@@ -2651,11 +2703,11 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "db55060061cf04871e3529f423b4bde2237b9e066bed5a644072d16675909461"
+      "sha256": "3383ae170a431605b0d1483587791ae96b4acded6cab3390c39442935eba29ce"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
-      "sha256": "a479fc83261edb28f106743e1dedd68a9422497011c3d352eef13be38c5ed335"
+      "sha256": "a15e47ec3f7936e2f6bcbdb30d4f319ab95f2388f6c2371149f59a13e9c5dcfc"
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
@@ -2691,7 +2743,7 @@
     },
     "modules/portability/progress.mjs": {
       "source": "modules/portability/progress.mjs",
-      "sha256": "801bc3cfa12f490613a3643ad77623273cad83f9e6f558229baf7263472076e6"
+      "sha256": "fece9aa4accbade5b97c8a81edabe1338582e7673d6b4a104f83c300f83958cf"
     },
     "modules/portability/provider-data.mjs": {
       "source": "modules/portability/provider-data.mjs",
