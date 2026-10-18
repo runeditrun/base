@@ -7,30 +7,34 @@ import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { buildPackage } from '../scripts/rer-package.mjs';
-import { integrity } from '../scripts/rer-package/registry.mjs';
+import { integrity, localRegistry } from '../scripts/rer-package/registry.mjs';
 import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { userInfo } from 'node:os';
 import { realpath } from 'node:fs/promises';
 
 const base = resolve(import.meta.dirname, '..');
 const fixture = join(import.meta.dirname, 'fixtures/business');
-let directory, launcher;
+let directory, launcher, packed;
 before(async () => {
  directory = await mkdtemp(join(base, '.business-connect-'));
  const bytes = await readFile(await buildPackage(base, join(directory, 'package')));
- const packed = join(directory, 'packed');
- await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), packed);
- launcher = join(packed, 'global/rer.mjs');
+ const files = readPackage(bytes, { integrity: integrity(bytes) });
+ // The same tarball, for npx through a loopback registry.
+ packed = { bytes, version: JSON.parse(files.find(file => file.path === 'package.json').data).version };
+ await writePackage(files, join(directory, 'packed'));
+ launcher = join(directory, 'packed', 'global/rer.mjs');
 });
 after(() => directory && rm(directory, { recursive: true, force: true }));
 
-async function cli(home, args, { terminal = false, input = '', columns = 120, onSpawn, onOutput, env: extra = {}, path = process.env.PATH } = {}) {
+// npx: the command as the platform's prompt gives it, in its own process group
+// as a terminal starts it, so a signal to the group reaches npx and rer alike.
+async function cli(home, args, { terminal = false, npx = false, input = '', columns = 120, onSpawn, onOutput, env: extra = {}, path = process.env.PATH } = {}) {
  await mkdir(home, { recursive: true });
  const env = { PATH: path, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns), ...extra };
  return new Promise((resolveRun, reject) => {
-  const command = terminal ? 'python3' : process.execPath;
-  const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : [launcher, ...args];
-  const child = spawn(command, parameters, { cwd: home, env, stdio: ['pipe','pipe','pipe'] });
+  const command = terminal ? 'python3' : npx ? 'npx' : process.execPath;
+  const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : npx ? ['-y', '@runeditrun/rer', ...args] : [launcher, ...args];
+  const child = spawn(command, parameters, { cwd: home, env, stdio: ['pipe','pipe','pipe'], detached: npx });
   onSpawn?.(child);
   let stdout = '', stderr = '';
   const timer = setTimeout(() => child.kill('SIGKILL'), 40000);
@@ -421,8 +425,9 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
  }
 });
 
-test('inside an agent sandbox run and next apply the owner\'s choices and say what they wait for, run.lock never outlives run, and disconnect tells the truth', async t => {
- const remote = await fixtureServer(t), home = join(directory, 'sandbox-home'), stateDir = join(home, '.rer-business'), env = { RER_BUSINESS_STATE_DIR: stateDir };
+test('inside an agent sandbox run and next apply the owner\'s choices for its agent and say what they wait for, run.lock never outlives run, and disconnect tells the truth', async t => {
+ // A Claude Code computer; the Codex one follows at the end.
+ const remote = await fixtureServer(t), home = join(directory, 'sandbox-home'), stateDir = join(home, '.rer-business'), env = { RER_BUSINESS_STATE_DIR: stateDir, CLAUDECODE: '1' };
  await mkdir(home, { recursive: true });
  const folder = await realpath(home), lock = join(stateDir, 'run.lock');
  remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
@@ -479,6 +484,28 @@ test('inside an agent sandbox run and next apply the owner\'s choices and say wh
  const scanned = await cli(home, ['business','run','--once'], { env });
  assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
  assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);
+
+ // Ctrl-C in the terminal that started run through npx, as the prompt says:
+ // the SIGINT reaches npx and run together, and npx forwards it to run again.
+ // Here Ctrl-C comes again while run hands its lease back, so run certainly
+ // gets SIGINT after its first one. It still finishes the handback, removes
+ // run.lock and says it stopped.
+ const registry = await localRegistry(); t.after(registry.close);
+ registry.publish(packed.version, packed.bytes);
+ remote.state.root = join(home, 'large-project'); await mkdir(remote.state.root);
+ await writeFile(join(remote.state.root, 'package.json'), JSON.stringify({ dependencies: Object.fromEntries(Array.from({ length: 1800 }, (_, index) => [`fixture-library-${index}`, '1.0.0'])) }));
+ remote.state.tasks = [{ task_id: 'npx-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ let group;
+ remote.state.onHeartbeat = () => { if (remote.state.checkpoint.page === 1) { remote.state.onHeartbeat = null; process.kill(-group.pid, 'SIGINT'); } };
+ remote.state.onRelease = () => { remote.state.onRelease = null; process.kill(-group.pid, 'SIGINT'); };
+ const npm = { 'npm_config_@runeditrun:registry': `${registry.url}/`, npm_config_cache: join(directory, 'npm-cache'), npm_config_update_notifier: 'false' };
+ const interrupted = await cli(home, ['business','run'], { npx: true, env: { ...env, ...npm }, onSpawn: child => { group = child; } });
+ assert.equal(interrupted.code, 0, `npx and run exit 0 after Ctrl-C: ${interrupted.stderr}`);
+ assert.ok(interrupted.stdout.includes(`Business supervisor stopped (SIGINT); run.lock removed. Run RER_BUSINESS_STATE_DIR=${stateDir} npx -y @runeditrun/rer business run again`), interrupted.stdout);
+ assert.equal(remote.state.released?.reason, 'handover', 'the lease is handed back');
+ assert.equal(remote.state.phase, 'ready');
+ await assert.rejects(stat(lock), { code: 'ENOENT' });
+
  remote.state.tasks = [];
  assert.ok((await cli(home, ['business','run','--once'], { env })).stdout.includes(`Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${remote.origin}/business/biz`));
 
@@ -505,4 +532,22 @@ test('inside an agent sandbox run and next apply the owner\'s choices and say wh
  assert.equal(finished.code, 0, finished.stderr); assert.ok(finished.stdout.includes('Device was already revoked'), finished.stdout);
  await assert.rejects(readFile(join(home, 'fake-keychain.json')), { code: 'ENOENT' });
  assert.ok(!(await readdir(home)).includes('.rer-business'));
+
+ // On a Codex computer the secret-file rules have nothing to apply to: nothing
+ // is written under ~/.claude, nothing asks for a run outside the sandbox, and
+ // that is said once, whatever the owner chose.
+ const codexHome = join(directory, 'codex-home'), codexEnv = { RER_BUSINESS_STATE_DIR: join(codexHome, '.rer-business'), CODEX_HOME: join(codexHome, '.codex') };
+ remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+ const codex = await connect(codexHome, remote, { env: codexEnv });
+ const notApplicable = 'Secret-file rules do not apply on Codex: Business has no way yet to stop Codex from reading your secret files';
+ assert.ok(codex.stdout.includes(notApplicable) && codex.stdout.includes('The owner has not chosen yet:') && !codex.stdout.includes('never reads your secret files'), codex.stdout);
+ remote.state.optIns = { installPermissions: true, awakeConsent: false, installService: false };
+ const codexNext = await cli(codexHome, ['business','next'], { env: codexEnv });
+ assert.equal(codexNext.code, 0, codexNext.stderr);
+ assert.ok(codexNext.stdout.includes("Applied the owner's choices for this computer:\n  - Keep this computer awake while it works: not allowed"), codexNext.stdout);
+ const codexRun = await cli(codexHome, ['business','run','--once'], { env: codexEnv });
+ assert.equal(codexRun.code, 0, codexRun.stderr);
+ for (const later of [codexNext, codexRun]) assert.ok(!/secret files|Claude Code|outside the agent sandbox/.test(later.stdout + later.stderr), later.stdout);
+ assert.ok(!(await readdir(codexHome)).includes('.claude'), 'nothing is written under ~/.claude');
+ assert.equal((await cli(codexHome, ['business','disconnect'], { env: codexEnv })).code, 0);
 });

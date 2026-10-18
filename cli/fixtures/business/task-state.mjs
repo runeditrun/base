@@ -121,6 +121,7 @@ export function taskStore(state) {
   events.set(body.client_event_id, { signature, fence });
   const result = { ...reply(task, fence), ...(action === 'heartbeat' ? heartbeatControls(body) : {}), ...(action === 'uploads' ? { stored: body.document.signals.length } : {}) };
   if (action === 'heartbeat') state.onHeartbeat?.();
+  if (action === 'release') state.onRelease?.();
   return result;
  }
  function heartbeatControls(body) { return { controls: [], cursor: body.cursor ?? 0, cancel_requested: false }; }

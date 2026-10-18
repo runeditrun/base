@@ -29,6 +29,14 @@ const said = {
 const reported = new Set();
 const once = (key, text) => { if (reported.has(key)) return; reported.add(key); process.stdout.write(text); };
 
+// Choices with no way to take effect for the agent on this computer. The rules
+// are Claude Code's own settings, and Codex has no equivalent Business can
+// write yet, so on a Codex computer nothing is written under ~/.claude and
+// nothing asks for a run outside the sandbox. It is recorded and said once.
+const notApplicable = {
+ codex: { installPermissions: 'Secret-file rules do not apply on Codex: Business has no way yet to stop Codex from reading your secret files, so it added no rules and needs nothing more for this choice.\n' },
+};
+
 /** Read the owner's choices (GET /executors/self) and apply each one that
  * changed since this computer last applied it, then say which were applied.
  * connect, run and next all call this, so connect never has to run again.
@@ -42,9 +50,15 @@ export async function applyChoices(api, state) {
  try { self = await api.get('/api/business/executors/self'); }
  catch (error) { if (![403, 404].includes(error.status)) throw error; }
  const decided = Object.fromEntries(names.map(name => [name, typeof self?.optIns?.[name] === 'boolean' ? self.optIns[name] : null]));
- const applied = state.applied ?? {}, lines = [], refused = [];
+ // The agent this computer reported when it paired, as the owner's browser words its choices.
+ const inapplicable = notApplicable[self?.device?.agent_kind?.value] ?? {};
+ const applied = state.applied ?? {}, lines = [], refused = [], unavailable = [];
  let serviceInstalled = false;
  for (const name of names) {
+  if (inapplicable[name]) {
+   if (applied[name] !== 'not-applicable') { applied[name] = 'not-applicable'; unavailable.push(inapplicable[name]); }
+   continue;
+  }
   const choice = decided[name];
   if (choice === null || applied[name] === choice) continue;
   try {
@@ -56,14 +70,13 @@ export async function applyChoices(api, state) {
  }
  state.applied = applied;
  state.awakeConsent = applied.awakeConsent === true;
- if (lines.length) {
-  await saveState(state);
-  process.stdout.write(`Applied the owner's choices for this computer:\n${lines.join('')}`);
- }
+ if (lines.length || unavailable.length) await saveState(state);
+ if (lines.length) process.stdout.write(`Applied the owner's choices for this computer:\n${lines.join('')}`);
+ for (const text of unavailable) process.stdout.write(text);
  for (const { name, error } of refused) {
   once(`refused:${name}:${error.message}`, `Not applied yet: ${choices[name]}. ${describe(error)} The run and next commands try again at each check-in; to apply it now, run ${businessCommand('next')} outside the agent sandbox or in your own terminal.\n`);
  }
- const undecided = names.filter(name => decided[name] === null);
+ const undecided = names.filter(name => decided[name] === null && !inapplicable[name]);
  if (undecided.length) {
   once(`undecided:${undecided.join()}`, `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, so connect does not need to run again.\n`);
  }
