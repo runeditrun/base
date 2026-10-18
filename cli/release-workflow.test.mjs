@@ -8,13 +8,13 @@ const spool = { id: 42, name: 'verify', path: '.github/workflows/verify.yml' };
 const slate = { id: 42, name: 'Verify Slate', path: '.github/workflows/verify.yml' };
 const selectedRuns = (f, workflow) => ({
   [`repos/${repository}/actions/workflows/${workflow.id}/runs?head_sha=${f.sha}&per_page=100`]:
-    [{ workflow_runs: [{ ...f.run, workflow_id: workflow.id }] }],
+    [{ workflow_runs: [{ ...f.run, workflow_id: workflow.id, path: workflow.path }] }],
 });
 
 test('rer release finds Spool and Slate by conventional workflow file, before workflow name', async t => {
-  const f = await source(t);
   for (const workflow of [spool, slate, { ...slate, path: '.github/workflows/VERIFY.YAML' }]) {
-    const { result, receipt } = f.invoke([f.run], [], {
+    const f = await source(t, { workflows: { [workflow.path.split('/').at(-1)]: workflow.name, 'other.yml': 'Verify' } });
+    const { result, receipt } = f.invoke([{ ...f.run, path: workflow.path }], [], {
       [workflowsPath]: [{ workflows: [workflow, { id: 43, name: 'Verify', path: '.github/workflows/other.yml' }] }],
     });
     assert.equal(result.status, 0, result.stdout);
@@ -26,7 +26,7 @@ test('rer release finds Spool and Slate by conventional workflow file, before wo
 
 test('rer release uses a committed declaration by name or file, before the conventional file', async t => {
   for (const selector of ['vErIfY sLaTe', '.GITHUB/WORKFLOWS/SLATE.YAML', 'SLATE.yaml']) {
-    const f = await source(t, { declaration: { verifyWorkflow: selector } });
+    const f = await source(t, { declaration: { verifyWorkflow: selector }, workflows: { 'verify.yml': 'verify', 'slate.yaml': 'Verify Slate' } });
     const workflow = { ...slate, id: 43, path: '.github/workflows/slate.yaml' };
     const { result, receipt } = f.invoke([], [], {
       [workflowsPath]: [{ workflows: [spool, workflow] }], ...selectedRuns(f, workflow),
@@ -38,15 +38,15 @@ test('rer release uses a committed declaration by name or file, before the conve
 });
 
 test('rer release uses a single case-insensitive Verify name when no declaration or conventional file exists', async t => {
-  const f = await source(t);
+  const f = await source(t, { workflows: { 'check.yml': 'vErIfY' } });
   const workflow = { ...spool, name: 'vErIfY', path: '.github/workflows/check.yml' };
-  const { result, receipt } = f.invoke([f.run], [], { [workflowsPath]: [{ workflows: [workflow] }] });
+  const { result, receipt } = f.invoke([{ ...f.run, path: workflow.path }], [], { [workflowsPath]: [{ workflows: [workflow] }] });
   assert.equal(result.status, 0, result.stdout);
   assert.equal(receipt.gates.verify.workflowFile, workflow.path);
 });
 
 test('rer release refuses ambiguous workflows with both candidates and an explicit selection remedy', async t => {
-  const f = await source(t);
+  const f = await source(t, { workflows: { 'check.yml': 'Verify', 'test.yml': 'verify' } });
   const workflows = [
     { ...spool, name: 'Verify', path: '.github/workflows/check.yml' },
     { ...spool, id: 43, path: '.github/workflows/test.yml' },
@@ -60,7 +60,7 @@ test('rer release refuses ambiguous workflows with both candidates and an explic
 });
 
 test('rer release --verify-workflow wins over a declaration and conventional file by name or file', async t => {
-  const f = await source(t, { declaration: { verifyWorkflow: 'verify' } });
+  const f = await source(t, { declaration: { verifyWorkflow: 'verify' }, workflows: { 'verify.yml': 'verify', 'candidate.yml': 'Verify candidate' } });
   const workflow = { id: 43, name: 'Verify candidate', path: '.github/workflows/candidate.yml' };
   for (const selector of ['vErIfY cAnDiDaTe', '.GITHUB/WORKFLOWS/CANDIDATE.YML', 'CANDIDATE.yml']) {
     const { result, receipt } = f.invoke([], ['--verify-workflow', selector], {

@@ -12,7 +12,7 @@ export const repository = 'octocat/Hello-World';
 const marker = name => `node -e "require('node:fs').writeFileSync(process.env.${name}, 'ran')"`;
 const read = path => JSON.parse(readFileSync(path, 'utf8'));
 
-export async function source(t, { localPass = false, portable = false, buildFailure = false, declaration } = {}) {
+export async function source(t, { localPass = false, portable = false, buildFailure = false, declaration, workflows = { 'verify.yml': 'Verify' } } = {}) {
   const f = fixture(t, `${marker('VERIFY_MARKER')} && node --test check.test.mjs${localPass ? '' : ' && node -e "process.exit(7)"'}`);
   const pkg = read(join(f.repo, 'package.json'));
   pkg.scripts.build = `node -e "const fs=require('node:fs');fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/bundle.js','export const released = true;')" && ${marker('BUILD_MARKER')}`;
@@ -23,6 +23,10 @@ export async function source(t, { localPass = false, portable = false, buildFail
   if (declaration !== undefined) {
     writeFileSync(join(f.repo, 'edition.json'), JSON.stringify({ id: repository }));
     writeFileSync(join(f.repo, 'rer-project.json'), JSON.stringify({ projectId: repository, sourceRepository: 'https://github.com/' + repository, ...declaration }));
+  }
+  mkdirSync(join(f.repo, '.github/workflows'), { recursive: true });
+  for (const [file, name] of Object.entries(workflows)) {
+    writeFileSync(join(f.repo, '.github/workflows', file), `name: ${JSON.stringify(name)}\non: [push, workflow_dispatch]\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm verify\n`);
   }
   f.sha = f.commit();
   execFileSync('git', ['-C', f.repo, 'remote', 'add', 'origin', `git@github.com:${repository}.git`]);
@@ -48,13 +52,13 @@ else { process.stderr.write('unexpected API request'); process.exitCode = 1; }
     await cp(join(base, 'onboarding'), join(target, 'scripts/base-onboarding'), { recursive: true });
     cli = join(target, 'scripts/rer.mjs');
   }
-  const run = { id: 12345, workflow_id: 42, head_sha: f.sha, head_branch: 'main', event: 'push',
+  const run = { id: 12345, workflow_id: 42, path: '.github/workflows/verify.yml', head_sha: f.sha, head_branch: 'main', event: 'push',
     status: 'completed', conclusion: 'success', repository: { full_name: repository }, head_repository: { full_name: repository } };
   let attempt = 0;
   function invoke(runs = [run], flags = [], extra = {}) {
     writeFileSync(responses, JSON.stringify({
       [`repos/${repository}`]: { full_name: repository, default_branch: 'main' },
-      [`repos/${repository}/actions/workflows?per_page=100`]: [{ workflows: [{ id: 42, name: 'Verify' }] }],
+      [`repos/${repository}/actions/workflows?per_page=100`]: [{ workflows: [{ id: 42, name: 'Verify', path: '.github/workflows/verify.yml' }] }],
       [`repos/${repository}/actions/workflows/42/runs?head_sha=${f.sha}&per_page=100`]: [{ workflow_runs: runs }], ...extra,
     }));
     const output = join(f.temporary, 'release-' + attempt++);

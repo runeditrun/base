@@ -63,7 +63,13 @@ other SHAs, repositories, branches and unsuccessful runs cannot authorize releas
 Workflow selection uses `--verify-workflow NAME_OR_FILE` first, then the
 optional top-level `verifyWorkflow` from committed `rer-project.json`, then
 `.github/workflows/verify.yml` or `verify.yaml`, then a single workflow named
-`verify`. Names, full file paths and basenames match case-insensitively. For
+`verify`. Files and literal top-level YAML `name:` values are read from the
+selected source commit's tree, so a later rename or deletion on the default
+branch does not discard that commit's gate. Names, full file paths and basenames
+match case-insensitively. Use the filename for a name expressed with YAML aliases
+or tags. Every accepted run must have exactly that committed workflow path
+(after removing an `@ref` suffix); a current-list workflow ID, when present,
+must also match. All other run checks above remain required. For
 example, `"verifyWorkflow": "Verify Slate"` or
 `--verify-workflow .github/workflows/candidate.yml` selects a seed's own gate.
 An explicit selection that is missing or ambiguous blocks; multiple conventional

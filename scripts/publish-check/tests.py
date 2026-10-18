@@ -2,12 +2,16 @@
 import hashlib
 import json
 import os
+from pathlib import Path
 import secrets
+import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 import unittest
 import zlib
+from unittest.mock import patch
 from test_repo import ROOT, RepositoryFixture, resolving, generic_credential
 from history_scan import scan
 from test_copy_digests import CopyDigestTests
@@ -456,6 +460,72 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         with tempfile.TemporaryDirectory() as directory:
             subprocess.check_call(['git', 'clone', '-q', '--depth=1', self.repo.as_uri(), directory], stderr=subprocess.DEVNULL)
             self.assertEqual(scan(directory)['status'], 'INCOMPLETE')
+
+    def test_failed_git_reports_command_exit_and_redacted_first_stderr_line(self):
+        real_git = shutil.which('git')
+        with tempfile.TemporaryDirectory() as directory:
+            # Keep the executable outside the scanned working tree.
+            fake = Path(directory) / 'git'
+            public = Path(directory) / 'public.git'
+            subprocess.check_call([real_git, 'clone', '-q', '--bare', str(self.repo), str(public)])
+            value = 'ghp_' + secrets.token_hex(20)
+            for operation in ('rev-list', 'cat-file', 'fetch'):
+                for first in ('fatal: fixture transport failed', 'fatal: credential ' + value):
+                    with self.subTest(operation=operation, private=value in first):
+                        stderr = first + '\nsecond line must stay private\n'
+                        fake.write_text(f'#!{sys.executable}\nimport os, sys\n'
+                                        f'if {operation!r} in sys.argv[1:]:\n'
+                                        f'    sys.stderr.write({stderr!r})\n'
+                                        '    sys.exit(73)\n'
+                                        f'os.execv({real_git!r}, [{real_git!r}, *sys.argv[1:]])\n')
+                        fake.chmod(0o755)
+                        options = ['--public-base', str(public) + '#main'] if operation == 'fetch' else []
+                        result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'),
+                                                 '--repo', str(self.repo), *options],
+                                                env={**os.environ, 'PATH': directory + os.pathsep + os.environ['PATH']},
+                                                capture_output=True, text=True, timeout=15)
+                        self.assertEqual(result.returncode, 2)
+                        report = json.loads(result.stdout)
+                        self.assertEqual(report['status'], 'INCOMPLETE')
+                        finding, = report['findings']
+                        self.assertEqual(finding['rule'], 'scan.public-base-rejected' if operation == 'fetch'
+                                         else 'scan.history-incomplete')
+                        details = finding['git']
+                        self.assertIn(operation, details['command'])
+                        self.assertEqual(details['exitCode'], 73)
+                        if value in first:
+                            self.assertIn('redacted-path-sha256', details['stderr'])
+                        else:
+                            self.assertEqual(details['stderr'], first)
+                        self.assertNotIn(value, result.stdout + result.stderr)
+                        self.assertNotIn('second line must stay private', result.stdout + result.stderr)
+
+    def test_unavailable_git_reports_timeout_or_start_error(self):
+        real_run = subprocess.run
+        private_ref = 'ghp_' + secrets.token_hex(20)
+        for kind in ('timeout', 'start'):
+            with self.subTest(kind=kind):
+                def failing_git(command, *args, **kwargs):
+                    if command[0] == 'git':
+                        if kind == 'timeout':
+                            raise subprocess.TimeoutExpired(command, 120, stderr=b'fatal: fixture deadline\nprivate second line')
+                        raise FileNotFoundError(2, 'fixture git unavailable', 'git')
+                    return real_run(command, *args, **kwargs)
+                with patch('git_history.subprocess.run', side_effect=failing_git):
+                    report = scan(str(self.repo), ref=private_ref)
+                self.assertEqual(report['status'], 'INCOMPLETE')
+                finding, = report['findings']
+                self.assertEqual(finding['rule'], 'scan.history-incomplete')
+                self.assertEqual(finding['reason'], 'history.git-unavailable')
+                details = finding['git']
+                self.assertIn('rev-parse', details['command'])
+                if kind == 'timeout':
+                    self.assertEqual(details['timeoutSeconds'], 120)
+                    self.assertEqual(details['stderr'], 'fatal: fixture deadline')
+                else:
+                    self.assertIn('FileNotFoundError', details['startError'])
+                self.assertNotIn(private_ref, json.dumps(report))
+                self.assertNotIn('private second line', json.dumps(report))
 
     def test_timeout(self):
         result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo),
