@@ -1,48 +1,70 @@
 import { createD1ImportJob, readD1ImportJob } from '../d1/jobs.ts';
 import { applyD1ImportBatches } from '../d1/apply.ts';
 import { rollbackD1Import, undoD1Import } from '../d1/reverse.ts';
-import type { DoorPlanRow, DoorRequest } from './types.ts';
+import { loadPlans } from '../d1/plans.ts';
+import type { DoorPlanRow, DoorRequest, DoorSnapshot } from './types.ts';
 import { kitContext, reserveApply } from './authority.ts';
 import { inspectRecords } from './inventory.ts';
 import { DoorError } from './grants.ts';
-import { assertion, authorized, lineage, loadSnapshot, planRow, sql, transact } from './store.ts';
+import { assertion, authorized, fenced, lineage, loadSnapshot, planRow, snapshotHeld, sql, transact } from './store.ts';
 import { text } from './uploads.ts';
 
+/** Whether this kit job holds the plan the owner reviewed. A person's erasure
+ * re-fingerprints the job's plan and keeps the reviewed fingerprint inside it. */
+async function reviewedJob(request: DoorRequest, row: DoorPlanRow, job: Record<string,any>): Promise<boolean> {
+  if (job.fingerprint === row.fingerprint) return true;
+  const plan = (await loadPlans([job],request.options.database,request.options.targets.planCodec)).get(job.id);
+  return plan?.erasure?.reviewedFingerprint === row.fingerprint;
+}
+/** The kit context for a plan's own job. It needs no snapshot, so it still
+ * works after an erasure withdrew one; the kit job binds the same plan. An
+ * erasure re-fingerprints the job, so reviewedJob, not the kit, binds it to
+ * the reviewed fingerprint. */
+async function jobContext(request: DoorRequest, row: DoorPlanRow & {job_id: string}) {
+  const job = await request.options.database.prepare('SELECT id,namespace,mapping_version,destination,principal_id,operation_key,fingerprint,plan_json FROM ik_jobs WHERE id=?').bind(row.job_id).first();
+  if (!job || job.destination !== request.options.destination || job.principal_id !== request.options.ownerPrincipalId
+    || job.operation_key !== 'door:' + row.id || !await reviewedJob(request,row,job)) throw new DoorError('plan_custody_mismatch', 409);
+  return {...kitContext(request, {id: row.id, kitNamespace: job.namespace, plan: {mappingVersion: job.mapping_version} as DoorSnapshot['plan']}), reviewedFingerprint: undefined};
+}
 /** Creation and indexing may be separate commits; the immutable operation key
  * makes a queued job recoverable even if its response or index update was lost. */
 async function associated(request: DoorRequest, row: DoorPlanRow): Promise<DoorPlanRow> {
   if (row.job_id) return row;
-  const job = await request.options.database.prepare('SELECT id,fingerprint FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?')
+  const job = await request.options.database.prepare('SELECT id,fingerprint,plan_json FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?')
     .bind(request.options.destination,request.options.ownerPrincipalId,'door:'+row.id).first();
   if (!job) return row;
-  if (job.fingerprint !== row.fingerprint) throw new DoorError('job_binding_mismatch',409);
+  if (!await reviewedJob(request,row,job)) throw new DoorError('job_binding_mismatch',409);
   await transact(request.options.database,request.authority,[sql('UPDATE ik_door_plans SET job_id=? WHERE id=? AND job_id IS NULL',job.id,row.id)]);
-  return {...row,job_id:job.id};
+  return {...row,job_id:job.id as string};
 }
 export async function apply(request: DoorRequest, input: Record<string,unknown>) {
   if (Object.keys(input).some(k=>!['planId','reviewedFingerprint'].includes(k))) throw new DoorError('invalid_apply_input',400);
   const row = await associated(request,await planRow(request,text(input.planId,'plan_id')));
   if (input.reviewedFingerprint !== row.fingerprint || request.grant.fingerprint !== row.fingerprint) throw new DoorError('review_fingerprint_mismatch');
-  const snapshot = await loadSnapshot(request,row), context = kitContext(request,snapshot);
   const current = await lineage(request);
   if (current.head_id === row.id && row.job_id) {
     const approval = await request.options.database.prepare('SELECT approval_id,approved_at FROM ik_door_approvals WHERE plan_id=?').bind(row.id).first();
     if (approval?.approval_id !== request.grant.approvalRecordId || approval?.approved_at !== request.grant.approvedAt) throw new DoorError('approval_mismatch');
-    return {planId:row.id,job:await readD1ImportJob(row.job_id,context)};
+    return {planId:row.id,job:await readD1ImportJob(row.job_id,await jobContext(request,{...row,job_id:row.job_id}))};
   }
-  await reserveApply(request,snapshot);
-  const job = await createD1ImportJob(snapshot.plan,context);
-  await transact(request.options.database,request.authority,[
-    sql('UPDATE ik_door_plans SET job_id=? WHERE id=? AND (job_id IS NULL OR job_id=?)',job.id,row.id,job.id),
-    assertion(sql('EXISTS(SELECT 1 FROM ik_door_plans WHERE id=? AND job_id=?)',row.id,job.id)),
-  ]);
-  const result = await applyD1ImportBatches(job.id,context);
+  const snapshot = await loadSnapshot(request,row), context = kitContext(request,snapshot);
+  // The kit asserts the snapshot is still held at both ends of every batch.
+  const result = await fenced(request,row.id,snapshotHeld(row.id),async()=>{
+    await reserveApply(request,snapshot);
+    const job = await createD1ImportJob(snapshot.plan,context);
+    await transact(request.options.database,request.authority,[
+      sql('UPDATE ik_door_plans SET job_id=? WHERE id=? AND (job_id IS NULL OR job_id=?)',job.id,row.id,job.id),
+      assertion(sql('EXISTS(SELECT 1 FROM ik_door_plans WHERE id=? AND job_id=?)',row.id,job.id)),
+    ]);
+    return applyD1ImportBatches(job.id,context);
+  });
   await lineage(request);
   return {planId:row.id,job:result};
 }
 export async function status(request: DoorRequest, input: Record<string,unknown>) {
-  const row = await associated(request,await planRow(request,text(input.planId,'plan_id'))), snapshot = await loadSnapshot(request,row);
-  const job = row.job_id ? await readD1ImportJob(row.job_id,kitContext(request,snapshot)) : null;
+  const row = await associated(request,await planRow(request,text(input.planId,'plan_id')));
+  if (!row.job_id) await loadSnapshot(request,row);
+  const job = row.job_id ? await readD1ImportJob(row.job_id,await jobContext(request,{...row,job_id:row.job_id})) : null;
   await lineage(request);
   const approval = await request.options.database.prepare('SELECT owner,approved_at,approval_id,reviewer FROM ik_door_approvals WHERE plan_id=?').bind(row.id).first();
   return {planId:row.id,fingerprint:row.fingerprint,job,approval,
@@ -71,7 +93,7 @@ export async function undo(request: DoorRequest, input: Record<string,unknown>) 
     ]);
     return {planId:id,state:'cancelled'};
   }
-  const snapshot = await loadSnapshot(request,row), context = kitContext(request,snapshot), job = await readD1ImportJob(row.job_id,context);
+  const context = await jobContext(request,{...row,job_id:row.job_id}), job = await readD1ImportJob(row.job_id,context);
   const result = ['completed','undoing','undone'].includes(job.state)?await undoD1Import(job.id,context):await rollbackD1Import(job.id,context);
   await lineage(request);
   return {planId:id,job:result};

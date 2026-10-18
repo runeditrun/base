@@ -39,5 +39,7 @@ export interface DoorPlanRow {
 export interface DoorRequest {
   options: ImportDoorOptions; grant: Readonly<DoorGrant>; kid: string;
   authority: D1Sql;
+  /** The destination's erasure journal rows when the request was admitted. */
+  epoch: number;
   persisted?: Promise<PersistedImport>;
 }

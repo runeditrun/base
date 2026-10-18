@@ -20,9 +20,12 @@ export async function planRow(request: DoorRequest, id: string): Promise<DoorPla
   if (!row) throw new DoorError('plan_not_found', 404);
   return row;
 }
+/** A saved plan's snapshot. A person's erasure withdraws every chunk of it:
+ * the plan, its approval and its kit job stay, the reviewed records do not. */
 export async function loadSnapshot(request: DoorRequest, row: DoorPlanRow): Promise<DoorSnapshot> {
   const chunks = await request.options.database.prepare('SELECT ordinal,body FROM ik_door_plan_chunks WHERE plan_id=? ORDER BY ordinal').bind(row.id).all();
-  if (!chunks.results.length || chunks.results.some((c, i) => c.ordinal !== i)) throw new DoorError('plan_custody_mismatch', 409);
+  if (!chunks.results.length) throw new DoorError('snapshot_withdrawn', 410, {planId: row.id});
+  if (chunks.results.some((c, i) => c.ordinal !== i)) throw new DoorError('plan_custody_mismatch', 409);
   const snapshot = JSON.parse(chunks.results.map(c => c.body).join('')) as DoorSnapshot;
   if (sha256(canonicalJson(snapshot)) !== row.snapshot_hash || snapshot.id !== row.id || snapshot.namespace !== row.namespace || snapshot.bundleSha256 !== row.bundle_sha256
     || snapshot.previous !== row.previous_id || snapshot.plan.fingerprint !== row.fingerprint
@@ -50,7 +53,21 @@ export async function lineage(request: DoorRequest): Promise<{ head_id: string |
     if (!current) throw new DoorError('lineage_conflict', 409);
   }
 }
-export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot): Promise<void> {
+/** A saved plan's snapshot is still held. An erasure withdraws all of its chunks at once. */
+export const snapshotHeld = (planId: string): D1Sql => sql('EXISTS(SELECT 1 FROM ik_door_plan_chunks WHERE plan_id=?)', planId);
+/** Door work already in flight never writes back or applies content an erasure
+ * withdrew meanwhile: each of its batches asserts that what it builds on is still
+ * held. A batch refused because it is not answers 410; any other failure stands. */
+export async function fenced<T>(request: DoorRequest, planId: string, held: D1Sql, work: () => Promise<T>): Promise<T> {
+  try { return await work(); }
+  catch (error) {
+    if (error instanceof DoorError) throw error;
+    const row = await statement(request.options.database, sql(`SELECT CASE WHEN (${held.sql}) THEN 1 ELSE 0 END AS ok`, ...held.params ?? [])).first();
+    if (row?.ok !== 1) throw new DoorError('snapshot_withdrawn', 410, {planId});
+    throw error;
+  }
+}
+export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot, upload: {id: string}): Promise<void> {
   const db = request.options.database, g = request.grant;
   await transact(db, request.authority, [
     sql('INSERT OR IGNORE INTO ik_door_namespaces(installation_id,namespace) VALUES(?,?)', g.installationId, g.namespace),
@@ -67,6 +84,14 @@ export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot)
     chunks.push(sql('INSERT INTO ik_door_plan_chunks(plan_id,ordinal,body) VALUES(?,?,?)', snapshot.id, ordinal, body.slice(offset,end)));
     offset = end;
   }
-  for (let i = 0; i < chunks.length; i += 8) await transact(db, request.authority, chunks.slice(i, i + 8));
-  await transact(db, request.authority, [sql('UPDATE ik_door_plans SET complete=1 WHERE id=?', snapshot.id)]);
+  // Each batch, and the one that completes the plan, requires the whole source
+  // upload, a catch-up's previous snapshot and every chunk written before it.
+  const held = (written: number) => sql(`EXISTS(SELECT 1 FROM ik_door_uploads u WHERE u.id=? AND u.installation_id=? AND u.namespace=? AND u.bundle_sha256=?
+      AND (SELECT count(*) FROM ik_door_chunks c WHERE c.upload_id=u.id)=u.total_chunks)
+    AND (? IS NULL OR EXISTS(SELECT 1 FROM ik_door_plan_chunks WHERE plan_id=?))
+    AND (SELECT count(*) FROM ik_door_plan_chunks WHERE plan_id=?)=?`,
+    upload.id, g.installationId, g.namespace, snapshot.bundleSha256, snapshot.previous, snapshot.previous, snapshot.id, written);
+  const batch = (written: number, queries: D1Sql[]) => fenced(request, snapshot.id, held(written), () => transact(db, request.authority, [assertion(held(written)), ...queries]));
+  for (let i = 0; i < chunks.length; i += 8) await batch(i, chunks.slice(i, i + 8));
+  await batch(chunks.length, [sql('UPDATE ik_door_plans SET complete=1 WHERE id=?', snapshot.id)]);
 }

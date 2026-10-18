@@ -1,7 +1,7 @@
-import type { ImportDoorOptions } from './types.ts';
+import type { DoorRequest, ImportDoorOptions } from './types.ts';
 import type { DoorAction } from './grants.ts';
 import { DoorError } from './grants.ts';
-import { admit, enabled } from './authority.ts';
+import { admit, enabled, erasedSince } from './authority.ts';
 import { authorized } from './store.ts';
 import { uploads } from './uploads.ts';
 import { plan } from './planning.ts';
@@ -38,6 +38,7 @@ export function createImportDoorHandler(options: ImportDoorOptions): (request: R
   return async request => {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/rer/import/')) return null;
+    let admitted: DoorRequest | undefined;
     try {
       // Check opt-in before revealing routes, authentication, or parser behavior.
       if (!await enabled(options)) return Response.json({error:'not_found'},{status:404,headers});
@@ -45,12 +46,15 @@ export function createImportDoorHandler(options: ImportDoorOptions): (request: R
       if (!Object.hasOwn(routes,action)) return Response.json({error:'not_found'},{status:404,headers});
       if (request.method!=='POST') return Response.json({error:'method_not_allowed'},{status:405,headers:{...headers,Allow:'POST'}});
       if (url.search || url.hash) throw new DoorError('query_transport_forbidden',400);
-      const admitted = await admit(options,request,action), input = await readInput(request);
+      admitted = await admit(options,request,action); const input = await readInput(request);
       if (['status','reconcile','undo'].includes(action) && Object.keys(input).some(k=>k!=='planId')) throw new DoorError('invalid_input',400);
       const result = await routes[action](admitted,input);
       await authorized(admitted);
       return Response.json(result,{headers});
-    } catch (error) {
+    } catch (caught) {
+      // Work an erasure overtook answers one stable refusal, whichever batch it reached.
+      const overtaken = admitted && (!(caught instanceof DoorError) || caught.code === 'grant_revoked_or_expired') && await erasedSince(admitted).catch(() => false);
+      const error = overtaken ? new DoorError('erased_during_request', 410) : caught;
       const known = error instanceof DoorError;
       // Never reflect a parser/native adapter error containing customer records.
       return Response.json({error:known?error.code:'import_door_conflict',...(known && error.details?{details:error.details}:{})},{status:known?error.status:409,headers});

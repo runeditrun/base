@@ -33,4 +33,9 @@ export const importDoorSchema = [
     plan_id TEXT PRIMARY KEY REFERENCES ik_door_plans(id), approval_id TEXT NOT NULL,
     owner TEXT NOT NULL, approved_at TEXT NOT NULL, fingerprint TEXT NOT NULL,
     reviewer TEXT NOT NULL)`,
+  // Additive for installed doors: one logical namespace belongs to one product
+  // destination, even before an upload has a plan or a kit job.
+  `CREATE TABLE IF NOT EXISTS ik_door_scopes (
+    installation_id TEXT NOT NULL, namespace TEXT NOT NULL, destination TEXT NOT NULL,
+    PRIMARY KEY(installation_id,namespace))`,
 ];

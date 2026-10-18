@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { canonicalJson, sha256 } from '../provenance/identity.ts';
 import { readFileSource } from '../readers/file.ts';
 import { planD1Import } from '../d1/jobs.ts';
+import { erasedSourcePredicates } from '../d1/erasure-claims.ts';
 import type { ImportPlan, MappingResult } from '../types.ts';
 import type { DoorPlanRow, DoorRecord, DoorRequest, DoorSnapshot } from './types.ts';
 import { kitContext } from './authority.ts';
 import { importedTarget, recordKey } from './inventory.ts';
 import { DoorError } from './grants.ts';
-import { lineage, loadSnapshot, planRow, saveSnapshot } from './store.ts';
-import { bundleBytes, text, uploadRow } from './uploads.ts';
+import { lineage, loadSnapshot, planRow, saveSnapshot, sql, statement, transact } from './store.ts';
+import { bundleBytes, text, uploadRow, type UploadRow } from './uploads.ts';
 
 export function preview(snapshot: DoorSnapshot) {
   const {plan,differences} = snapshot;
@@ -20,6 +21,17 @@ export function preview(snapshot: DoorSnapshot) {
 export async function plan(request: DoorRequest, input: Record<string, unknown>) {
   if (Object.keys(input).some(k=>!['uploadId','catchup'].includes(k)) || (input.catchup !== undefined && typeof input.catchup !== 'boolean')) throw new DoorError('invalid_plan_input',400);
   const upload = await uploadRow(request,text(input.uploadId,'upload_id'));
+  try { return await planUpload(request,input,upload); }
+  catch (error) {
+    // Whatever refuses this plan first (a pending import, interrupted staging, a
+    // withdrawn snapshot, the catch-up shape or a bound), an upload holding an
+    // erased record is refused for that instead, and goes. A failing screen leaves
+    // the original refusal standing.
+    if (error instanceof DoorError && error.code !== 'source_erased') await screen(request,upload).catch(screened => { if (screened instanceof DoorError && screened.code === 'source_erased') throw screened; });
+    throw error;
+  }
+}
+async function planUpload(request: DoorRequest, input: Record<string, unknown>, upload: UploadRow) {
   const current = await lineage(request);
   const existing = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE installation_id=? AND namespace=? AND bundle_sha256=?')
     .bind(request.grant.installationId,request.grant.namespace,upload.bundle_sha256).first<DoorPlanRow>();
@@ -35,10 +47,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
   const previous = current.head_id ? await loadSnapshot(request,await planRow(request,current.head_id)) : null;
   if (previous && input.catchup !== true) throw new DoorError('catchup_required',409);
   if (!previous && (input.catchup === true || request.grant.catchup === 'bounded')) throw new DoorError('catchup_requires_baseline',409);
-  const bytes = await bundleBytes(request,upload), options = request.options;
-  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256]));
-  const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
-    {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.grant.maxBytes,request.grant.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.grant.maxRecords,request.grant.maxRecords)});
+  const options = request.options, {kitNamespace,source} = await readUpload(request,upload);
   const prior = new Map((previous?.records ?? []).map(r=>[recordKey(r),r]));
   const revisions = new Map<string,{revision:string;matches:boolean}>();
   for (const record of prior.values()) for (const target of record.targets) {
@@ -89,8 +98,30 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     snapshot.records.push({...old,explanation:'Absent from source snapshot; retained in the seed. No deletion proposed.'});
   }
   if (request.grant.catchup === 'bounded') assertBounded(snapshot,previous!);
-  await saveSnapshot(request,snapshot);
+  await refuseErased(request,upload,snapshot.plan);
+  await saveSnapshot(request,snapshot,upload);
   return preview(snapshot);
+}
+async function readUpload(request: DoorRequest, upload: UploadRow) {
+  const bytes = await bundleBytes(request,upload), options = request.options;
+  const kitNamespace = 'door:' + sha256(canonicalJson([request.grant.namespace,upload.bundle_sha256]));
+  const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:options.format,parse:options.parse},
+    {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.grant.maxBytes,request.grant.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.grant.maxRecords,request.grant.maxRecords)});
+  return {kitNamespace,source};
+}
+/** The kit never stages an erased record, and neither does the door: an upload
+ * holding one can never be planned, so it goes too. The epoch fences a later erasure. */
+async function refuseErased(request: DoorRequest, upload: UploadRow, plan: ImportPlan): Promise<void> {
+  const db = request.options.database;
+  for (const clear of erasedSourcePredicates(plan)) if ((await statement(db, sql(`SELECT ${clear.sql} AS clear`, ...clear.params ?? [])).first())?.clear !== 1) {
+    await transact(db, request.authority, [sql('DELETE FROM ik_door_chunks WHERE upload_id=?', upload.id), sql('DELETE FROM ik_door_uploads WHERE id=?', upload.id)]);
+    throw new DoorError('source_erased', 409);
+  }
+}
+/** The upload planned on its own with the plain mapping: one holding an erased record is refused and goes. */
+async function screen(request: DoorRequest, upload: UploadRow): Promise<void> {
+  const {kitNamespace,source} = await readUpload(request,upload), mapping = request.options.mapping;
+  await refuseErased(request,upload,await planD1Import(source,mapping,kitContext(request,{id:randomUUID(),kitNamespace,plan:{mappingVersion:mapping.version} as ImportPlan})));
 }
 export function assertBounded(snapshot: DoorSnapshot, previous: DoorSnapshot): void {
   const d = snapshot.differences, changed = d.additions.length + d.replacements.length;
