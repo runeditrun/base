@@ -19,6 +19,7 @@ import { staticAssetResponse } from '../../foundation/runtime/static-assets'
 import { seedDemo } from './demo'
 import { importDoorResponse } from './core/features/people/door.server'
 import { importPageResponse } from './core/features/people/import-page.server'
+import { rejectedResponse } from '../../foundation/runtime/rejected-response'
 
 const api = createApi()
 const queueMessage = z.union([z.object({ id: z.string().length(26) }).strict(), z.object({ erasure: z.string().regex(/^[0-9a-f]{32}$/) }).strict(),
@@ -30,7 +31,10 @@ export default withDemo({
     if (asset) return asset
     bindings = requireBindings(bindings)
     const imported = await importDoorResponse(request, bindings)
-    if (imported) return imported
+    // Admission runs before dispatch, so finish refused uploads with the same
+    // bounded drain as the normal router. Otherwise workerd can replace 4xx
+    // replies with an upload-proxy 500 when the request body is still unread.
+    if (imported) return rejectedResponse(request, imported)
     const keyExchange = await developmentKeyResponse(request, bindings)
     if (keyExchange) return keyExchange
     if (new URL(request.url).pathname.startsWith('/.well-known/rer-') || new URL(request.url).pathname.startsWith('/auth/dependencies/') || new URL(request.url).pathname === '/auth/owner-claim') {

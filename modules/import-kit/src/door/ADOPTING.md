@@ -6,9 +6,9 @@ For an owner moving data, start at the seed's signed-in import screen:
 /app/import
 ```
 
-Base's [default reference journey](https://github.com/runeditrun/base/blob/main/default-seed/IMPORTING.md) uses
+In a Base checkout, the [default reference journey](../../../../default-seed/IMPORTING.md) uses
 an exported people JSON file, review, apply, reconcile and undo. The
-[local-run guide](https://github.com/runeditrun/base/blob/main/export/RUN-LOCALLY.md) describes how to launch and
+[local-run guide](../../../../export/RUN-LOCALLY.md) describes how to launch and
 claim the local app. Installation `.rer` archive recovery is currently a
 separate developer-only mechanism; it is not accepted by this door.
 
