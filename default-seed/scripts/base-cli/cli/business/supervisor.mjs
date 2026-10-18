@@ -2,32 +2,61 @@ import { randomUUID } from 'node:crypto';
 import { access, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Api, taskPath, pause } from './api.mjs';
-import { paired } from './local-commands.mjs';
-import { createCredentialStore } from './keychain.mjs';
-import { nextQuestions } from './questions.mjs';
-import { lockSupervisor, stateDirectory, credentialHandle } from './state.mjs';
+import { paired, revokedByServer, revokedText } from './local-commands.mjs';
+import { nextQuestions, ownerLink } from './questions.mjs';
+import { lockSupervisor, stateDirectory, saveState } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
+import { applyChoices } from './choices.mjs';
+import { businessCommand } from './invocation.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
 const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-installation', 'installation-import-origin-unavailable', 'installation-owner-claim-unconfigured', 'connected-seed-import-required']);
+const checkIn = 25_000;
 
+// What this computer is waiting for, in the owner's terms. Until its own
+// folder scan has finished, that is the owner's scan permission for the folder
+// connect ran in; afterwards it is the owner's next step in the browser.
+function waitingFor(state) {
+ if (!state.discovered) {
+  const folder = state.workingFolder ?? process.cwd();
+  return `Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${ownerLink(state)}/tools`;
+ }
+ return `Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${ownerLink(state)}`;
+}
+
+/** Work this computer's tasks. It says what it is doing and what it waits
+ * for, applies the owner's choices at every check-in, and removes run.lock on
+ * every exit, including Ctrl-C, SIGTERM and a closed terminal (SIGHUP). */
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
  const parked = new Set(), unlock = await lockSupervisor(), stop = new AbortController();
- const interrupted = () => stop.abort(Error('Business supervisor stopped.'));
- process.once('SIGTERM', interrupted); process.once('SIGINT', interrupted);
- const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(interrupted, () => {}); }, 250);
- let progress;
+ const interrupted = signal => () => stop.abort(Object.assign(Error('Business supervisor stopped.'), { signal }));
+ const handlers = Object.fromEntries(['SIGTERM', 'SIGINT', 'SIGHUP'].map(signal => [signal, interrupted(signal)]));
+ for (const [signal, handler] of Object.entries(handlers)) process.once(signal, handler);
+ const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(() => stop.abort(Error('Business supervisor stopped for disconnect.')), () => {}); }, 250);
+ let progress, said = '', held = null;
+ const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
  try {
   progress = await loadProgress();
   await unlink(join(directory, 'disconnect')).catch(error => { if (error.code !== 'ENOENT') throw error; });
+  if (!once) process.stdout.write(`Business run is working this computer's tasks for ${ownerLink(state)}. It checks in every ${checkIn / 1000} seconds and keeps going until you stop it (Ctrl-C).\n`);
   do {
+   const { serviceInstalled } = await applyChoices(api, state);
+   if (serviceInstalled && !once) {
+    process.stdout.write('The background service now works this computer\'s tasks, so this run stops here.\n');
+    return;
+   }
    if (!progress.pendingClaim) {
     const summaries = await nextQuestions(api, stop.signal);
     const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
-    if (!selected) { if (once) { process.stdout.write('Nothing yet.\n'); return; } await pause(25_000, stop.signal); continue; }
+    if (!selected) {
+     say(waitingFor(state));
+     if (once) { process.stdout.write('Nothing yet.\n'); return; }
+     await pause(checkIn, stop.signal); continue;
+    }
+    held = selected.state === 'leased' ? selected.task_id : null;
     progress.pendingClaim = { claim_id: randomUUID(), task_id: selected.task_id };
     await saveProgress(progress);
    }
@@ -37,11 +66,15 @@ export async function run({ once = false } = {}) {
     if (error.status !== 409) throw error;
     progress = {}; await saveProgress(progress);
     if (once) throw error;
-    await pause(25_000, stop.signal); continue;
+    await pause(checkIn, stop.signal); continue;
    }
    if (!claimed.task || claimed.task.state !== 'leased' || claimed.task.fence !== claimed.fence || Date.parse(claimed.lease_expires_at) <= Date.now()) {
+    const interrupted = held === progress.pendingClaim?.task_id;
     progress = {}; await saveProgress(progress);
-    if (once && !claimed.task) { process.stdout.write('Nothing yet.\n'); return; }
+    // A task this computer held before it was stopped stays leased until the
+    // lease ends; then the server returns it to ready with its checkpoint.
+    if (!claimed.task && interrupted) say('Waiting for the server to hand back the scan this computer was doing when it stopped; its earlier lease has not ended yet.');
+    if (once && !claimed.task) { if (!interrupted) say(waitingFor(state)); process.stdout.write('Nothing yet.\n'); return; }
     continue;
    }
    if (!kinds.has(claimed.task.kind) || claimed.task.kind_version !== 1) throw Error('Business server returned an unimplemented task kind.');
@@ -61,11 +94,18 @@ export async function run({ once = false } = {}) {
      }
      throw Error('Business vendor export needs a connected seed upload grant and execution-input contract.');
     }
+    const page = claimed.task.checkpoint?.page;
+    say(page ? `Resuming the names-only scan of this computer's allowed folders from page ${page + 1}.` : 'Scanning this computer\'s allowed folders for tool names (names only; no file contents leave this computer).');
     const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
-     send: (destination, body) => lease.send(destination, body), saveCheckpoint: checkpoint => lease.checkpointSaved(checkpoint), stateDir: directory });
+     send: (destination, body) => lease.send(destination, body), stateDir: directory,
+     saveCheckpoint: async checkpoint => {
+      await lease.checkpointSaved(checkpoint);
+      if (checkpoint.page) process.stdout.write(`Sent page ${checkpoint.page} of ${checkpoint.total}; the server has ${checkpoint.records_done} names and saved this checkpoint.\n`);
+     } });
     await lease.complete(); finished = true;
     await result.cleanup();
-    process.stdout.write('Business discover.local completed and checked by the server.\n');
+    if (!state.discovered) { state.discovered = true; await saveState(state); }
+    say('Business discover.local completed and checked by the server.');
    } catch (error) { failure = lease.signal.aborted ? lease.signal.reason : error; }
    finally {
     if (!finished && failure?.status !== 401) {
@@ -83,10 +123,13 @@ export async function run({ once = false } = {}) {
   } while (!stop.signal.aborted);
  } catch (error) {
   if (error.status === 401) {
-   await createCredentialStore().delete(credentialHandle(state.origin));
-   process.stderr.write('Business pairing expired or was revoked. Supervisor stopped.\n');
+   const revoked = await revokedByServer(state);
+   process.stderr.write(`Business pairing expired or was revoked, so this supervisor stopped. This computer was ${revokedText(revoked)}\n`);
   } else if (!stop.signal.aborted) throw error;
  } finally {
-  clearInterval(monitor); process.off('SIGTERM', interrupted); process.off('SIGINT', interrupted); await unlock();
+  clearInterval(monitor);
+  for (const [signal, handler] of Object.entries(handlers)) process.off(signal, handler);
+  await unlock();
  }
+ if (stop.signal.reason?.signal) process.stdout.write(`Business supervisor stopped (${stop.signal.reason.signal}); run.lock removed. Run ${businessCommand('run')} again to continue from the saved checkpoint.\n`);
 }

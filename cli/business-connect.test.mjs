@@ -2,7 +2,7 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -221,6 +221,7 @@ test('a killed packed supervisor resumes a lapsed lease from its acknowledged sc
  assert.equal((await cli(home, ['business','run','--once'])).code, 0, 'revocation stops the supervisor cleanly');
  const revoked = await cli(home, ['business','status','--json']);
  assert.equal(JSON.parse(revoked.stdout).paired, false, 'revoked device credential is removed locally');
+ assert.equal(JSON.parse(revoked.stdout).revoked, true, 'status says revoked, never paired');
  assert.ok(!JSON.stringify(remote.state.requests).includes('fixture-private-version-never-export'));
  assert.equal((await cli(home, ['business','disconnect'])).code, 0);
 });
@@ -351,7 +352,9 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  assert.ok(!(await readdir(home)).includes('.rer'), 'nothing is written to ~/.rer when RER_BUSINESS_STATE_DIR is set');
  assert.equal((await stat(join(stateDir, 'state.json'))).mode & 0o777, 0o600);
  for (const choice of ['Add rules so Claude Code never reads your secret files', 'Install the background service']) assert.ok(paired.stdout.includes(choice), paired.stdout);
- assert.ok(!paired.stdout.includes('Keep this computer awake while it works'), 'a decided choice is not asked again');
+ const [applied, undecided] = paired.stdout.split('The owner has not chosen yet:');
+ assert.ok(applied.includes('Keep this computer awake while it works: not allowed') && !undecided.includes('Keep this computer awake while it works'), 'a decided choice is applied and named, not asked again');
+ assert.ok(!paired.stdout.includes('connect again to apply'), 'connect never has to run again: run and next apply later choices');
  assert.ok(!/installPermissions|awakeConsent|installService/.test(paired.stdout + paired.stderr), 'internal names never reach a person');
  const status = await cli(home, ['business','status','--json'], { env });
  assert.equal(JSON.parse(status.stdout).paired, true);
@@ -416,4 +419,87 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
  }
+});
+
+test('inside an agent sandbox run and next apply the owner\'s choices and say what they wait for, run.lock never outlives run, and disconnect tells the truth', async t => {
+ const remote = await fixtureServer(t), home = join(directory, 'sandbox-home'), stateDir = join(home, '.rer-business'), env = { RER_BUSINESS_STATE_DIR: stateDir };
+ await mkdir(home, { recursive: true });
+ const folder = await realpath(home), lock = join(stateDir, 'run.lock');
+ remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+ const paired = await connect(home, remote, { env });
+ assert.ok(paired.stdout.includes('the run and next commands apply the choices at their next check-in, so connect does not need to run again') && !paired.stdout.includes('connect again to apply'), paired.stdout);
+
+ // Before the owner allows its folder, run says exactly what it waits for.
+ const waitingRun = await cli(home, ['business','run','--once'], { env });
+ assert.equal(waitingRun.code, 0, waitingRun.stderr);
+ assert.ok(waitingRun.stdout.includes(`Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${remote.origin}/business/biz/tools`) && waitingRun.stdout.endsWith('Nothing yet.\n'), waitingRun.stdout);
+ await assert.rejects(stat(lock), { code: 'ENOENT' }, 'run --once removes run.lock');
+
+ // The owner chooses in the browser; the next check-in applies what it can and names what it cannot.
+ remote.state.optIns = { installPermissions: true, awakeConsent: true, installService: false };
+ // A place this session cannot write, as ~/.claude is inside an agent sandbox (also when tests run as root).
+ await writeFile(join(home, '.claude'), '');
+ const next = await cli(home, ['business','next'], { env });
+ assert.equal(next.code, 0, next.stderr);
+ assert.ok(next.stdout.includes("Applied the owner's choices for this computer:\n  - Keep this computer awake while it works: allowed") && next.stdout.includes('Install the background service: not allowed'), next.stdout);
+ assert.match(next.stdout, /Not applied yet: Add rules so Claude Code never reads your secret files\. Business could not \w+ \S*\.claude\S*: .*\(E[A-Z]+\)\. The run and next commands try again at each check-in/);
+ assert.ok(next.stdout.includes(`RER_BUSINESS_STATE_DIR=${stateDir} `) && next.stdout.endsWith('Nothing yet.\n'), next.stdout);
+ assert.equal(JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8')).awakeConsent, true);
+ await rm(join(home, '.claude'));
+ const appliedRun = await cli(home, ['business','run','--once'], { env });
+ assert.ok(appliedRun.stdout.includes('Add rules so Claude Code never reads your secret files: allowed') && !appliedRun.stdout.includes('Keep this computer awake'), 'each choice is applied and named once');
+ assert.ok(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')).permissions.deny.includes('Read(**/.env)'));
+ assert.ok(!(await cli(home, ['business','next'], { env })).stdout.includes('Applied'), 'unchanged choices are not applied again');
+
+ // A long run explains itself and removes run.lock when its terminal closes.
+ let hangUp = true;
+ const hungUp = await cli(home, ['business','run'], { env, onOutput: (stdout, child) => { if (hangUp && stdout.includes('Waiting for the owner')) { hangUp = false; child.kill('SIGHUP'); } } });
+ assert.equal(hungUp.code, 0, hungUp.stderr);
+ assert.ok(hungUp.stdout.startsWith("Business run is working this computer's tasks") && hungUp.stdout.includes('stopped (SIGHUP); run.lock removed'), hungUp.stdout);
+ await assert.rejects(stat(lock), { code: 'ENOENT' });
+ // A lock left by a killed run (its process is gone, or it has not been refreshed) is cleared on the next start.
+ const gone = spawn(process.execPath, ['-e', '']); await new Promise(resolve => gone.once('close', resolve));
+ for (const [pid, age] of [[gone.pid, 0], [process.pid, 600]]) {
+  await writeFile(lock, String(pid)); const then = new Date(Date.now() - age * 1000); await utimes(lock, then, then);
+  const restarted = await cli(home, ['business','run','--once'], { env });
+  assert.equal(restarted.code, 0, `stale lock (${age ? 'not refreshed' : 'dead process'}) is cleared: ${restarted.stderr}`);
+ }
+ await writeFile(lock, String(process.pid));
+ const competing = await cli(home, ['business','run','--once'], { env });
+ assert.equal(competing.code, 1); assert.match(competing.stderr, /already running for this computer \(process \d+\)/);
+ await rm(lock);
+
+ // Once its scan is done, run says it waits for the owner's next step.
+ remote.state.root = join(home, 'project'); await mkdir(remote.state.root);
+ await writeFile(join(remote.state.root, 'package.json'), JSON.stringify({ dependencies: { algoliasearch: '5.0.0' } }));
+ remote.state.tasks = [{ task_id: 'sandbox-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ const scanned = await cli(home, ['business','run','--once'], { env });
+ assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
+ assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);
+ remote.state.tasks = [];
+ assert.ok((await cli(home, ['business','run','--once'], { env })).stdout.includes(`Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${remote.origin}/business/biz`));
+
+ // Inside the sandbox the OS store refuses removal: the server revokes first,
+ // disconnect exits 0, says what is still stored and names the one command.
+ await writeFile(join(home, 'sandboxed-credential-store'), '');
+ const sandboxed = await cli(home, ['business','disconnect'], { env });
+ assert.equal(sandboxed.code, 0, sandboxed.stderr);
+ assert.equal(remote.state.revoked, true, 'the server revokes before anything local');
+ assert.ok(sandboxed.stdout.startsWith('Revoked on the server; the local credential is still stored.'), sandboxed.stdout);
+ assert.ok(sandboxed.stdout.includes(`run outside the agent sandbox or in your own terminal:\n  RER_BUSINESS_STATE_DIR=${stateDir} `) && /business disconnect\n/.test(sandboxed.stdout), sandboxed.stdout);
+ if (process.platform === 'darwin') assert.ok(sandboxed.stdout.includes('security exited with status 161'), sandboxed.stdout);
+ assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'the refused removal left the credential');
+ const status = await cli(home, ['business','status'], { env });
+ assert.ok(status.stdout.startsWith('Business: revoked on the server; the local credential is still stored.') && !status.stdout.includes('paired'), status.stdout);
+ assert.deepEqual(JSON.parse((await cli(home, ['business','status','--json'], { env })).stdout).revoked, true);
+ for (const verb of [['next'], ['run','--once'], ['connect']]) {
+  const refused = await cli(home, ['business', ...verb], { env });
+  assert.equal(refused.code, 1); assert.ok(refused.stderr.includes('This computer was revoked on the server; the local credential is still stored.'), refused.stderr);
+ }
+ // The named command, outside the sandbox, finishes.
+ await rm(join(home, 'sandboxed-credential-store'));
+ const finished = await cli(home, ['business','disconnect'], { env });
+ assert.equal(finished.code, 0, finished.stderr); assert.ok(finished.stdout.includes('Device was already revoked'), finished.stdout);
+ await assert.rejects(readFile(join(home, 'fake-keychain.json')), { code: 'ENOENT' });
+ assert.ok(!(await readdir(home)).includes('.rer-business'));
 });
