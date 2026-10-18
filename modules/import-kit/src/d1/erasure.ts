@@ -23,6 +23,7 @@ import { eraseBounded } from './erasure-bounded.ts';
 import { originalVersions } from './original-storage.ts';
 import { fieldRedactions, inRange, redactPlanFields, unmatchedPath } from './field-redaction.ts';
 import { redactedCustody, redactedNativeFields } from './redacted-custody.ts';
+import { supersededEntries } from './erasure-superseded.ts';
 
 /** Erase one normalized native entity and every retained copy of its source.
  * nativeStatements execute in the same D1 batch as all kit custody changes.
@@ -54,8 +55,9 @@ export async function eraseD1ImportTarget(kind: string, id: string, nativeStatem
  * read, and with `owned` only the native rows their active provenance owns are
  * rewritten. `matched` carries match counts from earlier steps. `sever`, in a
  * step with no target, is the erased target's digest: the related source copies
- * the step finds are severed and bound to it, while the target's own records
- * (indexed to it) wait for the final step and its native erasure. */
+ * the step finds are severed and bound to it, and so are the target's own records
+ * whose import of it was superseded or reversed (see erasure-superseded.ts); its
+ * other own records (indexed to it) wait for the final step and its native erasure. */
 export interface ErasureStep { selection: JobSelection; owned?: boolean; matched?: D1FieldMatch[]; sever?: string }
 
 /** The unbounded erasure of one target (or, with no target, only of the related
@@ -74,17 +76,20 @@ export async function targetErasure(target: { kind: string; id: string } | undef
   const scan = related ? await relatedSelection(context, related, step?.selection) : undefined;
   let identities = new Set<string>([...targetRows.map(row => row.source_identity), ...digest ? await stagedSourceIdentities(digest, context) : [], ...scan?.identities ?? []]);
   let sourceRows = await selectKeys(db, 'ik_d1_plan_index', 'source_identity', [...identities]);
+  let superseded: D1Sql[] = [];
   if (!digest && step?.sever) {
-    const own = new Set(sourceRows.filter(row => row.target_identity === step.sever).map(row => row.source_identity));
+    const earlier = await supersededEntries(db, context.destination, step.sever, sourceRows);
+    const own = new Set(sourceRows.filter(row => row.target_identity === step.sever && !earlier.identities.has(row.source_identity)).map(row => row.source_identity));
     identities = new Set([...identities].filter(identity => !own.has(identity)));
     sourceRows = sourceRows.filter(row => !own.has(row.source_identity));
+    superseded = earlier.guards;
   }
   const bound = digest ?? step?.sever ?? '';
   const severed: RelatedPlanErasure = { identities: new Set([...scan?.identities ?? []].filter(identity => identities.has(identity) && !targetRows.some(row => row.source_identity === identity))), target: bound };
   const privateErasure = digest ? stageErasure(context.destination, digest, [...identities]) : { before: [], after: [] };
   const ids = [...new Set([...sourceRows.map(row => row.job_id), ...scan?.originals.keys() ?? [], ...scan?.redactedJobs ?? []])];
   const snapshot = await readInventorySnapshot(ids, db, targets.planCodec);
-  const before: D1Sql[] = [indexedDestinationGuard(context.destination), ...privateErasure.before, ...scan?.guards ?? [],
+  const before: D1Sql[] = [indexedDestinationGuard(context.destination), ...privateErasure.before, ...scan?.guards ?? [], ...superseded,
     ...digest ? selectedCounts('ik_d1_plan_index', 'target_identity', [digest], indexed) : [],
     ...selectedCounts('ik_d1_plan_index', 'source_identity', [...identities], sourceRows),
     ...exactRows('ik_d1_plan_index', ['job_id','ordinal','source_identity','target_identity'], sourceRows)];

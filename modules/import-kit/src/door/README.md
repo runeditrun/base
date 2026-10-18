@@ -81,11 +81,21 @@ the catch-up shape or a bound. Any other bundle keeps that refusal and stays.
 A catch-up keeps each unchanged record as a zero-effect entry in its own kit
 job. Erasing a target a door import wrote severs the same source record in every
 kit job of that door namespace, and withdraws the originals that hold it. A
-resumable erasure severs those copies in the bounded steps that read their jobs,
-so a lineage of any length erases within the request budget, and its final step
-reads only the jobs no step has read since they last changed. A step or an
-erasure fails closed if a catch-up joins that namespace while it reads; a retry
-then erases it too.
+resumable erasure severs those copies in the bounded steps that read their jobs.
+The same steps erase each earlier import of the target that a later catch-up
+superseded or that was undone, oldest first, bound to the erased target like the
+copies. Every step, and the final step, fits one request in statements (1,000,
+or the caller's lower limit) and in bytes (one 32 MiB D1 call); one that would
+not writes nothing and is retried with fewer jobs, then with pages of one job's
+entries. The final step reads the target's live import and the jobs no step has
+read since they last changed, and runs the native statements. So a lineage of
+any length, however often the person changed, erases as long as each job (a step
+rewrites its plan whole) fits one such request, and the live import's job fits
+one together with the native statements; otherwise the erasure answers
+`IMPORT_D1_REQUEST_LIMIT` and writes nothing. Earlier imports outside the live
+import's door namespace, or superseded under a `preserve-conflicts` job, wait
+for the final step. A step or an erasure fails closed if a catch-up joins that
+namespace while it reads; a retry then erases it too.
 Later imports start a new namespace, or a new baseline after `undo`.
 Enablement, key revocations and grant replay protection survive.
 

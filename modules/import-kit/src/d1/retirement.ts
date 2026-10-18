@@ -12,6 +12,9 @@ import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw, type Store } fro
 import { fieldRedactions } from './field-redaction.ts';
 import { doorCustodyInScope, doorLineage, type DoorLineage } from './retirement-door.ts';
 import { retireD1ImportCustodyStep } from './retirement-bounded.ts';
+import { chainFirst } from './erasure-superseded.ts';
+import { batchBytes } from './transport.ts';
+import { RPC_LIMIT } from '../../../d1-transport/index.mjs';
 import type { D1ErasurePending, D1ErasureStepOptions } from './erasure-progress.ts';
 
 /** Erase a person from import custody and journal it, in one D1 batch with the
@@ -69,7 +72,11 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
     const clean = new Map(jobs.filter(job => job.revision !== null && !stale.has(job.id) && progress!.clean.get(job.id) === job.revision).map(job => [job.id, job.revision!]));
     pending = jobs.filter(job => !clean.has(job.id));
     progress = { ...progress, clean, lineage: severing };
-    if (lineage.select) sever = { target: targetIdentity(destination, person.target!.kind, person.target!.id), select: lineage.select, fence: lineage.fence };
+    if (lineage.select) {
+      sever = { target: targetIdentity(destination, person.target!.kind, person.target!.id), select: lineage.select, fence: lineage.fence };
+      // Steps read the target's superseded imports oldest first, so each erases them with every older one.
+      pending = await chainFirst(db, destination, sever.target, pending);
+    }
     if (progress.page || pending.length > progress.span) {
       if (person.related?.snapshot !== undefined) throw new Error('IMPORT_REDACTION_SNAPSHOT_UNBOUNDED_ONLY');
       return redactionSteps(fields, context, fence, progress, pending, undefined, sever);
@@ -93,6 +100,8 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
     // One read after the batch returns its journal row.
     const needed = prefix.length + nativeStatements.length + fence.length + suffix.length + 1;
     if (needed > remaining(context)) throw overflow(needed);
+    // A final step too large for one D1 RPC goes on in steps too.
+    if (batchBytes([...prefix, ...nativeStatements, ...fence, ...suffix]) > RPC_LIMIT) throw new D1RequestLimitError();
   } catch (error) {
     // A redaction too large for one request goes on in steps; nothing was written.
     if (!step || !pending.length || person.related?.snapshot !== undefined || !(error instanceof D1RequestLimitError)) throw error;

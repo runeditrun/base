@@ -6,6 +6,8 @@ import type { SourceRecord } from '../types.ts';
 import { targetErasure } from './erasure.ts';
 import { exactRows } from './sets.ts';
 import { batchRows } from './read-results.ts';
+import { batchBytes } from './transport.ts';
+import { RPC_LIMIT } from '../../../d1-transport/index.mjs';
 import type { EntryRange } from './field-redaction.ts';
 import { addMatches, revisionsAfter, STEP_JOBS, writeProgress, type JobRevision, type RedactionPage, type RedactionProgress } from './retirement-steps.ts';
 import { tallyJournal, tallyBefore, tallyStores, tallyWithdraw } from './retirement-tally.ts';
@@ -109,9 +111,11 @@ async function redactionStep(fields: readonly D1FieldRedaction[], context: D1Imp
       ...exactRows('ik_d1_custody_states', ['job_id', 'revision'], free.map(job => ({ job_id: job.id, revision: job.revision }))), ...sever?.fence.map(guard) ?? []]);
     const suffix = [...packGuards([...erasure.after, ...tallyJournal(stores, receiptId, touched, { recordedAt, recordsErased: erasure.decisions.length, jobsRetired: 0, streamsRetired: 0 }, true),
       authority(context, 'erase'), sql('DELETE FROM ik_d1_assertions')]), ...readonlyChecks(erasure.final), revisionsAfter(touched.jobs), finalAuthority(context, 'erase')];
-    const needed = prefix.length + fence.length + suffix.length;
+    const needed = prefix.length + fence.length + suffix.length, batch = [...prefix, ...fence, ...suffix];
     if (needed > remaining(context)) throw overflow(needed);
-    const results = await db.batch([...prefix, ...fence, ...suffix].map(statement => prepare(db, statement)));
+    // The batch must also fit one D1 RPC: a step too large in bytes is sized down like one too large in statements.
+    if (batchBytes(batch) > RPC_LIMIT) throw new D1RequestLimitError();
+    const results = await db.batch(batch.map(statement => prepare(db, statement)));
     for (const row of batchRows(results[results.length - 2]) as { job_id: string; revision: number }[]) {
       revisions.set(row.job_id, row.revision);
       if (!range) clean.set(row.job_id, row.revision);

@@ -55,7 +55,7 @@ export async function doorCustodyInScope(db: D1Database, destination: string, st
   return row?.found === 1;
 }
 
-const jobLink = "j.id=p.job_id OR (p.job_id IS NULL AND j.operation_key='door:'||p.id)";
+export const jobLink = "j.id=p.job_id OR (p.job_id IS NULL AND j.operation_key='door:'||p.id)";
 /** What an erasure severs of a door import's lineage: the merged selector, the
  * kit jobs that may hold a copy, and a fence: predicates that fail the erasure
  * if a kit job joins one of those door namespaces after this read, with copies
