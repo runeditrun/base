@@ -6,7 +6,7 @@ import { targetErasure } from './erasure.ts';
 import { exactRows } from './sets.ts';
 import type { EntryRange } from './field-redaction.ts';
 import { addMatches, revisionsAfter, STEP_JOBS, writeProgress, type JobRevision, type RedactionPage, type RedactionProgress } from './retirement-steps.ts';
-import { tallyJournal, tallyBefore, tallyStores } from './retirement-tally.ts';
+import { tallyJournal, tallyBefore, tallyStores, tallyWithdraw } from './retirement-tally.ts';
 
 /** Statements one request may run (D1's per-invocation limit, as budget.ts counts it). */
 const BUDGET = 1000;
@@ -96,7 +96,7 @@ async function redactionStep(fields: readonly D1FieldRedaction[], context: D1Imp
     const recordedAt = new Date().toISOString(), touched = { destination, jobs: [...holding].sort(), streams: [] as string[] };
     touched.streams = (await db.prepare('SELECT DISTINCT stream_id AS id FROM ik_d1_stream_pages WHERE job_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(touched.jobs)).all<{ id: string }>()).results.map(row => row.id).sort();
     const stores = await tallyStores(db);
-    const prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...erasure.before,
+    const prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...tallyWithdraw(stores, touched), ...erasure.before,
       ...exactRows('ik_d1_custody_states', ['job_id', 'revision'], free.map(job => ({ job_id: job.id, revision: job.revision })))]);
     const suffix = [...packGuards([...erasure.after, ...tallyJournal(stores, receiptId, touched, { recordedAt, recordsErased: 0, jobsRetired: 0, streamsRetired: 0 }, true),
       authority(context, 'erase'), sql('DELETE FROM ik_d1_assertions')]), ...readonlyChecks(erasure.final), revisionsAfter(touched.jobs), finalAuthority(context, 'erase')];

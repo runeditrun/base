@@ -45,6 +45,8 @@ export async function uploads(request: DoorRequest, input: Record<string, unknow
   if (bytes.toString('base64') !== input.base64 || bytes.length !== Math.min(CHUNK_BYTES, totalBytes - index * CHUNK_BYTES) || sha256(bytes) !== chunkHash) throw new DoorError('chunk_hash_or_size_mismatch', 400);
   const g = request.grant;
   await transact(request.options.database, request.authority, [
+    sql('INSERT OR IGNORE INTO ik_door_scopes(installation_id,namespace,destination) VALUES(?,?,?)', g.installationId, g.namespace, request.options.destination),
+    assertion(sql('EXISTS(SELECT 1 FROM ik_door_scopes WHERE installation_id=? AND namespace=? AND destination=?)', g.installationId, g.namespace, request.options.destination)),
     sql('INSERT OR IGNORE INTO ik_door_uploads(id,installation_id,namespace,name,bundle_sha256,total_bytes,total_chunks) VALUES(?,?,?,?,?,?,?)', id, g.installationId, g.namespace, name, hash, totalBytes, totalChunks),
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_uploads WHERE id=? AND installation_id=? AND namespace=? AND name=? AND bundle_sha256=? AND total_bytes=? AND total_chunks=?)', id, g.installationId, g.namespace, name, hash, totalBytes, totalChunks)),
     sql('INSERT OR IGNORE INTO ik_door_chunks(upload_id,ordinal,sha256,size,base64) VALUES(?,?,?,?,?)', id, index, chunkHash, bytes.length, input.base64),

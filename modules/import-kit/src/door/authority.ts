@@ -15,7 +15,13 @@ export async function admit(options: ImportDoorOptions, request: Request, action
   if (grant.action !== action || new URL(request.url).origin !== options.claim.appOrigin) throw new DoorError('grant_binding_mismatch');
   const basic = sql(`EXISTS(SELECT 1 FROM ik_door_settings WHERE installation_id=? AND enabled=1)
     AND NOT EXISTS(SELECT 1 FROM ik_door_revoked_keys WHERE installation_id=? AND kid=?)
-    AND unixepoch() < ?`, grant.installationId, grant.installationId, kid, grant.exp);
+    AND unixepoch() < ?
+    AND NOT EXISTS(SELECT 1 FROM ik_door_scopes WHERE installation_id=? AND namespace=? AND destination<>?)
+    AND NOT EXISTS(SELECT 1 FROM ik_door_plans p JOIN ik_jobs j
+      ON j.id=p.job_id OR (p.job_id IS NULL AND j.operation_key='door:'||p.id)
+      WHERE p.installation_id=? AND p.namespace=? AND j.destination<>?)`,
+    grant.installationId, grant.installationId, kid, grant.exp,
+    grant.installationId, grant.namespace, options.destination, grant.installationId, grant.namespace, options.destination);
   try {
     await transact(options.database, basic, [sql('INSERT INTO ik_door_grants(installation_id,jti,action,namespace,kid,expires) VALUES(?,?,?,?,?,?)', grant.installationId, grant.jti, action, grant.namespace, kid, grant.exp)]);
   } catch { throw new DoorError('grant_replayed_revoked_or_expired'); }

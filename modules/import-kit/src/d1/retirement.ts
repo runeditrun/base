@@ -7,8 +7,9 @@ import { targetErasure, type ErasureStep } from './erasure.ts';
 import { destinationRevisions, readProgress, type JobRevision, type RedactionProgress } from './retirement-steps.ts';
 import { overflow, redactionSteps } from './redaction-step.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
-import { tallyBefore, tallyJournal, tallyStores } from './retirement-tally.ts';
+import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw, type Store } from './retirement-tally.ts';
 import { fieldRedactions } from './field-redaction.ts';
+import { doorCustodyInScope } from './retirement-door.ts';
 import { retireD1ImportCustodyStep } from './retirement-bounded.ts';
 import type { D1ErasurePending, D1ErasureStepOptions } from './erasure-progress.ts';
 
@@ -47,7 +48,10 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
   await readAtomic(context, [], undefined, 'erase');
   const db = context.storage.database, destination = context.destination;
   const scope = await retirementScope(db, destination, values), retiring = new Set(scope.jobs);
-  const fenced = Boolean(person.target) || fields.length > 0 || scope.jobs.length + scope.streams.length + scope.stages.length + scope.anchors.length + scope.preparations.length > 0;
+  // Withdrawn door content is custody too: a values-only erasure that removes it is fenced.
+  let stores: Store[] | undefined;
+  const fenced = Boolean(person.target) || fields.length > 0 || scope.jobs.length + scope.streams.length + scope.stages.length + scope.anchors.length + scope.preparations.length > 0
+    || await doorCustodyInScope(db, destination, stores = await tallyStores(db));
   if (fenced && !checkpoint.length) throw new Error('IMPORT_RETIREMENT_CHECKPOINT_REQUIRED');
   const fence = fenced ? checkpoint : [];
   // Only the checkpoint fences rows the tally does not count (another import's jobs, a seed's tables): unfenced caller SQL is refused.
@@ -72,9 +76,9 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
     receiptId = randomUUID(); const recordedAt = new Date().toISOString();
     const touched = { destination, jobs: [...new Set([...erasure.jobs, ...scope.jobs])].sort(), streams: [] as string[] };
     touched.streams = [...new Set([...scope.anchors, ...await pageStreams(db, touched.jobs)])].sort();
-    const stores = await tallyStores(db);
+    stores ??= await tallyStores(db);
     const entry = { recordedAt, recordsErased: erasure.decisions.length, jobsRetired: scope.jobs.length, streamsRetired: scope.anchors.length };
-    prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...erasure.before, ...scopeGuards(scope)]);
+    prefix = packGuards([authority(context, 'erase'), ...tallyBefore(stores, receiptId, touched), ...tallyWithdraw(stores, touched), ...erasure.before, ...scopeGuards(scope)]);
     suffix = [...packGuards([...erasure.after, ...retirementWrites(scope, destination, receiptId, recordedAt), ...headerAbsence(destination, values),
       ...tallyJournal(stores, receiptId, touched, entry, fenced), authority(context, 'erase'), sql('DELETE FROM ik_d1_assertions')]), ...readonlyChecks(erasure.final), finalAuthority(context, 'erase')];
     // One read after the batch returns its journal row.

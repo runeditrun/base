@@ -20,9 +20,12 @@ export async function planRow(request: DoorRequest, id: string): Promise<DoorPla
   if (!row) throw new DoorError('plan_not_found', 404);
   return row;
 }
+/** A saved plan's snapshot. A person's erasure withdraws every chunk of it:
+ * the plan, its approval and its kit job stay, the reviewed records do not. */
 export async function loadSnapshot(request: DoorRequest, row: DoorPlanRow): Promise<DoorSnapshot> {
   const chunks = await request.options.database.prepare('SELECT ordinal,body FROM ik_door_plan_chunks WHERE plan_id=? ORDER BY ordinal').bind(row.id).all();
-  if (!chunks.results.length || chunks.results.some((c, i) => c.ordinal !== i)) throw new DoorError('plan_custody_mismatch', 409);
+  if (!chunks.results.length) throw new DoorError('snapshot_withdrawn', 410, {planId: row.id});
+  if (chunks.results.some((c, i) => c.ordinal !== i)) throw new DoorError('plan_custody_mismatch', 409);
   const snapshot = JSON.parse(chunks.results.map(c => c.body).join('')) as DoorSnapshot;
   if (sha256(canonicalJson(snapshot)) !== row.snapshot_hash || snapshot.id !== row.id || snapshot.namespace !== row.namespace || snapshot.bundleSha256 !== row.bundle_sha256
     || snapshot.previous !== row.previous_id || snapshot.plan.fingerprint !== row.fingerprint
