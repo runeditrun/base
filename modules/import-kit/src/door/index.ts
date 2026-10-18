@@ -3,6 +3,7 @@ import type { DoorAction } from './grants.ts';
 import { DoorError } from './grants.ts';
 import { admit, enabled, erasedSince } from './authority.ts';
 import { authorized } from './store.ts';
+import { sizeLimitError } from './limits.ts';
 import { uploads } from './uploads.ts';
 import { plan } from './planning.ts';
 import { apply, status, reconcile, undo } from './jobs.ts';
@@ -54,7 +55,8 @@ export function createImportDoorHandler(options: ImportDoorOptions): (request: R
     } catch (caught) {
       // Work an erasure overtook answers one stable refusal, whichever batch it reached.
       const overtaken = admitted && (!(caught instanceof DoorError) || caught.code === 'grant_revoked_or_expired') && await erasedSince(admitted).catch(() => false);
-      const error = overtaken ? new DoorError('erased_during_request', 410) : caught;
+      // A kit size limit is a named 413.
+      const error = overtaken ? new DoorError('erased_during_request', 410) : sizeLimitError(caught) ?? caught;
       const known = error instanceof DoorError;
       // Never reflect a parser/native adapter error containing customer records.
       return Response.json({error:known?error.code:'import_door_conflict',...(known && error.details?{details:error.details}:{})},{status:known?error.status:409,headers});
