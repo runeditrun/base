@@ -4,6 +4,20 @@ See [setup, command and scope](../publish-check-README.md).
 
 `git_history.py` delegates revision resolution, traversal, tree inventory and
 blob reads to system Git (`rev-parse`, `rev-list`, `ls-tree`, `cat-file --batch`).
+Before any tree inventory asks for blob sizes, `history_hydration.py` counts
+missing objects and hydrates a partial clone with one `fetch --refetch --no-filter`
+from its promisor remote. A failed fetch or remaining missing object makes the
+inspection incomplete. `history.hydration` reports the missing counts, fetch
+count and elapsed time; subsequent history reads disable lazy fetching.
+
+Reports include implementation version, Python version and a digest of the
+Python scanner source, plus total and per-phase wall times and call counts.
+The release gate uses this same scanner entry point. When comparing it with a
+standalone run, compare implementation digests as well as source trees:
+`rer` inside a checkout runs the rer version that checkout pins, even when a
+newer launcher started it. A tagged exact-source release stages its actual Git tag object in an isolated
+clone and includes its message in the same full source scan. `annotationInspection`
+is the staged annotation subset of that result; no second history walk is needed.
 `gitleaks.py` runs the pinned scanner in git, directory and stdin modes and keeps
 its report private until translating it into the value-free v3 envelope.
 Hexadecimal credential assignments also use a Gitleaks rule without generic
