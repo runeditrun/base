@@ -9,6 +9,7 @@ import { publicationScan, sourcePublicationScan, validatePublicationDestination 
 import { publicDestination, requirePublicDestination, remotePublicHead, publicChild, assertPublicTree } from './public-child.mjs';
 import { writePublishHandoff } from './publish-handoff.mjs';
 import { releasePublicBase } from './public-base.mjs';
+import { prepareTagAdoption, confirmTagAdoption } from './tag-adoption.mjs';
 import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark.mjs';
 
 // Failure output belongs to the private receipt, not the site preview.
@@ -30,7 +31,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
   releaseMessage(source);
   if (typeof tag === 'string' && tag !== source.tag) throw Error('Requested tag must match the committed release version');
   const existing = git(source.repo, 'tag', '--list', source.tag).toString().trim();
-  if (existing && tag && !dryRun) throw Error('Release tag already exists; choose a new committed version');
+  if (existing && tag && !dryRun && (onto !== undefined || clean)) throw Error('Release tag already exists; choose a new committed version');
   // Validate metadata before installs or output writes.
   catalogue(source, project, repository, { verify: { status: 'PENDING' }, publishCheck: { status: 'PENDING' } }, preview);
   const destination = onto !== undefined ? publicDestination(onto, repository, source.repo) : null;
@@ -47,6 +48,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
     const checkout = resolve(temporary, 'seed');
     git(source.repo, 'clone', '--no-hardlinks', '--no-checkout', '--', source.repo, checkout);
     git(checkout, 'checkout', '--detach', source.commit);
+    const adopted = tag && !dryRun && !destination && !clean ? prepareTagAdoption(source, checkout) : null;
     const verify = await verifySource(source, checkout, localVerify, verifyWorkflow);
     // Explicit clean-history publication scans every byte and ref of the actual
     // parentless export. Exact-source releases classify against public history
@@ -55,7 +57,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       : clean ? cleanHistory(source, temporary, Boolean(tag)) : null;
     let report = exported
       ? publicationScan(exported.repo, exported.commit, envFile, project, repository, scanBase)
-      : sourcePublicationScan(source, temporary, envFile, project, repository, scanBase, Boolean(tag));
+      : sourcePublicationScan(source, temporary, envFile, project, repository, scanBase, Boolean(tag), adopted);
     if (destination) {
       assertPublicTree(exported.repo, exported.commit, source.tree);
       if (report.status === 'PASS' && (report.complete !== true || report.guarantees?.historyScanned !== true ||
@@ -81,7 +83,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       publicExport: null, siteRelease: null };
     // A blocked preview may prepare the site metadata/docs for local review.
     // Its provenance explicitly records blocked gates; it is never a release.
-    const publicSource = exported ? { ...source, commit: exported.commit, publicTagStaged: Boolean(destination && tag) } : source;
+    const publicSource = exported ? { ...source, commit: exported.commit, contractSourceCommit: source.commit, publicTagStaged: Boolean(destination && tag) } : source;
     if (passed || preview) receipt.siteRelease = writeCatalogue(publicSource, output, catalogue(publicSource, project, repository, withoutOutput(gates), preview));
     if (passed) {
       if (tag) {
@@ -97,8 +99,13 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
       if (tag && !dryRun) {
         // Public-child writes every artifact before the last guard/source tag,
         // so a failed write or changed remote cannot leave a private tag.
-        if (!destination) annotate(source.repo, source, source.commit);
-        receipt.tag.created = true;
+        if (adopted) {
+          confirmTagAdoption(source, adopted);
+          Object.assign(receipt.tag, { adopted: true, object: adopted.object });
+        } else {
+          if (!destination) annotate(source.repo, source, source.commit);
+          receipt.tag.created = true;
+        }
         // Bind the receipt to the annotated tag in the published history.
         // Clean/public-child exports have a different commit from the source.
         const tagRepo = exported?.repo ?? source.repo, tagRef = `refs/tags/${source.tag}`;

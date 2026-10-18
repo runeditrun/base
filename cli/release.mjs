@@ -14,7 +14,7 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --ref REF              Selected committed source (default: HEAD).
   --public-base REF      Public history as GIT_URL#BRANCH for exact-source scans;
                          defaults to this public repository's default branch.
-  --tag [vVERSION]       Prepare source artifacts and create a local annotated tag;
+  --tag [vVERSION]       Prepare source artifacts and create or adopt an annotated tag;
                          an explicit tag must match the committed release version.
   --dry-run              Run the real gates and suppress local tag creation.
   --local-verify         Run the seed's full verification locally instead of

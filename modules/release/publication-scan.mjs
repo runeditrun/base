@@ -34,10 +34,13 @@ export function publicationScan(repo, ref, envFile, project, repository, publicB
 // This is the ordinary release gate, also usable without installing/building a
 // seed. The scanner sees the original checkout and every source ref; only the
 // new annotation is read from the clean candidate, never verification output.
-export function sourcePublicationScan(source, temporary, envFile, project, repository, publicBase, tagged) {
+export function sourcePublicationScan(source, temporary, envFile, project, repository, publicBase, tagged, adopted) {
   const started = performance.now();
   let annotationFile;
-  if (tagged) {
+  if (adopted) {
+    annotationFile = resolve(temporary, 'annotation.tag');
+    writeFileSync(annotationFile, git(adopted.repo, 'cat-file', 'tag', adopted.object), { mode: 0o600 });
+  } else if (tagged) {
     const candidate = resolve(temporary, 'annotation');
     git(source.repo, 'clone', '--no-hardlinks', '--no-checkout', '--', source.repo, candidate);
     git(candidate, 'checkout', '--detach', source.commit);

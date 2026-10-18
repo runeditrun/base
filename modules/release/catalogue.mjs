@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { parseContract } from '../../foundation/runtime/seed-contract.mjs';
+import { inheritedContract } from './contract-judgment.mjs';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = value => JSON.stringify(value, null, 2) + '\n';
@@ -20,7 +21,10 @@ export function catalogue(source, project, repository, gates, dryRun) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s.id)) throw Error('Invalid seed listing ID');
   for (const key of ['name', 'category', 'description', 'maturity'])
     if (typeof s[key] !== 'string' || !s[key]) throw Error('Incomplete seed listing metadata');
-  const contract = clauses(source.bytes('CONTRACT.md').toString());
+  const contractBytes = source.bytes('CONTRACT.md');
+  const inherited = inheritedContract(source, contractBytes);
+  const contract = inherited ? inherited.clauses : clauses(contractBytes.toString());
+  if (!contract.length) throw Error('CONTRACT.md must contain published clauses');
   const licence = source.bytes('LICENSE').toString();
   if (!licence.includes('Permission is hereby granted, free of charge')) throw Error('Declare a supported listing license');
   const docs = ['seed.json', 'CONTRACT.md', 'AGENTS.md', 'LICENSE', 'RELEASE.json',
@@ -36,6 +40,7 @@ export function catalogue(source, project, repository, gates, dryRun) {
   for (const key of ['scope', 'spine', 'composition', 'operatingCost', 'limits', 'accessibility']) if (s[key] !== undefined) listing[key] = s[key];
   return { schemaVersion: 1, project, release: s.version, provenance: {
     kind: dryRun ? 'release-preview' : 'publisher-release', repository, revision: source.commit, tree: source.tree,
+    ...(inherited ? { contractJudgment: inherited.judgment } : {}),
     publication: dryRun ? (gates.verify.status === 'PASS' && gates.publishCheck.status === 'PASS' ? 'dry-run' : 'blocked') : 'local-release',
     tag: source.tag, gates, note: dryRun
       ? (source.publicTagStaged ? 'Local review preview; public export tag staged. No private source tag created or push performed.'

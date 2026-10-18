@@ -115,11 +115,60 @@ registry is input for that integration, not a replacement for the site's registr
 
 By default, success writes only the receipt, publication report and site preview;
 its provenance says `publication: dry-run`. It creates no tag or source archive.
-Pass **`--tag`** to create an annotated local `v<version>` tag at the verified
-commit and the exact source export. Existing tags are never changed. The command
+Pass **`--tag`** or **`--tag v<version>`** to prepare the exact source export
+and an annotated local version tag at the verified commit, or adopt the matching
+remote annotated tag described below. Existing tags are never changed. The command
 **never pushes,
 changes repository visibility, dispatches Actions, deploys or edits a site**.
 Publication and deployment retain their separate owner authorization.
+
+### Tag-first patch release
+
+For an ordinary release from an already public source repository, push the
+release branch, then push the annotated version tag before producing artifacts.
+This lets the tag's Verify run authorize that exact commit. In the clean source
+checkout, set the existing publication inputs above and run:
+
+```sh
+set -eu
+source_sha="$(git rev-parse HEAD)"
+tag="$(git show "$source_sha:seed.json" | node --input-type=module -e 'let text=""; for await (const part of process.stdin) text += part; console.log("v" + JSON.parse(text).version)')"
+release_message="$(git show "$source_sha:RELEASE.json" | node --input-type=module -e 'let text=""; for await (const part of process.stdin) text += part; const release=JSON.parse(text), notes=release.publicReleaseNotes; if (notes !== undefined && (typeof notes !== "string" || !notes.trim())) throw Error("Public release notes must be nonempty text"); process.stdout.write(process.argv[1] + (notes ? "\n\n" + notes.trim() : ""))' "$tag")"
+git push origin HEAD
+git -c tag.gpgSign=false tag -a --cleanup=verbatim "$tag" "$source_sha" -m "$release_message"
+git push origin "refs/tags/$tag"
+```
+
+Wait for the selected Verify workflow's tag run to complete successfully on
+`source_sha`. Then, from Base, produce the release using that same source SHA
+and explicit tag (substitute the source checkout and a new output directory):
+
+```sh
+pnpm rer release --repo /path/to/seed --ref "$source_sha" --tag "$tag" \
+  --project "$PUBLIC_PROJECT" --repository "$PUBLIC_REPOSITORY" \
+  --output /path/to/new-release-directory
+```
+
+The annotation message is exactly the version tag, followed, only when public
+notes are present, by two newlines and the trimmed committed
+`RELEASE.json.publicReleaseNotes`, then exactly one final newline. The producer
+uses verbatim annotation text; do not add a summary or signing footer.
+A remote tag is adopted only when it is an annotated tag directly targeting the
+selected source commit, its embedded tag name and the requested tag both match
+`v<version>`, and its message bytes exactly match the generated annotation. A
+lightweight tag, nested tag, different commit, name or message is refused. The
+receipt records the adopted tag object ID; the producer preserves that object
+instead of recreating it. This does not relax GitHub Verify selection or any
+publication, installation, build or integrity gate. Parentless and public-child
+exports retain their separate source/export identities described below.
+
+A stable patch may inherit contract validation from the latest lower stable tag on
+an ancestor commit in the same major/minor series only when that tag's committed
+version metadata agrees and the `CONTRACT.md` blob bytes are identical. A changed
+contract, first release, minor or major release uses the full contract parser.
+Prereleases do not take this stable-patch path. The catalogue still derives its
+published clauses from the committed contract; inheritance does not waive the
+other release gates.
 
 `--dry-run` performs the selected verification path, local artifact steps and history scan and suppresses
 tag creation even with `--tag`. `--tag --dry-run` also prepares the source archive
@@ -292,7 +341,7 @@ signing material from the vault through `--key-stdin`; `sign` never echoes it.
 `--key-stdin` refuses terminal input; pipe the key from a vault or file instead.
 
 Signing requires `release-receipt.json` to record a completed `RELEASED`
-tagged release with a created public tag. It writes the detached DSSE envelope
+tagged release with a created or adopted public tag. It writes the detached DSSE envelope
 as `rer-release.dsse.json` beside the receipt. The statement binds the public
 repository, tag, commit, tree and tag object, and hashes `public-source.tar`,
 `release-receipt.json`, `publish-check.json`, the bundle's single

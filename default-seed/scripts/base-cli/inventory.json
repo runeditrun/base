@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.63",
+  "cliVersion": "0.2.63-dev.gb70dbba0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -947,7 +947,7 @@
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "01f5a171548f84081feff6704866b69b8badcd3df33301bff2ccb69cf33bca85"
+      "sha256": "9751cd8e63d1fa754d6ae5f4a926e3135a35966f0c4589c399f18acae4e95771"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -2767,19 +2767,27 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "45604c333cb19e673365991c7503c9e3377fdd93027601e031766422eed7c7ca"
+      "sha256": "119f2e4fee2270eb6e95e8f94862dfefd1dc51ea1d7b9ee664e49a04ab6338de"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
-      "sha256": "10cc8768eeccf3c27c883d27daffee027712b24274a24e075ed3a7949aafc008"
+      "sha256": "b43c5f522946c13626a571255a3843047e0b541500ba3b03337cb4470f4959d3"
+    },
+    "modules/release/contract-judgment.mjs": {
+      "source": "modules/release/contract-judgment.mjs",
+      "sha256": "c908a24123b571961e7407104d1fa1da8449e1815afd21679ec2f489233d2480"
     },
     "modules/release/export.mjs": {
       "source": "modules/release/export.mjs",
-      "sha256": "05f179928e53ccf657cf0225fe587fd082a8649791223db09df3ff3006c413db"
+      "sha256": "e1a8bf4aa3ecf39cf014d82830e2dc378829be10e19162927cde582a469307f0"
     },
     "modules/release/github-verify.mjs": {
       "source": "modules/release/github-verify.mjs",
       "sha256": "19e2cf4495b035ae86fb8cba9dc8d0949e070c331c3ecfc18e2a2b78ea96e935"
+    },
+    "modules/release/historical-clauses.mjs": {
+      "source": "modules/release/historical-clauses.mjs",
+      "sha256": "05c35b2216071c67063baae52078a853e9f945c8c10352b5b64e1de2d68af1ae"
     },
     "modules/release/keygen.mjs": {
       "source": "modules/release/keygen.mjs",
@@ -2787,7 +2795,7 @@
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "078be38edbb90ded1729d5d9bcb86d3f17732dbd80274a15ed241d8b77d0dc2b"
+      "sha256": "828d8768b550987c23cff0257ffd45f157a394dd00215d16054fec469bf3952a"
     },
     "modules/release/public-base.mjs": {
       "source": "modules/release/public-base.mjs",
@@ -2807,7 +2815,7 @@
     },
     "modules/release/publication-scan.mjs": {
       "source": "modules/release/publication-scan.mjs",
-      "sha256": "13e4c96a2c046ae2e1914b8cca1dc67f41f921628f5718d2af8269f4bd13dc77"
+      "sha256": "d09f864cbdf4c5898dd8f0e678a18798507e90fad09a1b9718b3ed151416d06d"
     },
     "modules/release/publish-handoff.mjs": {
       "source": "modules/release/publish-handoff.mjs",
@@ -2815,7 +2823,7 @@
     },
     "modules/release/sign.mjs": {
       "source": "modules/release/sign.mjs",
-      "sha256": "bed1f6cb6aa3acb7e95d6c7c7212a553574f3a917cbf0fa05d126e499ca2a2ff"
+      "sha256": "15e3af9b9b07a60790adaf6e9256bb5cb702aaf7dadba864de00f2fb15b19aa5"
     },
     "modules/release/signature.mjs": {
       "source": "modules/release/signature.mjs",
@@ -2844,6 +2852,10 @@
     "modules/release/statement.mjs": {
       "source": "modules/release/statement.mjs",
       "sha256": "fbff65098af59082c6c7b8ee1d8307279b75b9e741e5ea010178e89fb1d726b3"
+    },
+    "modules/release/tag-adoption.mjs": {
+      "source": "modules/release/tag-adoption.mjs",
+      "sha256": "b30783d7ba96df9057faf9c9bfb2d957f66a79f8defb9d39b2f8a67f45bd2353"
     },
     "modules/release/test-summary.mjs": {
       "source": "modules/release/test-summary.mjs",

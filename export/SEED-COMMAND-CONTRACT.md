@@ -64,6 +64,30 @@ default branch or the release tag when that tag resolves to the same commit.
 `workflowName`, `workflowId`, `runId` and `runUrl`. `--local-verify` explicitly
 runs frozen installation and the seed's local verification targets instead.
 
+For a tag-first patch release from an already public source, push the branch,
+create `git -c tag.gpgSign=false tag -a --cleanup=verbatim v<version> <exact-source-sha> -m "$release_message"`, push that
+tag, wait for its selected Verify workflow to finish green on that SHA, then run
+`rer release --repo DIR --ref <exact-source-sha> --tag v<version> --project PUBLISHER/NAME --repository GITHUB_URL --output NEW_DIR`.
+Build `release_message` from the selected commit: the version tag alone, or the
+tag followed by two newlines and trimmed `RELEASE.json.publicReleaseNotes` when
+present. Notes must be nonempty text. The annotation must match that verbatim
+message followed by exactly one newline. `modules/release/README.md` in Base
+has the shell recipe.
+
+The producer may adopt that remote annotated tag only when it directly targets
+the selected commit, its embedded name and requested tag both equal the committed
+version tag, and its annotation message bytes match the generated message.
+Lightweight or nested tags and differing commits, names or messages are refused;
+existing tags are never rewritten. The receipt retains the adopted tag object ID.
+This changes neither the exact-SHA GitHub Verify gate nor the other release gates.
+
+Contract validation may be inherited only for a stable patch from the latest lower
+stable tag on an ancestor commit in the same major/minor series, with coherent
+committed version metadata and identical `CONTRACT.md` blob bytes. Changed
+contracts, first releases, minor/major releases and prereleases use the full
+contract parser. The catalogue still reads the committed contract's published
+clauses.
+
 `--no-queue` is available only on the heavy commands that list it and only
 when the original caller has `CI=true`. The actual descriptor is authoritative
 for a given checkout.

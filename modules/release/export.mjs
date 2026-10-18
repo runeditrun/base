@@ -28,8 +28,8 @@ export function releaseMessage(source) {
 }
 
 export function annotate(repo, source, commit, name = source.tag) {
-  git(repo, '-c', 'user.name=Run Edit Run', '-c', 'user.email=releases@runeditrun.invalid', '-c', 'core.hooksPath=/dev/null',
-    'tag', '-a', name, commit, '-m', releaseMessage(source));
+  git(repo, '-c', 'user.name=Run Edit Run', '-c', 'user.email=releases@runeditrun.invalid', '-c', 'core.hooksPath=/dev/null', '-c', 'tag.gpgSign=false',
+    'tag', '-a', '--cleanup=verbatim', name, commit, '-m', releaseMessage(source) + '\n');
 }
 
 export function cleanHistory(source, temporary, tagged = false) {
