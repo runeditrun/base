@@ -22,7 +22,9 @@ export async function readFileSource(input: FileSourceInput, limits?: ReaderLimi
     // Removing credentials: the source value must hold none once its plain ones
     // go, and its records may repeat none of them. The parser sees the value as
     // read, so each record reports its own removals.
-    const clean = remove ? removeCredentials(value, policy) : undefined;
+    // A value too deeply encoded to inspect is refused by name, as refuse mode does.
+    let clean: ReturnType<typeof removeCredentials> | undefined;
+    try { clean = remove ? removeCredentials(value, policy) : undefined; } catch { fail('INVALID_OR_CREDENTIAL_SOURCE_DATA', at); }
     if (clean?.removed.some(item => !item.beforeUpload)) withheld = true;
     const encoded = safeValue(clean ? clean.value : value, [], at, policy);
     if (Buffer.byteLength(encoded) > bounded.maxRecordBytes) fail('SOURCE_RECORD_BYTE_LIMIT', at);

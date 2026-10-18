@@ -53,7 +53,10 @@ Owner history and undo must include jobs from either authority.
    which reads each import job with its own policy, lists them, and door undo
    after an owner edit keeps the owner's change and reverses the rest, as the
    seed's local imports do. Only new door jobs take the option; earlier ones keep
-   the policy they were created with. Strict remains the default, unchanged. A
+   the policy they were created with, even when an apply in flight resumes
+   after the seed remounts with another policy. Strict remains the default,
+   unchanged. With preserve, undoing a catch-up that kept an owner's edit
+   releases the layer beneath it, so the baseline then undoes too. A
    seed that adapted `door/types.ts` and `door/authority.ts` to pass a policy
    (Lamp) drops that change, re-vendors the door verbatim and passes the option.
 3. **Operator mount.** Import `createImportOperatorHandler` from
@@ -157,9 +160,12 @@ scope, expiry and approval rules do not change.
 - **Credential fields in exports.** Vendor exports carry credential-named
   fields (UptimeRobot's `apiKey: null` on every monitor) and URLs with
   `user:pass@`. The door reads every upload with the kit's `credentials:
-  'remove'`: null, empty and masked values pass, and a real value is removed
-  from its record, which is kept and noted. The plan holds none, the original
-  bytes are withheld and the upload's chunks are deleted once the plan is saved.
+  'remove'`: null, empty, masked and boolean values pass, and a real value is
+  removed from its record, which is kept and noted. That covers compound names
+  (`httpPassword`, `client_secret`, `customHttpHeaders['X-Api-Key']`), header
+  pairs (`{name: 'Authorization', value}`) and URLs of any scheme. The plan
+  holds none, the original bytes are withheld and the upload's chunks are
+  deleted once the plan is saved, or once a plan of them is refused.
   Do not drop such records or fields in the seed's parser to get past a refusal.
 
 - **Export custody.** A seed whose export policy excludes import custody

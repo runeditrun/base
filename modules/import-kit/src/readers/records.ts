@@ -69,7 +69,8 @@ export class RecordCollector {
       try { textId(record.kind); textId(record.sourceId); } catch { fail('INVALID_PARSED_RECORD_ID', location); }
       let secrets = this.secrets, removed: RemovedCredential[] = [];
       if (removal) {
-        const clean = removeCredentials(record.payload, this.paginationCursorPolicy);
+        let clean: ReturnType<typeof removeCredentials>;
+        try { clean = removeCredentials(record.payload, this.paginationCursorPolicy); } catch { fail('INVALID_OR_CREDENTIAL_SOURCE_DATA', location); }
         record = { ...record, payload: clean.value };
         secrets = [...secrets, ...removal.secrets, ...clean.secrets];
         removed = clean.removed;

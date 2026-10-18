@@ -46,22 +46,55 @@ export function reference(value, origin, pathname, allowedQuery = []) {
   if ([...url.searchParams.keys()].some(key => !allowedQuery.includes(key))) fail('INVALID_PAGINATION');
   return url;
 }
-// A field of this name holds a credential unless it is empty: null, a boolean
-// (Calendly's `secret` flag), whitespace or a mask such as "****" or "[redacted]".
-const credentialKey = /^(?:password|passwd|secret|token|credentials?|authorization|cookie)$|(?:api|access|auth|integration|routing|service|signing|private|client|refresh|session)[_-]?(?:key|secret|token)$|^webhook[_-]?(?:url|secret)$|(?:http|web)[_-]?cal[_-]?url$/iu;
+// The seed's import door applies the same rules (modules/import-kit, removeCredentials).
+// A field holds a credential when its name's letters end in a credential word
+// (apiKey, httpPassword, http_password, client_secret, X-Api-Key, integration_key,
+// webhook_url), unless it is empty: null, a boolean (Calendly's `secret` flag),
+// whitespace or a mask such as "****" or "[redacted]".
+const credentialName = /(?:password|passwd|secret|token|credentials?|authorization|cookie|(?:api|access|private|auth|client|integration|routing|service|signing|session|refresh)key|webhookurl|calurl)$/u;
 const placeholder = /^(?:\s*|[*\u2022\u25CF\u00B7x#_.-]{1,64}|[<[({]?\s*(?:redacted|hidden|masked|removed|omitted|none|null|n\/a|placeholder)\s*[>\])}]?)$/iu;
 /** What a stripped credential value becomes; the seed's import door reports it per record. */
 export const REMOVED_CREDENTIAL = '[removed]';
 const empty = value => value === null || typeof value === 'boolean' || (typeof value === 'string' && placeholder.test(value));
+/** Every percent-encoding layer of a key, decoded byte by byte, as the door inspects it. */
+function decoded(text) {
+  for (let depth = 0; depth < 32 && /%[\da-f]{2}/iu.test(text); depth++) text = text.replace(/%([\da-f]{2})/giu, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  return text;
+}
+const isCredentialName = name => credentialName.test(decoded(name).toLowerCase().replace(/[^a-z]/gu, ''));
+// The door's credentialQueryKey rule for URL query and fragment parameter names.
+const credentialParameter = key => /token|secret|key|auth|signature|credential|password|cookie/iu.test(decoded(key));
+const authority = /^(\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2})[^\\/?#]*@/iu;
+/** A URL of any scheme without its user name and password (`removed@` marks
+ * where they were) and without credential query or fragment parameters, except
+ * the adapter's own validated pagination keys, spelled exactly. */
+function withoutUrlCredentials(text, pagination) {
+  if (!/^\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2}|^[/?]/iu.test(text)) return text;
+  let result = text.replace(authority, '$1removed@');
+  const drop = (pairs, requireValue) => pairs.split('&').filter(pair => (requireValue && !pair.includes('=')) || pagination.includes(pair.split('=')[0]) || !credentialParameter(pair.split('=')[0])).join('&');
+  const hashAt = result.indexOf('#'), end = hashAt < 0 ? result.length : hashAt;
+  let fragment = hashAt < 0 ? '' : result.slice(hashAt);
+  if (fragment.includes('=')) { const kept = drop(fragment.slice(1), true); fragment = kept ? '#' + kept : ''; }
+  const queryAt = result.indexOf('?');
+  if (queryAt < 0 || queryAt > end) return result.slice(0, end) + fragment;
+  const query = drop(result.slice(queryAt + 1, end), false);
+  return result.slice(0, query ? queryAt + 1 : queryAt) + query + fragment;
+}
 /** A copy of a parsed vendor response without credential values, made before any
- * byte is emitted for upload: a credential-named field's value becomes
- * REMOVED_CREDENTIAL, and a URL's user name and password become `removed@`, so
- * the record stays and the seed can say what was removed. */
-export function withoutCredentials(value) {
-  if (Array.isArray(value)) return value.map(withoutCredentials);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, child]) =>
-    [key, credentialKey.test(key) && !empty(child) ? REMOVED_CREDENTIAL : withoutCredentials(child)]));
-  return typeof value === 'string' ? value.replace(/^((?:https?:)?\/\/)[^/?#]*@/iu, '$1removed@') : value;
+ * byte is emitted for upload: a credential-named field's value, or the `value`
+ * of a `{name|key, value}` pair naming one (a header pair), becomes
+ * REMOVED_CREDENTIAL, so the record stays and the seed can say what was removed.
+ * URLs lose credentials as withoutUrlCredentials describes; `pagination` lists
+ * the adapter's validated query keys, which stay. */
+export function withoutCredentials(value, pagination = []) {
+  if (Array.isArray(value)) return value.map(child => withoutCredentials(child, pagination));
+  if (value && typeof value === 'object') {
+    const label = Object.entries(value).find(([key, child]) => /^(?:name|key)$/iu.test(key) && typeof child === 'string');
+    const pair = !!label && Object.hasOwn(value, 'value') && isCredentialName(label[1]);
+    return Object.fromEntries(Object.entries(value).map(([key, child]) =>
+      [key, ((pair && key === 'value') || isCredentialName(key)) && !empty(child) ? REMOVED_CREDENTIAL : withoutCredentials(child, pagination)]));
+  }
+  return typeof value === 'string' ? withoutUrlCredentials(value, pagination) : value;
 }
 export function assertCount(value, max = 1000) {
   if (!Number.isSafeInteger(value) || value < 0 || value > max) fail('INVALID_CHECKPOINT');

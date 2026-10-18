@@ -66,7 +66,7 @@ export async function* run(ctx) {
     const next = s.phase === 0 ? null : nextToken(body, path, s.token);
     if (next !== null && (next === s.token || s.seen.includes(next))) fail('PAGINATION_CYCLE');
     const name = `${resource}-${String(s.files.length + 1).padStart(6,'0')}.json`;
-    const bytes = Buffer.from(JSON.stringify(withoutCredentials(body)) + '\n');
+    const bytes = Buffer.from(JSON.stringify(withoutCredentials(body, queries)) + '\n');
     if (s.files.length >= 600) fail('FILE_LIMIT');
     s.files.push({ name, resource, page: s.seen.length + 1, size: bytes.length, sha256: hash(bytes), capturedAt: s.asOf });
     s.token = next;

@@ -47,11 +47,15 @@ parsing and unexpected errors never expose response text, URLs or key values.
 ## Credentials in responses
 
 Every adapter strips credential values from a parsed response before it emits
-bytes for upload, keeping the record. A credential-named field (`apiKey`,
-`password`, `token`, `integration_key`, `X-Api-Key`, `webhook_url` and the like)
-holding a value becomes `"[removed]"`, and a URL's user name and password become
-`removed@`; the seed's import door reports both per record. Null, booleans, empty
-strings and masks such as `****` are not credentials and stay as they are.
+bytes for upload, keeping the record, by the same rules as the seed's import
+door. A field whose name's letters end in a credential word (`apiKey`,
+`httpPassword`, `http_password`, `client_secret`, `X-Api-Key`, `integration_key`,
+`webhook_url` and the like), or the `value` of a `{name|key, value}` pair naming
+one (`{name: 'Authorization', value}`), becomes `"[removed]"`; a URL of any scheme
+loses its user name and password (they become `removed@`) and its credential
+query and fragment parameters, except the adapter's own validated pagination
+keys (`page_token`). The door reports the markers per record. Null, booleans,
+empty strings and masks such as `****` are not credentials and stay as they are.
 Pagination is read from the response as received, so a credential-bearing
 pagination link is still refused.
 

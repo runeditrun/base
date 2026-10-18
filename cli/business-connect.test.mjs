@@ -421,12 +421,14 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
 test('vendor exports strip credential values before upload, keeping every record, empty credential fields and pagination', async t => {
  const { exportVendor } = await import('./business/vendors/index.mjs');
  const key = 'fixture-vendor-read-key', apiKey = 'fixture-account-api-key-value', password = 'fixture-basic-auth-pass';
- const secrets = [key, apiKey, password, 'fixture-header-secret', 'fixture-integration-key'];
+ const secrets = [key, apiKey, password, 'fixture-header-secret', 'fixture-integration-key', 'fixture-http-password', 'fixture-pair-secret', 'fixture-query-key', 'fixture-fragment-token'];
  // Uptime's UptimeRobot v3 fixture shape: every monitor carries apiKey, one checks a user:pass@ URL.
  const monitors = [
   { id: 9000001, url: 'https://shop.example.com/', customHttpHeaders: null, psps: [{ id: 5, isPasswordSet: false }], apiKey: null },
   { id: 9000009, url: 'https://api.partner.example.net/v1/health', customHttpHeaders: { 'X-Api-Key': 'fixture-header-secret' }, apiKey: '' },
   { id: 9000012, url: `https://user:${password}@staging.example.com/`, customHttpHeaders: null, apiKey },
+  // UptimeRobot's own httpPassword, a header pair, and credential query and fragment parameters beside a validated pagination key.
+  { id: 9000020, url: 'https://api.partner.example.net/v1/health?api_key=fixture-query-key&region=eu&page_token=kept-page#access_token=fixture-fragment-token', authType: 'HTTP_BASIC', httpUsername: 'ops', httpPassword: 'fixture-http-password', hasSecret: true, customHttpHeaders: [{ name: 'Authorization', value: 'Bearer fixture-pair-secret' }], apiKey: null },
  ];
  const responses = new Map(Object.entries({
   'https://api.uptimerobot.com/v3/monitors?limit=200': { data: monitors.slice(0, 2), nextLink: 'https://api.uptimerobot.com/v3/monitors?cursor=page-2' },
@@ -445,11 +447,13 @@ test('vendor exports strip credential values before upload, keeping every record
  const collect = async (vendor, inputs) => { const items = []; for await (const item of exportVendor(vendor, { key, inputs })) items.push(item); return items; };
  const uptime = await collect('uptimerobot', {}), text = Buffer.concat(uptime.map(item => item.bytes)).toString();
  const pages = text.trim().split('\n').map(line => JSON.parse(line));
- assert.deepEqual(pages.map(page => page.data.map(monitor => monitor.id)), [[9000001, 9000009], [9000012]], 'every record is kept');
+ assert.deepEqual(pages.map(page => page.data.map(monitor => monitor.id)), [[9000001, 9000009], [9000012, 9000020]], 'every record is kept');
  assert.deepEqual(pages.map(page => page.nextLink), ['https://api.uptimerobot.com/v3/monitors?cursor=page-2', null]);
  assert.deepEqual([pages[0].data[0].apiKey, pages[0].data[1].apiKey, pages[0].data[0].psps[0].isPasswordSet], [null, '', false], 'empty credential fields stay as they are');
  assert.equal(pages[0].data[1].customHttpHeaders['X-Api-Key'], '[removed]');
  assert.deepEqual([pages[1].data[0].url, pages[1].data[0].apiKey], ['https://removed@staging.example.com/', '[removed]']);
+ const compound = pages[1].data[1];
+ assert.deepEqual([compound.url, compound.httpPassword, compound.httpUsername, compound.hasSecret, compound.customHttpHeaders], ['https://api.partner.example.net/v1/health?region=eu&page_token=kept-page', '[removed]', 'ops', true, [{ name: 'Authorization', value: '[removed]' }]], 'compound names, header pairs and credential parameters go; pagination keys and booleans stay');
  const pagerduty = await collect('pagerduty', { start: '2026-10-01T00:00:00.000Z', end: '2026-10-08T00:00:00.000Z' });
  const bundle = JSON.parse(Buffer.concat(pagerduty.map(item => item.bytes)).toString());
  assert.deepEqual(bundle.users[0].users[0], { id: 'PUSER01', name: 'Fixture Responder', integration_key: '[removed]', html_url: 'https://fixture.pagerduty.com/users/PUSER01' }, 'a credential field no longer refuses the export');

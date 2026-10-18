@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.63-dev.gbaed19ff",
+  "cliVersion": "0.2.63-dev.g6844a7da",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -527,15 +527,15 @@
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
-      "sha256": "a07a35d4f7dd210b8dc41d5eb102faa36ce9d595395922e923fa5e3a2bc9e336"
+      "sha256": "282c7655e94316c973dbc3d0b14aed7c43c6056274e40e27ef118c50f76bf0e3"
     },
     "cli/business/vendors/calendly.mjs": {
       "source": "cli/business/vendors/calendly.mjs",
-      "sha256": "fb67b61f71d37fe89531db0b7dbbfdb90b2bdf3359be6db8d2eeb10378626746"
+      "sha256": "aeb08332caba53b6dbc36c0b26097d0dac468f1de42016e4a5011ab9747e37fe"
     },
     "cli/business/vendors/common.mjs": {
       "source": "cli/business/vendors/common.mjs",
-      "sha256": "3a622ca6d9af76fb7893887d684fb56874818187128aa1fffc4a0931545bc9aa"
+      "sha256": "fcc59e590c41c00f704235195f8261561f94e43ff96d2541307dc739ff19df03"
     },
     "cli/business/vendors/index.mjs": {
       "source": "cli/business/vendors/index.mjs",
@@ -547,11 +547,11 @@
     },
     "cli/business/vendors/sentry.mjs": {
       "source": "cli/business/vendors/sentry.mjs",
-      "sha256": "7542c62a0dd990527a442e5521500b6b83e16dada9493d93bee9806465c30096"
+      "sha256": "bc4a4530efe0258a0f2df48277ff6109618085df12dae798ed2c491855ad9fd6"
     },
     "cli/business/vendors/uptimerobot.mjs": {
       "source": "cli/business/vendors/uptimerobot.mjs",
-      "sha256": "e728d07c54184c2f0c1f67042ca190150b707520b184b76976c1b9d6222bd5a3"
+      "sha256": "a1ae9ed6b8db476306832a1c856ab02907a3c11ba45bef489e64840a1e7d7354"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",

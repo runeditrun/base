@@ -146,13 +146,29 @@ export interface RemovedCredential {
   /** An exporter had already removed it: the field holds REMOVED_CREDENTIAL. */
   beforeUpload?: true;
 }
-/** A copy of `value` without the plain credential values assertNoCredentials
- * refuses: a credential-named field holding a value is dropped, and a URL loses
- * its user name, password and credential query parameters. Placeholders stay.
- * `removed` reports each by JSON pointer and kind, never value. `secrets` holds
- * the removed values (six characters or longer) so a reader can refuse any
- * record that still repeats one elsewhere. Encoded forms are left for
- * assertNoCredentials to refuse. */
+/** Remove mode's wider net, never refuse mode's: a key whose letters end in a
+ * credential word, e.g. `httpPassword`, `http_password`, `client_secret`,
+ * `X-Api-Key`, `pushToken`, `integration_key` or `webhook_url`. Returns its
+ * letters, lower-cased. rer's vendor exports strip by the same rule. */
+const REMOVABLE_KEY = /(?:password|passwd|secret|token|credentials?|authorization|cookie|(?:api|access|private|auth|client|integration|routing|service|signing|session|refresh)key|webhookurl|calurl)$/;
+export function removableCredentialName(key: string): string | undefined {
+  const name = decodedCredentialText(key).toLowerCase().replace(/[^a-z]/g, '');
+  return REMOVABLE_KEY.test(name) ? name.slice(-64) : undefined;
+}
+/** Any `scheme://` (or `scheme:\\`, `//`) URL after leading whitespace, and the relative forms refuse mode checks. */
+const AUTHORITY = /^(\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2})([^\\/?#]*)@/i;
+const removableUrl = (text: string) => /^\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2}/i.test(text) || looksLikeUrl(text);
+/** A value nothing can authenticate with: a placeholder, or a boolean flag such as `secret: true`. */
+const empty = (value: unknown) => typeof value === 'boolean' || credentialPlaceholder(value);
+/** A copy of `value` without plain credential values: a field whose name ends in
+ * a credential word (`apiKey`, `httpPassword`, `client_secret`, `X-Api-Key`)
+ * holding a value is dropped, as is the `value` of a `{name|key, value}` pair
+ * naming one (an `Authorization` header pair). A URL of any scheme loses its
+ * user name and password, and its credential query and fragment parameters.
+ * Placeholders and booleans stay. `removed` reports each by JSON pointer and
+ * kind, never value. `secrets` holds the removed values (six characters or
+ * longer) so a reader can refuse any record that still repeats one elsewhere.
+ * Encoded forms are left for assertNoCredentials to refuse. */
 export function removeCredentials(value: Json, policy?: PaginationCursorPolicy): { value: Json; removed: RemovedCredential[]; secrets: string[] } {
   paginationPolicy(policy);
   const removed: RemovedCredential[] = [], secrets: string[] = [];
@@ -162,32 +178,44 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
     else if (item && typeof item === 'object') for (const child of Object.values(item)) leaves(child);
   };
   const pointer = (path: string, key: string | number) => `${path}/${String(key).replace(/~/g, '~0').replace(/\//g, '~1')}`;
+  /** Drops `key=value` pairs naming a credential from `&`-separated text. */
+  const pairs = (text: string, path: string, requireValue: boolean): string => {
+    const all = text.split('&'), kept = all.filter(pair => (requireValue && !pair.includes('=')) || !credentialQueryKey(pair.split('=')[0], policy));
+    if (kept.length === all.length) return text;
+    for (const pair of all) if (!kept.includes(pair)) secret(pair.slice(pair.indexOf('=') + 1));
+    removed.push({ path, field: { kind: 'url-query' } });
+    return kept.join('&');
+  };
   const url = (text: string, path: string): string => {
-    if (!looksLikeUrl(text)) return text;
+    if (!removableUrl(text)) return text;
     let result = text;
-    const userinfo = /^((?:https?:)?\/\/)([^/?#]*)@/i.exec(result);
+    const userinfo = AUTHORITY.exec(result);
     if (userinfo) {
       secret(userinfo[2]);
       result = userinfo[1] + result.slice(userinfo[0].length);
+      // Even rer's `removed@` marker goes: refuse mode, which scans retained
+      // originals, refuses any user name, so the original is withheld either way.
       removed.push({ path, field: { kind: 'url-userinfo' } });
     }
-    const queryStart = result.indexOf('?'), fragmentStart = result.indexOf('#');
-    if (queryStart < 0 || (fragmentStart >= 0 && fragmentStart < queryStart)) return result;
-    const queryEnd = fragmentStart < 0 ? result.length : fragmentStart;
-    const pairs = result.slice(queryStart + 1, queryEnd).split('&');
-    const kept = pairs.filter(pair => !credentialQueryKey(pair.split('=')[0], policy));
-    if (kept.length === pairs.length) return result;
-    for (const pair of pairs) if (!kept.includes(pair)) secret(pair.slice(pair.indexOf('=') + 1));
-    removed.push({ path, field: { kind: 'url-query' } });
-    return result.slice(0, kept.length ? queryStart + 1 : queryStart) + kept.join('&') + result.slice(queryEnd);
+    const fragmentStart = result.indexOf('#'), queryStart = result.indexOf('?');
+    const end = fragmentStart < 0 ? result.length : fragmentStart;
+    let fragment = fragmentStart < 0 ? '' : result.slice(fragmentStart);
+    // Fragment parameters such as an OAuth `#access_token=` go; a plain anchor stays.
+    if (fragment.includes('=')) { const kept = pairs(fragment.slice(1), path, true); fragment = kept ? '#' + kept : ''; }
+    if (queryStart < 0 || queryStart > end) return result.slice(0, end) + fragment;
+    const query = pairs(result.slice(queryStart + 1, end), path, false);
+    return result.slice(0, query ? queryStart + 1 : queryStart) + query + fragment;
   };
   const visit = (item: Json, path: string): Json => {
     if (Array.isArray(item)) return item.map((child, index) => visit(child, pointer(path, index)));
     if (item && typeof item === 'object') {
       const entries: [string, Json][] = [];
+      // A header-style pair: `{name: 'Authorization', value}` or `{key: 'X-Api-Key', value}`.
+      const label = Object.entries(item).find(([key, child]) => /^(?:name|key)$/i.test(key) && typeof child === 'string');
+      const pairName = label && Object.hasOwn(item, 'value') ? removableCredentialName(label[1] as string) : undefined;
       for (const [key, child] of Object.entries(item)) {
-        const name = key === 'secret' && typeof child === 'boolean' ? undefined : credentialKey(key);
-        if (name !== undefined && !credentialPlaceholder(child)) {
+        const name = pairName !== undefined && key === 'value' ? pairName : removableCredentialName(key);
+        if (name !== undefined && !empty(child)) {
           leaves(child);
           removed.push({ path: pointer(path, key), field: { kind: 'field', name } });
           continue;

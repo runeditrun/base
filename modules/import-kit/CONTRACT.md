@@ -132,8 +132,9 @@ changed records replace only rows the import created, fenced by their original
 provenance revision and native values. Missing source records are listed, never
 deleted. One plan remains pending per logical namespace until applied or undone;
 kit job state recovers the lineage after interrupted calls. The same bundle
-reuses its exact retained plan; changing mapping requires a fresh explicit
-namespace and review. Undo proceeds newest first and preserves native edits.
+reuses its exact retained plan unless its apply failed or its import was undone
+or rolled back; changing mapping requires a fresh explicit namespace and review.
+Undo proceeds newest first and preserves native edits.
 
 Bounded catch-up requires a nonempty prior snapshot and a standing owner approval
 record and time. It refuses gone, conflicting, rejected or unmapped records and
@@ -240,8 +241,11 @@ key and credential-bearing URLs remain forbidden, including in raw file/API
 originals excluded by a parser. Accepted originals remain exact.
 
 `readFileSource` with `credentials: 'remove'` (the import door's choice) keeps a
-record holding a plain credential value instead: it drops the credential field
-or the URL's user name, password and credential query parameters, reports each
+record holding a plain credential value instead. It casts a wider net than the
+refusal above: it drops any field whose name's letters end in a credential word
+(`httpPassword`, `client_secret`, `X-Api-Key`), the `value` of a `{name|key,
+value}` pair naming one, and a URL's (any scheme's) user name, password and
+credential query and fragment parameters, keeping booleans. It reports each
 per record as a `CREDENTIAL_REMOVED` warning diagnostic (field pointer and kind,
 never the value), and withholds the file's original bytes as
 `{ status: 'unavailable', reason: 'credentials-removed' }`. A record that still
