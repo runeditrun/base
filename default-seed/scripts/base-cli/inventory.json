@@ -355,7 +355,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "71736dc2f1efbceb8b0e6bae6b337e3a97832affcf6d5890d7c0f051fae7c24f"
+      "sha256": "82238ad0ad49cf8f7467e54e37472c506cc1be15866157434eb903aa120a3c3b"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -801,6 +801,10 @@
       "source": "cli/hydration/verdict.mjs",
       "sha256": "89dfc6539935a29f30ec5b2f722d6fe46e06478f88be051daa11e1ea0b4f16bb"
     },
+    "cli/import-origin.mjs": {
+      "source": "cli/import-origin.mjs",
+      "sha256": "9d93eda603f74f455a3bf957fdc54e91a620f9c763fff160fc16292a6caaaa81"
+    },
     "cli/independent.mjs": {
       "source": "cli/independent.mjs",
       "sha256": "ddddaf3f3ce7e272d2aee6d6f289bc1cf85542c283f07ab83c1860c2c0caf914"
@@ -831,7 +835,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "844804a8ac75e8f4e0df806d3e0d6eb70c1759b45b1f7d7be925230fba4ab4f1"
+      "sha256": "e1b4f653648f9327e2aa964effb3cc34c576f0919af2572350d5b232981c9c50"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",

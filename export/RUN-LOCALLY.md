@@ -274,6 +274,16 @@ After import, run setup to establish the owner and local configuration. Auth,
 private settings and transient runtime state are excluded. Remote
 transfer is unsupported by the maintained references and fails visibly.
 
+Import defaults to the local copy. If you supply `--origin URL`, a local import
+accepts only HTTP on exactly `localhost`, `127.0.0.1` or `[::1]` at this
+checkout's configured local dev port. That is the saved port, or 8787 when no
+origin has been saved. Every HTTPS URL, other host (including a front-door
+`NAME.localhost`) or different port requires `--target remote`; without it,
+import refuses before reading the archive or preparing data. Leaving out
+`--origin`, or supplying a matching local origin, keeps the usual local restore
+behavior. `--target remote` still refuses when the adapter does not support
+complete remote import, as in the maintained references.
+
 Real deployment uses the owner-account procedure and its private credentials.
 `rer deploy --dry-run` validates and builds locally without a
 provider request. The default environment is `production`; select another with

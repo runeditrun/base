@@ -23,10 +23,20 @@ export async function main(argv = process.argv.slice(2)) {
   options=parse(argv,process.cwd(),{independent});out=output(options);
   if (options.help) return showHelp(options,out);
   if (!independent && options.forwarded.length) throw invalid('First-party commands accept only the documented flags, without forwarded arguments.');
+  let project;
+  if (!independent && options.verb === 'import' && options.origin !== undefined && options.target !== 'remote') {
+   project = await resolveProject(options.cwd);
+   const refusal = await (await import('./import-origin.mjs')).importOriginRefusal(project, options);
+   if (refusal) {
+    out.error(refusal);
+    if (options.json) out.result(false, refusal.exitCode);
+    return refusal.exitCode;
+   }
+  }
   if(options.noQueue){const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw invalid('--no-queue requires the original caller CI=true.');}finally{await policy.close();}}
   const runtime = await selectNodeRuntime(options, argv, out);
   if (runtime) return runtime.exitCode;
-  const project = await resolveProject(options.cwd);
+  project ??= await resolveProject(options.cwd);
   if (project.profile === 'independent' && !['describe', 'check', 'doctor'].includes(options.verb)) options = parse(argv, process.cwd(), { independent: true });
   else if (options.forwarded.length) throw invalid('First-party commands accept only the documented flags, without forwarded arguments.');
   out = output(options);
