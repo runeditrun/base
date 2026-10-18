@@ -381,7 +381,36 @@ In a terminal, connect asks separately before adding Claude Code user Read deny
 rules, allowing export-scoped macOS wake prevention, and installing a launchd
 or systemd user service. Only the exact answer `yes` opts in. Noninteractive
 connect pairs but leaves those optional changes off. Background services use
-absolute Node and CLI paths. No model process is started.
+absolute Node and CLI paths.
+
+Connect also asks once which supported CLI should answer agent questions:
+Claude, Codex or `none`. Detection reads only absolute PATH entries and skips a
+candidate unless every link, the file and every folder above them, on the PATH
+entry and on the resolved path, belong to you or root. Folders that group or
+others can write are refused unless they are root's sticky folders (such as
+`/tmp`), and so is a file they can modify. It checks the resolved file's help
+in a throwaway home without credentials and records that resolved path (the
+one that runs), its pinned cheaper-tier model (Claude: `sonnet`; Codex: the
+smallest current model in the catalog the installed Codex ships) and device
+capabilities. Noninteractive connect chooses `none`, preserving interactive
+`next` / `answer` use. Reconnect to change the choice. `status` shows the
+recorded questions CLI, model and limits.
+
+Limits stay on the computer. At most 30 model questions an hour: the
+supervisor pauses questions at the limit and keeps working other tasks. Each
+question runs at most 120 seconds and holds at most 256 vendor ids. Claude runs
+with `--effort low`, thinking off and at most 1024 output tokens per model turn
+(`CLAUDE_CODE_DISABLE_THINKING`, `CLAUDE_CODE_MAX_OUTPUT_TOKENS`). Its
+`--max-budget-usd 0.05` is checked after each turn, so it stops a question
+once the cost passes $0.05 rather than capping the turn that crosses it. Codex
+runs with low reasoning effort and has no per-question dollar limit. `connect
+--questions-per-hour N` and `--max-budget-usd USD` can only lower the hourly
+and dollar limits.
+
+Each question's records live in `~/.rer/business/classifier/`, including Codex's
+private home with its copy of your Codex login. If the supervisor is killed
+mid-question, its next start stops any classifier still running from that
+question and removes the folder; `disconnect` does the same.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
@@ -401,7 +430,7 @@ The owner confirms the inventory in the browser.
 a headers helper. That output is a short-lived credential: connect it directly
 to the MCP client and do not paste it into an agent transcript.
 
-`rer business status` shows local pairing, service state and progress without
+`rer business status` shows local pairing, questions CLI, service state and progress without
 printing checkpoints or vendor data. `rer business disconnect` removes the
 service, device and vendor credentials, state and introduced Claude rules,
 preserving preexisting settings and unrelated edits. Revocation in the browser
@@ -414,6 +443,44 @@ snapshots and page boundaries are saved privately so a killed supervisor can
 resume from its server checkpoint without rescanning a changed tree. Snapshots
 are removed after completion. A missing snapshot for an acknowledged page is
 an explicit error. Revocation stops the supervisor on its next 401.
+
+With a chosen CLI, `run` also claims `classify.row` and starts one classifier
+process per question in an empty temporary working directory. Its prompt has
+only RER template text, catalog vendor IDs, and closed usage enums. A question
+with more than 50 vendors, or a vendor ID longer than 32 characters of
+`a-z`, `0-9` and at most 2 hyphens, is released with that reason before a
+model starts. Raw vendor and DNS evidence, server instructions and schema
+annotations never enter the prompt. Answers must match the question's closed
+vendor/usage/confidence schema locally before completion, and confidence is
+posted rounded to 2 decimals. Invalid output, process failure, cancellation or
+a 120-second timeout releases the lease; model diagnostics are never printed.
+Timeout and cancellation stop the private process group, including a CLI's
+native child process.
+Owner-only tasks remain in the browser. Temporary schema and answer files stay
+outside the model's working directory and are removed afterwards.
+
+Claude runs with `-p --tools "" --strict-mcp-config --setting-sources ""
+--output-format json --json-schema <schema> --model sonnet --max-budget-usd 0.05
+--safe-mode --disable-slash-commands --no-session-persistence` and receives
+`HOME`, `USER` and `LOGNAME` (which Claude Code on macOS needs to find its
+login; from the OS account when unset) plus only `ANTHROPIC_API_KEY` and
+`CLAUDE_CODE_OAUTH_TOKEN`. Codex runs with `exec --sandbox read-only
+--skip-git-repo-check --output-schema <schema-file> --ignore-user-config
+--ignore-rules --ephemeral --output-last-message <answer-file> --model <model>`
+in a fresh temporary `HOME` and `CODEX_HOME` holding only a copy of the
+customer's `auth.json`, and receives only `OPENAI_API_KEY` and `CODEX_API_KEY`
+as credentials. The customer's Codex config, MCP servers, hooks, skills and
+global `AGENTS.md` stay behind. Credentials Codex refreshes during the run are
+returned to the customer's `auth.json` unless their own Codex changed it
+meanwhile. Codex additionally disables hooks, plugins, apps, memory, shell,
+browser, image and subagent features and web search, and explicitly disables
+each MCP server it still loads (managed or system configuration), listed with
+the same private `CODEX_HOME` without starting them. Before the model starts,
+`codex debug prompt-input` renders what the model would see; anything beyond
+Codex's own developer text and a probe, such as an `AGENTS.md` or
+`AGENTS.override.md`, releases the question, as do credentials that are not
+in a copyable file or the environment. Supervisor preloads and agent-specific
+environment instructions are excluded for both CLIs.
 
 **Remaining export blockers:** grants for linked, configured targets now resolve
 to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare

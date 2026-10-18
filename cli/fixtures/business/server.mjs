@@ -2,9 +2,12 @@ import { createServer } from 'node:http';
 import { actionBody, closed, eventId, identifier, integer, object, requireValue, usage } from './contract.mjs';
 import { taskStore } from './task-state.mjs';
 
+// The merged platform's question carries every catalogue id plus none: 166.
+export const catalogueSize = 166;
+const catalogue = ['sentry', 'uptimerobot', ...Array.from({ length: catalogueSize - 3 }, (_, index) => `catalogue-vendor-${String(index + 1).padStart(3, '0')}`), 'none'];
 export const classificationSchema = {
  type: 'object', additionalProperties: false, required: ['vendor_id', 'usage', 'confidence'],
- properties: { vendor_id: { type: 'string', enum: ['sentry', 'uptimerobot', 'none'] },
+ properties: { vendor_id: { type: 'string', enum: catalogue },
   usage: { type: 'string', enum: usage }, confidence: { type: 'number', minimum: 0, maximum: 1 } },
 };
 const version = '2025-11-25';

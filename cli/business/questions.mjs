@@ -2,10 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Api, identifier } from './api.mjs';
 import { sensitive } from './detector.mjs';
 import { paired } from './local-commands.mjs';
+import { classification, classifications, ownerKinds, roundConfidence, catalogVendorId } from './classification.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
-export const classifications = ['uses', 'sells', 'both', 'product-dependency'];
 
 export async function mcpClient(api, { taskId, signal } = {}) {
  const minted = await api.mintToken('mcp', { taskId, signal });
@@ -33,20 +33,7 @@ export async function nextQuestions(api, signal) {
  if (!Array.isArray(result.tasks)) throw Error('Business server returned invalid task summaries.');
  return result.tasks;
 }
-const ownerKinds = new Set(['signup.checkout','connect.cloudflare','connect.github','consent.grant','confirm.inventory','plan.review','wave.approve','switchoff.cancel','cutover.billing','rollback.billing']);
 export const ownerLink = state => `${state.origin}/business/${encodeURIComponent(identifier(state.businessId))}`;
-
-function classification(task) {
- const toolId = identifier(task.question?.tool_id), vendorId = task.question?.vendor_id;
- const schema = task.question?.answer_schema, vendors = schema?.properties?.vendor_id?.enum;
- const usages = schema?.properties?.usage?.enum;
- if (!Array.isArray(vendors) || !vendors.length || vendors.some(value => typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(value) || sensitive(value))
-  || !vendors.includes('none') || !vendors.includes(vendorId) || sensitive(toolId)
-  || !Array.isArray(usages) || usages.length !== classifications.length || classifications.some(value => !usages.includes(value))
-  || schema.properties.confidence?.type !== 'number' || schema.properties.confidence.minimum !== 0 || schema.properties.confidence.maximum !== 1)
-  throw Error('Business classification metadata was refused.');
- return { toolId, vendorId, vendors };
-}
 
 export async function next() {
  const signal = AbortSignal.timeout(55_000);
@@ -66,10 +53,10 @@ export async function next() {
 export async function answer(id, vendorId, choice, rawConfidence = '1') {
  identifier(id);
  // Reject free text before even looking up the question or minting a bearer.
- if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId)) throw Error('Choose a catalog vendor id from rer business next, or none.');
+ if (!catalogVendorId(vendorId)) throw Error('Choose a catalog vendor id from rer business next, or none.');
  if (!classifications.includes(choice)) throw Error(`Choose an enum: ${classifications.join(', ')}.`);
  if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(rawConfidence)) throw Error('Choose a numeric confidence between 0 and 1.');
- const confidence = Number(rawConfidence);
+ const confidence = roundConfidence(Number(rawConfidence));
  const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
  const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
  if (summary.runner === 'owner' || ownerKinds.has(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerLink(state)}`);

@@ -8,26 +8,49 @@ import { nextQuestions } from './questions.mjs';
 import { lockSupervisor, stateDirectory, credentialHandle } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
+import { classify } from './model-cli.mjs';
+import { ownerKinds } from './classification.mjs';
+import { QuestionsPaused, questionLimits, questionsLeft, takeQuestion } from './question-budget.mjs';
 import { runDiscovery } from './discovery-task.mjs';
+import { sweepRuns } from './classifier-runs.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
 const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-installation', 'installation-import-origin-unavailable', 'installation-owner-claim-unconfigured', 'connected-seed-import-required']);
 
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
+ const runnable = new Set([...kinds, ...(state.classifier ? ['classify.row'] : [])]);
+ const limits = questionLimits(state);
+ let announced = false;
+ const paused = error => {
+  if (!announced) process.stdout.write(error.message + '\n');
+  announced = true;
+ };
  const parked = new Set(), unlock = await lockSupervisor(), stop = new AbortController();
  const interrupted = () => stop.abort(Error('Business supervisor stopped.'));
  process.once('SIGTERM', interrupted); process.once('SIGINT', interrupted);
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(interrupted, () => {}); }, 250);
  let progress;
  try {
+  // Under the lock: stop classifiers a killed supervisor left running and
+  // remove their records, scratch folders and Codex credential copies.
+  await sweepRuns();
   progress = await loadProgress();
   await unlink(join(directory, 'disconnect')).catch(error => { if (error.code !== 'ENOENT') throw error; });
   do {
    if (!progress.pendingClaim) {
     const summaries = await nextQuestions(api, stop.signal);
-    const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
-    if (!selected) { if (once) { process.stdout.write('Nothing yet.\n'); return; } await pause(25_000, stop.signal); continue; }
+    const eligible = summaries.filter(task => runnable.has(task.kind) && task.runner === 'executor' && !ownerKinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
+    // At the hourly limit, model questions wait; other tasks still run.
+    const questionRoom = runnable.has('classify.row') && await questionsLeft(limits.questionsPerHour) > 0;
+    const selected = eligible.find(task => task.kind !== 'classify.row' || questionRoom);
+    if (!selected) {
+     if (eligible.length) paused(new QuestionsPaused(limits.questionsPerHour));
+     else if (once) process.stdout.write('Nothing yet.\n');
+     if (once) return;
+     await pause(25_000, stop.signal); continue;
+    }
+    if (selected.kind === 'classify.row') announced = false;
     progress.pendingClaim = { claim_id: randomUUID(), task_id: selected.task_id };
     await saveProgress(progress);
    }
@@ -44,10 +67,10 @@ export async function run({ once = false } = {}) {
     if (once && !claimed.task) { process.stdout.write('Nothing yet.\n'); return; }
     continue;
    }
-   if (!kinds.has(claimed.task.kind) || claimed.task.kind_version !== 1) throw Error('Business server returned an unimplemented task kind.');
    const lease = new Lease(api, claimed, progress, stop.signal);
    let finished = false, released = false, failure;
    try {
+    if (!runnable.has(claimed.task.kind) || claimed.task.kind_version !== 1 || claimed.task.runner === 'owner' || ownerKinds.has(claimed.task.kind)) throw Error('Business server returned an unimplemented or owner-only task kind.');
     progress.current = { kind: claimed.task.kind, checkpoint: claimed.task.checkpoint, uploadedBytes: claimed.task.checkpoint?.bytes_done ?? 0 };
     await saveProgress(progress);
     if (claimed.task.kind === 'export.vendor') {
@@ -61,19 +84,34 @@ export async function run({ once = false } = {}) {
      }
      throw Error('Business vendor export needs a connected seed upload grant and execution-input contract.');
     }
-    const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
-     send: (destination, body) => lease.send(destination, body), saveCheckpoint: checkpoint => lease.checkpointSaved(checkpoint), stateDir: directory });
-    await lease.complete(); finished = true;
-    await result.cleanup();
-    process.stdout.write('Business discover.local completed and checked by the server.\n');
-   } catch (error) { failure = lease.signal.aborted ? lease.signal.reason : error; }
+    if (claimed.task.kind === 'classify.row') {
+     await lease.heartbeat();
+     const outputs = await classify(claimed.task, state.classifier, { signal: lease.signal, maxBudgetUsd: limits.maxBudgetUsd, beforeModel: () => takeQuestion(limits.questionsPerHour) });
+     await lease.complete(outputs); finished = true;
+     process.stdout.write('Business classify.row answer submitted for server validation.\n');
+    } else {
+     const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
+      send: (destination, body) => lease.send(destination, body), saveCheckpoint: checkpoint => lease.checkpointSaved(checkpoint), stateDir: directory });
+     await lease.complete(); finished = true;
+     await result.cleanup();
+     process.stdout.write('Business discover.local completed and checked by the server.\n');
+    }
+   } catch (error) {
+    failure = lease.signal.aborted ? lease.signal.reason : error;
+    if (claimed.task.kind === 'classify.row' && !(failure instanceof QuestionsPaused)) parked.add(claimed.task.id);
+   }
    finally {
     if (!finished && failure?.status !== 401) {
-     try { await lease.release(stop.signal.aborted ? 'handover' : parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
+     try { await lease.release(stop.signal.aborted || failure instanceof QuestionsPaused ? 'handover' : claimed.task.kind === 'export.vendor' && parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
      catch (error) { if (error.status === 401) failure = error; }
     }
     await lease.close();
     if (finished || released) { progress = {}; await saveProgress(progress); }
+   }
+   if (failure instanceof QuestionsPaused) {
+    paused(failure);
+    if (once) return;
+    await pause(25_000, stop.signal); continue;
    }
    if (failure) {
     if (failure.status === 401 || once || !parked.has(claimed.task.id)) throw failure;

@@ -7,6 +7,8 @@ import { removePermissions } from './permissions.mjs';
 import { pause } from './api.mjs';
 import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
+import { questionLimits } from './question-budget.mjs';
+import { sweepRuns } from './classifier-runs.mjs';
 
 export async function paired() {
  const state = await loadState();
@@ -52,6 +54,8 @@ export async function disconnect() {
  const state = await loadState(), directory = stateDirectory();
  await removeService();
  await stopSupervisor(directory);
+ // With the supervisor gone, stop any classifier a killed one left behind.
+ await sweepRuns();
  await removePermissions();
  if (state) {
   const store = createCredentialStore();
@@ -64,19 +68,32 @@ export async function disconnect() {
  process.stdout.write('Business disconnected. Local service, credentials and added permissions removed.\n');
 }
 
+function questionSettings(state) {
+ if (!state.classifier) return { questions_model: null, questions_per_hour: null, max_budget_usd: null };
+ const limits = questionLimits(state);
+ return { questions_model: state.classifier.model ?? null, questions_per_hour: limits.questionsPerHour, max_budget_usd: state.classifier.name === 'claude' ? limits.maxBudgetUsd : null };
+}
+
+// What this computer enforces per model question, as status reports it.
+const limitText = (classifier, settings) => classifier.name === 'claude'
+ ? `low effort, no thinking, 1024 output tokens a turn; at most ${settings.questions_per_hour} questions an hour; a question stops after a turn passes $${settings.max_budget_usd}`
+ : `low reasoning effort; at most ${settings.questions_per_hour} questions an hour`;
+
 export async function status({ json = false } = {}) {
  const state = await loadState();
  if (!state) {
-  process.stdout.write(json ? JSON.stringify({ paired: false, service: 'not_installed', current_task: null, checkpoint: null }) + '\n' : 'Business: not paired.\nService: not installed.\nTask: none.\nCheckpoint: none.\n'); return;
+  process.stdout.write(json ? JSON.stringify({ paired: false, service: 'not_installed', current_task: null, checkpoint: null, questions_cli: 'none' }) + '\n' : 'Business: not paired.\nService: not installed.\nTask: none.\nCheckpoint: none.\nQuestions CLI: none.\n'); return;
  }
  const stored = state.origin && await createCredentialStore().get(credentialHandle(state.origin));
  const service = await serviceStatus();
  const active = (await loadProgress()).current;
  if (json) {
-  process.stdout.write(JSON.stringify({ paired: Boolean(stored), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: ['discover.local', 'export.vendor'].includes(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
+  process.stdout.write(JSON.stringify({ paired: Boolean(stored), questions_cli: state.classifier?.name ?? 'none', ...questionSettings(state), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: ['discover.local', 'export.vendor', 'classify.row'].includes(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
   return;
  }
  process.stdout.write(`Business: ${stored ? 'paired' : 'credential missing'}.\nService: ${service.running ? 'running' : service.installed ? 'installed, stopped' : 'not installed'}.\n`);
- process.stdout.write(`Task: ${['discover.local', 'export.vendor'].includes(active?.kind) ? active.kind : 'none'}.\n`);
+ const settings = questionSettings(state);
+ process.stdout.write(`Questions CLI: ${state.classifier ? `${state.classifier.name} (model ${settings.questions_model}, ${limitText(state.classifier, settings)}; 120 seconds a question)` : 'none'}.\n`);
+ process.stdout.write(`Task: ${['discover.local', 'export.vendor', 'classify.row'].includes(active?.kind) ? active.kind : 'none'}.\n`);
  process.stdout.write(`Checkpoint: ${active?.checkpoint ? 'saved' : 'none'}${Number.isSafeInteger(active?.uploadedBytes) ? `; ${active.uploadedBytes} bytes uploaded` : ''}.\n`);
 }
