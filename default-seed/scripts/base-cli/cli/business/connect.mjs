@@ -7,17 +7,19 @@ import { installService } from './service.mjs';
 import { installPermissions } from './permissions.mjs';
 import { consent, questionCli } from './prompts.mjs';
 import { detectClassifiers } from './model-cli.mjs';
+import { questionLimits } from './question-budget.mjs';
 
 export const capabilities = ['discover.local', 'export.vendor:sentry', 'export.vendor:uptimerobot', 'export.vendor:pagerduty', 'export.vendor:calendly'];
 
-export async function connect({ code, origin }) {
+export async function connect({ code, origin, limits: lowered = {} }) {
  origin = originUrl(origin);
  if (await loadState()) throw Error('Business has local pairing state. Disconnect before pairing again.');
  const store = createCredentialStore(), handle = credentialHandle(origin);
  // Fail before redeeming the one-use browser code if the OS store is absent.
  if (await store.get(handle)) throw Error('A Business credential already exists for this origin. Disconnect it before pairing again.');
  const available = await detectClassifiers(), choice = await questionCli(available);
- const classifier = choice === 'none' ? null : { name: choice, path: available[choice] };
+ const classifier = choice === 'none' ? null : { name: choice, path: available[choice].path, model: available[choice].model };
+ const limits = questionLimits({ limits: lowered });
  const deviceCapabilities = [...capabilities, ...(classifier ? ['classify.row', `classifier:${choice}`] : [])];
  const api = new Api(origin);
  const pending = await api.post('/api/business/executors/pair', {
@@ -35,7 +37,7 @@ export async function connect({ code, origin }) {
   await pause(Math.max(1, Math.min(5, Number(result.interval) || 5)) * 1000);
  }
  if (result?.status !== 'paired' || typeof result.device_credential !== 'string') throw Error('Browser approval expired. Create a new pairing code in the browser.');
- const state = { version: 1, origin, businessId: identifier(result.business_id), executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false, classifier, capabilities: deviceCapabilities };
+ const state = { version: 1, origin, businessId: identifier(result.business_id), executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false, classifier, limits, capabilities: deviceCapabilities };
  await store.set(handle, result.device_credential);
  try { await saveState(state); } catch (error) { await store.delete(handle); throw error; }
  process.stdout.write('Business paired. Device credential stored in OS keychain.\n');

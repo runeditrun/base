@@ -384,10 +384,19 @@ connect pairs but leaves those optional changes off. Background services use
 absolute Node and CLI paths.
 
 Connect also asks once which supported CLI should answer agent questions:
-Claude, Codex or `none`. It checks their help on PATH and records the chosen
-absolute executable and device capabilities. Noninteractive connect chooses
-`none`, preserving interactive `next` / `answer` use. Reconnect to change the
-choice. `status` shows the recorded questions CLI.
+Claude, Codex or `none`. Detection reads only absolute PATH entries, resolves
+each candidate's real path and skips files that group or others can modify.
+It checks their help in a throwaway home without credentials and records the
+chosen absolute executable, its pinned cheaper-tier model (Claude: `sonnet`;
+Codex: the smallest current model in the catalog the installed Codex ships)
+and device capabilities. Noninteractive connect chooses `none`, preserving
+interactive `next` / `answer` use. Reconnect to change the choice. `status`
+shows the recorded questions CLI, model and limits.
+
+Spend limits stay on the computer: at most 30 model questions an hour (the
+supervisor pauses questions at the limit and keeps working other tasks) and at
+most $0.05 per Claude question (`--max-budget-usd`). `connect
+--questions-per-hour N` and `--max-budget-usd USD` can only lower them.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
@@ -423,27 +432,41 @@ an explicit error. Revocation stops the supervisor on its next 401.
 
 With a chosen CLI, `run` also claims `classify.row` and starts one classifier
 process per question in an empty temporary working directory. Its prompt has
-only RER template text, catalog vendor IDs, and closed usage enums. Raw vendor
-and DNS evidence, server instructions and schema annotations never enter the
-prompt. Answers must match the question's closed vendor/usage/confidence schema
-locally before completion. Invalid output, process failure, cancellation or a
-120-second timeout releases the lease; model diagnostics are never printed.
+only RER template text, catalog vendor IDs, and closed usage enums. A question
+with more than 50 vendors, or a vendor ID longer than 32 characters of
+`a-z`, `0-9` and at most 2 hyphens, is released with that reason before a
+model starts. Raw vendor and DNS evidence, server instructions and schema
+annotations never enter the prompt. Answers must match the question's closed
+vendor/usage/confidence schema locally before completion, and confidence is
+posted rounded to 2 decimals. Invalid output, process failure, cancellation or
+a 120-second timeout releases the lease; model diagnostics are never printed.
 Timeout and cancellation stop the private process group, including a CLI's
 native child process.
 Owner-only tasks remain in the browser. Temporary schema and answer files stay
 outside the model's working directory and are removed afterwards.
 
 Claude runs with `-p --tools "" --strict-mcp-config --setting-sources ""
---output-format json --json-schema <schema> --safe-mode
---disable-slash-commands --no-session-persistence`. Codex runs with
-`exec --sandbox read-only --skip-git-repo-check --output-schema <schema-file>
---ignore-user-config --ignore-rules --ephemeral --output-last-message <answer-file>`.
-Codex additionally disables hooks, plugins, apps, memory, shell, browser,
-image and subagent features, suppresses inherited instructions and web search,
-and inspects MCP configuration without starting servers so each configured
-server is explicitly disabled for the classification. The inspection never
-prints or persists transport settings. The customer's CLI authentication remains available; supervisor preloads and
-agent-specific environment instructions are excluded.
+--output-format json --json-schema <schema> --model sonnet --max-budget-usd 0.05
+--safe-mode --disable-slash-commands --no-session-persistence` and receives
+`HOME`, `USER` and `LOGNAME` (which Claude Code on macOS needs to find its
+login; from the OS account when unset) plus only `ANTHROPIC_API_KEY` and
+`CLAUDE_CODE_OAUTH_TOKEN`. Codex runs with `exec --sandbox read-only
+--skip-git-repo-check --output-schema <schema-file> --ignore-user-config
+--ignore-rules --ephemeral --output-last-message <answer-file> --model <model>`
+in a fresh temporary `HOME` and `CODEX_HOME` holding only a copy of the
+customer's `auth.json`, and receives only `OPENAI_API_KEY` and `CODEX_API_KEY`
+as credentials. The customer's Codex config, MCP servers, hooks, skills and
+global `AGENTS.md` stay behind. Credentials Codex refreshes during the run are
+returned to the customer's `auth.json` unless their own Codex changed it
+meanwhile. Codex additionally disables hooks, plugins, apps, memory, shell,
+browser, image and subagent features and web search, and explicitly disables
+each MCP server it still loads (managed or system configuration), listed with
+the same private `CODEX_HOME` without starting them. Before the model starts,
+`codex debug prompt-input` renders what the model would see; anything beyond
+Codex's own developer text and a probe, such as an `AGENTS.md` or
+`AGENTS.override.md`, releases the question, as do credentials that are not
+in a copyable file or the environment. Supervisor preloads and agent-specific
+environment instructions are excluded for both CLIs.
 
 **Remaining export blockers:** grants for linked, configured targets now resolve
 to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare

@@ -25,9 +25,9 @@ before(async () => {
 });
 after(() => directory && rm(directory, { recursive: true, force: true }));
 
-async function cli(home, args, { terminal = false, input = '', approve, columns = 120, onSpawn, path = `${join(directory, 'models/bin')}:${process.env.PATH}`, questionCli = 'none' } = {}) {
+async function cli(home, args, { terminal = false, input = '', approve, columns = 120, onSpawn, path = `${join(directory, 'models/bin')}:${process.env.PATH}`, questionCli = 'none', env: extra = {} } = {}) {
  await mkdir(home, { recursive: true });
- const env = { PATH: path, TMPDIR: join(directory, 'tmp'), MCP_CONFIG: 'fixture-untrusted-mcp', CODEX_INSTRUCTIONS: 'fixture-untrusted-instructions', TEST_QUESTION_CLI: questionCli, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns) };
+ const env = { PATH: path, TMPDIR: join(directory, 'tmp'), MCP_CONFIG: 'fixture-untrusted-mcp', CODEX_INSTRUCTIONS: 'fixture-untrusted-instructions', TEST_QUESTION_CLI: questionCli, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns), ...extra };
  return new Promise((resolveRun, reject) => {
   const command = terminal ? 'python3' : process.execPath;
   const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : [launcher, ...args];
@@ -45,8 +45,8 @@ async function cli(home, args, { terminal = false, input = '', approve, columns 
   child.stdin.end(input);
  });
 }
-async function connect(home, remote, options = {}) {
- const result = await cli(home, ['business','connect','--code','ABCD-1234','--origin',remote.origin], {
+async function connect(home, remote, { connectArgs = [], ...options } = {}) {
+ const result = await cli(home, ['business','connect','--code','ABCD-1234','--origin',remote.origin,...connectArgs], {
   ...options, approve: () => fetch(remote.origin + '/api/business/biz/pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, confirmation_number: '246810' }) }),
  });
  assert.equal(result.code, 0, `CLI pairs after browser number approval; approved=${remote.state.approved}; printed_number=${result.stdout.includes('Confirmation number:')}; paired=${result.stdout.includes('Business paired.')}; credential_error=${result.stderr.includes('OS credential storage')}; generic=${result.stderr.includes('Business command failed')}`);

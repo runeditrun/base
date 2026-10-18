@@ -10,6 +10,7 @@ import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
 import { classify } from './model-cli.mjs';
 import { ownerKinds } from './classification.mjs';
+import { QuestionsPaused, questionLimits, questionsLeft, takeQuestion } from './question-budget.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
@@ -18,6 +19,12 @@ const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
  const runnable = new Set([...kinds, ...(state.classifier ? ['classify.row'] : [])]);
+ const limits = questionLimits(state);
+ let announced = false;
+ const paused = error => {
+  if (!announced) process.stdout.write(error.message + '\n');
+  announced = true;
+ };
  const parked = new Set(), unlock = await lockSupervisor(), stop = new AbortController();
  const interrupted = () => stop.abort(Error('Business supervisor stopped.'));
  process.once('SIGTERM', interrupted); process.once('SIGINT', interrupted);
@@ -29,8 +36,17 @@ export async function run({ once = false } = {}) {
   do {
    if (!progress.pendingClaim) {
     const summaries = await nextQuestions(api, stop.signal);
-    const selected = summaries.find(task => runnable.has(task.kind) && task.runner === 'executor' && !ownerKinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
-    if (!selected) { if (once) { process.stdout.write('Nothing yet.\n'); return; } await pause(25_000, stop.signal); continue; }
+    const eligible = summaries.filter(task => runnable.has(task.kind) && task.runner === 'executor' && !ownerKinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
+    // At the hourly limit, model questions wait; other tasks still run.
+    const questionRoom = runnable.has('classify.row') && await questionsLeft(limits.questionsPerHour) > 0;
+    const selected = eligible.find(task => task.kind !== 'classify.row' || questionRoom);
+    if (!selected) {
+     if (eligible.length) paused(new QuestionsPaused(limits.questionsPerHour));
+     else if (once) process.stdout.write('Nothing yet.\n');
+     if (once) return;
+     await pause(25_000, stop.signal); continue;
+    }
+    if (selected.kind === 'classify.row') announced = false;
     progress.pendingClaim = { claim_id: randomUUID(), task_id: selected.task_id };
     await saveProgress(progress);
    }
@@ -66,7 +82,7 @@ export async function run({ once = false } = {}) {
     }
     if (claimed.task.kind === 'classify.row') {
      await lease.heartbeat();
-     const outputs = await classify(claimed.task, state.classifier, { signal: lease.signal });
+     const outputs = await classify(claimed.task, state.classifier, { signal: lease.signal, maxBudgetUsd: limits.maxBudgetUsd, beforeModel: () => takeQuestion(limits.questionsPerHour) });
      await lease.complete(outputs); finished = true;
      process.stdout.write('Business classify.row answer submitted for server validation.\n');
     } else {
@@ -78,15 +94,20 @@ export async function run({ once = false } = {}) {
     }
    } catch (error) {
     failure = lease.signal.aborted ? lease.signal.reason : error;
-    if (claimed.task.kind === 'classify.row') parked.add(claimed.task.id);
+    if (claimed.task.kind === 'classify.row' && !(failure instanceof QuestionsPaused)) parked.add(claimed.task.id);
    }
    finally {
     if (!finished && failure?.status !== 401) {
-     try { await lease.release(stop.signal.aborted ? 'handover' : claimed.task.kind === 'export.vendor' && parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
+     try { await lease.release(stop.signal.aborted || failure instanceof QuestionsPaused ? 'handover' : claimed.task.kind === 'export.vendor' && parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
      catch (error) { if (error.status === 401) failure = error; }
     }
     await lease.close();
     if (finished || released) { progress = {}; await saveProgress(progress); }
+   }
+   if (failure instanceof QuestionsPaused) {
+    paused(failure);
+    if (once) return;
+    await pause(25_000, stop.signal); continue;
    }
    if (failure) {
     if (failure.status === 401 || once || !parked.has(claimed.task.id)) throw failure;

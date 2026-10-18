@@ -3,11 +3,13 @@ import { connect } from './connect.mjs';
 import { vendorKey, disconnect, status } from './local-commands.mjs';
 import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
+import { defaultLimits } from './question-budget.mjs';
 
 const usage = `Usage: rer business VERB
   scan [DIR...] [--json]          Names-only local discovery
-  connect --code CODE [--origin URL]
-                                 Pair, compare a number in your browser, then opt in to a service
+  connect --code CODE [--origin URL] [--questions-per-hour N] [--max-budget-usd USD]
+                                 Pair, compare a number in your browser, then opt in to a service;
+                                 the limits only lower the defaults (30 questions an hour, $0.05)
   run [--once]                   Run discovery and chosen CLI questions; vendor uploads pending
   next                           Return one templated question or nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
@@ -28,11 +30,20 @@ export async function businessCommand(argv) {
    const options = {};
    for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
-    if (!['--code', '--origin'].includes(name) || !args[index + 1] || args[index + 1].startsWith('--') || Object.hasOwn(options, name.slice(2))) return invalid();
+    if (!['--code', '--origin', '--questions-per-hour', '--max-budget-usd'].includes(name) || !args[index + 1] || args[index + 1].startsWith('--') || Object.hasOwn(options, name.slice(2))) return invalid();
     options[name.slice(2)] = args[index + 1];
    }
    if (typeof options.code !== 'string' || !/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(options.code)) return invalid();
-   await connect(options);
+   const limits = {};
+   if (options['questions-per-hour'] !== undefined) {
+    if (!/^[1-9]\d?$/.test(options['questions-per-hour']) || Number(options['questions-per-hour']) > defaultLimits.questionsPerHour) return invalid();
+    limits.questionsPerHour = Number(options['questions-per-hour']);
+   }
+   if (options['max-budget-usd'] !== undefined) {
+    if (!/^0?\.\d{1,4}$/.test(options['max-budget-usd']) || !(Number(options['max-budget-usd']) > 0) || Number(options['max-budget-usd']) > defaultLimits.maxBudgetUsd) return invalid();
+    limits.maxBudgetUsd = Number(options['max-budget-usd']);
+   }
+   await connect({ code: options.code, origin: options.origin, limits });
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
   else if (verb === 'run' && (!args.length || args.length === 1 && args[0] === '--once')) await run({ once: args[0] === '--once' });

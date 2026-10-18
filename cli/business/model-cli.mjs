@@ -1,9 +1,10 @@
-import { execute as runProcess } from './model-process.mjs';
-import { constants } from 'node:fs';
-import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { execute } from './model-process.mjs';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { classification, classificationPrompt, validateClassification } from './classification.mjs';
+import { claudeEnvironment, codexEnvironment, detectionEnvironment, trustedExecutable } from './model-env.mjs';
+import { copyCodexCredentials, instructionProbe, onlyProbe, returnRefreshedCredentials, smallestCodexModel } from './codex-home.mjs';
 
 const codexIsolation = [
  '--disable', 'hooks', '--disable', 'plugins', '--disable', 'apps', '--disable', 'memories',
@@ -17,84 +18,101 @@ const codexIsolation = [
 ];
 
 const required = {
- claude: ['--tools', '--strict-mcp-config', '--setting-sources', '--output-format', '--json-schema', '--safe-mode', '--disable-slash-commands', '--no-session-persistence'],
- codex: ['--sandbox', '--skip-git-repo-check', '--output-schema', '--ignore-user-config', '--ignore-rules', '--ephemeral', '--output-last-message'],
+ claude: ['--tools', '--strict-mcp-config', '--setting-sources', '--output-format', '--json-schema', '--model', '--max-budget-usd', '--safe-mode', '--disable-slash-commands', '--no-session-persistence'],
+ codex: ['--sandbox', '--skip-git-repo-check', '--output-schema', '--ignore-user-config', '--ignore-rules', '--ephemeral', '--output-last-message', '--model'],
 };
+const modelShape = /^[a-z0-9][a-z0-9.-]{0,63}$/;
 
-// Pass authentication and transport settings, never the supervisor's Node
-// preload, agent instructions, hooks, MCP configuration or vendor credentials.
-function environment() {
- const env = {};
- for (const key of ['HOME', 'PATH', 'LANG', 'LC_ALL', 'TMPDIR', 'TEMP', 'TMP', 'CODEX_HOME', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE']) {
-  if (process.env[key] !== undefined) env[key] = process.env[key];
- }
- return env;
+// Probe one candidate in a throwaway home without credentials. Returns the
+// pinned cheaper-tier model it accepts, or null when it is unsupported.
+async function probe(name, path) {
+ const temporary = await mkdtemp(join(tmpdir(), 'rer-business-cli-help-'));
+ try {
+  await mkdir(join(temporary, 'codex'), { mode: 0o700 });
+  const run = (args, limit) => execute(path, args, { cwd: temporary, timeout: 10_000, env: detectionEnvironment(temporary), limit });
+  const help = await run(name === 'codex' ? ['exec', '--help'] : ['--help']);
+  if (!required[name].every(flag => help.includes(flag))) return null;
+  if (name === 'claude') return 'sonnet';
+  const known = new Set((await run(['features', 'list'])).split('\n').map(line => line.trim().split(/\s+/)[0]));
+  if (codexIsolation.some((arg, index) => ['--disable', '--enable'].includes(arg) && !known.has(codexIsolation[index + 1]))) return null;
+  return smallestCodexModel(await run(['debug', 'models', '--bundled'], 16 * 1024 * 1024));
+ } catch { return null; /* Unsupported or unavailable CLIs are not advertised. */ }
+ finally { await rm(temporary, { recursive: true, force: true }); }
 }
 
-const execute = (path, args, options) => runProcess(path, args, { env: environment(), ...options });
-
+// Absolute PATH entries only, first trusted match per CLI.
 export async function detectClassifiers() {
  const found = await Promise.all(Object.keys(required).map(async name => {
-  for (const directory of (process.env.PATH ?? '').split(':').filter(Boolean)) {
-   const path = resolve(directory, name);
-   try { if (!(await stat(path)).isFile()) continue; await access(path, constants.X_OK); }
-   catch { continue; }
-   const temporary = await mkdtemp(join(tmpdir(), 'rer-business-cli-help-'));
-   try {
-    if (name === 'codex') await mkdir(join(temporary, 'codex'), { mode: 0o700 });
-    const help = await execute(path, name === 'codex' ? ['exec', '--help'] : ['--help'], { cwd: temporary, timeout: 10_000, env: { ...environment(), HOME: temporary, CODEX_HOME: join(temporary, 'codex') } });
-    if (!required[name].every(flag => help.includes(flag))) return null;
-    if (name === 'codex') {
-     const features = await execute(path, ['features', 'list'], { cwd: temporary, timeout: 10_000, env: { ...environment(), HOME: temporary, CODEX_HOME: join(temporary, 'codex') } });
-     const known = new Set(features.split('\n').map(line => line.trim().split(/\s+/)[0]));
-     if (codexIsolation.some((arg, index) => ['--disable', '--enable'].includes(arg) && !known.has(codexIsolation[index + 1]))) return null;
-    }
-    return [name, path];
-   } catch { /* Unsupported or unavailable CLIs are not advertised. */ }
-   finally { await rm(temporary, { recursive: true, force: true }); }
-   return null;
+  for (const directory of (process.env.PATH ?? '').split(':')) {
+   if (!isAbsolute(directory)) continue;
+   const path = join(directory, name);
+   if (!(await trustedExecutable(path))) continue;
+   const model = await probe(name, path);
+   return model ? [name, { path, model }] : null;
   }
   return null;
  }));
  return Object.fromEntries(found.filter(Boolean));
 }
 
-// The exec command has no global MCP-off switch. Inspect configuration without
-// starting servers, then explicitly disable every named server (including
-// managed/system configuration). Never persist or expose transport settings.
-async function disabledMcp(path, cwd, signal) {
+// The exec command has no global MCP-off switch. List servers with the same
+// private CODEX_HOME exec uses (so only managed or system servers remain),
+// without starting them, and disable each one explicitly.
+async function disabledMcp(path, options) {
  let servers;
  try {
-  servers = JSON.parse(await execute(path, ['mcp', 'list', '--json', '--disable', 'hooks', '--disable', 'plugins', '--disable', 'apps'], { cwd, signal, timeout: 10_000 }));
+  servers = JSON.parse(await execute(path, ['mcp', 'list', '--json', '--disable', 'hooks', '--disable', 'plugins', '--disable', 'apps'], { ...options, timeout: 10_000 }));
   if (!Array.isArray(servers) || servers.length > 1000 || servers.some(server => typeof server.name !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(server.name))) throw Error();
  } catch { throw Error('Business classifier MCP isolation could not be established. Task released.'); }
  return servers.flatMap(server => ['-c', `mcp_servers.${server.name}.enabled=false`]);
 }
 
-export async function classify(task, classifier, { signal } = {}) {
+async function runCodex(classifier, task, { temporary, schemaPath, outputPath, signal, beforeModel }) {
+ const home = join(temporary, 'home'), codexHome = join(home, '.codex'), cwd = join(temporary, 'work');
+ await mkdir(codexHome, { recursive: true, mode: 0o700 });
+ const copy = await copyCodexCredentials(codexHome), options = { cwd, signal, env: codexEnvironment(home, codexHome) };
+ const mcp = await disabledMcp(classifier.path, options);
+ let rendered;
+ try { rendered = await execute(classifier.path, ['debug', 'prompt-input', ...codexIsolation, ...mcp, instructionProbe], { ...options, timeout: 10_000, limit: 1024 * 1024 }); }
+ catch { throw Error('Business classifier could not check Codex instructions. Task released.'); }
+ if (!onlyProbe(rendered)) throw Error('Business classifier refused: Codex would load AGENTS.md or other inherited instructions. Task released.');
+ await beforeModel();
+ try {
+  await execute(classifier.path, ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--output-schema', schemaPath, '--ignore-user-config', '--ignore-rules', '--ephemeral', '--output-last-message', outputPath, '--model', classifier.model, ...codexIsolation, ...mcp],
+   { ...options, input: classificationPrompt(task) });
+ } finally { await returnRefreshedCredentials(copy, codexHome); }
+ try {
+  if ((await stat(outputPath)).size > 65536) throw Error();
+  return JSON.parse(await readFile(outputPath, 'utf8'));
+ } catch { throw Error('Business classifier returned an invalid result. Task released.'); }
+}
+
+async function runClaude(classifier, task, { schema, cwd, signal, beforeModel, maxBudgetUsd }) {
+ await beforeModel();
+ const stdout = await execute(classifier.path, ['-p', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--output-format', 'json', '--json-schema', JSON.stringify(schema),
+  '--model', classifier.model, '--max-budget-usd', String(maxBudgetUsd), '--safe-mode', '--disable-slash-commands', '--no-session-persistence'], { cwd, signal, env: claudeEnvironment(), input: classificationPrompt(task) });
+ try {
+  const result = JSON.parse(stdout);
+  if (result.is_error || result.subtype !== 'success') throw Error();
+  return result.structured_output;
+ } catch { throw Error('Business classifier returned an invalid result. Task released.'); }
+}
+
+// beforeModel runs immediately before the model process starts, so the
+// hourly limit counts model questions only.
+export async function classify(task, classifier, { signal, beforeModel, maxBudgetUsd }) {
  const { schema } = classification(task);
- if (!classifier || !Object.hasOwn(required, classifier.name) || !isAbsolute(classifier.path)) throw Error('Business classifier is unavailable. Reconnect to choose a supported CLI.');
+ if (!classifier || !Object.hasOwn(required, classifier.name) || !isAbsolute(classifier.path) || typeof classifier.model !== 'string' || !modelShape.test(classifier.model))
+  throw Error('Business classifier is unavailable. Reconnect to choose a supported CLI.');
+ if (!(await trustedExecutable(classifier.path))) throw Error('Business classifier executable is missing or writable by others. Reconnect to choose a supported CLI.');
  const temporary = await mkdtemp(join(tmpdir(), 'rer-business-classifier-'));
  try {
   const cwd = join(temporary, 'work'); await mkdir(cwd, { mode: 0o700 });
   const schemaPath = join(temporary, 'schema.json'), outputPath = join(temporary, 'answer.json');
   await writeFile(schemaPath, JSON.stringify(schema), { mode: 0o600, flag: 'wx' });
-  const mcp = classifier.name === 'codex' ? await disabledMcp(classifier.path, cwd, signal) : [];
-  const args = classifier.name === 'claude'
-   ? ['-p', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--output-format', 'json', '--json-schema', JSON.stringify(schema), '--safe-mode', '--disable-slash-commands', '--no-session-persistence']
-   : ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--output-schema', schemaPath, '--ignore-user-config', '--ignore-rules', '--ephemeral', '--output-last-message', outputPath, ...codexIsolation, ...mcp];
-  const stdout = await execute(classifier.path, args, { cwd, input: classificationPrompt(task), signal });
-  let answer;
-  try {
-   if (classifier.name === 'claude') {
-    const result = JSON.parse(stdout);
-    if (result.is_error || result.subtype !== 'success') throw Error();
-    answer = result.structured_output;
-   } else {
-    if ((await stat(outputPath)).size > 65536) throw Error();
-    answer = JSON.parse(await readFile(outputPath, 'utf8'));
-   }
-  } catch { throw Error('Business classifier returned an invalid result. Task released.'); }
+  const answer = classifier.name === 'claude'
+   ? await runClaude(classifier, task, { schema, cwd, signal, beforeModel, maxBudgetUsd })
+   : await runCodex(classifier, task, { temporary, schemaPath, outputPath, signal, beforeModel });
   return validateClassification(task, answer);
  } finally { await rm(temporary, { recursive: true, force: true }); }
 }

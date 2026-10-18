@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 
 // CLI packages can wrap a native binary in Node. Bound and cancel the private
 // process group, so the native classifier cannot outlive a killed wrapper.
-export async function execute(path, args, { cwd, input, signal, timeout = 120_000, env }) {
+export async function execute(path, args, { cwd, input, signal, timeout = 120_000, env, limit = 65536 }) {
  signal?.throwIfAborted();
  return new Promise((resolveRun, reject) => {
   const child = spawn(path, args, { cwd, env, detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -14,7 +14,7 @@ export async function execute(path, args, { cwd, input, signal, timeout = 120_00
   const timer = setTimeout(stop, timeout);
   const collect = keep => chunk => {
    bytes += chunk.length;
-   if (bytes > 65536) stop();
+   if (bytes > limit) stop();
    else if (keep) output.push(chunk);
   };
   child.stdout.on('data', collect(true)); child.stderr.on('data', collect(false));
