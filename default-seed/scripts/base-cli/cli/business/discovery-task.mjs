@@ -26,7 +26,10 @@ function inputs(task, grant, checkpoint, stateDir) {
  if (!object(task) || task.kind !== 'discover.local' || !object(grant)) fail('requires a scoped local discovery grant');
  identifier(task.id); identifier(grant.id); identifier(grant.consent?.id);
  if (grant.task_id !== task.id || !integer(task.fence) || task.fence < 1 || grant.fence !== task.fence) fail('grant does not match the claimed task and fence');
- if (grant.destination !== `/api/business/tasks/${encodeURIComponent(task.id)}/uploads`) fail('grant has an invalid upload destination');
+ const upload = typeof grant.destination === 'string' && /^\/api\/business\/tasks\/([^/]+)\/uploads$/.exec(grant.destination);
+ let destination;
+ try { destination = upload && `/api/business/tasks/${decodeURIComponent(upload[1])}/uploads`; } catch { fail('grant has an invalid upload destination'); }
+ if (destination !== `/api/business/tasks/${task.id}/uploads`) fail('grant has an invalid upload destination');
  if (!integer(grant.quota_bytes) || grant.quota_bytes < 1 || grant.quota_bytes > QUOTA_BYTES || !integer(grant.uploaded_bytes) || grant.uploaded_bytes > grant.quota_bytes) fail('grant has invalid byte limits');
  const paths = grant.consent.scope?.paths;
  if (!Array.isArray(paths) || !paths.length || paths.some(path => typeof path !== 'string' || /[\u0000-\u001f\u007f]/u.test(path) || !(isAbsolute(path) || path.startsWith('~/')))) fail('consent must contain absolute or home-relative scoped paths');
