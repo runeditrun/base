@@ -388,8 +388,13 @@ Claude, Codex or `none`. Detection reads only absolute PATH entries and skips a
 candidate unless every link, the file and every folder above them, on the PATH
 entry and on the resolved path, belong to you or root. Folders that group or
 others can write are refused unless they are root's sticky folders (such as
-`/tmp`), and so is a file they can modify. It checks the resolved file's help
-in a throwaway home without credentials and records that resolved path (the
+`/tmp`), and so is a file they can modify. On macOS, any of those links, files
+or folders is also refused when its access control list (`ls -lde`) has an
+`allow` entry for `write`, `append`, `add_file`, `add_subdirectory`,
+`delete_child`, `delete`, `writesecurity` or `chown`; `deny` entries, such as
+your home folder's `everyone deny delete`, are fine. It checks the resolved
+file's help in a throwaway home without credentials, inside
+`~/.rer/business/`, and records that resolved path (the
 one that runs), its pinned cheaper-tier model (Claude: `sonnet`; Codex: the
 smallest current model in the catalog the installed Codex ships) and device
 capabilities. Noninteractive connect chooses `none`, preserving interactive
@@ -407,10 +412,18 @@ runs with low reasoning effort and has no per-question dollar limit. `connect
 --questions-per-hour N` and `--max-budget-usd USD` can only lower the hourly
 and dollar limits.
 
-Each question's records live in `~/.rer/business/classifier/`, including Codex's
-private home with its copy of your Codex login. If the supervisor is killed
+Each question's records live in `~/.rer/business/classifier/`, including its
+scratch folder and Codex's private home with its copy of your Codex login;
+nothing is placed in a shared temporary folder. If the supervisor is killed
 mid-question, its next start stops any classifier still running from that
-question and removes the folder; `disconnect` does the same.
+question and removes the folder; `disconnect` does the same. Only your own
+processes are stopped, and only a process group whose leader still has the
+start time recorded when it was started (or, once that leader has exited, a
+group still naming the question's own scratch folder), so a reused process id
+is never signalled. A recorded folder is removed only while it is a real
+folder (not a link) that you own with mode 0700; anything else is dropped
+from the record untouched. A folder that cannot be removed is reported and
+its record dropped, so it never blocks a start or `disconnect`.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
@@ -445,8 +458,9 @@ are removed after completion. A missing snapshot for an acknowledged page is
 an explicit error. Revocation stops the supervisor on its next 401.
 
 With a chosen CLI, `run` also claims `classify.row` and starts one classifier
-process per question in an empty temporary working directory. Its prompt has
-only RER template text, catalog vendor IDs, and closed usage enums. A question
+process per question in an empty working folder in that question's record.
+Its prompt has only RER template text, catalog vendor IDs, and closed usage
+enums. A question
 with more than 50 vendors, or a vendor ID longer than 32 characters of
 `a-z`, `0-9` and at most 2 hyphens, is released with that reason before a
 model starts. Raw vendor and DNS evidence, server instructions and schema
@@ -467,8 +481,8 @@ login; from the OS account when unset) plus only `ANTHROPIC_API_KEY` and
 `CLAUDE_CODE_OAUTH_TOKEN`. Codex runs with `exec --sandbox read-only
 --skip-git-repo-check --output-schema <schema-file> --ignore-user-config
 --ignore-rules --ephemeral --output-last-message <answer-file> --model <model>`
-in a fresh temporary `HOME` and `CODEX_HOME` holding only a copy of the
-customer's `auth.json`, and receives only `OPENAI_API_KEY` and `CODEX_API_KEY`
+with a private `HOME` in the question's record and a `CODEX_HOME` holding
+only a copy of the customer's `auth.json`, and receives only `OPENAI_API_KEY` and `CODEX_API_KEY`
 as credentials. The customer's Codex config, MCP servers, hooks, skills and
 global `AGENTS.md` stay behind. Credentials Codex refreshes during the run are
 returned to the customer's `auth.json` unless their own Codex changed it

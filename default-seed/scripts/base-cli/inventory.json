@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.54",
+  "cliVersion": "0.2.54-dev.gd6325102",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -399,7 +399,7 @@
     },
     "cli/business/classifier-runs.mjs": {
       "source": "cli/business/classifier-runs.mjs",
-      "sha256": "845f804afd44b8573bb9f616ea66e4cfb47d3c49721026d94c48caa67dd1ad39"
+      "sha256": "5af2cd71dacb032c021672a4618b45b706025232fe38553b4d04fed6d98890d0"
     },
     "cli/business/codex-home.mjs": {
       "source": "cli/business/codex-home.mjs",
@@ -443,11 +443,11 @@
     },
     "cli/business/model-cli.mjs": {
       "source": "cli/business/model-cli.mjs",
-      "sha256": "9d40f0bd36a02e65c90e056faad9f5ceef38bf235bd437705805ae4e5dfd0144"
+      "sha256": "9a7c110b1db8112ee70353d17faf24f01d6a6c265d9505e12dd7808206d9e813"
     },
     "cli/business/model-env.mjs": {
       "source": "cli/business/model-env.mjs",
-      "sha256": "08d680370c38d5fb90922e44c0ec9b31693f3b957ee07f3e6ed0a38141e85412"
+      "sha256": "86eb19f02ea67b51b77d6bcb5b0a0f9445e8af83c50f33314eba109f3eaac490"
     },
     "cli/business/model-process.mjs": {
       "source": "cli/business/model-process.mjs",

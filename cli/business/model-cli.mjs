@@ -1,11 +1,11 @@
 import { execute } from './model-process.mjs';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { classificationPrompt, modelClassification, validateClassification } from './classification.mjs';
 import { claudeEnvironment, codexEnvironment, detectionEnvironment, trustedExecutable } from './model-env.mjs';
 import { copyCodexCredentials, instructionProbe, onlyProbe, returnRefreshedCredentials, smallestCodexModel } from './codex-home.mjs';
 import { startRun } from './classifier-runs.mjs';
+import { stateDirectory } from './state.mjs';
 
 const codexIsolation = [
  '--disable', 'hooks', '--disable', 'plugins', '--disable', 'apps', '--disable', 'memories',
@@ -24,10 +24,12 @@ const required = {
 };
 const modelShape = /^[a-z0-9][a-z0-9.-]{0,63}$/;
 
-// Probe one candidate in a throwaway home without credentials. Returns the
+// Probe one candidate in a throwaway home without credentials, inside the
+// private Business folder rather than a shared temporary folder. Returns the
 // pinned cheaper-tier model it accepts, or null when it is unsupported.
 async function probe(name, path) {
- const temporary = await mkdtemp(join(tmpdir(), 'rer-business-cli-help-'));
+ await mkdir(stateDirectory(), { recursive: true, mode: 0o700 });
+ const temporary = await mkdtemp(join(stateDirectory(), 'cli-help-'));
  try {
   await mkdir(join(temporary, 'codex'), { mode: 0o700 });
   const run = (args, limit) => execute(path, args, { cwd: temporary, timeout: 10_000, env: detectionEnvironment(temporary), limit });
