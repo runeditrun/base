@@ -132,7 +132,7 @@ serves actual Vite HMR with the same auth and data. Managed foreground servers
 remain active in their first invocation; compatible repeated invocations reuse
 the server and exit. Stop before build or verification.
 
-`deploy --dry-run` validates and builds locally without provider requests. Real
+`deploy --dry-run` validates and builds locally, then reads target secret bindings without provider writes. Real
 owner-account deploy applies declared D1 migrations and checks health. Local
 validation does not establish provider acceptance or remote health.
 

@@ -285,9 +285,14 @@ behavior. `--target remote` still refuses when the adapter does not support
 complete remote import, as in the maintained references.
 
 Real deployment uses the owner-account procedure and its private credentials.
-`rer deploy --dry-run` validates and builds locally without a
-provider request. The default environment is `production`; select another with
-`--environment NAME`. Local validation does not establish provider acceptance,
+`rer deploy --dry-run` validates and builds locally, then reads the target
+secret bindings using `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. It uses
+the same required-secret resolver as deploy: every missing binding and its input
+name is reported with the same nonzero exit and error, including in `--json` mode.
+Secrets held by the target are inherited; optional absent secrets stay unbound.
+Missing credentials or a refused secret-list read fail the dry run. It performs
+no provider writes, uploads, secret changes or resource creation. The default environment is `production`; select another with
+`--environment NAME`. The dry run does not establish upload acceptance,
 hosted health or mail delivery.
 
 `rer describe` reads the current checkout's actual verbs,

@@ -129,7 +129,7 @@ product scope and measured evidence as work proceeds.
 
 The template declares D1 and real auth migrations. Local `setup` builds,
 migrates and prepares the real first owner for automatic local sign-in.
-`deploy --dry-run` validates and builds locally without provider requests; real deploy uses the owner-account kit, applies declared D1
+`deploy --dry-run` validates and builds locally, then reads target secret bindings without provider writes; real deploy uses the owner-account kit, applies declared D1
 migrations and checks health. Local checks do not establish hosted acceptance.
 
 Fresh foundation generation assigns distinct migration ordinals, including
