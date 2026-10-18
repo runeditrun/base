@@ -4,7 +4,7 @@ import { rollbackD1Import, undoD1Import } from '../d1/reverse.ts';
 import type { DoorPlanRow, DoorRequest } from './types.ts';
 import { kitContext, reserveApply } from './authority.ts';
 import { inspectRecords } from './inventory.ts';
-import { DoorError } from './grants.ts';
+import { DoorError } from './protocol.ts';
 import { assertion, authorized, lineage, loadSnapshot, planRow, sql, transact } from './store.ts';
 import { text } from './uploads.ts';
 
@@ -22,12 +22,12 @@ async function associated(request: DoorRequest, row: DoorPlanRow): Promise<DoorP
 export async function apply(request: DoorRequest, input: Record<string,unknown>) {
   if (Object.keys(input).some(k=>!['planId','reviewedFingerprint'].includes(k))) throw new DoorError('invalid_apply_input',400);
   const row = await associated(request,await planRow(request,text(input.planId,'plan_id')));
-  if (input.reviewedFingerprint !== row.fingerprint || request.grant.fingerprint !== row.fingerprint) throw new DoorError('review_fingerprint_mismatch');
+  if (input.reviewedFingerprint !== row.fingerprint || request.access.fingerprint !== row.fingerprint) throw new DoorError('review_fingerprint_mismatch');
   const snapshot = await loadSnapshot(request,row), context = kitContext(request,snapshot);
   const current = await lineage(request);
   if (current.head_id === row.id && row.job_id) {
     const approval = await request.options.database.prepare('SELECT approval_id,approved_at FROM ik_door_approvals WHERE plan_id=?').bind(row.id).first();
-    if (approval?.approval_id !== request.grant.approvalRecordId || approval?.approved_at !== request.grant.approvedAt) throw new DoorError('approval_mismatch');
+    if (approval?.approval_id !== request.access.approvalRecordId || approval?.approved_at !== request.access.approvedAt) throw new DoorError('approval_mismatch');
     return {planId:row.id,job:await readD1ImportJob(row.job_id,context)};
   }
   await reserveApply(request,snapshot);
@@ -46,7 +46,7 @@ export async function status(request: DoorRequest, input: Record<string,unknown>
   await lineage(request);
   const approval = await request.options.database.prepare('SELECT owner,approved_at,approval_id,reviewer FROM ik_door_approvals WHERE plan_id=?').bind(row.id).first();
   return {planId:row.id,fingerprint:row.fingerprint,job,approval,
-    caption:approval?`approved via Business by ${approval.owner} at ${approval.approved_at}, fingerprint ${row.fingerprint}`:null};
+    caption:approval?`${approval.reviewer !== approval.approval_id ? 'approved' : 'approved via Business'} by ${approval.owner} at ${approval.approved_at}, fingerprint ${row.fingerprint}`:null};
 }
 export async function reconcile(request: DoorRequest, input: Record<string,unknown>) {
   const row = await associated(request,await planRow(request,text(input.planId,'plan_id'))), snapshot = await loadSnapshot(request,row);
@@ -59,14 +59,14 @@ export async function reconcile(request: DoorRequest, input: Record<string,unkno
 }
 export async function undo(request: DoorRequest, input: Record<string,unknown>) {
   const id = text(input.planId,'plan_id');
-  const candidate = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE id=? AND installation_id=? AND namespace=?').bind(id,request.grant.installationId,request.grant.namespace).first<DoorPlanRow>();
+  const candidate = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE id=? AND installation_id=? AND namespace=?').bind(id,request.access.installationId,request.access.namespace).first<DoorPlanRow>();
   if (!candidate) throw new DoorError('plan_not_found',404);
   const row = await associated(request,candidate);
   if (!row.job_id) {
     // Cancel an interrupted private preparation, which has no kit effects.
     await transact(request.options.database,request.authority,[
       assertion(sql('NOT EXISTS(SELECT 1 FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?)',request.options.destination,request.options.ownerPrincipalId,'door:'+id)),
-      sql('UPDATE ik_door_namespaces SET pending_id=NULL WHERE installation_id=? AND namespace=? AND pending_id=?',request.grant.installationId,request.grant.namespace,id),
+      sql('UPDATE ik_door_namespaces SET pending_id=NULL WHERE installation_id=? AND namespace=? AND pending_id=?',request.access.installationId,request.access.namespace,id),
       sql('DELETE FROM ik_door_plan_chunks WHERE plan_id=?',id),sql('DELETE FROM ik_door_approvals WHERE plan_id=?',id),sql('DELETE FROM ik_door_plans WHERE id=? AND job_id IS NULL',id),
     ]);
     return {planId:id,state:'cancelled'};

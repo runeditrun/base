@@ -2,7 +2,7 @@ import { canonicalJson, sha256 } from '../provenance/identity.ts';
 import { planFingerprint } from '../plan/index.ts';
 import type { D1Database, D1Sql } from '../d1/types.ts';
 import type { DoorPlanRow, DoorRequest, DoorSnapshot } from './types.ts';
-import { DoorError } from './grants.ts';
+import { DoorError } from './protocol.ts';
 
 export const sql = (sql: string, ...params: unknown[]): D1Sql => ({ sql, params });
 export const statement = (db: D1Database, query: D1Sql) => db.prepare(query.sql).bind(...query.params ?? []);
@@ -12,11 +12,11 @@ export async function transact(db: D1Database, authority: D1Sql, queries: D1Sql[
 }
 export async function authorized(request: DoorRequest): Promise<void> {
   const row = await statement(request.options.database, sql(`SELECT CASE WHEN (${request.authority.sql}) THEN 1 ELSE 0 END AS ok`, ...request.authority.params ?? [])).first();
-  if (row?.ok !== 1) throw new DoorError('grant_revoked_or_expired');
+  if (row?.ok !== 1) throw new DoorError(request.via === 'operator' ? 'owner_required' : 'grant_revoked_or_expired');
 }
 export async function planRow(request: DoorRequest, id: string): Promise<DoorPlanRow> {
   const row = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE id=? AND installation_id=? AND namespace=? AND complete=1')
-    .bind(id, request.grant.installationId, request.grant.namespace).first<DoorPlanRow>();
+    .bind(id, request.access.installationId, request.access.namespace).first<DoorPlanRow>();
   if (!row) throw new DoorError('plan_not_found', 404);
   return row;
 }
@@ -34,7 +34,7 @@ export async function loadSnapshot(request: DoorRequest, row: DoorPlanRow): Prom
 /** Recover indexing after a committed kit batch or an owner undo through the seed.
  * Kit state remains authoritative. Never hide a partially applied pending import. */
 export async function lineage(request: DoorRequest): Promise<{ head_id: string | null; pending_id: string | null }> {
-  const db = request.options.database, installation = request.grant.installationId, namespace = request.grant.namespace;
+  const db = request.options.database, installation = request.access.installationId, namespace = request.access.namespace;
   let current = await db.prepare('SELECT head_id,pending_id FROM ik_door_namespaces WHERE installation_id=? AND namespace=?').bind(installation, namespace).first<{head_id:string|null;pending_id:string|null}>();
   if (!current) return { head_id: null, pending_id: null };
   for (;;) {
@@ -51,7 +51,7 @@ export async function lineage(request: DoorRequest): Promise<{ head_id: string |
   }
 }
 export async function saveSnapshot(request: DoorRequest, snapshot: DoorSnapshot): Promise<void> {
-  const db = request.options.database, g = request.grant;
+  const db = request.options.database, g = request.access;
   await transact(db, request.authority, [
     sql('INSERT OR IGNORE INTO ik_door_namespaces(installation_id,namespace) VALUES(?,?)', g.installationId, g.namespace),
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_namespaces WHERE installation_id=? AND namespace=? AND head_id IS ? AND pending_id IS NULL)', g.installationId, g.namespace, snapshot.previous)),

@@ -1,5 +1,8 @@
 # Optional D1 import door
 
+See [ADOPTING.md](ADOPTING.md) for the single-path adoption checklist, the
+owner-session mount without owner-claim, and public HTTP conformance.
+
 Import `createImportDoorHandler`, `importDoorSchema`,
 `writeImportDoorSettings` and `readImportDoorHistory` from `./index.ts`.
 The handler returns `(request: Request) => Promise<Response | null>`; pass
@@ -12,6 +15,7 @@ Construct the handler with these seed-owned options:
 | --- | --- |
 | `database`, `targets` | D1 database and its real `D1TargetAdapter`. |
 | `claim` | The same server-owned `OwnerClaimConfig` and trusted key ring used by owner-claim. |
+| `installationId` | Optional permanent door key for settings, lineage and history; defaults to `claim.installationId`. Use the owner-session mount's key when RER's claim id differs. |
 | `ownerPrincipalId` | Actual owner principal used by the seed's ordinary import history and undo context. |
 | `destination`, `mapping` | Product destination and reviewed `ImportMapping`. |
 | `format`, `parse` | `'json'` or `'ndjson'`, and the product's parser of source records. |
@@ -22,7 +26,7 @@ numbered migration after the D1 import-kit schemas. Preserve existing applied
 migration names. Copy the import-kit runtime and its sibling owner-claim and
 D1 transport dependencies with their relative topology intact.
 
-The door starts disabled and returns 404 until explicitly enabled. From the
+The grant door starts disabled and returns 404 until explicitly enabled. From the
 seed's server-only owner control, call
 `writeImportDoorSettings(database, installationId, { enabled, revokedKids? },
 ownerPredicate)`. The `D1Sql` predicate must check the existing owner session,

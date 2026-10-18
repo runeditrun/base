@@ -4,12 +4,17 @@ import { door, documents } from './door/fixture.ts';
 import { readImportDoorHistory, writeImportDoorSettings } from '../src/door/index.ts';
 import { readD1ImportOriginals, undoD1Import } from '../src/d1/index.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
+import type { Json } from '../src/types.ts';
 
 test('HTTP import door is absent until the installation opts in',async t=>{
   const d=await door(t);
   for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  await d.enable();
+  delete (d.options.claim.publicKeys as Record<string, JsonWebKey>).test;
+  for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
 });
 
 test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody',async t=>{
@@ -121,4 +126,103 @@ test('HTTP grants and bounded catch-up fail closed while valid snapshot replacem
   await d.apply(guarded.body);await d.undo(guarded.body.planId);
   await writeImportDoorSettings(d.db,d.options.claim.installationId,{enabled:true,revokedKids:['test']},d.ownerPredicate);
   assert.equal((await d.call('plan',{})).status,403);
+});
+
+
+test('owner-session HTTP pipeline works in a seed with no owner-claim module or grant key ring',async t=>{
+  const d=await door(t,'operator');
+  for (const action of ['uploads','plan','apply','status','reconcile','undo']) {
+    assert.equal((await fetch(d.origin+'/api/rer/import/'+action,{method:'POST'})).status,404);
+  }
+  const post=(body:unknown,headers:Record<string,string>)=>fetch(d.origin+'/api/operator/import/apply',{
+    method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
+  assert.equal((await post({}, {Origin:d.origin,Authorization:'Bearer test-not-an-owner-session'})).status,401);
+  assert.equal((await post({}, {Origin:'https://other.example.test',Cookie:'test-owner-session'})).status,403);
+  const planned=await d.plan(documents(25,true));
+  assert.equal(planned.status,200,JSON.stringify(planned.body));
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  assert.equal((await d.call('apply',{planId:planned.body.planId})).status,400);
+  assert.equal((await d.call('apply',{planId:planned.body.planId,reviewedFingerprint:'0'.repeat(64)})).status,403);
+  d.runtime.native().exec("CREATE TRIGGER revoke_owner_during_write AFTER INSERT ON native_records BEGIN UPDATE native_authority SET enabled=0 WHERE id='owner'; END");
+  assert.equal((await d.call('apply',{planId:planned.body.planId,reviewedFingerprint:planned.body.fingerprint})).status,409);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  d.runtime.native().exec('DROP TRIGGER revoke_owner_during_write');
+  const job=await d.apply(planned.body);
+  const status=await d.call('status',{planId:planned.body.planId});
+  assert.equal(status.status,200);assert.equal(status.body.job.state,'completed');
+  assert.match(status.body.caption,/^approved by /);
+  const history=await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate);
+  assert.equal(history[0].jobId,job.id);assert.notEqual(history[0].reviewer,history[0].approvalRecordId);
+  const report=await d.call('reconcile',{planId:planned.body.planId});
+  assert.equal(report.status,200,JSON.stringify(report.body));assert.equal(report.body.ok,true);
+  assert.equal(report.body.counts.present,25);assert.equal(report.body.counts.nativeTargets,25);
+  d.runtime.native().exec("UPDATE native_authority SET enabled=0 WHERE id='owner'");
+  assert.equal((await d.call('undo',{planId:planned.body.planId})).status,403);
+  d.runtime.native().exec("UPDATE native_authority SET enabled=1 WHERE id='owner'");
+  await d.undo(planned.body.planId);
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  const originals=await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace});
+  assert.equal(originals[0].original.status,'retained');
+  assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
+  assert.equal(d.runtime.native().prepare('SELECT enabled FROM ik_door_settings').get()!.enabled,0);
+});
+
+test('Business added later under a different RER claim id keeps the door key, owner history and catch-up lineage',async t=>{
+  const d=await door(t,'operator'),key=d.options.claim.installationId,count=()=>d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n;
+  const kept=await d.plan(documents(5));assert.equal(kept.status,200,JSON.stringify(kept.body));await d.apply(kept.body);
+  // RER supplies its own claim installation id later; the grant mount keeps the operator's door key.
+  d.addGrants('rer-assigned');
+  await writeImportDoorSettings(d.db,key,{enabled:true},d.ownerPredicate);
+  assert.equal((await d.call('plan',{},{installationId:key})).status,403,'grants are still verified against the claim id');
+  const history=await readImportDoorHistory(d.db,key,d.ownerPredicate);
+  assert.equal(history.length,1);assert.equal(history[0].planId,kept.body.planId);assert.match(history[0].caption,/^approved by /);
+  assert.equal((await readImportDoorHistory(d.db,'rer-assigned',d.ownerPredicate)).length,0);
+  const records=documents(6),uploadId=await d.upload(records);
+  const plain=await d.call('plan',{uploadId});assert.equal(plain.status,409);assert.equal(plain.body.error,'catchup_required');
+  const catchup=await d.call('plan',{uploadId,catchup:true});assert.equal(catchup.status,200,JSON.stringify(catchup.body));
+  assert.equal(catchup.body.summary.created,1);assert.equal(catchup.body.summary.unchanged,5);assert.equal(catchup.body.summary.updated,0);
+  await d.apply(catchup.body);assert.equal(count(),6);
+  const both=await readImportDoorHistory(d.db,key,d.ownerPredicate);
+  assert.deepEqual(both.map(h=>[h.planId,h.caption.split(' by ')[0]]).sort(),[[kept.body.planId,'approved'],[catchup.body.planId,'approved via Business']].sort());
+  assert.equal(d.runtime.native().prepare("SELECT COUNT(*) n FROM ik_door_grants WHERE installation_id<>?").get(key)!.n,0);
+  assert.equal(d.runtime.native().prepare("SELECT COUNT(*) n FROM ik_door_namespaces").get()!.n,1);
+  // The owner's own mount still undoes the newest snapshot, then the original.
+  d.state.via='operator';
+  await d.undo(catchup.body.planId);assert.equal(count(),5);await d.undo(kept.body.planId);assert.equal(count(),0);
+});
+
+test('one owner-session mount serves several import sources chosen per request from a server-side allow-list',async t=>{
+  const d=await door(t,'operator'),count=(table:string)=>d.runtime.native().prepare(`SELECT COUNT(*) n FROM ${table}`).get()!.n;
+  // ADOPTING.md step 3: one handler per request, namespace and parser from the allow-list entry.
+  const sources:Record<string,{parse(value:Json):{kind:string;sourceId:string;payload:Json}}>={
+    wiki:{parse:value=>({kind:'document',sourceId:(value as {id:string}).id,payload:value})},
+    tickets:{parse:value=>({kind:'ticket',sourceId:'t'+(value as {id:string}).id,payload:value})},
+  };
+  d.mount(async request=>{
+    if (!new URL(request.url).pathname.startsWith('/api/operator/import/')) return null;
+    const source=request.headers.get('X-Import-Source') ?? '';
+    if (!Object.hasOwn(sources,source)) return Response.json({error:'unknown_import_source'},{status:400});
+    return d.operator({namespace:source,parse:sources[source].parse})(request);
+  });
+  for (const headers of [{},{'X-Import-Source':'other'},{'X-Import-Source':'__proto__'}] as Record<string,string>[]) {
+    d.state.headers=headers;
+    assert.equal((await d.call('uploads',{name:'x.json'})).status,400);assert.equal((await d.call('plan',{uploadId:'x'})).body.error,'unknown_import_source');
+  }
+  assert.equal(count('ik_door_uploads'),0);
+  d.state.headers={'X-Import-Source':'wiki'};
+  const wiki=await d.plan(documents(5));assert.equal(wiki.status,200,JSON.stringify(wiki.body));await d.apply(wiki.body);
+  d.state.headers={'X-Import-Source':'tickets'};
+  assert.equal((await d.call('status',{planId:wiki.body.planId})).status,404,'a plan is reachable only through its own source');
+  assert.equal((await d.call('undo',{planId:wiki.body.planId})).status,404);
+  const ticketUpload=await d.upload(documents(3));
+  const tickets=await d.call('plan',{uploadId:ticketUpload});assert.equal(tickets.status,200,'a first import per source needs no catch-up');
+  assert.equal(tickets.body.summary.created,3);await d.apply(tickets.body);
+  assert.deepEqual(d.runtime.native().prepare("SELECT id FROM native_records ORDER BY id").all().map(r=>r.id),['0','1','2','3','4','t0','t1','t2']);
+  d.state.headers={'X-Import-Source':'wiki'};
+  assert.equal((await d.call('plan',{uploadId:ticketUpload})).status,404,'an upload is planned only in its own source');
+  assert.deepEqual(d.runtime.native().prepare('SELECT namespace FROM ik_door_namespaces ORDER BY namespace').all().map(r=>r.namespace),['tickets','wiki']);
+  const history=await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate);
+  assert.deepEqual(history.map(h=>h.namespace).sort(),['tickets','wiki']);
+  await d.undo(wiki.body.planId);assert.equal(count('native_records'),3);
+  d.state.headers={'X-Import-Source':'tickets'};await d.undo(tickets.body.planId);assert.equal(count('native_records'),0);
 });
