@@ -349,3 +349,93 @@ test('A person erased while a catch-up plan for their import is being saved neve
     assert.equal((await d.call('status',{planId:baseline.body.planId})).body.job.state,'completed');
   }
 });
+
+// Every row of every table, with base64 text and bytes decoded, holds none of these values.
+function assertNowhere(native:Native,values:string[]) {
+  for (const {name} of native.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) for (const row of native.prepare(`SELECT * FROM "${name}"`).all()) for (const [column,cell] of Object.entries(row)) {
+    const texts=[String(cell)];
+    if (typeof cell==='string' && /^[A-Za-z0-9+/=]{8,}$/.test(cell)) texts.push(Buffer.from(cell,'base64').toString('latin1'));
+    if (cell instanceof Uint8Array) texts.push(Buffer.from(cell).toString('latin1'));
+    for (const value of values) assert.ok(!texts.some(text=>text.includes(value)),`${name}.${column} holds ${value}`);
+  }
+}
+
+test('Erasing a person unchanged in a door catch-up leaves no copy in the catch-up job, which keeps its status and undo',async t=>{
+  for (const variant of ['target','seed-shaped','after-undo','bounded'] as const) {
+    const d=await door(t);await d.enable();
+    const native=d.runtime.native(),secret='catchup-unchanged-'+variant;
+    const base=[{id:'person',title:secret},{id:'kept',title:'catchup-kept'}];
+    const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
+    const catchup=await d.plan([...base,{id:'new',title:'catchup-new'}],{catchup:true});assert.equal(catchup.status,200,JSON.stringify(catchup.body));
+    assert.deepEqual(catchup.body.summary,{sourceRecords:3,created:1,updated:0,unchanged:2,gone:0});
+    const job=await d.apply(catchup.body);
+    if (variant==='after-undo') await d.undo(catchup.body.planId);
+    const remove=[{sql:"DELETE FROM native_records WHERE id='person'"}];
+    let erased;
+    if (variant==='seed-shaped') {
+      // The default seed's own call: target, the email as a value, optional reference fields, resumable redaction.
+      const person={target:{kind:'record',id:'person'},values:['person@example.test'],related:{fields:[{path:['details','reactions','*','users','*'],value:'person',optional:true}]}};
+      let continuation:string|undefined;
+      do {erased=await retireD1ImportCustody(person,remove,d.runtime.context(),checkpoint,{resumable:true,continuation});continuation=erased.continuation;} while(erased.phase==='redacting');
+    } else do {erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},remove,d.runtime.context(),checkpoint,variant==='bounded'?{operationKey:'catchup-erasure'}:{});} while(erased.phase==='pending');
+    assert.equal(erased.phase,'complete',variant);
+    assertNowhere(native,[secret]);
+    const namespace=native.prepare('SELECT namespace FROM ik_jobs WHERE id=?').get(job.id)!.namespace as string;
+    const originals=await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace});
+    assert.ok(!originals.some(o=>o.original?.status==='retained' && Buffer.from(o.original.base64,'base64').toString().includes(secret)),`${variant}: the catch-up keeps the erased person's original`);
+    const status=await d.call('status',{planId:catchup.body.planId});
+    assert.equal(status.status,200,JSON.stringify(status.body));assert.equal(status.body.job.state,variant==='after-undo'?'undone':'completed');
+    if (variant!=='after-undo') {
+      await d.undo(catchup.body.planId);
+      assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='new'").get()!.n,0,'the catch-up undoes');
+    }
+    assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='kept'").get()!.n,1);
+    // Every job stays indexed, so the next person's erasure needs no index upgrade.
+    const next=await retireD1ImportCustody({target:{kind:'record',id:'kept'}},[{sql:"DELETE FROM native_records WHERE id='kept'"}],d.runtime.context(),checkpoint);
+    assert.equal(next.phase,'complete');assertNowhere(native,['catchup-kept']);
+  }
+});
+
+test('A door upload in flight across an erasure, or holding an erased person, leaves nothing of them behind',async t=>{
+  for (const when of ['continuation','opening','after'] as const) {
+    const d=await door(t);await d.enable();
+    const native=d.runtime.native(),secret='upload-erased-'+when;
+    const baseline=await d.plan([{id:'person',title:secret},{id:'kept',title:'upload-kept'}]);assert.equal(baseline.status,200);await d.apply(baseline.body);
+    const erase=async ()=>{let erased;do {erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},[{sql:"DELETE FROM native_records WHERE id='person'"}],d.runtime.context(),checkpoint);} while(erased.phase==='pending');};
+    // A second bundle holding the person, in another namespace; a continuation's record is in its last chunk.
+    const records=[...(when==='continuation'?documents(12).map(r=>({...r,body:'x'.repeat(7000)})):[]),{id:'person',title:secret},{id:'other',title:'upload-other'}];
+    const bytes=Buffer.from(JSON.stringify(records)),totalChunks=Math.ceil(bytes.length/65_536),bundleSha256=sha256(bytes);
+    const chunk=(index:number)=>{const part=bytes.subarray(index*65_536,Math.min((index+1)*65_536,bytes.length));return {name:'again.json',bundleSha256,totalBytes:bytes.length,totalChunks,index,chunkSha256:sha256(part),base64:part.toString('base64')};};
+    const fresh={namespace:'fresh'};
+    if (when==='after') {
+      await erase();
+      let uploadId:string|undefined;
+      for (let index=0;index<totalChunks;index++) {const r=await d.call('uploads',{...(uploadId?{uploadId}:{}),...chunk(index)},fresh);assert.equal(r.status,200);uploadId=r.body.uploadId;}
+      const planned=await d.call('plan',{uploadId},fresh);
+      assert.deepEqual([planned.status,planned.body.error],[409,'source_erased'],JSON.stringify(planned.body));
+      assert.equal((await d.call('uploads',{uploadId},fresh)).status,404,'the upload holding the erased person goes');
+    } else {
+      let uploadId:string|undefined;
+      if (when==='continuation') {
+        assert.equal(totalChunks,2);assert.ok(Buffer.from(chunk(1).base64,'base64').toString().includes(secret));
+        const opened=await d.call('uploads',chunk(0),fresh);assert.equal(opened.status,200);uploadId=opened.body.uploadId;
+      }
+      // The chunk is admitted, then the erasure commits before its batch, as D1 allows.
+      let armed=false,fired=false;
+      const database=new Proxy(d.db,{get(target,prop) {
+        if (prop==='prepare') return (query:string)=>{if (query.startsWith('INSERT OR IGNORE INTO ik_door_chunks')) armed=true;return target.prepare(query);};
+        if (prop==='batch') return async (statements:Parameters<typeof target.batch>[0])=>{if (armed && !fired) {fired=true;await erase();} return target.batch(statements);};
+        const value=Reflect.get(target,prop);return typeof value==='function'?value.bind(target):value;
+      }});
+      const handler=createImportDoorHandler({...d.options,database});
+      const late=await handler(new Request(d.options.claim.appOrigin+'/api/rer/import/uploads',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await d.token('uploads',fresh)},
+        body:JSON.stringify({...(uploadId?{uploadId}:{}),...chunk(totalChunks-1)})}));
+      const body=await late!.json() as any;
+      assert.ok(fired);assert.deepEqual([late!.status,body.error],[410,'erased_during_request'],JSON.stringify(body));
+      if (uploadId) assert.equal((await d.call('uploads',{uploadId},fresh)).status,404,'the withdrawn upload does not come back');
+    }
+    assert.equal((await readD1ErasureJournal(d.runtime.context())).length,1);
+    assertNowhere(native,[secret]);
+    assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='kept'").get()!.n,1);
+  }
+});

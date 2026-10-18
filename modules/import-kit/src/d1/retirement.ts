@@ -9,7 +9,7 @@ import { overflow, redactionSteps } from './redaction-step.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
 import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw, type Store } from './retirement-tally.ts';
 import { fieldRedactions } from './field-redaction.ts';
-import { doorCustodyInScope } from './retirement-door.ts';
+import { doorCustodyInScope, withDoorLineage } from './retirement-door.ts';
 import { retireD1ImportCustodyStep } from './retirement-bounded.ts';
 import type { D1ErasurePending, D1ErasureStepOptions } from './erasure-progress.ts';
 
@@ -72,7 +72,7 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
   const start = remaining(context);
   let erasure: Awaited<ReturnType<typeof targetErasure>>, receiptId: string, prefix: D1Sql[], suffix: D1Sql[];
   try {
-    erasure = person.target || fields.length ? await targetErasure(person.target, context, person.related, retiring, step) : { before: [], after: [], final: [], decisions: [], jobs: [], fieldMatches: [] };
+    erasure = person.target || fields.length ? await targetErasure(person.target, context, (await withDoorLineage(person, db, destination, context.storage.targets.planCodec)).related, retiring, step) : { before: [], after: [], final: [], decisions: [], jobs: [], fieldMatches: [] };
     receiptId = randomUUID(); const recordedAt = new Date().toISOString();
     const touched = { destination, jobs: [...new Set([...erasure.jobs, ...scope.jobs])].sort(), streams: [] as string[] };
     touched.streams = [...new Set([...scope.anchors, ...await pageStreams(db, touched.jobs)])].sort();

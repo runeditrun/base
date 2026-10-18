@@ -2,12 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { canonicalJson, sha256 } from '../provenance/identity.ts';
 import { readFileSource } from '../readers/file.ts';
 import { planD1Import } from '../d1/jobs.ts';
+import { erasedSourcePredicates } from '../d1/erasure-claims.ts';
 import type { ImportPlan, MappingResult } from '../types.ts';
 import type { DoorPlanRow, DoorRecord, DoorRequest, DoorSnapshot } from './types.ts';
 import { kitContext } from './authority.ts';
 import { importedTarget, recordKey } from './inventory.ts';
 import { DoorError } from './grants.ts';
-import { lineage, loadSnapshot, planRow, saveSnapshot } from './store.ts';
+import { lineage, loadSnapshot, planRow, saveSnapshot, sql, statement, transact } from './store.ts';
 import { bundleBytes, text, uploadRow } from './uploads.ts';
 
 export function preview(snapshot: DoorSnapshot) {
@@ -89,6 +90,12 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     snapshot.records.push({...old,explanation:'Absent from source snapshot; retained in the seed. No deletion proposed.'});
   }
   if (request.grant.catchup === 'bounded') assertBounded(snapshot,previous!);
+  // The kit never stages an erased record, and neither does the door: an upload
+  // holding one can never be planned, so it goes too. The epoch fences a later erasure.
+  for (const clear of erasedSourcePredicates(snapshot.plan)) if ((await statement(options.database, sql(`SELECT ${clear.sql} AS clear`, ...clear.params ?? [])).first())?.clear !== 1) {
+    await transact(options.database, request.authority, [sql('DELETE FROM ik_door_chunks WHERE upload_id=?', upload.id), sql('DELETE FROM ik_door_uploads WHERE id=?', upload.id)]);
+    throw new DoorError('source_erased', 409);
+  }
   await saveSnapshot(request,snapshot,upload);
   return preview(snapshot);
 }

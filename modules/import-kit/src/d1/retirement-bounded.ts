@@ -9,7 +9,7 @@ import { stageD1ImportErasure } from './erasure-stage.ts';
 import { erasureRequestContext, erasureStatementBinding, type D1ErasurePending, type D1ErasureStepOptions } from './erasure-progress.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
 import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw } from './retirement-tally.ts';
-import { doorCustodyInScope } from './retirement-door.ts';
+import { doorCustodyInScope, withDoorLineage } from './retirement-door.ts';
 
 /** Retire headers and erase records over bounded requests. Only the final
  * publication changes public custody, native rows and the restore checkpoint.
@@ -37,7 +37,8 @@ export async function retireD1ImportCustodyStep(person: D1ImportPerson, nativeSt
     const fenced = !!person.target || !!fields.length || Object.values(scope).some(ids => ids.length > 0) || await doorCustodyInScope(db, destination, stores);
     if (fenced && !checkpoint.length) throw new Error('IMPORT_RETIREMENT_CHECKPOINT_REQUIRED');
     if (native.length && !fenced) throw new Error('IMPORT_RETIREMENT_NATIVE_REQUIRES_CHECKPOINT');
-    const selection = await prepareErasureSelection(person, native, bounded, id, retiring);
+    // The binding stays the caller's intent; each step derives the door lineage it severs.
+    const selection = await prepareErasureSelection(await withDoorLineage(person, db, destination, bounded.storage.targets.planCodec), native, bounded, id, retiring);
     const closure = scopeGuards(scope);
     const absence = headerAbsence(destination, person.values!);
     const retired = [sql('NOT EXISTS(SELECT 1 FROM ik_jobs WHERE id IN (SELECT value FROM json_each(?)))', JSON.stringify(scope.jobs)),

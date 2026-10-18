@@ -11,7 +11,7 @@ import { exactRows, jsonChunks, selectedCounts, selectKeys } from './sets.ts';
 import { canonicalJson, sha256, requireText } from '../provenance/identity.ts';
 import { erasePlanRecords, type RelatedPlanErasure } from './erased-plan.ts';
 import { fieldSelectionSnapshot, relatedSelection, type JobSelection } from './erasure-related.ts';
-import { indexedDestinationGuard, planIndex, planIndexRows, targetIdentity, unindexedJobs } from './erasure-index.ts';
+import { indexedDestinationGuard, planIndex, retainPlanIndex, targetIdentity, unindexedJobs } from './erasure-index.ts';
 import { readInventorySnapshot } from './inventory-snapshot.ts';
 import { erasureWrites, type ErasedDecision, type ErasedJob } from './erasure-writes.ts';
 import { stagedSourceIdentities, stageErasure } from './staging-erasure.ts';
@@ -107,7 +107,8 @@ export async function targetErasure(target: { kind: string; id: string } | undef
     after.push(...erasedCustody(plan, next, job.id, snapshot), ...retained.statements);
     if (fields.length) after.push(...redactedCustody(plan, next, job.id, snapshot, fields, step?.selection.range));
     // A severed record's index row moves from its native target (or none) to the erased target.
-    if (canonicalJson(planIndex(next, job.id)) !== canonicalJson(planIndex(plan, job.id))) after.push(sql('DELETE FROM ik_d1_plan_index WHERE job_id=?', job.id), ...planIndexRows(next, job.id));
+    // Rewriting the index drops the job's indexed fingerprint (a schema trigger); retain it again.
+    if (canonicalJson(planIndex(next, job.id)) !== canonicalJson(planIndex(plan, job.id))) after.push(sql('DELETE FROM ik_d1_plan_index WHERE job_id=?', job.id), ...retainPlanIndex(next, job.id));
     after.push(guard(sql('(SELECT count(*) FROM ik_d1_creation_plans WHERE job_id=? AND released=0)=? AND (SELECT count(*) FROM ik_d1_plan_chunks WHERE job_id=?)=?', job.id, retained.encoded.chunks.length, job.id, retained.encoded.chunks.length)));
     changedJobs.push({ id: job.id, body: retained.body, fingerprint: next.fingerprint, erasedRecords: next.entries.filter(entry => entry.erased).length, policyHash: reversal.binding === null ? null : policyHash(job.id, next.fingerprint, reversal.policy) });
     // Changing the fingerprint fences stale apply/undo evidence while preserving

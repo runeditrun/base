@@ -1,5 +1,9 @@
-import type { D1Database } from './types.ts';
+import type { D1Database, D1ImportPerson, D1PlanCodec } from './types.ts';
+import type { SourceRecord } from '../types.ts';
 import type { Store, TallyScope } from './retirement-tally.ts';
+import { loadPlans } from './plans.ts';
+import { targetIdentity } from './erasure-index.ts';
+import { canonicalJson } from '../provenance/identity.ts';
 
 // Record content only, children before parents. Plans, approvals, namespaces
 // and scopes are bookkeeping (see retirement-tally.ts) and keep import history.
@@ -48,4 +52,32 @@ export async function doorCustodyInScope(db: D1Database, destination: string, st
   const row = await db.prepare(`SELECT ${door.map(store => `EXISTS(SELECT 1 FROM ${store.name} WHERE ${store.where})`).join(' OR ')} AS found`)
     .bind(...door.flatMap(store => store.params(scope))).first<{ found: number }>();
   return row?.found === 1;
+}
+
+const jobLink = "j.id=p.job_id OR (p.job_id IS NULL AND j.operation_key='door:'||p.id)";
+/** A door catch-up keeps each unchanged (or refused) record as a zero-effect
+ * entry in its own kit job, under a new kit namespace, with the record's payload
+ * and the bundle original. Erasing a target that a door import wrote severs those
+ * copies too: the same kind and source id in any kit job of the same door
+ * namespace is the same source record. Merged with the caller's own selector. */
+export async function withDoorLineage(person: D1ImportPerson, db: D1Database, destination: string, codec?: D1PlanCodec): Promise<D1ImportPerson> {
+  if (!person.target || !await db.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='ik_door_plans'").first()) return person;
+  const { results } = await db.prepare(`SELECT DISTINCT j.*,i.ordinal AS entry_ordinal,p.installation_id AS door_installation,p.namespace AS door_namespace FROM ik_d1_plan_index i
+    JOIN ik_jobs j ON j.id=i.job_id JOIN ik_door_plans p ON ${jobLink} WHERE j.destination=? AND i.target_identity=? ORDER BY j.id,i.ordinal`)
+    .bind(destination, targetIdentity(destination, person.target.kind, person.target.id)).all<any>();
+  if (!results.length) return person;
+  const plans = await loadPlans([...new Map(results.map(row => [row.id, row])).values()], db, codec);
+  const lineages = new Map<string, string[]>(), keys = new Set<string>();
+  for (const row of results) {
+    const entry = plans.get(row.id)?.entries[row.entry_ordinal];
+    if (!entry || entry.erased) continue;
+    const door = canonicalJson([row.door_installation, row.door_namespace]);
+    if (!lineages.has(door)) lineages.set(door, (await db.prepare(`SELECT DISTINCT j.namespace FROM ik_door_plans p JOIN ik_jobs j ON ${jobLink} WHERE p.installation_id=? AND p.namespace=? AND j.destination=? ORDER BY j.namespace`)
+      .bind(row.door_installation, row.door_namespace, destination).all<{ namespace: string }>()).results.map(job => job.namespace));
+    for (const namespace of lineages.get(door)!) keys.add(canonicalJson([namespace, entry.source.kind, entry.source.sourceId]));
+  }
+  if (!keys.size) return person;
+  const own = person.related?.source;
+  const lineage = (record: SourceRecord) => keys.has(canonicalJson([record.namespace, record.kind, record.sourceId]));
+  return { ...person, related: { ...person.related, source: own ? record => own(record) || lineage(record) : lineage } };
 }
