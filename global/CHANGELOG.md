@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.57
+
+- **Large release scans finish within the publication budget.** The JSON identity pass tracks UTF-8 byte offsets incrementally. Orbit's scan finishes in 79 seconds instead of exceeding the 300-second deadline, with identical findings (#270).
+- **Hosted restore intent must be explicit.** `rer import --origin <hosted-url>` refuses unless `--target remote` is supplied, before inspecting archives or touching local data. Local origins at the saved port and imports without an origin continue to restore locally (#271).
+
 ## 0.2.56
 
 - **Run pages keep inline words and paths whole.** Inline code wraps only between words, so seed names such as `run-linen`, repository paths and start commands no longer split mid-word. Command blocks stay clear of Copy and copied text keeps its original bytes. Seeds receive the template on their next Base-copy refresh (#266).
