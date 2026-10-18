@@ -24,7 +24,7 @@ export async function checkout(t, declaration) {
 }
 
 export function account(t) {
- const provider = ownerProvider(), claims = [];
+ const provider = ownerProvider(), claims = [], claimBodies = [];
  let denied = false;
  const saved = Object.fromEntries(['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'MAIL_API_KEY', 'SESSION_SECRET', 'SETUP_TOKEN', 'OWNER_EMAIL', 'PUBLIC_ORIGIN', 'PIER_SESSION'].map(name => [name, process.env[name]]));
  for (const name of Object.keys(saved)) delete process.env[name];
@@ -34,6 +34,7 @@ export function account(t) {
   const url = new URL(input);
   if (url.hostname.endsWith('.workers.dev') && url.pathname === '/auth/bootstrap') {
    const body = JSON.parse(init.body), live = provider.state.secrets.find(item => item.name === 'SETUP_TOKEN')?.value;
+   claimBodies.push(body);
    claims.push({ origin: init.headers.Origin, matches: body.token === live });
    if (!live || body.token !== live) return Response.json({ error: 'invalid_token' }, { status: 403 });
    if (denied) return Response.json({ error: 'owner_claim_denied' }, { status: 403 });
@@ -45,7 +46,7 @@ export function account(t) {
   }
   return provider.fetch(input, init);
  });
- return { provider, claims, deny: value => { denied = value; } };
+ return { provider, claims, claimBodies, deny: value => { denied = value; } };
 }
 
 export const lifecycle = { run: async () => {}, settings: {}, hooks: { owner: { existingOwnerViaSignIn: true, displayName: input => input.displayName || 'Owner' } } };

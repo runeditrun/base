@@ -13,7 +13,7 @@ import { randomBytes } from 'node:crypto';
 // deploy hook's own: rer claims with the `token` it returned, else the one rer
 // gave it, and leaves that token with the hook.
 // `beforeClaim(token)` runs while the token is live (dependency approvals need it).
-export async function claimHostedOwner({ hook, setupManifest, declaration, deployed, env, supplied = [], secret, token: hookToken, addSecret, beforeClaim, recordClaim, inspect, store, signal, fetch = globalThis.fetch }) {
+export async function claimHostedOwner({ hook, setupManifest, declaration, deployed, env, input = {}, displayName, supplied = [], secret, token: hookToken, addSecret, beforeClaim, recordClaim, inspect, store, signal, fetch = globalThis.fetch }) {
  const claim = setupManifest?.steps?.find(step => step.type === 'owner-claim');
  if (!hook || !['object', 'function'].includes(typeof hook) || Array.isArray(hook) || !deployed.origin) {
   if (declaration.secrets?.some(item => item.binding === (claim?.tokenField ?? 'SETUP_TOKEN'))) throw ownerFailure('the owner bootstrap hook is unavailable');
@@ -52,7 +52,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
   return retire(linked.ownerOutcome);
  }
  if (typeof hook === 'function') {
-  const context = { origin: deployed.origin, vars: { ...env, [tokenKey]: token }, input: {}, store, signal, ownerClaim: claim, fail: () => ownerFailure('the seed owner hook failed') };
+  const context = { origin: deployed.origin, vars: { ...env, [tokenKey]: token }, input, store, signal, ownerClaim: claim, fail: () => ownerFailure('the seed owner hook failed') };
   let observed, exchanges = [];
   try {
    if (deployed.observedOwner) await hook(context);
@@ -69,7 +69,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
   if (!['claimed', 'kept'].includes(outcome)) throw ownerFailure('the seed owner hook did not confirm its bootstrap exchange');
   return retire(outcome);
  }
- const displayName = (typeof hook.displayName === 'function' ? hook.displayName({}) : undefined) || 'Owner';
+ displayName = (typeof hook.displayName === 'function' ? hook.displayName(input) : undefined) || displayName || 'Owner';
  let response, code = 'no code';
  try {
   response = await ownerClaimRequest(fetch, new URL(hook.path ?? '/auth/bootstrap', deployed.origin), { method: 'POST',

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.52",
+  "cliVersion": "0.2.52-dev.g18699a60",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -355,7 +355,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "e5d9c448ce18016f1ddf184e450924d4eb85234fbf7473fdfe5a29826d375993"
+      "sha256": "71736dc2f1efbceb8b0e6bae6b337e3a97832affcf6d5890d7c0f051fae7c24f"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -619,7 +619,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "cf2f65a36efac585ce3179ad47d16d239dce918ec42b6c5031b46e4ec5744f16"
+      "sha256": "f3bb54395e469d93609bb32754717a9384b68e8b605b0e26d6b6f061a5161d24"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -667,7 +667,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "ca684ea4bc45e111a30fd2507a2dc0c380ff7ad175fd270a19dd9d0849efa891"
+      "sha256": "6771ba7bd524d3dce68d6ef08df06068c26742e1f24d2c312311349bdcc306f0"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -693,9 +693,13 @@
       "source": "cli/deploy-observation.mjs",
       "sha256": "e5443721fc0d40f00ea994b972f650fc8e57866d154fc3de3eefd907cbd919bd"
     },
+    "cli/deploy-owner-input.mjs": {
+      "source": "cli/deploy-owner-input.mjs",
+      "sha256": "9db7b9cd36ab8e61f78eb9c671f4071bc3cf8dde7d527526cf20cd4049499496"
+    },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
-      "sha256": "991e9b0e41ba826e3d22be465c8a6b410bf5bb1c50a8cde1fca31ac1c0c8112e"
+      "sha256": "6c2e6ef799eb52dc6d82b5cee150371c9176394f73cd5a1ce1f4f7b9fbe442c5"
     },
     "cli/deploy-readiness.mjs": {
       "source": "cli/deploy-readiness.mjs",
@@ -719,7 +723,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "e3c1763e3f17d256b61c3f509be797794e0ce629fdec73bff93961c252a73d56"
+      "sha256": "0ce2320032a2b8d14d1a8bb416c5779dfa37a6a2bc31ed3cb5fb39a19d430774"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -859,7 +863,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "c4c6ad72300d916bb61044ae050e1911902b9c272f190f9c670d917b1e3cbc97"
+      "sha256": "87f23bf3aafdaaba7d127c4118ad51d29396482dce690a4783b82534c73a9436"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",

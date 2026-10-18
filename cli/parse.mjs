@@ -5,6 +5,7 @@ import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
 const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo']);
 export const mailbox = value => typeof value === 'string' && value.length <= 254 && /^[a-zA-Z0-9.!+_%\-]+@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+$/.test(value);
+export const validOwnerName = value => typeof value === 'string' && Boolean(value.trim()) && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value);
 // A loopback host: the shared predicate (including `*.localhost` door names),
 // plus `::1` as --host and a bracket-stripped hostname spell it.
 export const loopback = host => host === '::1' || isLoopbackHost(host);
@@ -81,7 +82,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if(options.platform !== undefined && !['workers','container'].includes(options.platform))throw invalid('Platform must be workers or container.');
  if (options.host !== undefined && !(verb === 'deploy' && options.platform === 'container') && !listenHost(options.host)) throw refuse('Host must be exactly 127.0.0.1, localhost or ::1.');
  if (options.ownerEmail !== undefined) { if (!mailbox(options.ownerEmail)) throw invalid('Provide a valid plain owner mailbox.'); options.ownerEmail = options.ownerEmail.toLowerCase(); }
- if (options.ownerName !== undefined && (options.ownerName.length > 200 || /[\p{Cc}\p{Cf}]/u.test(options.ownerName))) throw invalid('Provide a valid owner name.');
+ if (options.ownerName !== undefined && !validOwnerName(options.ownerName)) throw invalid('Provide a valid owner name.');
  if (options.target !== undefined && !['local', 'remote'].includes(options.target)) throw invalid('Target must be local or remote.');
  if (options.profile !== undefined && options.profile !== 'first-party') throw invalid('The supported explicit profile is first-party.');
  if (options.environment !== undefined && !/^[a-z][a-z0-9-]{0,39}$/.test(options.environment)) throw invalid('Provide a valid deployment environment name.');
