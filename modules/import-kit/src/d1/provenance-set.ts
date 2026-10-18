@@ -6,6 +6,7 @@ import type { D1ImportContext, D1Sql, D1ProvenanceRow } from './types.ts';
 import { guard, sql } from './database.ts';
 import { selectKeys, exactRows, jobColumns, claimColumns, provenanceColumns, jsonChunks } from './sets.ts';
 import { loadPlans, planGuards } from './plans.ts';
+import { ownerHeads, loadReferencedPlans, isReferencedOnly, reportedJobs } from './referenced-plans.ts';
 import { loadReversalState, reversalGuards,snapshotReversalGuards } from './undo-state.ts';
 import { readOriginals } from './originals.ts';
 import { custodyGuards } from './original-storage.ts';
@@ -17,9 +18,12 @@ import { custodyGuards } from './original-storage.ts';
 export async function provenanceSet(raws: any[], context: D1ImportContext, guards: D1Sql[] | undefined, extraOwners: string[] = [], extraClaims: string[] = [], snapshot?: InventorySnapshot) {
   const db = context.storage.database;
   const read = (table: string, key: string, values: string[]) => snapshot ? Promise.resolve(snapshot.rows(table, key, values)) : selectKeys(db, table, key, values);
+  // A fenced read reads each owner's header and referenced entries, not its plan.
+  const referenced = !guards && !snapshot && context.maxBatchBytes === undefined;
+  const ownerRows = (ids: string[]) => referenced ? ownerHeads(db, ids) : read('ik_jobs', 'id', ids);
   // Close preserved successors' history in both directions. Strict jobs retain
   // their existing export contract; strict undo still uses restorePredecessor.
-  const initialOwners = await read('ik_jobs', 'id', [...extraOwners, ...raws.map(r => r.job_id)]);
+  const initialOwners = await ownerRows([...extraOwners, ...raws.map(r => r.job_id)]);
   const preservedOwners = new Set(initialOwners.filter(r => r.reversal_policy === 'preserve-conflicts').map(r => r.id));
   const originalLength = raws.length, all = [...raws], known = new Map(raws.map(r => [r.id, r]));
   let level = raws.filter(r => preservedOwners.has(r.job_id));
@@ -36,12 +40,15 @@ export async function provenanceSet(raws: any[], context: D1ImportContext, guard
     level = next;
   }
   raws = all;
-  const owners = [...initialOwners, ...await read('ik_jobs', 'id', raws.map(r => r.job_id).filter(id => !initialOwners.some(o => o.id === id)))];
-  const ownerMap = new Map(owners.map(r => [r.id, r])), plans = snapshot ? new Map(owners.map(owner => [owner.id, snapshot.plans.get(owner.id)!])) : await loadPlans(owners, db, context.storage.targets.planCodec);
+  const owners = [...initialOwners, ...await ownerRows(raws.map(r => r.job_id).filter(id => !initialOwners.some(o => o.id === id)))];
+  const codec = context.storage.targets.planCodec, ownerMap = new Map(owners.map(r => [r.id, r]));
+  const plans = snapshot ? new Map(owners.map(owner => [owner.id, snapshot.plans.get(owner.id)!])) : referenced ? await loadReferencedPlans(owners, raws, db, codec) : await loadPlans(owners, db, codec);
+  // Preserved jobs with no reversal report yet: one existence read for all of them.
+  const reported = referenced ? await reportedJobs(db, owners.filter(o => o.reversal_policy === 'preserve-conflicts' && o.reversal_cursor === 0).map(o => o.id)) : undefined;
   for (const owner of owners) {
     const plan = plans.get(owner.id)!;
-    if (planFingerprint(plan) !== owner.fingerprint || plan.fingerprint !== owner.fingerprint || plan.version !== 1 || plan.destination !== owner.destination || plan.namespace !== owner.namespace || plan.mappingVersion !== owner.mapping_version || plan.principalId !== owner.principal_id || owner.total !== plan.entries.length || !Number.isSafeInteger(owner.checkpoint) || owner.checkpoint < 0 || owner.checkpoint > owner.total) throw new Error('PROVENANCE_JOB_MISMATCH');
-    const reversal=await loadReversalState(owner,plan,context,false,snapshot);
+    if ((!isReferencedOnly(plan) && planFingerprint(plan) !== owner.fingerprint) || plan.fingerprint !== owner.fingerprint || plan.version !== 1 || plan.destination !== owner.destination || plan.namespace !== owner.namespace || plan.mappingVersion !== owner.mapping_version || plan.principalId !== owner.principal_id || owner.total !== plan.entries.length || !Number.isSafeInteger(owner.checkpoint) || owner.checkpoint < 0 || owner.checkpoint > owner.total) throw new Error('PROVENANCE_JOB_MISMATCH');
+    const reversal=await loadReversalState(owner,plan,context,false,snapshot,reported&&owner.reversal_cursor===0&&!reported.has(owner.id)?[]:undefined);
     guards?.push(...planGuards(plan,owner.id),...(snapshot?.tables.has('ik_d1_reversal_reports')?snapshotReversalGuards(owner,reversal):reversalGuards(owner.id,reversal)));
     if(context.maxBatchBytes!==undefined){await readOriginals(plan,owner.id,context,snapshot);guards?.push(...custodyGuards(plan,owner.id));}
   }

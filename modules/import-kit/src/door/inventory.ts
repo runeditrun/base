@@ -6,10 +6,10 @@ import { readD1PersistedImport } from '../d1/index.ts';
 
 export const recordKey = (r: {kind:string;sourceId:string}) => canonicalJson([r.kind,r.sourceId]);
 export interface ImportedTarget { provenance: ProvenanceRow; matches: boolean }
-/** Each distinct owning plan, in one read. */
-async function ownerPlans(request: DoorRequest, ids: string[]): Promise<Map<string, DoorPlanRow>> {
-  const {results} = await request.options.database.prepare('SELECT * FROM ik_door_plans WHERE id IN (SELECT value FROM json_each(?)) AND installation_id=? AND namespace=? AND complete=1')
-    .bind(JSON.stringify(ids), request.access.installationId, request.access.namespace).all<DoorPlanRow>();
+/** Each distinct owning plan's job, in one read. */
+async function ownerPlans(request: DoorRequest, ids: string[]): Promise<Map<string, Pick<DoorPlanRow,'id'|'job_id'>>> {
+  const {results} = await request.options.database.prepare('SELECT id,job_id FROM ik_door_plans WHERE id IN (SELECT value FROM json_each(?)) AND installation_id=? AND namespace=? AND complete=1')
+    .bind(JSON.stringify(ids), request.access.installationId, request.access.namespace).all<Pick<DoorPlanRow,'id'|'job_id'>>();
   return new Map(results.map(row => [row.id, row]));
 }
 /** Product lineage only locates evidence. The kit's immutable plan/provenance
