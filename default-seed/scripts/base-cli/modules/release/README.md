@@ -52,9 +52,15 @@ to resolve the source repository's **Verify** workflow for the exact selected
 commit. The source identity comes from its GitHub `origin` (HTTPS or SSH), or the
 committed `rer-project.json.sourceRepository` when no GitHub origin is present;
 it is independent of the publication destination. Only a completed successful
-`push` or `workflow_dispatch` run on the default branch or the version's release
-tag qualifies. The run and head repository must both match the source repository,
-and a release tag must resolve remotely to the exact source commit. PR merge runs,
+`push` or `workflow_dispatch` run on the default branch, an authorized release
+branch, or the version's release tag qualifies. Authorized release branches match
+exactly `^release/(?:v[0-9]+(?:\.[0-9]+)?|[0-9]+\.[0-9]+\.x)$`, for example
+`release/v0`, `release/v0.4` or `release/0.4.x`. A release-branch run requires
+that branch's current head on GitHub to equal the source commit, or the version's
+release tag, when present, to resolve remotely to that commit. A moved or missing
+branch without that pinned tag is refused. The run and head repository must both
+match the source repository, and a run on the release tag still requires that
+tag to resolve remotely to the exact source commit. PR merge runs,
 other SHAs, repositories, branches and unsuccessful runs cannot authorize release.
 `gates.verify` records the source repository and commit, `workflowId`,
 `workflowFile`, `workflowName`, `runId`,

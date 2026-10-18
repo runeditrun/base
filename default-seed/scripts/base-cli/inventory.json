@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.52",
+  "cliVersion": "0.2.52-dev.g5e85ac5c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2687,7 +2687,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "45604c333cb19e673365991c7503c9e3377fdd93027601e031766422eed7c7ca"
+      "sha256": "4ddb21c8e335d0b0be78e41d9b1c0d3351f40da6707b19c46c3a5a5d779e85b4"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -2699,7 +2699,7 @@
     },
     "modules/release/github-verify.mjs": {
       "source": "modules/release/github-verify.mjs",
-      "sha256": "19e2cf4495b035ae86fb8cba9dc8d0949e070c331c3ecfc18e2a2b78ea96e935"
+      "sha256": "eda0ed74bb1f63897b9440eea64e2f7a159df8d36336eba88f95bae56a71c1bd"
     },
     "modules/release/keygen.mjs": {
       "source": "modules/release/keygen.mjs",
