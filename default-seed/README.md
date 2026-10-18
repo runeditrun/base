@@ -270,8 +270,8 @@ journal cannot be recognised.
 
 Erasing a person also erases them from import custody (migrations
 `0018_import_kit.sql`, `0019_people_imports.sql`,
-`0020_import_erasure_append_only.sql`, `0021_import_preparation_steps.sql` and
-`0022_import_stream_sources.sql`).
+`0020_import_erasure_append_only.sql`, `0021_import_preparation_steps.sql`,
+`0022_import_stream_sources.sql` and `0026_import_custody_replace.sql`).
 For an imported person the D1 erasure commits with import-kit's
 `retireD1ImportCustody`: their
 records become tombstones, so other people's imports still resume and undo, and

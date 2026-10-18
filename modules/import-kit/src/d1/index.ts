@@ -79,7 +79,7 @@ export type { D1CreatePreflightContext, D1CreatePreflight } from './creation.ts'
 export { d1NativeStagingSchema } from './native-staging-schema.ts';
 export { retainedSql } from './retained-values.ts';
 export { cancelD1NativeStaging, cancelD1ErasureStaging } from './native-staging-lifecycle.ts';
-export { d1CustodyStateSchema } from './custody-state-schema.ts';
+export { d1CustodyStateSchema, d1CustodyStateReplaceSchema } from './custody-state-schema.ts';
 export { d1ReversalFenceSchema } from './reversal-fence-schema.ts';
 
 export { d1StreamOriginSchema } from './stream-origin.ts';

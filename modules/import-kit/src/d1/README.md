@@ -17,7 +17,7 @@ budget. Calls that still exceed the provider transport ceiling fail explicitly.
 
 Apply `d1Schema`, `d1ErasureSchema`, `d1StreamOriginSchema`,
 `d1LegacyStreamReceiptUpgrade`, `d1StagingSchema`,
-`d1NativeStagingSchema`, `d1CustodyStateSchema`, `d1PreparationSchema`, `d1ReversalFenceSchema` and `d1RetirementSchema` in product-owned numbered migrations, or call
+`d1NativeStagingSchema`, `d1CustodyStateSchema`, `d1PreparationSchema`, `d1ReversalFenceSchema`, `d1RetirementSchema` and `d1CustodyStateReplaceSchema` in product-owned numbered migrations, or call
 `initializeD1ImportStorage(database)` during setup. The schema includes the common
 kit tables and D1 ownership/assertion tables. Do not mix the synchronous engine
 and D1 engine for the same jobs: each engine owns its checkpoint protocol.
@@ -1096,7 +1096,16 @@ There is no new default transport limit on ordinary omitted-policy APIs.
 The additive `d1CustodyStateSchema` installs `ik_d1_custody_states` and monotonic
 mutation triggers covering job fields, plan and original copies, provenance,
 claims, decisions, history, journal, reversal reports and stream membership.
-Prior jobs receive counters without changes to their public bytes. A counter is
+Prior jobs receive counters without changes to their public bytes. SQLite's
+REPLACE deletes the row it conflicts with without firing DELETE triggers, so apply
+the additive `d1CustodyStateReplaceSchema` as a new numbered migration after
+`d1CustodyStateSchema` and `d1RetirementSchema` (`initializeD1ImportStorage`
+applies it last). It ignores an insert over an existing counter (the backfill's
+`INSERT OR IGNORE` still adds missing ones), refuses an `ik_jobs` id that exists
+or was retired with `IMPORT_JOB_ID_REUSED`, and makes an insert that would replace
+a claim, provenance row (by id or live target), history row (by id or successor),
+stream page or stream advance the revision of every job owning the replaced row.
+A counter is
 captured before each retained report is validated; old cross-effect evidence is
 never copied into private transport. The report's existing policy and content
 hashes are validated before its explicitly redacted replacement is constructed.

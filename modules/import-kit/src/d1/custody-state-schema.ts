@@ -21,3 +21,27 @@ export const d1CustodyStateSchema = [
     return `CREATE TRIGGER IF NOT EXISTS ik_d1_custody_state_${table}_${event.toLowerCase()} AFTER ${event} ON ${table} BEGIN UPDATE ik_d1_custody_states SET revision=revision+1 WHERE job_id IN (SELECT i.job_id FROM ik_d1_plan_index i JOIN ik_jobs j ON j.id=i.job_id WHERE ${predicate}); END`;
   })),
 ];
+
+/** Owners of the rows an insert would replace through a key other than its own job's. */
+const replacedOwners: [table: string, owners: string][] = [
+  ['ik_sources', 'SELECT job_id FROM ik_sources WHERE identity=NEW.identity'],
+  ['ik_provenance', 'SELECT job_id FROM ik_provenance WHERE id=NEW.id UNION ALL SELECT job_id FROM ik_provenance WHERE NEW.reversed=0 AND reversed=0 AND destination=NEW.destination AND target_kind=NEW.target_kind AND target_id=NEW.target_id'],
+  ['ik_d1_history', 'SELECT job_id FROM ik_d1_history WHERE id=NEW.id UNION ALL SELECT job_id FROM ik_d1_history WHERE successor_id=NEW.successor_id'],
+  ['ik_d1_stream_pages', 'SELECT job_id FROM ik_d1_stream_pages WHERE stream_id=NEW.stream_id AND ordinal=NEW.ordinal'],
+  ['ik_d1_streams', 'SELECT job_id FROM ik_d1_stream_pages WHERE stream_id=NEW.id UNION ALL SELECT p.job_id FROM ik_d1_streams s JOIN ik_d1_stream_pages p ON p.stream_id=s.id WHERE s.destination=NEW.destination AND s.principal_id=NEW.principal_id AND s.operation_key=NEW.operation_key'],
+];
+
+/** Additive step after `d1CustodyStateSchema` and `d1RetirementSchema`. SQLite's
+ * REPLACE deletes the row it conflicts with without firing DELETE triggers, so
+ * without it one statement could rewind a revision or move custody between jobs
+ * while every revision the persisted read fenced stays the same.
+ * - An insert over an existing counter is ignored; the backfill's INSERT OR IGNORE still adds missing ones.
+ * - A job id that exists or was retired is never inserted again (`IMPORT_JOB_ID_REUSED`).
+ * - An insert that would replace a claim, provenance, history, stream page or
+ *   stream row first advances the revision of every job owning the replaced row.
+ *   An ordinary insert replaces nothing, and a refused one rolls the advance back. */
+export const d1CustodyStateReplaceSchema = [
+  'CREATE TRIGGER IF NOT EXISTS ik_d1_custody_state_insert BEFORE INSERT ON ik_d1_custody_states WHEN EXISTS(SELECT 1 FROM ik_d1_custody_states WHERE job_id=NEW.job_id) BEGIN SELECT RAISE(IGNORE); END',
+  "CREATE TRIGGER IF NOT EXISTS ik_d1_custody_state_job_reuse BEFORE INSERT ON ik_jobs WHEN EXISTS(SELECT 1 FROM ik_jobs WHERE id=NEW.id) OR EXISTS(SELECT 1 FROM ik_d1_retirements WHERE id=NEW.id AND kind='job') BEGIN SELECT RAISE(ABORT,'IMPORT_JOB_ID_REUSED'); END",
+  ...replacedOwners.map(([table, owners]) => `CREATE TRIGGER IF NOT EXISTS ik_d1_custody_state_${table}_replace BEFORE INSERT ON ${table} BEGIN UPDATE ik_d1_custody_states SET revision=revision+1 WHERE job_id IN (${owners}); END`),
+];
