@@ -349,7 +349,7 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
 
  const stateDir = join(work, '.rer-business');
  await mkdir(stateDir); await writeFile(join(stateDir, 'keep.txt'), 'not rer');
- const env = { RER_BUSINESS_STATE_DIR: stateDir };
+ const env = { RER_BUSINESS_STATE_DIR: stateDir, CLAUDECODE: '1' };
  remote.state.optIns = { installPermissions: null, awakeConsent: false, installService: null };
  const paired = await connect(home, remote, { env });
  assert.equal(redemptions(), before + 1, 'the same code pairs once the folder is writable');
@@ -404,7 +404,7 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
   const prior = { permissions: { deny: ['Read(existing/**)'] }, theme: 'dark' };
   await writeFile(join(home, '.claude/settings.json'), JSON.stringify(prior));
   const baseline = await readdir(home);
-  const optedIn = await connect(home, remote, { terminal: columns === 43, columns });
+  const optedIn = await connect(home, remote, { terminal: columns === 43, columns, env: { CLAUDECODE: '1' } });
   assert.ok(!optedIn.stdout.includes('[yes/no]'), 'browser decisions never need terminal answers');
   assert.equal(JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8')).awakeConsent, true);
   const status = await cli(home, ['business','status','--json']);
@@ -537,8 +537,9 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
 
  // On a Codex computer the secret-file rules have nothing to apply to: nothing
  // is written under ~/.claude, nothing asks for a run outside the sandbox, and
- // that is said once, whatever the owner chose.
- const codexHome = join(directory, 'codex-home'), codexEnv = { RER_BUSINESS_STATE_DIR: join(codexHome, '.rer-business'), CODEX_HOME: join(codexHome, '.codex') };
+ // that is said once, whatever the owner chose. A default Codex install sets
+ // CODEX_THREAD_ID but not CODEX_HOME, and Codex is told apart before Claude Code.
+ const codexHome = join(directory, 'codex-home'), codexEnv = { RER_BUSINESS_STATE_DIR: join(codexHome, '.rer-business'), CODEX_THREAD_ID: 'thread-1', CLAUDECODE: '1' };
  remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
  const codex = await connect(codexHome, remote, { env: codexEnv });
  const notApplicable = 'Secret-file rules do not apply on Codex: Business has no way yet to stop Codex from reading your secret files';
@@ -552,4 +553,21 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  for (const later of [codexNext, codexRun]) assert.ok(!/secret files|Claude Code|outside the agent sandbox/.test(later.stdout + later.stderr), later.stdout);
  assert.ok(!(await readdir(codexHome)).includes('.claude'), 'nothing is written under ~/.claude');
  assert.equal((await cli(codexHome, ['business','disconnect'], { env: codexEnv })).code, 0);
+ assert.equal(remote.state.agentKind, 'codex');
+
+ // An agent that is neither (no marker at all) is reported as other, and the
+ // rules do not apply to it either.
+ const otherHome = join(directory, 'other-home'), otherEnv = { RER_BUSINESS_STATE_DIR: join(otherHome, '.rer-business') };
+ remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+ const other = await connect(otherHome, remote, { env: otherEnv });
+ assert.equal(remote.state.agentKind, 'other');
+ assert.equal(other.stdout.split('Secret-file rules do not apply on this computer').length - 1, 1, other.stdout);
+ remote.state.optIns = { installPermissions: true, awakeConsent: false, installService: false };
+ for (const command of [['business','next'], ['business','run','--once']]) {
+  const later = await cli(otherHome, command, { env: otherEnv });
+  assert.equal(later.code, 0, later.stderr);
+  assert.ok(!/secret files|Claude Code|outside the agent sandbox/.test(later.stdout + later.stderr), later.stdout);
+ }
+ assert.ok(!(await readdir(otherHome)).includes('.claude'), 'nothing is written under ~/.claude');
+ assert.equal((await cli(otherHome, ['business','disconnect'], { env: otherEnv })).code, 0);
 });

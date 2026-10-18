@@ -6,7 +6,7 @@ import { createCredentialStore } from './keychain.mjs';
 import { applyChoices } from './choices.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
 import { Stopped } from './errors.mjs';
-import { deviceName, workingFolder } from './device.mjs';
+import { agentKind, deviceName, workingFolder } from './device.mjs';
 import { revokedText } from './local-commands.mjs';
 
 // Approval moves the server's pairing expiry to ten minutes after approval, and
@@ -62,7 +62,7 @@ export async function connect({ code, origin } = {}) {
    const name = deviceName(), folder = workingFolder();
    const response = await api.post('/api/business/executors/pair', {
     code, ...(name ? { device_name: name } : {}), ...(folder ? { working_folder: folder } : {}),
-    os: process.platform === 'darwin' ? 'macos' : 'linux', agent_kind: process.env.CODEX_HOME ? 'codex' : process.env.CLAUDECODE ? 'claude' : 'other', capabilities,
+    os: process.platform === 'darwin' ? 'macos' : 'linux', agent_kind: agentKind(), capabilities,
    }).catch(error => { throw error.status === 401 ? Error(`Business did not accept code ${code}: it has expired or was already used${error.reason ? ` (the server said: ${error.reason})` : ''}. Create a new code in ${origin}/business.`) : error; });
    const expires = Math.min(Date.now() + 600_000, Date.parse(response?.expires_at));
    if (response?.status !== 'pending_approval' || !/^\d{6}$/.test(response.confirmation_number) || typeof response.pairing_token !== 'string' || !response.pairing_token || !Number.isFinite(expires) || expires <= Date.now()) throw Error('Business server returned an invalid pairing response.');

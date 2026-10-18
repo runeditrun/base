@@ -18,3 +18,13 @@ function loginName() { try { return userInfo().username; } catch { return ''; } 
 export function workingFolder(folder = process.cwd()) {
  return typeof folder === 'string' && folder.startsWith('/') && folder.length <= 1000 && !/[\x00-\x1f\x7f]/.test(folder) ? folder : '';
 }
+
+/** The agent running this command, as the pairing reports it. Codex sets
+ * CODEX_THREAD_ID in every command it runs (CODEX_SANDBOX or CODEX_HOME in some
+ * set-ups), and a default Codex install never sets CODEX_HOME, so Codex is
+ * checked first; Claude Code sets CLAUDECODE. Anything else is "other".
+ */
+export function agentKind(env = process.env) {
+ if (env.CODEX_THREAD_ID || env.CODEX_SANDBOX || env.CODEX_HOME) return 'codex';
+ return env.CLAUDECODE ? 'claude' : 'other';
+}

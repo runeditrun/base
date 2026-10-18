@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.63-dev.g5aba4eb7",
+  "cliVersion": "0.2.63-dev.g11912ce6",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -403,7 +403,7 @@
     },
     "cli/business/choices.mjs": {
       "source": "cli/business/choices.mjs",
-      "sha256": "50187222d92422b5a721fce3b79b56f057cc34f712eb9ef5da2044fa86f8ee32"
+      "sha256": "f784b01a360db8f9201bfbec814becb7d7f6b9bc182c8a93d0c16fc4a471b01f"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
@@ -415,7 +415,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "7c667e47510c49cc82f370d6a020173b55b6bb1fcb30dd39013a9ff719485ba3"
+      "sha256": "2fe4b5cf3fa42ac0e6fa7c755968ab4a8deb530d509f5fbcbd37dfd6c904ffa9"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -423,7 +423,7 @@
     },
     "cli/business/device.mjs": {
       "source": "cli/business/device.mjs",
-      "sha256": "addfc17f535398a40aa8dadc66ad3ac1311a9f314d7b6716ccbfffe6286fb857"
+      "sha256": "6c8b4eb785ac60e8d155b292c8bb787afcf9b44251dd43fb1773c0a2a2aa71f1"
     },
     "cli/business/discovery-task.mjs": {
       "source": "cli/business/discovery-task.mjs",

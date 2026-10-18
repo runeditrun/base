@@ -30,11 +30,15 @@ const reported = new Set();
 const once = (key, text) => { if (reported.has(key)) return; reported.add(key); process.stdout.write(text); };
 
 // Choices with no way to take effect for the agent on this computer. The rules
-// are Claude Code's own settings, and Codex has no equivalent Business can
-// write yet, so on a Codex computer nothing is written under ~/.claude and
-// nothing asks for a run outside the sandbox. It is recorded and said once.
+// are Claude Code's own settings, so they apply only when the computer's agent
+// is Claude Code. For Codex, which has no equivalent Business can write yet, and
+// for any other agent, nothing is written under ~/.claude and nothing asks for a
+// run outside the sandbox. It is recorded and said once.
 const notApplicable = {
- codex: { installPermissions: 'Secret-file rules do not apply on Codex: Business has no way yet to stop Codex from reading your secret files, so it added no rules and needs nothing more for this choice.\n' },
+ installPermissions: {
+  codex: 'Secret-file rules do not apply on Codex: Business has no way yet to stop Codex from reading your secret files, so it added no rules and needs nothing more for this choice.\n',
+  other: 'Secret-file rules do not apply on this computer: Business writes them only for Claude Code, and this computer\'s agent is not Claude Code, so it added no rules and needs nothing more for this choice.\n',
+ },
 };
 
 /** Read the owner's choices (GET /executors/self) and apply each one that
@@ -50,8 +54,10 @@ export async function applyChoices(api, state) {
  try { self = await api.get('/api/business/executors/self'); }
  catch (error) { if (![403, 404].includes(error.status)) throw error; }
  const decided = Object.fromEntries(names.map(name => [name, typeof self?.optIns?.[name] === 'boolean' ? self.optIns[name] : null]));
- // The agent this computer reported when it paired, as the owner's browser words its choices.
- const inapplicable = notApplicable[self?.device?.agent_kind?.value] ?? {};
+ // The agent this computer reported when it paired, as the owner's browser words its choices:
+ // the Claude Code rules apply only to Claude Code. An unknown agent (no route yet) decides nothing.
+ const agent = self?.device?.agent_kind?.value;
+ const inapplicable = Object.fromEntries(Object.entries(notApplicable).filter(() => agent && agent !== 'claude').map(([name, text]) => [name, text[agent] ?? text.other]));
  const applied = state.applied ?? {}, lines = [], refused = [], unavailable = [];
  let serviceInstalled = false;
  for (const name of names) {
