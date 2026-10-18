@@ -4,12 +4,13 @@ import { requestContext, packGuards, remaining, D1RequestLimitError } from './bu
 import { authority, authorize, finalAuthority, guard, readonlyChecks, prepare, readAtomic, sql } from './database.ts';
 import { requireText } from '../provenance/identity.ts';
 import { targetErasure, type ErasureStep } from './erasure.ts';
-import { destinationRevisions, readProgress, type JobRevision, type RedactionProgress } from './retirement-steps.ts';
-import { overflow, redactionSteps } from './redaction-step.ts';
+import { destinationRevisions, lineageDigest, readProgress, type JobRevision, type RedactionProgress } from './retirement-steps.ts';
+import { overflow, redactionSteps, type LineageSever } from './redaction-step.ts';
+import { targetIdentity } from './erasure-index.ts';
 import { headerAbsence, retirementScope, retirementWrites, scopeGuards } from './retirement-scope.ts';
 import { tallyBefore, tallyJournal, tallyStores, tallyWithdraw, type Store } from './retirement-tally.ts';
 import { fieldRedactions } from './field-redaction.ts';
-import { doorCustodyInScope, doorLineage } from './retirement-door.ts';
+import { doorCustodyInScope, doorLineage, type DoorLineage } from './retirement-door.ts';
 import { retireD1ImportCustodyStep } from './retirement-bounded.ts';
 import type { D1ErasurePending, D1ErasureStepOptions } from './erasure-progress.ts';
 
@@ -56,26 +57,30 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
   const fence = fenced ? checkpoint : [];
   // Only the checkpoint fences rows the tally does not count (another import's jobs, a seed's tables): unfenced caller SQL is refused.
   if (nativeStatements.length && !fence.length) throw new Error('IMPORT_RETIREMENT_NATIVE_REQUIRES_CHECKPOINT');
-  let step: ErasureStep | undefined, progress: RedactionProgress | undefined, pending: JobRevision[] = [];
+  let step: ErasureStep | undefined, progress: RedactionProgress | undefined, pending: JobRevision[] = [], lineage: DoorLineage | undefined, sever: LineageSever | undefined;
   if (options.resumable && fields.length) {
     progress = readProgress(options.continuation, destination, fields);
+    // Revisions before the lineage's plans: every job a step may read is then a known lineage member.
     const jobs = await destinationRevisions(db, destination);
-    const clean = new Map(jobs.filter(job => job.revision !== null && progress!.clean.get(job.id) === job.revision).map(job => [job.id, job.revision!]));
+    lineage = await doorLineage(person, db, destination, context.storage.targets.planCodec);
+    // Steps sever the lineage's copies in the jobs they read, so a job stays clean
+    // only under the lineage it was read under; a source joining it voids that.
+    const severing = lineageDigest(progress.nonce, lineage.sources), stale = new Set(severing === progress.lineage ? [] : lineage.jobs);
+    const clean = new Map(jobs.filter(job => job.revision !== null && !stale.has(job.id) && progress!.clean.get(job.id) === job.revision).map(job => [job.id, job.revision!]));
     pending = jobs.filter(job => !clean.has(job.id));
-    progress = { ...progress, clean };
+    progress = { ...progress, clean, lineage: severing };
+    if (lineage.select) sever = { target: targetIdentity(destination, person.target!.kind, person.target!.id), select: lineage.select, fence: lineage.fence };
     if (progress.page || pending.length > progress.span) {
       if (person.related?.snapshot !== undefined) throw new Error('IMPORT_REDACTION_SNAPSHOT_UNBOUNDED_ONLY');
-      return redactionSteps(fields, context, fence, progress, pending);
+      return redactionSteps(fields, context, fence, progress, pending, undefined, sever);
     }
+    // The final step reads only pending jobs; a lineage job an earlier step cleaned holds no unsevered copy.
     step = { selection: { jobs: pending.map(job => job.id), clean, complete: true }, matched: progress.matched };
   }
   const start = remaining(context);
   let erasure: Awaited<ReturnType<typeof targetErasure>>, receiptId: string, prefix: D1Sql[], suffix: D1Sql[];
   try {
-    const lineage = await doorLineage(person, db, destination, context.storage.targets.planCodec);
-    // A resumable final step reads only pending jobs; the lineage's jobs join them even when an earlier step read them clean.
-    const unread = step ? lineage.jobs.filter(job => !step!.selection.jobs.includes(job)) : [];
-    if (step && unread.length) step = { ...step, selection: { ...step.selection, jobs: [...step.selection.jobs, ...unread], clean: new Map([...step.selection.clean].filter(([job]) => !unread.includes(job))) } };
+    lineage ??= await doorLineage(person, db, destination, context.storage.targets.planCodec);
     erasure = person.target || fields.length ? await targetErasure(person.target, context, lineage.person.related, retiring, step) : { before: [], after: [], final: [], decisions: [], jobs: [], fieldMatches: [] };
     receiptId = randomUUID(); const recordedAt = new Date().toISOString();
     const touched = { destination, jobs: [...new Set([...erasure.jobs, ...scope.jobs])].sort(), streams: [] as string[] };
@@ -92,7 +97,7 @@ export async function retireD1ImportCustody(person: D1ImportPerson, nativeStatem
     // A redaction too large for one request goes on in steps; nothing was written.
     if (!step || !pending.length || person.related?.snapshot !== undefined || !(error instanceof D1RequestLimitError)) throw error;
     const needed = (error as { needed?: number }).needed;
-    return redactionSteps(fields, context, fence, progress!, pending, { cost: needed === undefined ? undefined : start - remaining(context) + needed });
+    return redactionSteps(fields, context, fence, progress!, pending, { cost: needed === undefined ? undefined : start - remaining(context) + needed }, sever);
   }
   const results = await db.batch([...prefix, ...nativeStatements, ...fence, ...suffix].map(statement => prepare(db, statement)));
   const [journal] = await readJournal(db, destination, receiptId);
