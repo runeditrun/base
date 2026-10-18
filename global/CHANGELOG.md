@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.64
+
+- **Records start at one import door (#296).** The default seed uses upload, review, apply, reconcile and undo; the legacy importer is removed. Records export/import docs, templates and CLI help start at the door. Installation archives remain a separate backup/restore path. Adopting seeds follow [ADOPTING.md](../modules/import-kit/src/door/ADOPTING.md).
+- **Documented shared-door limits remain.** Erasing a completed head blocks later plans in that lineage. Retired email-labelled jobs return `409 plan_custody_mismatch` on status/undo.
+- **Readable contract progress (#301).** The shared /contract stat block and clause table wrap without overlap from 360 to 2560 pixels.
+
 ## 0.2.63
 
 - **Business connect waits for approval and keeps durable state (#277).** Pairing resumes after interruption, sends a readable device name and working folder, and accepts an explicit `RER_BUSINESS_STATE_DIR` when the usual state folder is unwritable. A refused macOS Keychain write stops before redeeming the code and explains how to approve the command outside the sandbox. Browser choices remain authoritative.

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.63-dev.gab614156",
+  "cliVersion": "0.2.64",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
