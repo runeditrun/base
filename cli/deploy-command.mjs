@@ -6,6 +6,7 @@ import { invalid, refuse, RerError } from './errors.mjs';
 import { ownerDeploy } from './deploy.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
+import { deployOwnerInput } from './deploy-owner-input.mjs';
 import { checkHostedSetup, hostedSetupFailure } from './deploy-setup.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { observeOwner, ownerExchangeFailure } from './deploy-observation.mjs';
@@ -94,6 +95,7 @@ export async function deployCommand(context) {
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
  const sourceSha = options.dryRun ? undefined : committedSource(root, options);
+ const ownerInput = await deployOwnerInput(context);
  const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  const { createRedaction } = await shared('redaction.mjs');
  const redaction = createRedaction();
@@ -125,7 +127,7 @@ export async function deployCommand(context) {
     Object.assign(process.env, env);
     // The hook builds and uploads by itself: it never sees the checkout's local settings.
     deployed = await withoutLocalSettings(root, { settings: [...(Array.isArray(adapter.settings) ? adapter.settings : []), adapter.hooks?.secrets?.file], operationToken: context.operationToken },
-     () => adapter.deploy({ ...context, linkDependencies: async (origin, token) => link(token, origin) }));
+     () => adapter.deploy({ ...context, input: ownerInput.input, linkDependencies: async (origin, token) => link(token, origin) }));
    } finally {
     for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
     Object.assign(process.env, saved);
@@ -150,7 +152,7 @@ export async function deployCommand(context) {
    if (typeof deployed.setupToken === 'string' && deployed.setupToken) addSecret(deployed.setupToken);
    const sentSecrets = (uploaded?.sentSecrets ?? []).filter(binding => uploaded.propagation.matchesToken(binding, env[declaration.secrets.find(item => item.binding === binding)?.environment]));
    const kit = state ? { secret: (extra, values) => command('secret', extra, values), recordClaim: outcome => command('record-owner', ['--outcome', outcome]) } : { token: deployed.setupToken || undefined };
-   claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, sentSecrets, propagation:deployed.propagation ?? uploaded?.propagation, origin, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, supplied, ...kit, addSecret, beforeClaim: token => link(token, origin), store, signal: context.signal });
+   claimed = await claimHostedOwner({ hook: adapter.hooks?.owner, setupManifest, declaration, deployed: { ...state, sentSecrets, propagation:deployed.propagation ?? uploaded?.propagation, origin, owner: claimed, observedOwner: () => claims.at(-1)?.outcome }, env, ...ownerInput, supplied, ...kit, addSecret, beforeClaim: token => link(token, origin), store, signal: context.signal });
    if (!linked) await linkDependencies?.(origin);
    step = 'verify hosted setup';
    await checkHostedSetup({ origin, claimed: claimed ?? state?.ownerClaim?.outcome ?? claims.at(-1)?.outcome, signal: context.signal });

@@ -336,6 +336,16 @@ declaration refuses completion. A kit or custom-hook deploy, except `--dry-run`,
 first refuses uncommitted tracked source, naming the files, before any build or
 upload.
 
+For a hosted owner claim, deploy reuses the name saved by `rer setup` in the
+checkout's `.seed/installer/setup-answers.json`, under the adapter's
+`input.names.name` field (default `displayName`). If no name is known,
+interactive deploy asks once and saves it there. For unattended deployment,
+`rer deploy --non-interactive --owner-name 'Maya Chen'` supplies the name;
+without a saved or supplied name, it refuses before upload. Names use the same
+validation as `setup --owner-name`: nonblank, at most 200 characters and no
+Unicode Cc or Cf control characters. Nameless installers retain their existing
+deployment behavior.
+
 `--env-file` values are available in the command's preflight, custom hook and
 child build environment and are redacted; the caller environment is restored
 on success and failure. `--remove`, `--set-secret` and `--unset-secret` always go

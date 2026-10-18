@@ -90,12 +90,12 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  // Without Cloudflare values a real deploy says where to get them: the token
  // page and the permissions this declaration needs, or the project's own guide.
  git('checkout','package.json');
- const noAccount=(await seed.text(['deploy','--env-file','production.env'],3)).stderr;
+ const noAccount=(await seed.text(['deploy','--owner-name','Maya Chen','--env-file','production.env'],3)).stderr;
  assert.match(noAccount,/CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required/);
  for(const text of ['https://dash.cloudflare.com/profile/api-tokens','Workers Scripts: Edit','D1: Edit','Queues: Edit'])assert.ok(noAccount.includes(text),noAccount);
  const guide='https://guide.example.test/docs/operations#what-you-need-first';
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,deployGuide:guide}));
- const guided=(await seed.text(['deploy','--env-file','production.env'],3)).stderr;
+ const guided=(await seed.text(['deploy','--owner-name','Maya Chen','--env-file','production.env'],3)).stderr;
  assert.ok(guided.includes(guide),guided);
  const guidedDry=(await seed.text(['deploy','--dry-run'])).stderr;
  assert.match(guidedDry,new RegExp(`production sign-in mail: MAIL_API_KEY \\(or RESEND_API_KEY\\).* \\(see ${guide.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\)`),guidedDry);
