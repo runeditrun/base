@@ -28,11 +28,35 @@ export async function source(t, { localPass = false, portable = false, buildFail
   for (const [file, name] of Object.entries(workflows)) {
     writeFileSync(join(f.repo, '.github/workflows', file), `${typeof name === 'string' ? 'name: ' + JSON.stringify(name) : name.yaml}\non: [push, workflow_dispatch]\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm verify\n`);
   }
+  execFileSync('git', ['-C', f.repo, 'branch', '-M', 'main']);
   f.sha = f.commit();
   execFileSync('git', ['-C', f.repo, 'remote', 'add', 'origin', `git@github.com:${repository}.git`]);
   const commands = join(f.temporary, 'commands'); mkdirSync(commands);
   const responses = join(f.temporary, 'responses.json'), calls = join(f.temporary, 'calls.jsonl');
   writeFileSync(calls, '');
+  const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+  const git = join(commands, 'git');
+  // Git transport is the other GitHub network boundary. Serve its advertised
+  // refs and fetched objects from this real local repository; all Git plumbing
+  // and the scanner still use the installed Git, with no external transport.
+  writeFileSync(git, `#!${process.execPath}
+const { spawnSync } = require('node:child_process'), fs = require('node:fs');
+let args = process.argv.slice(2);
+const network = args.some(arg => ['fetch', 'ls-remote', 'clone', 'push'].includes(arg));
+if (network) args = args.map(arg => {
+  if (arg === 'https://github.com/${repository}' || arg === 'https://github.com/${repository}.git' || arg === 'git@github.com:${repository}.git' || arg === 'origin') {
+    fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(['git-network', arg]) + '\\n');
+    return ${JSON.stringify(f.repo)};
+  }
+  if (/^[a-z][a-z0-9+.-]*:\\/\\/|^git@/i.test(arg)) {
+    process.stderr.write('Unexpected network transport in release fixture'); process.exit(97);
+  }
+  return arg;
+});
+const child = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit' });
+process.exit(child.status ?? 1);
+`);
+  chmodSync(git, 0o755);
   const gh = join(commands, 'gh');
   // The only fake is GitHub's network boundary, shared with publication scan.
   writeFileSync(gh, `#!${process.execPath}
