@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFile, readFile, rm } from 'node:fs/promises';
+import { writeFile, readFile, rm, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { main as cli } from './main.mjs';
@@ -37,7 +37,7 @@ import { commandAdapter as declareAdapter } from ${source('./adapter.mjs')};
 import { ownerDeploy } from ${source('./deploy.mjs')};
 import { main as owner } from ${source('../modules/deploy-kit/owner-cli.mjs')};
 const lifecycle = localInstaller({secrets:{file:'.dev.vars',keepExisting:true},owner:{displayName:input=>input[${JSON.stringify(name)}]?.trim()||'Owner'}});
-export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer-setup.json'},ownerBootstrap:${nameField === 'displayName'},input:{names:{name:${JSON.stringify(name)}}},deployDeclaration:'deploy.json',deploy:${custom ? "async ({root,options})=>({...await owner(['deploy','--declaration','deploy.json','--environment',options.environment??'production'],process.env,{cwd:root}),deployed:true})" : "ownerDeploy('deploy.json',lifecycle)"}});`);
+export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer-setup.json'},ownerBootstrap:${nameField === 'displayName'},input:{names:{name:${JSON.stringify(name)}}},deployDeclaration:'deploy.json',deploy:${custom ? "async ({root,options})=>({...await owner([options.dryRun?'dry-run':'deploy','--declaration','deploy.json','--environment',options.environment??'production'],process.env,{cwd:root}),deployed:!options.dryRun})" : "ownerDeploy('deploy.json',lifecycle)"}});`);
    await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'deploy'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: `${verb} the installation.` }])) }));
    await writeFile(join(root, '.node-version'), process.versions.node + '\n');
    await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
@@ -53,6 +53,29 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
    };
    const answersPath = join(root, '.seed/installer/setup-answers.json');
    if (nameField) {
+    const writes = provider.state.writes.length, calls = provider.state.calls.length;
+    const real = await run('deploy'), dry = await run('deploy', '--dry-run');
+    assert.equal(real.code, 3, real.error);
+    assert.equal(dry.code, 3, dry.error ?? 'a nameless dry run must refuse');
+    assert.match(dry.error, /--owner-name/);
+    assert.equal(dry.error, real.error, 'dry run and deploy give the same advice');
+    assert.equal(provider.state.calls.length, calls, 'owner input resolves before the network edge');
+    assert.equal(provider.state.writes.length, writes, 'nothing was uploaded');
+    const token = process.env.CLOUDFLARE_API_TOKEN;
+    delete process.env.CLOUDFLARE_API_TOKEN;
+    try {
+     const unnamed = await run('deploy', '--dry-run');
+     assert.equal(unnamed.code, 3);
+     assert.match(unnamed.error, /--owner-name/);
+     const credentialFree = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');
+     assert.equal(credentialFree.code, 3);
+     assert.match(credentialFree.error, /CLOUDFLARE_API_TOKEN/);
+     assert.equal(provider.state.calls.length, calls, 'credential-free refusals never reach the provider');
+    } finally { process.env.CLOUDFLARE_API_TOKEN = token; }
+    const named = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');
+    assert.equal(named.code, 0, named.error);
+    assert.equal(provider.state.writes.length, writes, 'a named dry run never uploads');
+    await assert.rejects(access(answersPath), { code: 'ENOENT' });
     const socket = createServer(); await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
     const setup = await run('setup', '--host', '127.0.0.1', '--port', String(port), '--owner-name', 'Maya Chen');
@@ -68,10 +91,20 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
     assert.equal(result.code, 2, 'a nameless installer still rejects the name flag');
     return;
    }
+   const statePath = join(root, '.rer/deploy/production.json');
+   const heldState = await readFile(statePath), heldWrites = provider.state.writes.length, heldClaims = claimBodies.length;
+   assert.equal(JSON.parse(heldState).ownerClaim.outcome, 'claimed');
+   await rm(answersPath);
+   for (const flags of [['--dry-run'], []]) {
+    const held = await run('deploy', ...flags);
+    assert.equal(held.code, 0, held.error);
+    assert.equal(claimBodies.length, heldClaims, 'a recorded owner is never bootstrapped again');
+    assert.equal(provider.state.writes.length, heldWrites, 'an unchanged redeploy needs no provider writes');
+    assert.deepEqual(await readFile(statePath), heldState);
+   }
    // Remove the hosted installation through its public door so each assertion
    // observes a fresh bootstrap, using the fixture's single Worker account.
    assert.equal((await run('deploy', '--remove', '--yes')).code, 0);
-   await rm(answersPath);
    const writes = provider.state.writes.length, claims = claimBodies.length;
    result = await run('deploy');
    assert.equal(result.code, 3, result.error);
