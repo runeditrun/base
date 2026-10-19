@@ -464,6 +464,54 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.assertEqual(result.returncode, 2)
         self.assertEqual(json.loads(result.stdout)['status'], 'INCOMPLETE')
 
+    def test_cli_usage_reports_safe_errors(self):
+        value = 'synthetic-private-value-' + secrets.token_hex(16)
+
+        def command(*args):
+            return subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo), *args],
+                                  capture_output=True, text=True, timeout=30)
+
+        cases = [
+            (['--bogus'], '--bogus', 'unrecognized'),
+            (['--bogus=' + value, value], '--bogus', 'unrecognized'),
+            (['--timeout-seconds'], '--timeout-seconds', 'expected one argument'),
+            (['--timeout-seconds', 'x'], '--timeout-seconds', 'invalid timeout'),
+            *[(['--timeout-seconds=' + invalid], '--timeout-seconds', 'invalid timeout')
+              for invalid in (value, '0', '-1', '7201', 'nan', 'inf')],
+            (['--public-base', value], '--public-base', 'expected'),
+            (['--public-base', 'https://example.invalid/' + value + '#HEAD'], '--public-base', 'expected'),
+            (['--p=' + value], '--p', 'ambiguous'),
+            (['--help=' + value], '--help', 'ignored explicit argument'),
+            ([value], None, 'unrecognized'),
+        ]
+        for args, flag, problem in cases:
+            with self.subTest(flag=flag, problem=problem):
+                result = command(*args)
+                report = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(report['status'], 'INCOMPLETE')
+                self.assertFalse(report['complete'])
+                self.assertEqual([f['rule'] for f in report['findings']], ['scan.usage'])
+                finding = report['findings'][0]
+                self.assertIn(problem, finding['message'])
+                if flag:
+                    self.assertIn(flag, finding['message'])
+                self.assertIn('--help', finding['validFlags'])
+                self.assertIn('--timeout-seconds', finding['validFlags'])
+                self.assertEqual(len(result.stderr.splitlines()), 1)
+                self.assertIn(finding['message'], result.stderr)
+                self.assertIn('--help', result.stderr)
+                self.assertNotIn(value, result.stdout + result.stderr)
+
+        clean = command()
+        self.assertEqual(clean.returncode, 0)
+        self.assertEqual(json.loads(clean.stdout)['status'], 'PASS')
+        self.assertEqual(clean.stderr, '')
+        help_result = command('--help')
+        self.assertEqual(help_result.returncode, 0)
+        self.assertIn('--public-base', help_result.stdout)
+        self.assertEqual(help_result.stderr, '')
+
     def test_message_and_tag(self):
         value = 'ghp_' + secrets.token_hex(20)
         self.git('commit', '--allow-empty', '-qm', value)

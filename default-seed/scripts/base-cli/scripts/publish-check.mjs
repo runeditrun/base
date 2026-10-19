@@ -55,7 +55,13 @@ if (reason) report = {
   history: { commits: 0, trees: 0, blobs: 0 },
   guarantees: { historyScanned: false, visualRecognition: false, environmentChecked: false },
 };
-report.implementation ??= {};
-report.implementation.version = runningVersion();
-process.stdout.write(JSON.stringify(report) + '\n');
+if (report.help) process.stdout.write(report.help);
+else {
+  for (const finding of report.findings) {
+    if (finding.rule === 'scan.usage') process.stderr.write(`publish-check: ${finding.message}; see --help\n`);
+  }
+  report.implementation ??= {};
+  report.implementation.version = runningVersion();
+  process.stdout.write(JSON.stringify(report) + '\n');
+}
 process.exitCode = code;
