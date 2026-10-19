@@ -13,9 +13,12 @@ const CHUNK = 65_536;
  * a preview that writes nothing native, a namespace with an applied import
  * (`baselines`: its source ids) plans only catch-ups, a bounded catch-up grant
  * refuses a change of 5% or more, and archive and restore-check keep and parse an
- * exact copy with no native writes. `mint` stands in for the platform's ES256 signer. */
+ * exact copy with no native writes. A bundle reuses its kept plan, except that a
+ * catch-up never reuses an applied one (`apply`: Business applying a plan), so an
+ * unchanged source plans a catch-up of no changes for its own upload.
+ * `mint` stands in for the platform's ES256 signer. */
 export async function door(t) {
- const state = { grants: new Map(), requests: [], uploads: new Map(), plans: [], archives: new Map(), baselines: new Map(), nativeWrites: 0, bundleModes: [], stateDir: null };
+ const state = { grants: new Map(), requests: [], uploads: new Map(), plans: [], archives: new Map(), baselines: new Map(), applied: new Map(), nativeWrites: 0, bundleModes: [], stateDir: null };
  function mint(action, namespace, { catchup } = {}) {
   const token = `${part({ alg: 'ES256', typ: 'rer-import-grant+jwt', kid: 'fixture' })}.${part({ action, namespace, jti: randomUUID(), ...(catchup ? { catchup } : {}) })}.${randomBytes(64).toString('base64url')}`;
   state.grants.set(token, { action, namespace, catchup, used: false });
@@ -61,7 +64,14 @@ export async function door(t) {
  }
  function plan(body, grant) {
   if (Object.keys(body).some(key => !['uploadId', 'catchup'].includes(key)) || body.catchup !== undefined && typeof body.catchup !== 'boolean') refuse('invalid_plan_input');
-  const upload = uploaded(body.uploadId, grant.namespace), monitors = read(upload.bytes), baseline = state.baselines.get(grant.namespace);
+  const upload = uploaded(body.uploadId, grant.namespace), applied = state.applied.get(grant.namespace) ?? [];
+  // The same bundle reuses its kept plan; a catch-up skips the namespace's applied plans and compares with the head.
+  const kept = state.plans.find(item => item.namespace === grant.namespace && item.bundleSha256 === upload.bundleSha256 && !(body.catchup === true && applied.includes(item.planId)));
+  if (kept) {
+   if (grant.catchup === 'bounded' && !kept.standing) refuse('standing_approval_mismatch', 403);
+   return kept.preview;
+  }
+  const monitors = read(upload.bytes), baseline = state.baselines.get(grant.namespace);
   if (baseline && body.catchup !== true) refuse('catchup_required', 409);
   if (!baseline && (body.catchup === true || grant.catchup === 'bounded')) refuse('catchup_requires_baseline', 409);
   const ids = monitors.map(monitor => String(monitor.id)), additions = baseline ? ids.filter(id => !baseline.includes(id)) : ids;
@@ -71,11 +81,19 @@ export async function door(t) {
    if (additions.length * 100 >= baseline.length * 5) refuse('catchup_requires_proposal:change_must_be_under_five_percent', 409);
   }
   const planId = randomUUID(), fingerprint = sha256(Buffer.concat([upload.bytes, Buffer.from(planId)]));
-  state.plans.push({ planId, uploadId: upload.id, fingerprint, bundleSha256: upload.bundleSha256, namespace: grant.namespace, records: monitors.length, catchup: body.catchup === true, standing: grant.catchup === 'bounded' });
-  return { planId, fingerprint, bundleSha256: upload.bundleSha256,
+  const preview = { planId, fingerprint, bundleSha256: upload.bundleSha256,
    summary: { sourceRecords: monitors.length, created: additions.length, updated: 0, unchanged: unchanged.length, gone: gone.length },
    counts: counts(monitors), rejected: [], diagnostics: [],
    differences: { additions: additions.map(id => ({ sourceId: id })), replacements: [], unchanged: unchanged.map(id => ({ sourceId: id })), gone: gone.map(id => ({ sourceId: id })) } };
+  state.plans.push({ planId, uploadId: upload.id, fingerprint, bundleSha256: upload.bundleSha256, namespace: grant.namespace, records: monitors.length, ids, catchup: body.catchup === true, standing: grant.catchup === 'bounded', preview });
+  return preview;
+ }
+ /** Business applies a kept plan: it joins the namespace's applied plans and its records become the baseline. */
+ function apply(planId) {
+  const kept = state.plans.find(item => item.planId === planId);
+  if (!kept) refuse('plan_not_found', 404);
+  state.applied.set(kept.namespace, [...state.applied.get(kept.namespace) ?? [], planId]);
+  state.baselines.set(kept.namespace, kept.ids);
  }
  const answer = archive => ({ archiveId: archive.id, key: `business-archive/${archive.tool}/${archive.takenAt}`, tool: archive.tool, takenAt: archive.takenAt,
   bundleSha256: sha256(archive.bytes), bytes: archive.bytes.length, counts: counts(read(archive.bytes)) });
@@ -119,5 +137,5 @@ export async function door(t) {
  await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
  t.after(() => new Promise(resolve => { http.close(resolve); http.closeAllConnections(); }));
  // Business's own restore-check of a reported archive (null when the door holds none).
- return { state, origin: `http://127.0.0.1:${http.address().port}`, mint, restoreCheck: archiveId => { try { return restoreCheck(archiveId); } catch { return null; } } };
+ return { state, origin: `http://127.0.0.1:${http.address().port}`, mint, apply, restoreCheck: archiveId => { try { return restoreCheck(archiveId); } catch { return null; } } };
 }

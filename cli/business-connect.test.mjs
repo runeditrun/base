@@ -694,14 +694,29 @@ test('an agent catches up and archives a vendor through its app\'s import door, 
  assert.deepEqual(JSON.parse(seed.state.requests.find(entry => entry.url === '/api/rer/import/plan').body), { uploadId: standing.uploadId, catchup: true });
  assert.ok(bounded.stdout.includes('10 new') && bounded.stdout.includes('590 unchanged') && bounded.stdout.includes('standing catch-up approval'), bounded.stdout);
 
+ // Business applies it under the standing approval. The vendor is then unchanged: its export is the same bundle as
+ // that applied plan, and the door plans a catch-up of no changes for this upload, which run completes with.
+ seed.apply(standing.planId);
+ remote.state.tasks = [{ task_id: 'biz:tool1:catchup-unchanged', kind: 'catchup.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Bring over recent UptimeRobot changes' }];
+ const quiet = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(quiet);
+ assert.equal(quiet.code, 0, quiet.stderr);
+ const unchanged = seed.state.plans.at(-1), latest = [...seed.state.uploads.values()].at(-1);
+ assert.ok(unchanged.planId !== standing.planId && unchanged.bundleSha256 === standing.bundleSha256 && unchanged.uploadId === latest.id, 'the same bundle planned afresh for this upload');
+ assert.ok(unchanged.catchup && unchanged.standing, 'the door planned a catch-up under the standing approval');
+ assert.deepEqual(unchanged.preview.summary, { sourceRecords: 600, created: 0, updated: 0, unchanged: 600, gone: 0 });
+ assert.deepEqual(completed('biz:tool1:catchup-unchanged').body.outputs, { upload_id: latest.id, plan_id: unchanged.planId, bundle_sha256: unchanged.bundleSha256 });
+ assert.ok(/(?:^|\D)0 new/.test(quiet.stdout) && quiet.stdout.includes('600 unchanged') && quiet.stdout.includes('standing catch-up approval'), quiet.stdout);
+ seed.apply(unchanged.planId);
+
  // A catch-up beyond the bound (100 new on 500): the door refuses the standing approval, and run asks for a plan the owner reviews.
  seed.state.baselines.set('uptimerobot', ids.slice(0, 500));
  remote.state.tasks = [{ task_id: 'biz:tool1:catchup2', kind: 'catchup.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Bring over recent UptimeRobot changes' }];
+ const plansBefore = seed.state.plans.length;
  const reviewed = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(reviewed);
  assert.equal(reviewed.code, 0, reviewed.stderr);
  assert.deepEqual(grantsAsked('biz:tool1:catchup2').filter(body => body.action === 'plan').map(body => body.review ?? false), [false, true]);
  const review = seed.state.plans.at(-1), plans = seed.state.requests.filter(entry => entry.url === '/api/rer/import/plan').slice(-2).map(entry => JSON.parse(entry.body));
- assert.ok(seed.state.plans.length === 2 && review.catchup && !review.standing, 'only the reviewed catch-up plan was kept');
+ assert.ok(seed.state.plans.length === plansBefore + 1 && review.catchup && !review.standing, 'only the reviewed catch-up plan was kept');
  assert.deepEqual(plans, [{ uploadId: review.uploadId, catchup: true }, { uploadId: review.uploadId, catchup: true }]);
  assert.deepEqual(completed('biz:tool1:catchup2').body.outputs, { upload_id: review.uploadId, plan_id: review.planId, bundle_sha256: review.bundleSha256 });
  assert.ok(reviewed.stdout.includes('100 new') && reviewed.stdout.includes('5% or more') && reviewed.stdout.includes(`approves this catch-up in the browser: ${board}`), reviewed.stdout);
