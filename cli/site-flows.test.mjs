@@ -22,28 +22,45 @@ async function seed(t) {
  const adapter = join(root, 'scripts/installer/local.mjs'), original = await readFile(adapter, 'utf8');
  const pages = join(root, 'src/site/pages.ts');
  const render = (html, runHtml = '<p>Run</p>') => writeFile(pages, `export function sitePages({ clients = {}, styles = [] }) { return { pages: [{path:'/',html:styles.map(url=>'<link rel="stylesheet" href="'+url+'">').join('')+${JSON.stringify(html)}.replace('CLIENT_URL', clients.demo ?? '')}, {path:'/run',html:${JSON.stringify(runHtml)}}], assets: [] }; }`);
- const build = async () => {
-  try { const result = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'build', '--site', '--json', '--no-queue'], { cwd: root, env: { PATH:process.env.PATH, HOME:join(directory, 'home'), TZ:'UTC', CI: 'true', RER_NO_UPDATE_CHECK: '1' }, maxBuffer: 1024 * 1024 }); return {code:0, ...result}; }
+ const build = async (env = {}) => {
+  try { const result = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'build', '--site', '--json', '--no-queue'], { cwd: root, env: { PATH:process.env.PATH, HOME:join(directory, 'home'), TZ:'UTC', CI: 'true', RER_NO_UPDATE_CHECK: '1', ...env }, maxBuffer: 1024 * 1024 }); return {code:0, ...result}; }
   catch (error) { return {code:error.code, stdout:error.stdout, stderr:error.stderr}; }
  };
  return { root, adapter, original, pages, render, build };
 }
 
-test('built Run page wraps inline code only between words and keeps commands clear of Copy', async t => {
+test('built run-site uses US dates and keeps the one-line command start together', async t => {
  const f = await seed(t);
+ await writeFile(join(f.root, 'CONTRACT.md'), (await readFile(join(base, 'foundation/template/CONTRACT.md'), 'utf8')).replaceAll('BASE_COMMIT', '0123abcd').replaceAll('BASE_DATE', '2026-10-18'));
+ const runData = join(f.root, 'src/site/run.ts');
+ await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy'));
  await writeFile(join(f.root, 'public/favicon.svg'), await readFile(join(f.root, 'public/brand/mark.svg')));
- const result = await f.build();
+ const result = await f.build({TZ:'America/Los_Angeles'});
  assert.equal(result.code, 0, result.stdout + result.stderr);
  const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
-  const context = await browser.newContext({permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
+  const context = await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/Los_Angeles',permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
+  await page.goto(preview.url + '/contract');
+  const contractDate = { text:await page.locator('time').textContent(), datetime:await page.locator('time').getAttribute('datetime'), dataDate:await page.locator('#progress').getAttribute('data-date') };
   await page.goto(preview.url + '/run');
   await page.evaluate(() => document.fonts.ready);
   assert.deepEqual(await page.locator('link[rel=icon], link[rel=apple-touch-icon]').evaluateAll(links => links.map(link => ({ href: link.getAttribute('href'), sizes: link.getAttribute('sizes') }))), [{ href: '/favicon.svg', sizes: 'any' }], 'the built shared head selects the existing small icon instead of the full mark');
   assert.equal((await context.request.get(preview.url + '/favicon.svg')).status(), 200, 'the selected icon is exported with the site');
   assert.ok(await page.locator('p code').count(), 'the built page has inline commands');
+  const commandStartLines = () => page.locator('.alt code').evaluate(code => {
+   const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT), tops = new Set();
+   let offset = 0;
+   for (let node = walker.nextNode(); node; node = walker.nextNode()) for (let i = 0; i < node.length; i++, offset++) {
+    if (offset >= 'npx -y @runeditrun/rer dev'.length || /\s/.test(node.textContent[i])) continue;
+    const range = document.createRange(); range.setStart(node, i); range.setEnd(node, i + 1);
+    tops.add(Math.round(range.getBoundingClientRect().top));
+   }
+   return tops.size;
+  });
+  assert.deepEqual({ ...contractDate, commandStartLines:await commandStartLines() }, { text:'Oct 18, 2026', datetime:'2026-10-18', dataDate:'2026-10-18', commandStartLines:1 }, 'US date and unbroken one-line command start at 390px');
   for (let width = 360; width <= 2560; width += 20) {
    await page.setViewportSize({width,height:900});
+   assert.equal(await commandStartLines(), 1, `one-line command start at ${width}px`);
    assert.deepEqual(await codeChipBreaksWord(page), [], `inline code at ${width}px`);
    assert.deepEqual((await commandBlocks(page)).filter(block => block.covered || block.clipped), [], `command blocks at ${width}px`);
    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 0.5), false, `sideways overflow at ${width}px`);
