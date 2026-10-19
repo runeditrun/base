@@ -1,4 +1,5 @@
 import type { ImportPlan, Json, PaginationCursorPolicy } from '../types.ts';
+import { credentialName } from './credential-names.ts';
 
 const MAX_ENCODING_DEPTH = 32;
 
@@ -55,9 +56,8 @@ export function reflectedCredentialMatcher(secrets: readonly string[]): (value: 
 export function credentialQueryKey(rawKey: string, policy?: PaginationCursorPolicy): boolean {
   // The sole exception is the exact wire spelling, not encoded/case aliases.
   if (policy === 'page-token-v1' && rawKey === 'page_token') return false;
-  const key = decodedCredentialText(rawKey);
-  // `sig` is a signature only as the whole key (an Azure SAS `?sig=`), never inside `signal` or `design`.
-  return /token|secret|key|auth|signature|credential|password|cookie/i.test(key) || /^\s*sig\s*$/i.test(key);
+  // A credential by its whole name parts (`api_key`, `access_token`, `sig`, `X-Amz-Signature`), never `keyword` or `author`.
+  return credentialName(decodedCredentialText(rawKey), 'query') !== undefined;
 }
 
 /** Inspection-only structure; opaque values are checked separately, never reparsed as outer query syntax. */
@@ -88,23 +88,13 @@ export function credentialFieldText(field: CredentialField): string {
   return field.kind === 'field' ? `credential field "${field.name}"` : field.kind === 'url-userinfo' ? 'URL user name or password'
     : field.kind === 'url-query' ? 'URL credential query parameter' : 'repeated credential value';
 }
-const CREDENTIAL_KEY = /^(?:access[_-]?token|refresh[_-]?token|token|authorization|cookie|password|api[_-]?key|secret)$/i;
-/** Its plural, holding a list or map of credentials (`tokens: [...]`, `apiKeys: [...]`). */
-const CREDENTIAL_KEYS = /^(?:access[_-]?token|refresh[_-]?token|token|cookie|password|api[_-]?key|secret)s$/i;
-/** Credential shapes outside those exact names, by their letters: a name with
- * `secret`, `subscription` or `functions` before `key` (`secret_key`,
- * `x-functions-key`, `Ocp-Apim-Subscription-Key`), `X-Auth` and `pwd`. Both
- * refuse and remove mode treat them as credentials. */
-const CREDENTIAL_SHAPE = /(?:secret|subscription|functions)keys?$|^xauth$|pwds?$/;
-/** The normalised name of a credential-named key, e.g. `apiKey` and `api_key` are
- * both `apikey`, and whether a value under it counts: a plural name holds
- * credentials only as text, so `tokens: 1500` stays a count. */
+/** A credential-named field (`apiKey`, `httpPassword`, `client_secret`, `X-Api-Key`,
+ * `Ocp-Apim-Subscription-Key`, `X-Auth`, `pwd`), by whole name parts, and whether a
+ * value under it counts: a plural name holds credentials only as text, so
+ * `tokens: 1500` stays a count, and null, a boolean or a mask is no credential. */
 function credentialKey(key: string): { name: string; holds: (value: unknown) => boolean } | undefined {
-  const decoded = decodedCredentialText(key), letters = decoded.toLowerCase().replace(/[^a-z]/g, '');
-  if (CREDENTIAL_KEY.test(decoded)) return { name: decoded.toLowerCase().replace(/[_-]/g, ''), holds: value => !credentialPlaceholder(value) };
-  if (CREDENTIAL_KEYS.test(decoded) || /(?:secret|subscription|functions)keys$|pwds$/.test(letters)) return { name: letters.slice(-64), holds: credentialText };
-  if (CREDENTIAL_SHAPE.test(letters)) return { name: letters.slice(-64), holds: value => !emptyCredential(value) };
-  return undefined;
+  const credential = credentialName(decodedCredentialText(key), 'field');
+  return credential && { name: credential.name, holds: credential.plural ? credentialText : value => !emptyCredential(value) };
 }
 /** A value holding credentials as text: a string that is no placeholder, or a
  * list or map with one as a member (`['…']`, `{github: '…'}`). A list of objects
@@ -146,7 +136,6 @@ export function assertNoCredentials(value: unknown, policy?: PaginationCursorPol
     }
     if (item && typeof item === 'object') {
       for (const [key, child] of Object.entries(item)) {
-        if (key === 'secret' && typeof child === 'boolean') continue;
         const credential = credentialKey(key);
         // A plural name holds a credential as text; a container under it is still searched.
         if (credential?.holds(child)) throw new CredentialError('CREDENTIAL_IN_DURABLE_DATA', { kind: 'field', name: credential.name });
@@ -183,26 +172,13 @@ export interface RemovedCredential {
   /** An exporter had already removed it: the field holds REMOVED_CREDENTIAL. */
   beforeUpload?: true;
 }
-/** Remove mode's wider net, never refuse mode's: a key whose letters end in a
- * credential word, e.g. `httpPassword`, `http_password`, `client_secret`,
- * `X-Api-Key`, `pushToken`, `integration_key`, `webhook_url`, `secret_key`,
- * `x-functions-key`, `Ocp-Apim-Subscription-Key` or `db_pwd`, or is `X-Auth`;
- * or that word's plural (`apiKeys`, `tokens`), which holds credentials only as
- * text. Returns its letters, lower-cased, and that test. rer's vendor exports
- * strip by the same rule. */
-const REMOVABLE_KEY = /(?:authorization|credentials?|webhookurl|calurl)$|^xauth$/;
-const REMOVABLE_WORD = /(?:password|passwd|pwd|secret|token|cookie|(?:api|access|private|auth|client|integration|routing|service|signing|session|refresh|secret|subscription|functions)key)(s?)$/;
-export function removableCredentialName(key: string): { name: string; holds: (value: unknown) => boolean } | undefined {
-  const name = decodedCredentialText(key).toLowerCase().replace(/[^a-z]/g, ''), word = REMOVABLE_WORD.exec(name);
-  if (!word && !REMOVABLE_KEY.test(name)) return undefined;
-  return { name: name.slice(-64), holds: word?.[1] ? credentialText : value => !emptyCredential(value) };
-}
 /** Any `scheme://` (or `scheme:\\`, `//`) URL after leading whitespace, and the relative forms refuse mode checks. */
 const AUTHORITY = /^(\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2})([^\\/?#]*)@/i;
 const removableUrl = (text: string) => /^\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2}/i.test(text) || looksLikeUrl(text);
-/** A copy of `value` without plain credential values: a field whose name ends in
- * a credential word (`apiKey`, `httpPassword`, `client_secret`, `X-Api-Key`,
- * `secret_key`, `X-Auth`, `pwd`, plural `apiKeys`) holding a value is dropped, as
+/** A copy of `value` without plain credential values: a field whose name's parts
+ * are a credential word or phrase (`apiKey`, `httpPassword`, `client_secret`,
+ * `X-Api-Key`, `secret_key`, `X-Auth`, `pwd`, plural `apiKeys`; never `keyword`
+ * or `author`) holding a value is dropped, as
  * is the `value` of a `{name|key, value}` pair naming one (an `Authorization`
  * header pair) and of a `[name, value]` pair in a list of them (Sentry's header
  * tuples), which keeps its name. A URL of any scheme loses its
@@ -249,7 +225,7 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
     return result.slice(0, query ? queryStart + 1 : queryStart) + query + fragment;
   };
   /** Whether a value under a credential name goes; an exporter's marker is noted as removed before upload. */
-  const strip = (credential: ReturnType<typeof removableCredentialName>, child: Json, at: string, fallback: string): boolean => {
+  const strip = (credential: ReturnType<typeof credentialKey>, child: Json, at: string, fallback: string): boolean => {
     if (credential !== undefined && !emptyCredential(child) && credential.holds(child)) {
       leaves(child);
       removed.push({ path: at, field: { kind: 'field', name: credential.name } });
@@ -265,7 +241,7 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
       const tuples = namedTuples(item);
       return item.map((child, index) => {
         const name = tuples.get(index);
-        if (name !== undefined && strip(removableCredentialName(name), (child as Json[])[1], pointer(pointer(path, index), 1), name)) return [name];
+        if (name !== undefined && strip(credentialKey(name), (child as Json[])[1], pointer(pointer(path, index), 1), name)) return [name];
         return visit(child, pointer(path, index));
       });
     }
@@ -273,9 +249,9 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
       const entries: [string, Json][] = [];
       // A header-style pair: `{name: 'Authorization', value}` or `{key: 'X-Api-Key', value}`.
       const label = Object.entries(item).find(([key, child]) => /^(?:name|key)$/i.test(key) && typeof child === 'string');
-      const pairName = label && Object.hasOwn(item, 'value') ? removableCredentialName(label[1] as string) : undefined;
+      const pairName = label && Object.hasOwn(item, 'value') ? credentialKey(label[1] as string) : undefined;
       for (const [key, child] of Object.entries(item)) {
-        if (strip(pairName !== undefined && key === 'value' ? pairName : removableCredentialName(key), child, pointer(path, key), key)) continue;
+        if (strip(pairName !== undefined && key === 'value' ? pairName : credentialKey(key), child, pointer(path, key), key)) continue;
         entries.push([key, visit(child, pointer(path, key))]);
       }
       // fromEntries defines own properties, so a `__proto__` key stays data.

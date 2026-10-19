@@ -421,9 +421,9 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
 test('vendor exports strip credential values before upload, keeping every record, empty credential fields and pagination', async t => {
  const { exportVendor } = await import('./business/vendors/index.mjs');
  const key = 'fixture-vendor-read-key', apiKey = 'fixture-account-api-key-value', password = 'fixture-basic-auth-pass';
- const shapes = ['fixture-functions-key', 'fixture-apim-key', 'fixture-x-auth', 'fixture-secret-key', 'fixture-pwd', 'fixture-api-keys-item', 'fixture-tokens-item', 'fixture-tuple-token', 'fixture-sas-sig'];
+ const shapes = ['fixture-functions-key', 'fixture-apim-key', 'fixture-x-auth', 'fixture-secret-key', 'fixture-pwd', 'fixture-api-keys-item', 'fixture-tokens-item', 'fixture-tuple-token', 'fixture-sas-sig', 'fixture-auth-token', 'fixture-session-id'];
  const secrets = [key, apiKey, password, 'fixture-header-secret', 'fixture-integration-key', 'fixture-http-password', 'fixture-pair-secret', 'fixture-query-key', 'fixture-fragment-token', ...shapes];
- const lookalikes = { keyword: 'uptime', monkey: 'chaos', signal: 'green', design: 'v2', tokens: 1500, pwd: null, secret_key: '', apiKeys: ['****'], headers: [['Accept', '*/*'], ['X-Auth', 'none']] };
+ const lookalikes = { keyword: 'uptime', monkey: 'chaos', signal: 'green', design: 'v2', author: 'ops', primaryKey: 'pk_1', sortKey: 'name', tokenizer: 'bpe', tokens: 1500, pwd: null, secret_key: '', apiKeys: ['****'], headers: [['Accept', '*/*'], ['X-Auth', 'none']] };
  // Uptime's UptimeRobot v3 fixture shape: every monitor carries apiKey, one checks a user:pass@ URL.
  const monitors = [
   { id: 9000001, url: 'https://shop.example.com/', customHttpHeaders: null, psps: [{ id: 5, isPasswordSet: false }], apiKey: null },
@@ -432,8 +432,8 @@ test('vendor exports strip credential values before upload, keeping every record
   // UptimeRobot's own httpPassword, a header pair, and credential query and fragment parameters beside a validated pagination key.
   { id: 9000020, url: 'https://api.partner.example.net/v1/health?api_key=fixture-query-key&region=eu&page_token=kept-page#access_token=fixture-fragment-token', authType: 'HTTP_BASIC', httpUsername: 'ops', httpPassword: 'fixture-http-password', hasSecret: true, customHttpHeaders: [{ name: 'Authorization', value: 'Bearer fixture-pair-secret' }], apiKey: null },
   // Common credential shapes beyond those, and names that only look like credential names.
-  { id: 9000032, url: 'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=fixture-sas-sig&signal=1', customHttpHeaders: { 'x-functions-key': 'fixture-functions-key', 'Ocp-Apim-Subscription-Key': 'fixture-apim-key', 'X-Auth': 'fixture-x-auth' }, secret_key: 'fixture-secret-key', pwd: 'fixture-pwd', apiKeys: ['fixture-api-keys-item'], tokens: ['fixture-tokens-item'], headers: [['Authorization', 'Bearer fixture-tuple-token'], ['Accept', '*/*']], apiKey: null },
-  { id: 9000034, url: 'https://shop.example.com/?signal=1&design=2', ...lookalikes, apiKey: null },
+  { id: 9000032, url: 'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=fixture-sas-sig&signal=1', customHttpHeaders: { 'x-functions-key': 'fixture-functions-key', 'Ocp-Apim-Subscription-Key': 'fixture-apim-key', 'X-Auth': 'fixture-x-auth' }, secret_key: 'fixture-secret-key', pwd: 'fixture-pwd', apiKeys: ['fixture-api-keys-item'], tokens: ['fixture-tokens-item'], headers: [['Authorization', 'Bearer fixture-tuple-token'], ['Accept', '*/*']], authToken: 'fixture-auth-token', sessionId: 'fixture-session-id', apiKey: null },
+  { id: 9000034, url: 'https://status.example.test/check?keyword=up&signal=1&design=2&author=ops', ...lookalikes, apiKey: null },
  ];
  const responses = new Map(Object.entries({
   'https://api.uptimerobot.com/v3/monitors?limit=200': { data: monitors.slice(0, 2), nextLink: 'https://api.uptimerobot.com/v3/monitors?cursor=page-2' },
@@ -463,6 +463,7 @@ test('vendor exports strip credential values before upload, keeping every record
  const shaped = pages[2].data[0];
  assert.deepEqual([shaped.url, shaped.customHttpHeaders, shaped.secret_key, shaped.pwd, shaped.apiKeys, shaped.tokens, shaped.headers],
   ['https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed&signal=1', { 'x-functions-key': '[removed]', 'Ocp-Apim-Subscription-Key': '[removed]', 'X-Auth': '[removed]' }, '[removed]', '[removed]', '[removed]', '[removed]', [['Authorization', '[removed]'], ['Accept', '*/*']]], 'secret/subscription/functions keys, X-Auth, pwd, plurals, header tuples and sig leave markers');
+ assert.deepEqual([shaped.authToken, shaped.sessionId], ['[removed]', '[removed]'], 'names are matched by whole parts: authToken and sessionId are credentials');
  assert.deepEqual(pages[2].data[1], monitors[5], 'look-alike names, counts and placeholders stay as they are');
  const pagerduty = await collect('pagerduty', { start: '2026-10-01T00:00:00.000Z', end: '2026-10-08T00:00:00.000Z' });
  const bundle = JSON.parse(Buffer.concat(pagerduty.map(item => item.bytes)).toString());

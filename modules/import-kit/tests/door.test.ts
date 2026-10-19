@@ -960,10 +960,16 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   // tuples and an Azure SAS `sig`.
   const shapes={functions:'test-azure-functions-key',subscription:'test-apim-subscription-key',xAuth:'test-x-auth-header',secretKey:'test-secret-key-field',
     pwd:'test-pwd-field-value',apiKeys:'test-api-keys-list-item',tokens:'test-tokens-list-item',tuple:'test-tuple-bearer-token',sig:'test-sas-signature'};
-  const secrets=[uptimeKey,uptimePassword,...Object.values(compound),...Object.values(shapes)];
+  // Credential names the kit matches by whole parts, not letters: header, field and plural forms.
+  const parts={xAuthToken:'test-x-auth-token-header',authToken:'test-auth-token-field',private_key:'test-private-key-field',sessionId:'test-session-id-field',
+    bearer:'test-bearer-field',signature:'test-signature-field',passwords:'test-passwords-list-item'};
+  const secrets=[uptimeKey,uptimePassword,...Object.values(compound),...Object.values(shapes),...Object.values(parts),'test-keyword-monitor-api-key'];
   // Names that only look like credential names, and placeholders, stay exactly as they are.
-  const lookalikes={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',url:'https://shop.example.com/?signal=1&design=2',headers:[['Accept','*/*']],
+  const lookalikes={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',author:'ops',keywords:['up','ok'],tokenizer:'bpe',primaryKey:'pk_1',sortKey:'name',monitorKey:'m1',keyType:'rsa',
+    url:'https://shop.example.com/?signal=1&design=2&keyword=up&author=ops&primaryKey=1',headers:[['Accept','*/*']],
     customHttpHeaders:{'X-Auth':'none'},pwd:null,secret_key:'',apiKeys:['****'],tokens:1500};
+  // An UptimeRobot keyword monitor: its `?keyword=up` is not a credential, while an `api_key` beside it is.
+  const keywordUrl='https://status.example.test/check?keyword=up',keywordKey='test-keyword-monitor-api-key';
   const bytes=pages([monitor(9000001),monitor(9000002,{apiKey:''}),monitor(9000005,{url:null,apiKey:'********'})],
     [monitor(9000012,{url:`https://user:${uptimePassword}@staging.example.com/`}),monitor(9000013,{apiKey:uptimeKey}),
       // What rer's vendor export uploads after stripping: its markers, never the values.
@@ -978,12 +984,15 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
       monitor(9000032,{customHttpHeaders:{'x-functions-key':shapes.functions,'Ocp-Apim-Subscription-Key':shapes.subscription,'X-Auth':shapes.xAuth},secret_key:shapes.secretKey,pwd:shapes.pwd}),
       monitor(9000033,{url:`https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=${shapes.sig}`,apiKeys:[shapes.apiKeys],tokens:[shapes.tokens],headers:[['Authorization','Bearer '+shapes.tuple],['Accept','*/*']]}),
       monitor(9000034,lookalikes),
-      monitor(9000035,{url:'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed',secret_key:'[removed]',apiKeys:'[removed]',headers:[['X-Auth','[removed]']]})]);
+      monitor(9000035,{url:'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed',secret_key:'[removed]',apiKeys:'[removed]',headers:[['X-Auth','[removed]']]}),
+      monitor(9000036,{type:'KEYWORD',url:keywordUrl,keyword:'up'}),monitor(9000037,{type:'KEYWORD',url:keywordUrl+`&api_key=${keywordKey}&region=eu`}),
+      monitor(9000038,{customHttpHeaders:{'X-Auth-Token':parts.xAuthToken},authToken:parts.authToken,private_key:parts.private_key,sessionId:parts.sessionId,bearer:parts.bearer,
+        signature:parts.signature,passwords:[parts.passwords]})]);
   const native=d.runtime.native(),uploadId=await d.upload(bytes);
   for (const secret of secrets) assert.ok(stored(native).includes(secret),'the scan sees the uploaded credentials');
   const planned=await d.call('plan',{uploadId});
   assert.equal(planned.status,200,JSON.stringify(planned.body));
-  assert.deepEqual(planned.body.summary,{sourceRecords:17,created:17,updated:0,unchanged:0,gone:0});
+  assert.deepEqual(planned.body.summary,{sourceRecords:20,created:20,updated:0,unchanged:0,gone:0});
   const userinfo='A user name and password were removed from a URL; the record is kept.',query='A credential query parameter was removed from a URL; the record is kept.';
   const field=(name:string)=>`The value of credential field "${name}" was removed; the record is kept without it.`;
   const before=(name:string)=>`The value of credential field "${name}" was removed before upload; the record is kept without it.`;
@@ -1003,6 +1012,10 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
     ['9000032','/customHttpHeaders/X-Auth',field('xauth')],['9000032','/secret_key',field('secretkey')],['9000032','/pwd',field('pwd')],
     ['9000033','/url',query],['9000033','/apiKeys',field('apikeys')],['9000033','/tokens',field('tokens')],['9000033','/headers/0/1',field('authorization')],
     ['9000035','/url',query],['9000035','/secret_key',before('secretkey')],['9000035','/apiKeys',before('apikeys')],['9000035','/headers/0/1',before('xauth')],
+    // `?keyword=up` stays (9000036); the `api_key` beside it goes and is noted (9000037); whole-name credentials go field by field (9000038).
+    ['9000037','/url',query],
+    ['9000038','/customHttpHeaders/X-Auth-Token',field('xauthtoken')],['9000038','/authToken',field('authtoken')],['9000038','/private_key',field('privatekey')],
+    ['9000038','/sessionId',field('sessionid')],['9000038','/bearer',field('bearer')],['9000038','/signature',field('signature')],['9000038','/passwords',field('passwords')],
   ]);
   assert.ok(planned.body.diagnostics.some((n:any)=>n.code==='ORIGINAL_UNAVAILABLE'&&/withheld because they held credential values/.test(n.message)));
   // The uploaded bytes went once the plan was saved; the plan never held them.
@@ -1024,9 +1037,13 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   assert.deepEqual([value('9000032').customHttpHeaders,Object.hasOwn(value('9000032'),'secret_key'),Object.hasOwn(value('9000032'),'pwd')],[{},false,false]);
   const shaped=value('9000033');
   assert.deepEqual([shaped.url,Object.hasOwn(shaped,'apiKeys'),Object.hasOwn(shaped,'tokens'),shaped.headers],['https://acct.blob.core.windows.net/c/b?sv=2020-08-04',false,false,[['Authorization'],['Accept','*/*']]]);
-  assert.deepEqual(value('9000034'),monitor(9000034,lookalikes),'look-alike names and placeholders stay as they are');
+  assert.deepEqual(value('9000034'),monitor(9000034,lookalikes),'look-alike names, a `?keyword=up` URL and placeholders stay as they are');
+  assert.equal(value('9000036').url,keywordUrl,'a keyword monitor plans with its URL intact');
+  assert.equal(value('9000037').url,keywordUrl+'&region=eu','the api_key beside ?keyword=up is removed, the keyword and region stay');
+  const named=value('9000038');
+  assert.deepEqual([named.customHttpHeaders,...Object.keys(parts).filter(name=>name!=='xAuthToken').map(name=>Object.hasOwn(named,name))],[{},false,false,false,false,false,false]);
   assert.deepEqual((await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace}))[0].original,{status:'unavailable',reason:'credentials-removed'});
-  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,17);
+  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,20);
   for (const secret of secrets) assert.ok(!stored(native).includes(secret),'no credential value is stored after apply');
   // A bundle holding only empty credential fields keeps its exact original.
   const clean=await d.call('plan',{uploadId:await d.upload(pages([monitor(9000001),monitor(9000002)])),catchup:true});

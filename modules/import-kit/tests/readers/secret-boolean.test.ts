@@ -49,6 +49,24 @@ test('public readers and durable planning retain boolean secret semantics with e
     [{apiKeys:[{apiKey:'synthetic-credential'}]},'credential field "apikey"'],[{tokens:[{url:'https://u:synthetic-credential@source.test/'}]},'URL user name or password'],
   ];
   for(const [value,field] of refused) await assert.rejects(read(value),(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field===field,field);
+  // Names are matched by whole parts (camelCase, `_`, `-`, `.`, digits), as a field, a header-tuple name or a URL query and fragment key.
+  const credentialNames=['apiKey','api_key','API-KEY','x-api-key','secret_key','secretKey','client_secret','x-functions-key','Ocp-Apim-Subscription-Key','X-Auth','X-Auth-Token','Authorization','auth',
+    'authToken','accessToken','access_token','refreshToken','token','tokens','bearer','password','passwd','pwd','httpPassword','http_password','privateKey','private_key','sig','signature','sessionId','cookie','apiKeys','secrets','passwords'];
+  const plainNames=['keyword','keywords','monkey','donkey','turkey','hockey','author','authority','authors','signal','design','signup','tokenizer','passwordless','keyboard','primaryKey','foreignKey','sortKey','keyType','monitorKey'];
+  const kind=(field:string)=>(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field.startsWith(field);
+  for(const name of credentialNames){
+    const value=/^(?:tokens|secrets|passwords|apiKeys)$/.test(name)?['synthetic-credential']:'synthetic-credential';
+    await assert.rejects(read({[name]:value}),kind('credential field'),`field ${name}`);
+    await assert.rejects(read({headers:[[name,'synthetic-credential'],['Accept','*/*']]}),kind('credential field'),`tuple ${name}`);
+    await assert.rejects(read({link:`https://source.test/page?${name}=synthetic-credential`}),kind('URL credential query'),`query ${name}`);
+  }
+  for(const name of plainNames){
+    const plain={[name]:'synthetic',headers:[[name,'synthetic'],['Accept','*/*']],link:`https://source.test/page?${name}=synthetic&region=eu#${name}=synthetic`};
+    assert.deepEqual((await read(plain)).records[0].payload,{uri:'https://source.test/event',...plain},`plain ${name}`);
+  }
+  // A bare `key` is a credential only as a query key (`?key=`), never as a field; `primaryKey` and `sortKey` are not credentials anywhere.
+  await assert.rejects(read({link:'https://source.test/page?key=synthetic-credential'}),kind('URL credential query'));
+  assert.equal((await read({key:'k_1',primaryKey:'pk_1'})).records.length,1);
   // Look-alike names, counts under a plural name, a lone two-item list and placeholders are accepted as they are.
   const accepted={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',link:'https://source.test/?signal=1&design=2',tags:['password','reset'],
     tokens:{input:1500,output:300},inputTokens:1500,hasSecretKey:true,pwd:null,secret_key:'',apiKeys:['****'],headers:[['Authorization','none'],['X-Auth','[redacted]']]};

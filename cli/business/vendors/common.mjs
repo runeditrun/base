@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
+import { credentialName } from './credential-names.mjs';
 
 export class VendorExportError extends Error {
   constructor(code, status) {
@@ -47,14 +48,14 @@ export function reference(value, origin, pathname, allowedQuery = []) {
   return url;
 }
 // The seed's import door applies the same rules (modules/import-kit, removeCredentials).
-// A field holds a credential when its name's letters end in a credential word
-// (apiKey, httpPassword, http_password, client_secret, X-Api-Key, integration_key,
-// webhook_url, secret_key, x-functions-key, Ocp-Apim-Subscription-Key, db_pwd) or
-// are X-Auth, unless it is empty: null, a boolean (Calendly's `secret` flag),
-// whitespace or a mask such as "****" or "[redacted]". A plural (apiKeys, tokens)
-// holds credentials only as text, so a count such as `tokens: 1500` stays.
-const credentialName = /(?:authorization|credentials?|webhookurl|calurl)$|^xauth$/u;
-const credentialWord = /(?:password|passwd|pwd|secret|token|cookie|(?:api|access|private|auth|client|integration|routing|service|signing|session|refresh|secret|subscription|functions)key)(s?)$/u;
+// A field holds a credential when the parts of its name are a credential word or
+// phrase (apiKey, httpPassword, http_password, client_secret, X-Api-Key,
+// integration_key, webhook_url, secret_key, x-functions-key,
+// Ocp-Apim-Subscription-Key, db_pwd, X-Auth), unless its value is empty: null, a
+// boolean (Calendly's `secret` flag), whitespace or a mask such as "****" or
+// "[redacted]". Names that only contain such letters (keyword, monkey, author,
+// signal, design) are not credentials. A plural (apiKeys, tokens) holds
+// credentials only as text, so a count such as `tokens: 1500` stays.
 const placeholder = /^(?:\s*|[*\u2022\u25CF\u00B7x#_.-]{1,64}|[<[({]?\s*(?:redacted|hidden|masked|removed|omitted|none|null|n\/a|placeholder)\s*[>\])}]?)$/iu;
 /** What a stripped credential value becomes; the seed's import door reports it per record. */
 export const REMOVED_CREDENTIAL = '[removed]';
@@ -72,13 +73,12 @@ function decoded(text) {
 }
 /** Whether a value under this name is a credential, by the door's rule. */
 function credential(name, value) {
-  const letters = decoded(name).toLowerCase().replace(/[^a-z]/gu, ''), word = credentialWord.exec(letters);
-  if (!word && !credentialName.test(letters)) return false;
-  return !empty(value) && (!word?.[1] || text(value));
+  const found = credentialName(decoded(name));
+  return found !== undefined && !empty(value) && (!found.plural || text(value));
 }
-// The door's credentialQueryKey rule for URL query and fragment parameter names;
-// `sig` (an Azure SAS signature) only as the whole name.
-const credentialParameter = key => /token|secret|key|auth|signature|credential|password|cookie/iu.test(decoded(key)) || /^\s*sig\s*$/iu.test(decoded(key));
+// The door's credentialQueryKey rule for URL query and fragment parameter names:
+// api_key, access_token, a bare `key`, sig and X-Amz-Signature, never keyword or author.
+const credentialParameter = key => credentialName(decoded(key), 'query') !== undefined;
 const authority = /^(\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2})[^\\/?#]*@/iu;
 /** A URL of any scheme with its user name and password replaced by `removed@`,
  * and the value of each credential query or fragment parameter by `removed`,

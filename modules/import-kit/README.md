@@ -96,6 +96,48 @@ source and before-image audit data. Reversal is restartable and checks the exact
 applied revision and value before changing a target. A native edit is reported as
 `NATIVE_EDIT_CONFLICT` and preserved.
 
+## Credential names
+
+A name is a credential when its **whole parts** are a credential word or phrase,
+never because a part only contains the letters of one. The kit splits an object
+key, a header name, the name in a `[name, value]` pair and a URL query or
+fragment key into lower-case parts at camelCase and PascalCase boundaries
+(`apiKey`, `XAPIKey`), at `_`, `-`, `.`, spaces and any other non-letter, and at
+digits (`token2` is `token`). The same rule serves both modes: refuse mode
+(`assertNoCredentials`, the readers) and the import door's `credentials:
+'remove'`, which drops the value and notes it per record.
+
+- Credential words, as the last part: `token`, `secret`, `password`, `passwd`,
+  `pwd`, `cookie`, `authorization`, `bearer`, `credential(s)`, so `accessToken`,
+  `client_secret`, `httpPassword`, `X-Auth-Token` and `Set-Cookie` are caught.
+  Their plurals (`tokens`, `apiKeys`, `secrets`, `passwords`) hold credentials
+  only as text, so `tokens: 1500` is a count and stays.
+- `key` counts after a qualifier: `api`, `access`, `private`, `secret`, `auth`,
+  `client`, `integration`, `routing`, `service`, `signing`, `session`, `refresh`,
+  `subscription`, `functions`, `consumer`, `app`, `license`, `master`,
+  `encryption` or `admin` (`api_key`, `x-functions-key`,
+  `Ocp-Apim-Subscription-Key`, `secretKey`, `privateKey`). **Borderline names
+  such as `primaryKey`, `foreignKey`, `sortKey`, `monitorKey` and `keyType`
+  are not credentials:** a database or sort key, or an identifier, is not a
+  secret, and treating one as a credential would fail real exports. A bare
+  `key` is a credential only as a URL query or fragment key (`?key=`, the
+  Google API convention), never as a field.
+- Also credentials: `auth` and `X-Auth` as a whole name, `sessionId`, and the
+  one-part spellings (`apikey`, `accesstoken`, `clientsecret`, `webhookurl`).
+  `sig` and `signature` are credentials as a whole name (an Azure SAS `sig`, a
+  `Signature` field) and as the last part of a query key (`X-Amz-Signature`).
+  Public identifiers (`publicKey`, `keyId`, `AWSAccessKeyId`) are not credentials.
+- Not credentials: `keyword`, `keywords`, `monkey`, `donkey`, `turkey`,
+  `hockey`, `author`, `authority`, `authors`, `signal`, `design`, `signup`,
+  `tokenizer`, `passwordless`, `keyboard`, `tokenCount` and the like. An
+  UptimeRobot keyword monitor's `?keyword=up` therefore plans with its URL intact,
+  while an `?api_key=` beside it is still removed (or refused).
+
+Value-shaped detection is unchanged: user names and passwords in URLs, known
+token prefixes, base64 and every encoding layer are checked as before. Null, an
+empty string, a mask (`****`, `[redacted]`, `[removed]`) and a boolean under a
+credential name are not credentials.
+
 ## Plan-size cap
 
 New plans and plans submitted for creation are bounded by the inclusive
