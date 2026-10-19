@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, lchownSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fixture } from './test-fixture.mjs';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 
@@ -43,9 +43,13 @@ ${locked ? 'chmodSync(residue, 0o555);' : ''}
     // user so the cleanup error remains a real filesystem failure in CI.
     const home = join(f.temporary, 'home');
     mkdirSync(home);
+    // Scanner version metadata reads the real Base checkout too. It remains
+    // root-owned, so trust that exact checkout in this test user's config.
+    const config = join(home, '.gitconfig');
+    execFileSync('git', ['config', '--file', config, '--add', 'safe.directory', join(import.meta.dirname, '../..')]);
     Object.assign(f.env, { HOME: home, XDG_CACHE_HOME: join(home, 'cache'),
       XDG_CONFIG_HOME: join(home, 'config'), XDG_DATA_HOME: join(home, 'data'),
-      npm_config_store_dir: join(home, 'store') });
+      npm_config_store_dir: join(home, 'store'), GIT_CONFIG_GLOBAL: config });
     unprivileged(f.temporary);
     unprivileged(f.env.RER_JOBS_DIR);
     Object.assign(identity, { uid: 65534, gid: 65534 });
