@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.72
+
+- **The import door creates jobs for multi-MB sources (#346).** Job creation is chunked within D1's statement and RPC limits, with server-side checkpoints, so a resumed creation continues where it stopped and a partly staged job is never applied; the plan codec is honoured and the original is retained once. A 6.9 MB people export (6,083 people) and a 3,000-person dependency graph plan, create, apply and undo through the default seed's door, where the same export previously failed its first apply with import_door_conflict. ADOPTING.md step 4 names owner opt-in as the recommended consent path.
+- **/contract fits 320 px (#349).** The shared header bar and nav wrap (the brand's min-content decides) and phone links get a 24 px minimum height, so the /contract header has no sideways scroll at 320 px (scrollWidth 329 → 320).
+
 ## 0.2.71
 
 - **Restores split migrations at SQLite's own statement boundaries (#344).** The portability classifier re-splits each migration chunk with sql-text.mjs splitStatements (the sqlite3_complete state machine: a trigger ends only at `; END ;`, so `CASE … END` never ends it) and counts only real table names, never keywords, function names, qualified columns, literals or comments; the secret-column check still sees every identifier. rer import's replay uses the same splitter. Slate's retained archive restores past 0038.
