@@ -73,7 +73,7 @@ function decoded(text) {
 }
 /** Whether a value under this name is a credential, by the door's rule. */
 function credential(name, value) {
-  const found = credentialName(decoded(name));
+  const found = credentialName(decoded(name), 'remove');
   return found !== undefined && !empty(value) && (!found.plural || text(value));
 }
 // The door's credentialQueryKey rule for URL query and fragment parameter names:

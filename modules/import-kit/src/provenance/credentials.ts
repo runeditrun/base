@@ -88,12 +88,15 @@ export function credentialFieldText(field: CredentialField): string {
   return field.kind === 'field' ? `credential field "${field.name}"` : field.kind === 'url-userinfo' ? 'URL user name or password'
     : field.kind === 'url-query' ? 'URL credential query parameter' : 'repeated credential value';
 }
-/** A credential-named field (`apiKey`, `httpPassword`, `client_secret`, `X-Api-Key`,
- * `Ocp-Apim-Subscription-Key`, `X-Auth`, `pwd`), by whole name parts, and whether a
- * value under it counts: a plural name holds credentials only as text, so
- * `tokens: 1500` stays a count, and null, a boolean or a mask is no credential. */
-function credentialKey(key: string): { name: string; holds: (value: unknown) => boolean } | undefined {
-  const credential = credentialName(decodedCredentialText(key), 'field');
+/** A credential-named field (`apiKey`, `client_secret`, `X-Api-Key`,
+ * `Ocp-Apim-Subscription-Key`, `X-Auth`, `pwd`; in remove mode also `httpPassword`
+ * and `pushToken`), by whole name parts, and whether a value under it counts: a
+ * plural name holds credentials only as text, so `tokens: 1500` stays a count,
+ * and null, a boolean or a mask is no credential. Refuse mode takes the whole
+ * name as the phrase, so a pagination cursor such as `next_page_token` is
+ * accepted; remove mode, which keeps the record, takes any name ending in one. */
+function credentialKey(key: string, mode: 'refuse' | 'remove'): { name: string; holds: (value: unknown) => boolean } | undefined {
+  const credential = credentialName(decodedCredentialText(key), mode);
   return credential && { name: credential.name, holds: credential.plural ? credentialText : value => !emptyCredential(value) };
 }
 /** A value holding credentials as text: a string that is no placeholder, or a
@@ -128,7 +131,7 @@ export function assertNoCredentials(value: unknown, policy?: PaginationCursorPol
   const visit = (item: unknown): void => {
     if (Array.isArray(item)) {
       for (const [index, name] of namedTuples(item)) {
-        const credential = credentialKey(name), value = (item[index] as unknown[])[1];
+        const credential = credentialKey(name, 'refuse'), value = (item[index] as unknown[])[1];
         if (credential && !emptyCredential(value) && credential.holds(value)) throw new CredentialError('CREDENTIAL_IN_DURABLE_DATA', { kind: 'field', name: credential.name });
       }
       for (const child of item) visit(child);
@@ -136,7 +139,7 @@ export function assertNoCredentials(value: unknown, policy?: PaginationCursorPol
     }
     if (item && typeof item === 'object') {
       for (const [key, child] of Object.entries(item)) {
-        const credential = credentialKey(key);
+        const credential = credentialKey(key, 'refuse');
         // A plural name holds a credential as text; a container under it is still searched.
         if (credential?.holds(child)) throw new CredentialError('CREDENTIAL_IN_DURABLE_DATA', { kind: 'field', name: credential.name });
         visit(child);
@@ -241,7 +244,7 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
       const tuples = namedTuples(item);
       return item.map((child, index) => {
         const name = tuples.get(index);
-        if (name !== undefined && strip(credentialKey(name), (child as Json[])[1], pointer(pointer(path, index), 1), name)) return [name];
+        if (name !== undefined && strip(credentialKey(name, 'remove'), (child as Json[])[1], pointer(pointer(path, index), 1), name)) return [name];
         return visit(child, pointer(path, index));
       });
     }
@@ -249,9 +252,9 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
       const entries: [string, Json][] = [];
       // A header-style pair: `{name: 'Authorization', value}` or `{key: 'X-Api-Key', value}`.
       const label = Object.entries(item).find(([key, child]) => /^(?:name|key)$/i.test(key) && typeof child === 'string');
-      const pairName = label && Object.hasOwn(item, 'value') ? credentialKey(label[1] as string) : undefined;
+      const pairName = label && Object.hasOwn(item, 'value') ? credentialKey(label[1] as string, 'remove') : undefined;
       for (const [key, child] of Object.entries(item)) {
-        if (strip(pairName !== undefined && key === 'value' ? pairName : credentialKey(key), child, pointer(path, key), key)) continue;
+        if (strip(pairName !== undefined && key === 'value' ? pairName : credentialKey(key, 'remove'), child, pointer(path, key), key)) continue;
         entries.push([key, visit(child, pointer(path, key))]);
       }
       // fromEntries defines own properties, so a `__proto__` key stays data.

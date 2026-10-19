@@ -535,11 +535,11 @@
     },
     "cli/business/vendors/common.mjs": {
       "source": "cli/business/vendors/common.mjs",
-      "sha256": "4b32b841564db561707dbed88590ebde55a6f15e433f9014cbadd2e1492dc894"
+      "sha256": "82358c09c95117d3838f0aa59df452a5f024a66585954fca3ecf0af01dce7109"
     },
     "cli/business/vendors/credential-names.mjs": {
       "source": "cli/business/vendors/credential-names.mjs",
-      "sha256": "1cc7fe6d69235e88d670639acc81e70288c4e6dfcb1dcf9762b31346ba2da41f"
+      "sha256": "b96eb0a0c01a253592b6bf1778b1f96f01427c1d17801a50e719dfbcdbbeb7b6"
     },
     "cli/business/vendors/index.mjs": {
       "source": "cli/business/vendors/index.mjs",

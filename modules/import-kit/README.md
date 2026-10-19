@@ -103,35 +103,46 @@ never because a part only contains the letters of one. The kit splits an object
 key, a header name, the name in a `[name, value]` pair and a URL query or
 fragment key into lower-case parts at camelCase and PascalCase boundaries
 (`apiKey`, `XAPIKey`), at `_`, `-`, `.`, spaces and any other non-letter, and at
-digits (`token2` is `token`). The same rule serves both modes: refuse mode
-(`assertNoCredentials`, the readers) and the import door's `credentials:
-'remove'`, which drops the value and notes it per record.
+digits (`token2` is `token`). One rule serves refuse mode (`assertNoCredentials`,
+the readers), the import door's `credentials: 'remove'` (which drops the value
+and notes it per record) and rer's vendor exports, at two reaches:
 
-- Credential words, as the last part: `token`, `secret`, `password`, `passwd`,
-  `pwd`, `cookie`, `authorization`, `bearer`, `credential(s)`, so `accessToken`,
-  `client_secret`, `httpPassword`, `X-Auth-Token` and `Set-Cookie` are caught.
-  Their plurals (`tokens`, `apiKeys`, `secrets`, `passwords`) hold credentials
-  only as text, so `tokens: 1500` is a count and stays.
-- `key` counts after a qualifier: `api`, `access`, `private`, `secret`, `auth`,
-  `client`, `integration`, `routing`, `service`, `signing`, `session`, `refresh`,
-  `subscription`, `functions`, `consumer`, `app`, `license`, `master`,
-  `encryption` or `admin` (`api_key`, `x-functions-key`,
-  `Ocp-Apim-Subscription-Key`, `secretKey`, `privateKey`). **Borderline names
-  such as `primaryKey`, `foreignKey`, `sortKey`, `monitorKey` and `keyType`
-  are not credentials:** a database or sort key, or an identifier, is not a
-  secret, and treating one as a credential would fail real exports. A bare
-  `key` is a credential only as a URL query or fragment key (`?key=`, the
-  Google API convention), never as a field.
-- Also credentials: `auth` and `X-Auth` as a whole name, `sessionId`, and the
-  one-part spellings (`apikey`, `accesstoken`, `clientsecret`, `webhookurl`).
-  `sig` and `signature` are credentials as a whole name (an Azure SAS `sig`, a
-  `Signature` field) and as the last part of a query key (`X-Amz-Signature`).
-  Public identifiers (`publicKey`, `keyId`, `AWSAccessKeyId`) are not credentials.
-- Not credentials: `keyword`, `keywords`, `monkey`, `donkey`, `turkey`,
-  `hockey`, `author`, `authority`, `authors`, `signal`, `design`, `signup`,
-  `tokenizer`, `passwordless`, `keyboard`, `tokenCount` and the like. An
-  UptimeRobot keyword monitor's `?keyword=up` therefore plans with its URL intact,
-  while an `?api_key=` beside it is still removed (or refused).
+- **Refuse mode** takes the whole name as the phrase, after an optional header
+  `x-`: the word alone or after one qualifier (`token`, `access_token`,
+  `refresh_token`, `X-Auth-Token`, `password`, `httpPassword`, `client_secret`,
+  `api_key`, `x-api-key`, `private_key`, `sessionId`, `cookie`, `Authorization`,
+  `bearer`), a `secret`, `subscription` or `functions` key under any name
+  (`Ocp-Apim-Subscription-Key`, `x-functions-key`, `secret_key`), and `pwd`. A
+  longer name such as the pagination cursor `next_page_token` is not refused.
+- **Remove mode and URL keys** take any name that ends in the phrase
+  (`pushToken`, `integration_key`, `db_pwd`, `webhook_url`), since removing a
+  value keeps the record. A URL query or fragment key also counts a bare `key`
+  (the `?key=` convention) and a last part `sig` or `signature` (`X-Amz-Signature`).
+
+The words are `token`, `secret`, `password`, `passwd`, `pwd`, `cookie`,
+`authorization`, `bearer` and `credential(s)`; `key` counts after a qualifier
+(`api`, `access`, `private`, `secret`, `auth`, `client`, `integration`,
+`routing`, `service`, `signing`, `session`, `refresh`, `subscription`,
+`functions`, `consumer`, `app`, `license`, `master`, `encryption` or `admin`);
+`auth` and `X-Auth`, `sessionId` and the one-part spellings (`apikey`,
+`accesstoken`, `clientsecret`) count; and `sig` and `signature` count as a whole
+name (an Azure SAS `sig`, a `Signature` field). Plurals (`tokens`, `apiKeys`,
+`secrets`, `passwords`) hold credentials only as text, so `tokens: 1500` is a
+count and stays.
+
+- **Borderline names are not credentials:** `primaryKey`, `foreignKey`, `sortKey`,
+  `monitorKey` and `keyType` name a database or sort key or an identifier, not a
+  secret, and treating them as credentials would fail real exports. A bare `key`
+  is a credential only as a URL query or fragment key, never as a field. Public
+  identifiers (`publicKey`, `keyId`, `AWSAccessKeyId`) are not credentials.
+- **Look-alikes are not credentials:** `keyword`, `keywords`, `monkey`, `donkey`,
+  `turkey`, `hockey`, `author`, `authority`, `authors`, `signal`, `design`,
+  `signup`, `tokenizer`, `passwordless`, `keyboard` and the like. An UptimeRobot
+  keyword monitor's `?keyword=up` plans with its URL intact, while an `?api_key=`
+  beside it is still removed (or refused).
+- **Trade-off:** a field named just `signature` or `auth` is a credential, so an
+  agent's email `signature` in an export is removed by the door (the record is
+  kept and noted); `emailSignature` is not.
 
 Value-shaped detection is unchanged: user names and passwords in URLs, known
 token prefixes, base64 and every encoding layer are checked as before. Null, an

@@ -235,18 +235,20 @@ archive older than the erasure is refused whole under the later journal.
 
 Credential keys are names whose whole parts are a credential word or phrase
 (see `README.md`, "Credential names"): the name is split at camelCase, `_`, `-`,
-`.`, spaces and digits, and its last part is `token`, `secret`, `password`,
-`passwd`, `pwd`, `cookie`, `authorization`, `bearer` or `credential(s)`, or
-`key` after a qualifier (`api`, `access`, `private`, `secret`, `subscription`,
-`functions` and the like), or is `auth`/`X-Auth`, `sig`/`signature`, `sessionId`,
-under an object key, a header name or as the name of a `[name, value]` pair in a
-list of them (`apiKey`, `api_key`, `access_token`, `X-Auth-Token`, `httpPassword`,
-`client_secret`, `secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`,
-`pwd`), plus their plurals holding text (`tokens: [...]`, `apiKeys: [...]`). A
-URL query or fragment key follows the same rule, and a bare `key` or a last part
-`sig`/`signature` (`X-Amz-Signature`) counts there too. Names merely containing
-such letters (`keyword`, `monkey`, `author`, `signal`, `design`, `tokenizer`,
-`primaryKey`, `sortKey`) are not credential keys.
+`.`, spaces and digits. Refuse mode takes the whole name, after an optional
+header `x-`, as the phrase: `token`, `access_token`, `refresh_token`,
+`authorization`, `cookie`, `password`, `api_key`/`apiKey`, `secret`, `bearer`,
+`X-Auth`, `X-Auth-Token`, `httpPassword`, `client_secret`, `private_key`,
+`sessionId`, `sig`/`signature`, any name with `secret`, `subscription` or
+`functions` before `key` (`secret_key`, `x-functions-key`,
+`Ocp-Apim-Subscription-Key`) and `pwd`, and their plurals holding text
+(`tokens: [...]`, `apiKeys: [...]`), under an object key or as the name of a
+`[name, value]` pair in a list of them. A URL query or fragment key is a
+credential when it ends in such a phrase, or is a bare `key` or ends in
+`sig`/`signature` (`X-Amz-Signature`). Names merely containing such letters
+(`keyword`, `monkey`, `author`, `signal`, `design`, `tokenizer`, `primaryKey`,
+`sortKey`) are not credential keys, and neither is a longer name such as the
+pagination cursor `next_page_token`.
 Credential-key validation permits a JSON boolean (a common noncredential
 visibility flag such as `secret: true`), and null, an empty string or a mask
 (`****`, `[redacted]`, `[removed]` and similar) under any credential key: they sit
@@ -255,9 +257,9 @@ key and credential-bearing URLs remain forbidden, including in raw file/API
 originals excluded by a parser. Accepted originals remain exact.
 
 `readFileSource` with `credentials: 'remove'` (the import door's choice) keeps a
-record holding a plain credential value instead. It applies the same
-name rule to every record and drops a field whose name's parts are a credential
-word or phrase (`httpPassword`, `client_secret`, `X-Api-Key`) or its plural holding text
+record holding a plain credential value instead. It casts a wider net than the
+refusal above: it drops any field whose name's parts end in a credential word or
+phrase (`httpPassword`, `client_secret`, `X-Api-Key`, `pushToken`) or its plural holding text
 (`apiKeys: [...]`), the `value` of a `{name|key, value}` pair naming one or of
 such a `[name, value]` pair in a list of them, and a URL's (any scheme's) user name, password and
 credential query and fragment parameters, keeping booleans. It reports each

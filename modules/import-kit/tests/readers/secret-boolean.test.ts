@@ -69,7 +69,7 @@ test('public readers and durable planning retain boolean secret semantics with e
   assert.equal((await read({key:'k_1',primaryKey:'pk_1'})).records.length,1);
   // Look-alike names, counts under a plural name, a lone two-item list and placeholders are accepted as they are.
   const accepted={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',link:'https://source.test/?signal=1&design=2',tags:['password','reset'],
-    tokens:{input:1500,output:300},inputTokens:1500,hasSecretKey:true,pwd:null,secret_key:'',apiKeys:['****'],headers:[['Authorization','none'],['X-Auth','[redacted]']]};
+    tokens:{input:1500,output:300},inputTokens:1500,next_page_token:'cursor/a+b',nextSyncToken:'sync-1',emailSignature:'Thanks',hasSecretKey:true,pwd:null,secret_key:'',apiKeys:['****'],headers:[['Authorization','none'],['X-Auth','[redacted]']]};
   const source=await read(accepted);
   assert.deepEqual(source.records[0].payload,{uri:'https://source.test/event',...accepted});assert.equal(source.artifacts[0].original?.status,'available');
 });
