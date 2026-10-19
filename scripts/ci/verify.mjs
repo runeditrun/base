@@ -26,7 +26,9 @@ if (group === '--matrix') {
   assert.ok((await moduleTestFiles()).length >= MODULE_SHARDS, 'Each module shard must have test files');
   await cliShardPlan();
   await referenceShardPlan();
-  console.log(JSON.stringify({ include: Object.keys(groups)
+  // DIAGNOSTIC ONLY (gr-base-268): six parallel copies of the erasure journey shard.
+  console.log(JSON.stringify({ include: Array.from({ length: 6 }, (_, copy) => ({ group: 'reference', shard: 1, total: 2, copy })) }));
+  if (process.env.GR_BASE_268_FULL_MATRIX) console.log(JSON.stringify({ include: Object.keys(groups)
     .filter(group => group !== 'journeys' || process.env.CI_INCLUDE_JOURNEYS === 'true')
     .flatMap(group => {
       const total = group === 'modules' ? MODULE_SHARDS : group === 'cli' ? CLI_SHARDS : group === 'reference' ? 2 : 0;
