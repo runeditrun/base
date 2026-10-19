@@ -16,6 +16,15 @@ arguments remain `--public-base <url>#<branch>`, `--project <owner>/<repo>`,
 returns INCOMPLETE. `--cache-dir` is accepted for caller compatibility and no
 longer creates a resumable cache.
 
+Invalid flags, missing values, invalid timeouts and malformed `--public-base`
+arguments return INCOMPLETE (exit 2) with one `scan.usage` finding. Its `message`
+names the argument problem and its `validFlags` lists the accepted flags. Only
+flag names are echoed; argument values stay out of the report and diagnostics.
+The same message appears on one stderr line pointing to `--help`, which prints
+the command's usage. Other incomplete scans retain their existing rules, such
+as `scan.public-base-rejected` for an unavailable or refused remote base,
+`scan.deadline-exceeded`, `scan.interrupted` and `scan.worker-incomplete`.
+
 Output change: the v3 report now includes `scanner` and secret findings include
 Gitleaks `scannerRule`; binary/parser guarantees, limits and cache details are removed.
 

@@ -2979,7 +2979,7 @@
     },
     "scripts/publish-check.mjs": {
       "source": "scripts/publish-check.mjs",
-      "sha256": "0cdee0d8f6315fc515c09290f63df23a60520ff0571cae67da21d82372bb4bff"
+      "sha256": "3fb2db00300d2b37cd90368ac805df6a91d158f619317edf40a18b180c9b648f"
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
@@ -2995,7 +2995,7 @@
     },
     "scripts/publish-check/cli.py": {
       "source": "scripts/publish-check/cli.py",
-      "sha256": "91b4ea61edb4e36204656a1ce8c21012c8b246c86af8cbb1c5d7b1633d26eaa4"
+      "sha256": "d6840fee8bf211b69ed8630649de48e6502cde468d40e09bbfee2cb37ba1a5e5"
     },
     "scripts/publish-check/command_arguments.py": {
       "source": "scripts/publish-check/command_arguments.py",
