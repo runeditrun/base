@@ -26,7 +26,8 @@ retaining any later known sign-in, so missing historical sessions never establis
 immediate inactivity.
 
 Canonical JSON sorts object keys, preserves array order and rejects non-JSON
-values. SHA-256 covers the complete definition, including both bounds. The owner
+values. The definition is snapshotted once; validation, action grants and SHA-256
+all use that same snapshot, including both bounds. The owner
 reviews that exact hash; approval rereads the definition and rejects stale hashes.
 Approval stores the definition, actions, hash, owner id/authority version, session
 kind, approval time and revocation details. Reapproval atomically revokes its
@@ -60,7 +61,13 @@ remain committed. Existing final-owner and invitation/version triggers still app
 
 Admission is serialized per policy: another admitted run cannot overlap, and the
 minimum interval starts at the last admitted run's finish, including failed or
-refused admitted runs. Early ticks are refused with `policy_interval`. Consecutive
+refused admitted runs. An admitted run still running beyond Cloudflare's
+[15-minute scheduled-handler limit](https://developers.cloudflare.com/workers/platform/limits/#duration)
+is atomically marked failed with `policy_expired` and a `policy:expired` audit
+bound to its original run id. Its minimum interval is measured from admission,
+so recovery cannot exceed the approved tick frequency; live runs still block
+overlap. Expired capabilities cannot write or overwrite the expiry outcome.
+Early ticks are refused with `policy_interval`. Consecutive
 identical unadmitted refusals for the same policy/version/approval/outcome coalesce
 into one history row with `repeats` occurrences and `lastSeenAt`. Admitted runs
 retain separate rows and action history.
