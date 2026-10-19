@@ -18,12 +18,12 @@ import { exportReference } from '../scripts/export-reference.mjs';
 import { initialize } from '../foundation/initialize.mjs';
 import { assemble } from '../composition/assemble.mjs';
 import { sourceRoots } from './export.mjs';
-import {fixture,freePort,hostStatus,pause,chromium,forwardingProxy,documentedCommand} from './fixtures/reference.mjs';
+import {fixture,freePort,setupOrigin,hostStatus,pause,chromium,forwardingProxy,documentedCommand} from './fixtures/reference.mjs';
 import { readDevKey } from '../modules/operator-auth/dev/sign-in-as.mjs';
 import { privateRuntime } from './fixtures/private-runtime.mjs';
 import { unreadableCommands } from './fixtures/run-page.mjs';
 for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real Worker install/setup/dev/sign-in/build/reset and teardown`,{timeout:20*60_000},async t=>{
- const f=await fixture(kind,t),port=await freePort(),url=`http://127.0.0.1:${port}`;let setupPort=await freePort();while(setupPort===port)setupPort=await freePort();
+ const f=await fixture(kind,t);let port,url;
  await t.test('frozen install and real local application lifecycle', async local=>{
  const events=child=>child.stdoutText.trim().split('\n').map(line=>JSON.parse(line));
  const guide=await readFile(join(f.root,'RUN-LOCALLY.md'),'utf8'),steps=guide.match(/```sh\n([^`]+)\n```/)?.[1].trim().split('\n');assert.ok(steps,'exported operator recipe is available to execute');
@@ -51,9 +51,10 @@ for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real W
  await symlink(answers,join(f.root,'linked-answers.json'));await f.run(['setup','--answers','linked-answers.json','--json','--non-interactive'],4);await rm(join(f.root,'linked-answers.json'));await rm(answers);
  const manifestAnswers={OWNER_EMAIL:'cli-owner@example.test',...(kind==='foundation'?{WORKSPACE_TITLE:'Manifest workspace',CONNECTION_PASSWORD:'fixture-connection-passphrase'}:{})};
  await writeFile(answers,JSON.stringify(manifestAnswers),{mode:0o600});
- const setupCommand=steps[1].replace('you@example.com','cli-owner@example.test')+` --answers answers.json --owner-name CLI --port ${setupPort} --non-interactive --json`;
+ const setupCommand=steps[1].replace('you@example.com','cli-owner@example.test')+' --answers answers.json --owner-name CLI --non-interactive --json';
  const [setupProgram,...setupArgs]=documentedCommand(setupCommand);
  const setupResult=f.launch(setupArgs,setupProgram,{CI:'false'});
+ const setupUrl=await setupOrigin(setupResult),setupPort=Number(new URL(setupUrl).port);
  await privateRuntime(`http://127.0.0.1:${setupPort}`,f.root,{kind,runtime:'setup',child:setupResult});
  assert.equal(await setupResult.done,0,'documented JSON setup passes through the real heavy-job queue');
  assert.equal(events(setupResult).filter(event=>event.event==='setup-ready').length,1,'JSON setup readiness is emitted once');
@@ -76,6 +77,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  // would serve, and saves into the documented exports/ folder.
  await f.run(['export','--output','journey.json','--json'],4);
  await f.run(['export','--output','exports/journey.rer','--json']);await cp(join(f.root,'exports/journey.rer'),join(f.root,'journey.rer'));
+ port=await freePort();while(port===setupPort)port=await freePort();url=`http://127.0.0.1:${port}`;
  const dev=f.start(['dev','--port',String(port),'--json','--non-interactive']);local.after(()=>f.stop(dev));
  const deadline=Date.now()+120000;while(!dev.stdoutText.includes('"event":"ready"')&&dev.exitCode===null&&Date.now()<deadline)await pause(100);
  assert.ok(dev.stdoutText.includes('"event":"ready"'),'actual dev health must precede ready');
@@ -157,7 +159,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  for(const path of retained)assert.equal(await readFile(join(f.root,path),'utf8'),'retained owner artifact','reset preserves source/dependencies/exports/deployment receipts');
  await assert.rejects(access(join(f.root,'.dev.vars')));await assert.rejects(access(join(f.root,'.wrangler/state')));
  await writeFile(answers,JSON.stringify({...manifestAnswers,OWNER_EMAIL:'fresh-owner@example.test'}),{mode:0o600});
- await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--port',String(port),'--non-interactive','--json']);await rm(answers);
+ url=events(await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--non-interactive','--json'])).find(event=>event.event==='setup-ready').url;port=Number(new URL(url).port);await rm(answers);
  const tables=await f.data("SELECT name FROM sqlite_master WHERE name='cli_reset_probe'");assert.equal(tables[0].results.length,0,'confirmed reset removed prior domain rows');
  const ownerRows=await f.data('SELECT email FROM oa_operators');assert.deepEqual(ownerRows[0].results,[{email:'fresh-owner@example.test'}],'fresh setup has only the new real owner');
  const deploySettings=join(f.root,'.seed/installer/dry-run.env');await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
@@ -218,7 +220,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  for(const name of ['oa_sessions','oa_provider_sessions','rer_dependency_keys'])assert.equal((await f.data(`SELECT count(*) n FROM ${name}`))[0].results[0].n,0,`${name} remains absent after restore`);
  assert.deepEqual((await f.data('SELECT idp_sign_in,first_setup FROM oa_auth_settings'))[0].results,kind==='foundation'?[{idp_sign_in:0,first_setup:0}]:[],'restore does not enable provider admission');
  await writeFile(answers,JSON.stringify({...manifestAnswers,OWNER_EMAIL:'fresh-owner@example.test'}),{mode:0o600});
- await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--port',String(port),'--non-interactive','--json']);await rm(answers);
+ url=events(await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--non-interactive','--json'])).find(event=>event.event==='setup-ready').url;port=Number(new URL(url).port);await rm(answers);
  await recoverArchiveIdentity(f,url,originalIdentity,{retained:kind==='foundation'});
  for(const name of retainedIdentityTables)assert.deepEqual((await f.data(`SELECT * FROM ${name}`))[0].results,identityBefore[name],`${name} survives setup and native recovery exactly`);
  if(kind==='default-seed'){
