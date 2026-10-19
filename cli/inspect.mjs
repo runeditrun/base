@@ -141,8 +141,12 @@ export async function check(project, explicitProfile) {
 // command still calling one.
 async function packageClauses(root, pkg) {
  const declared = declaredPackage(pkg), locked = await lockedPackage(root), clauses = [];
+ const patchHash = /\(patch_hash=([^)]*)\)/.exec(locked?.version ?? '')?.[1];
+ const patchPath = patchHash ? await rerPatchPath(root, pkg, locked.version, patchHash) : undefined;
  clauses.push(['SC-13.package.pin', pkg.devDependencies?.[packageName] === declared && exactVersion.test(declared), `Pin ${packageName} in devDependencies to an exact version (for example "0.2.0"), not ${JSON.stringify(declared)} or a runtime dependency.`]);
- clauses.push(['SC-13.package.lockfile', locked?.locked && locked.specifier === declared && locked.version === declared, `Run pnpm install so pnpm-lock.yaml locks ${packageName} ${declared}${locked?.version ? ` (it locks ${locked.version})` : ''}.`]);
+ clauses.push(['SC-13.package.lockfile', locked?.locked && locked.specifier === declared && locked.version === declared, patchHash
+  ? `${packageName} is patched locally${patchPath ? ` by ${patchPath}` : ' (see pnpm patchedDependencies metadata)'}. This change belongs upstream in Base; adopt a published rer version containing it and remove the local patch before checking the first-party contract again.`
+  : `Run pnpm install so pnpm-lock.yaml locks ${packageName} ${declared}${locked?.version ? ` (it locks ${locked.version})` : ''}.`]);
  for (const path of vendoredPaths) {
   let present = true; try { await lstat(resolve(root, path)); } catch { present = false; }
   clauses.push(['SC-13.package.vendored.' + path, !present, `Remove ${path}: a checkout that pins ${packageName} runs the package, not a vendored copy (node scripts/export-cli.mjs --to-package converts one).`]);
@@ -151,6 +155,30 @@ async function packageClauses(root, pkg) {
  const calls = await vendoredCalls(root);
  clauses.push(['SC-13.package.calls', !calls.length, `Run pnpm exec rer VERB instead of the removed vendored copy (pnpm install --frozen-lockfile first where nothing has installed yet) in ${calls.length} place${calls.length === 1 ? '' : 's'}:\n${calls.slice(0, 20).join('\n')}${calls.length > 20 ? `\n...and ${calls.length - 20} more` : ''}`]);
  return clauses;
+}
+
+// pnpm's lockfile records the selected patch hash and path, including when
+// patchedDependencies lives in pnpm-workspace.yaml rather than package.json.
+async function rerPatchPath(root, pkg, version, hash) {
+ const selector = `${packageName}@${version.split('(')[0]}`;
+ let text;
+ try { text = await readFile(resolve(root, 'pnpm-lock.yaml'), 'utf8'); } catch {}
+ const scalar = value => value.trim().replace(/^(['"])(.*)\1$/, (_, quote, content) => quote === "'" ? content.replace(/''/g, "'") : content);
+ const patches = [];
+ let reading = false, entry;
+ for (const line of (text ?? '').split('\n')) {
+  if (line === 'patchedDependencies:') { reading = true; continue; }
+  if (!reading || !line.trim()) continue;
+  if (/^\S/.test(line)) break;
+  const key = /^  (\S.*):\s*$/.exec(line);
+  if (key) { entry = { selector: scalar(key[1]) }; patches.push(entry); continue; }
+  const field = /^    (hash|path):\s*(.+)$/.exec(line);
+  if (entry && field) entry[field[1]] = scalar(field[2]);
+ }
+ const selected = patches.find(patch => (patch.selector === packageName || patch.selector.startsWith(packageName + '@')) && patch.hash === hash);
+ if (selected?.path) return selected.path;
+ const declared = pkg.pnpm?.patchedDependencies;
+ return declared?.[selector] ?? declared?.[packageName];
 }
 
 // Without the pinned pnpm on PATH, rer provides it for this command only

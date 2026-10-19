@@ -1,0 +1,5 @@
+@media (max-width: 600px) {
+  .rer-themed .scheduled-policies dl { display: block; }
+  .rer-themed .scheduled-policies dt { font-weight: 500; }
+  .rer-themed .scheduled-policies dd { margin: 0 0 14px; }
+}

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.70
+
+- **Archive restores judge later data statements by the table they write (#340).** A bounded INSERT/REPLACE/UPDATE/DELETE whose target is outside the restorable catalogue, and reaches none of it by trigger or FK action, is admitted whatever it reads; an INSERT…SELECT/VALUES into a catalogue table the archive lacks is replayed at finalize in migration order, in the same D1 batch, and recorded in bridged.replayed. Nook's retained archive restores past 0061.
+- **Owner-approved scheduled policy jobs (#323).** Owners approve hash-pinned, scoped scheduled operator-auth status actions with fresh proof; every cron attempt re-checks owner, version, revocation, role policy, action and target inside the write transaction and is audited, with approve/revoke/history at /app/policies and an additive migration.
+- **Staged product directory for deploy (#334).** An owner deploy declaration can set top-level "productDirectory" (for example .rer/deploy/product); rer validates its checkout-relative placement and symlink containment and forwards it to the kit's dry run, deploy and health checks.
+- **Sign-in mark (#338).** Optional config.branding.mark (a same-origin root-relative image path) shows on sign-in, one-click, confirmation, settings and dev key-exchange pages; pages without a mark are unchanged.
+- **/contract overlap regression checks (#336).** The run-site browser door now measures /contract split cards at 860, 1000 and 1160 px for overlap and sideways overflow.
+- **Owned runtime stops promptly (#341).** The post-health port-ownership check now stops when its launch is cancelled, so a stop during startup no longer leaves rer polling for 15 seconds.
+
+## 0.2.69
+
+- **Renewable hosted import leases (#328).** A hosted import holds a five-minute renewable lease (30-second heartbeat while active) with fenced request claims; the next restore safely aborts stale staging and owned blobs through the existing recovery, and owner active/status/abort routes stay authenticated.
+- **One-click sign-in offers providers (#324).** One-click owner entry also offers the visible provider forms, carrying returnTo, with provider origins in the CSP; SC-13 names a local rer patch and points it upstream to Base.
+- **Run site dates and command (#326).** /contract shows US short UTC dates, and the /run command's `npx` start stays whole, breaking only before the repository.
+- **CLI setup tests (#325).** Five CLI setup tests no longer pre-probe a --port, and shared fixture cleanup tolerates a late .DS_Store.
+
+## 0.2.68
+
+- **Retained-archive restores (#316, #318).** Placing an older archive treats a CREATE TRIGGER or DROP TRIGGER statement bounded as exactly one trigger as schema-only, and restore drops and recreates the destination's triggers around insertion; a later write that reaches an archived table through a trigger is still refused. Base reads RER Platform's rer_migrations ledger, places an archive without a migration record by the ledger it carries (every archived name and hash must match an applied migration), and admits a later UPDATE or DELETE of a table the archive holds no rows of.
+- **Release scans committed bytes only (#317).** rer release scans the raw committed source in an isolated mirror, so ignored local files such as .dev.vars and dist no longer block a release; a committed credential still does.
+- **Import credential names (#311).** The import door matches credential names by whole name parts (keyword, author and primaryKey are not credentials), catches query-key credentials such as application_key, hapikey and token_auth, and treats signatures and session ids as credentials only as URL keys and header names.
+- **Lobby recovery help on this computer only (#319).** The claimed Lobby shows the project-folder `rer signin` line only on loopback hosts, so hosted owners no longer see it.
+- **Import safety normalization (#322).** A seed's importSafety/importRow hook bounds staged rows to declared safe values (for example connections forced inactive with their tokens cleared), checks determinism and idempotence, and journals per-table, column and value counts into status, receipts and owner CLI output.
+
 ## 0.2.67
 
 - **Import door options (#298 with #308).** Seeds choose credential removal modes and a preserve or strict reversal policy when an import is created. Failed applies can be retried, CLI-stripped query and fragment credentials receive per-record notes, more credential shapes are recognized, and a blocked re-baseline is refused at plan time with a named 409.

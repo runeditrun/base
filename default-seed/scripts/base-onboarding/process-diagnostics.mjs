@@ -25,8 +25,10 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
   const remaining=Math.floor(context.deadline-performance.now());
   if(remaining<=0)break;
   const timeout=attempt===0?Math.min(3000,remaining):remaining;
-  try{return (await exec(command,args,{timeout,maxBuffer})).stdout;}
+  try{return (await exec(command,args,{timeout,maxBuffer,signal:context.signal})).stdout;}
   catch(error){
+   // A cancelled caller stops inspecting: the abort is never an ownership verdict.
+   if(context.signal?.aborted)throw context.signal.reason;
    // A selected state file positively observed before a timeout still has a
    // holder. Partial output can never establish the absence of a holder.
    if(typeof error.stdout==='string'&&positiveResult?.(error.stdout))return error.stdout;
@@ -166,6 +168,9 @@ export async function listenerPorts(pid,context=inspectionContext()){
 export async function listenerOwnership(pid,port,host,context=inspectionContext()){
  context.port=port;
  do {
+ // A cancelled launch has stopped its app, so its listener never appears:
+ // end now rather than polling ps and lsof until the inspection budget.
+ context.signal?.throwIfAborted();
  const owned=await descendants(pid,context);
  const ownRows=await listeners([...owned],context);
  const own=ownRows.find(row=>owned.has(row.pid)&&row.sockets.some(socket=>serves(socket,port,host)===true));
@@ -180,7 +185,7 @@ export async function listenerOwnership(pid,port,host,context=inspectionContext(
  if(row)return {status:owned.has(row.pid)?'owned':'other',pid:row.pid};
  const remaining=context.deadline-performance.now();
  if(remaining<=0)return {status:'none'};
- await delay(Math.min(100,remaining));
+ await delay(Math.min(100,remaining),undefined,{signal:context.signal});
  }while(performance.now()<context.deadline);
  return {status:'none'};
 }

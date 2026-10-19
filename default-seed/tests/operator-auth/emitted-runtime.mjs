@@ -25,31 +25,33 @@ export async function migrate(db, filename) {
   await db.batch(splitSql(sql).map((statement) => db.prepare(statement)))
 }
 export const emittedRuntime = (options = {}) => startOnFreePort((port) => startEmittedRuntime(port, options))
-async function startEmittedRuntime(port, { prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo }) {
+async function startEmittedRuntime(port, { prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, files = false, hostname = '127.0.0.1' }) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
   const production = !noMail
-  const origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://127.0.0.1:${port}`
+  const origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://${hostname}:${port}`
+  const forwardHost = demoHost || hostname !== '127.0.0.1'
   const mails = []
   const networkRequests = []
   const provider = oidc ? await testProvider(origin, owner) : undefined
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter((file) => file.endsWith('.js')).map((file) => `assets/${file}`)]
     .map((file) => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
-  // Preserve the hosted URL and Host through Miniflare's loopback proxy, as the
+  // Preserve the requested URL and Host through Miniflare's loopback proxy, as the
   // demo front does when forwarding into this visitor's container.
-  if (demoHost) modules.unshift({ type: 'ESModule', path: join(root, 'dist/server/test-demo-entry.mjs'),
+  if (forwardHost) modules.unshift({ type: 'ESModule', path: join(root, 'dist/server/test-demo-entry.mjs'),
     contents: `import worker from ${JSON.stringify('./' + config.main)};
       export default { ...worker, async fetch(envelope, env, execution) {
         const { url, ...init } = await envelope.json();
         return worker.fetch(new Request(url, init), env, execution);
       } };` })
-  const options = convertV4MiniflareOptions({
+  const legacyOptions = {
     host: '127.0.0.1', port, https: production, modulesRoot: join(root, 'dist/server'),
     modules,
     compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
     assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
     d1Databases: { DB: 'default-seed-emitted' },
+    ...(files ? { r2Buckets: { FILES: 'default-seed-emitted-files' } } : {}),
     queueProducers: { JOBS: 'reference-jobs' }, queueConsumers: { 'reference-jobs': { maxBatchTimeout: 0 } },
     bindings: {
       AUTH_ORIGIN: origin, AUTH_LOCAL: production ? 'false' : 'true', OWNER_EMAIL: owner, SETUP_TOKEN: setupToken,
@@ -70,11 +72,12 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
       mails.push(await request.json())
       return Response.json({ id: `test-receipt-${mails.length}` })
     },
-  })
+  }
+  const options = convertV4MiniflareOptions(legacyOptions)
   const mf = new Miniflare({ ...options, resourcePersistencePath: join(directory, 'state') })
   try {
     await mf.ready
-    const db = await mf.getD1Database('DB')
+    let db = await mf.getD1Database('DB')
     await migrate(db, '0001_reference.sql')
     if (prior) {
       await db.prepare("INSERT INTO operators VALUES ('old-operator','previous@example.test','2026-09-08T00:00:00Z')").run()
@@ -84,14 +87,23 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
     for (const file of (await readdir(join(root, 'migrations/core'))).filter((file) => file.endsWith('.sql') && file !== '0001_reference.sql').sort()) await migrate(db, file)
     const call = (path, { method = 'GET', input, body, cookie, headers = {} } = {}) => {
       const init = { method, headers: {
-        ...(demoHost ? { host: new URL(origin).host, 'CF-Connecting-IP': '192.0.2.1' } : {}),
+        ...(forwardHost ? { host: new URL(origin).host, 'CF-Connecting-IP': demoHost ? '192.0.2.1' : '127.0.0.1' } : {}),
         ...(method === 'POST' ? { origin, 'content-type': 'application/json' } : {}),
         ...(cookie ? { cookie } : {}), ...headers,
       }, ...(body !== undefined ? { body } : input === undefined ? {} : { body: JSON.stringify(input) }) }
-      return demoHost ? mf.dispatchFetch(`https://127.0.0.1:${port}/test-dispatch`, {
+      return forwardHost ? mf.dispatchFetch(`${production ? 'https' : 'http'}://127.0.0.1:${port}/test-dispatch`, {
         method: 'POST', redirect: 'manual', body: JSON.stringify({ url: origin + path, ...init }),
       }) : mf.dispatchFetch(origin + path, { ...init, redirect: 'manual' })
     }
-    return { origin, call, db, mails, mf, provider, networkRequests, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
+    return { origin, call, get db() { return db }, mails, mf, provider, networkRequests,
+      // Deploy changed real Worker source against the same persisted D1. This
+      // models policy edits without an application-only test endpoint/binding.
+      async redeploy(transform = source => source) {
+        const changed = await Promise.all(modules.map(async module => ({ ...module,
+          contents: transform(module.contents ?? await readFile(module.path, 'utf8'), module.path) })))
+        await mf.setOptions({ ...convertV4MiniflareOptions({ ...legacyOptions, modules: changed }), resourcePersistencePath: join(directory, 'state') })
+        await mf.ready
+        db = await mf.getD1Database('DB')
+      }, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
   } catch (error) { await Promise.allSettled([mf.dispose(), rm(directory, { recursive: true, force: true })]); throw error }
 }

@@ -19,6 +19,7 @@ import { deploymentRecord } from './deployment-record.mjs';
 import { cloudflareCredentials, missingCredentialsMessage } from './deploy-needs.mjs';
 import { keptSecrets, keepSecrets, forgetSecrets } from './deploy-secrets.mjs';
 import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
+import { deployProductDirectory, deployProductArguments } from './deploy-product.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -35,6 +36,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const retry = options.remove ? `${again} --remove --yes` : options.setSecret ? `${again} --set-secret ${options.setSecret}` : options.unsetSecret ? `${again} --unset-secret ${options.unsetSecret}` : options.rotateSecret ? `${again} --rotate-secret ${options.rotateSecret}` : again;
   if (change.length > 1 || change.length && options.dryRun) throw invalid(`Use ${change.join(', ')}${options.dryRun ? ' and --dry-run' : ''} on separate runs.`);
   if (options.remove && !options.yes) throw invalid(`${again} --remove deletes this environment's Worker and every D1, R2, KV and queue rer created for it, with their data. Add --yes to confirm.`);
+  const productDirectory = change.length ? undefined : deployProductDirectory(declaration);
   const recordedState = change.length ? await deploymentRecord(root, options) : undefined;
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
@@ -58,7 +60,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   redaction.addSecrets([...(await settingKinds({ declaration, setupManifest })).privateValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment]).filter(Boolean)]);
   const claim = setupManifest?.steps?.find(item => item.type === 'owner-claim');
   const declared = binding => (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(item => item?.binding === binding);
-  const owner = (command, extra = [], values = env, more = {}) => main([command, '--declaration', declarationPath, '--environment', environment, ...extra], values, { cwd: root, localOnlyKeys, ...more });
+  const owner = async (command, extra = [], values = env, more = {}) => main([command, '--declaration', declarationPath, '--environment', environment, ...(['dry-run', 'deploy', 'health'].includes(command) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
   // Keep confirmed creation events across deploy and the independent health call.
   const created = [];
   let step = 'deploy', deployed;

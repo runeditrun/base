@@ -61,6 +61,10 @@ export default withDemo({
       const imports = await importPageResponse(request, bindings)
       if (imports) return imports
     }
+    if (path === '/app/policies') {
+      const policies = await (await import('./core/features/policies/page.server')).policyPageResponse(request, bindings)
+      if (policies) return policies
+    }
     if (path === '/app/people') {
       const people = await (await import('./core/features/people/page.server')).peoplePageResponse(request, bindings)
       if (people) return people
@@ -86,7 +90,15 @@ export default withDemo({
   },
   async scheduled(controller, bindings: Bindings): Promise<void> {
     const checked = requireBindings(bindings)
-    await recordScheduledRun(checked, controller.cron)
-    await (await import('./core/features/people/routes')).resumePendingErasures(checked)
+    const failures: unknown[] = []
+    for (const job of [
+      () => recordScheduledRun(checked, controller.cron),
+      async () => (await import('./core/features/policies/scheduled.server')).runScheduledPolicies(checked),
+      async () => (await import('./core/features/people/routes')).resumePendingErasures(checked),
+    ]) {
+      try { await job() }
+      catch (error) { failures.push(error) }
+    }
+    if (failures.length) throw new AggregateError(failures, 'Scheduled maintenance failed')
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

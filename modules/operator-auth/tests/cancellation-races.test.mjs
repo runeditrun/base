@@ -39,11 +39,17 @@ for (const winner of ['cancellation', 'confirmation']) test(`invitation race: ${
     await awaitBarrier(db, barrier);
     const committed = await r.call(winner === 'cancellation' ? '/auth/invite/cancel' : '/auth/confirm', winner === 'cancellation' ? cancellation : confirmation);
     assert.equal(committed.status, winner === 'cancellation' ? 200 : 303);
+    let expectedLastSignin = invitee.operator.last_signin_at;
+    if (winner === 'confirmation') {
+      const admitted = await db.prepare('SELECT created_at FROM oa_sessions WHERE operator_id=?').bind(invitee.operator.id).first();
+      assert.ok(Number.isSafeInteger(admitted?.created_at), 'winning confirmation admits a timestamped session');
+      expectedLastSignin = admitted.created_at;
+    }
     const losing = await release(r, barrier, pending);
     assert.equal(losing.status, winner === 'cancellation' ? 400 : 409);
     assert.equal(losing.headers.get('set-cookie'), null);
     const operator = await db.prepare('SELECT * FROM oa_operators WHERE id=?').bind(invitee.operator.id).first();
-    assert.deepEqual(operator, { ...invitee.operator, status: winner === 'cancellation' ? 'inactive' : 'active', version: invitee.operator.version + 1 });
+    assert.deepEqual(operator, { ...invitee.operator, status: winner === 'cancellation' ? 'inactive' : 'active', version: invitee.operator.version + 1, last_signin_at: expectedLastSignin });
     const sessions = await db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(operator.id).first();
     assert.equal(sessions.n, winner === 'cancellation' ? 0 : 1);
     const token = await db.prepare('SELECT consumed_at FROM oa_tokens WHERE operator_id=?').bind(operator.id).first();

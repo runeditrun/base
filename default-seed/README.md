@@ -340,3 +340,15 @@ capacity, sign-in and CI policy.
 The typecheck stage of `pnpm run verify` uses checkout-local, gitignored
 `.cache/typecheck.tsbuildinfo`; deleting it forces a full check, while
 `pnpm run build` still builds the real Worker and assets.
+
+## Scheduled policy approvals
+
+After signing in as the owner and finishing setup, open `/app/policies` from the
+operator app. Review the complete definition, permitted actions/scopes and hash,
+then approve that exact version. Revoke at any time; changes require reapproval.
+The reference starts with an unapproved policy to deactivate members with no OA
+sign-in in 90 days. This measures session creation, not domain activity. The
+Worker cron records every attempt and performs only approved bounded actions.
+Owners can inspect approvals and run outcomes on that page. Audit records bind
+`policy:<id>@<hash>`, approving owner and unique run id to each committed action.
+See [the policy design](../modules/operator-auth/SCHEDULED-POLICY.md) for adoption.
