@@ -23,6 +23,7 @@ import { settingKinds } from './deploy-settings.mjs';
 import { deployGuide, neededForRealDeploy, reportNeeded } from './deploy-needs.mjs';
 import { keepHookSecrets } from './deploy-secrets.mjs';
 import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
+import { deployProductDirectory, deployProductArguments, DeployProductError } from './deploy-product.mjs';
 
 export function validateDeployOptions(options) {
  const changes = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret', options.rotateSecret && '--rotate-secret'].filter(Boolean);
@@ -93,6 +94,7 @@ export async function deployCommand(context) {
  // A hook that deployed through the kit keeps what its Worker holds: rotate there as a secret change.
  if (options.rotateSecret && !adapter.deploy.managesHostedOwner && await hookState(root, options.environment ?? 'production')) return ownerDeploy(path, adapter)(context);
  if (adapter.deploy.managesHostedOwner) { const result = await adapter.deploy(context); return options.dryRun ? dryRun(result) : result; }
+ const productDirectory = deployProductDirectory(declaration);
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
  const sourceSha = options.dryRun ? undefined : committedSource(root, options);
@@ -109,7 +111,7 @@ export async function deployCommand(context) {
  // A hook keeping the kit's record in its own state file named it; every kit
  // step after the hook (inspect, secret, record-owner) reads that record.
  let hookRecord = await hookState(root, environment);
- const command = (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
+ const command = async (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...(['dry-run', 'deploy', 'health'].includes(verb) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
  // A hook that deployed through the kit's standard record lets rer issue and
  // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
  let recorded, hookReturned = false;
@@ -134,6 +136,7 @@ export async function deployCommand(context) {
     Object.assign(process.env, saved);
    }
    hookReturned = true;
+   await deployProductArguments(root, productDirectory);
    await refuseLocalEnvOutput(root, adapter.devIdentity?.output, { uploaded: !options.dryRun });
    if (options.dryRun) {
     await command('dry-run');
@@ -165,6 +168,7 @@ export async function deployCommand(context) {
    return { ...result, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   });
  } catch (error) {
+  if (error instanceof DeployProductError) throw error;
   const again = deployAgain(options);
   const { commandFailure } = await shared('failures.mjs');
   const secrets = secretFailureMessage(error);
