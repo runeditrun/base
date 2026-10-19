@@ -36,6 +36,15 @@
       ]
     },
     {
+      "name": "import-archive",
+      "browser": false,
+      "hosted": false,
+      "commands": [
+        "pnpm run build",
+        "node --test --test-concurrency=1 tests/e2e/import-archive.test.mjs"
+      ]
+    },
+    {
       "name": "auth-conformance",
       "browser": true,
       "hosted": false,

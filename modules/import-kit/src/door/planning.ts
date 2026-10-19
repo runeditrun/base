@@ -187,7 +187,7 @@ async function retainedSource(request: DoorRequest, upload: UploadRow): Promise<
 }
 /** The kit never stages an erased record, and neither does the door: an upload
  * holding one can never be planned, so it goes too. The epoch fences a later erasure. */
-async function refuseErased(request: DoorRequest, upload: UploadRow, plan: ImportPlan): Promise<void> {
+export async function refuseErased(request: DoorRequest, upload: UploadRow, plan: ImportPlan): Promise<void> {
   const db = request.options.database;
   for (const clear of erasedSourcePredicates(plan)) if ((await statement(db, sql(`SELECT ${clear.sql} AS clear`, ...clear.params ?? [])).first())?.clear !== 1) {
     await forget(request, upload);

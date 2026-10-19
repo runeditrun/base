@@ -621,7 +621,8 @@ Independent projects without an adapter use `OPERATIONS.json` v2 `commands.NAME.
 
 A seed may explicitly mount import-kit's D1-only
 `createImportDoorHandler(options)` from `modules/import-kit/src/door/index.ts`
-under POST `/api/rer/import/{uploads,plan,apply,status,reconcile,undo}`. This is
+under POST `/api/rer/import/{uploads,plan,apply,status,reconcile,undo,archive,restore-check}`
+(the last two grant-only). This is
 the optional grant authority for the same pipeline used by the signed-in
 operator mount, not a second importer. The seed supplies its database, real
 target adapter, parser/mapping, destination and actual owner principal, and
@@ -630,8 +631,10 @@ A seed that already installed the door never re-applies `importDoorSchema`
 (it refuses on that older door schema, so the deploy fails rather than keep the
 old plan table). It applies the door migrations once each, in order, each in a
 new numbered migration: `importDoorApplyFailureMigration` as a single atomic
-batch, then `importDoorScopesMigration`. Until both are applied, an enabled
-door answers every route with 503 `import_door_schema_outdated`.
+batch, then `importDoorScopesMigration`, then `importDoorArchiveMigration`.
+Until the first two are applied, an enabled door answers every route with 503
+`import_door_schema_outdated`; without the third, only `archive` and
+`restore-check` do.
 Base does not mount the door in a seed automatically. Copy the module's
 `CONTRACT.md` and `src/door/README.md` with its runtime and dependencies.
 

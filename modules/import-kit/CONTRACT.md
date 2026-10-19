@@ -93,7 +93,9 @@ metadata are rejected rather than retained.
 
 `src/door/index.ts` exports `createImportDoorHandler(options)`, returning an
 async `(request: Request) => Promise<Response | null>` handler for POST
-`/api/rer/import/{uploads,plan,apply,status,reconcile,undo}`. A seed must mount it
+`/api/rer/import/{uploads,plan,apply,status,reconcile,undo,archive,restore-check}`
+(the last two grant-only: an archive of a tool's final export and its
+no-write test restore). A seed must mount it
 explicitly, retain its own product parser and D1 target adapter, and apply
 `importDoorSchema` as a new numbered migration after the D1 schemas. No seed is
 mounted by this module. The door is disabled by default and answers 404 until
@@ -126,11 +128,13 @@ the failed plan and its approval cannot authorise a retry. Replan the retained
 upload for a fresh fingerprint and owner approval; roll back earlier committed
 batches first. Existing adopters apply the door migrations once each, in order, each in a
 new numbered migration: `importDoorApplyFailureMigration` as one atomic batch,
-then `importDoorScopesMigration`; they never re-apply `importDoorSchema`. Fresh
+then `importDoorScopesMigration`, then `importDoorArchiveMigration`; they never
+re-apply `importDoorSchema`. Fresh
 adopters use `importDoorSchema`, whose first statement refuses the older door
 schema so a wrong upgrade fails at deploy. An enabled door on an outdated schema
 (old per-bundle uniqueness, no failure table or no scope table) answers 503
-`import_door_schema_outdated`. Retryable D1 errors
+`import_door_schema_outdated`; without the archive tables only `archive` and
+`restore-check` answer it. Retryable D1 errors
 (storage resets, code updates, lost connections, overload, timeouts) and SQLite
 busy/locked classify as `import_door_apply_transient`. Configure
 `ownerPrincipalId` as the seed owner's actual principal, and use that same
