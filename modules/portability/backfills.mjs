@@ -55,7 +55,7 @@ export function laterData({applied,unapplied,replay,catalogue,archived,empty,tab
     // fresh destination must be reset and derived from the restored installation.
     if(!list.some(s=>s.today || ['insert','replace'].includes(s.data.verb)))continue;
     const bad=list.filter(s=>!replayable(s,{table,statements,restorable,writable,carried,tables:known,secrets,views}));
-    const reach=reachingTables(statements,[table]),other=later.filter(s=>!list.includes(s) && writesAnother(s,table,reach,list));
+    const reach=reachingTables(statements,[table]),other=later.filter(s=>!admitted.has(s) && !list.includes(s) && writesAnother(s,table,reach,list));
     if(bad.length || other.length){[...bad,...other].forEach(s=>refused.add(s));continue;}
     replays.push(...list);
   }

@@ -277,16 +277,20 @@ test('an archive predating a guard and a view restores past triggers holding CAS
 });
 
 test('a five-statement CHECK widening rebuild preserves the destination definition and every archived rowid', async () => {
+  const logged = { name: '0003_entry_log.sql', sql: `CREATE TABLE entry_log(code TEXT NOT NULL,kind TEXT NOT NULL);
+INSERT INTO entry_log(code,kind) SELECT code,kind FROM entries;
+CREATE TRIGGER entry_logged AFTER INSERT ON entries BEGIN INSERT INTO entry_log VALUES(NEW.code,NEW.kind); END;` };
   for (const [populated, copy] of [[false, '*'], [false, 'code,kind'], [false, 'rowid AS original_rowid,*'], [true, 'rowid AS original_rowid,*'], [false, 'rowid AS original_rowid,code,kind'], [true, 'rowid AS original_rowid,code,kind']]) {
     const wider = rebuildEntries('0002_wider_check.sql', undefined, undefined, copy);
     const source = database([entries]);
     if (populated) source.exec("INSERT INTO entries(rowid,code,kind) VALUES(-11,'alpha','old'),(4,'beta','kept'),(29,'gamma','old'); INSERT INTO companion VALUES('carried')");
     const bundle = await archive(await service(source, [entries]));
-    const migrations = [entries, wider], target = database(migrations), definition = entryDefinition(target);
+    const migrations = [entries, wider, logged], target = database(migrations), definition = entryDefinition(target);
     assert.equal((await restore(await service(target, migrations), bundle)).phase, 'complete');
     assert.equal(entryDefinition(target), definition);
     assert.deepEqual(entryRows(target), entryRows(source));
     assert.deepEqual(rows(target, ['companion']), rows(source, ['companion']));
+    assert.deepEqual(rows(target, ['entry_log']).entry_log, rows(source, ['entries']).entries);
     assert.equal(target.prepare("SELECT name FROM sqlite_master WHERE name='entries_copy'").get(), undefined);
     target.exec("INSERT INTO entries(code,kind) VALUES('after','new')");
     assert.throws(() => target.exec("INSERT INTO entries(code,kind) VALUES('invalid','unknown')"), /CHECK constraint/);
