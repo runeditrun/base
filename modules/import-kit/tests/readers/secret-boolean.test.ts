@@ -44,6 +44,9 @@ test('public readers and durable planning retain boolean secret semantics with e
     [{pwd:'synthetic-credential'},'credential field "pwd"'],[{apiKeys:['synthetic-credential']},'credential field "apikeys"'],[{tokens:['synthetic-credential']},'credential field "tokens"'],
     [{headers:[['Authorization','Bearer synthetic-credential'],['Accept','*/*']]},'credential field "authorization"'],
     [{link:'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=synthetic-credential'},'URL credential query parameter'],
+    // A plural name's container is still searched: a credential nested under it is refused.
+    [{tokens:[{token:'synthetic-credential'}]},'credential field "token"'],[{secrets:{github:{token:'synthetic-credential'}}},'credential field "token"'],
+    [{apiKeys:[{apiKey:'synthetic-credential'}]},'credential field "apikey"'],[{tokens:[{url:'https://u:synthetic-credential@source.test/'}]},'URL user name or password'],
   ];
   for(const [value,field] of refused) await assert.rejects(read(value),(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field===field,field);
   // Look-alike names, counts under a plural name, a lone two-item list and placeholders are accepted as they are.

@@ -148,10 +148,8 @@ export function assertNoCredentials(value: unknown, policy?: PaginationCursorPol
       for (const [key, child] of Object.entries(item)) {
         if (key === 'secret' && typeof child === 'boolean') continue;
         const credential = credentialKey(key);
-        if (credential !== undefined) {
-          if (!credential.holds(child)) continue;
-          throw new CredentialError('CREDENTIAL_IN_DURABLE_DATA', { kind: 'field', name: credential.name });
-        }
+        // A plural name holds a credential as text; a container under it is still searched.
+        if (credential?.holds(child)) throw new CredentialError('CREDENTIAL_IN_DURABLE_DATA', { kind: 'field', name: credential.name });
         visit(child);
       }
     } else if (typeof item === 'string') {
