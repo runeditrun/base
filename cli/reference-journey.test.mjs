@@ -222,7 +222,14 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  await writeFile(answers,JSON.stringify({...manifestAnswers,OWNER_EMAIL:'fresh-owner@example.test'}),{mode:0o600});
  url=events(await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--non-interactive','--json'])).find(event=>event.event==='setup-ready').url;port=Number(new URL(url).port);await rm(answers);
  await recoverArchiveIdentity(f,url,originalIdentity,{retained:kind==='foundation'});
- for(const name of retainedIdentityTables)assert.deepEqual((await f.data(`SELECT * FROM ${name}`))[0].results,identityBefore[name],`${name} survives setup and native recovery exactly`);
+ // Recovery signs the owner in, and each sign-in advances oa_operators.last_signin_at (durable sign-in history); every other column survives exactly.
+ const signedIn=rows=>rows.map(({last_signin_at,...row})=>row);
+ for(const name of retainedIdentityTables){
+  const after=(await f.data(`SELECT * FROM ${name}`))[0].results;
+  if(name!=='oa_operators'){assert.deepEqual(after,identityBefore[name],`${name} survives setup and native recovery exactly`);continue;}
+  assert.deepEqual(signedIn(after),signedIn(identityBefore[name]),`${name} survives setup and native recovery exactly`);
+  after.forEach((row,index)=>assert.ok(row.last_signin_at>=identityBefore[name][index].last_signin_at,'recovery sign-in only advances last_signin_at'));
+ }
  if(kind==='default-seed'){
   assert.deepEqual((await f.data('SELECT email,role,status FROM oa_operators'))[0].results,[{email:'fresh-owner@example.test',role:'owner',status:'active'}],'a restored default-seed has one freshly claimed owner');
   assert.equal((await f.data('SELECT count(*) n FROM oa_bootstrap'))[0].results[0].n,1,'the fresh owner claim remains one-time');
