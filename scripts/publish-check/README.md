@@ -6,8 +6,11 @@ See [setup, command and scope](../publish-check-README.md).
 blob reads to system Git (`rev-parse`, `rev-list`, `ls-tree`, `cat-file --batch`).
 Before any tree inventory asks for blob sizes, `history_hydration.py` counts
 missing objects and hydrates a partial clone with one `fetch --refetch --no-filter`
-from its promisor remote. A failed fetch or remaining missing object makes the
-inspection incomplete. `history.hydration` reports the missing counts, fetch
+from its promisor remote. The batch explicitly requests every missing object,
+including selected history outside that remote's branch refspecs. A failed fetch
+or remaining missing object makes the inspection incomplete and names a missing
+blob and its committed path, with `fetch the full history` guidance.
+`history.hydration` reports the missing counts, fetch
 count and elapsed time; subsequent history reads disable lazy fetching.
 
 Reports include implementation version, Python version and a digest of the

@@ -11,6 +11,7 @@ import { writePublishHandoff } from './publish-handoff.mjs';
 import { releasePublicBase } from './public-base.mjs';
 import { prepareTagAdoption, confirmTagAdoption, assertTagAdoption } from './tag-adoption.mjs';
 import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark.mjs';
+import { cleanupTemporary } from './cleanup.mjs';
 
 // Failure output belongs to the private receipt, not the site preview.
 const withoutOutput = gates => JSON.parse(JSON.stringify(gates, (key, value) => key === 'output' ? undefined : value));
@@ -21,13 +22,15 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
   if (onto !== undefined && clean) throw Error('--onto and --clean-history are mutually exclusive');
   if (publicBase !== undefined && (onto !== undefined || clean)) throw Error('--public-base selects exact-source history; cannot combine with export history modes');
   const preview = dryRun || !tag;
+  // The shared history reader hydrates promised blobs once, before any source
+  // metadata, placeholder inspection or release export reads their contents.
+  validatePublicationDestination({ repo, commit: ref }, project, repository);
   const source = inspectSource(repo, ref);
   // A release refuses a seed still wearing Base's placeholder mark unless the
   // caller allows it explicitly; the receipt records that allowance.
   const files = [...source.entries].filter(([, entry]) => entry.type === 'blob' && ['100644', '100755'].includes(entry.mode)).map(([path]) => path);
   const marks = await placeholderMarks(source.entries.has('OPERATIONS.json') ? JSON.parse(source.bytes('OPERATIONS.json')).project : project, files, source.bytes);
   if (marks.length && !allowPlaceholderMark) throw Object.assign(Error(`${placeholderMessage(marks)} Release refused; pass --allow-placeholder-mark to release with it.`), { code: 'placeholder_mark' });
-  validatePublicationDestination(source, project, repository);
   releaseMessage(source);
   if (typeof tag === 'string' && tag !== source.tag) throw Error('Requested tag must match the committed release version');
   const existing = git(source.repo, 'tag', '--list', source.tag).toString().trim();
@@ -44,6 +47,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
   output = newOutput(source.repo, output);
   const temporary = mkdtempSync(resolve(tmpdir(), 'rer-release-'));
   let receipt;
+  let cleanupAttempted = false;
   try {
     const checkout = resolve(temporary, 'seed');
     git(source.repo, 'clone', '--no-hardlinks', '--no-checkout', '--', source.repo, checkout);
@@ -117,17 +121,20 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
         });
       }
     }
-    if (passed && tag && destination) writePublishHandoff(output, destination, receipt);
     if (passed && adopted) {
       assertTagAdoption(source, adopted, { imported: true });
       if (receipt.tag.object !== adopted.object || receipt.publicExport.tagObject !== adopted.object ||
           receipt.publicExport.commit !== adopted.commit || receipt.source.commit !== adopted.commit)
         throw Error('Adopted release tag identity does not match the release receipt');
     }
+    cleanupAttempted = true;
+    const warning = cleanupTemporary(temporary);
+    if (warning) receipt.warnings = [warning];
+    if (passed && tag && destination) writePublishHandoff(output, destination, receipt);
     writeFileSync(resolve(output, 'release-receipt.json'), json(receipt), { flag: 'wx' });
     if (passed && destination) {
       requirePublicDestination(destination);
-      if (remotePublicHead(exported.repo, destination, source.tag) !== publicParent) throw Error('Public destination changed before handoff');
+      if (remotePublicHead(tag ? resolve(output, 'public-git') : source.repo, destination, source.tag) !== publicParent) throw Error('Public destination changed before handoff');
       if (tag && !dryRun) annotate(source.repo, source, source.commit);
     }
     return receipt;
@@ -135,5 +142,5 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
     // No incomplete directory should be mistaken for a completed export.
     rmSync(output, { recursive: true, force: true });
     throw error;
-  } finally { rmSync(temporary, { recursive: true, force: true }); }
+  } finally { if (!cleanupAttempted) cleanupTemporary(temporary); }
 }

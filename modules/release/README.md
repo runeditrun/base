@@ -15,7 +15,12 @@ pnpm rer release --repo /path/to/seed --ref main \
 
 The `rer` bin and `node bin/rer.mjs` expose the same command. Node 22+, Python 3,
 Git, pnpm and tar are required, along with authenticated `gh` for GitHub sources.
-Use a full, clean seed clone with its declared package-manager version. The producer reads
+Use a full-history, clean seed clone with its declared package-manager version;
+`--filter=blob:none` is supported, while shallow history is refused. Before
+reading source files, destination validation uses the publication scanner's
+single batched hydration fetch. An unavailable blob reports its object ID and
+committed path with `fetch the full history` guidance, separately from identity
+disagreements. The producer reads
 committed `seed.json`, `package.json`, `RELEASE.json`, `LICENSE`, `CONTRACT.md` and
 `AGENTS.md`. Version declarations must agree. `--project` declares the publishing
 identity; `--repository` is the credential-free public destination URL. Neither is inferred
@@ -32,6 +37,11 @@ the repository identity. Repository fields are credential-free HTTPS GitHub
 URLs; identity comparison ignores case and a terminal `.git` in URLs. Missing,
 malformed, partial or inconsistent identities fail closed. The selected
 committed tree supplies the declarations.
+
+Temporary release directories are removed recursively, including incidental
+Finder metadata. A cleanup failure keeps a completed release successful and
+records a `temporary-cleanup-failed` warning in stderr and the release receipt;
+its directory can then be removed manually.
 
 The platform reads these same HTTPS GitHub URLs, plus bare an owner and repository name separated by a slash for releases that carry it; ordinary release editions still require the URL here.
 

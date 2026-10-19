@@ -11,7 +11,7 @@ class InspectionError(Exception):
 
 def git_environment():
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-    env.update(GIT_TERMINAL_PROMPT='0', GIT_NO_REPLACE_OBJECTS='1')
+    env.update(GIT_TERMINAL_PROMPT='0', GIT_NO_REPLACE_OBJECTS='1', GIT_NO_LAZY_FETCH='1')
     return env
 
 
@@ -41,7 +41,6 @@ class History:
         self.revisions = [self.commit, *public_revisions] if public_base else ['--all', self.commit]
         from history_hydration import prepare
         self.hydration = prepare(self)
-        self.env['GIT_NO_LAZY_FETCH'] = '1'
         self.commits = self.run('rev-list', *self.revisions).decode().splitlines()
         self.public_commits = set(self.run('rev-list', *public_revisions).decode().splitlines()) if public_base else set()
         self.trees = {}
@@ -49,10 +48,10 @@ class History:
         self.reader = subprocess.Popen(['git', '-C', self.repo, 'cat-file', '--batch'],
                                        env=self.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-    def run(self, *args):
+    def run(self, *args, input=None):
         try:
             result = subprocess.run(['git', '-C', self.repo, '-c', 'core.quotePath=false', *args],
-                                    env=self.env, capture_output=True, timeout=120)
+                                    env=self.env, input=input, capture_output=True, timeout=120)
             if result.returncode:
                 raise InspectionError('history.git-failed')
             return result.stdout
@@ -89,11 +88,13 @@ class History:
         self.reader.stdin.flush()
         header = self.reader.stdout.readline().split()
         if len(header) != 3 or header[1] != b'blob':
-            raise InspectionError('history.missing-blob')
+            from history_hydration import missing_blob
+            raise missing_blob(self, oid)
         size = int(header[2])
         data = self.reader.stdout.read(size)
         if len(data) != size or self.reader.stdout.read(1) != b'\n':
-            raise InspectionError('history.missing-blob')
+            from history_hydration import missing_blob
+            raise missing_blob(self, oid)
         return data
 
     def selected(self, path):
