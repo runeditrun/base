@@ -8,6 +8,9 @@ import {createServer} from 'node:net';
 import {localOperation} from '../onboarding/local/operation.mjs';
 import { createHash } from 'node:crypto';
 
+const stagingTables = async seed => (await seed.data("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*' ORDER BY name"))[0].results;
+const manifest = async (seed, file) => JSON.parse((await readFile(join(seed.root, file), 'utf8')).split('\n')[0]);
+
 test('import requires an explicit remote target for a non-local origin and leaves the checkout untouched', { timeout: 10 * 60_000 }, async t => {
  const seed = await portabilityFixture(t);
  await seed.run(['export', '--output', 'exports/empty.rer']);
@@ -80,9 +83,12 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
  assert.match(hosted.stderr, /https:\/\/example\.invalid[^]*npx wrangler d1 export \S+ --remote --output /);
  await assert.rejects(stat(join(seed.root, 'exports/hosted.rer')), { code: 'ENOENT' });
  const query = 'SELECT * FROM computed_entries ORDER BY id', rows = (await seed.data(query))[0].results;
- let previous;
+ let previous, excludedTables;
  for (const round of [1, 2, 3]) {
   const name = `exports/round-${round}.rer`, exported = (await seed.run(['export', '--output', name])).at(-1);
+  const current = await manifest(seed, name);
+  if (excludedTables) assert.deepEqual(current.excludedTables, excludedTables, 'restore scratch never enters the next export manifest');
+  else excludedTables = current.excludedTables;
   const status = await stat(join(seed.root, name));
   assert.equal(status.nlink, 1, 'export leaves one link to the archive');
   assert.equal(status.mode & 0o777, 0o600);
@@ -91,8 +97,16 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
   previous = exported.contentHash;
   await seed.run(['reset', '--yes']);
   assert.equal((await seed.run(['import', '--input', name, '--yes'])).at(-1).contentHash, exported.contentHash);
+  assert.deepEqual(await stagingTables(seed), [], 'a completed import drops every staging copy and sidecar');
   assert.deepEqual((await seed.data(query))[0].results, rows);
  }
+ const after = (await seed.run(['export', '--output', 'exports/after.rer'])).at(-1);
+ assert.equal(after.contentHash, previous);
+ assert.deepEqual((await manifest(seed, 'exports/after.rer')).excludedTables, excludedTables);
+ // This refusal happens after staging, while the existing owner rows stay intact.
+ await seed.run(['import', '--input', 'exports/round-1.rer', '--yes'], 4);
+ assert.deepEqual(await stagingTables(seed), [], 'a refused import drops its staging after rollback');
+ assert.deepEqual((await seed.data(query))[0].results, rows);
  // Negative controls: the check for a private, single-link input stays strict.
  await seed.run(['reset', '--yes']);
  await copyFile(join(seed.root, 'exports/round-1.rer'), join(seed.root, 'shared.rer'));
@@ -102,13 +116,17 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
  await copyFile(join(seed.root, 'exports/round-1.rer'), join(seed.root, 'group.rer'));
  await chmod(join(seed.root, 'group.rer'), 0o640);
  await seed.run(['import', '--input', 'group.rer', '--yes'], 4);
+ const corrupt = await readFile(join(seed.root, 'exports/round-1.rer'), 'utf8');
+ await writeFile(join(seed.root, 'corrupt.rer'), corrupt.replace('café', 'changed'), { mode: 0o600 });
+ await seed.run(['import', '--input', 'corrupt.rer', '--yes'], 1);
+ assert.deepEqual(await stagingTables(seed), [], 'a corrupt archive leaves no staging');
 });
 
 test('local import and setup after import finish with a slow inspection and retain restored data', {timeout:10*60_000}, async t=>{
  const seed=await portabilityFixture(t,{generated:false}),slow={slow:true};
  await seed.run(['export','--output','exports/empty.rer']);
  await seed.data("INSERT INTO articles VALUES('retained','retained','Restored title','Owner content','2026-10-16')");
- await seed.run(['export','--output','exports/saved.rer']);
+ const saved=(await seed.run(['export','--output','exports/saved.rer'])).at(-1);
  await seed.run(['reset','--yes'],0,slow);
  // An empty, migrated destination still has state files for the injected
  // lsof timeout; importing into absent state would skip that query entirely.
@@ -121,6 +139,10 @@ test('local import and setup after import finish with a slow inspection and reta
   }
  }finally{await operation.release();}
  await seed.run(['import','--input','exports/saved.rer','--yes'],0,slow);
+ assert.deepEqual(await stagingTables(seed), []);
+ const restored=(await seed.run(['export','--output','exports/restored.rer'])).at(-1);
+ assert.equal(restored.contentHash,saved.contentHash);
+ assert.deepEqual((await manifest(seed,'exports/restored.rer')).excludedTables,(await manifest(seed,'exports/saved.rer')).excludedTables);
  const socket=createServer();await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));
  const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));
  const setup=await seed.run(['setup','--owner-email','restored@example.test','--port',String(port),'--non-interactive'],0,slow);
@@ -147,7 +169,7 @@ test('export and import print progress; a crashed import is cleaned at the next 
  const crashed = await seed.text(['import', '--input', 'exports/large.rer', '--yes'], 1, { fault: 'crash' });
  assert.match(crashed.stderr, /Restoring a [\d.]+ [KMG]?B archive\./);
  assert.match(crashed.stderr, /ended before it finished \(signal SIGKILL\)\. Run the same command again; it starts over/);
- // The unfinished imports and the staging tables of one import job (a successful import keeps its own finished snapshot).
+ // The unfinished imports and the staging tables belonging to one import job.
  const unfinished = "SELECT (SELECT import_job FROM rer_portability_state) AS job, (SELECT COUNT(*) FROM rer_portability_jobs WHERE kind = 'import' AND phase NOT IN ('complete', 'aborted')) AS unfinished";
  const tablesOf = async job => (await seed.data(`SELECT COUNT(*) AS n FROM sqlite_master WHERE instr(name, 'rer_portability_stage_${job.replaceAll('-', '')}') = 1`))[0].results[0].n;
  const left = (await seed.data(unfinished))[0].results[0];
@@ -160,10 +182,12 @@ test('export and import print progress; a crashed import is cleaned at the next 
  assert.deepEqual((await seed.data(query))[0].results, rows);
  assert.deepEqual((await seed.data(unfinished))[0].results[0], { job: null, unfinished: 0 });
  assert.equal(await tablesOf(left.job), 0, 'the crashed import\'s staging is gone');
+ assert.deepEqual(await stagingTables(seed), [], 'the replacement import also drops its own staging');
  // An unexpected failure names its class, never its message, and the staging it made is aborted.
  await seed.run(['reset', '--yes']);
  const native = await seed.text(['import', '--input', 'exports/large.rer', '--yes'], 1, { fault: 'native' });
  assert.match(native.stderr, /\(native_error: RangeError\)\. Run the same command again; it starts over\./);
  assert.doesNotMatch(native.stdout + native.stderr, /private row content/);
  assert.deepEqual((await seed.data(unfinished))[0].results[0], { job: null, unfinished: 0 });
+ assert.deepEqual(await stagingTables(seed), [], 'a failed import drops its staging');
 });

@@ -84,6 +84,9 @@ test('foreign-key failure rolls back rows and triggers, removing every owned obj
   for(const table of bad.manifest.tables)assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM "'+table.name+'"').first()).n,0,table.name);
   assert.equal((await target.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='trigger' AND name='triggered_insert'").first()).n,1);
   assert.equal((await target.bucket.list()).objects.length,0);assert.equal((await service.imports.status(id)).phase,'staging');
+  assert.ok((await target.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*'").first()).n>0,'rollback keeps staging available until abort');
+  await service.imports.abort(id);
+  assert.equal((await target.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*'").first()).n,0);
 });
 test('fault after R2 writes cleans only owned keys',async t=>{
   const {bundle,target}=await setup(t);let fired=false;
@@ -93,10 +96,14 @@ test('fault after R2 writes cleans only owned keys',async t=>{
 });
 test('lost response after D1 commit preserves objects and reports complete',async t=>{
   const {bundle,target}=await setup(t);let fired=false;
+  await target.db.prepare('CREATE TABLE rer_portability_stage_unrelated(value TEXT)').run();
+  await target.db.prepare("INSERT INTO rer_portability_stage_unrelated VALUES('keep')").run();
   const db=faultDatabase(target.db,async(sql,commit)=>{const result=await commit();if(sql.some(s=>s.startsWith('INSERT INTO "audit"'))){fired=true;throw new Error('lost_response');}return result;});
   const s=await createPortability({db,buckets:{FILES:target.bucket},policy:fixturePolicy}),id=await stage(s,bundle);
   assert.equal((await s.imports.finalize(id,{archiveHash:bundle.closing.archiveHash})).phase,'complete');assert.ok(fired);assert.equal((await s.imports.finalize(id,{archiveHash:bundle.closing.archiveHash})).phase,'complete');
   assert.equal((await target.bucket.list()).objects.length,2);assert.equal((await s.imports.status(id)).phase,'complete');
+  assert.deepEqual((await target.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*'").all()).results,[{name:'rer_portability_stage_unrelated'}]);
+  assert.equal((await target.db.prepare('SELECT value FROM rer_portability_stage_unrelated').first()).value,'keep');
 });
 test('staged product validation can refuse before any R2 write',async t=>{
   const {bundle,target,service}=await setup(t,{policy:{...fixturePolicy,validateStaged:async({read})=>{assert.equal((await read('effects'))[0].enabled,0);return false;}}});
@@ -104,7 +111,11 @@ test('staged product validation can refuse before any R2 write',async t=>{
 });
 test('replaceable rows, suppressed triggers, NULL secrets and configuration survive restore',async t=>{
   const {bundle,target,service}=await setup(t);await target.db.prepare("INSERT INTO settings VALUES('theme','migration seed')").run();
+  // Pooled destinations can retain SQLite internals from earlier cases. Compare
+  // this destination's own inventory across restore, cleaning its export first.
+  const before=await archive(service);await service.exports.abort(before.id);
   const {status}=await restore(service,bundle);assert.deepEqual(status.requiredConfiguration,['PROVIDER_KEY']);
+  assert.deepEqual((await archive(service)).manifest.excludedTables,before.manifest.excludedTables);
   assert.equal((await target.db.prepare('SELECT value FROM settings').first()).value,'blue');assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM audit').first()).n,1);
   assert.equal((await target.db.prepare('SELECT credential FROM effects').first()).credential,null);
   await target.db.prepare("INSERT INTO triggered VALUES('after')").run();assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM audit').first()).n,2);
@@ -123,6 +134,7 @@ test('direct bindings export, import, export gives equal rows, objects and conte
   await target.db.prepare("UPDATE d1_migrations SET state='applied'").run();
   await restore(service,bundle);const second=await archive(service);
   assert.equal(second.contentHash,bundle.contentHash);assert.deepEqual(rows(second),rows(bundle));
+  assert.equal((await target.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*'").first()).n,0);
   for(const key of ['large','small'])assert.deepEqual(new Uint8Array(await (await target.bucket.get(key)).arrayBuffer()),new Uint8Array(await (await source.bucket.get(key)).arrayBuffer()));
   assert.deepEqual(second.manifest.objects,bundle.manifest.objects);assert.equal(second.manifest.sourceIdentity,bundle.manifest.sourceIdentity);
 });
