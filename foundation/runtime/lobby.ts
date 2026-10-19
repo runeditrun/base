@@ -42,8 +42,8 @@ const accentStyle = (identity: EditionIdentity) => identity.accentColor ? `:root
 /**
  * The Lobby document for one state. Identity and state shape it; `loginHint`,
  * the claimed owner's email on a local instance only, rides on the Sign in link
- * as ?login_hint= so the sign-in form opens with it filled in. The same local
- * host signal enables project-folder recovery, even without a sole owner email.
+ * as ?login_hint= so the sign-in form opens with it filled in. The local
+ * request host enables project-folder recovery, even without a sole owner email.
  */
 export function lobbyHtml(identity: EditionIdentity, state: SetupState, loginHint?: string, local = false): string {
   checkIdentity(identity)
@@ -70,9 +70,9 @@ const loopbackHost = /^(?:localhost|127\.0\.0\.1|\[::1\]|(?:[a-z0-9-]+\.)+localh
  * visitor of a hosted instance and never names its owner; locally the visitor
  * is the person at this computer, who just claimed it.
  */
-async function localOwnerEmail(db: D1Database, local: boolean): Promise<string | undefined> {
+async function localOwnerEmail(db: D1Database, origin: string): Promise<string | undefined> {
   try {
-    if (!local) return undefined
+    if (!loopbackHost.test(new URL(origin).hostname)) return undefined
     const { results } = await db.prepare("SELECT email FROM oa_operators WHERE role = 'owner' AND status = 'active' LIMIT 2").all<{ email: string }>()
     return results.length === 1 ? results[0].email : undefined
   } catch { return undefined }
@@ -90,11 +90,11 @@ export async function lobbyResponse(request: Request, bindings: LobbyBindings, i
   // Another origin or Host gets the app's ordinary document 404.
   if (!admitted(request, bindings.AUTH_ORIGIN)) return rejectedResponse(request, new Response('Not found', { status: 404, headers: base }))
   if (request.method !== 'GET' && request.method !== 'HEAD') return rejectedResponse(request, new Response(null, { status: 405, headers: { ...base, allow: 'GET, HEAD' } }))
-  const local = loopbackHost.test(new URL(bindings.AUTH_ORIGIN).hostname)
+  const local = loopbackHost.test(new URL(request.url).hostname)
   let state: SetupState
   try { state = await setupState(bindings.DB, claimed) } catch { return Response.json({ error: 'setup_unavailable' }, { status: 503, headers: base }) }
   const style = accentStyle(identity) + STYLE
   if (!hashes.has(style)) hashes.set(style, digest(style))
   const policy = `default-src 'none'; style-src 'self' 'sha256-${await hashes.get(style)}'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
-  return new Response(request.method === 'HEAD' ? null : lobbyHtml(identity, state, state === 'claimed' ? await localOwnerEmail(bindings.DB, local) : undefined, local), { headers: { ...base, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': policy } })
+  return new Response(request.method === 'HEAD' ? null : lobbyHtml(identity, state, state === 'claimed' ? await localOwnerEmail(bindings.DB, bindings.AUTH_ORIGIN) : undefined, local), { headers: { ...base, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': policy } })
 }
