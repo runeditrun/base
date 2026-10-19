@@ -1,4 +1,8 @@
-import { actionBody, classificationOutput, closed, exportOutputs, identifier, integer, requireValue } from './contract.mjs';
+import { actionBody, archiveOutputs, classificationOutput, closed, exportOutputs, identifier, integer, requireValue } from './contract.mjs';
+
+// The vendor tasks that write into an app's import door, and the door actions each may ask a grant for
+// (platform executors/grants.ts for export.vendor; catch-up and archive as the M5 contract asks).
+const doorActions = { 'export.vendor': ['uploads', 'plan', 'status'], 'catchup.vendor': ['uploads', 'plan', 'status'], 'switchoff.archive': ['uploads', 'archive', 'restore-check'] };
 
 const expires = () => new Date(Date.now() + 600_000).toISOString();
 const numeric = ['page', 'total', 'records_done', 'bytes_done', 'progress'];
@@ -40,8 +44,8 @@ export function taskStore(state) {
   runnable(task); requireValue(task.phase === 'ready', 409);
   task.phase = 'leased'; task.fence++; task.lease = expires();
   const id = `grant-${task.summary.task_id}-${task.fence}`, local = task.summary.kind === 'discover.local';
-  // A vendor export names its app's import door once that door is ready (platform grantView).
-  const door = task.summary.kind === 'export.vendor' && state.door;
+  // A vendor task names its app's import door once that door is ready (platform grantView).
+  const door = Object.hasOwn(doorActions, task.summary.kind) && state.door;
   task.grants.set(task.fence, { id, task_id: task.summary.task_id, fence: task.fence,
    destination: local ? state.destination ?? `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/uploads` : task.summary.kind === 'classify.row' ? 'none' : door ? `${door.origin}/api/rer/import/uploads` : 'unavailable:no-linked-installation',
    quota_bytes: local ? state.quotaBytes ?? 2 * 1024 * 1024 : door ? 2 * 1024 * 1024 : 0,
@@ -71,7 +75,8 @@ export function taskStore(state) {
  function action(id, action, body, mcp = false) {
   actionBody(action, body, mcp);
   const task = find(id); runnable(task);
-  if (action === 'complete' && task.summary.kind === 'export.vendor') exportOutputs(body.outputs);
+  if (action === 'complete' && ['export.vendor', 'catchup.vendor'].includes(task.summary.kind)) exportOutputs(body.outputs);
+  else if (action === 'complete' && task.summary.kind === 'switchoff.archive') archiveOutputs(body.outputs);
   else if (body.outputs !== undefined) {
    if (task.summary.kind === 'classify.row') classificationOutput(body.outputs, task.summary.question?.answer_schema);
    else requireValue(Object.keys(body.outputs).length === 0, 409);
@@ -113,6 +118,14 @@ export function taskStore(state) {
      // The platform's check (exportPreviewCheck): the door holds the reported plan, for the reported upload, of exactly the reported bundle.
      const { upload_id, plan_id, bundle_sha256 } = body.outputs;
      requireValue(state.door?.state.plans.some(plan => plan.planId === plan_id && plan.uploadId === upload_id && plan.bundleSha256 === bundle_sha256 && !plan.failureCode), 409, 'business_export_preview_mismatch');
+    } else if (task.summary.kind === 'catchup.vendor') {
+     // A catch-up names a catch-up plan the door holds for exactly that upload and bundle.
+     const { upload_id, plan_id, bundle_sha256 } = body.outputs;
+     requireValue(state.door?.state.plans.some(plan => plan.planId === plan_id && plan.uploadId === upload_id && plan.bundleSha256 === bundle_sha256 && plan.catchup), 409, 'business_catchup_plan_mismatch');
+    } else if (task.summary.kind === 'switchoff.archive') {
+     // Business test-restores the reported archive itself: zero writes, the executor's hash.
+     const restored = state.door?.restoreCheck(body.outputs.archive_id);
+     requireValue(restored && restored.bundleSha256 === body.outputs.bundle_sha256, 409, 'business_archive_restore_mismatch');
     } else requireValue(task.summary.kind === 'discover.local' && state.uploads.length > 0, 409);
     task.phase = 'done'; task.lease = null;
    }
@@ -132,18 +145,21 @@ export function taskStore(state) {
   return result;
  }
  function heartbeatControls(body) { return { controls: [], cursor: body.cursor ?? 0, cancel_requested: false }; }
- /** POST /api/business/tasks/:taskId/import-grants (platform executors/grants.ts issueImportGrant). */
+ /** POST /api/business/tasks/:taskId/import-grants (platform executors/grants.ts issueImportGrant). A catch-up's plan
+  * grant carries the owner's standing approval (`catchup: 'bounded'`) when one covers the tool, unless `review` asks
+  * for a plan the owner reviews per action. */
  function importGrant(id, body) {
-  closed(body, ['fence', 'grant_id', 'action']); integer(body.fence); identifier(body.grant_id);
-  requireValue(['uploads', 'plan', 'status'].includes(body.action));
+  closed(body, ['fence', 'grant_id', 'action', 'review']); integer(body.fence); identifier(body.grant_id);
   const task = find(id); runnable(task);
-  requireValue(task.summary.kind === 'export.vendor', 409);
+  requireValue(Object.hasOwn(doorActions, task.summary.kind), 409);
+  requireValue(doorActions[task.summary.kind].includes(body.action));
+  requireValue(body.review === undefined || body.review === true && task.summary.kind === 'catchup.vendor' && body.action === 'plan');
   const bound = grant(task, body.fence);
   requireValue(bound.id === body.grant_id && task.fence === body.fence && task.phase === 'leased' && Date.parse(task.lease) > Date.now() && state.door, 409);
   state.importGrants = (state.importGrants ?? 0) + 1;
-  const namespace = state.exportVendor ?? 'uptimerobot';
-  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${state.door.mint(body.action, namespace)}`,
-   action: body.action, namespace, expires_at: new Date(Date.now() + 300_000).toISOString() };
+  const namespace = state.exportVendor ?? 'uptimerobot', bounded = task.summary.kind === 'catchup.vendor' && body.action === 'plan' && !body.review && state.standingApproval;
+  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${state.door.mint(body.action, namespace, { catchup: bounded ? 'bounded' : undefined })}`,
+   action: body.action, namespace, ...(bounded ? { catchup: 'bounded' } : {}), expires_at: new Date(Date.now() + 300_000).toISOString() };
  }
  return { find, summary, claim, action, importGrant };
 }

@@ -12,10 +12,15 @@ const usage = `Usage: rer business VERB
                                  (up to the code's 10 minutes); run it again to resume
   run [--once]                   Work this computer's tasks: the folder scan the owner allows, then
                                  vendor exports into each app's import door (a preview the owner
-                                 approves; the vendor key stays in OS credential storage). Says what
-                                 it is doing and waiting for; applies the owner's choices at each check-in
+                                 approves), catch-ups (applied within the owner's standing approval,
+                                 else reviewed by the owner) and the final archive the app keeps and
+                                 test-restores; the vendor key stays in OS credential storage. Says
+                                 what it is doing and waiting for; applies the owner's choices at
+                                 each check-in
   next                           Apply the owner's choices, then return one templated question, the
-                                 agent's next step, or nothing yet within 60 seconds
+                                 agent's next step, an owner step with its browser link (freeze,
+                                 rollback card, cancellation; never agent work), or nothing yet
+                                 within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
                                  Catalog vendor or none; uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a read-only vendor key in OS credential storage; the owner
