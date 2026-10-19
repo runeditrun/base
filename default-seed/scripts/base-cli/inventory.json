@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "7f67c68e5f0aa2a0519fc06fa4bbb77280cb37bf07eef4c5b6e70efa442618f2"
+      "sha256": "adc231db5785a69624ee5de90b8227d83e4825133e9f3eb16bf0077e221dcb84"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -205,7 +205,7 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "1fbbe4868a69e5cc4eeb2b57c4a10347203812cad09762d71253a51f44801435"
+      "sha256": "15503277b5517faed1fe7d5e0215c1aa6f03ba3ca2dad3bd44af1cc5892aa823"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",

@@ -238,8 +238,11 @@ async function start(context, hooks) {
  // its /health would pass. Claim and sign in only against the process this
  // setup started.
  let ownership;
- try { ownership=await listenerOwnership(child.pid,expectedPort,context.runtimePort?'127.0.0.1':new URL(url).hostname,inspectionContext({port:expectedPort,verb:context.verb??'setup'})); }
- catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}
+ try { ownership=await listenerOwnership(child.pid,expectedPort,context.runtimePort?'127.0.0.1':new URL(url).hostname,inspectionContext({port:expectedPort,verb:context.verb??'setup',signal})); }
+ catch(error){
+  if (signal?.aborted) throw error;
+  throw installationFailure('command_failed',{step:'start',diagnostic:error});
+ }
  if (ownership.status !== 'owned') {
   const message = (store.redact??(value=>value))(ownership.status==='other'
    ? `Another process answered on port ${expectedPort}; the application did not bind it. Listener PID ${ownership.pid}. Nothing was sent. Stop that process or choose another port, then run setup again.`
