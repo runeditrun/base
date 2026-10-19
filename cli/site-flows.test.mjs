@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
 import { freePort } from '../global/tests/harness.mjs';
 import { codeChipBreaksWord, commandBlocks } from './fixtures/run-page.mjs';
+import { splitCardLayout } from './fixtures/contract-page.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -58,6 +59,23 @@ test('built Run page wraps inline code only between words and keeps commands cle
    await button.click();
    await page.waitForFunction(async expected => await navigator.clipboard.readText() === expected, command);
    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), command, 'Copy keeps the command bytes');
+  }
+  // Exercise the same built run site with both kinds populated, using the
+  // existing full contract fixture rather than a hand-built card fragment.
+  await writeFile(join(f.root, 'CONTRACT.md'), await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md')));
+  const contractBuild = await f.build();
+  assert.equal(contractBuild.code, 0, contractBuild.stdout + contractBuild.stderr);
+  await page.reload();
+  await page.getByRole('navigation', {name:'Site', exact:true}).getByRole('link', {name:'Contract', exact:true}).click();
+  await page.evaluate(() => document.fonts.ready);
+  assert.equal(await page.locator('.card.split > div').count(), 2, 'both clause kinds are visible');
+  for (const width of [860, 1000, 1160]) {
+   await page.setViewportSize({width,height:900});
+   const layout = await splitCardLayout(page);
+   assert.deepEqual(layout.overlaps, [], `split-card text overlap at ${width}px`);
+   assert.deepEqual(layout.overflow, [], `split-card text overflow at ${width}px`);
+   assert.equal(layout.sideways, false, `split-card sideways overflow at ${width}px`);
+   assert.equal(layout.pageSideways, false, `contract sideways overflow at ${width}px`);
   }
   await context.close();
  } finally { await browser.close(); await preview.close(); }
