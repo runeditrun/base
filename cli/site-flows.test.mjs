@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
 import { freePort } from '../global/tests/harness.mjs';
 import { codeChipBreaksWord, commandBlocks } from './fixtures/run-page.mjs';
-import { splitCardLayout } from './fixtures/contract-page.mjs';
+import { headerLayout, splitCardLayout } from './fixtures/contract-page.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -93,6 +93,12 @@ test('built run-site uses US dates and keeps the one-line command start together
    assert.deepEqual(layout.overflow, [], `split-card text overflow at ${width}px`);
    assert.equal(layout.sideways, false, `split-card sideways overflow at ${width}px`);
    assert.equal(layout.pageSideways, false, `contract sideways overflow at ${width}px`);
+  }
+  // The header keeps its links on screen at the narrowest phone: Docs, Contract and Source beside a long name wrap below it.
+  for (const path of ['/contract', '/run']) {
+   await page.goto(preview.url + path);
+   await page.setViewportSize({width:320,height:700});
+   assert.deepEqual(await headerLayout(page), { sideways:false, links:3, offscreen:[], small:[], overlaps:[] }, `header at 320px on ${path}`);
   }
   await context.close();
  } finally { await browser.close(); await preview.close(); }
