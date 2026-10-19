@@ -89,6 +89,6 @@ export async function importArchive(service, path, transient, journal, progress)
   }
   progress?.({ phase: 'finishing', total: manifest.partCount });
   const status = await service.imports.finalize(id, { contentHash: closing.contentHash, archiveHash: closing.archiveHash, ...(later ? { laterJournal: later } : {}) }); complete = true;
-  return { ...receipt(manifest, closing, transient), ...(status.bridged ? { bridged: status.bridged } : {}), ...(status.skippedTables ? { skippedTables: status.skippedTables } : {}) };
+  return { ...receipt(manifest, closing, transient), ...(status.bridged ? { bridged: status.bridged } : {}), ...(status.skippedTables ? { skippedTables: status.skippedTables } : {}), ...(status.safetyChanges ? { safetyChanges: status.safetyChanges } : {}) };
  } finally { if (id && !complete) await service.imports.abort(id); }
 }

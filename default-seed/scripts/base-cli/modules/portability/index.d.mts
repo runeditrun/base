@@ -22,13 +22,19 @@ export interface Staged {
 export interface ArchivePolicy {
   product: string; excludeTables?: string[]; includeTables?: string[]; derivedTables?: string[];
   secretColumns?: Record<string,string[]>; exportRow?: (table:string,row:Row)=>Row;
+  /** Nonempty finite safe-value sets for writable non-key columns; requires importRow. */
+  importSafety?: Record<string,Record<string,Cell[]>>;
+  /** Pure, synchronous, deterministic and idempotent; called only for importSafety tables before validateStaged. */
+  importRow?: (table:string,row:Row)=>Row;
   replaceableTables?: string[]; requiredConfiguration?: string[]; validateStaged?: (staged:Staged)=>boolean|void|Promise<boolean|void>;
   acceptedSchemas?: Record<string,{upgradeRow:(table:string,row:Row)=>Row}>;
   buckets?: Record<string,{prefix?:string;objectReferences?:{table:string;keyColumn:string}}>;
   extraPayloads?: Record<string,{produce:()=>Uint8Array|ReadableStream<Uint8Array>|Promise<Uint8Array|ReadableStream<Uint8Array>>;consume:(source:ReadableStream<Uint8Array>,descriptor:PayloadDescriptor)=>void|Promise<void>}>;
   partBytes?: number;
 }
-export interface Status {id:string;kind:'export'|'import';phase:'building'|'staging'|'applying'|'complete'|'aborted';completed:number;total:number|null;/** Export only: bytes of the parts built so far. */bytes?:number;contentHash:string|null;requiredConfiguration?:string[];bridged?:Bridge;/** Platform bookkeeping ignored in an older archive. */skippedTables?:string[]}
+/** Actual changed rows grouped by table, column and safe replacement value; never original values. */
+export interface SafetyChange {table:string;column:string;value:Cell;rows:number}
+export interface Status {id:string;kind:'export'|'import';phase:'building'|'staging'|'applying'|'complete'|'aborted';completed:number;total:number|null;/** Export only: bytes of the parts built so far. */bytes?:number;contentHash:string|null;requiredConfiguration?:string[];bridged?:Bridge;/** Platform bookkeeping ignored in an older archive. */skippedTables?:string[];/** Durable summary of bounded import normalization. */safetyChanges?:SafetyChange[]}
 /** Later additive migrations an older archive was restored across. */
 export interface Bridge {fromSchema:string;toSchema:string;migrations:string[];tables:string[];columns:Record<string,string[]>}
 /** A runner's replay of the destination's applied migrations: the archive schema identity after a chosen set, and each migration's statements. */

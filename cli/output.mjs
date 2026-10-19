@@ -1,5 +1,6 @@
 import { handleBrokenPipes } from './stdio.mjs';
 import { exportSummary } from './export-summary.mjs';
+import { importSafetySummary } from './import-summary.mjs';
 export function output(options) {
  handleBrokenPipes();
  let finished = false;
@@ -19,6 +20,7 @@ export function output(options) {
    if (structuredResult) this.event('result', { ok, exitCode, ...details });
    // A finished export ends with one line naming its archive; the receipt is --json data.
    else if (ok && options.verb === 'export' && exportSummary(details)) this.human(exportSummary(details));
+   else if (ok && options.verb === 'import' && importSafetySummary(details)) this.human('import: complete (exit 0)\n' + importSafetySummary(details));
    else if (!['describe', 'check', 'dev', 'preview', 'setup'].includes(options.verb) || !ok) this.human(`${options.verb}: ${ok ? 'complete' : 'failed'} (exit ${exitCode})`);
   },
   error(error) {

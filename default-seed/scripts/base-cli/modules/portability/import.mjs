@@ -1,5 +1,6 @@
 import { all, statement, state, guard, job, save, partQueries, parts, readPart, cleanCopies, quote, stream, insist, run } from './storage.mjs';
 import { stagePart } from './import-staging.mjs';
+import { normalizeStaged } from './import-safety.mjs';
 import { refuseProviderData } from './provider-data.mjs';
 import { refuseDevData } from './dev-data.mjs';
 import { catalogue, validateRow, bindCell, writableColumns } from './catalogue.mjs';
@@ -162,6 +163,7 @@ export async function finalizeImport(context,id,{contentHash,archiveHash,laterJo
   await bucketsEmpty(context,row);
   await refuseDevData(db,row.metadata.copies,row.metadata.targets);
   await refuseProviderData(db,row.metadata.copies,row.metadata.targets);
+  await normalizeStaged(context,row);
   if(config.validateStaged) {
     const read=async table=>{insist(row.metadata.copies[table],'staged_table');const target=row.metadata.targets.find(t=>t.name===table);return (await readCopy(db,target,row.metadata.copies[table],0,row.metadata.manifest.tables.find(t=>t.name===table)?.count??0)).map(x=>x.row);};
     insist(await config.validateStaged({db,tables:{...row.metadata.copies},read,manifest})!==false,'staged_validation');
@@ -197,7 +199,7 @@ export async function finalizeImport(context,id,{contentHash,archiveHash,laterJo
 }
 export async function importStatus(context,id) {
   const row=await job(context.db,id,'import');return {id,kind:'import',phase:row.phase,completed:row.completed,total:row.metadata.manifest.partCount,
-    contentHash:row.metadata.contentHash??null,requiredConfiguration:row.phase==='complete'?row.metadata.manifest.requiredConfiguration:[],...(row.metadata.bridge?{bridged:row.metadata.bridge}:{}),...(row.metadata.skippedTables?{skippedTables:row.metadata.skippedTables}:{})};
+    contentHash:row.metadata.contentHash??null,requiredConfiguration:row.phase==='complete'?row.metadata.manifest.requiredConfiguration:[],...(row.metadata.bridge?{bridged:row.metadata.bridge}:{}),...(row.metadata.skippedTables?{skippedTables:row.metadata.skippedTables}:{}),...(row.metadata.safetyChanges?{safetyChanges:row.metadata.safetyChanges}:{})};
 }
 export async function abortImport(context,id) {
   const row=await job(context.db,id,'import');insist(row.phase!=='complete','import_complete',409);
