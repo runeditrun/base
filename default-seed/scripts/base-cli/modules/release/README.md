@@ -17,6 +17,8 @@ The `rer` bin and `node bin/rer.mjs` expose the same command. Node 22+, Python 3
 Git, pnpm and tar are required, along with authenticated `gh` for GitHub sources.
 Use a full-history, clean seed clone with its declared package-manager version;
 `--filter=blob:none` is supported, while shallow history is refused. Before
+release work begins, tracked changes and untracked files in the source checkout
+are refused; ignored local files do not become release inputs. Before
 reading source files, destination validation uses the publication scanner's
 single batched hydration fetch. An unavailable blob reports its object ID and
 committed path with `fetch the full history` guidance, separately from identity
@@ -97,9 +99,14 @@ path needs the seed's browser prerequisites and any resources its verification
 requires. Routine CI and default verification do not invoke the release-only
 script.
 
-Both paths then scan source history with publish-check. When the checkout's
-origin is a confirmed public repository, the scanner uses that source
-repository's advertised default branch and published tags as its public base.
+Both paths then run publish-check in a fresh disposable clone checked out at
+the selected source commit. Its working tree contains exactly that commit's
+committed files, isolated from the caller's ignored or untracked files and from
+installation, build and verification outputs. The clone retains all source refs
+and full history: committed secrets and historical findings remain subject to
+the publication checks. When the source checkout's origin is a confirmed public
+repository, the scanner uses that source repository's advertised default branch
+and published tags as its public base.
 Already-public findings are classified pre-existing; unpublished content still
 blocks. Other sources retain complete local-ref history inspection.
 A passing step's receipt retains exit status and numeric final summaries from
@@ -212,9 +219,10 @@ Public export commit and annotated-tag messages contain the version and optional
 `RELEASE.json.publicReleaseNotes` only. Private source commit identities stay in
 the private release receipt. The clean export's final annotated tag exists
 before publication inspection, and the checked repository is copied unchanged
-into `public-git/`. Ordinary releases inspect their source history and stage the
-exact final annotation in a disposable checkout for inspection before creating
-the source tag. Release notes pass the same content rules as the public tree.
+into `public-git/`. Ordinary releases stage the exact final annotation in the
+fresh selected-commit checkout and inspect it with the source history before
+creating the source tag. Release notes pass the same content rules as the
+public tree.
 
 ## Releasing a seed that is already public
 

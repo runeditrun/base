@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { git } from './source.mjs';
-import { annotate } from './export.mjs';
+import { annotate, sourceTree } from './export.mjs';
 import { runningVersion } from '../../cli/version.mjs';
 
 export function validatePublicationDestination(source, project, repository) {
@@ -36,26 +36,32 @@ export function publicationScan(repo, ref, envFile, project, repository, publicB
 }
 
 // This is the ordinary release gate, also usable without installing/building a
-// seed. The scanner sees the original checkout and every source ref; only the
-// new annotation is read from the clean candidate, never verification output.
+// seed. Materialize raw committed bytes, without checkout filters or export
+// attributes, and mirror every source ref for the existing history policy.
+// Neither the caller's local files nor verification output enters this tree.
 export function sourcePublicationScan(source, temporary, envFile, project, repository, publicBase, tagged, adopted) {
   const started = performance.now();
+  const candidate = sourceTree(source, resolve(temporary, 'publication'));
+  git(source.repo, 'clone', '--mirror', '--no-hardlinks', '--', source.repo, resolve(candidate, '.git'));
+  git(candidate, 'config', 'core.bare', 'false');
+  git(candidate, 'update-ref', '--no-deref', 'HEAD', source.commit);
+  git(candidate, 'read-tree', source.commit);
   let annotationFile;
   if (adopted) {
     annotationFile = resolve(temporary, 'annotation.tag');
     writeFileSync(annotationFile, git(adopted.repo, 'cat-file', 'tag', adopted.object), { mode: 0o600 });
   } else if (tagged) {
-    const candidate = resolve(temporary, 'annotation');
-    git(source.repo, 'clone', '--no-hardlinks', '--no-checkout', '--', source.repo, candidate);
-    git(candidate, 'checkout', '--detach', source.commit);
     const staged = git(candidate, 'tag', '--list', source.tag).toString().trim();
     const name = staged ? `${source.tag}-publication-candidate` : source.tag;
     annotate(candidate, source, source.commit, name);
     annotationFile = resolve(temporary, 'annotation.tag');
     writeFileSync(annotationFile, git(candidate, 'cat-file', 'tag', `refs/tags/${name}`), { mode: 0o600 });
+    // Inspect the new tag once via annotationFile, leaving the mirrored source
+    // refs unchanged for the full-history scan.
+    git(candidate, 'tag', '-d', name);
   }
   const stagingSeconds = (performance.now() - started) / 1000;
-  const report = publicationScan(source.repo, source.commit, envFile, project, repository, publicBase, annotationFile);
+  const report = publicationScan(candidate, source.commit, envFile, project, repository, publicBase, annotationFile);
   Object.assign(report.invocation, { stagingSeconds, totalSeconds: (performance.now() - started) / 1000 });
   return report;
 }

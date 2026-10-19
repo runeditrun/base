@@ -61,10 +61,10 @@ parsing and unexpected errors never expose response text, URLs or key values.
 
 Every adapter strips credential values from a parsed response before it emits
 bytes for upload, keeping the record, by the same rules as the seed's import
-door. A field whose name's letters end in a credential word (`apiKey`,
+door. A field whose name's parts are a credential word or phrase (`apiKey`,
 `httpPassword`, `http_password`, `client_secret`, `X-Api-Key`, `integration_key`,
 `webhook_url`, `secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`,
-`pwd` and the like) or are `X-Auth`, the `value` of a `{name|key, value}` pair
+`pwd`, `X-Auth` and the like), the `value` of a `{name|key, value}` pair
 naming one (`{name: 'Authorization', value}`), or the value of such a
 `[name, value]` pair in a list of them (Sentry's header tuples), becomes
 `"[removed]"`. A plural name (`apiKeys`, `tokens`) counts only when it holds
@@ -76,8 +76,20 @@ and the value of each credential query or fragment parameter (`api_key`,
 own validated pagination keys (`page_token`). The door drops each marker and
 reports it per record as `CREDENTIAL_REMOVED`, so the owner sees which record
 lost a credential. Null, booleans, empty strings and masks such as `****` are
-not credentials and stay as they are. Names that merely contain such letters
-(`keyword`, `monkey`, `signal`, `design`) are not credential names.
+not credentials and stay as they are. Names are matched by whole parts
+(camelCase, `_`, `-`, digits), so names that merely contain such letters
+(`keyword`, `monkey`, `author`, `signal`, `design`, `primaryKey`) are not
+credential names and a `?keyword=up` URL stays intact. `Signature` and
+`Session-Id` count only as header names (a key under `headers`, a tuple, a
+`{name|key, value}` pair in a header list), so an agent's `signature` field and
+Help Scout's `customFields: [{name: 'Session ID', value}]` stay;
+`auth` and `credentials` count only when they hold text naming no scheme or mode,
+and an object under them loses only its own credential fields
+(`auth: {type: 'oauth2', token: "[removed]"}`) and a `value`, `pass`, `pw` or
+`secret…` member (Keycloak's `credentials: [{type: 'password', value: "[removed]"}]`).
+`passphrase`, `jwt`, `JSESSIONID` and `PHPSESSID` count everywhere. Query and fragment keys also
+count documented API key names such as `token_auth`, `application_key`,
+`user_key` and `hapikey`.
 Pagination is read from the response as received, so a credential-bearing
 pagination link is still refused.
 

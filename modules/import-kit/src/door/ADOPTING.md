@@ -199,12 +199,18 @@ scope, expiry and approval rules do not change.
   fields (UptimeRobot's `apiKey: null` on every monitor) and URLs with
   `user:pass@`. The door reads every upload with the kit's `credentials:
   'remove'`: null, empty, masked and boolean values pass, and a real value is
-  removed from its record, which is kept and noted. That covers compound names
+  removed from its record, which is kept and noted. Names match by whole parts
+  (camelCase, `_`, `-`, digits), not letters: it covers compound names
   (`httpPassword`, `client_secret`, `customHttpHeaders['X-Api-Key']`,
   `secret_key`, `Ocp-Apim-Subscription-Key`, `X-Auth`, `pwd`), plurals holding
   text (`apiKeys: [...]`), header pairs (`{name: 'Authorization', value}`) and
   `[name, value]` header tuples, and URLs of any scheme, including the markers
-  rer's vendor exports leave (`removed@`, `?api_key=removed`). The plan
+  rer's vendor exports leave (`removed@`, `?api_key=removed`). Look-alikes such
+  as UptimeRobot's `?keyword=up`, `author`, `signal` or `primaryKey` are not
+  credentials and import with the URL and fields intact, and neither is a
+  support export's agent `signature` or a chat's `session_id` (`Signature` and
+  `Session-Id` count only as header names), nor `auth: {type: 'oauth2'}` or
+  `credentials: []`. The plan
   holds none, the original bytes are withheld and the upload's chunks are
   deleted once the plan is saved, or once a plan of them is refused.
   Do not drop such records or fields in the seed's parser to get past a refusal.
