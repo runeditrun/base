@@ -168,10 +168,17 @@ field holding null, an empty string or a mask is not a credential and imports as
 it is. A real value is removed from its record, which is kept: a credential-named
 field is dropped: any key whose letters end in a credential word (`apiKey`,
 `httpPassword`, `http_password`, `client_secret`, `X-Api-Key`, `pushToken`,
-`integration_key`, `webhook_url` and the like), and the `value` of a
-`{name|key, value}` pair naming one (`{name: 'Authorization', value}`). Booleans
-stay. A URL of any scheme, after leading whitespace, loses its user name and
-password and its credential query and fragment parameters. Each removal is a
+`integration_key`, `webhook_url`, `secret_key`, `x-functions-key`,
+`Ocp-Apim-Subscription-Key`, `pwd` and the like) or are `X-Auth`; a plural
+(`apiKeys: [...]`, `tokens: [...]`) when it holds text, so a count such as
+`tokens: 1500` stays; the `value` of a `{name|key, value}` pair naming one
+(`{name: 'Authorization', value}`), and the value of such a `[name, value]`
+pair in a list of them (Sentry's header tuples). Booleans stay, and names
+merely containing such letters (`keyword`, `monkey`, `signal`, `design`) are
+not credential names. A URL of any scheme, after leading whitespace, loses its
+user name and password and its credential query and fragment parameters
+(`api_key`, `access_token`, `sig` and the like), including the `removed@` and
+`?api_key=removed` markers rer's vendor exports leave. Each removal is a
 `CREDENTIAL_REMOVED` warning in `diagnostics` with the record's `kind`,
 `sourceId`, the field pointer and its kind, never the value; a field holding the
 `[removed]` marker rer's vendor exports leave is reported as removed before
@@ -241,8 +248,12 @@ answers 409 `native_edit_conflict`. Each has a `details.reason`.
 
 When an erasure withdrew the live import's snapshot, nothing can be compared
 with it: an owner-session `plan` retires it as the baseline and plans a new
-one (the kit's guards refuse any target an earlier import still holds), while a
-Business catch-up still answers 410 `snapshot_withdrawn`.
+one, while a Business catch-up still answers 410 `snapshot_withdrawn`. While an
+earlier import of the source still holds a record the new plan writes, the kit
+would refuse its apply, so `plan` answers 409 `earlier_import_holds_records`
+instead, with `details.planIds` and a `details.reason` to undo the earlier
+import first; nothing is retired. After that undo the same upload plans and
+applies.
 
 An interrupted private plan preparation reports
 `plan_staging_interrupted_cancel_and_replan` with `details.planId`. Call `undo` with that `planId`

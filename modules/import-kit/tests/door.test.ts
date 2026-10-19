@@ -804,9 +804,22 @@ test('owner-session HTTP pipeline works in a seed with no owner-claim module or 
   const again=await d.plan(documents(25,true));
   assert.equal(again.status,200,JSON.stringify(again.body));assert.notEqual(again.body.planId,replanned.body.planId);
   assert.equal((await d.apply(again.body)).state,'completed');assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,25);
-  // An erasure withdrew the live import's snapshot: the owner's next plan starts a
-  // new baseline instead of a permanent 410 (Business catch-ups keep the 410).
+  // An erasure withdrew the live import's snapshot. The owner's plan of the same
+  // file without the erased person is refused at plan time, by name, while the
+  // earlier import still holds its records; nothing is retired. After that
+  // import's undo, the same upload plans and applies.
   await retireD1ImportCustody({target:{kind:'record',id:'0'}},[{sql:"DELETE FROM native_records WHERE id='0'"}],d.runtime.context(),checkpoint);
+  const remaining=await d.upload(documents(25,true).filter(record=>record.id!=='0')),held=await d.call('plan',{uploadId:remaining});
+  assert.deepEqual([held.status,held.body.error,held.body.details.planIds],[409,'earlier_import_holds_records',[again.body.planId]],JSON.stringify(held.body));
+  assert.match(held.body.details.reason,/Undo the earlier import first/);
+  assert.equal(d.runtime.native().prepare('SELECT head_id FROM ik_door_namespaces').get()!.head_id,again.body.planId,'nothing is retired');
+  await d.undo(again.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  const rebaselined=await d.call('plan',{uploadId:remaining});
+  assert.equal(rebaselined.status,200,JSON.stringify(rebaselined.body));assert.deepEqual(rebaselined.body.summary,{sourceRecords:24,created:24,updated:0,unchanged:0,gone:0});
+  assert.equal((await d.apply(rebaselined.body)).state,'completed');assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,24);
+  // A plan writing no record an earlier import holds starts a new baseline
+  // instead of a permanent 410 (Business catch-ups keep the 410).
+  await retireD1ImportCustody({target:{kind:'record',id:'1'}},[{sql:"DELETE FROM native_records WHERE id='1'"}],d.runtime.context(),checkpoint);
   const baseline=await d.plan([{id:'fresh',title:'After the erasure'}]);
   assert.equal(baseline.status,200,JSON.stringify(baseline.body));assert.deepEqual(baseline.body.summary,{sourceRecords:1,created:1,updated:0,unchanged:0,gone:0});
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
@@ -942,7 +955,15 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   // customHttpHeaders['X-Api-Key'], an Authorization pair, client_secret.
   const compound={httpPassword:'test-http-basic-pass',http_password:'test-underscore-pass',xApiKey:'test-header-api-key',pair:'test-pair-bearer-token',
     clientSecret:'test-oauth-client-secret',ftp:'test-ftp-password',backslash:'test-backslash-pass',query:'test-query-api-key',fragment:'test-fragment-token'};
-  const secrets=[uptimeKey,uptimePassword,...Object.values(compound)];
+  // Common credential shapes beyond those: Azure Functions and API Management
+  // keys, X-Auth, secret_key and pwd, plurals, Sentry's [name, value] header
+  // tuples and an Azure SAS `sig`.
+  const shapes={functions:'test-azure-functions-key',subscription:'test-apim-subscription-key',xAuth:'test-x-auth-header',secretKey:'test-secret-key-field',
+    pwd:'test-pwd-field-value',apiKeys:'test-api-keys-list-item',tokens:'test-tokens-list-item',tuple:'test-tuple-bearer-token',sig:'test-sas-signature'};
+  const secrets=[uptimeKey,uptimePassword,...Object.values(compound),...Object.values(shapes)];
+  // Names that only look like credential names, and placeholders, stay exactly as they are.
+  const lookalikes={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',url:'https://shop.example.com/?signal=1&design=2',headers:[['Accept','*/*']],
+    customHttpHeaders:{'X-Auth':'none'},pwd:null,secret_key:'',apiKeys:['****'],tokens:1500};
   const bytes=pages([monitor(9000001),monitor(9000002,{apiKey:''}),monitor(9000005,{url:null,apiKey:'********'})],
     [monitor(9000012,{url:`https://user:${uptimePassword}@staging.example.com/`}),monitor(9000013,{apiKey:uptimeKey}),
       // What rer's vendor export uploads after stripping: its markers, never the values.
@@ -951,14 +972,21 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
       monitor(9000021,{customHttpHeaders:{'X-Api-Key':compound.xApiKey},http_password:compound.http_password}),
       monitor(9000022,{customHttpHeaders:[{name:'Authorization',value:'Bearer '+compound.pair}],client_secret:compound.clientSecret}),
       monitor(9000023,{url:` ftp://files:${compound.ftp}@files.example.com/`}),
-      monitor(9000024,{url:`https:\\\\bs:${compound.backslash}@x.example.com/health?api_key=${compound.query}&region=eu#access_token=${compound.fragment}`})]);
+      monitor(9000024,{url:`https:\\\\bs:${compound.backslash}@x.example.com/health?api_key=${compound.query}&region=eu#access_token=${compound.fragment}`})],
+    // What rer's vendor export uploads for credential query and fragment parameters and the shapes below: markers, never the values.
+    [monitor(9000030,{url:'https://api.example.com/health?api_key=removed&region=eu'}),monitor(9000031,{url:'https://app.example.com/cb#access_token=removed'}),
+      monitor(9000032,{customHttpHeaders:{'x-functions-key':shapes.functions,'Ocp-Apim-Subscription-Key':shapes.subscription,'X-Auth':shapes.xAuth},secret_key:shapes.secretKey,pwd:shapes.pwd}),
+      monitor(9000033,{url:`https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=${shapes.sig}`,apiKeys:[shapes.apiKeys],tokens:[shapes.tokens],headers:[['Authorization','Bearer '+shapes.tuple],['Accept','*/*']]}),
+      monitor(9000034,lookalikes),
+      monitor(9000035,{url:'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed',secret_key:'[removed]',apiKeys:'[removed]',headers:[['X-Auth','[removed]']]})]);
   const native=d.runtime.native(),uploadId=await d.upload(bytes);
   for (const secret of secrets) assert.ok(stored(native).includes(secret),'the scan sees the uploaded credentials');
   const planned=await d.call('plan',{uploadId});
   assert.equal(planned.status,200,JSON.stringify(planned.body));
-  assert.deepEqual(planned.body.summary,{sourceRecords:11,created:11,updated:0,unchanged:0,gone:0});
+  assert.deepEqual(planned.body.summary,{sourceRecords:17,created:17,updated:0,unchanged:0,gone:0});
   const userinfo='A user name and password were removed from a URL; the record is kept.',query='A credential query parameter was removed from a URL; the record is kept.';
   const field=(name:string)=>`The value of credential field "${name}" was removed; the record is kept without it.`;
+  const before=(name:string)=>`The value of credential field "${name}" was removed before upload; the record is kept without it.`;
   assert.deepEqual(planned.body.diagnostics.filter((n:any)=>n.code==='CREDENTIAL_REMOVED').map((n:any)=>[n.sourceId,n.field,n.message]),[
     ['9000012','/url',userinfo],
     ['9000013','/apiKey',field('apikey')],
@@ -969,6 +997,12 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
     ['9000022','/customHttpHeaders/0/value',field('authorization')],['9000022','/client_secret',field('clientsecret')],
     ['9000023','/url',userinfo],
     ['9000024','/url',userinfo],['9000024','/url',query],['9000024','/url',query],
+    // rer's markers name the record whose URL lost a credential parameter, as the raw upload does.
+    ['9000030','/url',query],['9000031','/url',query],
+    ['9000032','/customHttpHeaders/x-functions-key',field('xfunctionskey')],['9000032','/customHttpHeaders/Ocp-Apim-Subscription-Key',field('ocpapimsubscriptionkey')],
+    ['9000032','/customHttpHeaders/X-Auth',field('xauth')],['9000032','/secret_key',field('secretkey')],['9000032','/pwd',field('pwd')],
+    ['9000033','/url',query],['9000033','/apiKeys',field('apikeys')],['9000033','/tokens',field('tokens')],['9000033','/headers/0/1',field('authorization')],
+    ['9000035','/url',query],['9000035','/secret_key',before('secretkey')],['9000035','/apiKeys',before('apikeys')],['9000035','/headers/0/1',before('xauth')],
   ]);
   assert.ok(planned.body.diagnostics.some((n:any)=>n.code==='ORIGINAL_UNAVAILABLE'&&/withheld because they held credential values/.test(n.message)));
   // The uploaded bytes went once the plan was saved; the plan never held them.
@@ -986,8 +1020,13 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   assert.deepEqual(value('9000021').customHttpHeaders,{});assert.ok(!Object.hasOwn(value('9000021'),'http_password'));
   assert.deepEqual(value('9000022').customHttpHeaders,[{name:'Authorization'}]);assert.ok(!Object.hasOwn(value('9000022'),'client_secret'));
   assert.equal(value('9000023').url,' ftp://files.example.com/');assert.equal(value('9000024').url,'https:\\\\x.example.com/health?region=eu');
+  assert.equal(value('9000030').url,'https://api.example.com/health?region=eu');assert.equal(value('9000031').url,'https://app.example.com/cb');
+  assert.deepEqual([value('9000032').customHttpHeaders,Object.hasOwn(value('9000032'),'secret_key'),Object.hasOwn(value('9000032'),'pwd')],[{},false,false]);
+  const shaped=value('9000033');
+  assert.deepEqual([shaped.url,Object.hasOwn(shaped,'apiKeys'),Object.hasOwn(shaped,'tokens'),shaped.headers],['https://acct.blob.core.windows.net/c/b?sv=2020-08-04',false,false,[['Authorization'],['Accept','*/*']]]);
+  assert.deepEqual(value('9000034'),monitor(9000034,lookalikes),'look-alike names and placeholders stay as they are');
   assert.deepEqual((await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace}))[0].original,{status:'unavailable',reason:'credentials-removed'});
-  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,11);
+  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,17);
   for (const secret of secrets) assert.ok(!stored(native).includes(secret),'no credential value is stored after apply');
   // A bundle holding only empty credential fields keeps its exact original.
   const clean=await d.call('plan',{uploadId:await d.upload(pages([monitor(9000001),monitor(9000002)])),catchup:true});

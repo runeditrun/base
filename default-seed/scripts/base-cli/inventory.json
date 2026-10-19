@@ -527,7 +527,7 @@
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
-      "sha256": "282c7655e94316c973dbc3d0b14aed7c43c6056274e40e27ef118c50f76bf0e3"
+      "sha256": "ebd479e295dedf7a7e5ea8f044d5351613ed7333f46aebf27fdfa9d354fed179"
     },
     "cli/business/vendors/calendly.mjs": {
       "source": "cli/business/vendors/calendly.mjs",
@@ -535,7 +535,7 @@
     },
     "cli/business/vendors/common.mjs": {
       "source": "cli/business/vendors/common.mjs",
-      "sha256": "fcc59e590c41c00f704235195f8261561f94e43ff96d2541307dc739ff19df03"
+      "sha256": "fafc5ec264f522eb4c673cf396b7064f5f4c0b943c76e4ce70a4e1d5bf0b3ec4"
     },
     "cli/business/vendors/index.mjs": {
       "source": "cli/business/vendors/index.mjs",

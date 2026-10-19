@@ -50,12 +50,21 @@ Every adapter strips credential values from a parsed response before it emits
 bytes for upload, keeping the record, by the same rules as the seed's import
 door. A field whose name's letters end in a credential word (`apiKey`,
 `httpPassword`, `http_password`, `client_secret`, `X-Api-Key`, `integration_key`,
-`webhook_url` and the like), or the `value` of a `{name|key, value}` pair naming
-one (`{name: 'Authorization', value}`), becomes `"[removed]"`; a URL of any scheme
-loses its user name and password (they become `removed@`) and its credential
-query and fragment parameters, except the adapter's own validated pagination
-keys (`page_token`). The door reports the markers per record. Null, booleans,
-empty strings and masks such as `****` are not credentials and stay as they are.
+`webhook_url`, `secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`,
+`pwd` and the like) or are `X-Auth`, the `value` of a `{name|key, value}` pair
+naming one (`{name: 'Authorization', value}`), or the value of such a
+`[name, value]` pair in a list of them (Sentry's header tuples), becomes
+`"[removed]"`. A plural name (`apiKeys`, `tokens`) counts only when it holds
+text, so a count such as `tokens: 1500` stays. A URL of any scheme keeps a
+marker where each credential was: its user name and password become `removed@`,
+and the value of each credential query or fragment parameter (`api_key`,
+`access_token`, `sig` and the like) becomes `removed`
+(`?api_key=removed&region=eu`, `#access_token=removed`), except the adapter's
+own validated pagination keys (`page_token`). The door drops each marker and
+reports it per record as `CREDENTIAL_REMOVED`, so the owner sees which record
+lost a credential. Null, booleans, empty strings and masks such as `****` are
+not credentials and stay as they are. Names that merely contain such letters
+(`keyword`, `monkey`, `signal`, `design`) are not credential names.
 Pagination is read from the response as received, so a credential-bearing
 pagination link is still refused.
 
