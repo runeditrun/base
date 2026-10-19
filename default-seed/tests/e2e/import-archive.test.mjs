@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { completeFirstRun } from '../operator-auth/first-run.mjs'
 import { emittedRuntime, owner, setupToken } from '../operator-auth/emitted-runtime.mjs'
+import { withoutCredentials } from '../../scripts/base-cli/cli/business/vendors/common.mjs'
 
 const issuer = 'https://business.example.test'
 const claimInstallation = 'business-archive-test-installation'
@@ -50,7 +51,7 @@ async function businessSeed(t) {
       assert.equal(sent.status, 200, JSON.stringify(sent.body))
       uploadId = sent.body.uploadId
     }
-    return { uploadId, bytes }
+    return { uploadId, bytes, totalChunks }
   }
   const plan = async (uploadId, catchup) => {
     const planned = await call('plan', { uploadId, ...(catchup ? { catchup } : {}) })
@@ -72,18 +73,21 @@ async function businessSeed(t) {
 
 test('Business keeps a tool\'s final export as an archive in the default seed: plan and catch-up leave it, and restore-check parses it writing nothing', async (t) => {
   const seed = await businessSeed(t)
-  // rer's vendor exports leave a removed credential as a marker; that bundle archives.
-  const team = [
-    { ref: 'ada', name: 'Ada Archive', email: 'ada@example.test', details: { team: 'Support', apiKey: '[removed]' } },
-    { ref: 'lin', name: 'Lin Archive', email: 'lin@example.test' },
-  ]
+  // What rer's vendor export uploads: each live credential value stripped, its
+  // marker left in a field (`[removed]`), a URL's user name (`removed@`) and a
+  // credential query parameter (`=removed`). That bundle holds no credential, so it archives.
+  const team = withoutCredentials([
+    { ref: 'ada', name: 'Ada Archive', email: 'ada@example.test', details: { team: 'Support', apiKey: randomUUID() } },
+    { ref: 'lin', name: 'Lin Archive', email: 'lin@example.test', details: { health: `https://monitor:${randomUUID()}@status.example.test/health` } },
+    { ref: 'hal', name: 'Hal Archive', email: 'hal@example.test', details: { hook: `https://hooks.example.test/in?api_key=${randomUUID()}&region=eu` } },
+  ])
   const first = await seed.upload(team)
   const takenAt = new Date().toISOString(), request = { uploadId: first.uploadId, tool: 'people-vendor', takenAt }
   const archived = await seed.call('archive', request)
   assert.equal(archived.status, 200, JSON.stringify(archived.body))
   assert.deepEqual({ ...archived.body, archiveId: undefined, counts: undefined }, { archiveId: undefined, counts: undefined,
     key: `business-archive/people-vendor/${takenAt}`, tool: 'people-vendor', takenAt, bundleSha256: hash(first.bytes), bytes: first.bytes.length })
-  assert.deepEqual([archived.body.counts.input, archived.body.counts.mapped, archived.body.counts.rejected], [2, 2, 0])
+  assert.deepEqual([archived.body.counts.input, archived.body.counts.mapped, archived.body.counts.rejected], [team.length, team.length, 0])
   assert.deepEqual(await seed.call('archive', request), archived, 'repeating the request with a fresh grant answers the same archive')
   assert.deepEqual(await seed.people(), [], 'archiving writes nothing native')
 
@@ -97,25 +101,31 @@ test('Business keeps a tool\'s final export as an archive in the default seed: p
   assert.deepEqual(await seed.call('archive', { ...request, tool: '../people' }), { status: 400, body: { error: 'invalid_tool' } })
   assert.equal((await seed.owned('/api/operator/import/archive', request)).status, 404, 'the owner-session mount does not serve grant-only actions')
 
-  // A live credential value is never kept in exact bytes.
-  const secret = await seed.upload([{ ref: 'kai', name: 'Kai Secret', email: 'kai@example.test', details: { apiKey: randomUUID() } }])
-  const refused = await seed.call('archive', { ...request, uploadId: secret.uploadId })
-  assert.deepEqual([refused.status, refused.body.error], [422, 'archive_holds_credentials'])
+  // A live credential value, in a field or a URL, is never kept in exact bytes.
+  for (const details of [{ apiKey: randomUUID() }, { health: `https://monitor:${randomUUID()}@status.example.test/health` }, { hook: `https://hooks.example.test/in?api_key=${randomUUID()}` }]) {
+    const secret = await seed.upload([{ ref: 'kai', name: 'Kai Secret', email: 'kai@example.test', details }])
+    const refused = await seed.call('archive', { ...request, uploadId: secret.uploadId })
+    assert.deepEqual([refused.status, refused.body.error], [422, 'archive_holds_credentials'], Object.keys(details)[0])
+  }
 
-  // The baseline applies, then the tool's next export catches up and is archived as the final copy.
+  // The baseline applies, then the tool's final export, which adds a person and
+  // repeats one record identically, is archived and caught up.
   await seed.apply(await seed.plan(first.uploadId))
-  const final = await seed.upload([...team, { ref: 'max', name: 'Max Final', email: 'max@example.test' }])
-  const catchup = await seed.plan(final.uploadId, true)
-  assert.deepEqual([catchup.summary.created, catchup.summary.unchanged], [1, 2])
-  await seed.apply(catchup)
+  const added = [{ ref: 'max', name: 'Max Final', email: 'max@example.test' }]
+  const final = await seed.upload([...team, team[1], ...added])
   const finalTakenAt = new Date().toISOString()
   const last = await seed.call('archive', { uploadId: final.uploadId, tool: 'people-vendor', takenAt: finalTakenAt })
   assert.equal(last.status, 200, JSON.stringify(last.body))
-  assert.equal(last.body.counts.input, catchup.summary.sourceRecords, 'the final archive counts what the final catch-up read')
+  const catchup = await seed.plan(final.uploadId, true)
+  assert.deepEqual([catchup.summary.created, catchup.summary.unchanged], [added.length, team.length])
+  await seed.apply(catchup)
+  assert.deepEqual([last.body.counts.unique, last.body.counts.input], [catchup.summary.sourceRecords, catchup.counts.input],
+    'the final archive counts what the final catch-up read: unique records against its source records, every record read against its input')
+  assert.ok(last.body.counts.input > last.body.counts.unique, 'the repeated record counts in input only')
   assert.deepEqual(await seed.call('archive', { ...request, takenAt: finalTakenAt }), { status: 409, body: { error: 'archive_exists', details: { archiveId } } })
 
   const native = await seed.people()
-  assert.deepEqual(native.map((person) => person.ref).sort(), ['ada', 'lin', 'max'])
+  assert.deepEqual(native.map((person) => person.ref).sort(), [...team, ...added].map((person) => person.ref).sort())
   for (const kept of [archived.body, last.body]) {
     const checked = await seed.call('restore-check', { archiveId: kept.archiveId })
     assert.equal(checked.status, 200, JSON.stringify(checked.body))
@@ -139,9 +149,10 @@ test('A person\'s erasure withdraws the door\'s archives and says so; the erased
 
   const erased = await seed.owned('/api/people/eve/erasure', { confirmation: 'erase eve' })
   assert.equal(erased.status, 200, JSON.stringify(erased.body))
-  assert.ok(erased.body.journal.stores.some((store) => store.store === 'ik_door_archive_chunks' && store.rows === 1), 'the erasure journal counts the withdrawn archive bytes')
-  assert.deepEqual(await seed.call('restore-check', { archiveId: archived.body.archiveId }), { status: 410, body: { error: 'archive_withdrawn', details: {
-    archiveId: archived.body.archiveId, reason: 'An erasure in this seed withdrew the archive\'s bytes with the rest of the import door\'s held content. Nothing remains to restore.' } } })
+  assert.ok(erased.body.journal.stores.some((store) => store.store === 'ik_door_archive_chunks' && store.rows === sent.totalChunks), 'the erasure journal counts the withdrawn archive bytes')
+  const withdrawn = await seed.call('restore-check', { archiveId: archived.body.archiveId })
+  assert.deepEqual([withdrawn.status, withdrawn.body.error, withdrawn.body.details.archiveId], [410, 'archive_withdrawn', archived.body.archiveId])
+  assert.ok(typeof withdrawn.body.details.reason === 'string' && withdrawn.body.details.reason.length > 0, 'the refusal says why')
   assert.equal((await seed.owned('/api/people/ray/export')).status, 200, 'unrelated native records stay')
 
   // The tool's export still holds Eve: it is refused, and the upload goes, as a plan of it would.

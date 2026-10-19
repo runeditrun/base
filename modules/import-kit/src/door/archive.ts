@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 import { canonicalJson, sha256 } from '../provenance/identity.ts';
-import { readFileSource } from '../readers/file.ts';
+import { readFileSourceRemovals } from '../readers/file.ts';
 import { planD1Import } from '../d1/jobs.ts';
 import type { ImportPlan } from '../types.ts';
 import type { DoorRequest } from './types.ts';
@@ -35,15 +35,16 @@ async function archivesInstalled(request: DoorRequest): Promise<void> {
 
 /** Reads the bundle with the namespace's reader and plans it with the plain
  * mapping, as a first plan of it would: counts and rejections, no write. An
- * archive keeps exact bytes, so a bundle the reader had to remove credential
- * values from is refused rather than kept. */
+ * archive keeps exact bytes, so a bundle the reader had to remove a live
+ * credential value from is refused rather than kept; the markers rer's vendor
+ * exports leave (`[removed]`, `removed@`, `=removed`) hold none, so they archive. */
 async function readArchive(request: DoorRequest, name: string, bytes: Uint8Array, id: string, bundleSha256: string): Promise<ImportPlan> {
   const options = request.options, access = request.access;
   const kitNamespace = 'door-archive:' + sha256(canonicalJson([access.namespace, bundleSha256, id]));
   try {
-    const source = await readFileSource({namespace: kitNamespace, name, bytes, format: options.format, parse: options.parse, credentials: 'remove'},
+    const {source, liveCredentialsRemoved} = await readFileSourceRemovals({namespace: kitNamespace, name, bytes, format: options.format, parse: options.parse, credentials: 'remove'},
       {...options.limits, maxBytes: Math.min(options.limits?.maxBytes ?? access.maxBytes, access.maxBytes), maxRecords: Math.min(options.limits?.maxRecords ?? access.maxRecords, access.maxRecords)});
-    if (source.artifacts.some(a => a.original?.status === 'unavailable' && a.original.reason === 'credentials-removed')) throw new DoorError('archive_holds_credentials', 422,
+    if (liveCredentialsRemoved) throw new DoorError('archive_holds_credentials', 422,
       {reason: 'The bundle holds credential values, and an archive keeps its exact bytes, so it is not kept. Export again with credential values removed (rer\'s vendor exports remove them) and archive that.'});
     return await planD1Import(source, options.mapping, kitContext(request, {id, kitNamespace, plan: {mappingVersion: options.mapping.version} as ImportPlan}));
   } catch (error) { throw sourceRefusal(error) ?? error; }

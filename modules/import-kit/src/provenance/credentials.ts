@@ -180,9 +180,17 @@ export interface RemovedCredential {
   /** JSON pointer of the field within the value. */
   path: string;
   field: CredentialField;
-  /** An exporter had already removed it: the field holds REMOVED_CREDENTIAL. */
+  /** No live value went: an exporter had already removed it. A field holds
+   * REMOVED_CREDENTIAL; a URL holds a placeholder where the value was, such as
+   * the `removed@` user name and `=removed` parameter rer's vendor exports leave. */
   beforeUpload?: true;
 }
+/** Whether a removal took out a live credential value, not an exporter's marker. */
+export const liveCredentialRemoved = (item: RemovedCredential): boolean => !item.beforeUpload;
+/** Whether a removal withholds the original bytes: a live value, or any URL
+ * credential part, marker included, since refuse mode, which scans retained
+ * originals, refuses a URL's user name and credential parameters whatever they hold. */
+export const withholdsOriginal = (item: RemovedCredential): boolean => !item.beforeUpload || item.field.kind !== 'field';
 /** Remove mode's wider net, never refuse mode's: a key whose letters end in a
  * credential word, e.g. `httpPassword`, `http_password`, `client_secret`,
  * `X-Api-Key`, `pushToken`, `integration_key`, `webhook_url`, `secret_key`,
@@ -224,8 +232,10 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
   const pairs = (text: string, path: string, requireValue: boolean): string => {
     const all = text.split('&'), kept = all.filter(pair => (requireValue && !pair.includes('=')) || !credentialQueryKey(pair.split('=')[0], policy));
     if (kept.length === all.length) return text;
-    for (const pair of all) if (!kept.includes(pair)) secret(pair.slice(pair.indexOf('=') + 1));
-    removed.push({ path, field: { kind: 'url-query' } });
+    const values = all.filter(pair => !kept.includes(pair)).map(pair => pair.slice(pair.indexOf('=') + 1));
+    values.forEach(secret);
+    // rer's `=removed` marker (or another placeholder) in every dropped parameter: no live value went.
+    removed.push({ path, field: { kind: 'url-query' }, ...(values.every(credentialPlaceholder) ? { beforeUpload: true as const } : {}) });
     return kept.join('&');
   };
   const url = (text: string, path: string): string => {
@@ -237,7 +247,7 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
       result = userinfo[1] + result.slice(userinfo[0].length);
       // Even rer's `removed@` marker goes: refuse mode, which scans retained
       // originals, refuses any user name, so the original is withheld either way.
-      removed.push({ path, field: { kind: 'url-userinfo' } });
+      removed.push({ path, field: { kind: 'url-userinfo' }, ...(credentialPlaceholder(userinfo[2]) ? { beforeUpload: true as const } : {}) });
     }
     const fragmentStart = result.indexOf('#'), queryStart = result.indexOf('?');
     const end = fragmentStart < 0 ? result.length : fragmentStart;

@@ -297,8 +297,11 @@ exact uploaded bytes into the seed's own D1 as the tool's archive, named
 `business-archive/<tool>/<takenAt>` (`key`), and answers its `archiveId`, the
 bundle's `bundleSha256` and `bytes`, and `counts`: the reader and mapping's
 counts of the bundle (`input`, `unique`, `mapped`, `rejected`, `byKind` and the
-rest), as a first plan of it would report them. Compare `counts.input` with a
-catch-up's `summary.sourceRecords`. Archiving writes nothing native. The archive
+rest), as a first plan of it would report them. `counts.input` counts every
+record read, a repeated identical record included, and `counts.unique` each
+source identity once: to check an archive against the catch-up of the same
+export, compare `counts.unique` with the catch-up's `summary.sourceRecords`, or
+`counts.input` with the catch-up's `counts.input`. Archiving writes nothing native. The archive
 holds its own copy, so `plan`, a catch-up, a cancelled preparation or an `undo`
 never deletes it, and the upload stays usable for planning. The same request
 again answers the same archive; another `tool` or `takenAt` for an archived
@@ -306,8 +309,10 @@ upload answers 409 `archive_exists` with `details.archiveId`.
 
 An archive keeps exact bytes, so it refuses what the door never keeps: a bundle
 from which the reader had to remove a live credential value answers 422
-`archive_holds_credentials` (rer's vendor exports leave the `[removed]` marker,
-which archives); a bundle holding an erased record answers 409 `source_erased`
+`archive_holds_credentials`. The markers rer's vendor exports leave in place of
+the values they strip (`[removed]` in a field, `removed@` in a URL, `=removed`
+for a query or fragment parameter) hold no credential, so such a bundle
+archives, although a plan of it still withholds the original; a bundle holding an erased record answers 409 `source_erased`
 and the upload goes, as `plan` does; a reader refusal answers its named 4xx. An
 upload whose bytes already went (planned with credentials removed, or refused)
 answers 410 `upload_bytes_withheld`: upload it again and archive before
