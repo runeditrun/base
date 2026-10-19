@@ -18,7 +18,7 @@ export async function runHistory(store, request, fence) {
 export async function finishRun(store, id, error, now) {
   const status = error?.status ?? 'completed', code = error?.code ?? null;
   await store.batch([
-    ["UPDATE oa_policy_runs SET status=?,error=?,finished_at=?,last_seen_at=? WHERE id=?", [status, code, now, now, id]],
+    ["UPDATE oa_policy_runs SET status=?,error=?,finished_at=?,last_seen_at=? WHERE id=? AND status='running'", [status, code, now, now, id]],
     [`UPDATE oa_policy_runs SET repeats=repeats+1,last_seen_at=? WHERE rowid=(
       SELECT prior.rowid FROM oa_policy_runs prior JOIN oa_policy_runs tick ON tick.id=?
       WHERE tick.admitted=0 AND tick.status='refused' AND prior.rowid=(SELECT MAX(rowid) FROM oa_policy_runs WHERE rowid<tick.rowid AND policy_id=tick.policy_id)
