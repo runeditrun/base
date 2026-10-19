@@ -49,11 +49,14 @@ export async function productionMail(root, declaration, env) {
  const routes = selected.map(provider => {
   const credentialKeys = deferred && nativeCredential[provider] && !declaredProviders.has(provider) ? [nativeCredential[provider]]
    : ['MAIL_API_KEY', ...(nativeCredential[provider] ? [nativeCredential[provider]] : [])];
+  // A seed's direct-provider adapter can declare the contract's shared provider
+  // binding. Its explicit environment mapping (or live declared secret) still wins.
+  if (nativeCredential[provider] && secrets.has('MAIL_PROVIDER_API_KEY')) credentialKeys.push('MAIL_PROVIDER_API_KEY');
   const declaredCredentials = credentialKeys.filter(key => secrets.has(key));
   // Only resend and sendgrid have a provider key of their own; cloudflare and rer send with MAIL_API_KEY alone.
   const providerKeys = (nativeCredential[provider] ? [nativeCredential[provider]] : []).filter(key => !declaredCredentials.includes(key));
   const credentialText = declaredCredentials.includes('MAIL_API_KEY') && providerKeys.length
-    ? `MAIL_API_KEY (or ${providerKeys.join(' / ')})`
+    ? `${declaredCredentials.join(' or ')} (or ${providerKeys.join(' / ')})`
     : declaredCredentials.join(' or ') || credentialKeys.join(' or ');
   return live => {
    let relaySelected = true;
