@@ -11,8 +11,9 @@ function canonical(value) {
   return invalid();
 }
 export async function policyVersion(input) {
-  keys(input, ['id', 'kind', 'parameters', 'actions']);
+  keys(input, ['id', 'kind', 'parameters', 'actions', 'maxActionsPerRun', 'minIntervalMinutes']);
   if (!/^[a-z][a-z0-9-]{0,79}$/.test(input.id) || typeof input.id !== 'string' || typeof input.kind !== 'string' || !/^[a-z][a-z0-9:._-]{0,119}$/.test(input.kind) || !plain(input.parameters) || !Array.isArray(input.actions) || !input.actions.length || input.actions.length > 20) invalid();
+  if (!Number.isSafeInteger(input.maxActionsPerRun) || input.maxActionsPerRun < 1 || input.maxActionsPerRun > 100 || !Number.isSafeInteger(input.minIntervalMinutes) || input.minIntervalMinutes < 1 || input.minIntervalMinutes > 525600) invalid();
   for (const grant of input.actions) {
     keys(grant, ['action', 'scope']);
     if (!actions.includes(grant.action)) invalid();

@@ -13,10 +13,13 @@ const escape = (value: string) => value.replace(/[&<>"']/g, character => `&#${ch
 type Policies = NonNullable<ReturnType<typeof operatorAuth>['scheduledPolicies']>
 type Listing = Awaited<ReturnType<Policies['list']>>
 type Approval = Listing['approvals'][number]
-type Run = Awaited<ReturnType<Policies['runs']>>[number]
+type RunListing = Awaited<ReturnType<Policies['runs']>>
+type Run = RunListing['runs'][number]
 
 const field = (label: string, value: string) => `<dt>${escape(label)}</dt><dd>${escape(value)}</dd>`
 const time = (value: string | number) => readableTime(value, timeZone)
+const actionLabels: Record<string, string> = { 'operators:deactivate': 'Deactivate operator', 'operators:reactivate': 'Reactivate operator' }
+const actionLabel = (action: string) => actionLabels[action] ?? fieldLabel(action)
 
 // Parameters are part of the exact approval: render every nested value without
 // the depth limit appropriate to a short activity-feed evidence summary.
@@ -35,22 +38,34 @@ function revokeForm(approval: Approval): string {
 }
 
 function approvalHtml(approval: Approval, directory: Map<string, string>): string {
-  return `<dl>${field('Approval ID', approval.id)}${field('Policy ID', approval.policyId)}${field('Approved version hash', approval.versionHash)}${field('Approved by', actorName(directory, approval.ownerId))}${field('Owner authority version', String(approval.ownerVersion))}${field('Approved at', time(approval.approvedAt))}${field('Revoked at', approval.revokedAt === null ? 'Not revoked' : time(approval.revokedAt))}</dl>`
+  return `<dl>${field('Approval ID', approval.id)}${field('Policy ID', approval.policyId)}${field('Approved version hash', approval.versionHash)}${field('Approved by', actorName(directory, approval.ownerId))}${field('Approval session kind', approval.sessionKind)}${field('Owner authority version', String(approval.ownerVersion))}${field('Approved at', time(approval.approvedAt))}${field('Revoked at', approval.revokedAt === null ? 'Not revoked' : time(approval.revokedAt))}${field('Revocation reason', approval.revokeReason ? fieldLabel(approval.revokeReason) : 'None recorded')}</dl>`
 }
 
 function policyHtml(policy: Listing['policies'][number], directory: Map<string, string>): string {
   const definition = policy.definition
-  const actionLabels: Record<string, string> = { 'operators:deactivate': 'Deactivate operators', 'operators:reactivate': 'Reactivate operators' }
-  return `<section><h2>${escape(definition.id)}</h2><dl>${field('Policy ID', definition.id)}${field('Job kind', definition.kind)}${field('State', fieldLabel(policy.state))}${field('Version hash', policy.versionHash)}</dl>
+  return `<section><h2>${escape(definition.id)}</h2><dl>${field('Policy ID', definition.id)}${field('Job kind', definition.kind)}${field('State', fieldLabel(policy.state))}${field('Version hash', policy.versionHash)}${field('Maximum actions per run', String(definition.maxActionsPerRun))}${field('Minimum interval between runs', `${definition.minIntervalMinutes} minutes`)}</dl>
 <h3>Parameters</h3>${parametersHtml(definition.parameters)}
-<h3>Allowed actions and complete scopes</h3>${definition.actions.length ? `<ol>${definition.actions.map(({ action, scope }) => `<li><p>${escape(actionLabels[action] ?? fieldLabel(action))} (<code>${escape(action)}</code>)</p><dl>${field('Allowed roles', scope.roles.join(', '))}${field('Operator restriction', scope.operatorIds === undefined ? 'Any operator matching the other scope requirements' : scope.operatorIds.length ? scope.operatorIds.map(id => `${actorName(directory, id)} (${id})`).join(', ') : 'No operators')}${field('Inactivity requirement', scope.inactiveDays === undefined ? 'None' : `No OA session created in the last ${scope.inactiveDays} days; account creation is used for someone who has never signed in.`)}</dl></li>`).join('')}</ol>` : '<p>No actions allowed.</p>'}
-<p>Owner accounts and invitations cannot be targeted. Inactivity measures sign-in sessions, not activity in the app.</p>
+<h3>Allowed actions and complete scopes</h3>${definition.actions.length ? `<ol>${definition.actions.map(({ action, scope }) => `<li><p>${escape(actionLabel(action))} (<code>${escape(action)}</code>)</p><dl>${field('Allowed roles', scope.roles.join(', '))}${field('Operator restriction', scope.operatorIds === undefined ? 'Any operator matching the other scope requirements' : scope.operatorIds.length ? scope.operatorIds.map(id => `${actorName(directory, id)} (${id})`).join(', ') : 'No operators')}${field('Inactivity requirement', scope.inactiveDays === undefined ? 'None' : `No sign-in in the last ${scope.inactiveDays} days, measured from the durable last sign-in timestamp; account creation is used for someone who has never signed in.`)}</dl></li>`).join('')}</ol>` : '<p>No actions allowed.</p>'}
+<p>Owner accounts and invitations cannot be targeted. Inactivity uses the durable sign-in timestamp, not activity in the app.</p>
 <h3>Current approval</h3>${policy.approval ? approvalHtml(policy.approval, directory) + revokeForm(policy.approval) : '<p>No approval recorded.</p>'}
 <form method="post" action="${PATH}"><input type="hidden" name="action" value="approve"><input type="hidden" name="policyId" value="${escape(definition.id)}"><input type="hidden" name="versionHash" value="${escape(policy.versionHash)}"><button>Approve this exact version</button></form></section>`
 }
 
+function actionHtml(action: Run['actions'][number], directory: Map<string, string>): string {
+  const refused = action.action === 'policy:refused'
+  const value = action.value
+  const attemptedAction = refused ? value.attemptedAction : action.action
+  return `<li><p>${refused ? 'Refused target' : 'Committed action'}: ${escape(attemptedAction ? actionLabel(attemptedAction) : 'No action recorded')}</p><dl>${field('Target operator', value.operatorId ? actorName(directory, value.operatorId) : 'No target recorded')}${field('Target operator ID', value.operatorId ?? 'No target recorded')}${field(refused ? 'Attempted action' : 'Action', attemptedAction ?? 'None recorded')}${field('Recorded at', time(action.createdAt))}${refused ? field('Refusal code', value.error ?? 'None recorded') : ''}${field('Audit event', action.action)}${field('Audit ID', action.id)}${field('Actor', action.actor)}${field('Policy ID', value.policyId ?? 'No policy recorded')}${field('Version hash', value.versionHash ?? 'No version recorded')}${field('Approval ID', value.approvalId ?? 'No approval')}${field('Approved by', value.approvedBy ? actorName(directory, value.approvedBy) : 'No approving owner')}${field('Run ID', value.runId ?? 'No run recorded')}</dl></li>`
+}
+
 function runHtml(run: Run, directory: Map<string, string>): string {
-  return `<section><h3>${escape(run.policyId)}</h3><dl>${field('Actor', `policy:${run.policyId}@${run.versionHash}`)}${field('Run ID', run.id)}${field('Approval ID', run.approvalId ?? 'No approval')}${field('Approved by', run.approvedBy ? actorName(directory, run.approvedBy) : 'No approving owner')}${field('Started at', time(run.startedAt))}${field('Finished at', run.finishedAt === null ? 'Not finished' : time(run.finishedAt))}${field('Outcome', fieldLabel(run.status))}${field('Refusal or error code', run.error ?? 'None')}</dl></section>`
+  return `<section><h3>${escape(run.policyId)}</h3><dl>${field('Actor', run.versionHash ? `policy:${run.policyId}@${run.versionHash}` : 'No version recorded')}${field('Run ID', run.id)}${field('Approval ID', run.approvalId ?? 'No approval')}${field('Approved by', run.approvedBy ? actorName(directory, run.approvedBy) : 'No approving owner')}${field('Started at', time(run.startedAt))}${field('Finished at', run.finishedAt === null ? 'Not finished' : time(run.finishedAt))}${field('Outcome', fieldLabel(run.status))}${field('Refusal or error code', run.error ?? 'None')}${field('Tick occurrences', String(run.repeats))}${field('Last seen at', time(run.lastSeenAt))}</dl>
+<h4>Committed actions and refused targets</h4>${run.actions.length ? `<ol>${run.actions.map(action => actionHtml(action, directory)).join('')}</ol>` : '<p>No committed actions or refused targets recorded for this run.</p>'}</section>`
+}
+
+function paginationHtml(history: RunListing, before: string | null): string {
+  if (!before && !history.nextCursor) return ''
+  return `<nav aria-label="Run history pages"><p>${before ? `<a href="${PATH}#run-history">Newest runs</a>` : ''}${before && history.nextCursor ? ' · ' : ''}${history.nextCursor ? `<a href="${PATH}?before=${escape(encodeURIComponent(history.nextCursor))}#run-history" rel="next">Older runs</a>` : ''}</p></nav>`
 }
 
 async function page(content: string, status = 200, head = false): Promise<Response> {
@@ -85,13 +100,13 @@ export async function policyPageResponse(request: Request, bindings: Bindings): 
       return seeOther(PATH, headers)
     }
     const [listing, runs, directory] = await Promise.all([policies.list(request), policies.runs(request), operatorDirectory(bindings.DB)])
-    return page(`<p>Review the complete definition before approving its exact version. Changes to any definition field require approval again. Reapproval replaces the previous approval.</p><p>Revocation stops future runs and further actions in an active run. It cannot undo actions already committed.</p>
+    return page(`<p>Review the complete definition before approving its exact version. Changes to any definition field require approval again. Reapproval replaces the previous approval.</p><p>Standing approvals require a native, OIDC or password sign-in with fresh proof. Development and review sign-ins cannot approve schedules.</p><p>Revocation stops future runs and further actions in an active run. It cannot undo actions already committed.</p>
 ${listing.policies.length ? listing.policies.map(policy => policyHtml(policy, directory)).join('') : '<p>No scheduled policies declared.</p>'}
 <h2>Approval history</h2>${listing.approvals.length ? listing.approvals.map(approval => `<section><h3>${escape(approval.policyId)}</h3>${approvalHtml(approval, directory)}${revokeForm(approval)}</section>`).join('') : '<p>No approvals yet.</p>'}
-<h2>Run history</h2><p>Outcomes include refused and failed attempts. A failed run may have committed earlier actions; review the activity audit for those actions.</p>${runs.length ? runs.map(run => runHtml(run, directory)).join('') : '<p>No runs yet.</p>'}`, 200, request.method === 'HEAD')
+<h2 id="run-history">Run history</h2><p>Up to 25 runs are shown per page, newest first. Refused ticks with the same outcome may be grouped; tick occurrences include the first attempt, and the last-seen time includes repeats. A failed run may have committed earlier actions. Review each run’s committed actions and refused targets below.</p>${paginationHtml(runs, url.searchParams.get('before'))}${runs.runs.length ? runs.runs.map(run => runHtml(run, directory)).join('') : '<p>No runs on this page.</p>'}${paginationHtml(runs, url.searchParams.get('before'))}`, 200, request.method === 'HEAD')
   } catch (error) {
     if (!(error instanceof AuthError)) throw error
     const code = /^[a-z][a-z0-9_:-]{0,99}$/.test(error.code) ? error.code : 'request_refused'
-    return page(`<p role="alert">Request refused (${escape(code)}).</p><p><a href="/app/policies">Review current policies and approvals</a></p>`, error.status, request.method === 'HEAD')
+    return page(`<p role="alert">Request refused (${escape(code)}).</p>${['step_up_required', 'policy_session_denied'].includes(code) ? '<p><a href="/signin?returnTo=%2Fapp%2Fpolicies">Sign in again to approve a scheduled policy</a></p>' : ''}<p><a href="/app/policies">Review current policies and approvals</a></p>`, error.status, request.method === 'HEAD')
   }
 }

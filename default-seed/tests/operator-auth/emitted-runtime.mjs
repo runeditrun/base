@@ -25,7 +25,7 @@ export async function migrate(db, filename) {
   await db.batch(splitSql(sql).map((statement) => db.prepare(statement)))
 }
 export const emittedRuntime = (options = {}) => startOnFreePort((port) => startEmittedRuntime(port, options))
-async function startEmittedRuntime(port, { prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo }) {
+async function startEmittedRuntime(port, { prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, files = false }) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
@@ -50,6 +50,7 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
     compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
     assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
     d1Databases: { DB: 'default-seed-emitted' },
+    ...(files ? { r2Buckets: { FILES: 'default-seed-emitted-files' } } : {}),
     queueProducers: { JOBS: 'reference-jobs' }, queueConsumers: { 'reference-jobs': { maxBatchTimeout: 0 } },
     bindings: {
       AUTH_ORIGIN: origin, AUTH_LOCAL: production ? 'false' : 'true', OWNER_EMAIL: owner, SETUP_TOKEN: setupToken,

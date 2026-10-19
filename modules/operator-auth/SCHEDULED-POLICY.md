@@ -2,102 +2,127 @@
 
 Design · 19 October 2026
 
-A seed declares trusted server-side policy definitions through the
-`scheduledPolicies: () => definitions` option of OA `createOperatorAuth`.
-There is no HTTP run endpoint and no request header, token, session kind or
-caller-supplied actor that grants scheduled authority. Native-account adapters
-must implement their own equivalent transaction fence before adopting this door.
+A seed declares trusted server-side definitions through OA `createOperatorAuth`'s
+`scheduledPolicies: () => definitions` option. Only trusted Worker code calls
+`run`; there is no HTTP run endpoint or caller-supplied actor granting scheduled
+authority. Native-account adapters need an equivalent transaction fence before
+adopting this door.
 
 ## Definition and approval
 
-Each definition contains an id, job kind, JSON parameters and an explicit list
-of allowed actions with their target scopes. The initial supported actions are
-`operators:deactivate` and `operators:reactivate`; neither may target an owner or
-an invitation. Scopes require non-owner roles and may restrict exact operator
-ids and require no sign-in within `inactiveDays`. Inactivity here means no OA
-session created since the cutoff (or account creation for someone never signed
-in), not a claim to measure a seed's domain activity. Seeds needing domain
-activity must first add an enforceable scoped action for their own store.
+A definition contains an id, job kind, JSON parameters, allowed actions/scopes,
+and two required integer bounds: `maxActionsPerRun` (1–100) and
+`minIntervalMinutes` (1–525600). Supported actions are `operators:deactivate`
+and `operators:reactivate`. Scopes require non-owner roles and may restrict exact
+operator ids or require inactivity for `inactiveDays`. Owners and invitations
+cannot be targets.
+
+Inactivity uses `oa_operators.last_signin_at`, retained when sessions are deleted.
+An insert trigger advances it when an OA session is created. For new accounts
+that have never signed in, account creation is used; both the account creation
+and sign-in cutoffs must pass. This measures sign-in, not activity in the seed's
+domain. Legacy accounts receive a conservative timestamp at migration time,
+retaining any later known sign-in, so missing historical sessions never establish
+immediate inactivity.
 
 Canonical JSON sorts object keys, preserves array order and rejects non-JSON
-values. SHA-256 covers the entire definition, including id, kind, parameters,
-actions and scopes. Changing any field needs fresh approval. The signed-in
-owner submits the hash they reviewed; the server reads the current definition
-again and refuses a stale hash. Approval stores the exact definition and action
-set, hash, owner id and authority version, approval time and revocation time.
-Approval/revocation require the existing origin, session and transaction fence.
-Reapproval creates a new approval record and revokes its predecessor atomically.
+values. SHA-256 covers the complete definition, including both bounds. The owner
+reviews that exact hash; approval rereads the definition and rejects stale hashes.
+Approval stores the definition, actions, hash, owner id/authority version, session
+kind, approval time and revocation details. Reapproval atomically revokes its
+predecessor. When the runner first observes a changed definition, it revokes the
+old approval with `superseded_by_change`; reverting the source cannot revive it.
 
-## Scheduled authority
+Standing approval requires a native, OIDC or password owner session and the
+existing `requireFreshProof` check, as well as origin/session transaction fences.
+Development and review sessions are refused outright: cron cannot repeat their
+request gate. The seed's `rolePolicy` must allow every declared action at approval.
+Approval survives sign-out and session expiry; it is an explicit delegation.
+Owner authority-version changes invalidate it, including demotion then promotion.
 
-A trusted Worker scheduled handler calls `auth.scheduledPolicies.run(policyId,
-async run => { await run.execute('operators:deactivate', operatorId) })`. The
-callback receives a bounded capability, never a simulated owner request or a
-session. The door reads the current definition at admission and before each
-action, checks its hash against the live approval, and creates a unique run id.
-Every attempt is recorded, including missing, edited, revoked or invalid-owner
-approvals. Errors propagate to the scheduled handler after the run is logged.
+## Scheduled authority and bounds
 
-The existing store actor fence gains an internal, unforgeable policy-actor
-branch. It rechecks the exact approval id/hash/action set, revocation, active
-owner role and authority version, live run, action and target scope inside the
-same D1 transaction as the status mutation and audit event. The ordinary session
-branch is unchanged. Owner targets, invitations and actions outside the approved
-set fail closed. A completed/failed run capability cannot act again. Revocation
-stops future runs and subsequent writes of an already executing run immediately
-at the transaction boundary. It cannot undo an action already committed.
-The final-owner and invitation/version database triggers continue to apply.
+A scheduled handler calls `auth.scheduledPolicies.run(policyId, async run => {
+await run.execute('operators:deactivate', operatorId) })`. The callback receives a
+bounded capability, never a simulated owner session. The door rereads the current
+definition and live approval at admission and before each action. Before acting,
+it evaluates the seed's current `rolePolicy` with the approving owner and target.
 
-Audit entries record `policy:<id>@<sha256>`, `approvedBy`, approval id, run id,
-action and target. Runs retain started/finished times, outcome and refusal code;
-approval and revocation are audited as the signed-in owner. Partial runs retain
-every committed action audit even if a later action fails. Worker code and its
-DB binding are trusted: this door bounds authority granted through operator-auth,
-not arbitrary SQL written by a compromised seed deployment. Version a job kind
-when changing its semantics; all security-relevant bounds belong in the hashed
-definition and must be enforced by the action implementation.
+An internal policy actor selects an unforgeable store fence. The status mutation
+and committed-action audit share a D1 transaction that rechecks approval
+id/hash/actions, revocation, accepted approval session kind, active owner role and
+authority version, admitted live run, action count and target scope. Sequential
+capability use and the transaction count enforce `maxActionsPerRun`; the reference
+selector also limits its candidates to that bound. Stale or overbroad selection
+does not widen the approved scope. Closed run capabilities cannot act again.
+Revocation stops subsequent writes at the transaction boundary; committed actions
+remain committed. Existing final-owner and invitation/version triggers still apply.
 
-## Adoption and owner flow
+Admission is serialized per policy: another admitted run cannot overlap, and the
+minimum interval starts at the last admitted run's finish, including failed or
+refused admitted runs. Early ticks are refused with `policy_interval`. Consecutive
+identical unadmitted refusals for the same policy/version/approval/outcome coalesce
+into one history row with `repeats` occurrences and `lastSeenAt`. Admitted runs
+retain separate rows and action history.
 
-Apply `accounts/schema/scheduled-policy.sql` as a new numbered migration on an
-existing OA store. Fresh OA schemas include the same tables. Declare policies in
-trusted source, not HTTP input; wire cron to `run`. Refusals remain recorded; a handler may continue unrelated
-maintenance but must never rewrite a refused run as success. Select candidates using real seed data, then call `run.execute` for each;
-the fence repeats the approved bounds even if selection is stale or overbroad.
+Runs record outcome, timestamps and refusal/error codes. Action audits bind
+`policy:<id>@<sha256>`, approving owner, approval id, unique run id, action and
+target. Refused target attempts also record the attempted action and error code.
+Partial failures retain earlier committed-action audits. The reference handler
+attempts every policy despite prior failures, and attempts recording, policies
+and pending erasures independently. Durable policy `AuthError` refusals remain
+recorded; unexpected failures aggregate only after the jobs have been attempted.
+Storage failures can prevent durable history and are surfaced as failures.
 
-The owner screen must show kind, parameters, complete actions/scopes and current
-hash, the approving owner/time, approval status and run history. Submit that exact
-hash on approval, expose revoke, and explain that edits require approval again.
-Base's default seed supplies `/app/policies` and a conservative inactive-member
-example. It starts unapproved. Owners list definitions/approvals and runs through
-`GET /auth/policies` and `GET /auth/policy-runs`; POST `/auth/policy/approve` takes
-`{policyId, versionHash}`, POST `/auth/policy/revoke` takes `{approvalId}`.
-The reference uses Base's existing theme and native forms.
+Worker code and the raw DB binding remain trusted. These fences bound authority
+through operator-auth; they do not restrict arbitrary SQL in a compromised seed.
+Version a job kind when changing its semantics and put all security-relevant
+bounds in the hashed definition and enforcing implementation.
 
-Tests use the existing emitted Worker harness's `worker.scheduled()` door, real
-D1 migrations and signed-in approval APIs. They cover success/audit, an edited
-policy and reapproval, revocation, disallowed action/scope, non-owner approval,
-owner demotion and unchanged signed-in status administration.
+## Adoption, history and portability
 
+For an existing OA store, apply `accounts/schema/scheduled-policy.sql` if absent,
+then `scheduled-policy-hardening.sql` and `last-signin.sql` as new numbered
+migrations. Preserve applied migration history. Base uses `0029`, `0030` and
+`0031` respectively. The hardening migration revokes existing approvals with
+`fresh_approval_required`; owners must approve again with fresh proof. Apply the
+last-sign-in migration after any `oa_sessions` rebuild so its trigger survives.
+Fresh OA schemas include the current tables and trigger.
+
+Declare definitions in trusted source, wire cron to `run`, select real candidates
+and call `run.execute` for each. The default reference starts unapproved at
+`/app/policies`. Its owner screen shows complete parameters/scopes, bounds, current
+hash, approving owner/session kind, approval history and revocation reasons. Run
+history exposes outcomes, tick occurrences, committed actions and refused targets,
+including target ids, actor, approving owner, approval id, run id and timestamps.
+Owners can navigate to older pages rather than losing history after a fixed cap.
+
+Owner APIs are `GET /auth/policies`, `GET /auth/policy-runs`,
+`POST /auth/policy/approve` with `{policyId, versionHash}`, and
+`POST /auth/policy/revoke` with `{approvalId}`. `list` returns approval history and
+each current definition's state. `runs` returns `{runs, nextCursor}` with up to 25
+runs, newest first, including their action audits; pass `?before=<nextCursor>` for
+the next page. Occurrences include the first tick. Retain `oa_policy_runs` and
+`oa_auth_audit` for durable history.
+
+Portable exports preserve approval provenance but revoke approvals in the export
+snapshot, leaving the source installation unchanged. Import refuses an archive
+containing any live policy approval. Restoring records does not transfer standing
+authority; the destination owner must review and approve its current definitions.
 
 ```ts
 const definitions = () => [{
   id: 'inactive-members', kind: 'deactivate-members-without-recent-signin.v1',
   parameters: { inactiveDays: 90 },
+  maxActionsPerRun: 25, minIntervalMinutes: 10,
   actions: [{ action: 'operators:deactivate',
     scope: { roles: ['member'], inactiveDays: 90 } }],
 }];
 const auth = createOperatorAuth({ ...authOptions, scheduledPolicies: definitions });
-// Inside Worker.scheduled; candidates come from the seed's real database.
+// Inside Worker.scheduled; select real candidates within the declared run limit.
 await auth.scheduledPolicies.run('inactive-members', async run => {
   for (const candidate of candidates) {
     await run.execute('operators:deactivate', candidate.id);
   }
 });
 ```
-
-`list` returns all approval history and each current declaration's approval
-state; `runs` returns the latest 100 attempts. Keep the full `oa_policy_runs` and
-`oa_auth_audit` records for longer history. Approvals survive sign-out/session
-expiry: they are an explicit delegation, not a persisted session. Authority
-version changes invalidate them, including demotion followed by promotion.

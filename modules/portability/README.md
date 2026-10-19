@@ -130,6 +130,12 @@ that generation and the content hash, while retained domain and identity rows
 remain equal. Re-linking keeps the installation sector and person bindings;
 restored provider sign-in remains off until the owner explicitly enables it.
 
+Included standing policy approvals retain their provenance and run references,
+but export revokes them in the snapshot. The source approval stays unchanged.
+Restore refuses an archive containing a live approval, even with valid archive
+checksums. The destination owner must approve its policies again. Included
+operators retain their durable `last_signin_at` when sessions are scrubbed.
+
 SQLite VIRTUAL and STORED generated columns retain their visible schema metadata
 and original table SQL. Only writable base cells appear in archived rows or
 restore inserts; the destination's migrated schema computes generated values and
@@ -493,6 +499,7 @@ modules/portability/storage.mjs
 modules/portability/copies.mjs
 modules/portability/dev-data.mjs
 modules/portability/provider-data.mjs
+modules/portability/policy-data.mjs
 modules/portability/generated.mjs
 modules/portability/restore-safety.mjs
 modules/portability/bridge.mjs

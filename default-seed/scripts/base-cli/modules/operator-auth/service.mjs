@@ -77,7 +77,7 @@ export function createOperatorAuth(options) {
   const external = legacyAdmission({ admission, config });
   return Object.freeze({
     ...admin,
-    ...(options.scheduledPolicies ? { scheduledPolicies: scheduledPolicies({ definitions: options.scheduledPolicies, store, config, clock, authenticate }) } : {}),
+    ...(options.scheduledPolicies ? { scheduledPolicies: scheduledPolicies({ definitions: options.scheduledPolicies, store, config, clock, authenticate, requireFreshProof, rolePolicy }) } : {}),
     ...providerControl({ store, accounts, authenticate, config, clock }),
     ...fencedCredentials({store,authenticate,requireFreshProof,config,clock,hash}),
     ...ownerSignIn({ config, store, clock, sessions, limit }),

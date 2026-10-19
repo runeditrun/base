@@ -12,7 +12,10 @@ test('scheduled Worker door: exact owner approval bounds actions, audits runs, a
   const list = cookie => r.call('/auth/policies', { cookie }).then(response => response.json())
   const lastRun = async () => (await r.db.prepare('SELECT * FROM oa_policy_runs ORDER BY rowid DESC LIMIT 1').first())
   let attempts = 0
-  const tick = async () => { attempts++; await (await r.mf.getWorker()).scheduled({ cron: '*/10 * * * *' }); return lastRun() }
+  const tick = async () => {
+    // These are separate cron intervals; refusal cases test immediate replay.
+    await r.db.prepare('UPDATE oa_policy_runs SET finished_at=? WHERE admitted=1 AND finished_at IS NOT NULL').bind(Date.now()-11*60000).run()
+    attempts++; await (await r.mf.getWorker()).scheduled({ cron: '*/10 * * * *' }); return lastRun() }
   try {
     let ownerCookie = cookieOf(await post('/auth/bootstrap', { token: setupToken, displayName: 'Rivera Lee' }))
     await post('/auth/magic-link', { email: owner }); ownerCookie = await confirm()
@@ -28,6 +31,7 @@ test('scheduled Worker door: exact owner approval bounds actions, audits runs, a
     const aged = Date.now() - 180 * 86400000
     await r.db.prepare('UPDATE oa_operators SET created_at=? WHERE id=?').bind(aged, member.operator.id).run()
     await r.db.prepare('UPDATE oa_sessions SET created_at=? WHERE operator_id=?').bind(aged, member.operator.id).run()
+    await r.db.prepare('UPDATE oa_operators SET last_signin_at=? WHERE id=?').bind(aged, member.operator.id).run()
     const status = async id => (await r.db.prepare('SELECT status FROM oa_operators WHERE id=?').bind(id).first()).status
     assert.equal((await tick()).error, 'policy_approval_required')
     let policy = (await list(ownerCookie)).policies[0]
@@ -57,7 +61,7 @@ test('scheduled Worker door: exact owner approval bounds actions, audits runs, a
     const oldHash = policy.versionHash
     await r.redeploy(source => source.replaceAll('inactiveDays: 90', 'inactiveDays: 120'))
     assert.equal((await tick()).error, 'policy_changed')
-    assert.equal((await list(ownerCookie)).policies[0].state, 'policy_changed')
+    assert.equal((await list(ownerCookie)).policies[0].state, 'policy_revoked')
     assert.equal(await status(member.operator.id), 'active')
     assert.equal((await post('/auth/policy/approve', { policyId: policy.definition.id, versionHash: oldHash }, ownerCookie)).status, 409)
     approval = await approve()
@@ -97,8 +101,8 @@ test('scheduled Worker door: exact owner approval bounds actions, audits runs, a
     assert.equal((await tick()).error, 'policy_owner_changed')
     assert.equal(await status(member.operator.id), 'active')
     const runs = await r.call('/auth/policy-runs', { cookie: coowner.cookie }).then(response => response.json())
-    assert.equal(runs.length, attempts)
-    assert.ok(runs.every(run => run.finishedAt !== null && run.id))
+    assert.equal(runs.runs.length, attempts)
+    assert.ok(runs.runs.every(run => run.finishedAt !== null && run.id))
     assert.ok((await list(coowner.cookie)).approvals.length >= 3)
   } finally { await r.close() }
 })
