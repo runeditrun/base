@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.67-dev.gr-base-lander-44",
+  "cliVersion": "0.2.67",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {

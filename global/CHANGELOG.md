@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.67
+
+- **Import door options (#298 with #308).** Seeds choose credential removal modes and a preserve or strict reversal policy when an import is created. Failed applies can be retried, CLI-stripped query and fragment credentials receive per-record notes, more credential shapes are recognized, and a blocked re-baseline is refused at plan time with a named 409.
+- **Release from partial clones (#313).** Hydrate missing history blobs before release reads and tolerate temporary-directory cleanup failures after a saved result.
+- **Mail credentials and large migration histories (#314).** Deploy honors a declared MAIL_PROVIDER_API_KEY for SendGrid and Resend, and scales the bounded provider request budget to pending migrations.
+
 ## 0.2.66
 
 - **Seed copies pass the pin-time credential scan (#305).** Credential-shaped test fixtures in seed-vendored Base files are constructed at runtime, preserving their values and assertions. Seed copies and exported references no longer trigger the hosted pin-time credential scan, so seeds can refresh Base past 0.2.61 and pin again.
