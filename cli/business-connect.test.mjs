@@ -2,35 +2,39 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { buildPackage } from '../scripts/rer-package.mjs';
-import { integrity } from '../scripts/rer-package/registry.mjs';
+import { integrity, localRegistry } from '../scripts/rer-package/registry.mjs';
 import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { userInfo } from 'node:os';
 import { realpath } from 'node:fs/promises';
 
 const base = resolve(import.meta.dirname, '..');
 const fixture = join(import.meta.dirname, 'fixtures/business');
-let directory, launcher;
+let directory, launcher, packed;
 before(async () => {
  directory = await mkdtemp(join(base, '.business-connect-'));
  const bytes = await readFile(await buildPackage(base, join(directory, 'package')));
- const packed = join(directory, 'packed');
- await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), packed);
- launcher = join(packed, 'global/rer.mjs');
+ const files = readPackage(bytes, { integrity: integrity(bytes) });
+ // The same tarball, for npx through a loopback registry.
+ packed = { bytes, version: JSON.parse(files.find(file => file.path === 'package.json').data).version };
+ await writePackage(files, join(directory, 'packed'));
+ launcher = join(directory, 'packed', 'global/rer.mjs');
 });
 after(() => directory && rm(directory, { recursive: true, force: true }));
 
-async function cli(home, args, { terminal = false, input = '', columns = 120, onSpawn, onOutput, env: extra = {}, path = process.env.PATH } = {}) {
+// npx: the command as the platform's prompt gives it, in its own process group
+// as a terminal starts it, so a signal to the group reaches npx and rer alike.
+async function cli(home, args, { terminal = false, npx = false, input = '', columns = 120, onSpawn, onOutput, env: extra = {}, path = process.env.PATH } = {}) {
  await mkdir(home, { recursive: true });
  const env = { PATH: path, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns), ...extra };
  return new Promise((resolveRun, reject) => {
-  const command = terminal ? 'python3' : process.execPath;
-  const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : [launcher, ...args];
-  const child = spawn(command, parameters, { cwd: home, env, stdio: ['pipe','pipe','pipe'] });
+  const command = terminal ? 'python3' : npx ? 'npx' : process.execPath;
+  const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : npx ? ['-y', '@runeditrun/rer', ...args] : [launcher, ...args];
+  const child = spawn(command, parameters, { cwd: home, env, stdio: ['pipe','pipe','pipe'], detached: npx });
   onSpawn?.(child);
   let stdout = '', stderr = '';
   const timer = setTimeout(() => child.kill('SIGKILL'), 40000);
@@ -221,6 +225,7 @@ test('a killed packed supervisor resumes a lapsed lease from its acknowledged sc
  assert.equal((await cli(home, ['business','run','--once'])).code, 0, 'revocation stops the supervisor cleanly');
  const revoked = await cli(home, ['business','status','--json']);
  assert.equal(JSON.parse(revoked.stdout).paired, false, 'revoked device credential is removed locally');
+ assert.equal(JSON.parse(revoked.stdout).revoked, true, 'status says revoked, never paired');
  assert.ok(!JSON.stringify(remote.state.requests).includes('fixture-private-version-never-export'));
  assert.equal((await cli(home, ['business','disconnect'])).code, 0);
 });
@@ -344,14 +349,16 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
 
  const stateDir = join(work, '.rer-business');
  await mkdir(stateDir); await writeFile(join(stateDir, 'keep.txt'), 'not rer');
- const env = { RER_BUSINESS_STATE_DIR: stateDir };
+ const env = { RER_BUSINESS_STATE_DIR: stateDir, CLAUDECODE: '1' };
  remote.state.optIns = { installPermissions: null, awakeConsent: false, installService: null };
  const paired = await connect(home, remote, { env });
  assert.equal(redemptions(), before + 1, 'the same code pairs once the folder is writable');
  assert.ok(!(await readdir(home)).includes('.rer'), 'nothing is written to ~/.rer when RER_BUSINESS_STATE_DIR is set');
  assert.equal((await stat(join(stateDir, 'state.json'))).mode & 0o777, 0o600);
  for (const choice of ['Add rules so Claude Code never reads your secret files', 'Install the background service']) assert.ok(paired.stdout.includes(choice), paired.stdout);
- assert.ok(!paired.stdout.includes('Keep this computer awake while it works'), 'a decided choice is not asked again');
+ const [applied, undecided] = paired.stdout.split('The owner has not chosen yet:');
+ assert.ok(applied.includes('Keep this computer awake while it works: not allowed') && !undecided.includes('Keep this computer awake while it works'), 'a decided choice is applied and named, not asked again');
+ assert.ok(!paired.stdout.includes('connect again to apply'), 'connect never has to run again: run and next apply later choices');
  assert.ok(!/installPermissions|awakeConsent|installService/.test(paired.stdout + paired.stderr), 'internal names never reach a person');
  const status = await cli(home, ['business','status','--json'], { env });
  assert.equal(JSON.parse(status.stdout).paired, true);
@@ -397,7 +404,7 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
   const prior = { permissions: { deny: ['Read(existing/**)'] }, theme: 'dark' };
   await writeFile(join(home, '.claude/settings.json'), JSON.stringify(prior));
   const baseline = await readdir(home);
-  const optedIn = await connect(home, remote, { terminal: columns === 43, columns });
+  const optedIn = await connect(home, remote, { terminal: columns === 43, columns, env: { CLAUDECODE: '1' } });
   assert.ok(!optedIn.stdout.includes('[yes/no]'), 'browser decisions never need terminal answers');
   assert.equal(JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8')).awakeConsent, true);
   const status = await cli(home, ['business','status','--json']);
@@ -416,4 +423,151 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
  }
+});
+
+test('inside an agent sandbox run and next apply the owner\'s choices for its agent and say what they wait for, run.lock never outlives run, and disconnect tells the truth', async t => {
+ // A Claude Code computer, whose shell profile also exports CODEX_HOME (it still pairs as Claude Code); the Codex one follows at the end.
+ const remote = await fixtureServer(t), home = join(directory, 'sandbox-home'), stateDir = join(home, '.rer-business'), env = { RER_BUSINESS_STATE_DIR: stateDir, CLAUDECODE: '1', CODEX_HOME: join(directory, 'codex-profile-home') };
+ await mkdir(home, { recursive: true });
+ const folder = await realpath(home), lock = join(stateDir, 'run.lock');
+ remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+ const paired = await connect(home, remote, { env });
+ assert.ok(paired.stdout.includes('the run and next commands apply the choices at their next check-in, so connect does not need to run again') && !paired.stdout.includes('connect again to apply'), paired.stdout);
+
+ // Before the owner allows its folder, run says exactly what it waits for.
+ const waitingRun = await cli(home, ['business','run','--once'], { env });
+ assert.equal(waitingRun.code, 0, waitingRun.stderr);
+ assert.ok(waitingRun.stdout.includes(`Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${remote.origin}/business/biz/tools`) && waitingRun.stdout.endsWith('Nothing yet.\n'), waitingRun.stdout);
+ await assert.rejects(stat(lock), { code: 'ENOENT' }, 'run --once removes run.lock');
+
+ // The owner chooses in the browser; the next check-in applies what it can and names what it cannot.
+ remote.state.optIns = { installPermissions: true, awakeConsent: true, installService: false };
+ // A place this session cannot write, as ~/.claude is inside an agent sandbox (also when tests run as root).
+ await writeFile(join(home, '.claude'), '');
+ const next = await cli(home, ['business','next'], { env });
+ assert.equal(next.code, 0, next.stderr);
+ assert.ok(next.stdout.includes("Applied the owner's choices for this computer:\n  - Keep this computer awake while it works: allowed") && next.stdout.includes('Install the background service: not allowed'), next.stdout);
+ assert.match(next.stdout, /Not applied yet: Add rules so Claude Code never reads your secret files\. Business could not \w+ \S*\.claude\S*: .*\(E[A-Z]+\)\. The run and next commands try again at each check-in/);
+ assert.ok(next.stdout.includes(`RER_BUSINESS_STATE_DIR=${stateDir} `) && next.stdout.endsWith(`Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${remote.origin}/business/biz/tools\nNothing yet.\n`), next.stdout);
+ assert.equal(JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8')).awakeConsent, true);
+ await rm(join(home, '.claude'));
+ const appliedRun = await cli(home, ['business','run','--once'], { env });
+ assert.ok(appliedRun.stdout.includes('Add rules so Claude Code never reads your secret files: allowed') && !appliedRun.stdout.includes('Keep this computer awake'), 'each choice is applied and named once');
+ assert.ok(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')).permissions.deny.includes('Read(**/.env)'));
+ assert.ok(!(await cli(home, ['business','next'], { env })).stdout.includes('Applied'), 'unchanged choices are not applied again');
+
+ // A long run explains itself and removes run.lock when its terminal closes.
+ let hangUp = true;
+ const hungUp = await cli(home, ['business','run'], { env, onOutput: (stdout, child) => { if (hangUp && stdout.includes('Waiting for the owner')) { hangUp = false; child.kill('SIGHUP'); } } });
+ assert.equal(hungUp.code, 0, hungUp.stderr);
+ assert.ok(hungUp.stdout.startsWith("Business run is working this computer's tasks") && hungUp.stdout.includes('stopped (SIGHUP); run.lock removed'), hungUp.stdout);
+ await assert.rejects(stat(lock), { code: 'ENOENT' });
+ // A lock left by a killed run (its process is gone, or it has not been refreshed) is cleared on the next start.
+ const gone = spawn(process.execPath, ['-e', '']); await new Promise(resolve => gone.once('close', resolve));
+ for (const [pid, age] of [[gone.pid, 0], [process.pid, 600]]) {
+  await writeFile(lock, String(pid)); const then = new Date(Date.now() - age * 1000); await utimes(lock, then, then);
+  const restarted = await cli(home, ['business','run','--once'], { env });
+  assert.equal(restarted.code, 0, `stale lock (${age ? 'not refreshed' : 'dead process'}) is cleared: ${restarted.stderr}`);
+ }
+ await writeFile(lock, String(process.pid));
+ const competing = await cli(home, ['business','run','--once'], { env });
+ assert.equal(competing.code, 1); assert.match(competing.stderr, /already running for this computer \(process \d+\)/);
+ await rm(lock);
+
+ // Once its scan is done, run says it waits for the owner's next step.
+ remote.state.root = join(home, 'project'); await mkdir(remote.state.root);
+ await writeFile(join(remote.state.root, 'package.json'), JSON.stringify({ dependencies: { algoliasearch: '5.0.0' } }));
+ remote.state.tasks = [{ task_id: 'sandbox-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ // next has nothing to answer, and says run has work and how to start it.
+ const ready = await cli(home, ['business','next'], { env }), escaped = stateDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+ assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run\nNothing yet\\.\n$`));
+ const scanned = await cli(home, ['business','run','--once'], { env });
+ assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
+ assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);
+
+ // Ctrl-C in the terminal that started run through npx, as the prompt says:
+ // the SIGINT reaches npx and run together, and npx forwards it to run again.
+ // Here Ctrl-C comes again while run hands its lease back, so run certainly
+ // gets SIGINT after its first one. It still finishes the handback, removes
+ // run.lock and says it stopped.
+ const registry = await localRegistry(); t.after(registry.close);
+ registry.publish(packed.version, packed.bytes);
+ remote.state.root = join(home, 'large-project'); await mkdir(remote.state.root);
+ await writeFile(join(remote.state.root, 'package.json'), JSON.stringify({ dependencies: Object.fromEntries(Array.from({ length: 1800 }, (_, index) => [`fixture-library-${index}`, '1.0.0'])) }));
+ remote.state.tasks = [{ task_id: 'npx-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
+ let group;
+ remote.state.onHeartbeat = () => { if (remote.state.checkpoint.page === 1) { remote.state.onHeartbeat = null; process.kill(-group.pid, 'SIGINT'); } };
+ remote.state.onRelease = () => { remote.state.onRelease = null; process.kill(-group.pid, 'SIGINT'); };
+ const npm = { 'npm_config_@runeditrun:registry': `${registry.url}/`, npm_config_cache: join(directory, 'npm-cache'), npm_config_update_notifier: 'false' };
+ // npx's own exit status is npm's, and on Linux npm can exit by the signal
+ // while run is still handing its lease back, so the test reads run's own
+ // output, which is complete once every process holding it has exited.
+ const interrupted = await cli(home, ['business','run'], { npx: true, env: { ...env, ...npm }, onSpawn: child => { group = child; } });
+ assert.ok(interrupted.stdout.includes('Scanning this computer\'s allowed folders') && interrupted.stdout.endsWith(`Business supervisor stopped (SIGINT); run.lock removed. Run RER_BUSINESS_STATE_DIR=${stateDir} npx -y @runeditrun/rer business run again to continue from the saved checkpoint.\n`), `${interrupted.stdout}\n${interrupted.stderr}`);
+ assert.equal(remote.state.released?.reason, 'handover', 'the lease is handed back');
+ assert.equal(remote.state.phase, 'ready');
+ await assert.rejects(stat(lock), { code: 'ENOENT' });
+
+ remote.state.tasks = [];
+ assert.ok((await cli(home, ['business','run','--once'], { env })).stdout.includes(`Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${remote.origin}/business/biz`));
+
+ // Inside the sandbox the OS store refuses removal: the server revokes first,
+ // disconnect exits 0, says what is still stored and names the one command.
+ await writeFile(join(home, 'sandboxed-credential-store'), '');
+ const sandboxed = await cli(home, ['business','disconnect'], { env });
+ assert.equal(sandboxed.code, 0, sandboxed.stderr);
+ assert.equal(remote.state.revoked, true, 'the server revokes before anything local');
+ assert.ok(sandboxed.stdout.startsWith('Revoked on the server; the local credential is still stored.'), sandboxed.stdout);
+ assert.ok(sandboxed.stdout.includes(`run outside the agent sandbox or in your own terminal:\n  RER_BUSINESS_STATE_DIR=${stateDir} `) && /business disconnect\n/.test(sandboxed.stdout), sandboxed.stdout);
+ if (process.platform === 'darwin') assert.ok(sandboxed.stdout.includes('security exited with status 161'), sandboxed.stdout);
+ assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'the refused removal left the credential');
+ const status = await cli(home, ['business','status'], { env });
+ assert.ok(status.stdout.startsWith('Business: revoked on the server; the local credential is still stored.') && !status.stdout.includes('paired'), status.stdout);
+ assert.deepEqual(JSON.parse((await cli(home, ['business','status','--json'], { env })).stdout).revoked, true);
+ for (const verb of [['next'], ['run','--once'], ['connect']]) {
+  const refused = await cli(home, ['business', ...verb], { env });
+  assert.equal(refused.code, 1); assert.ok(refused.stderr.includes('This computer was revoked on the server; the local credential is still stored.'), refused.stderr);
+ }
+ // The named command, outside the sandbox, finishes.
+ await rm(join(home, 'sandboxed-credential-store'));
+ const finished = await cli(home, ['business','disconnect'], { env });
+ assert.equal(finished.code, 0, finished.stderr); assert.ok(finished.stdout.includes('Device was already revoked'), finished.stdout);
+ await assert.rejects(readFile(join(home, 'fake-keychain.json')), { code: 'ENOENT' });
+ assert.ok(!(await readdir(home)).includes('.rer-business'));
+
+ // On a Codex computer the secret-file rules have nothing to apply to: nothing
+ // is written under ~/.claude, nothing asks for a run outside the sandbox, and
+ // that is said once, whatever the owner chose. A default Codex install sets
+ // CODEX_THREAD_ID but not CODEX_HOME, and Codex is told apart before Claude Code.
+ const codexHome = join(directory, 'codex-home'), codexEnv = { RER_BUSINESS_STATE_DIR: join(codexHome, '.rer-business'), CODEX_THREAD_ID: 'thread-1', CLAUDECODE: '1' };
+ remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+ const codex = await connect(codexHome, remote, { env: codexEnv });
+ const notApplicable = 'Secret-file rules do not apply on Codex: Business has no way yet to stop Codex from reading your secret files';
+ assert.ok(codex.stdout.includes(notApplicable) && codex.stdout.includes('The owner has not chosen yet:') && !codex.stdout.includes('never reads your secret files'), codex.stdout);
+ remote.state.optIns = { installPermissions: true, awakeConsent: false, installService: false };
+ const codexNext = await cli(codexHome, ['business','next'], { env: codexEnv });
+ assert.equal(codexNext.code, 0, codexNext.stderr);
+ assert.ok(codexNext.stdout.includes("Applied the owner's choices for this computer:\n  - Keep this computer awake while it works: not allowed"), codexNext.stdout);
+ const codexRun = await cli(codexHome, ['business','run','--once'], { env: codexEnv });
+ assert.equal(codexRun.code, 0, codexRun.stderr);
+ for (const later of [codexNext, codexRun]) assert.ok(!/secret files|Claude Code|outside the agent sandbox/.test(later.stdout + later.stderr), later.stdout);
+ assert.ok(!(await readdir(codexHome)).includes('.claude'), 'nothing is written under ~/.claude');
+ assert.equal((await cli(codexHome, ['business','disconnect'], { env: codexEnv })).code, 0);
+ assert.equal(remote.state.agentKind, 'codex');
+
+ // An agent that is neither (no marker at all) is reported as other, and the
+ // rules do not apply to it either.
+ const otherHome = join(directory, 'other-home'), otherEnv = { RER_BUSINESS_STATE_DIR: join(otherHome, '.rer-business') };
+ remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+ const other = await connect(otherHome, remote, { env: otherEnv });
+ assert.equal(remote.state.agentKind, 'other');
+ assert.equal(other.stdout.split('Secret-file rules do not apply on this computer').length - 1, 1, other.stdout);
+ remote.state.optIns = { installPermissions: true, awakeConsent: false, installService: false };
+ for (const command of [['business','next'], ['business','run','--once']]) {
+  const later = await cli(otherHome, command, { env: otherEnv });
+  assert.equal(later.code, 0, later.stderr);
+  assert.ok(!/secret files|Claude Code|outside the agent sandbox/.test(later.stdout + later.stderr), later.stdout);
+ }
+ assert.ok(!(await readdir(otherHome)).includes('.claude'), 'nothing is written under ~/.claude');
+ assert.equal((await cli(otherHome, ['business','disconnect'], { env: otherEnv })).code, 0);
 });
