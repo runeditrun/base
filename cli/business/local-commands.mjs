@@ -7,6 +7,7 @@ import { removePermissions, permissionsAdded } from './permissions.mjs';
 import { Api, pause } from './api.mjs';
 import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
+import { vendorHandle } from './export-task.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
 import { describe } from './errors.mjs';
 
@@ -67,7 +68,7 @@ export async function revokedByServer(state) {
 
 export async function vendorKey(action, vendor) {
  if (!['add', 'remove'].includes(action) || !VENDORS.includes(vendor)) throw Error('Choose add or remove and a shipped vendor: sentry, uptimerobot, pagerduty, calendly.');
- const { state } = await paired(), store = createCredentialStore(), handle = `vendor:${vendor}:read`;
+ const { state } = await paired(), store = createCredentialStore(), handle = vendorHandle(vendor);
  if (action === 'add') {
   let secret = await readSecret();
   try { await store.set(handle, secret); } finally { secret = undefined; }
