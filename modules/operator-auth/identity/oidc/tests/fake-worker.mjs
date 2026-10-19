@@ -2,6 +2,7 @@
 // page, with fake OpenID providers standing only at the network edge. Provider
 // behaviour, grants and the test clock live in D1 so they survive a restart.
 import { createOperatorAuth, createAuthHandler, createSignInHandler, AuthError } from '../../../index.mjs';
+import { withDevIdentity } from '../../../dev/index.mjs';
 import { linkEdge } from '../../../tests/native/provider-edge.mjs';
 import { publicKey } from '../../../../dependencies/crypto.mjs';
 import { fixture as nativeFixture } from '../../../tests/native/accounts.mjs';
@@ -117,6 +118,12 @@ export default {
       throw error;
     }
     if(setup.native && setup.core?.dependencies) {const response=await createDependencies({db,origin:setup.core.origin??'https://app.example',name:'Native',provider:setup.dependencyIssuer,auth,fetch:fetcher,clock:now}).handle(request);if(response)return response;}
-    return await createSignInHandler(auth)(request) ?? await createAuthHandler(auth)(request) ?? new Response('Not found', { status: 404 });
+    const app = { async fetch(request) {
+      return await createSignInHandler(auth)(request) ?? await createAuthHandler(auth)(request) ?? new Response('Not found', { status: 404 });
+    } };
+    return setup.devKey ? withDevIdentity(app, {
+      config: () => options.config,
+      bindings: env => ({ ...env, RER_DEV_KEY: setup.devKey, AUTH_ORIGIN: options.config.origin, AUTH_LOCAL: 'true' }),
+    }).fetch(request, env, execution) : app.fetch(request);
   },
 };

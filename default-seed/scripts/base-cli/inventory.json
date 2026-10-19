@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.68",
+  "cliVersion": "0.2.68-dev.g737fb4bf",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -839,7 +839,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "d346976f2d70782852f2e764381bde8daf2ddc1c9bf14b5031f3f8b499db122f"
+      "sha256": "e5e379fdcf7d92a1adce7635c20dfe639847d8fdf263d8828b51f25b8b9be1cc"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -2411,7 +2411,7 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "cdfd59ec19f6e5b8cf0d85add580c17540a160501010a6d4eeb514b0d2d8b1a9"
+      "sha256": "1ddf328f6b789941b2102038edcb8b73b71cce4395e81c4e28371c95c4cf5c52"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
@@ -2599,11 +2599,11 @@
     },
     "modules/operator-auth/signin/index.mjs": {
       "source": "modules/operator-auth/signin/index.mjs",
-      "sha256": "65731ce39d042a57301692773180878ebb76fff89e30fcb5d86253d9c138b9e7"
+      "sha256": "6830071822ad747f16e50622c0f77424d2e2f0d9c4d1a6b42f4ea41fb08e72de"
     },
     "modules/operator-auth/signin/one-click.mjs": {
       "source": "modules/operator-auth/signin/one-click.mjs",
-      "sha256": "5fcd0e2432314f5910b3bd55e1226f0d3a5402639896a88bf9faf130369f30b3"
+      "sha256": "afb305c3055eb395e0d575f72c8c332dc56b2247848ba9940886dc1615eead40"
     },
     "modules/owner-claim/README.md": {
       "source": "modules/owner-claim/README.md",
