@@ -240,14 +240,19 @@ header `x-`, as the phrase: `token`, `access_token`, `refresh_token`,
 `authorization`, `cookie`, `password`, `api_key`/`apiKey`, `secret`, `bearer`,
 `X-Auth`, `X-Auth-Token`, `httpPassword`, `client_secret`, `private_key`,
 any name with `secret`, `subscription` or `functions` before `key`
-(`secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`) and `pwd`, and
+(`secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`), `pwd`,
+`passphrase`, `jwt`, `JSESSIONID` and `PHPSESSID`, and
 their plurals holding text (`tokens: [...]`, `apiKeys: [...]`), under an object
 key or as the name of a `[name, value]` pair in a list of them. `sessionId` and
 `sig`/`signature` are credential keys only as HTTP header names (a
-`[name, value]` pair, a key under `headers`) and URL keys, never as record
-fields. `auth` and `credentials` count only when their value is text naming no
-scheme or mode (not `include` or `oauth2`), or a list with such a member; an
-object under them is checked field by field. A URL query or fragment key is a
+`[name, value]` pair, a key under `headers`, a `{name|key, value}` pair in a
+header list) and URL keys, never as record fields; a `{name|key, value}` pair
+elsewhere (Help Scout's `customFields`) labels a field. `auth` and
+`credentials` count only when their value is text naming no scheme or mode (not
+`include` or `oauth2`), or a list with such a member; an object under them is
+checked field by field, and directly under them a `value`, `pass`, `pw` or
+`secret…` member (Keycloak's `credentials: [{type: 'password', value}]`,
+`secretData`, nodemailer's `{user, pass}`) is a credential too. A URL query or fragment key is a
 credential when it ends in such a phrase, or is a bare `key`, ends in
 `sig`/`signature` (`X-Amz-Signature`), has `application`, `user`, `account`,
 `deploy` or `shared` before `key`, or `token`, `basic`, `http`, `proxy` or

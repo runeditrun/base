@@ -128,11 +128,18 @@ and notes it per record) and rer's vendor exports, at two reaches:
   `account_key` names a record far more often than a secret.
 - **Header-only names:** `sig`, `signature` and `sessionId` (`session_id`,
   `Session-Id`) are credentials only as URL query or fragment keys and as HTTP
-  header names: the name in a `[name, value]` tuple or a `{name|key, value}`
-  pair, or a key of an object under `headers` (`customHttpHeaders`). As a
-  record's field they are data, so a support export's agent `signature`
-  (Zendesk and Freshdesk users and agents) and a chat's `session_id` import as
-  they are in refuse and remove mode.
+  header names: the name in a `[name, value]` tuple, a key of an object under
+  `headers`, `header` or `customHttpHeaders`, or the name of a
+  `{name|key, value}` pair in such a header list (`customHttpHeaders`, HAR's
+  `headers`, Postman's `header`). As a record's field they are data, so a
+  support export's agent `signature` (Zendesk and Freshdesk users and agents)
+  and a chat's `session_id` import as they are in refuse and remove mode.
+- **A `{name|key, value}` pair outside a header container labels a field.**
+  Its name has the field place, so Help Scout's
+  `customFields: [{name: 'Session ID', value}]` and Zendesk's
+  `custom_field_options` named `Signature` or `Session ID` import intact, while
+  a pair named `Authorization`, `password` or `api_key` loses its value
+  anywhere.
 - **`auth` and `credentials` hold a credential only when they hold one.** A
   field or container named `auth`, `X-Auth`, `credential` or `credentials` is
   refused (or removed) when its value is text that is no placeholder and names
@@ -144,6 +151,17 @@ and notes it per record) and rer's vendor exports, at two reaches:
   they are. The scheme and mode names are fetch's `include`, `same-origin` and
   `omit`, and the HTTP and API schemes (`none`, `basic`, `bearer`, `digest`,
   `oauth2`, `apikey`, `jwt`, `ntlm`, `aws`, `sigv4`, `hmac` and the like).
+- **Generic member names count inside `auth` and `credential(s)`.** Directly
+  under such a container (an object, or the objects in a list), a member named
+  `value`, `pass` or `pw`, or one whose first part is `secret` (`secretData`),
+  holds the credential: a Keycloak realm user's
+  `credentials: [{type: 'password', value}]` and `[{secretData}]`, nodemailer's
+  `auth: {user, pass}` and `credential: {type: 'apiKey', value}` are refused, or
+  removed and noted at their own path (`/credentials/0/value`), and rer's
+  vendor exports mark them `[removed]`. Elsewhere `value`, `pass` and `pw` are
+  data. Their siblings (`type`, `user`, `username`, `temporary`) stay, so
+  `auth: {type: 'bearer'}` and `credentials: {username: 'ops'}` import intact; a
+  bare `key` under them (`credentials: {key}`) usually labels and stays.
 
 The words are `token`, `secret`, `password`, `passwd`, `pwd`, `cookie`,
 `authorization`, `bearer` and `credential(s)`; `key` counts after a qualifier
@@ -151,8 +169,11 @@ The words are `token`, `secret`, `password`, `passwd`, `pwd`, `cookie`,
 `routing`, `service`, `signing`, `session`, `refresh`, `subscription`,
 `functions`, `consumer`, `app`, `license`, `master`, `encryption` or `admin`);
 `auth` and `X-Auth` and the one-part spellings (`apikey`, `accesstoken`,
-`clientsecret`) count; and `sig`, `signature` and `sessionId` count as a whole
-header name and as URL keys. Plurals (`tokens`, `apiKeys`, `secrets`,
+`clientsecret`) count; `passphrase`, `jwt` and the Java and PHP session cookies
+`JSESSIONID` and `PHPSESSID`, however split (`passPhrase`, `jsessionId`), count
+everywhere, as fields, header names and URL keys, since they name nothing else
+(`jwt_issuer` and `jwtAudience` end in another word and stay); and `sig`,
+`signature` and `sessionId` count as a whole header name and as URL keys. Plurals (`tokens`, `apiKeys`, `secrets`,
 `passwords`) hold credentials only as text, so `tokens: 1500` is a count and
 stays.
 

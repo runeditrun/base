@@ -970,8 +970,14 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   const fragmentKeys={AccountKey:'test-azure-account-key',shared_key:'test-shared-key-param',deploy_key:'test-deploy-key-param','DD-APPLICATION-KEY':'test-dd-application-key',
     basicAuth:'test-basic-auth-camel',http_auth:'test-http-auth-param',serviceAccountKey:'test-service-account-camel'};
   const containers={authToken:'test-auth-container-token',password:'test-credentials-container-password'};
+  // Under `auth` and `credential(s)`, a credential under a generic member name: a Keycloak realm user's
+  // `credentials: [{type: 'password', value}]` and `secretData`, nodemailer's `{user, pass}`, `credential: {type: 'apiKey', value}`.
+  const members={keycloakValue:'test-keycloak-password-value',keycloakSecret:'test-keycloak-secret-data',pass:'test-smtp-credentials-pass',apiKeyValue:'test-credential-api-key-value',pw:'test-auth-pw'};
+  // Names that are credentials everywhere (`passphrase`, `jwt`, Java's and PHP's session cookies), and header pairs under a header container.
+  const spelled={passphrase:'test-ssh-passphrase',jwt:'test-jwt-field',JSESSIONID:'test-jsessionid-field',PHPSESSID:'test-phpsessid-query'};
+  const headerPairs={signature:'test-signature-header-pair',sessionId:'test-session-id-header-pair'};
   const secrets=[uptimeKey,uptimePassword,...Object.values(compound),...Object.values(shapes),...Object.values(headerParts),...Object.values(parts),'test-keyword-monitor-api-key',
-    ...Object.values(queryKeys),...Object.values(fragmentKeys),...Object.values(containers)];
+    ...Object.values(queryKeys),...Object.values(fragmentKeys),...Object.values(containers),...Object.values(members),...Object.values(spelled),...Object.values(headerPairs)];
   const queryUrl='https://api.example.test/v1/check?'+Object.entries(queryKeys).map(([key,value])=>`${key}=${value}`).join('&')+'&region=eu#'+Object.entries(fragmentKeys).map(([key,value])=>`${key}=${value}`).join('&')+'&state=s';
   // Names that only look like credential names, and placeholders, stay exactly as they are.
   const lookalikes={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',author:'ops',keywords:['up','ok'],tokenizer:'bpe',primaryKey:'pk_1',sortKey:'name',monitorKey:'m1',keyType:'rsa',
@@ -999,12 +1005,17 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
       monitor(9000036,{type:'KEYWORD',url:keywordUrl,keyword:'up'}),monitor(9000037,{type:'KEYWORD',url:keywordUrl+`&api_key=${keywordKey}&region=eu`}),
       monitor(9000038,{customHttpHeaders:{'X-Auth-Token':headerParts.xAuthToken,Signature:headerParts.signature,'Session-Id':headerParts.sessionId},authToken:parts.authToken,private_key:parts.private_key,
         bearer:parts.bearer,passwords:[parts.passwords]}),
-      monitor(9000039,{url:queryUrl}),monitor(9000040,{auth:{type:'bearer',token:containers.authToken},credentials:{username:'ops',password:containers.password}})]);
+      monitor(9000039,{url:queryUrl}),monitor(9000040,{auth:{type:'bearer',token:containers.authToken},credentials:{username:'ops',password:containers.password}}),
+      monitor(9000041,{owner:{username:'ann',credentials:[{type:'password',value:members.keycloakValue,temporary:false},
+        {id:'c2',type:'password',secretData:`{"value":"${members.keycloakSecret}","salt":"c2FsdA=="}`,credentialData:'{"hashIterations":27500,"algorithm":"pbkdf2-sha256"}'}]}}),
+      monitor(9000042,{credentials:{user:'ops',pass:members.pass},credential:{type:'apiKey',value:members.apiKeyValue},smtp:{auth:{user:'ops',pw:members.pw}}}),
+      monitor(9000043,{url:`https://shop.example.com/9000043?PHPSESSID=${spelled.PHPSESSID}&region=eu`,passphrase:spelled.passphrase,jwt:spelled.jwt,JSESSIONID:spelled.JSESSIONID,
+        customHttpHeaders:[{name:'Signature',value:headerPairs.signature},{name:'Session-Id',value:headerPairs.sessionId},{name:'Accept',value:'*/*'}]})]);
   const native=d.runtime.native(),uploadId=await d.upload(bytes);
   for (const secret of secrets) assert.ok(stored(native).includes(secret),'the scan sees the uploaded credentials');
   const planned=await d.call('plan',{uploadId});
   assert.equal(planned.status,200,JSON.stringify(planned.body));
-  assert.deepEqual(planned.body.summary,{sourceRecords:22,created:22,updated:0,unchanged:0,gone:0});
+  assert.deepEqual(planned.body.summary,{sourceRecords:25,created:25,updated:0,unchanged:0,gone:0});
   const userinfo='A user name and password were removed from a URL; the record is kept.',query='A credential query parameter was removed from a URL; the record is kept.';
   const field=(name:string)=>`The value of credential field "${name}" was removed; the record is kept without it.`;
   const before=(name:string)=>`The value of credential field "${name}" was removed before upload; the record is kept without it.`;
@@ -1031,6 +1042,12 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
     // Query and fragment credential keys go (one note each for the fragment and the query); `auth` and `credentials` lose only their credential fields.
     ['9000039','/url',query],['9000039','/url',query],
     ['9000040','/auth/token',field('token')],['9000040','/credentials/password',field('password')],
+    // Generic member names go only under `auth` and `credential(s)`, each noted at its own path.
+    ['9000041','/owner/credentials/0/value',field('value')],['9000041','/owner/credentials/1/secretData',field('secretdata')],
+    ['9000042','/credentials/pass',field('pass')],['9000042','/credential/value',field('value')],['9000042','/smtp/auth/pw',field('pw')],
+    // `passphrase`, `jwt`, `JSESSIONID` and `?PHPSESSID=` everywhere; `Signature` and `Session-Id` pairs under customHttpHeaders.
+    ['9000043','/url',query],['9000043','/customHttpHeaders/0/value',field('signature')],['9000043','/customHttpHeaders/1/value',field('sessionid')],
+    ['9000043','/passphrase',field('passphrase')],['9000043','/jwt',field('jwt')],['9000043','/JSESSIONID',field('jsessionid')],
   ]);
   assert.ok(planned.body.diagnostics.some((n:any)=>n.code==='ORIGINAL_UNAVAILABLE'&&/withheld because they held credential values/.test(n.message)));
   // The uploaded bytes went once the plan was saved; the plan never held them.
@@ -1059,8 +1076,13 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   assert.deepEqual([named.customHttpHeaders,...Object.keys(parts).map(name=>Object.hasOwn(named,name))],[{},false,false,false,false]);
   assert.equal(value('9000039').url,'https://api.example.test/v1/check?region=eu#state=s','query and fragment credential keys go; region and state stay');
   assert.deepEqual([value('9000040').auth,value('9000040').credentials],[{type:'bearer'},{username:'ops'}]);
+  assert.deepEqual(value('9000041').owner,{username:'ann',credentials:[{type:'password',temporary:false},{id:'c2',type:'password',credentialData:'{"hashIterations":27500,"algorithm":"pbkdf2-sha256"}'}]});
+  assert.deepEqual([value('9000042').credentials,value('9000042').credential,value('9000042').smtp],[{user:'ops'},{type:'apiKey'},{auth:{user:'ops'}}]);
+  const spelledMonitor=value('9000043');
+  assert.deepEqual([spelledMonitor.url,spelledMonitor.customHttpHeaders,...['passphrase','jwt','JSESSIONID'].map(name=>Object.hasOwn(spelledMonitor,name))],
+    ['https://shop.example.com/9000043?region=eu',[{name:'Signature'},{name:'Session-Id'},{name:'Accept',value:'*/*'}],false,false,false]);
   assert.deepEqual((await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace}))[0].original,{status:'unavailable',reason:'credentials-removed'});
-  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,22);
+  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,25);
   for (const secret of secrets) assert.ok(!stored(native).includes(secret),'no credential value is stored after apply');
   // Support exports import as they are: a Zendesk and a Freshdesk agent's `signature`, and a chat's session ids, are record fields, not credentials.
   const support=await door(t);await support.enable();
@@ -1071,6 +1093,9 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
     {id:'2405.1.LwKcQYqRXr9WRA',type:'chat',session_id:'2405.1.LwKcQYqRXr9WRA',sessionId:'zchat-session-77',visitor:{name:'Visitor 1'},session:{browser:'Chrome',platform:'Mac OS'}},
     {id:43000012345,available:true,occasional:false,signature:'<div>Thanks,<br>Ops Agent</div>',ticket_scope:1,contact:{name:'Ops Agent',email:'agent@example.test'}},
     {id:20,subject:'Chat follow-up',custom_fields:{cf_chat_session_id:'fc-session-7'}},
+    // A `{name, value}` pair outside a header container labels a field: Help Scout's custom field (its `text` repeats the value) and Zendesk's field options.
+    {id:501,subject:'Login loop',customFields:[{id:1,name:'Session ID',value:'sess-3c4d5e6f7a',text:'sess-3c4d5e6f7a'},{id:2,name:'Signature',value:'Signed in person',text:'Signed in person'}]},
+    {id:360,type:'tagger',title:'Request type',custom_field_options:[{id:1,name:'Signature',raw_name:'Signature',value:'request_signature'},{id:2,name:'Session ID',raw_name:'Session ID',value:'request_session_id'}]},
   ];
   const supportPlan=await support.call('plan',{uploadId:await support.upload(Buffer.from(JSON.stringify(supportRecords)))});
   assert.equal(supportPlan.status,200,JSON.stringify(supportPlan.body));

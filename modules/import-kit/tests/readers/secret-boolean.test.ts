@@ -51,7 +51,9 @@ test('public readers and durable planning retain boolean secret semantics with e
   for(const [value,field] of refused) await assert.rejects(read(value),(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field===field,field);
   // Names are matched by whole parts (camelCase, `_`, `-`, `.`, digits), as a field, a header-tuple name or a URL query and fragment key.
   const credentialNames=['apiKey','api_key','API-KEY','x-api-key','secret_key','secretKey','client_secret','x-functions-key','Ocp-Apim-Subscription-Key','X-Auth','X-Auth-Token','Authorization','auth',
-    'authToken','accessToken','access_token','refreshToken','token','tokens','bearer','password','passwd','pwd','httpPassword','http_password','privateKey','private_key','sig','signature','sessionId','cookie','apiKeys','secrets','passwords'];
+    'authToken','accessToken','access_token','refreshToken','token','tokens','bearer','password','passwd','pwd','httpPassword','http_password','privateKey','private_key','sig','signature','sessionId','cookie','apiKeys','secrets','passwords',
+    // Names that are credentials everywhere: a passphrase, a JWT, and Java's and PHP's session cookies.
+    'passphrase','jwt','jsessionid','JSESSIONID','PHPSESSID'];
   const plainNames=['keyword','keywords','monkey','donkey','turkey','hockey','author','authority','authors','signal','design','signup','tokenizer','passwordless','keyboard','primaryKey','foreignKey','sortKey','keyType','monitorKey'];
   const kind=(field:string)=>(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field.startsWith(field);
   // `sig`, `signature` and `sessionId` are credentials as header names and URL keys, never as a record's field (an agent's signature, a chat's session id).
@@ -72,6 +74,12 @@ test('public readers and durable planning retain boolean secret semantics with e
     assert.deepEqual([removed.records[0].payload,removed.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED').map(d=>d.field)],
       [{uri:'https://source.test/event',link:'https://source.test/page?region=eu',callback:'https://source.test/cb#state=s'},['/link','/callback']],`removed ${name}`);
   }
+  // In remove mode they go as fields, header names and URL keys alike, each noted.
+  for(const name of ['passphrase','passPhrase','ssh_passphrase','jwt','JSESSIONID','jsessionId','PHPSESSID']){
+    const removed=await readRemoved({[name]:'synthetic-credential',headers:{[name]:'synthetic-credential'},link:`https://source.test/page?${name}=synthetic-credential&region=eu`});
+    assert.deepEqual([removed.records[0].payload,removed.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED').map(d=>d.field)],
+      [{uri:'https://source.test/event',headers:{},link:'https://source.test/page?region=eu'},[`/${name}`,`/headers/${name}`,'/link']],`removed ${name}`);
+  }
   for(const name of plainNames){
     const plain={[name]:'synthetic',headers:[[name,'synthetic'],['Accept','*/*']],link:`https://source.test/page?${name}=synthetic&region=eu#${name}=synthetic`};
     assert.deepEqual((await read(plain)).records[0].payload,{uri:'https://source.test/event',...plain},`plain ${name}`);
@@ -90,9 +98,12 @@ test('public readers and durable planning retain boolean secret semantics with e
     {uri:'https://example.zendesk.com/api/v2/chats/2405.1.LwKcQYqRXr9WRA',id:'2405.1.LwKcQYqRXr9WRA',type:'chat',session_id:'2405.1.LwKcQYqRXr9WRA',sessionId:'zchat-session-77',session:{browser:'Chrome'}},
     {uri:'https://example.freshdesk.com/api/v2/agents/43000012345',id:43000012345,available:true,occasional:false,signature:'<div>Thanks,<br>Ops Agent</div>',ticket_scope:1,contact:{name:'Ops Agent'}},
     {uri:'https://example.freshdesk.com/api/v2/tickets/20',id:20,subject:'Chat follow-up',custom_fields:{cf_chat_session_id:'fc-session-7'}},
+    // A `{name, value}` pair outside a header container labels a field: Help Scout's custom fields and Zendesk's ticket field options.
+    {uri:'https://api.helpscout.net/v2/conversations/501',id:501,customFields:[{id:1,name:'Session ID',value:'sess-3c4d5e6f7a',text:'sess-3c4d5e6f7a'},{id:2,name:'Signature',value:'Signed in person',text:'Signed in person'}]},
+    {uri:'https://example.zendesk.com/api/v2/ticket_fields/360',id:360,type:'tagger',custom_field_options:[{id:1,name:'Signature',raw_name:'Signature',value:'request_signature'},{id:2,name:'Session ID',raw_name:'Session ID',value:'request_session_id'}]},
   ];
   // `auth` and `credentials` holding no credential stay; their credential fields are refused, or removed and noted.
-  const containers=[{auth:{type:'oauth2'}},{credentials:[]},{request:{credentials:'include'}},{auth:'Bearer'}];
+  const containers=[{auth:{type:'oauth2'}},{credentials:[]},{request:{credentials:'include'}},{auth:'Bearer'},{auth:{type:'bearer'}},{credentials:{username:'ops'}},{credentials:'same-origin'}];
   for(const value of [...support,...containers]){
     const bytes=Buffer.from(JSON.stringify({collection:[value]}));
     assert.deepEqual((await readFileSource({namespace:'archive',name:'event.json',format:'json',bytes,parse:()=>[{kind:'record',sourceId:'s',payload:value}]})).records[0].payload,value,'refuse mode');
@@ -100,9 +111,24 @@ test('public readers and durable planning retain boolean secret semantics with e
     assert.deepEqual([removed.records[0].payload,removed.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED')],[value,[]],'remove mode');
   }
   for(const [value,field,path,kept] of [[{auth:{token:'synthetic-credential'}},'credential field "token"','/auth/token',{auth:{}}],[{credentials:{password:'synthetic-credential'}},'credential field "password"','/credentials/password',{credentials:{}}],
-    [{auth:'synthetic-credential'},'credential field "auth"','/auth',{}]] as const){
+    [{auth:'synthetic-credential'},'credential field "auth"','/auth',{}],
+    // Under `auth` and `credential(s)`, a credential under a generic member name: a Keycloak realm user's `{type, value}` and `secretData`,
+    // nodemailer's `{user, pass}`, `credential: {type: 'apiKey', value}`, `pw`, and a `jwt`.
+    [{credentials:[{type:'password',value:'synthetic-credential',temporary:false}]},'credential field "value"','/credentials/0/value',{credentials:[{type:'password',temporary:false}]}],
+    [{credentials:[{id:'c2',type:'password',secretData:'{"value":"synthetic-credential"}'}]},'credential field "secretdata"','/credentials/0/secretData',{credentials:[{id:'c2',type:'password'}]}],
+    [{credentials:{user:'ops',pass:'synthetic-credential'}},'credential field "pass"','/credentials/pass',{credentials:{user:'ops'}}],
+    [{credential:{type:'apiKey',value:'synthetic-credential'}},'credential field "value"','/credential/value',{credential:{type:'apiKey'}}],
+    [{smtp:{auth:{user:'ops',pw:'synthetic-credential'}}},'credential field "pw"','/smtp/auth/pw',{smtp:{auth:{user:'ops'}}}],
+    [{auth:{jwt:'synthetic-credential'}},'credential field "jwt"','/auth/jwt',{auth:{}}]] as const){
     await assert.rejects(read(value),(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field===field,field);
     const removed=await readRemoved(value);
     assert.deepEqual([removed.records[0].payload,removed.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED').map(d=>d.field)],[{uri:'https://source.test/event',...kept},[path]],path);
   }
+  // A `{name|key, value}` pair named `Signature` or `Session-Id` under a header container (customHttpHeaders, Postman's `header`, HAR's `headers`) is a credential.
+  const headerPairs={customHttpHeaders:[{name:'Signature',value:'synthetic-credential-a'},{name:'Accept',value:'*/*'}],request:{header:[{key:'Session-Id',value:'synthetic-credential-b'}]},
+    entries:[{request:{headers:[{name:'Signature',value:'synthetic-credential-c'}]}}]};
+  const pairs=await readRemoved(headerPairs);
+  assert.deepEqual([pairs.records[0].payload,pairs.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED').map(d=>d.field)],
+    [{uri:'https://source.test/event',customHttpHeaders:[{name:'Signature'},{name:'Accept',value:'*/*'}],request:{header:[{key:'Session-Id'}]},entries:[{request:{headers:[{name:'Signature'}]}}]},
+      ['/customHttpHeaders/0/value','/request/header/0/value','/entries/0/request/headers/0/value']]);
 });

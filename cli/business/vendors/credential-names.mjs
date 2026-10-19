@@ -19,8 +19,8 @@
 // a container (`auth`, `X-Auth`, `credential(s)`): its value is a credential when it is text
 // that names no scheme or mode (`include`, `oauth2`), or a list with such a member; an object
 // under it is searched field by field. Places, in `remove` mode: a record `field`, or an HTTP
-// `header` name (a `[name, value]` tuple, a `{name|key, value}` pair, a key of a `headers`
-// object). `sig`, `signature` and `sessionId` are credentials only as header names and URL
+// `header` name (a `[name, value]` tuple, a key of a `headers` object, a `{name|key, value}`
+// pair in a header list). `sig`, `signature` and `sessionId` are credentials only as header names and URL
 // query or fragment keys, never as record fields, so an agent's `signature` or a chat's
 // `session_id` imports.
 const WORDS = new Set(['token', 'secret', 'password', 'passwd', 'pwd', 'cookie', 'authorization', 'bearer', 'credential']);
@@ -33,6 +33,11 @@ const QUERY_AUTH_QUALIFIERS = new Set(['token', 'basic', 'http', 'proxy', 'api']
 const TOKEN_QUALIFIERS = ['access', 'refresh', 'auth', 'api', 'bearer', 'id', 'session', 'csrf', 'xsrf', 'bot', 'push', 'oauth', 'jwt'];
 const SECRET_QUALIFIERS = ['client', 'app', 'api', 'oauth', 'webhook', 'signing', 'shared'];
 const PASSWORD_QUALIFIERS = ['http', 'db', 'ftp', 'smtp', 'admin', 'user', 'basic', 'proxy', 'root', 'mail', 'login'];
+/** One-word credentials however a name splits them: a `passphrase` (`passPhrase`), a `jwt`, and Java's and PHP's session
+ * cookies (`JSESSIONID`, `jsessionId`, `PHPSESSID`). They name nothing else, so they count as fields, header names and URL keys. */
+const SPELLED = /^(?:passphrase|jwt|jsessionid|phpsessid)(s?)$/;
+/** What may stand before one in `refuse` mode (`ssh_passphrase`, `id_jwt`). */
+const SPELLED_QUALIFIERS = new Set([...PASSWORD_QUALIFIERS, ...TOKEN_QUALIFIERS, 'ssh', 'key', 'gpg', 'pgp', 'private']);
 /** What may stand before a credential word in `refuse` mode, which names the whole phrase (`access token`, `http password`). */
 const QUALIFIERS = {
   token: new Set(TOKEN_QUALIFIERS), secret: new Set(SECRET_QUALIFIERS),
@@ -56,6 +61,13 @@ export function headerContainer(key) {
   const last = nameParts(key).at(-1);
   return last === 'headers' || last === 'header';
 }
+// Under `auth`, `X-Auth`, `credential` or `credentials`, a member holding the credential under a generic name: `value`
+// (Keycloak's `{type: 'password', value}`, `credential: {type: 'apiKey', value}`), `pass` and `pw` (nodemailer's
+// `{user, pass}`), or a name whose first part is `secret` (Keycloak's `secretData`). Its name's letters, or undefined.
+export function credentialMember(name) {
+  const parts = nameParts(name);
+  return (parts.length === 1 && /^(?:value|pass|pw)$/.test(parts[0])) || parts[0] === 'secret' ? parts.join('') : undefined;
+}
 
 /** A name's lower-case parts, without digits. Format characters and accents are folded away first. */
 export function nameParts(name) {
@@ -76,6 +88,10 @@ export function credentialName(name, mode, place = 'field') {
   const strict = mode === 'refuse';
   // A URL key or a header name: where `sig`, `signature` and `sessionId` are credentials.
   const header = mode === 'query' || place === 'header';
+  for (let size = 1; size <= Math.min(3, phrase.length); size++) {
+    const spelled = SPELLED.exec(phrase.slice(-size).join(''));
+    if (spelled && (!strict || phrase.length === size || (phrase.length === size + 1 && SPELLED_QUALIFIERS.has(phrase[0])))) return found(spelled[1] === 's');
+  }
   // `credentials` holds a credential object as one value; the other plurals hold a list or map of text.
   const word = last === 'credentials' ? 'credential' : WORDS.has(last) ? last : last.endsWith('s') && WORDS.has(last.slice(0, -1)) ? last.slice(0, -1) : undefined;
   if (word !== undefined) {

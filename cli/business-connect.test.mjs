@@ -422,11 +422,14 @@ test('vendor exports strip credential values before upload, keeping every record
  const { exportVendor } = await import('./business/vendors/index.mjs');
  const key = 'fixture-vendor-read-key', apiKey = 'fixture-account-api-key-value', password = 'fixture-basic-auth-pass';
  const shapes = ['fixture-functions-key', 'fixture-apim-key', 'fixture-x-auth', 'fixture-secret-key', 'fixture-pwd', 'fixture-api-keys-item', 'fixture-tokens-item', 'fixture-tuple-token', 'fixture-sas-sig', 'fixture-auth-token', 'fixture-session-id', 'fixture-auth-container-token', 'fixture-credentials-password',
-  'fixture-token-auth', 'fixture-application-key', 'fixture-user-key', 'fixture-hapikey', 'fixture-basic-auth-param', 'fixture-account-key'];
+  'fixture-token-auth', 'fixture-application-key', 'fixture-user-key', 'fixture-hapikey', 'fixture-basic-auth-param', 'fixture-account-key',
+  'fixture-keycloak-value', 'fixture-keycloak-secret', 'fixture-credential-value', 'fixture-smtp-pass', 'fixture-passphrase', 'fixture-jwt', 'fixture-jsessionid', 'fixture-phpsessid', 'fixture-signature-pair'];
  const secrets = [key, apiKey, password, 'fixture-header-secret', 'fixture-integration-key', 'fixture-http-password', 'fixture-pair-secret', 'fixture-query-key', 'fixture-fragment-token', ...shapes];
  const lookalikes = { keyword: 'uptime', monkey: 'chaos', signal: 'green', design: 'v2', author: 'ops', primaryKey: 'pk_1', sortKey: 'name', tokenizer: 'bpe', tokens: 1500, pwd: null, secret_key: '', apiKeys: ['****'], headers: [['Accept', '*/*'], ['X-Auth', 'none']],
   // An agent's signature and a chat's session id are record fields, not credentials; auth and credentials holding no credential stay.
-  signature: 'Thanks, Ops', session_id: 'chat-session-1', auth: { type: 'oauth2' }, credentials: [], request: { credentials: 'include' } };
+  signature: 'Thanks, Ops', session_id: 'chat-session-1', auth: { type: 'oauth2' }, credentials: [], request: { credentials: 'include' }, smtp: { auth: { type: 'bearer' } }, owner: { credentials: { username: 'ops' } },
+  // A `{name, value}` pair outside a header container labels a field: Help Scout's custom fields, Zendesk's field options.
+  customFields: [{ id: 1, name: 'Session ID', value: 'sess-3c4d5e6f7a', text: 'sess-3c4d5e6f7a' }], custom_field_options: [{ id: 1, name: 'Signature', raw_name: 'Signature', value: 'request_signature' }] };
  // Uptime's UptimeRobot v3 fixture shape: every monitor carries apiKey, one checks a user:pass@ URL.
  const monitors = [
   { id: 9000001, url: 'https://shop.example.com/', customHttpHeaders: null, psps: [{ id: 5, isPasswordSet: false }], apiKey: null },
@@ -435,9 +438,14 @@ test('vendor exports strip credential values before upload, keeping every record
   // UptimeRobot's own httpPassword, a header pair, and credential query and fragment parameters beside a validated pagination key.
   { id: 9000020, url: 'https://api.partner.example.net/v1/health?api_key=fixture-query-key&region=eu&page_token=kept-page#access_token=fixture-fragment-token', authType: 'HTTP_BASIC', httpUsername: 'ops', httpPassword: 'fixture-http-password', hasSecret: true, customHttpHeaders: [{ name: 'Authorization', value: 'Bearer fixture-pair-secret' }], apiKey: null },
   // Common credential shapes beyond those, and names that only look like credential names.
-  { id: 9000032, url: 'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=fixture-sas-sig&signal=1&token_auth=fixture-token-auth&application_key=fixture-application-key&user_key=fixture-user-key#hapikey=fixture-hapikey&basic_auth=fixture-basic-auth-param&AccountKey=fixture-account-key&state=s',
+  { id: 9000032, url: 'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=fixture-sas-sig&signal=1&token_auth=fixture-token-auth&application_key=fixture-application-key&user_key=fixture-user-key&PHPSESSID=fixture-phpsessid#hapikey=fixture-hapikey&basic_auth=fixture-basic-auth-param&AccountKey=fixture-account-key&state=s',
    customHttpHeaders: { 'x-functions-key': 'fixture-functions-key', 'Ocp-Apim-Subscription-Key': 'fixture-apim-key', 'X-Auth': 'fixture-x-auth' }, secret_key: 'fixture-secret-key', pwd: 'fixture-pwd', apiKeys: ['fixture-api-keys-item'], tokens: ['fixture-tokens-item'],
-   headers: [['Authorization', 'Bearer fixture-tuple-token'], ['Session-Id', 'fixture-session-id'], ['Accept', '*/*']], authToken: 'fixture-auth-token', auth: { type: 'bearer', token: 'fixture-auth-container-token' }, credentials: { password: 'fixture-credentials-password' }, apiKey: null },
+   headers: [['Authorization', 'Bearer fixture-tuple-token'], ['Session-Id', 'fixture-session-id'], ['Accept', '*/*']], authToken: 'fixture-auth-token', auth: { type: 'bearer', token: 'fixture-auth-container-token' }, credentials: { password: 'fixture-credentials-password' }, apiKey: null,
+   // Generic member names under auth and credential(s) (a Keycloak realm user, nodemailer, an API key credential), names that are credentials
+   // everywhere, and a Postman header pair.
+   owner: { username: 'ann', credentials: [{ type: 'password', value: 'fixture-keycloak-value', temporary: false }, { type: 'password', secretData: '{"value":"fixture-keycloak-secret"}' }] },
+   credential: { type: 'apiKey', value: 'fixture-credential-value' }, smtp: { auth: { user: 'ops', pass: 'fixture-smtp-pass' } }, passphrase: 'fixture-passphrase', jwt: 'fixture-jwt', JSESSIONID: 'fixture-jsessionid',
+   request: { header: [{ key: 'Signature', value: 'fixture-signature-pair' }, { key: 'Accept', value: '*/*' }] } },
   { id: 9000034, url: 'https://status.example.test/check?keyword=up&signal=1&design=2&author=ops', ...lookalikes, apiKey: null },
  ];
  const responses = new Map(Object.entries({
@@ -467,10 +475,14 @@ test('vendor exports strip credential values before upload, keeping every record
  assert.deepEqual([compound.url, compound.httpPassword, compound.httpUsername, compound.hasSecret, compound.customHttpHeaders], ['https://api.partner.example.net/v1/health?api_key=removed&region=eu&page_token=kept-page#access_token=removed', '[removed]', 'ops', true, [{ name: 'Authorization', value: '[removed]' }]], 'compound names, header pairs and credential parameters leave markers the door reports per record; pagination keys and booleans stay');
  const shaped = pages[2].data[0];
  assert.deepEqual([shaped.url, shaped.customHttpHeaders, shaped.secret_key, shaped.pwd, shaped.apiKeys, shaped.tokens, shaped.headers],
-  ['https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed&signal=1&token_auth=removed&application_key=removed&user_key=removed#hapikey=removed&basic_auth=removed&AccountKey=removed&state=s',
+  ['https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed&signal=1&token_auth=removed&application_key=removed&user_key=removed&PHPSESSID=removed#hapikey=removed&basic_auth=removed&AccountKey=removed&state=s',
    { 'x-functions-key': '[removed]', 'Ocp-Apim-Subscription-Key': '[removed]', 'X-Auth': '[removed]' }, '[removed]', '[removed]', '[removed]', '[removed]', [['Authorization', '[removed]'], ['Session-Id', '[removed]'], ['Accept', '*/*']]],
   'secret/subscription/functions keys, X-Auth, pwd, plurals, header tuples (a Session-Id header among them), sig and query-key credentials such as token_auth and hapikey leave markers');
  assert.deepEqual([shaped.authToken, shaped.auth, shaped.credentials], ['[removed]', { type: 'bearer', token: '[removed]' }, { password: '[removed]' }], 'names are matched by whole parts; auth and credentials lose only their credential fields');
+ assert.deepEqual([shaped.owner, shaped.credential, shaped.smtp, shaped.passphrase, shaped.jwt, shaped.JSESSIONID, shaped.request],
+  [{ username: 'ann', credentials: [{ type: 'password', value: '[removed]', temporary: false }, { type: 'password', secretData: '[removed]' }] }, { type: 'apiKey', value: '[removed]' }, { auth: { user: 'ops', pass: '[removed]' } },
+   '[removed]', '[removed]', '[removed]', { header: [{ key: 'Signature', value: '[removed]' }, { key: 'Accept', value: '*/*' }] }],
+  'generic member names under auth and credential(s), passphrase, jwt, JSESSIONID and a Signature header pair leave markers');
  assert.deepEqual(pages[2].data[1], monitors[5], 'look-alike names, counts and placeholders stay as they are');
  const pagerduty = await collect('pagerduty', { start: '2026-10-01T00:00:00.000Z', end: '2026-10-08T00:00:00.000Z' });
  const bundle = JSON.parse(Buffer.concat(pagerduty.map(item => item.bytes)).toString());

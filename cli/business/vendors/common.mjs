@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { credentialName, credentialScheme, headerContainer } from './credential-names.mjs';
+import { credentialMember, credentialName, credentialScheme, headerContainer } from './credential-names.mjs';
 
 export class VendorExportError extends Error {
   constructor(code, status) {
@@ -58,8 +58,12 @@ export function reference(value, origin, pathname, allowedQuery = []) {
 // credentials only as text, so a count such as `tokens: 1500` stays. `auth` and
 // `credentials` hold one only as text naming no scheme or mode (`include`,
 // `oauth2`); an object under them keeps its fields and loses its own credential
-// fields (`auth: {token}`). `sig`, `signature` and `sessionId` are credentials as
-// header names (a tuple, a header pair, a key under `headers`), never as fields.
+// fields (`auth: {token}`) and, directly under them, a `value`, `pass`, `pw` or
+// `secret…` member (Keycloak's `credentials: [{type, value}]`, nodemailer's
+// `{user, pass}`). `passphrase`, `jwt`, `JSESSIONID` and `PHPSESSID` count
+// everywhere. `sig`, `signature` and `sessionId` are credentials as header names
+// (a tuple, a key under `headers`, a `{name|key, value}` pair in a header list),
+// never as fields; a pair elsewhere (Help Scout's `customFields`) labels a field.
 const placeholder = /^(?:\s*|[*\u2022\u25CF\u00B7x#_.-]{1,64}|[<[({]?\s*(?:redacted|hidden|masked|removed|omitted|none|null|n\/a|placeholder)\s*[>\])}]?)$/iu;
 /** What a stripped credential value becomes; the seed's import door reports it per record. */
 export const REMOVED_CREDENTIAL = '[removed]';
@@ -82,6 +86,10 @@ function credential(name, value, place) {
   const found = credentialName(decoded(name), 'remove', place);
   return found !== undefined && !empty(value) && (found.container ? schemeless(value) : !found.plural || text(value));
 }
+/** Whether this key is `auth`, `X-Auth`, `credential` or `credentials`, whose members are searched for a credential under a generic name. */
+const container = key => credentialName(decoded(key), 'remove')?.container === true;
+/** A member of such a container holding a credential under a generic name (`value`, `pass`, `pw`, `secretData`). */
+const member = (key, value) => credentialMember(decoded(key)) !== undefined && !empty(value);
 // The door's credentialQueryKey rule for URL query and fragment parameter names:
 // api_key, access_token, a bare `key`, sig and X-Amz-Signature, never keyword or author.
 const credentialParameter = key => credentialName(decoded(key), 'query') !== undefined;
@@ -114,16 +122,19 @@ const tuples = list => list.length > 0 && list.every(item => Array.isArray(item)
  * the adapter's validated query keys, which stay. */
 export function withoutCredentials(value, pagination = []) {
   // `headers`: the keys of this object, or of objects in this list, are HTTP header names.
-  const strip = (value, headers) => {
+  // `inside`: this object, or the objects in this list, sit under `auth` or `credential(s)`.
+  const strip = (value, headers, inside = false) => {
     if (Array.isArray(value)) {
       const pairs = tuples(value);
-      return value.map(child => pairs && credential(child[0], child[1], 'header') ? [child[0], REMOVED_CREDENTIAL] : strip(child, headers));
+      return value.map(child => pairs && credential(child[0], child[1], 'header') ? [child[0], REMOVED_CREDENTIAL] : strip(child, headers, inside));
     }
     if (value && typeof value === 'object') {
+      // A `{name|key, value}` pair's name is a header name only under a header container; elsewhere it labels a field.
+      const place = headers ? 'header' : 'field';
       const label = Object.entries(value).find(([key, child]) => /^(?:name|key)$/iu.test(key) && typeof child === 'string');
-      const pair = !!label && Object.hasOwn(value, 'value');
-      return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, (pair && key === 'value' ? credential(label[1], child, 'header') : credential(key, child, headers ? 'header' : 'field'))
-        ? REMOVED_CREDENTIAL : strip(child, headerContainer(key))]));
+      const pair = !!label && Object.hasOwn(value, 'value') && credentialName(decoded(label[1]), 'remove', place) !== undefined;
+      return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, (pair && key === 'value' ? credential(label[1], child, place) : credential(key, child, place) || (inside && member(key, child)))
+        ? REMOVED_CREDENTIAL : strip(child, headerContainer(key), container(key))]));
     }
     return typeof value === 'string' ? withoutUrlCredentials(value, pagination) : value;
   };

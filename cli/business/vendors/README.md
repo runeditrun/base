@@ -67,10 +67,14 @@ not credentials and stay as they are. Names are matched by whole parts
 (camelCase, `_`, `-`, digits), so names that merely contain such letters
 (`keyword`, `monkey`, `author`, `signal`, `design`, `primaryKey`) are not
 credential names and a `?keyword=up` URL stays intact. `Signature` and
-`Session-Id` count only as header names, so an agent's `signature` field stays;
+`Session-Id` count only as header names (a key under `headers`, a tuple, a
+`{name|key, value}` pair in a header list), so an agent's `signature` field and
+Help Scout's `customFields: [{name: 'Session ID', value}]` stay;
 `auth` and `credentials` count only when they hold text naming no scheme or mode,
 and an object under them loses only its own credential fields
-(`auth: {type: 'oauth2', token: "[removed]"}`). Query and fragment keys also
+(`auth: {type: 'oauth2', token: "[removed]"}`) and a `value`, `pass`, `pw` or
+`secret…` member (Keycloak's `credentials: [{type: 'password', value: "[removed]"}]`).
+`passphrase`, `jwt`, `JSESSIONID` and `PHPSESSID` count everywhere. Query and fragment keys also
 count documented API key names such as `token_auth`, `application_key`,
 `user_key` and `hapikey`.
 Pagination is read from the response as received, so a credential-bearing
