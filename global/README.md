@@ -497,9 +497,11 @@ read-only vendor key is read from OS credential storage, never from arguments,
 the environment or a file. The shipped adapter runs into a private 0600
 `export-<id>.bundle` file in the state folder, each item checked by the outbound
 detector; the bundle is sent in 64 KiB chunks, then planned, which leaves a
-zero-write preview in the door. Run records the bundle's SHA-256 as the task
-checkpoint's `chunk_hashes[0]` and asks Business to complete the task, prints
-only counts, and removes the bundle on every exit. Without the key, run
+zero-write preview in the door. Run then completes the task with outputs
+`{upload_id, plan_id, bundle_sha256}` (identifiers only); Business reads that
+plan from the door with its own grants and completes the task only if it is the
+plan of exactly that bundle. Run prints only counts and removes the bundle on
+every exit. Without the key, run
 releases the task as `paused` after an `owner_required` event and names the
 owner's command; a running supervisor picks the export up once the key is
 stored. A door that is not ready releases it as `paused` after a
@@ -508,7 +510,8 @@ other input. Sentry (its organization and window) and PagerDuty (its window)
 need inputs the executor task view does not carry yet, and Calendly's folder
 of files has no single-bundle door format yet: these release as `paused` after a
 `configuration_required` event. While an agent step waits (an export, or a
-question for `next`), run says what it waits for instead of `Nothing yet`.
+question for `next`, or the lease an earlier run on this computer still holds),
+run says what it waits for instead of `Nothing yet`.
 
 The current MCP `next_question` filters out owner items. When an owner summary
 is supplied, the CLI displays its browser link and refuses to answer it.

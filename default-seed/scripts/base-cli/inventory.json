@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.64-dev.g24d9b551",
+  "cliVersion": "0.2.64-dev.ge0b44ce0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -435,7 +435,7 @@
     },
     "cli/business/export-task.mjs": {
       "source": "cli/business/export-task.mjs",
-      "sha256": "3410a91e1c0649d7313a253e6aac310089ebe6aa6a6cef43968232cd3a9394a3"
+      "sha256": "ee584f04bf67752746e900569e6a077d93bde76b5dd9b22e53c09e8654ad14ac"
     },
     "cli/business/files.mjs": {
       "source": "cli/business/files.mjs",
@@ -451,7 +451,7 @@
     },
     "cli/business/lease.mjs": {
       "source": "cli/business/lease.mjs",
-      "sha256": "bc46001b172f375f626067e6348ff89fb8e1bad149250944f44a42bea3c75254"
+      "sha256": "43760ba80fe8dc4ded315766c4fe2f598da3075d0a7a440c7714687893a749d7"
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
@@ -527,7 +527,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "c71dd0326a2c0587f4561acbb484ce71dbdad3fbba153da2d9193398acbe2b9b"
+      "sha256": "8c35fb9d577e1d720a650a65beca801411d2b85c460a2759164d77871ec1c251"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

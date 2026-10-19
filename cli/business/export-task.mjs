@@ -17,6 +17,8 @@ export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'Uptim
 export const vendorHandle = vendor => `vendor:${vendor}:read`;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const loopback = hostname => ['localhost', '127.0.0.1', '[::1]'].includes(hostname);
+// The door identifiers Business accepts in an export's outputs (platform business/imports.ts).
+const DOOR_ID = /^[0-9A-Za-z][0-9A-Za-z_-]{0,127}$/;
 
 /** An export that cannot go on until someone else acts. The supervisor tells
  * Business with `question`, hands the lease back as paused and says `message`. */
@@ -150,7 +152,8 @@ const plural = (value, word) => `${value} ${word}${value === 1 ? '' : 's'}`;
 
 /** Perform a claimed export.vendor: the owner's key from the OS store, the
  * shipped adapter, the bundle in a 0600 state file, 64 KiB chunks each with a
- * fresh grant, then the door's plan (a zero-write preview), then completion.
+ * fresh grant, then the door's plan (a zero-write preview), then completion
+ * with the door's upload_id and plan_id and the bundle's SHA-256.
  * The bundle is removed on every exit. Returns the line to say. */
 export async function runExport({ lease, task, grant: claimedGrant, directory, say, ownerPage }) {
  const signal = lease.signal, { origin, quota } = destination(task, claimedGrant);
@@ -177,18 +180,19 @@ export async function runExport({ lease, task, grant: claimedGrant, directory, s
    const bytes = await readChunk(path, index, bundle.size);
    const result = await door(await fresh('uploads'), { ...(uploadId ? { uploadId } : {}), name: capability.output, bundleSha256: bundle.sha256,
     totalBytes: bundle.size, totalChunks: total, index, chunkSha256: hash(bytes), base64: bytes.toString('base64') }, signal);
-   if (typeof result.uploadId !== 'string' || !/^[A-Za-z0-9_.:-]{1,256}$/.test(result.uploadId) || uploadId && result.uploadId !== uploadId
+   if (typeof result.uploadId !== 'string' || !DOOR_ID.test(result.uploadId) || uploadId && result.uploadId !== uploadId
     || result.bundleSha256 !== bundle.sha256 || index === total - 1 && result.complete !== true) throw Error("The app's import door returned an invalid upload answer.");
    uploadId = result.uploadId;
    await lease.checkpointSaved({ page: index + 1, total, bytes_done: Math.min((index + 1) * CHUNK_BYTES, bundle.size), progress: Math.floor((index + 1) / total * 90) });
   }
   const preview = await door(await fresh('plan'), { uploadId }, signal);
   const summary = preview.summary ?? {}, counts = ['sourceRecords', 'created', 'updated', 'unchanged'].map(name => count(summary[name])), rejected = count(preview.counts?.rejected);
-  if (typeof preview.planId !== 'string' || !/^[A-Za-z0-9_.:-]{1,256}$/.test(preview.planId) || !/^[a-f0-9]{64}$/.test(preview.fingerprint ?? '')
+  if (typeof preview.planId !== 'string' || !DOOR_ID.test(preview.planId) || !/^[a-f0-9]{64}$/.test(preview.fingerprint ?? '')
    || preview.bundleSha256 !== bundle.sha256 || counts.includes(null) || rejected === null) throw Error("The app's import door returned an invalid preview.");
-  // Business checks the door holds a plan for exactly this bundle before it completes the task.
-  await lease.checkpointSaved({ page: total, total, bytes_done: bundle.size, progress: 100, chunk_hashes: [bundle.sha256] });
-  await lease.complete();
+  await lease.checkpointSaved({ page: total, total, bytes_done: bundle.size, progress: 100 });
+  // Identifiers only: Business reads that plan from the door with its own grants
+  // and completes the task only if it is the plan of exactly this bundle.
+  await lease.complete({ upload_id: uploadId, plan_id: preview.planId, bundle_sha256: bundle.sha256 });
   const [records, created, updated, unchanged] = counts;
   return `Import preview ready in ${origin}: ${plural(records, 'source record')}; ${created} to create, ${updated} to update, ${unchanged} unchanged, ${rejected} rejected. Nothing was imported: the owner reviews and approves this move in the browser: ${ownerPage}`;
  } finally {

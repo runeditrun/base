@@ -55,7 +55,7 @@ export async function door(t) {
   // Uptime's reader: one saved v3 monitors page per NDJSON line.
   const monitors = upload.bytes.toString('utf8').trim().split('\n').flatMap(line => JSON.parse(line).data);
   const planId = randomUUID(), fingerprint = sha256(Buffer.concat([upload.bytes, Buffer.from(planId)]));
-  state.plans.push({ planId, fingerprint, bundleSha256: upload.bundleSha256, namespace, records: monitors.length });
+  state.plans.push({ planId, uploadId: upload.id, fingerprint, bundleSha256: upload.bundleSha256, namespace, records: monitors.length });
   return { planId, fingerprint, bundleSha256: upload.bundleSha256,
    summary: { sourceRecords: monitors.length, created: monitors.length, updated: 0, unchanged: 0, gone: 0 },
    counts: { input: monitors.length, unique: monitors.length, duplicates: 0, mapped: monitors.length, unmapped: 0, rejected: 0, effects: monitors.length, byKind: { monitor: monitors.length } },

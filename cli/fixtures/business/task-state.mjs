@@ -1,4 +1,4 @@
-import { actionBody, classificationOutput, closed, identifier, integer, requireValue } from './contract.mjs';
+import { actionBody, classificationOutput, closed, exportOutputs, identifier, integer, requireValue } from './contract.mjs';
 
 const expires = () => new Date(Date.now() + 600_000).toISOString();
 const numeric = ['page', 'total', 'records_done', 'bytes_done', 'progress'];
@@ -71,7 +71,8 @@ export function taskStore(state) {
  function action(id, action, body, mcp = false) {
   actionBody(action, body, mcp);
   const task = find(id); runnable(task);
-  if (body.outputs !== undefined) {
+  if (action === 'complete' && task.summary.kind === 'export.vendor') exportOutputs(body.outputs);
+  else if (body.outputs !== undefined) {
    if (task.summary.kind === 'classify.row') classificationOutput(body.outputs, task.summary.question?.answer_schema);
    else requireValue(Object.keys(body.outputs).length === 0, 409);
   }
@@ -109,8 +110,9 @@ export function taskStore(state) {
      requireValue(!state.refuseQuestion && body.outputs !== undefined, 409);
      state.questionCompleted = body.outputs;
     } else if (task.summary.kind === 'export.vendor') {
-     // The platform's check: the door holds a plan for exactly the bundle the export reported.
-     requireValue(state.door?.state.plans.some(plan => plan.bundleSha256 === task.checkpoint.chunk_hashes?.[0]), 409);
+     // The platform's check (exportPreviewCheck): the door holds the reported plan, for the reported upload, of exactly the reported bundle.
+     const { upload_id, plan_id, bundle_sha256 } = body.outputs;
+     requireValue(state.door?.state.plans.some(plan => plan.planId === plan_id && plan.uploadId === upload_id && plan.bundleSha256 === bundle_sha256 && !plan.failureCode), 409, 'business_export_preview_mismatch');
     } else requireValue(task.summary.kind === 'discover.local' && state.uploads.length > 0, 409);
     task.phase = 'done'; task.lease = null;
    }

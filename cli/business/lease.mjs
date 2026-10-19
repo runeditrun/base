@@ -65,7 +65,8 @@ export class Lease {
   await saveProgress(this.progress);
   await this.heartbeat();
  }
- async complete() { clearInterval(this.timer); return this.serial(() => this.post(taskPath(this.claim.task.id, 'complete'), { outputs: {} })); }
+ /** Complete the task with the outputs its kind reports (none for a scan). */
+ async complete(outputs = {}) { clearInterval(this.timer); return this.serial(() => this.post(taskPath(this.claim.task.id, 'complete'), { outputs })); }
  async release(reason = 'handover') {
   clearInterval(this.timer);
   await this.tail;

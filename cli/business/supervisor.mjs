@@ -32,10 +32,14 @@ export async function run({ once = false } = {}) {
  const interrupted = signal => () => { unlock.now(); stop.abort(Object.assign(Error('Business supervisor stopped.'), { signal })); };
  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, interrupted(signal));
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(() => stop.abort(Error('Business supervisor stopped for disconnect.')), () => {}); }, 250);
- let progress, said = '', held = null;
+ let progress, said = '', held = null, summaries = [];
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
+ // An agent step that waits is said in its own words, never as "Nothing yet".
+ const waits = () => [...new Set([...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
  try {
   progress = await loadProgress();
+  // A claim saved before this computer stopped is the task it was doing.
+  held = progress.pendingClaim?.task_id ?? null;
   await unlink(join(directory, 'disconnect')).catch(error => { if (error.code !== 'ENOENT') throw error; });
   if (!once) process.stdout.write(`Business run is working this computer's tasks for ${ownerLink(state)}. It checks in every ${checkIn / 1000} seconds and keeps going until you stop it (Ctrl-C).\n`);
   do {
@@ -45,16 +49,14 @@ export async function run({ once = false } = {}) {
     return;
    }
    if (!progress.pendingClaim) {
-    const summaries = await nextQuestions(api, stop.signal);
+    summaries = await nextQuestions(api, stop.signal);
     const handles = (await loadState())?.vendorHandles ?? [];
     for (const [id, wait] of parked) if (wait.keyMissing && handles.includes(vendorHandle(wait.keyMissing))) parked.delete(id);
     const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
     if (!selected) {
-     // An agent step that waits is said in its own words, never as "Nothing yet".
-     const waits = [...new Set([...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
-     if (waits.length) say(waits.join('\n'));
-     else say(waitingFor(state));
-     if (once) { if (!waits.length) process.stdout.write('Nothing yet.\n'); return; }
+     const waiting = waits();
+     say(waiting.length ? waiting.join('\n') : waitingFor(state));
+     if (once) { if (!waiting.length) process.stdout.write('Nothing yet.\n'); return; }
      await pause(checkIn, stop.signal); continue;
     }
     held = selected.state === 'leased' ? selected.task_id : null;
@@ -75,7 +77,13 @@ export async function run({ once = false } = {}) {
     // A task this computer held before it was stopped stays leased until the
     // lease ends; then the server returns it to ready with its checkpoint.
     if (!claimed.task && interrupted) say('Waiting for the server to hand back the task this computer was doing when it stopped; its earlier lease has not ended yet.');
-    if (once && !claimed.task) { if (!interrupted) say(waitingFor(state)); process.stdout.write('Nothing yet.\n'); return; }
+    if (once && !claimed.task) {
+     // Only with no agent step waiting does run say "Nothing yet".
+     const waiting = interrupted ? [] : waits();
+     if (!interrupted) say(waiting.length ? waiting.join('\n') : waitingFor(state));
+     if (!interrupted && !waiting.length) process.stdout.write('Nothing yet.\n');
+     return;
+    }
     continue;
    }
    if (!kinds.has(claimed.task.kind) || claimed.task.kind_version !== 1) throw Error('Business server returned an unimplemented task kind.');

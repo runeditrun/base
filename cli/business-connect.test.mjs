@@ -604,10 +604,26 @@ test('an agent exports a vendor into its app\'s import door: next names the owne
  const stored = await cli(home, ['business','next'], { env }); outputs.push(stored);
  assert.ok(stored.stdout.includes("the owner's read-only UptimeRobot key is stored") && stored.stdout.includes('business vendor-key add uptimerobot'), stored.stdout);
 
+ // An earlier run here was stopped mid-export and Business still holds its lease: next names the export step and run
+ // says it waits for that lease to end, never "Nothing yet".
+ const [exportTask] = remote.state.tasks;
+ remote.state.tasks = [{ ...exportTask, state: 'leased', fence: 3 }];
+ const heldNext = await cli(home, ['business','next'], { env }); outputs.push(heldNext);
+ const heldRun = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(heldRun);
+ assert.equal(heldRun.code, 0, heldRun.stderr);
+ assert.ok(heldNext.stdout.includes('Agent: biz:seed:uptime:export:tool1') && !heldNext.stdout.includes('Nothing yet'), heldNext.stdout);
+ assert.ok(heldRun.stdout.includes('Waiting for the server to hand back the task this computer was doing when it stopped; its earlier lease has not ended yet.') && !heldRun.stdout.includes('Nothing yet'), heldRun.stdout);
+ assert.equal(seed.state.requests.length, 0, 'nothing reaches the door while the earlier lease holds');
+ // The lease ends and Business hands the export back.
+ remote.state.tasks = [exportTask];
+
  const grantsBefore = remote.state.importGrants;
  const exported = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(exported);
  assert.equal(exported.code, 0, exported.stderr);
  assert.equal(remote.state.phase, 'done', 'Business completed the export after its door held the plan');
+ // The completion reports identifiers only: the door's upload and plan and the bundle's hash.
+ const completed = remote.state.requests.find(entry => entry.route === '/api/business/tasks/biz%3Aseed%3Auptime%3Aexport%3Atool1/complete');
+ assert.deepEqual(completed.body.outputs, { upload_id: seed.state.plans[0].uploadId, plan_id: seed.state.plans[0].planId, bundle_sha256: seed.state.plans[0].bundleSha256 });
  assert.ok(exported.stdout.includes(`Import preview ready in ${seed.origin}: 600 source records; 600 to create, 0 to update, 0 unchanged, 0 rejected. Nothing was imported`), exported.stdout);
  assert.deepEqual((await readFile(join(home, 'vendor-requests.log'), 'utf8')).trim().split('\n'), ['/v3/monitors?limit=200 authorized', '/v3/monitors?limit=200&cursor=page2 authorized'], 'the shipped adapter read the vendor with the stored key');
  // 64 KiB chunks, each with its own single-use grant, then the plan: a preview with no native writes.
