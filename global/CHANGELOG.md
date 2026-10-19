@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.70
+
+- **Archive restores judge later data statements by the table they write (#340).** A bounded INSERT/REPLACE/UPDATE/DELETE whose target is outside the restorable catalogue, and reaches none of it by trigger or FK action, is admitted whatever it reads; an INSERT…SELECT/VALUES into a catalogue table the archive lacks is replayed at finalize in migration order, in the same D1 batch, and recorded in bridged.replayed. Nook's retained archive restores past 0061.
+- **Owner-approved scheduled policy jobs (#323).** Owners approve hash-pinned, scoped scheduled operator-auth status actions with fresh proof; every cron attempt re-checks owner, version, revocation, role policy, action and target inside the write transaction and is audited, with approve/revoke/history at /app/policies and an additive migration.
+- **Staged product directory for deploy (#334).** An owner deploy declaration can set top-level "productDirectory" (for example .rer/deploy/product); rer validates its checkout-relative placement and symlink containment and forwards it to the kit's dry run, deploy and health checks.
+- **Sign-in mark (#338).** Optional config.branding.mark (a same-origin root-relative image path) shows on sign-in, one-click, confirmation, settings and dev key-exchange pages; pages without a mark are unchanged.
+- **/contract overlap regression checks (#336).** The run-site browser door now measures /contract split cards at 860, 1000 and 1160 px for overlap and sideways overflow.
+- **Owned runtime stops promptly (#341).** The post-health port-ownership check now stops when its launch is cancelled, so a stop during startup no longer leaves rer polling for 15 seconds.
+
 ## 0.2.69
 
 - **Renewable hosted import leases (#328).** A hosted import holds a five-minute renewable lease (30-second heartbeat while active) with fenced request claims; the next restore safely aborts stale staging and owned blobs through the existing recovery, and owner active/status/abort routes stay authenticated.
