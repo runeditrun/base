@@ -1,7 +1,7 @@
 import { all, quote, insist } from './storage.mjs';
 import { canonicalJson } from './hash.mjs';
 import { tokens, identifier, folded } from './generated.mjs';
-import { changesData } from './migration-statements.mjs';
+import { changesData, reachingTables } from './migration-statements.mjs';
 
 // Applied product migrations in the ledger's own order. A state-bearing D1
 // ledger may hold an unacknowledged migration whose effects are unknown; neither
@@ -44,10 +44,13 @@ async function placement(manifest,cat,replay,applied) {
     unapplied=applied.slice(matching[0]);
   }
   // Only rows the archive carries can skip a later migration's change. A table
-  // the archive does not hold is restored empty, so triggers and backfills that
-  // name only such tables (a newly added module's own) change no restored row.
+  // the archive does not hold is restored empty, so backfills that name only
+  // such tables (a newly added module's own) change no restored row, unless a
+  // trigger from any applied migration carries their writes into one that is
+  // restorable. Trigger DDL itself changes no row (migration-statements.mjs).
   const restorable=cat.tables.map(t=>t.name).filter(name=>manifest.tables.some(t=>t.name===name));
-  for(const name of unapplied)insist(!replay.statements(name).some(sql=>changesData(sql,restorable)),'schema_mismatch:migration_data:'+name);
+  const reached=reachingTables(applied.flatMap(name=>replay.statements(name)),restorable);
+  for(const name of unapplied)insist(!replay.statements(name).some(sql=>changesData(sql,reached)),'schema_mismatch:migration_data:'+name);
   return {earlier};
 }
 // An archive with the destination's schema identity can still predate later
