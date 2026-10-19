@@ -18,9 +18,10 @@ let f, port, url, privateBytes, privateMode;
 const cleanups = [];
 before(async () => {
  f = await fixture('default-seed', {after: fn => cleanups.push(fn), diagnostic: () => {}});
- port = await freePort(); url = `http://127.0.0.1:${port}`;
  await f.run(['install', '--json']);
- await f.run(['setup', '--owner-email', 'managed-owner@example.test', '--port', String(port), '--non-interactive', '--json']);
+ const setup = events(await f.run(['setup', '--owner-email', 'managed-owner@example.test', '--non-interactive', '--json'])).find(row => row.event === 'setup-ready');
+ assert.ok(setup);
+ url = setup.url; port = Number(new URL(url).port);
  privateBytes = await readFile(join(f.root, '.dev.vars'));
  privateMode = (await stat(join(f.root, '.dev.vars'))).mode & 0o777;
  await f.data("CREATE TABLE managed_saved(value TEXT); INSERT INTO managed_saved VALUES('owner content')");
@@ -368,10 +369,11 @@ test('rer preview serves one fixed production workerd at the saved origin and ke
 test('rer preview refuses build-time rewrites by name until the project declares its generated outputs', {timeout: 15 * 60_000}, async t => {
  // This independent build flow owns its installation and ordinary sign-in
  // budget; the earlier owner journey must keep the real auth policy intact.
- const project = await fixture('default-seed', t), projectPort = await freePort();
- const origin = `http://127.0.0.1:${projectPort}`;
+ const project = await fixture('default-seed', t);
  await project.run(['install', '--json']);
- await project.run(['setup', '--owner-email', 'generated-owner@example.test', '--port', String(projectPort), '--non-interactive', '--json']);
+ const setup = events(await project.run(['setup', '--owner-email', 'generated-owner@example.test', '--non-interactive', '--json'])).find(row => row.event === 'setup-ready');
+ assert.ok(setup);
+ const origin = setup.url;
  // The build itself (Vite loading its config) rewrites one generated file and,
  // in the second half, edits one real source. Both reach preview as owner would.
  const config = join(project.root, 'vite.config.ts'), adapter = join(project.root, 'scripts/installer/local.mjs');
