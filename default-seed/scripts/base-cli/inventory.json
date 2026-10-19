@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.72-dev.gc6bc83d1",
+  "cliVersion": "0.2.72-dev.g864b8b31",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2703,11 +2703,11 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "a2c822b5fb4862b9b650d3f5624eed5b10bb81d54c1e828c1e21844841f4f8f6"
+      "sha256": "841af14869adc5d63b97062d987684f38ae6e3727037c8938bd6a9d6251cd93a"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
-      "sha256": "37a46d5a219b2ef20c6b69b570b547a1db622deba529d7c896fed350452255fe"
+      "sha256": "a8650af77c571380a8092a270313526e79a89b1d44ff3b71ab81496fe20022e3"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",

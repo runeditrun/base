@@ -53,8 +53,12 @@ export function laterData({applied,unapplied,replay,catalogue,archived,empty,tab
   for(const [table,list] of writes) {
     // Seed INSERTs into a new table replay too: the rows already present in a
     // fresh destination must be reset and derived from the restored installation.
-    if(!list.some(s=>s.today || ['insert','replace'].includes(s.data.verb)))continue;
     const bad=list.filter(s=>!replayable(s,{table,statements,restorable,writable,carried,tables:known,secrets,views}));
+    // Writes confined to tables created after the archive retain their
+    // admission. Replay eligible seeds, but do not turn a new-table-only
+    // upgrade into a refused backfill. View reads always require resolution.
+    const required=list.some(s=>s.today || s.data.names.some(name=>views.has(name)));
+    if(!required && bad.length)continue;
     const reach=reachingTables(statements,[table]),other=later.filter(s=>!admitted.has(s) && !list.includes(s) && writesAnother(s,table,reach,list));
     if(bad.length || other.length){[...bad,...other].forEach(s=>refused.add(s));continue;}
     replays.push(...list);

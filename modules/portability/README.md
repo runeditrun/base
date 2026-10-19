@@ -254,10 +254,11 @@ requires version 2 integrity.
 
 An archive restores into an installation whose schema differs only by migrations
 applied after the archive was made, when those migrations are additive: new
-tables, new columns that are nullable or have a default, and indexes. The
+tables, new columns that are nullable or have a default, and indexes, or the
+preserving CHECK rebuild described below. The
 archive's tables restore with their archived columns, later columns take their
-defaults, and later tables stay empty (they must be empty, like every restored
-table). This applies to normal v2 import and to backup-only v1 recovery.
+defaults, and later tables stay empty unless their eligible seed or backfill is
+replayed below. This applies to normal v2 import and to backup-only v1 recovery.
 
 The Base CLI runners (local Workers and container) pass `createPortability` a
 `migrations` replayer (`migration-history.mjs`, Node only) built from the
@@ -291,7 +292,8 @@ contain only `CREATE TABLE` (not `AS SELECT`), `CREATE INDEX` and
 `ALTER TABLE ... ADD COLUMN` (SQLite allows only constant defaults there) on the
 restorable tables. A later migration with any other statement that names a
 restorable table, such as an `INSERT`, `UPDATE` or `DELETE` that purges or
-backfills rows or a trigger, is refused with `schema_mismatch`; statements that
+backfills rows, is refused with `schema_mismatch` unless admitted or replayed
+below. Bounded trigger and view creation/removal changes only schema. Statements that
 touch only excluded tables are allowed. A data statement (`INSERT`, `REPLACE`,
 `UPDATE` or `DELETE`, including `INSERT ... SELECT` and a leading `WITH`) is
 judged by the table it writes: when that table is outside the restorable
@@ -312,11 +314,21 @@ keywords outside table position, function names (also table-valued ones such as
 literals, numbers and comments never count. Text Base cannot read to a
 statement boundary, such as an unclosed block comment, is refused. An archived table the archive holds no
 rows of restores empty, so an `UPDATE` or `DELETE` of it changes nothing and is
-allowed unless it also names a table the archive holds rows of (which it could
-read into its writes); an `INSERT` into it, or any other statement naming it,
-is still refused. For archives without a migration record,
+allowed regardless of what it reads: no row can change or fire a trigger. An
+ordinary `INSERT` into it remains refused. For archives without a migration record,
 every migration after the earliest prefix that gives the archive's schema is
 checked, since the archive may predate any of them.
+
+A complete five-statement `CREATE TABLE copy AS SELECT` / `DROP TABLE` /
+`CREATE TABLE` / `INSERT ... SELECT` / `DROP TABLE copy` sequence within one
+migration is admitted when every column is copied back unchanged and, for a
+populated archived table, its rowid is copied back too. The copy must be local
+to the sequence. Only CHECK clauses may differ; column declarations, defaults,
+collations, other constraints and table options remain unchanged. Manifest
+counts identify empty tables without another row scan. Restore uses the
+destination definition, so a row rejected by its CHECK fails the whole atomic
+restore; no row is skipped or coerced. Other statements still face the usual
+data classifier, and a proven preserving block is not a competing backfill writer.
 
 A backfill of a catalogue table the archive does not carry (one a later
 migration adds, restored empty) is **replayed** instead of refused: an
@@ -332,13 +344,18 @@ scans the restored rows. Rows the restore normalizes (import safety) are read
 as restored. The restore is refused with
 `schema_mismatch:migration_data:<migration>` instead when the archive carries
 the table (even with no rows), when a write to it is not a plain `INSERT` or
-`REPLACE`, reads any table other than archived ones and itself, selects `*` or
+`REPLACE`, reads any table other than archived ones and itself (including through
+a view resolved from applied migration history), selects `*` or
 a secret column, when a trigger on it or a foreign key action from it reaches a
 catalogue table, when any other later statement writes it (directly or through
 a trigger) or changes its columns other than by `ADD COLUMN` (allowed only when
 every replay names its columns), or when the statement cannot be bounded.
 A failed or interrupted apply leaves no replayed row; finalizing again replays
 from the start.
+Read-only trigger bodies, including RAISE-only guards, add no write dependency.
+Eligible constant seed INSERTs replay too. Statements confined to tables added
+after the archive retain their existing admission when they need no replay;
+an INSERT reading a view must still resolve entirely to carried tables.
 
 The same check runs when the archive's schema identity equals the destination's:
 a later migration that only purges or backfills rows leaves the schema unchanged,
@@ -639,6 +656,8 @@ modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
 modules/portability/sql-text.mjs
 modules/portability/backfills.mjs
+modules/portability/rebuilds.mjs
+modules/portability/replay-views.mjs
 modules/portability/legacy-safety.mjs
 modules/portability/export.mjs
 modules/portability/import.mjs
