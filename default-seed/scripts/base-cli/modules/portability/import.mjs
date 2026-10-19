@@ -1,4 +1,4 @@
-import { all, statement, state, guard, job, save, partQueries, parts, readPart, cleanCopies, quote, stream, insist, run } from './storage.mjs';
+import { all, statement, state, guard, job, save, partQueries, parts, readPart, dropCopyStatements, cleanCopyStatements, quote, stream, insist, run } from './storage.mjs';
 import { stagePart } from './import-staging.mjs';
 import { normalizeStaged } from './import-safety.mjs';
 import { ensureImportLeases, createImportLease, importLeaseStatus, importRunning, withImportLease } from './import-lease.mjs';
@@ -207,6 +207,9 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
       ...replaced.map(t=>db.prepare(`DELETE FROM ${quote(t)}`)),
       ...row.metadata.targets.flatMap(t=>restoreCopy(db,t,row.metadata.copies[t.name])),save(db,row),...replayStatements(db,row),
       ...row.metadata.triggers.map(t=>db.prepare(t.sql)),...mergeJournal(db,manifest,checked),...legacyAuditStatements(db,row),
+      // Publication and removal of this import's scratch commit together. A lost
+      // acknowledgement still finds a complete job with no staging left behind.
+      ...dropCopyStatements(db,row),
       db.prepare('UPDATE rer_portability_state SET import_job=NULL,applying=0 WHERE id=1'),db.prepare('DELETE FROM rer_portability_guard')]);
   }catch(e){
     // D1 may have committed even when its acknowledgement failed.
@@ -232,8 +235,8 @@ export async function abortImport(context,id,options={}) {
 }
 async function abortLeasedImport(context,row) {
   const id=row.id;
-  await removeOwned(context,id);await cleanCopies(context.db,row);row.phase='aborted';
-  await context.db.batch([save(context.db,row),statement(context.db,'UPDATE rer_portability_state SET import_job=NULL,applying=0 WHERE id=1 AND import_job=?',id)]);
+  await removeOwned(context,id);row.phase='aborted';
+  await context.db.batch([...cleanCopyStatements(context.db,row),save(context.db,row),statement(context.db,'UPDATE rer_portability_state SET import_job=NULL,applying=0 WHERE id=1 AND import_job=?',id)]);
   return importStatus(context,id);
 }
 // A restore's staging outlives a worker that died mid-restore (a crashed process or workerd) and refuses

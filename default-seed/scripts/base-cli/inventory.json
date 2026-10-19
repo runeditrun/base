@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.71",
+  "cliVersion": "0.2.71-dev.g88b2e081",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -935,7 +935,7 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "ca4797dba8415f00efa146a539c369b1855b584907ade7f113ce81700c568fb8"
+      "sha256": "095d1a61cdfdeb18c2e4080b73d7015e83aa055fe6bb1fe0ef11237cd77652b0"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
@@ -2783,7 +2783,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "454852c220f34baa1e93688923e4491636e7ed330ea8ffc30893031ea710d683"
+      "sha256": "09f131269115b946cc7d4baa97ae9ca827183d6f7b37600584cc2f09fd6bf12c"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
@@ -2851,7 +2851,7 @@
     },
     "modules/portability/storage.mjs": {
       "source": "modules/portability/storage.mjs",
-      "sha256": "4b25a8d56c8905817b3f5b7955b68843c83cbf1350a1e36b219cd5ef62fded6a"
+      "sha256": "33b0585d9c38658c647c5785231c87397cec26d4630c16eab2405db59d317355"
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
