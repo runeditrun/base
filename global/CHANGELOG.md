@@ -2,7 +2,6 @@
 
 ## 0.2.69
 
-- **Import door archive and restore-check (#320).** The import-kit door's grant actions add archive and restore-check (one door migration): archives survive plan and catch-up, erasure withdraws them and says so, restore-check parses with zero native writes and returns the hash and counts, and rer's own credential markers archive while live values are still refused.
 - **Renewable hosted import leases (#328).** A hosted import holds a five-minute renewable lease (30-second heartbeat while active) with fenced request claims; the next restore safely aborts stale staging and owned blobs through the existing recovery, and owner active/status/abort routes stay authenticated.
 - **One-click sign-in offers providers (#324).** One-click owner entry also offers the visible provider forms, carrying returnTo, with provider origins in the CSP; SC-13 names a local rer patch and points it upstream to Base.
 - **Run site dates and command (#326).** /contract shows US short UTC dates, and the /run command's `npx` start stays whole, breaking only before the repository.
