@@ -44,9 +44,15 @@ fields or invalid records are rejected. Imports never send mail or invitations.
 The screen also accepts the legacy people source envelope `{ "people": [...] }`.
 Do not upload the per-person privacy export or a `.rer` installation archive.
 
-Business uses this same door with signed, action-bound grants. It starts off;
-the owner can enable it and permanently revoke signing keys under **Business
-imports**. Disabling Business leaves the owner's history and Undo available.
+Business uses this same door with signed, action-bound grants. It starts off,
+also on an installation RER provisions for Business with `RER_IMPORT_DOOR=on`:
+grants stay closed until the owner turns on **Business imports** here, where
+the owner can also permanently revoke signing keys. Disabling Business leaves
+the owner's history and Undo available.
+
+A large export (several megabytes) follows the same steps. Its first apply
+creates the import job in bounded steps and may return before any person is
+written; the screen keeps applying until the job finishes.
 
 Low-level `rer export`/`rer import` back up and restore this installation. They
 remain a separate developer-only recovery mechanism, described
