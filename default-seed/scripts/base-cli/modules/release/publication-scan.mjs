@@ -10,7 +10,11 @@ export function validatePublicationDestination(source, project, repository) {
     execFileSync('python3', ['-B', resolve(import.meta.dirname, '../../scripts/publish-check/destination.py'),
       '--repo', source.repo, '--ref', source.commit, '--project', project, '--repository', repository],
     { stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch { throw Error('Publication destination must agree with the committed edition and project identities'); }
+  } catch (error) {
+    if (error.status === 2) throw Error(error.stderr.toString().trim());
+    if (error.status === 1) throw Error('Publication destination must agree with the committed edition and project identities');
+    throw Error('Publication destination inspection could not run');
+  }
 }
 
 export function publicationScan(repo, ref, envFile, project, repository, publicBase, annotationFile) {

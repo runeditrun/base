@@ -9,10 +9,62 @@ import tempfile
 import unittest
 
 from history_scan import scan
-from test_repo import RepositoryFixture, resolving
+from test_repo import ROOT, RepositoryFixture, resolving
 
 
 class PartialCloneTests(RepositoryFixture, unittest.TestCase):
+    def test_destination_hydrates_selected_history_outside_the_remote_refspec(self):
+        self.git('checkout', '-qb', 'edition')
+        project = 'publisher/product'
+        repository = 'https://github.com/octocat/Hello-World'
+        self.write('edition.json', json.dumps(dict(id=project)))
+        self.write('rer-project.json', json.dumps(dict(projectId=project, sourceRepository=repository)))
+        selected = self.commit()
+        manifest = self.git('rev-parse', selected + ':edition.json')
+        self.git('checkout', '-q', 'main')
+        self.git('config', 'uploadpack.allowFilter', 'true')
+        self.git('config', 'uploadpack.allowAnySHA1InWant', 'true')
+        with tempfile.TemporaryDirectory(prefix='publish-destination-partial-') as temporary:
+            directory = str(Path(temporary) / 'clone')
+            subprocess.run(['git', 'clone', '-q', '--single-branch', '--branch', 'main',
+                            '--filter=blob:none', self.repo.as_uri(), directory], check=True,
+                           capture_output=True, timeout=30)
+            def git(*args):
+                return subprocess.check_output(['git', '-C', directory, *args],
+                                               stderr=subprocess.DEVNULL, timeout=30).decode().strip()
+            git('fetch', '-q', '--no-tags', '--filter=blob:none', 'origin', selected)
+            missing = git('rev-list', '--objects', '--missing=print', selected)
+            self.assertIn('?' + manifest, missing.splitlines())
+            self.assertEqual(git('rev-parse', '--is-shallow-repository'), 'false')
+            requests = Path(temporary) / 'requests'
+            transport = Path(temporary) / 'upload-pack'
+            native = shutil.which('git-upload-pack')
+            transport.write_text(f'#!{sys.executable}\nimport os, sys\n'
+                                 f'with open({str(requests)!r}, "a") as log: log.write("fetch\\n")\n'
+                                 f'os.execv({native!r}, [{native!r}, *sys.argv[1:]])\n')
+            transport.chmod(0o755)
+            script = '''import { validatePublicationDestination } from './modules/release/publication-scan.mjs';
+try { validatePublicationDestination({repo: process.argv[1], commit: process.argv[2]}, process.argv[3], process.argv[4]); }
+catch (error) { console.error(error.message); process.exitCode = 2; }
+'''
+            # A lost promisor is an inspection failure, never a disagreement
+            # between the explicitly matching committed identities.
+            git('remote', 'set-url', 'origin', (Path(temporary) / 'unavailable').as_uri())
+            unavailable = subprocess.run(['node', '--input-type=module', '-e', script, directory,
+                                          selected, project, repository], cwd=ROOT,
+                                         capture_output=True, text=True, timeout=30)
+            self.assertEqual(unavailable.returncode, 2)
+            self.assertRegex(unavailable.stderr, r'missing blob [0-9a-f]+ at (edition.json|rer-project.json): fetch the full history')
+            self.assertNotIn('identity', unavailable.stderr)
+            git('remote', 'set-url', 'origin', self.repo.as_uri())
+            git('config', 'remote.origin.uploadpack', str(transport))
+            result = subprocess.run(['node', '--input-type=module', '-e', script, directory,
+                                     selected, project, repository], cwd=ROOT,
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(requests.read_text().splitlines(), ['fetch'])
+            self.assertNotIn('?' + manifest, git('rev-list', '--objects', '--missing=print', selected))
+
     def test_deleted_blobs_are_hydrated_together_and_inspected(self):
         path = 'removed/settings.txt'
         credential = 'ghp_' + secrets.token_hex(20)

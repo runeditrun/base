@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.66",
+  "cliVersion": "0.2.66-dev.g2505cf74",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2767,11 +2767,15 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "63a18fe36d57483f5e4415f2be31a0bb257c75d439ccb88cdf09e6a7ffb6e63d"
+      "sha256": "ccb3fccad217fd3c470dc2bddfc16d3115a393da685ff3436d6a59919a5d3e12"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
       "sha256": "05165a21d6836289ac07b093e10b2b9ae7a9c39c5f0ae1c6226fec7b32d24a8f"
+    },
+    "modules/release/cleanup.mjs": {
+      "source": "modules/release/cleanup.mjs",
+      "sha256": "839258ca711442a795e31f899dc16f401fb49df2a6195223ff8cbc6bf3c7f4e6"
     },
     "modules/release/export.mjs": {
       "source": "modules/release/export.mjs",
@@ -2787,7 +2791,7 @@
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "1c68d5edff030f17556a023b9543fb349ab8e798b59a4199780c7b5be96c58dd"
+      "sha256": "98a87ff8bb79e74e05d5393f63a7d302aa8b1873a3b663d9d3bd0e63f39df9bc"
     },
     "modules/release/public-base.mjs": {
       "source": "modules/release/public-base.mjs",
@@ -2807,7 +2811,7 @@
     },
     "modules/release/publication-scan.mjs": {
       "source": "modules/release/publication-scan.mjs",
-      "sha256": "d09f864cbdf4c5898dd8f0e678a18798507e90fad09a1b9718b3ed151416d06d"
+      "sha256": "c7f72ddb9d29f5bf5cf24378c9a41fb82016dc946a253d98da4b365d497dbb43"
     },
     "modules/release/publish-handoff.mjs": {
       "source": "modules/release/publish-handoff.mjs",
@@ -2887,7 +2891,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "18d1997a8c3ae1d9898b69aa2dcb815236ab3ada9ef29e2ea7edade1bbdaf4f3"
+      "sha256": "c5e240c93fc4cd144f938cd36fc57a49d998a93f27868f64c55a32403b949fc0"
     },
     "scripts/publish-check/c2pa.py": {
       "source": "scripts/publish-check/c2pa.py",
@@ -2931,7 +2935,7 @@
     },
     "scripts/publish-check/destination.py": {
       "source": "scripts/publish-check/destination.py",
-      "sha256": "eb72cbd9bf5f4657fc4fecb517b38e87e02b16de6eb059747288bfd98a49175f"
+      "sha256": "03e1bd5e912e7d0761b1f5277f23b33bd52aec81085f275589d04669a31218c7"
     },
     "scripts/publish-check/env_values.py": {
       "source": "scripts/publish-check/env_values.py",
@@ -2943,7 +2947,7 @@
     },
     "scripts/publish-check/git_history.py": {
       "source": "scripts/publish-check/git_history.py",
-      "sha256": "0dc18dc0b24ce9293eb5e647be1d1954a8824fb5ed3975353e015e8d0e108a28"
+      "sha256": "8a9cacce7ed7fe65befc823ea622573cd9d2ba9c09014f0b2f0e5ece89cb71a1"
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
@@ -2959,7 +2963,7 @@
     },
     "scripts/publish-check/history_hydration.py": {
       "source": "scripts/publish-check/history_hydration.py",
-      "sha256": "9de614a1e5ba287950a5bf9bce33d4a61c9367249bef73cbd89e77b36f5cd368"
+      "sha256": "f86071745f5fd3b49f41f18d1ec7a13e220f47c86b2f9afb5975afee9b20b090"
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",

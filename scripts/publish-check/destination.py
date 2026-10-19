@@ -2,6 +2,7 @@
 import argparse
 import json
 import re
+import sys
 from github_refs import FULL
 from project_identity import FIELDS, ordinary_document, tree_identity
 
@@ -115,7 +116,13 @@ if __name__ == '__main__':
     try:
         history = History(args.repo, args.ref)
         destination(history, args.project, args.repository)
-    except (ValueError, TypeError, UnicodeError, OSError, InspectionError):
+    except InspectionError as error:
+        print(str(error), file=sys.stderr)
+        raise SystemExit(2) from None
+    except OSError:
+        print('Publication destination inspection could not run', file=sys.stderr)
+        raise SystemExit(2) from None
+    except (ValueError, TypeError, UnicodeError):
         raise SystemExit(1) from None
     finally:
         if history:
