@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.66
+
+- **Seed copies pass the pin-time credential scan (#305).** Credential-shaped test fixtures in seed-vendored Base files are constructed at runtime, preserving their values and assertions. Seed copies and exported references no longer trigger the hosted pin-time credential scan, so seeds can refresh Base past 0.2.61 and pin again.
+
 ## 0.2.65
 
 - **Tag-first patch releases (#302).** rer release --tag adopts an existing remote annotated version tag at the exact source commit after its tag Verify passes. The producer captures one immutable tag object and checks object/commit equality before mutation and RELEASED. The existing release-tag Verify rule remains in force.
