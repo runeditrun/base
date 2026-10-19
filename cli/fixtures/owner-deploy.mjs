@@ -8,7 +8,7 @@ export const manifest = { steps: [{ type: 'owner-claim', mode: 'signed', emailFi
  fields: [{ name: 'SESSION_SECRET', kind: 'secret', generate: 'hex' }, { name: 'SETUP_TOKEN', kind: 'secret', generate: 'hex' }] };
 
 export async function checkout(t, declaration) {
- const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-deploy-owner-'))); t.after(() => rm(root, { recursive: true, force: true }));
+ const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-deploy-owner-'))); t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
  for (const path of ['dist/server', 'dist/client', 'migrations/core']) await mkdir(join(root, path), { recursive: true });
  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }] }));
  await writeFile(join(root, 'dist/server/index.js'), 'export default {scheduled(){},fetch(){}}');

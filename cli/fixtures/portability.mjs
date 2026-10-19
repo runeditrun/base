@@ -23,7 +23,7 @@ CREATE INDEX computed_entries_total ON computed_entries(total);`;
 export async function portabilityFixture(t,{generated=true}={}) {
  const directory=await mkdtemp(join(tmpdir(),'rer-data-journey-')),root=join(directory,'installation');
  const children=new Set();
- t.after(async()=>{for(const child of children)if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await child.done;}await rm(directory,{recursive:true,force:true});});
+ t.after(async()=>{for(const child of children)if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await child.done;}await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100});});
  await exportReference(base,root);
  await mkdir(join(root,'exports'));
  await useWorkspaceDependencies(root);

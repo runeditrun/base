@@ -8,7 +8,7 @@ const entry=fileURLToPath(new URL('../../bin/rer.mjs',import.meta.url));
 
 export async function queuedCommands(t) {
  const root=await mkdtemp(join(tmpdir(),'rer-queue-policy-')),children=new Set();
- t.after(async()=>{for(const child of children){if(child.exitCode===null&&child.signalCode===null)child.kill('SIGTERM');await child.done;}await rm(root,{recursive:true,force:true});});
+ t.after(async()=>{for(const child of children){if(child.exitCode===null&&child.signalCode===null)child.kill('SIGTERM');await child.done;}await rm(root,{recursive:true,force:true,maxRetries:3,retryDelay:100});});
  const environment={...process.env,RER_JOBS_DIR:join(root,'jobs'),RER_JOBS_SLOTS:'1',RER_JOBS_LOAD_THRESHOLD:'100000',RER_JOBS_MIN_FREE_MEMORY_BYTES:'0'};
  delete environment.CI;delete environment.RER_JOB_POLICY;delete environment.RER_JOB_MEMBERSHIP;
  const commands=Object.fromEntries(['install','setup','build','verify','deploy','export','import'].map(verb=>[verb,{argv:[process.execPath,'task.mjs',verb],inputs:['task.mjs'],effects:'Records real queue ownership for this independent command.'}]));

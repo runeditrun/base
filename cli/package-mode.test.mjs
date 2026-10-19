@@ -21,7 +21,7 @@ import { assemble } from '../composition/assemble.mjs';
 import { sourceRoots } from './export.mjs';
 import { aliases, pins, verbs } from './contract.mjs';
 import { run } from '../global/tests/harness.mjs';
-import { freePort, pause } from './fixtures/reference.mjs';
+import { pause } from './fixtures/reference.mjs';
 
 const base = resolve(import.meta.dirname, '..');
 const common = [...Object.keys(verbs), 'release'];
@@ -36,11 +36,11 @@ before(async () => {
  built = await mkdtemp(join(tmpdir(), 'rer-package-built-'));
  bytes = await readFile(await buildPackage(base, built));
 });
-after(() => built && rm(built, { recursive: true, force: true }));
+after(() => built && rm(built, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
 
 test('check accepts a checkout that pins the rer package and names the fix for each package clause', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-package-mode-'));
- t.after(() => rm(root, { recursive: true, force: true }));
+ t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
  // node_modules holds the package exactly as a registry would serve it.
  const files = readPackage(bytes, { integrity: integrity(bytes) });
  const { version } = JSON.parse(files.find(file => file.path === 'package.json').data);
@@ -109,7 +109,7 @@ test('check accepts a checkout that pins the rer package and names the fix for e
 
 test('--to-package refuses a vendored copy with local edits, listing them, and changes nothing', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-to-package-'));
- t.after(() => rm(root, { recursive: true, force: true }));
+ t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
  const exported = spawnSync(process.execPath, [join(base, 'scripts/export-cli.mjs'), root], { encoding: 'utf8' });
  assert.equal(exported.status, 0, exported.stderr);
  const pkg = JSON.stringify({ name: 'seed', scripts: { build: 'node scripts/rer.mjs build' } });
@@ -129,7 +129,7 @@ test('--to-package refuses a vendored copy with local edits, listing them, and c
 test('--to-package moves delivery operations, the scripts they run and CI workflows to the pinned rer', async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-to-package-calls-')), root = join(directory, 'seed'), stub = join(directory, 'bin'), log = join(directory, 'pnpm.log');
  const registry = await localRegistry();
- t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true }); });
+ t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); });
  const { version } = JSON.parse(readPackage(bytes, { integrity: integrity(bytes) }).find(file => file.path === 'package.json').data);
  registry.publish(version, bytes);
  await writeFile(join(directory, 'npmrc'), registry.npmrc());
@@ -216,7 +216,7 @@ test('--to-package moves delivery operations, the scripts they run and CI workfl
 test('a freshly composed foundation converted with --to-package passes check, its lock no longer recording the removed copy', async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-to-package-composed-')), root = join(directory, 'seed'), snapshot = join(directory, 'base'), family = join(directory, 'family');
  const registry = await localRegistry();
- t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true }); });
+ t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); });
  const { version } = JSON.parse(readPackage(bytes, { integrity: integrity(bytes) }).find(file => file.path === 'package.json').data);
  registry.publish(version, bytes);
  await writeFile(join(directory, 'npmrc'), registry.npmrc());
@@ -248,7 +248,7 @@ test('converted journey and README launches bootstrap a fresh seed through their
  let dev, done;
  t.after(async () => {
   if (dev && dev.exitCode === null && dev.signalCode === null) { dev.kill('SIGTERM'); await done; }
-  await registry.close(); await rm(directory, {recursive: true, force: true});
+  await registry.close(); await rm(directory, {recursive: true, force: true, maxRetries: 3, retryDelay: 100});
  });
  const files = readPackage(bytes, {integrity: integrity(bytes)});
  const {version} = JSON.parse(files.find(file => file.path === 'package.json').data);
@@ -289,9 +289,11 @@ process.stdout.write(result.stdout);process.stderr.write(result.stderr);process.
  assert.equal(JSON.parse(readme.stdout).profile, 'first-party');
  const help = await run(shim, ['dev', '--help'], {cwd: fresh, env});
  assert.equal(help.code, 0, 'the shim preserves the launcher help path');
- const port = await freePort();
- const setup = await run(shim, ['setup', '--owner-email', 'journey-owner@example.test', '--port', String(port), '--non-interactive', '--json'], {cwd: fresh, env, timeout: 120000});
+ const setup = await run(shim, ['setup', '--owner-email', 'journey-owner@example.test', '--non-interactive', '--json'], {cwd: fresh, env, timeout: 120000});
  assert.equal(setup.code, 0, 'the converted fresh seed completes real setup');
+ const setupReady = setup.stdout.split('\n').filter(line => line.startsWith('{')).map(JSON.parse).find(event => event.event === 'setup-ready');
+ assert.ok(setupReady, 'the converted fresh seed reports its selected origin');
+ const port = new URL(setupReady.url).port;
  dev = spawn(process.execPath, [join(root, driver), fresh, shim, 'dev', String(port)], {cwd: fresh, env, stdio: ['ignore', 'pipe', 'pipe']});
  let output = ''; dev.stdout.on('data', data => { output += data; }); dev.stderr.resume();
  done = new Promise((resolve, reject) => { dev.once('error', reject); dev.once('close', resolve); });
@@ -301,7 +303,7 @@ process.stdout.write(result.stdout);process.stderr.write(result.stderr);process.
  const info = output.split('\n').filter(line => line.startsWith('{')).map(JSON.parse).find(event => event.event === 'ready');
  assert.equal(typeof info.siteUrl, 'string', 'ordinary owner prose does not block the default owner label');
  assert.equal((await fetch(info.siteUrl + '/run')).status, 200);
- assert.equal((await fetch(`http://127.0.0.1:${port}/health`)).status, 200);
+ assert.equal((await fetch(setupReady.url + '/health')).status, 200);
  assert.equal(dev.exitCode, null, 'the shim keeps dev in the foreground under test-runner pipes');
  const stop = await run(shim, ['dev', '--stop', '--json'], {cwd: fresh, env});
  assert.equal(stop.code, 0);

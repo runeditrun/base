@@ -36,11 +36,27 @@ export function documentedCommand(line) {
 }
 export async function freePort() { const socket=createServer();await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));return port; }
 
+// Setup announces its chosen port before starting its temporary application.
+// Observe that real selection when a journey needs to probe setup while alive.
+export async function setupOrigin(child) {
+ const deadline=Date.now()+120000;
+ for (;;) {
+  const events=child.stdoutText.split('\n').slice(0,-1).filter(Boolean).map(JSON.parse);
+  const ready=events.find(event=>event.event==='setup-ready');
+  if(ready)return ready.url;
+  const selected=events.find(event=>event.event==='port');
+  if(selected)return `http://127.0.0.1:${selected.port}`;
+  assert.equal(child.exitCode,null,'setup must announce its selected port');
+  assert.ok(Date.now()<deadline,'setup port announcement deadline');
+  await pause(25);
+ }
+}
+
 export async function fixture(kind,t) {
  const directory=await mkdtemp(join(tmpdir(),'rer-real-journey-')), root=join(directory,'seed with spaces');
  const children=new Set();
  async function stop(child) { if(child.exitCode!==null||child.signalCode!==null)return;child.kill('SIGTERM');await Promise.race([child.done,pause(15000)]);if(child.exitCode===null&&child.signalCode===null)throw Error('CLI did not finish owned teardown'); }
- t.after(async()=>{for(const child of children)await stop(child);await rm(directory,{recursive:true,force:true});});
+ t.after(async()=>{for(const child of children)await stop(child);await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100});});
  if(kind==='default-seed')await exportReference(base,root);
  else {
   const snapshot=join(directory,'base'),family=join(directory,'family');await mkdir(snapshot);
@@ -54,7 +70,7 @@ export async function fixture(kind,t) {
   await writeFile(join(family,'editions/foundation/migrations/core/0005_notes.sql'), 'CREATE TABLE notes (id TEXT PRIMARY KEY, body TEXT, attachment BLOB);\n');
   git(family,'init','--quiet');git(family,'add','.');git(family,'-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','composed fixture');
   await assemble({familyRepo:family,baseRepo:snapshot,edition:'foundation',output:root,toolCommit:ref});
-  await rm(snapshot,{recursive:true});await rm(family,{recursive:true});
+  await rm(snapshot,{recursive:true,force:true,maxRetries:3,retryDelay:100});await rm(family,{recursive:true,force:true,maxRetries:3,retryDelay:100});
  }
  // Keep the prepared manager cache when the runner gives each job a fresh HOME.
  const tools=Object.fromEntries(['HTTP_PROXY','HTTPS_PROXY','NO_PROXY','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE','PLAYWRIGHT_BROWSERS_PATH','COREPACK_HOME','TMPDIR','TMP','TEMP'].filter(name=>process.env[name]).map(name=>[name,process.env[name]]));
