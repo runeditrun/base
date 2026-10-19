@@ -50,13 +50,16 @@ async function cleanup(child, state, timeoutMs) {
     if (state.error) errors.push(failure(`spawn failed: ${state.error.message}`, state.error))
     const known = new Set([state.pid]); const t0 = performance.now()
     trace(`STOP begin pid=${state.pid} args=${child.spawnargs.slice(0, 6).join(' ')}\n${tree(state.pid, known)}`)
-    child.once('exit', () => trace(`STOP exit-event pid=${state.pid} +${Math.round(performance.now() - t0)}ms`))
+    let exitAt = '-', closeAt = '-'
+    child.once('exit', () => { exitAt = Math.round(performance.now() - t0); trace(`STOP exit-event pid=${state.pid} +${exitAt}ms`) })
+    child.once('close', () => { closeAt = Math.round(performance.now() - t0) })
     const sampler = setInterval(() => trace(`STOP sample pid=${state.pid} +${Math.round(performance.now() - t0)}ms exited=${state.exited} closed=${state.closed}\n${tree(state.pid, known)}${performance.now() - t0 > 1500 ? '\n' + pipeHolders(child) : ''}`), 500)
     signal('SIGTERM')
     const graceful = await settledWithin(timeoutMs)
     clearInterval(sampler)
     const elapsed = Math.round(performance.now() - t0)
     trace(`STOP end pid=${state.pid} settled=${graceful.settled} ms=${elapsed} exited=${state.exited} closed=${state.closed}${graceful.settled ? '' : '\n' + tree(state.pid, known) + '\n' + pipeHolders(child)}`)
+    process.stderr.write(`STOPLINE ${child.spawnargs.slice(3, 5).join(' ')} ms=${elapsed} settled=${graceful.settled} code=${state.code} signal=${state.signal} exitAt=${exitAt} closeAt=${closeAt}\n`)
     if (!graceful.settled || elapsed > 1500) dump(`pid=${state.pid} settled=${graceful.settled} ms=${elapsed}`)
     if (!graceful.settled) {
       // KILL is a bounded ownership cleanup, never graceful success.

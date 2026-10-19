@@ -148,7 +148,11 @@
       "browser": true,
       "hosted": false,
       "commands": [
-        "node --test --test-concurrency=1 tests/local-journey/stop-sweep.test.mjs tests/local-journey/erasure.test.mjs"
+        "node --test --test-concurrency=1 tests/local-journey/erasure.test.mjs",
+        "node --test --test-concurrency=1 tests/local-journey/erasure.test.mjs",
+        "node --test --test-concurrency=1 tests/local-journey/erasure.test.mjs",
+        "node --test --test-concurrency=1 --test-name-pattern=imported.person tests/local-journey/erasure.test.mjs",
+        "node --test --test-concurrency=1 --test-name-pattern=imported.person tests/local-journey/erasure.test.mjs"
       ]
     },
     {
