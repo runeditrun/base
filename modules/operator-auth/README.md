@@ -680,3 +680,10 @@ route configuration, CI and release; Base checks do not establish integrated
 adoption or deployment.
 
 The application-side dependency, owner-setting and logout protocol is documented in [dependencies](../dependencies/README.md). Existing stores default to provider sign-in off, and provider admission requires the app-owned setting.
+
+## Owner-approved schedules
+
+OA accounts offer a bounded, hash-pinned scheduled policy door, separate from
+human sessions. Read [SCHEDULED-POLICY.md](SCHEDULED-POLICY.md) for the design,
+additive migration, declaration, owner approval/revocation flow and audit contract.
+The reference `/app/policies` screen and Worker scheduled handler show adoption.

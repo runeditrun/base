@@ -3,6 +3,7 @@ import { stagePart } from './import-staging.mjs';
 import { normalizeStaged } from './import-safety.mjs';
 import { ensureImportLeases, createImportLease, importLeaseStatus, importRunning, withImportLease } from './import-lease.mjs';
 import { refuseProviderData } from './provider-data.mjs';
+import { refusePolicyApprovals } from './policy-data.mjs';
 import { refuseDevData } from './dev-data.mjs';
 import { catalogue, validateRow, bindCell, writableColumns } from './catalogue.mjs';
 import { platformTable, restorableManifest } from './bookkeeping.mjs';
@@ -178,7 +179,9 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
   await bucketsEmpty(context,row);
   await refuseDevData(db,row.metadata.copies,row.metadata.targets);
   await refuseProviderData(db,row.metadata.copies,row.metadata.targets);
+  await refusePolicyApprovals(db,row.metadata.copies);
   await normalizeStaged(context,row);
+  await refusePolicyApprovals(db,row.metadata.copies);
   if(config.validateStaged) {
     const read=async table=>{insist(row.metadata.copies[table],'staged_table');const target=row.metadata.targets.find(t=>t.name===table);return (await readCopy(db,target,row.metadata.copies[table],0,row.metadata.manifest.tables.find(t=>t.name===table)?.count??0)).map(x=>x.row);};
     insist(await config.validateStaged({db,tables:{...row.metadata.copies},read,manifest})!==false,'staged_validation');

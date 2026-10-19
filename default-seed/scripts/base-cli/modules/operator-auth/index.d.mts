@@ -90,7 +90,10 @@ export interface AuthHooks<R extends string = Role> {
   /** After an email-link or provider sign-in completes. Return a returnTo to redirect; throw to refuse (the new session is revoked). */
   afterConfirm?(input: { request: Request; operator: Operator<R>; session: CompletedSession<R>['session']; method: 'email' | 'oidc'; returnTo: string }): void | { returnTo?: string } | Promise<void | { returnTo?: string }>;
 }
+export type { ScheduledPolicy, ScheduledPolicyDoor, PolicyApproval, PolicyRun } from './scheduled/index.mjs';
 export interface AuthOptions<R extends string = Role> {
+  /** OA store only: trusted source, re-read at approval/run/action time. */
+  scheduledPolicies?: () => import('./scheduled/index.mjs').ScheduledPolicy[];
   db: Database; config: AuthConfig; mailSender?: MailSender; clientIp: (request: Request) => string | Promise<string>; rolePolicy?: RolePolicy; clock?: () => number;
   hooks?: AuthHooks<R>;
   /** The runtime's fetch for provider discovery, JWKS and token calls (it must honour redirect: 'manual' and AbortSignal). */
@@ -142,6 +145,7 @@ export interface IdentityProviders {
 }
 export interface DomainRule { domain: string; providerId: string; createdAt: number }
 export interface OperatorAuth<R extends string = Role> {
+  readonly scheduledPolicies?: import('./scheduled/index.mjs').ScheduledPolicyDoor;
   /** Key-gated local development or an isolated hosted demo; unavailable in production. */
   readonly oneClick?: {
     people(request: Request): Promise<Array<{ email: string; displayName: string; role: R; href: string }> | null>;
