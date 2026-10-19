@@ -6,14 +6,20 @@ import { tokens, identifier, folded } from './generated.mjs';
 // restored row takes the same value the migration gave existing rows. Any
 // other statement (INSERT, UPDATE, DELETE, triggers, table rebuilds) changes
 // data unless it names none of the restorable tables, as when it only touches
-// operator-auth or other excluded tables.
-export function changesData(sql,restorable) {
+// operator-auth or other excluded tables. `empty` lists the restorable tables
+// the archive holds no rows of: restore leaves them empty, and an UPDATE or
+// DELETE of an empty table changes nothing, so such a statement changes data
+// only if it names another restorable table (one it could write, or read into
+// its writes). Any other statement naming an empty table still does: an INSERT
+// would leave rows the restore lacks.
+export function changesData(sql,restorable,empty=[]) {
   const list=tokens(sql),words=list.map(t=>t.quoted?undefined:folded(t.text));
   const kind=words.slice(0,4).filter(w=>!['temp','temporary','unique'].includes(w)).slice(0,2).join(' ');
   if(kind==='create table')return topLevelWords(list,words).includes('as');
   if(kind==='create index')return false;
   if(kind==='alter table' && words.find((w,i)=>i>2 && ['add','rename','drop'].includes(w))==='add')return false;
-  const names=new Set(restorable.map(folded));
+  const skipped=new Set(['update','delete'].includes(words[0])?empty.map(folded):[]);
+  const names=new Set(restorable.map(folded).filter(name=>!skipped.has(name)));
   return list.some(t=>t.quoted ? !t.text.startsWith("'") && names.has(folded(identifier(t))) : t.text.split('.').some(part=>names.has(folded(part))));
 }
 function topLevelWords(list,words) {
