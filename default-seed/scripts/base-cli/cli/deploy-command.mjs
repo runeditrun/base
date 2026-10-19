@@ -121,7 +121,7 @@ export async function deployCommand(context) {
  let deployed, claimed, linked = false, linkResult, step = 'custom deploy';
  const link = async (token, origin) => { if (!linked) { const state = await inspect(origin); linkResult = await linkDependencies?.(state?.origin ?? origin, token); linked = true; } return linkResult; };
  try {
-  return await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret, deployed: () => deployed, tokenKey: setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField }, async claims => {
+  const result = await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret, deployed: () => deployed, tokenKey: setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField }, async claims => {
    observedClaims = claims;
    const saved = { ...process.env };
    try {
@@ -160,10 +160,11 @@ export async function deployCommand(context) {
    if (!linked) await linkDependencies?.(origin);
    step = 'verify hosted setup';
    await checkHostedSetup({ origin, claimed: claimed ?? state?.ownerClaim?.outcome ?? claims.at(-1)?.outcome, signal: context.signal });
-   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${state ? '; the one-time setup token was removed' : ''}. Sign in by email at ${origin}.`);
    const { setupToken: _, ...result } = deployed;
    return { ...result, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   });
+  if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${recorded ? '; the one-time setup token was removed' : ''}. Sign in by email at ${result.origin}.`);
+  return result;
  } catch (error) {
   const again = deployAgain(options);
   const { commandFailure } = await shared('failures.mjs');

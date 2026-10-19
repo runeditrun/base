@@ -1,11 +1,12 @@
 import { observeReadiness, observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { ownerClaimRequest } from './deploy-claim-request.mjs';
+import { retireOwnerClaimSession } from './deploy-claim-session.mjs';
 // Observe the actual bootstrap exchange of a custom hook, including hooks that
 // call the shared owner helper themselves. Never issue a second claim after it.
 // The kit's deployment record, when the hook keeps one there, is checked before
 // linking with its live setup token; rer checks the origin the hook returns too.
 export async function observeOwner({ paths, inspect, beforeClaim, addSecret, deployed: knownDeployment, tokenKey }, run) {
- const fetch = globalThis.fetch, claims = [];
+ const fetch = globalThis.fetch, claims = [], sessions = [];
  globalThis.fetch = async (input, init = {}) => {
   const url = new URL(input instanceof Request ? input.url : input);
   let body;
@@ -23,6 +24,7 @@ export async function observeOwner({ paths, inspect, beforeClaim, addSecret, dep
   await beforeClaim?.(body.token, url.origin);
   const known = knownDeployment?.() ?? observedReadiness(url.origin);
   const response = await ownerClaimRequest(fetch, input, init, {deployed:known ?? deployed, tokenKey});
+  if (response.status === 303) sessions.push({ response, origin: url.origin });
   let code;
   if (response.status !== 303) {
    try { code = (await response.clone().json()).error; } catch {}
@@ -33,7 +35,10 @@ export async function observeOwner({ paths, inspect, beforeClaim, addSecret, dep
   return response;
  };
  try { return await observeReadiness(() => run(claims)); }
- finally { globalThis.fetch = fetch; }
+ finally {
+  globalThis.fetch = fetch;
+  await Promise.all(sessions.map(({ response, origin }) => retireOwnerClaimSession(fetch, response, origin)));
+ }
 }
 
 async function exchange(response,url,method) {

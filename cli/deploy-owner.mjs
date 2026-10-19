@@ -1,11 +1,12 @@
 import { ownerClaimRequest } from './deploy-claim-request.mjs';
+import { retireOwnerClaimSession } from './deploy-claim-session.mjs';
 import { observeOwner, ownerExchangeFailure } from './deploy-observation.mjs';
 import { randomBytes } from 'node:crypto';
 
 // After a healthy deploy, the hosted app's first owner is the setup owner: rer
 // claims it with the one-time setup token through the seed's standard owner step
-// (Base operator-auth POST /auth/bootstrap), then removes that token from the
-// Worker and records the new Worker version. A Worker still holding a token rer
+// (Base operator-auth POST /auth/bootstrap), signs out its unused session, then
+// removes that token from the Worker and records the new Worker version. A Worker still holding a token rer
 // did not upload this run gets a fresh one first, unless the person supplied the
 // token (environment or --env-file) and inspection has not found it absent. A
 // seed with its own owner step function runs its own bootstrap; identity-provider
@@ -60,7 +61,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
   } catch (cause) {
    const exchange = exchanges.lastExchange ?? exchanges.at(-1);
    const error = cause.message === 'owner-claim-failed' ? cause : ownerFailure(cause.message);
-   if (exchange) { error.ownerExchange = exchange; error.cause = ownerExchangeFailure(exchange); }
+   if (exchange && !cause.ownerSessionRetirement) { error.ownerExchange = exchange; error.cause = ownerExchangeFailure(exchange); }
    throw error;
   }
   // Function hooks can keep existing owners without returning a value. Observe
@@ -76,7 +77,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
    headers: { Origin: deployed.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token, displayName, returnTo: hook.returnTo ?? '/' }) }, {deployed, tokenKey, signal});
  } catch (error) { throw ownerFailure(`POST ${new URL(hook.path ?? '/auth/bootstrap',deployed.origin).pathname}: ` + (['owner-claim-origin-mismatch','owner-claim-redirected','owner-claim-readiness-timeout'].includes(error.message) ? error.message : 'the hosted application did not answer')); }
  if (response.status !== 303) { try { const body = await response.json(); if (typeof body?.error === 'string' && /^[a-z_]{1,64}$/.test(body.error)) code = body.error; } catch {} }
- else await response.body?.cancel();
+ else { await retireOwnerClaimSession(fetch, response, deployed.origin); await response.body?.cancel(); }
  const outcome = response.status === 303 ? 'claimed' : response.status === 409 && code === 'already_initialized' ? 'kept' : undefined;
  const advice = code !== 'invalid_setup_token' ? '' : !secret ? `; the Worker holds another setup token: have the deploy hook return the one it deployed as setupToken, or set it as ${item.environment} with --env-file` : given ? `; the ${item.environment} you supplied is not the deployed setup token: leave it unset and rer issues a fresh one` : '';
  if (!outcome) throw ownerFailure(`POST ${new URL(hook.path ?? '/auth/bootstrap',deployed.origin).pathname} returned HTTP ${response.status} (${code})${advice}`);

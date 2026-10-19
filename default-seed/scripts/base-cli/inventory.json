@@ -685,9 +685,13 @@
       "source": "cli/deploy-claim-request.mjs",
       "sha256": "8baa0f733e9dd7ebfc9cb99bf20e9f7190ca96b24eefd6491cd2b8385d7ebf6b"
     },
+    "cli/deploy-claim-session.mjs": {
+      "source": "cli/deploy-claim-session.mjs",
+      "sha256": "4edd39c5300b3436248539abc1d0d36b2cef0862d83c929dd4eac0a20aae74f7"
+    },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "f01d4302f7238f5a9a5c2679b8ca0f14af67451fe5d29a8f584b37b5f277c742"
+      "sha256": "3788aa5804cf2402234a5953fadc31dfdf5538b657a74128967163acd4b097f9"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -711,7 +715,7 @@
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",
-      "sha256": "e5443721fc0d40f00ea994b972f650fc8e57866d154fc3de3eefd907cbd919bd"
+      "sha256": "ec800f97efbe3501f22c969621072ebb9c4ffd397e8eaa1b430943c8387e2f08"
     },
     "cli/deploy-owner-input.mjs": {
       "source": "cli/deploy-owner-input.mjs",
@@ -719,7 +723,7 @@
     },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
-      "sha256": "6c2e6ef799eb52dc6d82b5cee150371c9176394f73cd5a1ce1f4f7b9fbe442c5"
+      "sha256": "a18cbd514579b07790df4ac9dc697915ac8fe57913143a087b409219668d6f2d"
     },
     "cli/deploy-readiness.mjs": {
       "source": "cli/deploy-readiness.mjs",
