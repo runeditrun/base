@@ -150,7 +150,9 @@ and notes it per record) and rer's vendor exports, at two reaches:
   fetch's `request.credentials: 'include'` and `auth: 'Bearer'` are accepted as
   they are. The scheme and mode names are fetch's `include`, `same-origin` and
   `omit`, and the HTTP and API schemes (`none`, `basic`, `bearer`, `digest`,
-  `oauth2`, `apikey`, `jwt`, `ntlm`, `aws`, `sigv4`, `hmac` and the like).
+  `oauth2`, `apikey`, `jwt`, `ntlm`, `aws`, `sigv4`, `hmac` and the like) and the
+  boolean words `true`, `false`, `yes`, `no`, `on`, `off`, `enabled` and
+  `disabled`, so Keycloak's `smtpServer.auth: "true"` imports intact.
 - **Generic member names count inside `auth` and `credential(s)`.** Directly
   under such a container (an object, or the objects in a list), a member named
   `value`, `pass` or `pw`, or one whose first part is `secret` (`secretData`),
@@ -191,7 +193,7 @@ stays.
   credentials, but a record field of the same name is not, so a signature or
   session token an exporter wrote as a plain record field is kept; the value
   checks below still apply to it. A field named just `auth` holding text other
-  than a scheme name is a credential.
+  than a scheme, mode or boolean word is a credential.
 
 Value-shaped detection is unchanged: user names and passwords in URLs, known
 token prefixes, base64 and every encoding layer are checked as before. Null, an

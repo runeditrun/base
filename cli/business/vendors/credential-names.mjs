@@ -49,8 +49,9 @@ const COMPOUND = new RegExp('^x?(?:'
   + `(?:${[...KEY_QUALIFIERS].join('|')})(?:key)|(?:${TOKEN_QUALIFIERS.join('|')})(?:token)|(?:${SECRET_QUALIFIERS.join('|')})(?:secret)`
   + `|(?:${PASSWORD_QUALIFIERS.join('|')})(?:password|passwd|pwd)|webhook(?:url)|cal(?:url))(s?)$`);
 /** A scheme or mode an `auth` or `credentials` field names, never a credential:
- * fetch's `include`, `same-origin` and `omit`, and HTTP and API authentication schemes. */
-const SCHEME = /^(?:omit|sameorigin|include|none|noauth|inherit|anonymous|basic|bearer|digest|negotiate|ntlm|kerberos|oauth(?:1|2|10|20|1a)?|apikey|jwt|hawk|hmac|aws|awsv4|sigv4|awssigv4|edgegrid|mutual|vapid|token|password|cookie|session|header|query)$/;
+ * fetch's `include`, `same-origin` and `omit`, HTTP and API authentication schemes, and boolean
+ * words (Keycloak's `smtpServer.auth: "true"`). */
+const SCHEME = /^(?:omit|sameorigin|include|none|noauth|inherit|anonymous|basic|bearer|digest|negotiate|ntlm|kerberos|oauth(?:1|2|10|20|1a)?|apikey|jwt|hawk|hmac|aws|awsv4|sigv4|awssigv4|edgegrid|mutual|vapid|token|password|cookie|session|header|query|true|false|yes|no|on|off|enabled|disabled)$/;
 
 /** Whether text under an `auth` or `credentials` name names a scheme or mode (`include`, `oauth2`, `Bearer`, `same-origin`). */
 export function credentialScheme(text) {

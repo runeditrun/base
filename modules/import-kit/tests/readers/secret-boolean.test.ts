@@ -103,7 +103,7 @@ test('public readers and durable planning retain boolean secret semantics with e
     {uri:'https://example.zendesk.com/api/v2/ticket_fields/360',id:360,type:'tagger',custom_field_options:[{id:1,name:'Signature',raw_name:'Signature',value:'request_signature'},{id:2,name:'Session ID',raw_name:'Session ID',value:'request_session_id'}]},
   ];
   // `auth` and `credentials` holding no credential stay; their credential fields are refused, or removed and noted.
-  const containers=[{auth:{type:'oauth2'}},{credentials:[]},{request:{credentials:'include'}},{auth:'Bearer'},{auth:{type:'bearer'}},{credentials:{username:'ops'}},{credentials:'same-origin'}];
+  const containers=[{auth:{type:'oauth2'}},{credentials:[]},{request:{credentials:'include'}},{auth:'Bearer'},{auth:{type:'bearer'}},{credentials:{username:'ops'}},{credentials:'same-origin'},{smtpServer:{auth:'true'}}];
   for(const value of [...support,...containers]){
     const bytes=Buffer.from(JSON.stringify({collection:[value]}));
     assert.deepEqual((await readFileSource({namespace:'archive',name:'event.json',format:'json',bytes,parse:()=>[{kind:'record',sourceId:'s',payload:value}]})).records[0].payload,value,'refuse mode');

@@ -539,7 +539,7 @@
     },
     "cli/business/vendors/credential-names.mjs": {
       "source": "cli/business/vendors/credential-names.mjs",
-      "sha256": "065d0b89a1441d30bea7195dac48629b7b94c7b4d23144bd1aa96eaa2c4ff0dd"
+      "sha256": "0aac0670f51ac73edb03a6ebdcfab7e9aac45e7ab3bcd2396be28ae368b0a3ee"
     },
     "cli/business/vendors/index.mjs": {
       "source": "cli/business/vendors/index.mjs",
