@@ -11,5 +11,6 @@ export function commandAdapter(lifecycle, options) {
  if (typeof ownerName === 'string' && ownerName.trim() && ownerName !== 'displayName') result.ownerBootstrap = false;
  result.verbs = Object.fromEntries(Object.entries(verbs).filter(([verb]) => !['export', 'import'].includes(verb) || typeof result.portability?.[verb] === 'function').map(([verb, definition]) => [verb, { flags: [...definition.flags] }]));
  result.verbs.release = { flags: [...releaseFlags] };
+ if (result.verbs.export && result.portability?.hostedExport !== undefined) result.verbs.export.effects = 'Export the local copy with --output, or run the declared hosted-export argv with --target remote. Hosted output keeps the seed\'s own format; the summary names its path and exit status.';
  return result;
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.72-dev.gb68e34db",
+  "cliVersion": "0.2.72-dev.gf3ccc6b8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -363,11 +363,11 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "68d59806ca82f477b374fbe9798e15e7ee4f96e2a47a68d1403ee49113c61ea4"
+      "sha256": "30407dc97df686729a061f50451da7e080552b3bb07533b8463e2214fa5c7e4e"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
-      "sha256": "ff2a5c98ce42cffe2f0db6802175d02d57221b27ad61011e73340652b86a780a"
+      "sha256": "305179d72c39e464f46af52255b79fe9091d58ca7e78b29dc1510a7a8c34abe9"
     },
     "cli/ai-local.mjs": {
       "source": "cli/ai-local.mjs",
@@ -787,7 +787,7 @@
     },
     "cli/export-summary.mjs": {
       "source": "cli/export-summary.mjs",
-      "sha256": "b75bd040388b1f330312c6a0b242b0d83ebe26664eb7b4af7e52e595e2b142e0"
+      "sha256": "4e24a230b5f4972b8be91673856ba22f68d37b536b3958c55eb6578345e9bf75"
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
@@ -797,9 +797,13 @@
       "source": "cli/font-cache.mjs",
       "sha256": "e540e9b5e48d9c27c0b54ca52d12c25273b917004111ebc389c25d08f67b5ada"
     },
+    "cli/hosted-export-command.mjs": {
+      "source": "cli/hosted-export-command.mjs",
+      "sha256": "fde8e7add8c825bb6f47f968ab8124be5278e2d5796fcbb113654f372052fb7d"
+    },
     "cli/hosted-export.mjs": {
       "source": "cli/hosted-export.mjs",
-      "sha256": "7337d05a4210c4a7cefbd0be0edec21f9a7e45337f87981be0d938b4ab81e8d5"
+      "sha256": "85f7a9f2fef863b73c7ecd83fc01312f62db05a26a43badf62bbb524eea568b4"
     },
     "cli/hosted-mail.mjs": {
       "source": "cli/hosted-mail.mjs",
@@ -847,7 +851,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "e5e379fdcf7d92a1adce7635c20dfe639847d8fdf263d8828b51f25b8b9be1cc"
+      "sha256": "1e9d8d0664acaf0d979852f7c7c8bb9c7edabf397d113a6f91a1342c88f1ddd4"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -871,7 +875,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "e1b4f653648f9327e2aa964effb3cc34c576f0919af2572350d5b232981c9c50"
+      "sha256": "9812a827063ab2ad997ce0ffe6aa6555864ecb540714c07dddb5668d89ceeb63"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -895,7 +899,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "b553b79e8615791d7873ccf4b6b5182eb41ed2a20848fe43288f62f65dfd89c6"
+      "sha256": "b98aedaa2f32de522638f7b2cec7be09c0b655a9a85eaa9af60fe66cb11a44a2"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
@@ -1087,7 +1091,7 @@
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
-      "sha256": "8df8f10fc853aacd7a3f52700e25d7c85a79d1e07ba23bc29c847189410c3aed"
+      "sha256": "bf0a4727930d749563a0c675b1b0715350bc1b4321154dea653d154fdc7e878b"
     },
     "cli/version.mjs": {
       "source": "cli/version.mjs",

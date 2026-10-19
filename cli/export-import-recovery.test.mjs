@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, copyFile, link, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, link, readFile, readdir, realpath, stat, symlink, writeFile } from 'node:fs/promises';
 import { parseJsonc } from './jsonc.mjs';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
@@ -10,6 +10,58 @@ import { createHash } from 'node:crypto';
 
 const stagingTables = async seed => (await seed.data("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*' ORDER BY name"))[0].results;
 const manifest = async (seed, file) => JSON.parse((await readFile(join(seed.root, file), 'utf8')).split('\n')[0]);
+
+test('rer export --target remote runs only a declared checkout script and preserves its outcome', { timeout: 5 * 60_000 }, async t => {
+ const seed = await portabilityFixture(t), adapterPath = join(seed.root, 'scripts/installer/local.mjs');
+ const adapter = await readFile(adapterPath, 'utf8');
+ // An undeclared seed keeps its existing public refusal, before writing anything.
+ await seed.text(['export', '--target', 'remote', '--output', 'exports/h.rer'], 2);
+ await assert.rejects(stat(join(seed.root, 'exports/h.rer')), { code: 'ENOENT' });
+ await writeFile(join(seed.root, 'scripts/hosted-export.mjs'), `
+import { mkdir, writeFile } from 'node:fs/promises';
+const args = process.argv.slice(2), output = args[args.indexOf('--out') + 1];
+if (args.includes('--directory')) await mkdir(output);
+await writeFile(args.includes('--directory') ? output + '/manifest.json' : output, JSON.stringify({ args, cwd: process.cwd() }));
+console.log('Hosted data saved');
+console.error('Hosted export progress');
+if (args.includes('--fail')) process.exit(7);
+`);
+ const declare = value => writeFile(adapterPath, adapter + '\ncommandAdapter.portability.hostedExport = ' + JSON.stringify(value) + ';\n');
+ await declare(['node', 'scripts/hosted-export.mjs']);
+ const shown = await seed.text(['export', '--target', 'remote', '--output', 'exports/h.rer', '--origin', 'https://hosted.example.test']);
+ const saved = JSON.parse(await readFile(join(seed.root, 'exports/h.rer'), 'utf8'));
+ assert.deepEqual(saved.args, ['--remote', '--environment', 'production', '--out', 'exports/h.rer', '--origin', 'https://hosted.example.test']);
+ assert.equal(saved.cwd, await realpath(seed.root));
+ assert.match(shown.stderr, /Hosted data saved[^]*Hosted export progress|Hosted export progress[^]*Hosted data saved/);
+ assert.match(shown.stdout, /Exported the hosted install at https:\/\/hosted\.example\.test to exports\/h\.rer .*exit 0/);
+ const checked = (await seed.run(['check'])).at(-1);
+ assert.ok(checked.clauses.find(row => row.id === 'SC-08.hosted-export')?.ok);
+ // Plain export still uses the local portability implementation with the hook declared.
+ const local = (await seed.run(['export', '--output', 'exports/local.rer'])).at(-1);
+ assert.equal(local.target, 'local');
+ assert.ok(local.contentHash);
+ const implicit = (await seed.run(['export', '--target', 'remote'])).at(-1);
+ assert.equal(implicit.target, 'remote');
+ assert.ok((await stat(join(seed.root, implicit.output))).isFile());
+ await declare(['node', 'scripts/hosted-export.mjs', '--directory']);
+ const directory = (await seed.run(['export', '--target', 'remote', '--output', 'exports/native'])).at(-1);
+ assert.equal(directory.output, 'exports/native');
+ assert.ok((await stat(join(seed.root, directory.output, 'manifest.json'))).isFile());
+ await declare(['node', 'scripts/hosted-export.mjs', '--fail']);
+ const failed = await seed.text(['export', '--target', 'remote', '--output', 'exports/failed.rer'], 7);
+ assert.match(failed.stdout, /hosted install[^]*exports\/failed\.rer[^]*exit 7/);
+ // Invalid argv and script paths fail conformance and execution before a child can write.
+ await writeFile(join(seed.root, '../outside.mjs'), "import { writeFile } from 'node:fs/promises'; await writeFile('exports/escaped', 'ran');\n");
+ await symlink(join(seed.root, '../outside.mjs'), join(seed.root, 'scripts/linked-export.mjs'));
+ for (const value of [['node', '../outside.mjs'], ['node', join(seed.root, 'scripts/hosted-export.mjs')], ['node', 'scripts/linked-export.mjs'], 'node scripts/hosted-export.mjs']) {
+  await declare(value);
+  const invalid = (await seed.run(['check'], 1)).at(-1);
+  assert.equal(invalid.clauses.find(row => row.id === 'SC-08.hosted-export')?.ok, false);
+  await seed.text(['export', '--target', 'remote', '--output', 'exports/refused.rer'], 4);
+  await assert.rejects(stat(join(seed.root, 'exports/refused.rer')), { code: 'ENOENT' });
+  await assert.rejects(stat(join(seed.root, 'exports/escaped')), { code: 'ENOENT' });
+ }
+});
 
 test('import requires an explicit remote target for a non-local origin and leaves the checkout untouched', { timeout: 10 * 60_000 }, async t => {
  const seed = await portabilityFixture(t);

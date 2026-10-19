@@ -103,6 +103,19 @@ destination refuses rows erased since. Erasure-fence refusals (`erased_row`,
 available only when the adapter declares complete resource coverage; an
 unsupported target exits 4.
 
+A first-party adapter may also declare `portability.hostedExport` as an argv
+array, for example `['node', 'scripts/export.mjs']`. With that declaration,
+`rer export --target remote --output exports/hosted` runs the seed's script
+from the checkout root with `--remote --environment production --out exports/hosted`.
+`--origin URL` maps to `--origin URL`; the script is responsible for honoring it
+and selecting the hosted install. Without `--output`, rer chooses
+`exports/hosted-<ISO timestamp>` (colons and dots replaced by hyphens).
+The output can be a file or directory in the seed's format; no local archive
+format or restore compatibility is implied. The closing summary names the hosted
+install, output path and exit status, and the process returns the script's exit
+code. See the adapter contract in `export/SEED-COMMAND-CONTRACT.md` for the path
+and execution rules. Plain export and undeclared adapters keep their behavior.
+
 Import defaults to `--target local`. An explicit `--origin` is accepted for a
 local import only when it uses HTTP, its host is exactly `localhost`,
 `127.0.0.1` or `[::1]`, and its port matches this checkout's configured local
