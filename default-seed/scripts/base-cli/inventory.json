@@ -2647,7 +2647,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "23325aaed0292c48145307ceab07842adb4294f77cc9d93648345046f2cc334b"
+      "sha256": "89fb5abb74d72a5332938db185da8c156c33da1ad9448a97aab6b1a061af5318"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -2739,7 +2739,7 @@
     },
     "modules/portability/migration-statements.mjs": {
       "source": "modules/portability/migration-statements.mjs",
-      "sha256": "7ce888fb2ee1f12af2232cdedd2e03cb1d46bd4053b5e01d738f1882a49b0a8d"
+      "sha256": "f16cfab25175f243fdd731c8557d3a6f031467a1589d8bbefcf89282ef9b6727"
     },
     "modules/portability/payloads.mjs": {
       "source": "modules/portability/payloads.mjs",
