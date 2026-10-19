@@ -11,6 +11,7 @@ import { StringDecoder } from 'node:string_decoder'
 import { assertDistExcludesSecrets, readmeCommands } from './readme.mjs'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
 import { freePort } from '../ports.mjs'
+import { traceEnv } from '../stop-trace.mjs'
 import { servingLoadThreshold } from '../../scripts/base-cli/cli/server-resources.mjs'
 
 const execute = promisify(execFile)
@@ -65,7 +66,7 @@ export async function freshLocalProject(owner) {
   const env = {
     ...servingEnvironment,
     ...Object.fromEntries(['HTTP_PROXY','HTTPS_PROXY','NO_PROXY','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE'].filter(name=>process.env[name]).map(name=>[name,process.env[name]])),
-    PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true',
+    PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', ...traceEnv,
     RER_JOBS_DIR: join(directory, 'jobs'), RER_JOBS_LOAD_THRESHOLD: '100000', RER_JOBS_MIN_FREE_MEMORY_BYTES: '0',
     RER_SERVERS_DIR: join(directory, 'servers'),
     npm_config_child_concurrency: '1', npm_config_network_concurrency: '2',
@@ -93,7 +94,12 @@ export async function freshLocalProject(owner) {
       return output
     } finally { await stopOwnedProcess(child) }
   }
-  async function stop() { const current = worker; worker = undefined; await stopOwnedProcess(current) }
+  async function stop() {
+    const current = worker; worker = undefined
+    try { await stopOwnedProcess(current) } catch (error) {
+      await writes; process.stderr.write(`===== COMMANDS LOG TAIL =====\n${(await readFile(logPath, 'utf8')).split('\n').slice(-60).join('\n')}\n===== END =====\n`); throw error
+    }
+  }
   let documented
   async function start(origin, args = documented.dev) {
     await resources(env)
