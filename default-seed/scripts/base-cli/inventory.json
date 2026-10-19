@@ -2739,7 +2739,7 @@
     },
     "modules/portability/migration-statements.mjs": {
       "source": "modules/portability/migration-statements.mjs",
-      "sha256": "f16cfab25175f243fdd731c8557d3a6f031467a1589d8bbefcf89282ef9b6727"
+      "sha256": "5999fb521ed0c07c1c6c32a2c20a4f7619dff7b77d26f0bb803397c0bbdb5169"
     },
     "modules/portability/payloads.mjs": {
       "source": "modules/portability/payloads.mjs",

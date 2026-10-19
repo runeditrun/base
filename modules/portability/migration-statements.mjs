@@ -38,7 +38,7 @@ export function reachingTables(statements,restorable) {
   return [...reached];
 }
 const kindOf=words=>words.slice(0,4).filter(w=>!['temp','temporary','unique'].includes(w)).slice(0,2).join(' ');
-const identifiers=list=>list.flatMap(t=>t.quoted?(t.text.startsWith("'")?[]:[folded(identifier(t))]):folded(t.text).split(/[^a-z0-9_$\u0080-￿]+/).filter(Boolean));
+const identifiers=list=>list.flatMap(t=>t.quoted?(t.text.startsWith("'")?[]:[folded(identifier(t))]):folded(t.text).split(/[^a-z0-9_$\u0080-\uffff]+/).filter(Boolean));
 const names=(list,reached)=>identifiers(list).some(name=>reached.has(name));
 // Tokens with each unquoted ';' split out, and trailing ones dropped.
 function atoms(list) {
