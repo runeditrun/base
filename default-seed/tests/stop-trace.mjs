@@ -5,10 +5,10 @@ import { mkdtempSync, readFileSync, readdirSync, readlinkSync, appendFileSync, s
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 export const traceDir = mkdtempSync(join(tmpdir(), 'stop-trace-'))
-export const traceEnv = { STOP_TRACE_DIR: traceDir, NODE_OPTIONS: `--require ${fileURLToPath(new URL('./stop-trace-hook.cjs', import.meta.url))}` }
+// No preload: a SIGTERM listener in pnpm changes how pnpm exits on SIGTERM.
+export const traceEnv = {}
 const harness = join(traceDir, 'harness.log')
 export const trace = (m) => appendFileSync(harness, `${new Date().toISOString()} ${m}\n`)
 
