@@ -650,3 +650,103 @@ test('an agent exports a vendor into its app\'s import door: next names the owne
  assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
  await assert.rejects(readFile(join(home, 'fake-keychain.json')), { code: 'ENOENT' }, 'disconnect removes the vendor key');
 });
+
+test('an agent catches up and archives a vendor through its app\'s import door, and next names freeze, rollback cards and cancellation as the owner\'s steps with their links', async t => {
+ const remote = await fixtureServer(t), seed = await door(t), home = join(directory, 'switch-home'), stateDir = join(home, '.rer-business');
+ const env = { RER_BUSINESS_STATE_DIR: stateDir };
+ const vendorEnv = { ...env, NODE_OPTIONS: `--import=${join(fixture, 'register.mjs')} --import=${join(fixture, 'vendor-edge.mjs')}` };
+ await connect(home, remote, { env });
+ seed.state.stateDir = stateDir; remote.state.door = seed;
+ const key = 'fixture-uptimerobot-read-only-key-for-the-switch', outputs = [];
+ const added = await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: key + '\n', env }); outputs.push(added);
+ assert.equal(added.code, 0, added.stderr);
+ const completed = id => remote.state.requests.find(entry => entry.route === `/api/business/tasks/${encodeURIComponent(id)}/complete`);
+ const grantsAsked = id => remote.state.requests.filter(entry => entry.route === `/api/business/tasks/${encodeURIComponent(id)}/import-grants`).map(entry => entry.body);
+
+ // A move's owner steps: next names each with its link and run waits for it; neither offers it as agent work.
+ const board = `${remote.origin}/business/biz`, page = `${board}/moves/tool1`;
+ for (const [kind, title, words] of [['freeze.vendor', 'Freeze UptimeRobot before the switch', 'freeze UptimeRobot'], ['rollback.dns', 'Undo the DNS switch', 'rollback card'], ['switchoff.cancel', 'Cancel UptimeRobot', 'cancel UptimeRobot at the vendor']]) {
+  remote.state.tasks = [{ task_id: `biz:tool1:${kind}`, kind, state: 'ready', runner: 'owner', fence: 0, title, tool_id: 'tool1' }];
+  const next = await cli(home, ['business','next'], { env }), waited = await cli(home, ['business','run','--once'], { env }); outputs.push(next, waited);
+  assert.equal(next.code, 0, next.stderr); assert.equal(waited.code, 0, waited.stderr);
+  assert.ok((`\n${next.stdout}`).includes(`\nOwner: biz:tool1:${kind}\n`) && next.stdout.includes(words) && next.stdout.endsWith(`In the browser: ${page}\n`), next.stdout);
+  assert.ok(!next.stdout.includes('Agent:') && !next.stdout.includes('business run') && !next.stdout.includes('vendor-key'), next.stdout);
+  assert.ok(waited.stdout.includes(words) && waited.stdout.includes(page), waited.stdout);
+ }
+ remote.state.tasks = [{ task_id: 'biz:freeze', kind: 'freeze.vendor', state: 'ready', runner: 'owner', fence: 0, title: 'Freeze UptimeRobot before the switch' }];
+ const boardNext = await cli(home, ['business','next'], { env });
+ assert.ok(boardNext.stdout.endsWith(`In the browser: ${board}\n`), `a step that names no tool links the switch-over board: ${boardNext.stdout}`);
+ assert.equal(seed.state.requests.length, 0, 'no owner step reaches the door');
+
+ // A catch-up within the owner's standing approval: 10 new monitors on a 590-monitor import. Next names the agent's
+ // own step before an owner step listed ahead of it.
+ const ids = Array.from({ length: 600 }, (_, index) => String(800000 + index));
+ seed.state.baselines.set('uptimerobot', ids.slice(0, 590)); remote.state.standingApproval = true;
+ remote.state.tasks = [remote.state.tasks[0], { task_id: 'biz:tool1:catchup1', kind: 'catchup.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Bring over recent UptimeRobot changes' }];
+ const catchupNext = await cli(home, ['business','next'], { env }); outputs.push(catchupNext);
+ assert.ok((`\n${catchupNext.stdout}`).includes('\nAgent: biz:tool1:catchup1\n') && catchupNext.stdout.includes('catch-up') && catchupNext.stdout.includes("read-only UptimeRobot key is stored")
+  && /\nThen run: .*business run\n$/.test(catchupNext.stdout), catchupNext.stdout);
+ const bounded = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(bounded);
+ assert.equal(bounded.code, 0, bounded.stderr);
+ const [standing] = seed.state.plans;
+ assert.ok(standing.catchup && standing.standing && standing.records === 600, 'the door planned a catch-up under the standing approval');
+ assert.deepEqual(completed('biz:tool1:catchup1').body.outputs, { upload_id: standing.uploadId, plan_id: standing.planId, bundle_sha256: standing.bundleSha256 });
+ assert.deepEqual(JSON.parse(seed.state.requests.find(entry => entry.url === '/api/rer/import/plan').body), { uploadId: standing.uploadId, catchup: true });
+ assert.ok(bounded.stdout.includes('10 new') && bounded.stdout.includes('590 unchanged') && bounded.stdout.includes('standing catch-up approval'), bounded.stdout);
+
+ // Business applies it under the standing approval. The vendor is then unchanged: its export is the same bundle as
+ // that applied plan, and the door plans a catch-up of no changes for this upload, which run completes with.
+ seed.apply(standing.planId);
+ remote.state.tasks = [{ task_id: 'biz:tool1:catchup-unchanged', kind: 'catchup.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Bring over recent UptimeRobot changes' }];
+ const quiet = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(quiet);
+ assert.equal(quiet.code, 0, quiet.stderr);
+ const unchanged = seed.state.plans.at(-1), latest = [...seed.state.uploads.values()].at(-1);
+ assert.ok(unchanged.planId !== standing.planId && unchanged.bundleSha256 === standing.bundleSha256 && unchanged.uploadId === latest.id, 'the same bundle planned afresh for this upload');
+ assert.ok(unchanged.catchup && unchanged.standing, 'the door planned a catch-up under the standing approval');
+ assert.deepEqual(unchanged.preview.summary, { sourceRecords: 600, created: 0, updated: 0, unchanged: 600, gone: 0 });
+ assert.deepEqual(completed('biz:tool1:catchup-unchanged').body.outputs, { upload_id: latest.id, plan_id: unchanged.planId, bundle_sha256: unchanged.bundleSha256 });
+ assert.ok(/(?:^|\D)0 new/.test(quiet.stdout) && quiet.stdout.includes('600 unchanged') && quiet.stdout.includes('standing catch-up approval'), quiet.stdout);
+ seed.apply(unchanged.planId);
+
+ // A catch-up beyond the bound (100 new on 500): the door refuses the standing approval, and run asks for a plan the owner reviews.
+ seed.state.baselines.set('uptimerobot', ids.slice(0, 500));
+ remote.state.tasks = [{ task_id: 'biz:tool1:catchup2', kind: 'catchup.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Bring over recent UptimeRobot changes' }];
+ const plansBefore = seed.state.plans.length;
+ const reviewed = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(reviewed);
+ assert.equal(reviewed.code, 0, reviewed.stderr);
+ assert.deepEqual(grantsAsked('biz:tool1:catchup2').filter(body => body.action === 'plan').map(body => body.review ?? false), [false, true]);
+ const review = seed.state.plans.at(-1), plans = seed.state.requests.filter(entry => entry.url === '/api/rer/import/plan').slice(-2).map(entry => JSON.parse(entry.body));
+ assert.ok(seed.state.plans.length === plansBefore + 1 && review.catchup && !review.standing, 'only the reviewed catch-up plan was kept');
+ assert.deepEqual(plans, [{ uploadId: review.uploadId, catchup: true }, { uploadId: review.uploadId, catchup: true }]);
+ assert.deepEqual(completed('biz:tool1:catchup2').body.outputs, { upload_id: review.uploadId, plan_id: review.planId, bundle_sha256: review.bundleSha256 });
+ assert.ok(reviewed.stdout.includes('100 new') && reviewed.stdout.includes('5% or more') && reviewed.stdout.includes(`approves this catch-up in the browser: ${board}`), reviewed.stdout);
+
+ // The archive: the final export kept by the door and test-restored, by this computer and again by Business.
+ remote.state.tasks = [{ task_id: 'biz:tool1:archive', kind: 'switchoff.archive', state: 'ready', runner: 'executor', fence: 0, title: 'Archive UptimeRobot before switching it off' }];
+ const archiveNext = await cli(home, ['business','next'], { env }); outputs.push(archiveNext);
+ assert.ok((`\n${archiveNext.stdout}`).includes('\nAgent: biz:tool1:archive\n') && archiveNext.stdout.includes('archive') && /\nThen run: .*business run\n$/.test(archiveNext.stdout), archiveNext.stdout);
+ const doorBefore = seed.state.requests.length;
+ const archived = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(archived);
+ assert.equal(archived.code, 0, archived.stderr);
+ const [kept] = seed.state.archives.values(), upload = seed.state.uploads.get(kept.uploadId);
+ assert.equal(kept.tool, 'uptimerobot'); assert.ok(kept.bytes.equals(upload.bytes), 'the archive is the exact uploaded export');
+ assert.deepEqual(completed('biz:tool1:archive').body.outputs, { archive_id: kept.id, bundle_sha256: upload.bundleSha256 });
+ const calls = seed.state.requests.slice(doorBefore).map(entry => entry.url.slice('/api/rer/import/'.length));
+ assert.deepEqual(calls, [...Array(upload.totalChunks).fill('uploads'), 'archive', 'restore-check']);
+ assert.deepEqual(grantsAsked('biz:tool1:archive').map(body => body.action), calls, 'each door request had its own grant from Business');
+ assert.equal(seed.state.restoreChecks, 2, 'this computer and then Business test-restored the archive');
+ assert.equal(seed.state.nativeWrites, 0, 'neither catch-up planning nor the archive wrote anything native');
+ assert.ok(archived.stdout.includes(`business-archive/uptimerobot/${kept.takenAt}`) && archived.stdout.includes('test-restored with no writes'), archived.stdout);
+ assert.equal(remote.state.phase, 'done');
+
+ // Nothing secret is printed, sent or kept, and every bundle was a private 0600 file that is gone after completion.
+ const printed = outputs.map(result => result.stdout + result.stderr).join('');
+ assert.ok(!printed.includes(key) && !printed.includes('Fixture monitor'), 'neither the key nor vendor records are printed');
+ assert.ok(!JSON.stringify(remote.state.requests).includes(key) && !JSON.stringify(seed.state.requests).includes(key), 'the key reaches neither Business nor the door');
+ assert.ok(seed.state.bundleModes.length >= 6 && seed.state.bundleModes.every(mode => mode === 0o600), JSON.stringify(seed.state.bundleModes));
+ for (const name of await readdir(stateDir)) {
+  assert.ok(!name.endsWith('.bundle'), `${name}: bundles are removed after completion`);
+  assert.ok(!(await readFile(join(stateDir, name), 'utf8')).includes(key), `${name} holds no key`);
+ }
+ assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
+});
