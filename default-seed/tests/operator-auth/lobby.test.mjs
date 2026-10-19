@@ -2,6 +2,24 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { emittedRuntime, setupToken, owner } from './emitted-runtime.mjs'
 
+test('the claimed Lobby offers project-folder recovery only on this computer', async () => {
+  for (const [options, local] of [[{ hostname: 'localhost', noMail: true }, true], [{ demoHost: true }, false]]) {
+    const runtime = await emittedRuntime(options)
+    try {
+      const claim = await runtime.call('/auth/bootstrap', {
+        method: 'POST', input: { token: setupToken, displayName: 'Morgan' },
+      })
+      assert.equal(claim.status, 303)
+      const response = await runtime.call('/')
+      assert.equal(response.status, 200)
+      const html = await response.text()
+      assert.match(html, /data-state="claimed"/)
+      if (local) assert.match(html, /<code>rer signin<\/code>/)
+      else assert.doesNotMatch(html, /rer signin/)
+    } finally { await runtime.close() }
+  }
+})
+
 test('the installed Lobby offers sign-in as soon as the owner is claimed, before first-run confirmation', async () => {
   const runtime = await emittedRuntime({ noMail: true })
   try {

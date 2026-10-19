@@ -6,6 +6,7 @@ import { legacyTargetState, requireLegacyEmpty } from '../modules/portability/le
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
 import { appliedMigrations as appliedMigrationNames } from '../modules/portability/bridge.mjs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createPortability, PortabilityError, readArchive } from '../modules/portability/index.mjs';
@@ -14,13 +15,16 @@ import { nativeFailure, stateBytes } from './portability-progress.mjs';
 import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
 
-// The migrations this installation applied, in its ledger's order, so a
-// restore can place an older archive within them.
+// The migrations this installation applied, in its ledger's order, with each
+// file's hash, so a restore can place an older archive within them.
 async function appliedMigrations(root, db, binding, split) {
  const config = parseJsonc(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
  const directory = join(root, config.d1_databases.find(entry => entry.binding === binding).migrations_dir ?? 'migrations');
  const names = await appliedMigrationNames(db) ?? [];
- return Promise.all(names.map(async name => ({ name, statements: split(await readFile(join(directory, name), 'utf8')) })));
+ return Promise.all(names.map(async name => {
+  const bytes = await readFile(join(directory, name));
+  return { name, statements: split(bytes.toString('utf8')), sha256: createHash('sha256').update(bytes).digest('hex') };
+ }));
 }
 
 // Transfers read only the D1 database and R2 buckets. A configuration with just
@@ -81,8 +85,10 @@ catch (error) {
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
  // A populated destination names its table or bucket: schema names, never row data.
  const occupied = error instanceof PortabilityError && /^(target|bucket)_not_empty:/.test(error.code) ? error.code.slice(error.code.indexOf(':') + 1) : undefined;
+ // Safety diagnostics contain only policy schema names, never source values.
+ const safety = error instanceof PortabilityError && error.code.startsWith('import_row_') ? error.code.slice(error.code.indexOf(':')+1) : undefined;
  // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
  const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), ...(native ? { native } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
 }

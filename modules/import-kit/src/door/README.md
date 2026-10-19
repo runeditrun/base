@@ -226,16 +226,20 @@ All bodies are JSON. Quotas are admission limits, not a hosted capacity promise.
 `plan` reads the upload with the kit's `credentials: 'remove'`. A credential
 field holding null, an empty string or a mask is not a credential and imports as
 it is. A real value is removed from its record, which is kept: a credential-named
-field is dropped: any key whose letters end in a credential word (`apiKey`,
-`httpPassword`, `http_password`, `client_secret`, `X-Api-Key`, `pushToken`,
-`integration_key`, `webhook_url`, `secret_key`, `x-functions-key`,
-`Ocp-Apim-Subscription-Key`, `pwd` and the like) or are `X-Auth`; a plural
+field is dropped: any key whose whole name parts are a credential word or
+phrase (`apiKey`, `httpPassword`, `http_password`, `client_secret`, `X-Api-Key`,
+`pushToken`, `integration_key`, `webhook_url`, `secret_key`, `x-functions-key`,
+`Ocp-Apim-Subscription-Key`, `pwd`, `X-Auth` and the like; `Signature` and
+`Session-Id` only as header names, so an agent's `signature` field stays; `auth`
+and `credentials` only when they hold a credential, so `auth: {type: 'oauth2'}`
+stays and `auth: {token}` loses its token); a plural
 (`apiKeys: [...]`, `tokens: [...]`) when it holds text, so a count such as
 `tokens: 1500` stays; the `value` of a `{name|key, value}` pair naming one
 (`{name: 'Authorization', value}`), and the value of such a `[name, value]`
 pair in a list of them (Sentry's header tuples). Booleans stay, and names
-merely containing such letters (`keyword`, `monkey`, `signal`, `design`) are
-not credential names. A URL of any scheme, after leading whitespace, loses its
+merely containing such letters (`keyword`, `monkey`, `author`, `signal`, `design`,
+`primaryKey`) are not credential names, so a keyword monitor's `?keyword=up` URL
+imports intact. A URL of any scheme, after leading whitespace, loses its
 user name and password and its credential query and fragment parameters
 (`api_key`, `access_token`, `sig` and the like), including the `removed@` and
 `?api_key=removed` markers rer's vendor exports leave. Each removal is a

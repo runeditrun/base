@@ -249,16 +249,36 @@ append-only (no update, delete or insert over an existing key). A batch that
 rewrites or retires custody carries the product's restore checkpoint, so an
 archive older than the erasure is refused whole under the later journal.
 
-Credential keys are the exact names `token`, `access_token`, `refresh_token`,
-`authorization`, `cookie`, `password`, `api_key`/`apiKey` and `secret`, their
-plurals holding text (`tokens: [...]`, `apiKeys: [...]`), any name with
-`secret`, `subscription` or `functions` before `key` (`secret_key`,
-`x-functions-key`, `Ocp-Apim-Subscription-Key`), `X-Auth` and `pwd`, under an
-object key or as the name of a `[name, value]` pair in a list of them; `sig`
-joins the credential query keys. Names merely containing such letters
-(`keyword`, `monkey`, `signal`, `design`) are not credential keys.
-Credential-key validation permits a JSON boolean under the exact key `secret`,
-a common noncredential visibility flag, and null, an empty string or a mask
+Credential keys are names whose whole parts are a credential word or phrase
+(see `README.md`, "Credential names"): the name is split at camelCase, `_`, `-`,
+`.`, spaces and digits. Refuse mode takes the whole name, after an optional
+header `x-`, as the phrase: `token`, `access_token`, `refresh_token`,
+`authorization`, `cookie`, `password`, `api_key`/`apiKey`, `secret`, `bearer`,
+`X-Auth`, `X-Auth-Token`, `httpPassword`, `client_secret`, `private_key`,
+any name with `secret`, `subscription` or `functions` before `key`
+(`secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`), `pwd`,
+`passphrase`, `jwt`, `JSESSIONID` and `PHPSESSID`, and
+their plurals holding text (`tokens: [...]`, `apiKeys: [...]`), under an object
+key or as the name of a `[name, value]` pair in a list of them. `sessionId` and
+`sig`/`signature` are credential keys only as HTTP header names (a
+`[name, value]` pair, a key under `headers`, a `{name|key, value}` pair in a
+header list) and URL keys, never as record fields; a `{name|key, value}` pair
+elsewhere (Help Scout's `customFields`) labels a field. `auth` and
+`credentials` count only when their value is text naming no scheme or mode (not
+`include` or `oauth2`), or a list with such a member; an object under them is
+checked field by field, and directly under them a `value`, `pass`, `pw` or
+`secret…` member (Keycloak's `credentials: [{type: 'password', value}]`,
+`secretData`, nodemailer's `{user, pass}`) is a credential too. A URL query or fragment key is a
+credential when it ends in such a phrase, or is a bare `key`, ends in
+`sig`/`signature` (`X-Amz-Signature`), has `application`, `user`, `account`,
+`deploy` or `shared` before `key`, or `token`, `basic`, `http`, `proxy` or
+`api` before `auth`, or is one part ending in `apikey`, `accesstoken` or
+`authtoken` (`hapikey`). Names merely containing such letters
+(`keyword`, `monkey`, `author`, `signal`, `design`, `tokenizer`, `primaryKey`,
+`sortKey`) are not credential keys, and neither is a longer name such as the
+pagination cursor `next_page_token`.
+Credential-key validation permits a JSON boolean (a common noncredential
+visibility flag such as `secret: true`), and null, an empty string or a mask
 (`****`, `[redacted]`, `[removed]` and similar) under any credential key: they sit
 where a credential would go but are not one. Every other value under a credential
 key and credential-bearing URLs remain forbidden, including in raw file/API
@@ -266,8 +286,8 @@ originals excluded by a parser. Accepted originals remain exact.
 
 `readFileSource` with `credentials: 'remove'` (the import door's choice) keeps a
 record holding a plain credential value instead. It casts a wider net than the
-refusal above: it drops any field whose name's letters end in a credential word
-(`httpPassword`, `client_secret`, `X-Api-Key`) or its plural holding text
+refusal above: it drops any field whose name's parts end in a credential word or
+phrase (`httpPassword`, `client_secret`, `X-Api-Key`, `pushToken`) or its plural holding text
 (`apiKeys: [...]`), the `value` of a `{name|key, value}` pair naming one or of
 such a `[name, value]` pair in a list of them, and a URL's (any scheme's) user name, password and
 credential query and fragment parameters, keeping booleans. It reports each
