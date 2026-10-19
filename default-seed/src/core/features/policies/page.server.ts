@@ -70,7 +70,7 @@ function paginationHtml(history: RunListing, before: string | null): string {
 
 async function page(content: string, status = 200, head = false): Promise<Response> {
   const frame = await themeFrame(theme)
-  const body = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scheduled policies · ${escape(identity.product)}</title>${frame.head}</head><body><main>${frame.brand}<h1>Scheduled policies</h1>${content}<p><a href="/app">Back to the operator app</a></p></main></body></html>`
+  const body = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scheduled policies · ${escape(identity.product)}</title>${frame.head}<link rel="stylesheet" href="/policies.css"></head><body><main class="scheduled-policies">${frame.brand}<h1>Scheduled policies</h1>${content}<p><a href="/app">Back to the operator app</a></p></main></body></html>`
   return new Response(head ? null : body, { status, headers: { ...headers, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': `default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; ${frame.policy}` } })
 }
 
