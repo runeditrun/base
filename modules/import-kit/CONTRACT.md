@@ -144,8 +144,9 @@ changed records replace only rows the import created, fenced by their original
 provenance revision and native values. Missing source records are listed, never
 deleted. One plan remains pending per logical namespace until applied or undone;
 kit job state recovers the lineage after interrupted calls. The same bundle
-reuses its exact retained plan; changing mapping requires a fresh explicit
-namespace and review. Undo proceeds newest first and preserves native edits.
+reuses its exact retained plan unless its apply failed or its import was undone
+or rolled back; changing mapping requires a fresh explicit namespace and review.
+Undo proceeds newest first and preserves native edits.
 
 Bounded catch-up requires a nonempty prior snapshot and a standing owner approval
 record and time. It refuses gone, conflicting, rejected or unmapped records and
@@ -244,10 +245,33 @@ append-only (no update, delete or insert over an existing key). A batch that
 rewrites or retires custody carries the product's restore checkpoint, so an
 archive older than the erasure is refused whole under the later journal.
 
+Credential keys are the exact names `token`, `access_token`, `refresh_token`,
+`authorization`, `cookie`, `password`, `api_key`/`apiKey` and `secret`, their
+plurals holding text (`tokens: [...]`, `apiKeys: [...]`), any name with
+`secret`, `subscription` or `functions` before `key` (`secret_key`,
+`x-functions-key`, `Ocp-Apim-Subscription-Key`), `X-Auth` and `pwd`, under an
+object key or as the name of a `[name, value]` pair in a list of them; `sig`
+joins the credential query keys. Names merely containing such letters
+(`keyword`, `monkey`, `signal`, `design`) are not credential keys.
 Credential-key validation permits a JSON boolean under the exact key `secret`,
-a common noncredential visibility flag. Every nonboolean value under that key,
-other credential keys and credential-bearing URLs remain forbidden, including in
-raw file/API originals excluded by a parser. Accepted originals remain exact.
+a common noncredential visibility flag, and null, an empty string or a mask
+(`****`, `[redacted]`, `[removed]` and similar) under any credential key: they sit
+where a credential would go but are not one. Every other value under a credential
+key and credential-bearing URLs remain forbidden, including in raw file/API
+originals excluded by a parser. Accepted originals remain exact.
+
+`readFileSource` with `credentials: 'remove'` (the import door's choice) keeps a
+record holding a plain credential value instead. It casts a wider net than the
+refusal above: it drops any field whose name's letters end in a credential word
+(`httpPassword`, `client_secret`, `X-Api-Key`) or its plural holding text
+(`apiKeys: [...]`), the `value` of a `{name|key, value}` pair naming one or of
+such a `[name, value]` pair in a list of them, and a URL's (any scheme's) user name, password and
+credential query and fragment parameters, keeping booleans. It reports each
+per record as a `CREDENTIAL_REMOVED` warning diagnostic (field pointer and kind,
+never the value), and withholds the file's original bytes as
+`{ status: 'unavailable', reason: 'credentials-removed' }`. A record that still
+repeats a removed value, or a credential in a form it cannot remove (encoded or
+nested in a query value), still fails.
 
 Public D1 planning is SELECT-only and checks the current SQL `plan` grant before
 mapping and before returning. A different `read` grant cannot substitute for it.

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.66",
+  "cliVersion": "0.2.67-dev.gr-base-lander-44",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -527,15 +527,15 @@
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
-      "sha256": "69f2e782c009f92a2d38b1e423e952ca0eae0f1aa07a27d6db7de9cea227118f"
+      "sha256": "a072ccf0538fc6b55aded465b48020e4477603c547d18d0f69f2eb7d1e6b86f2"
     },
     "cli/business/vendors/calendly.mjs": {
       "source": "cli/business/vendors/calendly.mjs",
-      "sha256": "8badcaeab56c16084f1bc420d1d7454b7fcc5b439598d9f3598a7a5754a913d7"
+      "sha256": "aeb08332caba53b6dbc36c0b26097d0dac468f1de42016e4a5011ab9747e37fe"
     },
     "cli/business/vendors/common.mjs": {
       "source": "cli/business/vendors/common.mjs",
-      "sha256": "f07670c758ef1fdef00157ea4bef93369ecb836af6d352ff28c2935ffa8d790a"
+      "sha256": "fafc5ec264f522eb4c673cf396b7064f5f4c0b943c76e4ce70a4e1d5bf0b3ec4"
     },
     "cli/business/vendors/index.mjs": {
       "source": "cli/business/vendors/index.mjs",
@@ -543,15 +543,15 @@
     },
     "cli/business/vendors/pagerduty.mjs": {
       "source": "cli/business/vendors/pagerduty.mjs",
-      "sha256": "313a56ef30c7ead91b0665c810373941d8620bc8f3e1994d509bb2ece4d4a239"
+      "sha256": "fc95a8e1d61a01dca9dc33a138108a899e18745ded23a119e8ba6313542b4ab7"
     },
     "cli/business/vendors/sentry.mjs": {
       "source": "cli/business/vendors/sentry.mjs",
-      "sha256": "851f969f9fa26ac229749b0e3f1cf9bfd3f18e12e7bdc938a73175b9fb904295"
+      "sha256": "bc4a4530efe0258a0f2df48277ff6109618085df12dae798ed2c491855ad9fd6"
     },
     "cli/business/vendors/uptimerobot.mjs": {
       "source": "cli/business/vendors/uptimerobot.mjs",
-      "sha256": "a4a3f68046853279600404ade5521c551bea84d57a078569a7eecf5f24ba3dc4"
+      "sha256": "a1ae9ed6b8db476306832a1c856ab02907a3c11ba45bef489e64840a1e7d7354"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",

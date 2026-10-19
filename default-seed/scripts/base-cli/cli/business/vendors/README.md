@@ -57,6 +57,30 @@ emission. HTTP errors contain only a fixed code and numeric status; network,
 parsing and unexpected errors never expose response text, URLs or key values.
 429 stops with `RATE_LIMITED`; there is no hidden retry loop.
 
+## Credentials in responses
+
+Every adapter strips credential values from a parsed response before it emits
+bytes for upload, keeping the record, by the same rules as the seed's import
+door. A field whose name's letters end in a credential word (`apiKey`,
+`httpPassword`, `http_password`, `client_secret`, `X-Api-Key`, `integration_key`,
+`webhook_url`, `secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`,
+`pwd` and the like) or are `X-Auth`, the `value` of a `{name|key, value}` pair
+naming one (`{name: 'Authorization', value}`), or the value of such a
+`[name, value]` pair in a list of them (Sentry's header tuples), becomes
+`"[removed]"`. A plural name (`apiKeys`, `tokens`) counts only when it holds
+text, so a count such as `tokens: 1500` stays. A URL of any scheme keeps a
+marker where each credential was: its user name and password become `removed@`,
+and the value of each credential query or fragment parameter (`api_key`,
+`access_token`, `sig` and the like) becomes `removed`
+(`?api_key=removed&region=eu`, `#access_token=removed`), except the adapter's
+own validated pagination keys (`page_token`). The door drops each marker and
+reports it per record as `CREDENTIAL_REMOVED`, so the owner sees which record
+lost a credential. Null, booleans, empty strings and masks such as `****` are
+not credentials and stay as they are. Names that merely contain such letters
+(`keyword`, `monkey`, `signal`, `design`) are not credential names.
+Pagination is read from the response as received, so a credential-bearing
+pagination link is still refused.
+
 ## Inputs and native coverage
 
 * `sentry`: `organization: {id, slug, region: 'us'|'de'}`, `start`, `end`, and
@@ -75,8 +99,8 @@ parsing and unexpected errors never expose response text, URLs or key values.
   with layers/final coverage, overrides for the window and escalation policies.
   Schedule listing only discovers IDs and is not duplicated in the bundle.
   Overrides retain full boundaries with `overflow=true` and add `schedule_id`,
-  as Oncall's documented bundle requires. Credential-bearing response fields
-  refuse the export. Incident history and paging configuration are not fetched.
+  as Oncall's documented bundle requires. Incident history and paging
+  configuration are not fetched.
 * `calendly`: optional `asOf` timestamp (recommended for a repeatable catch-up).
   An omitted timestamp is captured at first invocation and retained on resume.
   Downloads the current user, event types, availability schedules, per-type

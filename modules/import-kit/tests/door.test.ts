@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
 import { createImportDoorHandler, DoorError, enableDoorAtFirstClaim, importDoorApplyFailureMigration, importDoorSchema, readImportDoorHistory, verifyRerGrant, writeImportDoorSettings } from '../src/door/index.ts';
-import { d1RequestContext, readD1ImportOriginals, readD1ErasureJournal, retireD1ImportCustody, undoD1Import } from '../src/d1/index.ts';
+import { d1RequestContext, readD1ImportJob, readD1ImportOriginals, readD1ErasureJournal, retireD1ImportCustody, undoD1Import } from '../src/d1/index.ts';
 import { limitStatements } from '../src/d1/budget.ts';
 import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
 import { sqliteTargets } from './d1/sqlite-runtime.ts';
-import type { Json } from '../src/types.ts';
+import type { ImportMapping, Json, ParsedRecord } from '../src/types.ts';
 
 test('HTTP import door is absent until the installation opts in',async t=>{
   const d=await door(t);
@@ -880,6 +880,28 @@ test('owner-session HTTP pipeline works in a seed with no owner-claim module or 
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
   const originals=await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace});
   assert.equal(originals[0].original.status,'retained');
+  // An undone import is never reused: the same file imports again after undo.
+  const again=await d.plan(documents(25,true));
+  assert.equal(again.status,200,JSON.stringify(again.body));assert.notEqual(again.body.planId,replanned.body.planId);
+  assert.equal((await d.apply(again.body)).state,'completed');assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,25);
+  // An erasure withdrew the live import's snapshot. The owner's plan of the same
+  // file without the erased person is refused at plan time, by name, while the
+  // earlier import still holds its records; nothing is retired. After that
+  // import's undo, the same upload plans and applies.
+  await retireD1ImportCustody({target:{kind:'record',id:'0'}},[{sql:"DELETE FROM native_records WHERE id='0'"}],d.runtime.context(),checkpoint);
+  const remaining=await d.upload(documents(25,true).filter(record=>record.id!=='0')),held=await d.call('plan',{uploadId:remaining});
+  assert.deepEqual([held.status,held.body.error,held.body.details.planIds],[409,'earlier_import_holds_records',[again.body.planId]],JSON.stringify(held.body));
+  assert.match(held.body.details.reason,/Undo the earlier import first/);
+  assert.equal(d.runtime.native().prepare('SELECT head_id FROM ik_door_namespaces').get()!.head_id,again.body.planId,'nothing is retired');
+  await d.undo(again.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
+  const rebaselined=await d.call('plan',{uploadId:remaining});
+  assert.equal(rebaselined.status,200,JSON.stringify(rebaselined.body));assert.deepEqual(rebaselined.body.summary,{sourceRecords:24,created:24,updated:0,unchanged:0,gone:0});
+  assert.equal((await d.apply(rebaselined.body)).state,'completed');assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,24);
+  // A plan writing no record an earlier import holds starts a new baseline
+  // instead of a permanent 410 (Business catch-ups keep the 410).
+  await retireD1ImportCustody({target:{kind:'record',id:'1'}},[{sql:"DELETE FROM native_records WHERE id='1'"}],d.runtime.context(),checkpoint);
+  const baseline=await d.plan([{id:'fresh',title:'After the erasure'}]);
+  assert.equal(baseline.status,200,JSON.stringify(baseline.body));assert.deepEqual(baseline.body.summary,{sourceRecords:1,created:1,updated:0,unchanged:0,gone:0});
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
   assert.equal(d.runtime.native().prepare('SELECT enabled FROM ik_door_settings').get()!.enabled,0);
 });
@@ -985,4 +1007,222 @@ test('one owner-session mount serves several import sources chosen per request f
   assert.equal((await d.call('status',{planId:businessTickets.body.planId})).status,404);
   await d.undo(businessWiki.body.planId);await d.undo(wiki.body.planId);assert.equal(count('native_records'),4);
   d.state.headers={'X-Import-Source':'tickets'};await d.undo(businessTickets.body.planId);await d.undo(tickets.body.planId);assert.equal(count('native_records'),0);
+});
+
+// UptimeRobot v3 monitor pages as Uptime's door receives them: NDJSON pages whose
+// every monitor carries `apiKey: null`, with one monitor checking a user:pass@ URL.
+const uptimeKey='test-uptimerobot-account-key',uptimePassword='test-basic-auth-password';
+const monitor=(id:number,extra:Record<string,Json>={}):Record<string,Json>=>({id,friendlyName:`Monitor ${id}`,type:'HTTP',url:`https://shop.example.com/${id}`,interval:300,
+  authType:'NONE',customHttpHeaders:null,psps:[{id:5,isPasswordSet:false}],tags:[],status:'UP',apiKey:null,...extra});
+const pages=(...lists:Record<string,Json>[][])=>Buffer.from(lists.map((data,i)=>JSON.stringify({data,nextLink:i<lists.length-1?`https://api.uptimerobot.com/v3/monitors?cursor=${i+1}`:null})+'\n').join(''));
+const monitorSource=(copy?:string):{parse:(value:Json,index:number)=>ParsedRecord[];mapping:ImportMapping}=>({
+  parse:(value,index)=>(value as {data:Record<string,Json>[]}).data.map((m,i)=>({kind:'monitor',sourceId:String(m.id),pointer:`/${index}/data/${i}`,
+    // A parser that copies a credential into another field.
+    payload:copy?{...m,[copy]:m.apiKey ?? null}:m})),
+  mapping:{version:'v1',map:record=>({effects:[{targetKind:'monitor',targetId:record.sourceId,value:record.payload}]})},
+});
+/** Every stored row of every table, with base64 bodies decoded. */
+function stored(native:ReturnType<Awaited<ReturnType<typeof door>>['runtime']['native']>): string {
+  return native.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().flatMap(({name})=>native.prepare(`SELECT * FROM "${name as string}"`).all())
+    .map(row=>JSON.stringify(row)+Object.values(row).map(v=>typeof v==='string'&&/^[A-Za-z0-9+/]+=*$/.test(v)&&v.length>=16?Buffer.from(v,'base64').toString():'').join('')).join('\n');
+}
+
+test('HTTP door imports UptimeRobot pages whose records carry empty credential fields, and removes real credential values per record without storing them',async t=>{
+  const d=await door(t);await d.enable();
+  d.mount(createImportDoorHandler({...d.options,format:'ndjson',...monitorSource()}));
+  // Compound names, header pairs and URLs of any scheme, as raw uploads (the
+  // owner's move-in screen) carry them: UptimeRobot's own httpPassword, Uptime's
+  // customHttpHeaders['X-Api-Key'], an Authorization pair, client_secret.
+  const compound={httpPassword:'test-http-basic-pass',http_password:'test-underscore-pass',xApiKey:'test-header-api-key',pair:'test-pair-bearer-token',
+    clientSecret:'test-oauth-client-secret',ftp:'test-ftp-password',backslash:'test-backslash-pass',query:'test-query-api-key',fragment:'test-fragment-token'};
+  // Common credential shapes beyond those: Azure Functions and API Management
+  // keys, X-Auth, secret_key and pwd, plurals, Sentry's [name, value] header
+  // tuples and an Azure SAS `sig`.
+  const shapes={functions:'test-azure-functions-key',subscription:'test-apim-subscription-key',xAuth:'test-x-auth-header',secretKey:'test-secret-key-field',
+    pwd:'test-pwd-field-value',apiKeys:'test-api-keys-list-item',tokens:'test-tokens-list-item',tuple:'test-tuple-bearer-token',sig:'test-sas-signature'};
+  const secrets=[uptimeKey,uptimePassword,...Object.values(compound),...Object.values(shapes)];
+  // Names that only look like credential names, and placeholders, stay exactly as they are.
+  const lookalikes={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',url:'https://shop.example.com/?signal=1&design=2',headers:[['Accept','*/*']],
+    customHttpHeaders:{'X-Auth':'none'},pwd:null,secret_key:'',apiKeys:['****'],tokens:1500};
+  const bytes=pages([monitor(9000001),monitor(9000002,{apiKey:''}),monitor(9000005,{url:null,apiKey:'********'})],
+    [monitor(9000012,{url:`https://user:${uptimePassword}@staging.example.com/`}),monitor(9000013,{apiKey:uptimeKey}),
+      // What rer's vendor export uploads after stripping: its markers, never the values.
+      monitor(9000014,{apiKey:'[removed]',url:'https://removed@cli.example.com/'})],
+    [monitor(9000020,{authType:'HTTP_BASIC',httpUsername:'ops',httpPassword:compound.httpPassword,hasSecret:true}),
+      monitor(9000021,{customHttpHeaders:{'X-Api-Key':compound.xApiKey},http_password:compound.http_password}),
+      monitor(9000022,{customHttpHeaders:[{name:'Authorization',value:'Bearer '+compound.pair}],client_secret:compound.clientSecret}),
+      monitor(9000023,{url:` ftp://files:${compound.ftp}@files.example.com/`}),
+      monitor(9000024,{url:`https:\\\\bs:${compound.backslash}@x.example.com/health?api_key=${compound.query}&region=eu#access_token=${compound.fragment}`})],
+    // What rer's vendor export uploads for credential query and fragment parameters and the shapes below: markers, never the values.
+    [monitor(9000030,{url:'https://api.example.com/health?api_key=removed&region=eu'}),monitor(9000031,{url:'https://app.example.com/cb#access_token=removed'}),
+      monitor(9000032,{customHttpHeaders:{'x-functions-key':shapes.functions,'Ocp-Apim-Subscription-Key':shapes.subscription,'X-Auth':shapes.xAuth},secret_key:shapes.secretKey,pwd:shapes.pwd}),
+      monitor(9000033,{url:`https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=${shapes.sig}`,apiKeys:[shapes.apiKeys],tokens:[shapes.tokens],headers:[['Authorization','Bearer '+shapes.tuple],['Accept','*/*']]}),
+      monitor(9000034,lookalikes),
+      monitor(9000035,{url:'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed',secret_key:'[removed]',apiKeys:'[removed]',headers:[['X-Auth','[removed]']]})]);
+  const native=d.runtime.native(),uploadId=await d.upload(bytes);
+  for (const secret of secrets) assert.ok(stored(native).includes(secret),'the scan sees the uploaded credentials');
+  const planned=await d.call('plan',{uploadId});
+  assert.equal(planned.status,200,JSON.stringify(planned.body));
+  assert.deepEqual(planned.body.summary,{sourceRecords:17,created:17,updated:0,unchanged:0,gone:0});
+  const userinfo='A user name and password were removed from a URL; the record is kept.',query='A credential query parameter was removed from a URL; the record is kept.';
+  const field=(name:string)=>`The value of credential field "${name}" was removed; the record is kept without it.`;
+  const before=(name:string)=>`The value of credential field "${name}" was removed before upload; the record is kept without it.`;
+  assert.deepEqual(planned.body.diagnostics.filter((n:any)=>n.code==='CREDENTIAL_REMOVED').map((n:any)=>[n.sourceId,n.field,n.message]),[
+    ['9000012','/url',userinfo],
+    ['9000013','/apiKey',field('apikey')],
+    ['9000014','/url',userinfo],
+    ['9000014','/apiKey','The value of credential field "apikey" was removed before upload; the record is kept without it.'],
+    ['9000020','/httpPassword',field('httppassword')],
+    ['9000021','/customHttpHeaders/X-Api-Key',field('xapikey')],['9000021','/http_password',field('httppassword')],
+    ['9000022','/customHttpHeaders/0/value',field('authorization')],['9000022','/client_secret',field('clientsecret')],
+    ['9000023','/url',userinfo],
+    ['9000024','/url',userinfo],['9000024','/url',query],['9000024','/url',query],
+    // rer's markers name the record whose URL lost a credential parameter, as the raw upload does.
+    ['9000030','/url',query],['9000031','/url',query],
+    ['9000032','/customHttpHeaders/x-functions-key',field('xfunctionskey')],['9000032','/customHttpHeaders/Ocp-Apim-Subscription-Key',field('ocpapimsubscriptionkey')],
+    ['9000032','/customHttpHeaders/X-Auth',field('xauth')],['9000032','/secret_key',field('secretkey')],['9000032','/pwd',field('pwd')],
+    ['9000033','/url',query],['9000033','/apiKeys',field('apikeys')],['9000033','/tokens',field('tokens')],['9000033','/headers/0/1',field('authorization')],
+    ['9000035','/url',query],['9000035','/secret_key',before('secretkey')],['9000035','/apiKeys',before('apikeys')],['9000035','/headers/0/1',before('xauth')],
+  ]);
+  assert.ok(planned.body.diagnostics.some((n:any)=>n.code==='ORIGINAL_UNAVAILABLE'&&/withheld because they held credential values/.test(n.message)));
+  // The uploaded bytes went once the plan was saved; the plan never held them.
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_chunks WHERE upload_id=?').get(uploadId)!.n,0);
+  for (const secret of secrets) assert.ok(!stored(native).includes(secret),'no credential value is stored after planning');
+  assert.equal((await d.call('plan',{uploadId})).body.planId,planned.body.planId,'repeating the plan finds the saved one');
+  const again=await d.upload(bytes);assert.equal((await d.call('plan',{uploadId:again})).body.planId,planned.body.planId);
+  assert.equal(native.prepare('SELECT count(*) n FROM ik_door_chunks').get()!.n,0,'the same bytes uploaded again go too');
+  const job=await d.apply(planned.body);
+  const value=(id:string)=>JSON.parse(native.prepare("SELECT value_json FROM native_records WHERE kind='monitor' AND id=?").get(id)!.value_json as string);
+  assert.equal(value('9000012').url,'https://staging.example.com/');
+  assert.equal(value('9000001').apiKey,null);assert.equal(value('9000002').apiKey,'');assert.equal(value('9000005').apiKey,'********');
+  assert.ok(!Object.hasOwn(value('9000013'),'apiKey'));assert.equal(value('9000014').apiKey,'[removed]');
+  assert.ok(!Object.hasOwn(value('9000020'),'httpPassword'));assert.equal(value('9000020').hasSecret,true,'booleans stay');assert.equal(value('9000020').httpUsername,'ops');
+  assert.deepEqual(value('9000021').customHttpHeaders,{});assert.ok(!Object.hasOwn(value('9000021'),'http_password'));
+  assert.deepEqual(value('9000022').customHttpHeaders,[{name:'Authorization'}]);assert.ok(!Object.hasOwn(value('9000022'),'client_secret'));
+  assert.equal(value('9000023').url,' ftp://files.example.com/');assert.equal(value('9000024').url,'https:\\\\x.example.com/health?region=eu');
+  assert.equal(value('9000030').url,'https://api.example.com/health?region=eu');assert.equal(value('9000031').url,'https://app.example.com/cb');
+  assert.deepEqual([value('9000032').customHttpHeaders,Object.hasOwn(value('9000032'),'secret_key'),Object.hasOwn(value('9000032'),'pwd')],[{},false,false]);
+  const shaped=value('9000033');
+  assert.deepEqual([shaped.url,Object.hasOwn(shaped,'apiKeys'),Object.hasOwn(shaped,'tokens'),shaped.headers],['https://acct.blob.core.windows.net/c/b?sv=2020-08-04',false,false,[['Authorization'],['Accept','*/*']]]);
+  assert.deepEqual(value('9000034'),monitor(9000034,lookalikes),'look-alike names and placeholders stay as they are');
+  assert.deepEqual((await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace}))[0].original,{status:'unavailable',reason:'credentials-removed'});
+  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,17);
+  for (const secret of secrets) assert.ok(!stored(native).includes(secret),'no credential value is stored after apply');
+  // A bundle holding only empty credential fields keeps its exact original.
+  const clean=await d.call('plan',{uploadId:await d.upload(pages([monitor(9000001),monitor(9000002)])),catchup:true});
+  assert.equal(clean.status,200,JSON.stringify(clean.body));
+  assert.ok(!clean.body.diagnostics.some((n:any)=>['CREDENTIAL_REMOVED','ORIGINAL_UNAVAILABLE'].includes(n.code)));
+  // Retrying a failed apply (checkpoint 0) re-plans the same upload although its
+  // credential-bearing bytes went: the records come from the failed plan.
+  const e=await door(t);await e.enable();
+  const failing={...sqliteTargets,write(row:any){if(row.targetId==='9000013') throw new Error('SQLITE_CONSTRAINT: test refusal');return sqliteTargets.write(row);}};
+  e.mount(createImportDoorHandler({...e.options,format:'ndjson',...monitorSource(),targets:failing}));
+  const retained=await e.upload(pages([monitor(9000001),monitor(9000013,{apiKey:uptimeKey})])),first=await e.call('plan',{uploadId:retained});
+  assert.equal(first.status,200,JSON.stringify(first.body));
+  const failed=await e.call('apply',{planId:first.body.planId,reviewedFingerprint:first.body.fingerprint},{fingerprint:first.body.fingerprint,...e.approval});
+  assert.deepEqual([failed.status,failed.body.error],[409,'import_door_apply_constraint']);
+  assert.equal((await e.call('status',{planId:first.body.planId})).body.job.checkpoint,0);
+  e.mount(createImportDoorHandler({...e.options,format:'ndjson',...monitorSource()}));
+  const retry=await e.call('plan',{uploadId:retained});
+  assert.equal(retry.status,200,JSON.stringify(retry.body));assert.notEqual(retry.body.planId,first.body.planId);
+  assert.deepEqual(retry.body.diagnostics.filter((n:any)=>n.code==='CREDENTIAL_REMOVED').map((n:any)=>[n.sourceId,n.field]),[['9000013','/apiKey']]);
+  await e.apply(retry.body,{approvalRecordId:'test-retry-approval'});
+  // A plan refused for another reason keeps no credential bytes either; the same
+  // upload then answers a named 410, and a fresh upload plans.
+  const later=pages([monitor(9000001),monitor(9000013),monitor(9000030,{url:`https://api.example.com/health?api_key=${compound.query}`})]);
+  const refusedUpload=await e.upload(later),refused=await e.call('plan',{uploadId:refusedUpload});
+  assert.deepEqual([refused.status,refused.body.error],[409,'catchup_required']);
+  assert.equal(e.runtime.native().prepare('SELECT count(*) n FROM ik_door_chunks WHERE upload_id=?').get(refusedUpload)!.n,0);
+  assert.ok(!stored(e.runtime.native()).includes(compound.query),'a refused plan keeps no credential value');
+  const withheld=await e.call('plan',{uploadId:refusedUpload,catchup:true});
+  assert.deepEqual([withheld.status,withheld.body.error],[410,'upload_credentials_withheld']);assert.match(withheld.body.details.reason,/Upload the bundle again/);
+  const caughtUp=await e.call('plan',{uploadId:await e.upload(later),catchup:true});assert.equal(caughtUp.status,200,JSON.stringify(caughtUp.body));
+});
+
+test('HTTP door names every reader and bundle-check refusal with a 4xx and the field kind, never a bare conflict or the value',async t=>{
+  const d=await door(t);await d.enable();
+  const mount=(source:ReturnType<typeof monitorSource>,limits?:{maxRecordBytes:number})=>d.mount(createImportDoorHandler({...d.options,format:'ndjson',...source,...(limits?{limits}:{})}));
+  const refusals:[string,Buffer,ReturnType<typeof monitorSource>,number,string,string?][]=[
+    ['a parser copying a removed credential',pages([monitor(1,{apiKey:uptimeKey})]),monitorSource('copiedKey'),422,'source_credential','repeated credential value'],
+    ['a URL nested in a query value with a user name and password',pages([monitor(2,{url:`https://staging.example.com/go?to=${encodeURIComponent(`https://user:${uptimePassword}@other.example.com/`)}`})]),monitorSource(),422,'source_credential','URL user name or password'],
+    ['a mapping that proposes a credential field',pages([monitor(3)]),{...monitorSource(),mapping:{version:'v1',map:record=>({effects:[{targetKind:'monitor',targetId:record.sourceId,value:{token:uptimeKey}}]})}},422,'source_credential','credential field "token"'],
+    ['malformed JSON',Buffer.from('{"data":[\n'),monitorSource(),422,'source_malformed_json'],
+    ['two different records under one id',pages([monitor(4),monitor(4,{interval:60})]),monitorSource(),422,'source_duplicate_source_conflict'],
+    ['a parser failure',pages([monitor(5)]),{...monitorSource(),parse:()=>{throw new Error(uptimeKey);}},422,'source_parser_failed'],
+    ['a value encoded too deeply to inspect',pages([monitor(7,{note:'%'+'25'.repeat(33)+'41'})]),monitorSource(),422,'source_invalid_or_credential_source_data'],
+  ];
+  for (const [label,bytes,source,status,error,field] of refusals) {
+    mount(source);
+    const uploadId=await d.upload(bytes),refused=await d.call('plan',{uploadId});
+    assert.deepEqual([refused.status,refused.body.error],[status,error],label+': '+JSON.stringify(refused.body));
+    assert.equal(typeof refused.body.details.reason,'string',label);
+    if (field) { assert.equal(refused.body.details.field,field,label);assert.ok(refused.body.details.reason.includes(field),label); }
+    for (const secret of [uptimeKey,uptimePassword]) assert.ok(!JSON.stringify(refused.body).includes(secret),label);
+    // An upload holding a credential the door cannot remove, or a value it cannot inspect, is not kept.
+    if (error==='source_credential') for (const secret of [uptimeKey,uptimePassword]) assert.ok(!stored(d.runtime.native()).includes(secret),label);
+    if (['source_credential','source_invalid_or_credential_source_data'].includes(error)) assert.equal((await d.call('uploads',{uploadId})).status,404,label);
+  }
+  mount(monitorSource(),{maxRecordBytes:400});
+  const large=await d.call('plan',{uploadId:await d.upload(pages([monitor(6,{friendlyName:'Long name '.repeat(60)})]))});
+  assert.deepEqual([large.status,large.body.error],[413,'source_record_byte_limit'],JSON.stringify(large.body));
+  assert.equal(d.runtime.native().prepare('SELECT count(*) n FROM native_records').get()!.n,0);
+});
+
+test('A door created with the preserve-owner-edits reversal policy keeps owner edits on undo and reads in the seed\'s history; strict stays the default',async t=>{
+  for (const reversalPolicy of [undefined,'preserve-conflicts'] as const) {
+    const d=await door(t);await d.enable();
+    if (reversalPolicy) d.mount(createImportDoorHandler({...d.options,reversalPolicy}));
+    const planned=await d.plan(documents(3));assert.equal(planned.status,200,JSON.stringify(planned.body));
+    const job=await d.apply(planned.body),native=d.runtime.native();
+    // Lamp's ordinary history reads every import job with its own preserving policy.
+    const history={...d.runtime.context(),namespace:job.namespace,reversalPolicy:'preserve-conflicts' as const};
+    if (reversalPolicy) assert.equal((await readD1ImportJob(job.id,history)).state,'completed');
+    else await assert.rejects(readD1ImportJob(job.id,history),/REVERSAL_POLICY_CONFLICT/);
+    // The owner edits one imported record, then undoes the door import.
+    native.prepare("UPDATE native_records SET revision='owner-edit',value_json=? WHERE id='1'").run(canonicalJson({local:'owner edit'}));
+    if (!reversalPolicy) {
+      const refused=await d.call('undo',{planId:planned.body.planId});
+      assert.deepEqual([refused.status,refused.body.error],[409,'native_edit_conflict'],JSON.stringify(refused.body));assert.equal(typeof refused.body.details.reason,'string');
+      assert.deepEqual(native.prepare('SELECT id FROM native_records ORDER BY id').all().map(r=>r.id),['0','1','2']);
+      continue;
+    }
+    const undone=await d.undo(planned.body.planId);assert.equal(undone.body.job.state,'undone');
+    assert.deepEqual(native.prepare('SELECT id,value_json FROM native_records ORDER BY id').all().map(r=>[r.id,r.value_json]),[['1',canonicalJson({local:'owner edit'})]]);
+    assert.equal((await readD1ImportJob(job.id,history)).state,'undone');
+  }
+  // Only creation selects the policy: an apply in flight when the seed remounts
+  // with another policy resumes and keeps its job's own policy.
+  for (const [from,to] of [[undefined,'preserve-conflicts'],['preserve-conflicts','strict']] as const) {
+    const s=await door(t);await s.enable();
+    if (from) s.mount(createImportDoorHandler({...s.options,reversalPolicy:from}));
+    const planned=await s.plan(documents(60));assert.equal(planned.status,200,JSON.stringify(planned.body));
+    const input={planId:planned.body.planId,reviewedFingerprint:planned.body.fingerprint},grant={fingerprint:planned.body.fingerprint,...s.approval};
+    assert.equal((await s.call('apply',input,grant)).body.job.state,'applying');
+    s.mount(createImportDoorHandler({...s.options,reversalPolicy:to}));
+    const job=await s.apply(planned.body);assert.equal(job.state,'completed');
+    assert.equal(s.runtime.native().prepare('SELECT reversal_policy FROM ik_jobs WHERE id=?').get(job.id)!.reversal_policy,from ?? 'strict');
+  }
+  // A catch-up layer over the owner's edit: undoing it keeps the edit and
+  // releases the baseline beneath, which then undoes fully. While the catch-up
+  // is live, undoing the baseline is refused by name.
+  {
+    const l=await door(t);await l.enable();
+    l.mount(createImportDoorHandler({...l.options,reversalPolicy:'preserve-conflicts'}));
+    const native=l.runtime.native(),docs=documents(30);
+    const base=await l.plan(docs);const baseJob=await l.apply(base.body);
+    const layer=await l.plan([...docs.map(r=>r.id==='4'?{...r,title:'Changed at source'}:r),{id:'30',title:'Added',body:'z'}],{catchup:true});
+    assert.equal(layer.status,200,JSON.stringify(layer.body));await l.apply(layer.body);
+    const early=await l.call('undo',{planId:base.body.planId});
+    assert.deepEqual([early.status,early.body.error],[409,'import_superseded'],JSON.stringify(early.body));assert.match(early.body.details.reason,/Undo the newer import first/);
+    native.prepare("UPDATE native_records SET revision='owner-edit',value_json=? WHERE id='4'").run(canonicalJson({local:'owner'}));
+    assert.equal((await l.undo(layer.body.planId)).body.job.state,'undone');
+    assert.equal((await l.undo(base.body.planId)).body.job.state,'undone');
+    assert.deepEqual(native.prepare('SELECT id,value_json FROM native_records').all().map(r=>[r.id,r.value_json]),[['4',canonicalJson({local:'owner'})]]);
+    const reports=native.prepare('SELECT record_json FROM ik_d1_reversal_reports WHERE job_id=?').all(baseJob.id).map(r=>JSON.parse(r.record_json as string));
+    assert.equal(reports.length,30);assert.deepEqual(reports.filter(r=>r.disposition==='retained').map(r=>[r.targetId,r.reason]),[['4','superseded']]);
+    assert.equal((await readD1ImportJob(baseJob.id,{...l.runtime.context(),namespace:baseJob.namespace,reversalPolicy:'preserve-conflicts'})).state,'undone');
+  }
+  const d=await door(t);
+  assert.throws(()=>createImportDoorHandler({...d.options,reversalPolicy:'preserve-conflicts',targets:{...sqliteTargets,preparePreservedUndo:undefined}}),/invalid_configuration/);
+  assert.throws(()=>createImportDoorHandler({...d.options,reversalPolicy:'keep-everything' as 'strict'}),/invalid_configuration/);
 });
