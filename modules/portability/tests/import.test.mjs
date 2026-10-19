@@ -111,8 +111,11 @@ test('staged product validation can refuse before any R2 write',async t=>{
 });
 test('replaceable rows, suppressed triggers, NULL secrets and configuration survive restore',async t=>{
   const {bundle,target,service}=await setup(t);await target.db.prepare("INSERT INTO settings VALUES('theme','migration seed')").run();
+  // Pooled destinations can retain SQLite internals from earlier cases. Compare
+  // this destination's own inventory across restore, cleaning its export first.
+  const before=await archive(service);await service.exports.abort(before.id);
   const {status}=await restore(service,bundle);assert.deepEqual(status.requiredConfiguration,['PROVIDER_KEY']);
-  assert.deepEqual((await archive(service)).manifest.excludedTables,bundle.manifest.excludedTables);
+  assert.deepEqual((await archive(service)).manifest.excludedTables,before.manifest.excludedTables);
   assert.equal((await target.db.prepare('SELECT value FROM settings').first()).value,'blue');assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM audit').first()).n,1);
   assert.equal((await target.db.prepare('SELECT credential FROM effects').first()).credential,null);
   await target.db.prepare("INSERT INTO triggered VALUES('after')").run();assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM audit').first()).n,2);
