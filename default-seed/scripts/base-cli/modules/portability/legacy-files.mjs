@@ -38,6 +38,6 @@ export async function recoverLegacyArchive({db,buckets,policy:input,migrations},
  // A failure here must be reported; the durable restore audit remains intact.
  try {
   const recovered=await exportArchive(await createPortability({db,buckets,policy:input}),output,transient);
-  return {...recovered,legacyRecovery:true,unverifiedMetadata:true,restoredContentHash:closing.contentHash,...(status.bridged?{bridged:status.bridged}:{})};
+  return {...recovered,legacyRecovery:true,unverifiedMetadata:true,restoredContentHash:closing.contentHash,...(status.bridged?{bridged:status.bridged}:{}),...(status.safetyChanges?{safetyChanges:status.safetyChanges}:{})};
  }catch{throw new PortabilityError('legacy_restored_export_failed',500);}
 }

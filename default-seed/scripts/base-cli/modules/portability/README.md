@@ -41,6 +41,8 @@ schema at construction. Apply the bookkeeping migration first. Policy fields:
 | `derivedTables` | Virtual/FTS tables to regenerate; their shadow tables are excluded. |
 | `secretColumns` | Per-table nullable base columns omitted at export and written as NULL. Primary keys and generated columns cannot be secret. |
 | `exportRow(table,row)` | Pure, synchronous, idempotent transformation of encoded base cells. Restore writes its result verbatim; SQLite recomputes generated cells. |
+| `importSafety` | Per-table, per-column nonempty finite sets of safe encoded cells, paired with `importRow`. Only writable non-key columns may be declared. |
+| `importRow(table,row)` | Pure, synchronous, deterministic, idempotent normalization of staged rows in declared tables, before `validateStaged` and apply. Changes are bounded by `importSafety`. |
 | `replaceableTables` | Bootstrap rows replaced in the atomic restore batch. Rows the destination's own migrations insert need no entry where the runner passes `migrations` (see "Migration-seeded rows"). Populated excluded dependents reachable through modifying FK actions refuse replacement. |
 | `requiredConfiguration` | Setting names returned after restore for the owner to re-enter. |
 | `validateStaged({db,tables,read,manifest})` | Read-only product validation before any object write; false or a thrown error refuses restore. `tables` names the staging tables for bounded SQL queries; `read` is a convenience for small tables. |
@@ -150,6 +152,49 @@ Column affinity and NOT NULL are checked before staging. R2 metadata moves with
 the bytes. Large objects span parts and restore through multipart upload with at
 most one 5 MiB upload buffer. Extra payload consumers own their own transaction,
 idempotence and recovery; D1 cannot roll back Durable Object or external state.
+
+### Bounded import normalization
+
+Use `importSafety` with `importRow` when restored records must start in a safe
+state, even if an older archive contains active connections or credentials:
+
+```js
+export default {
+  product: 'my-product',
+  importSafety: {connections: {status: ['inactive'], token: [null]}},
+  importRow(table, row) {
+    return {...row, status: 'inactive', token: null};
+  },
+};
+```
+
+The hook is called only for tables declared in `importSafety`, after staging
+and before `validateStaged` or apply. Mandatory development/provider-data refusals
+run first; normalization cannot bypass them. It must return exactly the writable columns
+of its input row, preserve primary keys and every undeclared column, and change
+declared columns only to their listed safe values. Unchanged values need not be
+in the safe set. The hook must be pure, synchronous, deterministic and idempotent;
+keep external effects out of it. Generated columns recompute from the normalized
+base cells. Without this pair, import behavior is unchanged.
+
+Construction refuses an unpaired hook or declaration, unknown table or column
+names, primary keys, generated columns, empty safe sets and malformed encoded
+cells. Safe values use the ordinary cell encoding: null, strings, finite numbers
+or `{blob:base64}`. The destination policy supplies the hook; an archive cannot
+supply executable normalization.
+
+The import job persistently journals the summary in `metadata.safetyChanges`.
+`imports.status(id)` and the `importArchive` receipt expose it as `safetyChanges`,
+an array of `{table,column,value,rows}`. Each entry counts actual changed rows for
+that column and safe replacement value; a row changed in two columns contributes
+to two entries. The summary contains no original values or row records. Durable
+checkpoints keep retries from counting changes twice. Human `rer import` output
+prints these counts too, for example `3 automations imported with status="inactive"`.
+
+Archive integrity checks still verify the original archived contents. This
+summary is separate from the erasure journal: normalization does not bypass its
+fence or change journal adoption. Existing atomic D1 apply, owned-object rollback,
+extra-payload recovery responsibilities and transfer erasure behavior still apply.
 
 ## Archive and durable jobs
 
@@ -501,6 +546,7 @@ modules/portability/legacy-safety.mjs
 modules/portability/export.mjs
 modules/portability/import.mjs
 modules/portability/import-staging.mjs
+modules/portability/import-safety.mjs
 modules/portability/payloads.mjs
 modules/portability/journal.mjs
 modules/portability/http.mjs
