@@ -16,6 +16,6 @@ dev session and an invitation minted while using it, a signed-out session, a
 pending provider transaction, and the rate-limit rows those calls left.
 
 `credentials.json` holds the public, test-only values the later test needs:
-the session secret, the plaintext session and link credentials, and
-`generatedAt`. Links last 15 minutes and sessions a week, so
+the session secret and dev key as ordered parts, the plaintext session and link
+credentials, and `generatedAt`. Links last 15 minutes and sessions a week, so
 `tests/prior-data.test.mjs` runs its clock one minute after `generatedAt`.

@@ -265,7 +265,7 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "2db50c93bbed832c506f1c67ec158b71134f07c66ddc9cc38b76090d2e8ffa45"
+      "sha256": "56a77c2149626eaa3a69764f25b21421ce0be22ce8a11540350ee9f391e77e1a"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
@@ -2815,7 +2815,7 @@
     },
     "modules/release/sign.mjs": {
       "source": "modules/release/sign.mjs",
-      "sha256": "bed1f6cb6aa3acb7e95d6c7c7212a553574f3a917cbf0fa05d126e499ca2a2ff"
+      "sha256": "28c71e873399ce1f5556190919d054208c6610c28ae3afb7da24dba830fa560b"
     },
     "modules/release/signature.mjs": {
       "source": "modules/release/signature.mjs",

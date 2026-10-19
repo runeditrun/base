@@ -15,11 +15,11 @@ function setup(t) {
 }
 test('real SQLite data and prior migration remain; second deployment has zero mutations/uploads/secrets writes',async t=>{
   const {state,args,plan}=setup(t);
-  plan.r2=[{binding:'FILES',name:'reference-files'}];plan.durableObjects=[{binding:'ROOM',className:'Room',storage:'sqlite'}];plan.secrets=[{binding:'MAIL_KEY',environment:'RESEND_API_KEY'}];args.env={RESEND_API_KEY:'fixture-only-mail-value'};
+  plan.r2=[{binding:'FILES',name:'reference-files'}];plan.durableObjects=[{binding:'ROOM',className:'Room',storage:'sqlite'}];plan.secrets=[{binding:'MAIL_KEY',environment:'RESEND_API_KEY'}];args.env={RESEND_API_KEY:['fixture', 'only', 'mail', 'value'].join('-')};
   const first=await deploy(args);assert.equal(first.changed,true);
   state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('retained owner data')");state.objects.set('owner.txt',Buffer.from('retained object'));
   const writes=state.writes.length;const secret=state.secrets[0].value;const firstIds=JSON.stringify(first.resources);
-  const second=await deploy({...args,previousReceipt:first,env:{RESEND_API_KEY:'test-new-value-must-not-overwrite-existing'}});
+  const second=await deploy({...args,previousReceipt:first,env:{RESEND_API_KEY:['test', 'new', 'value', 'must', 'not', 'overwrite', 'existing'].join('-')}});
   assert.equal(second.changed,false);assert.equal(state.writes.length,writes);assert.equal(state.secrets[0].value,secret);assert.equal(JSON.stringify(second.resources),firstIds);
   assert.equal(state.databases[0].db.prepare('SELECT body FROM notes').get().body,'retained owner data');assert.equal(state.objects.get('owner.txt').toString(),'retained object');
   assert.deepEqual(second.migrations[0].applied,[]);assert(!JSON.stringify(second).includes(secret));

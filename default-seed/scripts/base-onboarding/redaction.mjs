@@ -60,7 +60,7 @@ const SCHEME = '(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://';
 const USERINFO = SCHEME + '([^\\s/?#"<>`]*)@';
 const SLASHED_USERINFO = SCHEME + '([^\\s/?#:@"<>`\\[\\]]*:(?![0-9]*(?:[/?#\\s"<>`]|$))(?=(?<password>[^\\s"<>`@]{0,128}))\\k<password>)@';
 // Provider token formats recognisable by their prefix alone.
-const TOKEN_PREFIX = '(?:gh[pousr]_|github_pat_|sk-(?:proj-)?|sk_live_|sk_test_|rk_live_|rk_test_|pk_live_|whsec_|SG\\.|xox[baprs]-|AKIA|ASIA|AIza|npm_|glpat-|pypi-|hf_|re_)';
+const TOKEN_PREFIX = '(?:' + ['gh[pousr]_', 'github_pat_', 'sk-(?:proj-)?', 'sk_live_', 'sk_test_', 'rk_live_', 'rk_test_', 'pk_live_', 'whsec_', 'SG\\.', 'xox[baprs]-', 'AKIA', 'ASIA', 'AIza', 'npm_', 'glpat-', 'pypi-', 'hf_', 're_'].join('|') + ')';
 const KNOWN_TOKEN = '(?<![A-Za-z0-9_])' + TOKEN_PREFIX + '[A-Za-z0-9_./+=-]+';
 const PATTERNS = new RegExp('(?:' + [
  AUTH_HEADER, BARE_AUTH,

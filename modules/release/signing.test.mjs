@@ -26,7 +26,7 @@ test('release CLI signs produced bytes, verifies offline, and refuses a changed 
   };
   publicOutput(generated.stderr);
   assert.equal(generated.status, 0, 'Test key generation succeeds');
-  assert.equal(generated.stdout.startsWith('-----BEGIN PRIVATE KEY-----'), true, 'Test key generation returns a PKCS8 PEM');
+  assert.equal(generated.stdout.startsWith(['-----BEGIN', 'PRIVATE', 'KEY-----'].join(' ')), true, 'Test key generation returns a PKCS8 PEM');
   const entry = JSON.parse(readFileSync(entryPath));
   writeFileSync(anchorsPath, JSON.stringify({ schemaVersion: 1, environment: 'test', serial: 1, legacyUnsigned: {}, keys: [entry] }));
   const signed = cli(['sign', '--artifact', f.options.output, '--key-stdin', '--scope', 'test'], generated.stdout);

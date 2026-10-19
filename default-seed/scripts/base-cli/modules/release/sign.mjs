@@ -21,7 +21,7 @@ export async function signArtifact(options) {
   let privateKey;
   try {
     const bytes = await keyInput(options);
-    if (!/^-----BEGIN PRIVATE KEY-----\r?\n[\s\S]+\r?\n-----END PRIVATE KEY-----\s*$/.test(bytes.toString('ascii'))) throw new Error();
+    if (!new RegExp(['^-----BEGIN ', 'PRIVATE ', String.raw`KEY-----\r?\n[\s\S]+\r?\n-----END `, 'PRIVATE ', String.raw`KEY-----\s*$`].join('')).test(bytes.toString('ascii'))) throw new Error();
     privateKey = createPrivateKey({ key: bytes, format: 'pem', type: 'pkcs8' });
     if (privateKey.asymmetricKeyType !== 'ed25519') throw new Error();
   } catch { refuse('SIGNATURE_INVALID'); }

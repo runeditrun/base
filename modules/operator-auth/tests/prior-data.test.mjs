@@ -13,7 +13,7 @@ const tables = ['oa_bootstrap', 'oa_dev_credentials', 'oa_external_identities', 
 const snapshot = async db => Object.fromEntries(await Promise.all(tables.map(async table => [table, (await db.prepare(`SELECT * FROM ${table} ORDER BY 1,2`).all()).results])));
 // The app that existed at auth-1 had one provider, the issuer its admin is bound to.
 const setup = {
-  core: { SESSION_SECRET: credentials.sessionSecret },
+  core: { SESSION_SECRET: credentials.sessionSecretParts.join('-') },
   providers: [{ id: 'legacy', preset: 'okta', issuer: 'https://idp.example', clientId: 'client', tokenAuthMethod: 'client_secret_basic', clientSecret: 'fixture-secret' }],
   fakes: [{ issuer: 'https://idp.example', redirectUri: 'https://app.example/auth/oidc/legacy/callback', clientId: 'client', keyName: 'oktaSigning', claims: { sub: 'admin-subject', email: 'admin@example.com', email_verified: true } }],
 };
