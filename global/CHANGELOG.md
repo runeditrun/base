@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.71
+
+- **Restores split migrations at SQLite's own statement boundaries (#344).** The portability classifier re-splits each migration chunk with sql-text.mjs splitStatements (the sqlite3_complete state machine: a trigger ends only at `; END ;`, so `CASE … END` never ends it) and counts only real table names, never keywords, function names, qualified columns, literals or comments; the secret-column check still sees every identifier. rer import's replay uses the same splitter. Slate's retained archive restores past 0038.
+- **Import door archive and restore-check (#320).** Door grants gain archive and restore-check actions behind one additive door migration: archives survive plan and catch-up, erasure withdraws them and says so, and restore-check parses with zero native writes and returns the hash and counts. A catch-up of an unchanged vendor export plans zero changes.
+- **Scheduled policy hardening (#339).** One canonical snapshot is validated, hashed, stored and executed; unknown actions are refused at approval and at execution; the cap counts every run-linked audit action; running rows past the 15-minute scheduled-handler limit expire atomically as failed/policy_expired with an audit row the owner sees.
+- **/run fits 360 px (#343).** The /run header reflows at its cause, so a 360 px viewport has no sideways scroll; the one-line npx start and byte-exact Copy are unchanged.
+- **Deploy revokes the bootstrap session (#327).** After owner hooks and before reporting success, rer deploy signs out the unused bootstrap session it created, so a fresh hosted install holds zero live sessions until the owner signs in.
+
 ## 0.2.70
 
 - **Archive restores judge later data statements by the table they write (#340).** A bounded INSERT/REPLACE/UPDATE/DELETE whose target is outside the restorable catalogue, and reaches none of it by trigger or FK action, is admitted whatever it reads; an INSERT…SELECT/VALUES into a catalogue table the archive lacks is replayed at finalize in migration order, in the same D1 batch, and recorded in bridged.replayed. Nook's retained archive restores past 0061.
