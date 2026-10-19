@@ -29,6 +29,10 @@ async function checkout(t, { publicSettings = ['APP_HOST'] } = {}) {
    claimed = true; return new Response(null, { status: 303, headers: { 'set-cookie': 'session=test; HttpOnly' } });
   }
   if (url.pathname === '/setup') return new Response(null, { status: 303, headers: { location: '/app' } });
+  if (url.pathname === '/auth/signout') {
+   assert.equal(new Headers(init.headers).get('cookie'), 'session=test');
+   return new Response(null, { status: 204 });
+  }
   return provider.fetch(input, init);
  });
  for (const directory of ['dist/server', 'dist/client', 'migrations/core']) await mkdir(join(root, directory), { recursive: true });
