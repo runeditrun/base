@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.69
+
+- **Import door archive and restore-check (#320).** The import-kit door's grant actions add archive and restore-check (one door migration): archives survive plan and catch-up, erasure withdraws them and says so, restore-check parses with zero native writes and returns the hash and counts, and rer's own credential markers archive while live values are still refused.
+- **Renewable hosted import leases (#328).** A hosted import holds a five-minute renewable lease (30-second heartbeat while active) with fenced request claims; the next restore safely aborts stale staging and owned blobs through the existing recovery, and owner active/status/abort routes stay authenticated.
+- **One-click sign-in offers providers (#324).** One-click owner entry also offers the visible provider forms, carrying returnTo, with provider origins in the CSP; SC-13 names a local rer patch and points it upstream to Base.
+- **Run site dates and command (#326).** /contract shows US short UTC dates, and the /run command's `npx` start stays whole, breaking only before the repository.
+- **CLI setup tests (#325).** Five CLI setup tests no longer pre-probe a --port, and shared fixture cleanup tolerates a late .DS_Store.
+
 ## 0.2.68
 
 - **Retained-archive restores (#316, #318).** Placing an older archive treats a CREATE TRIGGER or DROP TRIGGER statement bounded as exactly one trigger as schema-only, and restore drops and recreates the destination's triggers around insertion; a later write that reaches an archived table through a trigger is still refused. Base reads RER Platform's rer_migrations ledger, places an archive without a migration record by the ledger it carries (every archived name and hash must match an applied migration), and admits a later UPDATE or DELETE of a table the archive holds no rows of.
