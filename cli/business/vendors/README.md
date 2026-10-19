@@ -66,7 +66,13 @@ lost a credential. Null, booleans, empty strings and masks such as `****` are
 not credentials and stay as they are. Names are matched by whole parts
 (camelCase, `_`, `-`, digits), so names that merely contain such letters
 (`keyword`, `monkey`, `author`, `signal`, `design`, `primaryKey`) are not
-credential names and a `?keyword=up` URL stays intact.
+credential names and a `?keyword=up` URL stays intact. `Signature` and
+`Session-Id` count only as header names, so an agent's `signature` field stays;
+`auth` and `credentials` count only when they hold text naming no scheme or mode,
+and an object under them loses only its own credential fields
+(`auth: {type: 'oauth2', token: "[removed]"}`). Query and fragment keys also
+count documented API key names such as `token_auth`, `application_key`,
+`user_key` and `hapikey`.
 Pagination is read from the response as received, so a credential-bearing
 pagination link is still refused.
 

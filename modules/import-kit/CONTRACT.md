@@ -239,13 +239,20 @@ Credential keys are names whose whole parts are a credential word or phrase
 header `x-`, as the phrase: `token`, `access_token`, `refresh_token`,
 `authorization`, `cookie`, `password`, `api_key`/`apiKey`, `secret`, `bearer`,
 `X-Auth`, `X-Auth-Token`, `httpPassword`, `client_secret`, `private_key`,
-`sessionId`, `sig`/`signature`, any name with `secret`, `subscription` or
-`functions` before `key` (`secret_key`, `x-functions-key`,
-`Ocp-Apim-Subscription-Key`) and `pwd`, and their plurals holding text
-(`tokens: [...]`, `apiKeys: [...]`), under an object key or as the name of a
-`[name, value]` pair in a list of them. A URL query or fragment key is a
-credential when it ends in such a phrase, or is a bare `key` or ends in
-`sig`/`signature` (`X-Amz-Signature`). Names merely containing such letters
+any name with `secret`, `subscription` or `functions` before `key`
+(`secret_key`, `x-functions-key`, `Ocp-Apim-Subscription-Key`) and `pwd`, and
+their plurals holding text (`tokens: [...]`, `apiKeys: [...]`), under an object
+key or as the name of a `[name, value]` pair in a list of them. `sessionId` and
+`sig`/`signature` are credential keys only as HTTP header names (a
+`[name, value]` pair, a key under `headers`) and URL keys, never as record
+fields. `auth` and `credentials` count only when their value is text naming no
+scheme or mode (not `include` or `oauth2`), or a list with such a member; an
+object under them is checked field by field. A URL query or fragment key is a
+credential when it ends in such a phrase, or is a bare `key`, ends in
+`sig`/`signature` (`X-Amz-Signature`), has `application`, `user`, `account`,
+`deploy` or `shared` before `key`, or `token`, `basic`, `http`, `proxy` or
+`api` before `auth`, or is one part ending in `apikey`, `accesstoken` or
+`authtoken` (`hapikey`). Names merely containing such letters
 (`keyword`, `monkey`, `author`, `signal`, `design`, `tokenizer`, `primaryKey`,
 `sortKey`) are not credential keys, and neither is a longer name such as the
 pagination cursor `next_page_token`.

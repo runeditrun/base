@@ -110,25 +110,51 @@ and notes it per record) and rer's vendor exports, at two reaches:
 - **Refuse mode** takes the whole name as the phrase, after an optional header
   `x-`: the word alone or after one qualifier (`token`, `access_token`,
   `refresh_token`, `X-Auth-Token`, `password`, `httpPassword`, `client_secret`,
-  `api_key`, `x-api-key`, `private_key`, `sessionId`, `cookie`, `Authorization`,
-  `bearer`), a `secret`, `subscription` or `functions` key under any name
+  `api_key`, `x-api-key`, `private_key`, `cookie`, `Authorization`, `bearer`), a
+  `secret`, `subscription` or `functions` key under any name
   (`Ocp-Apim-Subscription-Key`, `x-functions-key`, `secret_key`), and `pwd`. A
   longer name such as the pagination cursor `next_page_token` is not refused.
 - **Remove mode and URL keys** take any name that ends in the phrase
   (`pushToken`, `integration_key`, `db_pwd`, `webhook_url`), since removing a
-  value keeps the record. A URL query or fragment key also counts a bare `key`
-  (the `?key=` convention) and a last part `sig` or `signature` (`X-Amz-Signature`).
+  value keeps the record.
+- **URL query and fragment keys** also count a bare `key` (the `?key=`
+  convention), a last part `sig` or `signature` (an Azure SAS `sig`,
+  `X-Amz-Signature`), `key`/`keys` after `application`, `user`, `account`,
+  `deploy` or `shared` (Datadog's `application_key`, 3scale's `user_key`,
+  `account_key`, `deploy_key`, `shared_key`), `auth` after `token`, `basic`,
+  `http`, `proxy` or `api` (Matomo's `token_auth`, `basic_auth`, `http_auth`), and
+  a one-part key ending in `apikey`, `accesstoken` or `authtoken` (HubSpot's
+  `hapikey`). As record fields these stay, since a field such as `user_key` or
+  `account_key` names a record far more often than a secret.
+- **Header-only names:** `sig`, `signature` and `sessionId` (`session_id`,
+  `Session-Id`) are credentials only as URL query or fragment keys and as HTTP
+  header names: the name in a `[name, value]` tuple or a `{name|key, value}`
+  pair, or a key of an object under `headers` (`customHttpHeaders`). As a
+  record's field they are data, so a support export's agent `signature`
+  (Zendesk and Freshdesk users and agents) and a chat's `session_id` import as
+  they are in refuse and remove mode.
+- **`auth` and `credentials` hold a credential only when they hold one.** A
+  field or container named `auth`, `X-Auth`, `credential` or `credentials` is
+  refused (or removed) when its value is text that is no placeholder and names
+  no scheme or mode, or a list with such a member; an object under it is searched
+  field by field like any other, so its credential-named fields (`auth: {token}`,
+  `credentials: {password}`) and credential-bearing URLs are refused, or removed
+  and noted at their own path. `auth: {type: 'oauth2'}`, `credentials: []`,
+  fetch's `request.credentials: 'include'` and `auth: 'Bearer'` are accepted as
+  they are. The scheme and mode names are fetch's `include`, `same-origin` and
+  `omit`, and the HTTP and API schemes (`none`, `basic`, `bearer`, `digest`,
+  `oauth2`, `apikey`, `jwt`, `ntlm`, `aws`, `sigv4`, `hmac` and the like).
 
 The words are `token`, `secret`, `password`, `passwd`, `pwd`, `cookie`,
 `authorization`, `bearer` and `credential(s)`; `key` counts after a qualifier
 (`api`, `access`, `private`, `secret`, `auth`, `client`, `integration`,
 `routing`, `service`, `signing`, `session`, `refresh`, `subscription`,
 `functions`, `consumer`, `app`, `license`, `master`, `encryption` or `admin`);
-`auth` and `X-Auth`, `sessionId` and the one-part spellings (`apikey`,
-`accesstoken`, `clientsecret`) count; and `sig` and `signature` count as a whole
-name (an Azure SAS `sig`, a `Signature` field). Plurals (`tokens`, `apiKeys`,
-`secrets`, `passwords`) hold credentials only as text, so `tokens: 1500` is a
-count and stays.
+`auth` and `X-Auth` and the one-part spellings (`apikey`, `accesstoken`,
+`clientsecret`) count; and `sig`, `signature` and `sessionId` count as a whole
+header name and as URL keys. Plurals (`tokens`, `apiKeys`, `secrets`,
+`passwords`) hold credentials only as text, so `tokens: 1500` is a count and
+stays.
 
 - **Borderline names are not credentials:** `primaryKey`, `foreignKey`, `sortKey`,
   `monitorKey` and `keyType` name a database or sort key or an identifier, not a
@@ -140,9 +166,11 @@ count and stays.
   `signup`, `tokenizer`, `passwordless`, `keyboard` and the like. An UptimeRobot
   keyword monitor's `?keyword=up` plans with its URL intact, while an `?api_key=`
   beside it is still removed (or refused).
-- **Trade-off:** a field named just `signature` or `auth` is a credential, so an
-  agent's email `signature` in an export is removed by the door (the record is
-  kept and noted); `emailSignature` is not.
+- **Trade-off:** a `Signature` or `Session-Id` header and a `?sig=` key are
+  credentials, but a record field of the same name is not, so a signature or
+  session token an exporter wrote as a plain record field is kept; the value
+  checks below still apply to it. A field named just `auth` holding text other
+  than a scheme name is a credential.
 
 Value-shaped detection is unchanged: user names and passwords in URLs, known
 token prefixes, base64 and every encoding layer are checked as before. Null, an

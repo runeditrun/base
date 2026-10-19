@@ -169,7 +169,10 @@ it is. A real value is removed from its record, which is kept: a credential-name
 field is dropped: any key whose whole name parts are a credential word or
 phrase (`apiKey`, `httpPassword`, `http_password`, `client_secret`, `X-Api-Key`,
 `pushToken`, `integration_key`, `webhook_url`, `secret_key`, `x-functions-key`,
-`Ocp-Apim-Subscription-Key`, `pwd`, `X-Auth`, `sessionId` and the like); a plural
+`Ocp-Apim-Subscription-Key`, `pwd`, `X-Auth` and the like; `Signature` and
+`Session-Id` only as header names, so an agent's `signature` field stays; `auth`
+and `credentials` only when they hold a credential, so `auth: {type: 'oauth2'}`
+stays and `auth: {token}` loses its token); a plural
 (`apiKeys: [...]`, `tokens: [...]`) when it holds text, so a count such as
 `tokens: 1500` stays; the `value` of a `{name|key, value}` pair naming one
 (`{name: 'Authorization', value}`), and the value of such a `[name, value]`

@@ -961,13 +961,24 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   const shapes={functions:'test-azure-functions-key',subscription:'test-apim-subscription-key',xAuth:'test-x-auth-header',secretKey:'test-secret-key-field',
     pwd:'test-pwd-field-value',apiKeys:'test-api-keys-list-item',tokens:'test-tokens-list-item',tuple:'test-tuple-bearer-token',sig:'test-sas-signature'};
   // Credential names the kit matches by whole parts, not letters: header, field and plural forms.
-  const parts={xAuthToken:'test-x-auth-token-header',authToken:'test-auth-token-field',private_key:'test-private-key-field',sessionId:'test-session-id-field',
-    bearer:'test-bearer-field',signature:'test-signature-field',passwords:'test-passwords-list-item'};
-  const secrets=[uptimeKey,uptimePassword,...Object.values(compound),...Object.values(shapes),...Object.values(parts),'test-keyword-monitor-api-key'];
+  // `Signature` and `Session-Id` are credentials as header names, never as a record's field.
+  const headerParts={xAuthToken:'test-x-auth-token-header',signature:'test-signature-header',sessionId:'test-session-id-header'};
+  const parts={authToken:'test-auth-token-field',private_key:'test-private-key-field',bearer:'test-bearer-field',passwords:'test-passwords-list-item'};
+  // Documented credential query and fragment keys (Matomo, Datadog, 3scale, HubSpot, Azure), and credential fields inside `auth` and `credentials`.
+  const queryKeys={token_auth:'test-matomo-token-auth',application_key:'test-datadog-application-key',user_key:'test-3scale-user-key',account_key:'test-account-key-param',
+    hapikey:'test-hubspot-hapikey',service_account_key:'test-service-account-key',basic_auth:'test-basic-auth-param'};
+  const fragmentKeys={AccountKey:'test-azure-account-key',shared_key:'test-shared-key-param',deploy_key:'test-deploy-key-param','DD-APPLICATION-KEY':'test-dd-application-key',
+    basicAuth:'test-basic-auth-camel',http_auth:'test-http-auth-param',serviceAccountKey:'test-service-account-camel'};
+  const containers={authToken:'test-auth-container-token',password:'test-credentials-container-password'};
+  const secrets=[uptimeKey,uptimePassword,...Object.values(compound),...Object.values(shapes),...Object.values(headerParts),...Object.values(parts),'test-keyword-monitor-api-key',
+    ...Object.values(queryKeys),...Object.values(fragmentKeys),...Object.values(containers)];
+  const queryUrl='https://api.example.test/v1/check?'+Object.entries(queryKeys).map(([key,value])=>`${key}=${value}`).join('&')+'&region=eu#'+Object.entries(fragmentKeys).map(([key,value])=>`${key}=${value}`).join('&')+'&state=s';
   // Names that only look like credential names, and placeholders, stay exactly as they are.
   const lookalikes={keyword:'uptime',monkey:'chaos',signal:'green',design:'v2',author:'ops',keywords:['up','ok'],tokenizer:'bpe',primaryKey:'pk_1',sortKey:'name',monitorKey:'m1',keyType:'rsa',
     url:'https://shop.example.com/?signal=1&design=2&keyword=up&author=ops&primaryKey=1',headers:[['Accept','*/*']],
-    customHttpHeaders:{'X-Auth':'none'},pwd:null,secret_key:'',apiKeys:['****'],tokens:1500};
+    customHttpHeaders:{'X-Auth':'none'},pwd:null,secret_key:'',apiKeys:['****'],tokens:1500,
+    // Record fields named like header-only credentials, and auth and credentials holding no credential.
+    signature:'Thanks, Ops',sessionId:'chat-session-1',auth:{type:'oauth2'},credentials:[],request:{credentials:'include'}};
   // An UptimeRobot keyword monitor: its `?keyword=up` is not a credential, while an `api_key` beside it is.
   const keywordUrl='https://status.example.test/check?keyword=up',keywordKey='test-keyword-monitor-api-key';
   const bytes=pages([monitor(9000001),monitor(9000002,{apiKey:''}),monitor(9000005,{url:null,apiKey:'********'})],
@@ -986,13 +997,14 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
       monitor(9000034,lookalikes),
       monitor(9000035,{url:'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=removed',secret_key:'[removed]',apiKeys:'[removed]',headers:[['X-Auth','[removed]']]}),
       monitor(9000036,{type:'KEYWORD',url:keywordUrl,keyword:'up'}),monitor(9000037,{type:'KEYWORD',url:keywordUrl+`&api_key=${keywordKey}&region=eu`}),
-      monitor(9000038,{customHttpHeaders:{'X-Auth-Token':parts.xAuthToken},authToken:parts.authToken,private_key:parts.private_key,sessionId:parts.sessionId,bearer:parts.bearer,
-        signature:parts.signature,passwords:[parts.passwords]})]);
+      monitor(9000038,{customHttpHeaders:{'X-Auth-Token':headerParts.xAuthToken,Signature:headerParts.signature,'Session-Id':headerParts.sessionId},authToken:parts.authToken,private_key:parts.private_key,
+        bearer:parts.bearer,passwords:[parts.passwords]}),
+      monitor(9000039,{url:queryUrl}),monitor(9000040,{auth:{type:'bearer',token:containers.authToken},credentials:{username:'ops',password:containers.password}})]);
   const native=d.runtime.native(),uploadId=await d.upload(bytes);
   for (const secret of secrets) assert.ok(stored(native).includes(secret),'the scan sees the uploaded credentials');
   const planned=await d.call('plan',{uploadId});
   assert.equal(planned.status,200,JSON.stringify(planned.body));
-  assert.deepEqual(planned.body.summary,{sourceRecords:20,created:20,updated:0,unchanged:0,gone:0});
+  assert.deepEqual(planned.body.summary,{sourceRecords:22,created:22,updated:0,unchanged:0,gone:0});
   const userinfo='A user name and password were removed from a URL; the record is kept.',query='A credential query parameter was removed from a URL; the record is kept.';
   const field=(name:string)=>`The value of credential field "${name}" was removed; the record is kept without it.`;
   const before=(name:string)=>`The value of credential field "${name}" was removed before upload; the record is kept without it.`;
@@ -1014,8 +1026,11 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
     ['9000035','/url',query],['9000035','/secret_key',before('secretkey')],['9000035','/apiKeys',before('apikeys')],['9000035','/headers/0/1',before('xauth')],
     // `?keyword=up` stays (9000036); the `api_key` beside it goes and is noted (9000037); whole-name credentials go field by field (9000038).
     ['9000037','/url',query],
-    ['9000038','/customHttpHeaders/X-Auth-Token',field('xauthtoken')],['9000038','/authToken',field('authtoken')],['9000038','/private_key',field('privatekey')],
-    ['9000038','/sessionId',field('sessionid')],['9000038','/bearer',field('bearer')],['9000038','/signature',field('signature')],['9000038','/passwords',field('passwords')],
+    ['9000038','/customHttpHeaders/X-Auth-Token',field('xauthtoken')],['9000038','/customHttpHeaders/Signature',field('signature')],['9000038','/customHttpHeaders/Session-Id',field('sessionid')],
+    ['9000038','/authToken',field('authtoken')],['9000038','/private_key',field('privatekey')],['9000038','/bearer',field('bearer')],['9000038','/passwords',field('passwords')],
+    // Query and fragment credential keys go (one note each for the fragment and the query); `auth` and `credentials` lose only their credential fields.
+    ['9000039','/url',query],['9000039','/url',query],
+    ['9000040','/auth/token',field('token')],['9000040','/credentials/password',field('password')],
   ]);
   assert.ok(planned.body.diagnostics.some((n:any)=>n.code==='ORIGINAL_UNAVAILABLE'&&/withheld because they held credential values/.test(n.message)));
   // The uploaded bytes went once the plan was saved; the plan never held them.
@@ -1041,10 +1056,27 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   assert.equal(value('9000036').url,keywordUrl,'a keyword monitor plans with its URL intact');
   assert.equal(value('9000037').url,keywordUrl+'&region=eu','the api_key beside ?keyword=up is removed, the keyword and region stay');
   const named=value('9000038');
-  assert.deepEqual([named.customHttpHeaders,...Object.keys(parts).filter(name=>name!=='xAuthToken').map(name=>Object.hasOwn(named,name))],[{},false,false,false,false,false,false]);
+  assert.deepEqual([named.customHttpHeaders,...Object.keys(parts).map(name=>Object.hasOwn(named,name))],[{},false,false,false,false]);
+  assert.equal(value('9000039').url,'https://api.example.test/v1/check?region=eu#state=s','query and fragment credential keys go; region and state stay');
+  assert.deepEqual([value('9000040').auth,value('9000040').credentials],[{type:'bearer'},{username:'ops'}]);
   assert.deepEqual((await readD1ImportOriginals(job.id,{...d.runtime.context(),namespace:job.namespace}))[0].original,{status:'unavailable',reason:'credentials-removed'});
-  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,20);
+  const reconciled=await d.call('reconcile',{planId:planned.body.planId});assert.equal(reconciled.body.ok,true);assert.equal(reconciled.body.counts.present,22);
   for (const secret of secrets) assert.ok(!stored(native).includes(secret),'no credential value is stored after apply');
+  // Support exports import as they are: a Zendesk and a Freshdesk agent's `signature`, and a chat's session ids, are record fields, not credentials.
+  const support=await door(t);await support.enable();
+  support.mount(createImportDoorHandler({...support.options,format:'json',parse:value=>({kind:'record',sourceId:String((value as {id:Json}).id),payload:value}),
+    mapping:{version:'v1',map:record=>({effects:[{targetKind:'record',targetId:record.sourceId,value:record.payload}]})}}));
+  const supportRecords:Record<string,Json>[]=[
+    {id:35436,url:'https://example.zendesk.com/api/v2/users/35436.json',name:'Ops Agent',email:'agent@example.test',role:'agent',signature:'Best regards,\nOps Agent\nExample Support',shared_agent:false,user_fields:{}},
+    {id:'2405.1.LwKcQYqRXr9WRA',type:'chat',session_id:'2405.1.LwKcQYqRXr9WRA',sessionId:'zchat-session-77',visitor:{name:'Visitor 1'},session:{browser:'Chrome',platform:'Mac OS'}},
+    {id:43000012345,available:true,occasional:false,signature:'<div>Thanks,<br>Ops Agent</div>',ticket_scope:1,contact:{name:'Ops Agent',email:'agent@example.test'}},
+    {id:20,subject:'Chat follow-up',custom_fields:{cf_chat_session_id:'fc-session-7'}},
+  ];
+  const supportPlan=await support.call('plan',{uploadId:await support.upload(Buffer.from(JSON.stringify(supportRecords)))});
+  assert.equal(supportPlan.status,200,JSON.stringify(supportPlan.body));
+  assert.deepEqual(supportPlan.body.diagnostics.filter((n:any)=>n.code==='CREDENTIAL_REMOVED'),[]);
+  await support.apply(supportPlan.body);
+  for (const record of supportRecords) assert.deepEqual(JSON.parse(support.runtime.native().prepare("SELECT value_json FROM native_records WHERE kind='record' AND id=?").get(String(record.id))!.value_json as string),record);
   // A bundle holding only empty credential fields keeps its exact original.
   const clean=await d.call('plan',{uploadId:await d.upload(pages([monitor(9000001),monitor(9000002)])),catchup:true});
   assert.equal(clean.status,200,JSON.stringify(clean.body));

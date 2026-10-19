@@ -54,11 +54,23 @@ test('public readers and durable planning retain boolean secret semantics with e
     'authToken','accessToken','access_token','refreshToken','token','tokens','bearer','password','passwd','pwd','httpPassword','http_password','privateKey','private_key','sig','signature','sessionId','cookie','apiKeys','secrets','passwords'];
   const plainNames=['keyword','keywords','monkey','donkey','turkey','hockey','author','authority','authors','signal','design','signup','tokenizer','passwordless','keyboard','primaryKey','foreignKey','sortKey','keyType','monitorKey'];
   const kind=(field:string)=>(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field.startsWith(field);
+  // `sig`, `signature` and `sessionId` are credentials as header names and URL keys, never as a record's field (an agent's signature, a chat's session id).
+  const headerOnly=new Set(['sig','signature','sessionId']);
   for(const name of credentialNames){
     const value=/^(?:tokens|secrets|passwords|apiKeys)$/.test(name)?['synthetic-credential']:'synthetic-credential';
-    await assert.rejects(read({[name]:value}),kind('credential field'),`field ${name}`);
+    if(headerOnly.has(name))assert.deepEqual((await read({[name]:value})).records[0].payload,{uri:'https://source.test/event',[name]:value},`field ${name}`);
+    else await assert.rejects(read({[name]:value}),kind('credential field'),`field ${name}`);
+    await assert.rejects(read({headers:{[name]:value}}),kind('credential field'),`header ${name}`);
     await assert.rejects(read({headers:[[name,'synthetic-credential'],['Accept','*/*']]}),kind('credential field'),`tuple ${name}`);
     await assert.rejects(read({link:`https://source.test/page?${name}=synthetic-credential`}),kind('URL credential query'),`query ${name}`);
+  }
+  // Documented credential query and fragment keys: Matomo's `token_auth`, Datadog's `application_key`, 3scale's `user_key`, HubSpot's `hapikey`.
+  const readRemoved=(value:Record<string,unknown>)=>readFileSource({namespace:'archive',name:'event.json',format:'json',credentials:'remove',bytes:Buffer.from(JSON.stringify({collection:[{uri:'https://source.test/event',...value}]})),parse});
+  for(const name of ['token_auth','application_key','user_key','account_key','AccountKey','shared_key','deploy_key','DD-APPLICATION-KEY','hapikey','service_account_key','serviceAccountKey','basic_auth','basicAuth','http_auth']){
+    await assert.rejects(read({link:`https://source.test/page?${name}=synthetic-credential&region=eu`}),kind('URL credential query'),`query ${name}`);
+    const removed=await readRemoved({link:`https://source.test/page?${name}=synthetic-credential&region=eu`,callback:`https://source.test/cb#${name}=synthetic-credential&state=s`});
+    assert.deepEqual([removed.records[0].payload,removed.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED').map(d=>d.field)],
+      [{uri:'https://source.test/event',link:'https://source.test/page?region=eu',callback:'https://source.test/cb#state=s'},['/link','/callback']],`removed ${name}`);
   }
   for(const name of plainNames){
     const plain={[name]:'synthetic',headers:[[name,'synthetic'],['Accept','*/*']],link:`https://source.test/page?${name}=synthetic&region=eu#${name}=synthetic`};
@@ -72,4 +84,25 @@ test('public readers and durable planning retain boolean secret semantics with e
     tokens:{input:1500,output:300},inputTokens:1500,next_page_token:'cursor/a+b',nextSyncToken:'sync-1',emailSignature:'Thanks',hasSecretKey:true,pwd:null,secret_key:'',apiKeys:['****'],headers:[['Authorization','none'],['X-Auth','[redacted]']]};
   const source=await read(accepted);
   assert.deepEqual(source.records[0].payload,{uri:'https://source.test/event',...accepted});assert.equal(source.artifacts[0].original?.status,'available');
+  // Support exports import as they are in both modes: a Zendesk agent's and a Freshdesk agent's `signature`, a chat's session ids.
+  const support=[
+    {uri:'https://example.zendesk.com/api/v2/users/35436.json',id:35436,name:'Ops Agent',role:'agent',signature:'Best regards,\nOps Agent\nExample Support',shared_agent:false,user_fields:{}},
+    {uri:'https://example.zendesk.com/api/v2/chats/2405.1.LwKcQYqRXr9WRA',id:'2405.1.LwKcQYqRXr9WRA',type:'chat',session_id:'2405.1.LwKcQYqRXr9WRA',sessionId:'zchat-session-77',session:{browser:'Chrome'}},
+    {uri:'https://example.freshdesk.com/api/v2/agents/43000012345',id:43000012345,available:true,occasional:false,signature:'<div>Thanks,<br>Ops Agent</div>',ticket_scope:1,contact:{name:'Ops Agent'}},
+    {uri:'https://example.freshdesk.com/api/v2/tickets/20',id:20,subject:'Chat follow-up',custom_fields:{cf_chat_session_id:'fc-session-7'}},
+  ];
+  // `auth` and `credentials` holding no credential stay; their credential fields are refused, or removed and noted.
+  const containers=[{auth:{type:'oauth2'}},{credentials:[]},{request:{credentials:'include'}},{auth:'Bearer'}];
+  for(const value of [...support,...containers]){
+    const bytes=Buffer.from(JSON.stringify({collection:[value]}));
+    assert.deepEqual((await readFileSource({namespace:'archive',name:'event.json',format:'json',bytes,parse:()=>[{kind:'record',sourceId:'s',payload:value}]})).records[0].payload,value,'refuse mode');
+    const removed=await readFileSource({namespace:'archive',name:'event.json',format:'json',bytes,credentials:'remove',parse:()=>[{kind:'record',sourceId:'s',payload:value}]});
+    assert.deepEqual([removed.records[0].payload,removed.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED')],[value,[]],'remove mode');
+  }
+  for(const [value,field,path,kept] of [[{auth:{token:'synthetic-credential'}},'credential field "token"','/auth/token',{auth:{}}],[{credentials:{password:'synthetic-credential'}},'credential field "password"','/credentials/password',{credentials:{}}],
+    [{auth:'synthetic-credential'},'credential field "auth"','/auth',{}]] as const){
+    await assert.rejects(read(value),(error:any)=>error.code==='INVALID_OR_CREDENTIAL_SOURCE_DATA'&&error.field===field,field);
+    const removed=await readRemoved(value);
+    assert.deepEqual([removed.records[0].payload,removed.diagnostics.filter(d=>d.code==='CREDENTIAL_REMOVED').map(d=>d.field)],[{uri:'https://source.test/event',...kept},[path]],path);
+  }
 });

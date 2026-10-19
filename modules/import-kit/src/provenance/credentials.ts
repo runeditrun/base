@@ -1,5 +1,5 @@
 import type { ImportPlan, Json, PaginationCursorPolicy } from '../types.ts';
-import { credentialName } from './credential-names.ts';
+import { credentialName, credentialScheme, headerContainer, type CredentialNamePlace } from './credential-names.ts';
 
 const MAX_ENCODING_DEPTH = 32;
 
@@ -90,14 +90,25 @@ export function credentialFieldText(field: CredentialField): string {
 }
 /** A credential-named field (`apiKey`, `client_secret`, `X-Api-Key`,
  * `Ocp-Apim-Subscription-Key`, `X-Auth`, `pwd`; in remove mode also `httpPassword`
- * and `pushToken`), by whole name parts, and whether a value under it counts: a
- * plural name holds credentials only as text, so `tokens: 1500` stays a count,
- * and null, a boolean or a mask is no credential. Refuse mode takes the whole
- * name as the phrase, so a pagination cursor such as `next_page_token` is
- * accepted; remove mode, which keeps the record, takes any name ending in one. */
-function credentialKey(key: string, mode: 'refuse' | 'remove'): { name: string; holds: (value: unknown) => boolean } | undefined {
-  const credential = credentialName(decodedCredentialText(key), mode);
-  return credential && { name: credential.name, holds: credential.plural ? credentialText : value => !emptyCredential(value) };
+ * and `pushToken`; as a header name also `Signature` and `Session-Id`), by whole
+ * name parts, and whether a value under it counts: a plural name holds
+ * credentials only as text, so `tokens: 1500` stays a count; `auth` and
+ * `credentials` hold one only as text naming no scheme or mode (`include`,
+ * `oauth2`), their objects being searched field by field; and null, a boolean or
+ * a mask is no credential. Refuse mode takes the whole name as the phrase, so a
+ * pagination cursor such as `next_page_token` is accepted; remove mode, which
+ * keeps the record, takes any name ending in one. */
+function credentialKey(key: string, mode: 'refuse' | 'remove', place: CredentialNamePlace = 'field'): { name: string; holds: (value: unknown) => boolean } | undefined {
+  const credential = credentialName(decodedCredentialText(key), mode, place);
+  return credential && { name: credential.name, holds: credential.container ? containerText : credential.plural ? credentialText : value => !emptyCredential(value) };
+}
+/** Under `auth` or `credentials`: text that is no placeholder and names no
+ * scheme or mode, or a list with such a member. `auth: {type: 'oauth2'}`,
+ * `credentials: []` and fetch's `credentials: 'include'` hold none; an object's
+ * own credential fields (`auth: {token: '…'}`) are found field by field. */
+function containerText(value: unknown): boolean {
+  if (typeof value === 'string') return !credentialPlaceholder(value) && !credentialScheme(value);
+  return Array.isArray(value) && value.some(member => typeof member === 'string' && containerText(member));
 }
 /** A value holding credentials as text: a string that is no placeholder, or a
  * list or map with one as a member (`['…']`, `{github: '…'}`). A list of objects
@@ -128,21 +139,22 @@ const looksLikeUrl = (value: string) => /^(?:https?:\/\/|\/|\?)/i.test(decodedCr
 
 export function assertNoCredentials(value: unknown, policy?: PaginationCursorPolicy): void {
   paginationPolicy(policy);
-  const visit = (item: unknown): void => {
+  // `headers`: the keys of this object, or of objects in this list, are HTTP header names.
+  const visit = (item: unknown, headers = false): void => {
     if (Array.isArray(item)) {
       for (const [index, name] of namedTuples(item)) {
-        const credential = credentialKey(name, 'refuse'), value = (item[index] as unknown[])[1];
+        const credential = credentialKey(name, 'refuse', 'header'), value = (item[index] as unknown[])[1];
         if (credential && !emptyCredential(value) && credential.holds(value)) throw new CredentialError('CREDENTIAL_IN_DURABLE_DATA', { kind: 'field', name: credential.name });
       }
-      for (const child of item) visit(child);
+      for (const child of item) visit(child, headers);
       return;
     }
     if (item && typeof item === 'object') {
       for (const [key, child] of Object.entries(item)) {
-        const credential = credentialKey(key, 'refuse');
+        const credential = credentialKey(key, 'refuse', headers ? 'header' : 'field');
         // A plural name holds a credential as text; a container under it is still searched.
         if (credential?.holds(child)) throw new CredentialError('CREDENTIAL_IN_DURABLE_DATA', { kind: 'field', name: credential.name });
-        visit(child);
+        visit(child, headerContainer(key));
       }
     } else if (typeof item === 'string') {
       // Relative pagination links receive the same check as absolute links.
@@ -180,8 +192,9 @@ const AUTHORITY = /^(\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2})([^\\/?#]*)@/i;
 const removableUrl = (text: string) => /^\s*(?:[a-z][a-z\d+.-]*:)?[\\/]{2}/i.test(text) || looksLikeUrl(text);
 /** A copy of `value` without plain credential values: a field whose name's parts
  * are a credential word or phrase (`apiKey`, `httpPassword`, `client_secret`,
- * `X-Api-Key`, `secret_key`, `X-Auth`, `pwd`, plural `apiKeys`; never `keyword`
- * or `author`) holding a value is dropped, as
+ * `X-Api-Key`, `secret_key`, `X-Auth`, `pwd`, plural `apiKeys`, and as a header
+ * name `Signature` and `Session-Id`; never `keyword`, `author`, or an agent's
+ * `signature` field) holding a value is dropped, as
  * is the `value` of a `{name|key, value}` pair naming one (an `Authorization`
  * header pair) and of a `[name, value]` pair in a list of them (Sentry's header
  * tuples), which keeps its name. A URL of any scheme loses its
@@ -238,24 +251,25 @@ export function removeCredentials(value: Json, policy?: PaginationCursorPolicy):
     if (child === REMOVED_CREDENTIAL) removed.push({ path: at, field: { kind: 'field', name: credential?.name ?? fallback.toLowerCase().slice(0, 64) }, beforeUpload: true });
     return false;
   };
-  const visit = (item: Json, path: string): Json => {
+  // `headers`: the keys of this object, or of objects in this list, are HTTP header names.
+  const visit = (item: Json, path: string, headers = false): Json => {
     if (Array.isArray(item)) {
       // A credential-named `[name, value]` pair keeps its name: `['Authorization']`.
       const tuples = namedTuples(item);
       return item.map((child, index) => {
         const name = tuples.get(index);
-        if (name !== undefined && strip(credentialKey(name, 'remove'), (child as Json[])[1], pointer(pointer(path, index), 1), name)) return [name];
-        return visit(child, pointer(path, index));
+        if (name !== undefined && strip(credentialKey(name, 'remove', 'header'), (child as Json[])[1], pointer(pointer(path, index), 1), name)) return [name];
+        return visit(child, pointer(path, index), headers);
       });
     }
     if (item && typeof item === 'object') {
       const entries: [string, Json][] = [];
       // A header-style pair: `{name: 'Authorization', value}` or `{key: 'X-Api-Key', value}`.
       const label = Object.entries(item).find(([key, child]) => /^(?:name|key)$/i.test(key) && typeof child === 'string');
-      const pairName = label && Object.hasOwn(item, 'value') ? credentialKey(label[1] as string, 'remove') : undefined;
+      const pairName = label && Object.hasOwn(item, 'value') ? credentialKey(label[1] as string, 'remove', 'header') : undefined;
       for (const [key, child] of Object.entries(item)) {
-        if (strip(pairName !== undefined && key === 'value' ? pairName : credentialKey(key, 'remove'), child, pointer(path, key), key)) continue;
-        entries.push([key, visit(child, pointer(path, key))]);
+        if (strip(pairName !== undefined && key === 'value' ? pairName : credentialKey(key, 'remove', headers ? 'header' : 'field'), child, pointer(path, key), key)) continue;
+        entries.push([key, visit(child, pointer(path, key), headerContainer(key))]);
       }
       // fromEntries defines own properties, so a `__proto__` key stays data.
       return Object.fromEntries(entries);
