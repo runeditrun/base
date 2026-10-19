@@ -9,7 +9,7 @@ import { exportReference } from '../scripts/export-reference.mjs';
 import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
 import { freePort } from '../global/tests/harness.mjs';
-import { codeChipBreaksWord, commandBlocks } from './fixtures/run-page.mjs';
+import { codeChipBreaksWord, commandBlocks, runLayoutTheme } from './fixtures/run-page.mjs';
 import { splitCardLayout } from './fixtures/contract-page.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
@@ -34,7 +34,12 @@ test('built run-site uses US dates and keeps the one-line command start together
  const f = await seed(t);
  await writeFile(join(f.root, 'CONTRACT.md'), (await readFile(join(base, 'foundation/template/CONTRACT.md'), 'utf8')).replaceAll('BASE_COMMIT', '0123abcd').replaceAll('BASE_DATE', '2026-10-18'));
  const runData = join(f.root, 'src/site/run.ts');
- await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy'));
+ await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy').replaceAll('Default seed', 'Chest').replace('docs: false', 'docs: true'));
+ const identity = join(f.root, 'src/core/app/identity.ts'), theme = join(f.root, 'public/rer-theme.css');
+ await writeFile(identity, (await readFile(identity, 'utf8')).replace("product: 'Default seed'", "product: 'Chest'"));
+ await writeFile(theme, await readFile(theme, 'utf8') + runLayoutTheme);
+ // This fixture has documentation, so its header exercises all three links.
+ await writeFile(f.pages, (await readFile(f.pages, 'utf8')).replace('pages: [', "pages: [{ path: '/docs', html: '<!doctype html><title>Docs</title><h1>Documentation</h1>' },"));
  await writeFile(join(f.root, 'public/favicon.svg'), await readFile(join(f.root, 'public/brand/mark.svg')));
  const result = await f.build({TZ:'America/Los_Angeles'});
  assert.equal(result.code, 0, result.stdout + result.stderr);
@@ -59,7 +64,11 @@ test('built run-site uses US dates and keeps the one-line command start together
    return tops.size;
   });
   assert.deepEqual({ ...contractDate, commandStartLines:await commandStartLines() }, { text:'Oct 18, 2026', datetime:'2026-10-18', dataDate:'2026-10-18', commandStartLines:1 }, 'US date and unbroken one-line command start at 390px');
-  for (let width = 360; width <= 2560; width += 20) {
+  const widths = new Set([390]);
+  for (let width = 360; width <= 2560; width += 20) widths.add(width);
+  for (let width = 361; width <= 399; width++) widths.add(width);
+  for (let width = 770; width <= 810; width++) widths.add(width);
+  for (const width of [...widths].sort((a, b) => a - b)) {
    await page.setViewportSize({width,height:900});
    assert.equal(await commandStartLines(), 1, `one-line command start at ${width}px`);
    assert.deepEqual(await codeChipBreaksWord(page), [], `inline code at ${width}px`);
