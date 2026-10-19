@@ -13,6 +13,7 @@ import { writeObject } from './payloads.mjs';
 import { createCopy,sidecar,readCopy,restoreCopy } from './copies.mjs';
 import { excludedDependentGuards, migrationSeeded, seededCondition } from './restore-safety.mjs';
 import { additiveBridge, sameSchemaMigrations, appliedMigrations } from './bridge.mjs';
+import { replayStatements } from './backfills.mjs';
 import { checkArchivedLedgers, archivedHistory } from './ledgers.mjs';
 import { legacyEmptyGuards, legacyAuditStatements, requireLegacyEmpty } from './legacy-safety.mjs';
 // ledgers: the rows of each migration ledger table the archive carries, as the
@@ -26,16 +27,16 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   const skippedTables=original.tables.filter(table=>platformTable(table.name)).map(table=>table.name);
   const cat=await catalogue(db,config),upgrade=config.acceptedSchemas[original.schema];
   const same=manifest.schema===cat.identity,history=()=>archivedHistory(original,ledgers);
-  const bridge=same || upgrade?undefined:await additiveBridge(db,manifest,cat,context.migrations,history);
+  const {replays,...bridge}=same || upgrade?{}:await additiveBridge(db,manifest,cat,context.migrations,history);
   if(same && !upgrade)await sameSchemaMigrations(db,manifest,cat,context.migrations,history);
-  if(!bridge)insist(canonicalJson(manifest.tables.map(x=>x.name))===canonicalJson(cat.tables.map(x=>x.name)),'table_inventory');
-  if(!upgrade && !bridge)for(const table of manifest.tables) {
+  if(!bridge.fromSchema)insist(canonicalJson(manifest.tables.map(x=>x.name))===canonicalJson(cat.tables.map(x=>x.name)),'table_inventory');
+  if(!upgrade && !bridge.fromSchema)for(const table of manifest.tables) {
     const target=cat.tables.find(t=>t.name===table.name);
     insist(canonicalJson(table.columns)===canonicalJson(target.columns) && canonicalJson(table.dependencies)===canonicalJson(target.dependencies),'column_inventory');
   }
   // Bridged tables stage and restore only the archived columns; the destination
   // supplies defaults for later columns and leaves later tables empty.
-  const targets=cat.tables.map(t=>bridge?.columns[t.name]?{...t,columns:manifest.tables.find(x=>x.name===t.name).columns,added:bridge.columns[t.name]}:t);
+  const targets=cat.tables.map(t=>bridge.columns?.[t.name]?{...t,columns:manifest.tables.find(x=>x.name===t.name).columns,added:bridge.columns[t.name]}:t);
   insist(canonicalJson(manifest.excludedColumns)===canonicalJson(config.secretColumns),'secret_inventory');
   insist(canonicalJson(manifest.requiredConfiguration)===canonicalJson(config.requiredConfiguration),'configuration_inventory');
   for(const o of manifest.objects) insist(buckets[o.bucket] && config.buckets[o.bucket] && o.key.startsWith(config.buckets[o.bucket].prefix??''),'bucket_inventory');
@@ -47,7 +48,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
     await abortImport(context,previous,{staleOnly:true});
   }
   const id=crypto.randomUUID(),copies=Object.fromEntries(targets.map((t,i)=>[t.name,'rer_portability_stage_'+id.replaceAll('-','')+'_'+i]));
-  const row={id,kind:'import',actor,phase:'staging',completed:0,metadata:{manifest:original,...(skippedTables.length?{restoreManifest:manifest,skippedTables}:{}),copies,targets,triggers:cat.triggers,...(bridge?{bridge}:{}),...(legacyRecovery?{legacyRecovery}: {}),...(ledgers?{ledgers}:{})}};
+  const row={id,kind:'import',actor,phase:'staging',completed:0,metadata:{manifest:original,...(skippedTables.length?{restoreManifest:manifest,skippedTables}:{}),copies,targets,triggers:cat.triggers,...(bridge.fromSchema?{bridge}:{}),...(replays?{replays}:{}),...(legacyRecovery?{legacyRecovery}: {}),...(ledgers?{ledgers}:{})}};
   try {
     await db.batch([guard(db,'(SELECT import_job FROM rer_portability_state WHERE id=1) IS NULL'),
       statement(db,'UPDATE rer_portability_state SET import_job=? WHERE id=1',id),
@@ -201,8 +202,8 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
       ...row.metadata.targets.map(t=>guard(db,`NOT EXISTS(SELECT 1 FROM ${quote(sidecar(row.metadata.copies[t.name]))} s JOIN rer_portability_journal j ON j.source=? AND j.tombstone=s.rer_portability_tombstone)`,manifest.sourceIdentity)),
       ...row.metadata.triggers.map(t=>db.prepare(`DROP TRIGGER ${quote(t.name)}`)),
       ...replaced.map(t=>db.prepare(`DELETE FROM ${quote(t)}`)),
-      ...row.metadata.targets.flatMap(t=>restoreCopy(db,t,row.metadata.copies[t.name])),
-      ...row.metadata.triggers.map(t=>db.prepare(t.sql)),...mergeJournal(db,manifest,checked),...legacyAuditStatements(db,row),save(db,row),
+      ...row.metadata.targets.flatMap(t=>restoreCopy(db,t,row.metadata.copies[t.name])),save(db,row),...replayStatements(db,row),
+      ...row.metadata.triggers.map(t=>db.prepare(t.sql)),...mergeJournal(db,manifest,checked),...legacyAuditStatements(db,row),
       db.prepare('UPDATE rer_portability_state SET import_job=NULL,applying=0 WHERE id=1'),db.prepare('DELETE FROM rer_portability_guard')]);
   }catch(e){
     // D1 may have committed even when its acknowledgement failed.

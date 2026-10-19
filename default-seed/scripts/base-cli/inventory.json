@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.69",
+  "cliVersion": "0.2.69-dev.gd1e9ca8c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2647,7 +2647,11 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "5a5527cc29cf4da55ae98edcc74fc17664337ce87f640a3fe31253995758a236"
+      "sha256": "27f7ac560ec5ea315bf0b81b5eb5d09c926c2833bad7abf404ed00a26d691e52"
+    },
+    "modules/portability/backfills.mjs": {
+      "source": "modules/portability/backfills.mjs",
+      "sha256": "b0048ed7979930729b91c5d4269eedc093efc8872eee97d65b19a1a798e5254e"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
@@ -2655,7 +2659,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "ab9f9bdc083fd5c0cadf2bd95708a297e3dc9eaf6b91424e26b885cb005e0d11"
+      "sha256": "d365a81cb5b73363b8a1a8b5626306932436b99d39c1c6f834c50b01d1bcb695"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -2723,11 +2727,11 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "2c570b2497fd4d25e660810f1a0e67670c596e0b864c730cfee42a0afe6abd19"
+      "sha256": "a270b26e2efd7a039868f8a8816bdb0f7cbb01607239fa10ce9e13371ef11eab"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
-      "sha256": "6e63eb2e099e093521fed02786c35d1011d25a46a4ad1ccca6e22c869f2ea4b8"
+      "sha256": "d4237d52ece3c807fa9b724f045fc63e5e457344d0e9fbe2df691494bf722512"
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
@@ -2759,7 +2763,7 @@
     },
     "modules/portability/migration-statements.mjs": {
       "source": "modules/portability/migration-statements.mjs",
-      "sha256": "6192afd23eea84c1b58e38e7c9a8ab4ec7c3e70b96ba99d899099650bd9f781d"
+      "sha256": "6b675680fe7f280e5ceb2ba7c9e073f6d8503c5d0dc92c13232f89fe0ec07d01"
     },
     "modules/portability/payloads.mjs": {
       "source": "modules/portability/payloads.mjs",

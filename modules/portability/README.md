@@ -286,13 +286,43 @@ contain only `CREATE TABLE` (not `AS SELECT`), `CREATE INDEX` and
 restorable tables. A later migration with any other statement that names a
 restorable table, such as an `INSERT`, `UPDATE` or `DELETE` that purges or
 backfills rows or a trigger, is refused with `schema_mismatch`; statements that
-touch only excluded tables are allowed. An archived table the archive holds no
+touch only excluded tables are allowed. A data statement (`INSERT`, `REPLACE`,
+`UPDATE` or `DELETE`, including `INSERT ... SELECT` and a leading `WITH`) is
+judged by the table it writes: when that table is outside the restorable
+catalogue (excluded, derived or platform) and no trigger or foreign key action
+(`ON DELETE`/`ON UPDATE CASCADE` or `SET`) carries its writes into a catalogue
+table, it changes no restored row and is allowed whatever it reads. Such a table
+then holds live rows the restore lacks, so a later statement that copies it into
+a catalogue table is refused. A statement this parser cannot bound to one table
+keeps the rule above. An archived table the archive holds no
 rows of restores empty, so an `UPDATE` or `DELETE` of it changes nothing and is
 allowed unless it also names a table the archive holds rows of (which it could
 read into its writes); an `INSERT` into it, or any other statement naming it,
 is still refused. For archives without a migration record,
 every migration after the earliest prefix that gives the archive's schema is
 checked, since the archive may predate any of them.
+
+A backfill of a catalogue table the archive does not carry (one a later
+migration adds, restored empty) is **replayed** instead of refused: an
+`INSERT ... SELECT` (or `INSERT ... VALUES`) into that table. Finalize empties
+the table (resetting its `AUTOINCREMENT` counter, as the live upgrade created
+it) and runs each of its later writes in migration order, exactly as written,
+after every archived row is inserted and while the destination's triggers are
+still dropped, in the same atomic D1 transaction as the rest of the restore. The
+table then holds what the live upgrade gave it. Time functions such as
+`strftime(..., 'now')` take the restore's time, as they took the upgrade's; an
+`INSERT ... SELECT` without `ORDER BY` assigns new keys in the order SQLite
+scans the restored rows. Rows the restore normalizes (import safety) are read
+as restored. The restore is refused with
+`schema_mismatch:migration_data:<migration>` instead when the archive carries
+the table (even with no rows), when a write to it is not a plain `INSERT` or
+`REPLACE`, reads any table other than archived ones and itself, selects `*` or
+a secret column, when a trigger on it or a foreign key action from it reaches a
+catalogue table, when any other later statement writes it (directly or through
+a trigger) or changes its columns other than by `ADD COLUMN` (allowed only when
+every replay names its columns), or when the statement cannot be bounded.
+A failed or interrupted apply leaves no replayed row; finalizing again replays
+from the start.
 
 The same check runs when the archive's schema identity equals the destination's:
 a later migration that only purges or backfills rows leaves the schema unchanged,
@@ -313,9 +343,13 @@ before any staging or audit write. Without a replayer (the HTTP handler, direct
 bindings), only identical schemas and `acceptedSchemas` restore.
 
 The import status and CLI receipt carry `bridged`: `migrations` (the later
-migrations bridged), `tables` (later tables left empty), `columns` (later columns
-per table that took defaults), `fromSchema` and `toSchema`. The import job keeps it
-and v1 recovery adds it to its audit record. `archiveHash`, `contentHash`,
+migrations bridged), `tables` (later tables, left empty unless replayed),
+`columns` (later columns per table that took defaults), `fromSchema` and
+`toSchema`, and with any replay `replayed`: one `{migration, statement, table,
+rows}` per replayed statement in the order run (`statement` is its index, from
+0, in the migration's split statements, `rows` the rows it wrote, recorded in the same
+transaction). The import job keeps it as the restore's journal of replays and
+v1 recovery adds it to its audit record. `archiveHash`, `contentHash`,
 the erasure fence and v1's own checks are unchanged.
 
 ## Backup-only v1 recovery
@@ -586,6 +620,7 @@ modules/portability/restore-safety.mjs
 modules/portability/bridge.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
+modules/portability/backfills.mjs
 modules/portability/legacy-safety.mjs
 modules/portability/export.mjs
 modules/portability/import.mjs
