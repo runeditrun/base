@@ -44,7 +44,7 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
         const { url, ...init } = await envelope.json();
         return worker.fetch(new Request(url, init), env, execution);
       } };` })
-  const options = convertV4MiniflareOptions({
+  const legacyOptions = {
     host: '127.0.0.1', port, https: production, modulesRoot: join(root, 'dist/server'),
     modules,
     compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
@@ -70,11 +70,12 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
       mails.push(await request.json())
       return Response.json({ id: `test-receipt-${mails.length}` })
     },
-  })
+  }
+  const options = convertV4MiniflareOptions(legacyOptions)
   const mf = new Miniflare({ ...options, resourcePersistencePath: join(directory, 'state') })
   try {
     await mf.ready
-    const db = await mf.getD1Database('DB')
+    let db = await mf.getD1Database('DB')
     await migrate(db, '0001_reference.sql')
     if (prior) {
       await db.prepare("INSERT INTO operators VALUES ('old-operator','previous@example.test','2026-09-08T00:00:00Z')").run()
@@ -92,6 +93,15 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
         method: 'POST', redirect: 'manual', body: JSON.stringify({ url: origin + path, ...init }),
       }) : mf.dispatchFetch(origin + path, { ...init, redirect: 'manual' })
     }
-    return { origin, call, db, mails, mf, provider, networkRequests, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
+    return { origin, call, get db() { return db }, mails, mf, provider, networkRequests,
+      // Deploy changed real Worker source against the same persisted D1. This
+      // models policy edits without an application-only test endpoint/binding.
+      async redeploy(transform = source => source) {
+        const changed = await Promise.all(modules.map(async module => ({ ...module,
+          contents: transform(module.contents ?? await readFile(module.path, 'utf8'), module.path) })))
+        await mf.setOptions({ ...convertV4MiniflareOptions({ ...legacyOptions, modules: changed }), resourcePersistencePath: join(directory, 'state') })
+        await mf.ready
+        db = await mf.getD1Database('DB')
+      }, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
   } catch (error) { await Promise.allSettled([mf.dispose(), rm(directory, { recursive: true, force: true })]); throw error }
 }

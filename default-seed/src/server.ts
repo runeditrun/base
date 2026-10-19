@@ -61,6 +61,10 @@ export default withDemo({
       const imports = await importPageResponse(request, bindings)
       if (imports) return imports
     }
+    if (path === '/app/policies') {
+      const policies = await (await import('./core/features/policies/page.server')).policyPageResponse(request, bindings)
+      if (policies) return policies
+    }
     if (path === '/app/people') {
       const people = await (await import('./core/features/people/page.server')).peoplePageResponse(request, bindings)
       if (people) return people
@@ -87,6 +91,7 @@ export default withDemo({
   async scheduled(controller, bindings: Bindings): Promise<void> {
     const checked = requireBindings(bindings)
     await recordScheduledRun(checked, controller.cron)
+    await (await import('./core/features/policies/scheduled.server')).runScheduledPolicies(checked)
     await (await import('./core/features/people/routes')).resumePendingErasures(checked)
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })
