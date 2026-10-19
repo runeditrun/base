@@ -56,7 +56,7 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
     SELECT p.* FROM ik_door_plans p WHERE installation_id=? AND namespace=? AND bundle_sha256=?
     AND NOT EXISTS(SELECT 1 FROM ik_door_apply_failures f WHERE f.plan_id=p.id)
     AND NOT EXISTS(SELECT 1 FROM ik_jobs j WHERE j.operation_key='door:'||p.id AND j.state IN ('undone','rolled_back'))
-    AND p.id NOT IN (SELECT id FROM applied) ORDER BY p.rowid DESC`)
+    AND p.id NOT IN (SELECT id FROM applied)`)
     .bind(catchup?1:0,request.access.installationId,request.access.namespace,request.access.installationId,request.access.namespace,upload.bundle_sha256).first<DoorPlanRow>();
   if (existing) {
     if (!existing.complete) throw new DoorError('plan_staging_interrupted_cancel_and_replan',409,{planId:existing.id});
