@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.68
+
+- **Retained-archive restores (#316, #318).** Placing an older archive treats a CREATE TRIGGER or DROP TRIGGER statement bounded as exactly one trigger as schema-only, and restore drops and recreates the destination's triggers around insertion; a later write that reaches an archived table through a trigger is still refused. Base reads RER Platform's rer_migrations ledger, places an archive without a migration record by the ledger it carries (every archived name and hash must match an applied migration), and admits a later UPDATE or DELETE of a table the archive holds no rows of.
+- **Release scans committed bytes only (#317).** rer release scans the raw committed source in an isolated mirror, so ignored local files such as .dev.vars and dist no longer block a release; a committed credential still does.
+- **Import credential names (#311).** The import door matches credential names by whole name parts (keyword, author and primaryKey are not credentials), catches query-key credentials such as application_key, hapikey and token_auth, and treats signatures and session ids as credentials only as URL keys and header names.
+- **Lobby recovery help on this computer only (#319).** The claimed Lobby shows the project-folder `rer signin` line only on loopback hosts, so hosted owners no longer see it.
+- **Import safety normalization (#322).** A seed's importSafety/importRow hook bounds staged rows to declared safe values (for example connections forced inactive with their tokens cleared), checks determinism and idempotence, and journals per-table, column and value counts into status, receipts and owner CLI output.
+
 ## 0.2.67
 
 - **Import door options (#298 with #308).** Seeds choose credential removal modes and a preserve or strict reversal policy when an import is created. Failed applies can be retried, CLI-stripped query and fragment credentials receive per-record notes, more credential shapes are recognized, and a blocked re-baseline is refused at plan time with a named 409.
