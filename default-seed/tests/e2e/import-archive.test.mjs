@@ -110,7 +110,8 @@ test('Business keeps a tool\'s final export as an archive in the default seed: p
 
   // The baseline applies, then the tool's final export, which adds a person and
   // repeats one record identically, is archived and caught up.
-  await seed.apply(await seed.plan(first.uploadId))
+  const baseline = await seed.plan(first.uploadId)
+  await seed.apply(baseline)
   const added = [{ ref: 'max', name: 'Max Final', email: 'max@example.test' }]
   const final = await seed.upload([...team, team[1], ...added])
   const finalTakenAt = new Date().toISOString()
@@ -123,6 +124,30 @@ test('Business keeps a tool\'s final export as an archive in the default seed: p
     'the final archive counts what the final catch-up read: unique records against its source records, every record read against its input')
   assert.ok(last.body.counts.input > last.body.counts.unique, 'the repeated record counts in input only')
   assert.deepEqual(await seed.call('archive', { ...request, takenAt: finalTakenAt }), { status: 409, body: { error: 'archive_exists', details: { archiveId } } })
+
+  // The vendor is unchanged since: its next export is the same bundle as the
+  // applied catch-up. Under the standing approval it plans afresh against that
+  // import, a catch-up of no changes that Business applies and reconciles; a
+  // repeated request reuses that unapplied plan. An ordinary plan of the same
+  // bytes still answers the applied import.
+  const standing = { catchup: 'bounded', approvalRecordId: randomUUID(), approvedAt: new Date().toISOString() }
+  const unchanged = await seed.upload([...team, team[1], ...added])
+  const quiet = await seed.call('plan', { uploadId: unchanged.uploadId, catchup: true }, await seed.token({ action: 'plan', ...standing }))
+  assert.equal(quiet.status, 200, JSON.stringify(quiet.body))
+  assert.notEqual(quiet.body.planId, catchup.planId, 'an unchanged source plans a new catch-up, not the applied one')
+  assert.deepEqual(quiet.body.summary, { ...catchup.summary, created: 0, updated: 0, unchanged: catchup.summary.sourceRecords, gone: 0 })
+  const again = await seed.call('plan', { uploadId: (await seed.upload([...team, team[1], ...added])).uploadId, catchup: true }, await seed.token({ action: 'plan', ...standing }))
+  assert.deepEqual([again.status, again.body.planId], [200, quiet.body.planId], 'the unapplied catch-up plan is reused')
+  for (let batch = 0; ; batch++) {
+    const applied = await seed.call('apply', { planId: quiet.body.planId, reviewedFingerprint: quiet.body.fingerprint }, await seed.token({ action: 'apply', fingerprint: quiet.body.fingerprint, ...standing }))
+    assert.equal(applied.status, 200, JSON.stringify(applied.body))
+    if (applied.body.job.state === 'completed') break
+    assert.ok(batch < 50, 'apply did not complete')
+  }
+  const reconciled = await seed.call('reconcile', { planId: quiet.body.planId })
+  assert.equal(reconciled.status, 200, JSON.stringify(reconciled.body))
+  const ordinary = await seed.call('plan', { uploadId: (await seed.upload(team)).uploadId })
+  assert.deepEqual([ordinary.status, ordinary.body.planId], [200, baseline.planId], 'an ordinary plan of an imported bundle reuses its plan')
 
   const native = await seed.people()
   assert.deepEqual(native.map((person) => person.ref).sort(), [...team, ...added].map((person) => person.ref).sort())

@@ -149,7 +149,9 @@ provenance revision and native values. Missing source records are listed, never
 deleted. One plan remains pending per logical namespace until applied or undone;
 kit job state recovers the lineage after interrupted calls. The same bundle
 reuses its exact retained plan unless its apply failed or its import was undone
-or rolled back; changing mapping requires a fresh explicit namespace and review.
+or rolled back; a catch-up never reuses an applied plan, so an unchanged source
+plans a catch-up with no changes against the head. Changing mapping requires a
+fresh explicit namespace and review.
 Undo proceeds newest first and preserves native edits.
 
 Bounded catch-up requires a nonempty prior snapshot and a standing owner approval

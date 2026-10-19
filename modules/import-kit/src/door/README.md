@@ -355,7 +355,11 @@ Only one plan may remain pending per logical namespace until applied or undone.
 Committed kit state recovers lineage after an interrupted call. Repeating a
 bundle reuses its exact retained plan unless that plan's apply failed or its
 import was undone or rolled back: then the same bundle plans afresh, so a file
-can be imported again after undo. Use a fresh explicit namespace and review
+can be imported again after undo. A catch-up (`catchup: true`) never reuses an
+applied plan, the head or one before it: a bundle identical to one already
+applied plans afresh against the head, so an unchanged source yields a catch-up
+with no changes that a standing approval can apply. Repeating it before it is
+applied reuses that catch-up plan. Use a fresh explicit namespace and review
 for a different mapping. Undo snapshots newest first, including undo from the
 seed's ordinary owner history. Undoing a snapshot while a newer one still holds
 its records answers 409 `import_superseded`; a strict undo after an owner edit
