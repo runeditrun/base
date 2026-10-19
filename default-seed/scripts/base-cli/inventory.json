@@ -363,7 +363,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "ce9053869e3dc52c1015674c79ddb38da3bc8dbf7fa2c172f7c503afc5aabf09"
+      "sha256": "68d59806ca82f477b374fbe9798e15e7ee4f96e2a47a68d1403ee49113c61ea4"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -691,7 +691,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "f01d4302f7238f5a9a5c2679b8ca0f14af67451fe5d29a8f584b37b5f277c742"
+      "sha256": "0030792760e9caffe375cfc9ef6ea8c1778f188391d92aca1bde77ec5a7b0785"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -725,6 +725,10 @@
       "source": "cli/deploy-owner.mjs",
       "sha256": "6c2e6ef799eb52dc6d82b5cee150371c9176394f73cd5a1ce1f4f7b9fbe442c5"
     },
+    "cli/deploy-product.mjs": {
+      "source": "cli/deploy-product.mjs",
+      "sha256": "84c76d01713c58c09b97890c8ed47c3aa884bcd244965f4d5918f72bc4d4e452"
+    },
     "cli/deploy-readiness.mjs": {
       "source": "cli/deploy-readiness.mjs",
       "sha256": "331bb95c8c3b1b9a756f15f5e03d705b6075accf2f26a28b9a4df2bff2d019ab"
@@ -751,7 +755,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "98314859afe3d9d79f5c7d432133e34010f68fd2ae14ca6af3d9ab90a5db01ea"
+      "sha256": "26c8386ef7363b0330c2b6cae2d2095ff16fbd4583d99fd46035ec6d735bbbd3"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -1583,7 +1587,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "47c46365751290c395b6e4f607393568331eb20e30ab5366ad1532432386aa20"
+      "sha256": "151cf6a1d0da14b8da8078360518d9b6d1dde6e40d1ba2f6481a0a8d2703d5f9"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1683,7 +1687,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "d9c8c4f359bb0c22919ff82a9f6c9ddcbbb8c20b777607987e286c0093d78d50"
+      "sha256": "19551dfa4ef8f26faec2622fffbee04f194c45271648602315193487ff312b89"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
