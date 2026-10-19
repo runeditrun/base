@@ -41,19 +41,30 @@ export async function withImportLease(context,id,operation,{abort=false,staleOnl
   if(staleOnly && lease.expires_at>now)throw await importRunning(db,id);
   if(!abort && lease.expires_at<=now)throw new PortabilityError('import_lease_expired',409);
   if(!soleOperator && lease.holder && lease.expires_at>now)throw await importRunning(db,id);
-  const claimed=await statement(db,`UPDATE rer_portability_import_leases SET holder=?,expires_at=?
-    WHERE job=? AND expires_at=? AND holder IS ?
-    AND EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND import_job=?)`,holder,now+IMPORT_LEASE_MS,id,lease.expires_at,lease.holder,id).run();
-  if(claimed.meta.changes!==1)throw await importRunning(db,id);
+  // Like staging/publication, claim by a transactional SQL guard. Transport
+  // adapters need not expose provider-specific UPDATE result metadata.
+  try {
+    await db.batch([guard(db,`EXISTS(SELECT 1 FROM rer_portability_import_leases WHERE job=? AND expires_at=? AND holder IS ?)
+      AND EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND import_job=?)`,id,lease.expires_at,lease.holder,id),
+      statement(db,'UPDATE rer_portability_import_leases SET holder=?,expires_at=? WHERE job=?',holder,now+IMPORT_LEASE_MS,id),
+      db.prepare('DELETE FROM rer_portability_guard')]);
+  }catch(error){
+    const current=await leaseRow(db,id);
+    if(current?.holder!==lease.holder || current?.expires_at!==lease.expires_at)throw await importRunning(db,id);
+    throw error;
+  }
   let stopped=false,timer,pending=Promise.resolve(),failure;
   const owned=async()=>{
     const current=await leaseRow(db,id);
     return current?.holder===holder && current.expires_at>Date.now();
   };
   const renew=async()=>{
-    const at=Date.now(),result=await statement(db,`UPDATE rer_portability_import_leases SET expires_at=?
-      WHERE job=? AND holder=? AND expires_at>?`,at+IMPORT_LEASE_MS,id,holder,at).run();
-    if(result.meta.changes!==1)throw new PortabilityError('import_lease_expired',409);
+    const at=Date.now();
+    try {
+      await db.batch([guard(db,'EXISTS(SELECT 1 FROM rer_portability_import_leases WHERE job=? AND holder=? AND expires_at>?)',id,holder,at),
+        statement(db,'UPDATE rer_portability_import_leases SET expires_at=? WHERE job=?',at+IMPORT_LEASE_MS,id),
+        db.prepare('DELETE FROM rer_portability_guard')]);
+    }catch(error){if(!await owned())throw new PortabilityError('import_lease_expired',409);throw error;}
   };
   const schedule=()=>{
     timer=setTimeout(()=>{

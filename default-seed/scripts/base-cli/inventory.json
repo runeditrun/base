@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.67",
+  "cliVersion": "0.2.67-dev.g5548f1bc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2703,7 +2703,7 @@
     },
     "modules/portability/import-lease.mjs": {
       "source": "modules/portability/import-lease.mjs",
-      "sha256": "61c0545b0c7370fdd8e136fb37af59b0d0fb4f396af782b608f7f9834d35bcc7"
+      "sha256": "97df004ec17a8b2fbc6ea53dbe1c3d4b8b5ad79f25eacca344609562f61dd761"
     },
     "modules/portability/import-staging.mjs": {
       "source": "modules/portability/import-staging.mjs",
