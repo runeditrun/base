@@ -26,7 +26,9 @@ export async function signArtifact(options) {
     if (privateKey.asymmetricKeyType !== 'ed25519') throw new Error();
   } catch { refuse('SIGNATURE_INVALID'); }
   const artifact = await readArtifact(options.artifact);
-  if (artifact.receipt.status !== 'RELEASED' || artifact.receipt.tag?.created !== true) refuse('SUBJECT_MISMATCH');
+  const tag = artifact.receipt.tag;
+  if (artifact.receipt.status !== 'RELEASED' || !(tag?.created === true ||
+    (tag?.adopted === true && tag.object === artifact.subject.tagObject))) refuse('SUBJECT_MISMATCH');
   const scope = options.scope ?? 'rer', issuedAt = timestamp(new Date());
   // This ephemeral proof checks our output, not publisher admission. The
   // consumer still needs a separately reviewed anchor with the real owner ID.

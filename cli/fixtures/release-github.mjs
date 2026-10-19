@@ -27,6 +27,24 @@ export async function source(t, { localPass = false, portable = false, buildFail
   f.sha = f.commit();
   execFileSync('git', ['-C', f.repo, 'remote', 'add', 'origin', `git@github.com:${repository}.git`]);
   const commands = join(f.temporary, 'commands'); mkdirSync(commands);
+  const remote = join(f.temporary, 'remote.git');
+  {
+    const actualGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+    execFileSync(actualGit, ['init', '--bare', '-q', remote]);
+    execFileSync(actualGit, ['-C', remote, 'symbolic-ref', 'HEAD', 'refs/heads/main']);
+    execFileSync(actualGit, ['-C', f.repo, 'push', remote, 'HEAD:refs/heads/main'], { stdio: 'pipe' });
+    // Only the network transport is replaced. All refs and tag objects are real.
+    const transport = join(commands, 'git');
+    writeFileSync(transport, `#!${process.execPath}
+const cp = require('node:child_process');
+const urls = ${JSON.stringify(['https://github.com/' + repository, 'https://github.com/' + repository + '.git', `git@github.com:${repository}.git`])};
+const args = process.argv.slice(2).map(arg => urls.includes(arg) ? ${JSON.stringify(remote)} : arg);
+if (args.some(arg => /^(?:https?:|ssh:|git:|git@)/.test(arg))) throw Error('Unconfigured test Git transport');
+const result = cp.spawnSync(${JSON.stringify(actualGit)}, args, { stdio: 'inherit' });
+process.exitCode = result.status ?? 1;
+`);
+    chmodSync(transport, 0o755);
+  }
   const responses = join(f.temporary, 'responses.json'), calls = join(f.temporary, 'calls.jsonl');
   writeFileSync(calls, '');
   const gh = join(commands, 'gh');
@@ -51,7 +69,7 @@ else { process.stderr.write('unexpected API request'); process.exitCode = 1; }
   const run = { id: 12345, workflow_id: 42, head_sha: f.sha, head_branch: 'main', event: 'push',
     status: 'completed', conclusion: 'success', repository: { full_name: repository }, head_repository: { full_name: repository } };
   let attempt = 0;
-  function invoke(runs = [run], flags = [], extra = {}) {
+  function invoke(runs = [run], flags = [], extra = {}, { dryRun = true, validationError = false } = {}) {
     writeFileSync(responses, JSON.stringify({
       [`repos/${repository}`]: { full_name: repository, default_branch: 'main' },
       [`repos/${repository}/actions/workflows?per_page=100`]: [{ workflows: [{ id: 42, name: 'Verify' }] }],
@@ -59,11 +77,11 @@ else { process.stderr.write('unexpected API request'); process.exitCode = 1; }
     }));
     const output = join(f.temporary, 'release-' + attempt++);
     const result = spawnSync(process.execPath, [cli, 'release', '--repo', f.repo, '--project', repository,
-      '--repository', 'https://github.com/' + repository, '--ref', f.sha, '--output', output, '--dry-run', ...flags],
+      '--repository', 'https://github.com/' + repository, '--ref', f.sha, '--output', output, ...(dryRun ? ['--dry-run'] : []), ...flags],
     { cwd: f.temporary, env, encoding: 'utf8', timeout: 120000 });
-    assert.equal(result.stderr, '', result.stderr);
-    return { result, receipt: JSON.parse(result.stdout), output };
+    if (!validationError) assert.equal(result.stderr, '', result.stderr);
+    return { result, receipt: result.stdout.trim() ? JSON.parse(result.stdout) : null, output };
   }
-  return { ...f, env, calls, run, invoke };
+  return { ...f, env, calls, run, invoke, remote };
 }
 

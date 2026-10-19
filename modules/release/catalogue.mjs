@@ -20,7 +20,11 @@ export function catalogue(source, project, repository, gates, dryRun) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s.id)) throw Error('Invalid seed listing ID');
   for (const key of ['name', 'category', 'description', 'maturity'])
     if (typeof s[key] !== 'string' || !s[key]) throw Error('Incomplete seed listing metadata');
-  const contract = clauses(source.bytes('CONTRACT.md').toString());
+  const contractBytes = source.bytes('CONTRACT.md');
+  // Published releases do not record an authenticated fresh contract judgment.
+  // Tags and matching bytes alone cannot authorize skipping today's parser.
+  const contract = clauses(contractBytes.toString());
+  if (!contract.length) throw Error('CONTRACT.md must contain published clauses');
   const licence = source.bytes('LICENSE').toString();
   if (!licence.includes('Permission is hereby granted, free of charge')) throw Error('Declare a supported listing license');
   const docs = ['seed.json', 'CONTRACT.md', 'AGENTS.md', 'LICENSE', 'RELEASE.json',
