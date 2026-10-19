@@ -53,7 +53,7 @@ function database(migrations, { ledger = true } = {}) {
   }
   return db;
 }
-const service = (db, migrations) => createPortability({ db: binding(db), policy, migrations: async () => migrationReplay(plan(migrations), policy) });
+const service = (db, migrations, input = policy) => createPortability({ db: binding(db), policy: input, migrations: async () => migrationReplay(plan(migrations), input) });
 async function archive(portability) {
   const id = await portability.exports.create();
   while ((await portability.exports.advance(id, { maxParts: 10 })).phase === 'building') {}
@@ -144,5 +144,48 @@ INSERT INTO audit VALUES('a1');` },
     const migrations = [custody, later], target = database(migrations);
     await assert.rejects((await service(target, migrations)).imports.create(bundle.manifest), new RegExp('schema_mismatch:migration_data:' + later.name));
     assert.deepEqual(rows(target, ['jobs', 'custody_states', 'sources']), { jobs: [], custody_states: [], sources: [] });
+  }
+});
+
+// Like a search capacity migration: triggers feeding an excluded queue whose
+// bodies start `SELECT CASE ... END||p.id`. Wrangler's splitter misses their
+// END and hands them over glued to each other and to the backfill after them.
+const searchPolicy = { product: 'trigger-migrations', excludeTables: ['search_dirty', 'd1_assertions'] };
+const knowledge = { name: '0001_knowledge.sql', sql: `CREATE TABLE pages(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,page_kind TEXT NOT NULL);
+CREATE TABLE page_blocks(id TEXT PRIMARY KEY,page_id TEXT NOT NULL,body TEXT NOT NULL);
+CREATE TABLE d1_assertions(ok INTEGER NOT NULL CHECK(ok=1));` };
+const dirty = "INSERT INTO search_dirty SELECT CASE WHEN p.page_kind='record' THEN 'record:' ELSE 'page:' END||p.id,p.workspace_id FROM pages p WHERE p.id=NEW.page_id ON CONFLICT(key) DO NOTHING;";
+const search = { name: '0002_search.sql', sql: `CREATE TABLE search_dirty(key TEXT PRIMARY KEY,workspace_id TEXT NOT NULL);
+CREATE TRIGGER search_pages_insert AFTER INSERT ON pages BEGIN INSERT INTO search_dirty VALUES(CASE WHEN NEW.page_kind='record' THEN 'record:' ELSE 'page:' END||NEW.id,NEW.workspace_id) ON CONFLICT(key) DO NOTHING; END;
+CREATE TRIGGER search_page_blocks_insert AFTER INSERT ON page_blocks BEGIN ${dirty} END;
+CREATE TRIGGER search_page_blocks_update AFTER UPDATE ON page_blocks BEGIN ${dirty} END;
+INSERT INTO search_dirty SELECT CASE WHEN page_kind='record' THEN 'record:' ELSE 'page:' END||id,workspace_id FROM pages;` };
+// Like an import door: a guard that fails the migration while an old unique
+// index exists, writing only an excluded assertions table, then a new table and a view of it.
+const door = { name: '0003_door.sql', sql: `INSERT INTO d1_assertions(ok) SELECT 0 WHERE EXISTS(SELECT 1 FROM pragma_index_list('door_plans') l WHERE l."unique"=1 AND (SELECT group_concat(name) FROM pragma_index_info(l.name))='page_id,id');
+CREATE TABLE IF NOT EXISTS door_plans(id TEXT PRIMARY KEY,page_id TEXT NOT NULL);
+CREATE VIEW door_plan_pages AS SELECT id,page_id FROM door_plans;` };
+
+test('an archive predating a guard and a view restores past triggers holding CASE ... END; archived rewrites and unreadable chunks stay refused', async () => {
+  const source = database([knowledge, search]);
+  source.exec("INSERT INTO pages VALUES('p1','w1','page'),('r1','w1','record'); INSERT INTO page_blocks VALUES('b1','p1','Hello'),('b2','r1','Fields')");
+  const bundle = await archive(await service(source, [knowledge, search], searchPolicy));
+  assert.deepEqual(bundle.manifest.migrations, [knowledge.name, search.name]);
+  const migrations = [knowledge, search, door], target = database(migrations), before = triggers(target);
+  assert.equal((await restore(await service(target, migrations, searchPolicy), bundle)).phase, 'complete');
+  assert.deepEqual(rows(target, ['pages', 'page_blocks', 'door_plans']), { ...rows(source, ['pages', 'page_blocks']), door_plans: [] });
+  assert.deepEqual(triggers(target), before);
+  target.exec("UPDATE page_blocks SET body='Edited' WHERE id='b2'");
+  assert.deepEqual(rows(target, ['search_dirty']), { search_dirty: [{ key: 'record:r1', workspace_id: 'w1' }] });
+
+  const refusals = [
+    [{ name: '0003_door.sql', sql: `${door.sql}\nUPDATE pages SET page_kind='page' WHERE page_kind='record';` }, /schema_mismatch:migration_data:0003_door\.sql/],
+    // SQLite runs a statement ending in an open block comment; Base cannot read where it ends.
+    [{ name: '0003_open.sql', statements: ['CREATE INDEX pages_kind ON pages(page_kind); /* left open'] }, /generated_sql/],
+  ];
+  for (const [later, refusal] of refusals) {
+    const list = [knowledge, search, later], destination = database(list);
+    await assert.rejects((await service(destination, list, searchPolicy)).imports.create(bundle.manifest), refusal, later.name);
+    assert.deepEqual(rows(destination, ['pages', 'page_blocks']), { pages: [], page_blocks: [] });
   }
 });

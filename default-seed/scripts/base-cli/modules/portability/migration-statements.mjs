@@ -1,4 +1,5 @@
 import { tokens, identifier, folded } from './generated.mjs';
+import { tableNames, splitStatements } from './sql-text.mjs';
 
 // Whether one migration statement can change rows a restore carries. Only
 // CREATE TABLE (not AS SELECT), CREATE INDEX and ALTER TABLE ... ADD COLUMN
@@ -18,8 +19,12 @@ import { tokens, identifier, folded } from './generated.mjs';
 // (no row fires a trigger either), so such a statement changes data only if it
 // names another reached table (one it could write, or read into its writes).
 // Any other statement naming an empty table still does: an INSERT would leave
-// rows the restore lacks.
+// rows the restore lacks. A chunk holding several statements (sql-text.mjs
+// splitStatements) changes data when any of them does.
 export function changesData(sql,reached,empty=[]) {
+  return splitStatements(sql).some(one=>statementChanges(one,reached,empty));
+}
+function statementChanges(sql,reached,empty) {
   const list=tokens(sql),words=list.map(t=>t.quoted?undefined:folded(t.text)),kind=kindOf(words);
   if(kind==='create table')return topLevelWords(list,words).includes('as');
   if(kind==='create index')return false;
@@ -34,15 +39,16 @@ export function changesData(sql,reached,empty=[]) {
 // DELETE/UPDATE CASCADE or SET) declared by a reached table: a write to such a
 // table during a later migration changes restorable rows the archive lacks. A
 // trigger counts when its statement names a reached table anywhere; one this
-// parser cannot bound adds every name it holds.
+// parser cannot bound adds every table name it holds (sql-text.mjs tableNames:
+// never a keyword, function, qualified column or literal).
 export function reachingTables(statements,restorable) {
-  const reached=new Set(restorable.map(folded)),parsed=statements.map(sql=>tokens(sql)).map(list=>({list,words:list.map(t=>t.quoted?undefined:folded(t.text))}));
+  const reached=new Set(restorable.map(folded)),parsed=statements.flatMap(splitStatements).map(sql=>tokens(sql)).map(list=>({list,words:list.map(t=>t.quoted?undefined:folded(t.text))}));
   const triggers=parsed.filter(({words})=>kindOf(words)==='create trigger').map(({list})=>({list,on:createdTrigger(list)?.on}));
   const actions=parsed.filter(({words})=>['create table','alter table'].includes(kindOf(words)) && words.some((w,i)=>w==='cascade' || (w==='set' && ['delete','update'].includes(words[i-1])))).map(({list})=>referencing(list));
   for(let grew=true;grew;) {
     grew=false;
     const add=name=>{if(!reached.has(name)){reached.add(name);grew=true;}};
-    for(const {list,on} of triggers)if(names(list,reached))(on===undefined?identifiers(list):[on]).forEach(add);
+    for(const {list,on} of triggers)if(names(list,reached))(on===undefined?tableNames(list):[on]).forEach(add);
     for(const {table,parents} of actions)if(table===undefined?parents.some(name=>reached.has(name)):reached.has(table))parents.forEach(add);
   }
   return [...reached];
@@ -63,7 +69,8 @@ function tableName(name) {
 // directly, after an optional WITH clause, with what a replay must know of it:
 // {verb, target, conflict (an OR clause's resolution, 'replace' for REPLACE),
 // columns (an explicit insert column list), upsert (ON CONFLICT ... DO UPDATE),
-// star (a * or t.* result column), names (every identifier it holds)}. Undefined
+// star (a * or t.* result column), names (the table names it holds, tableNames),
+// words (every identifier it holds, columns and keywords too)}. Undefined
 // for any other statement or one this parser cannot bound. Triggers on the
 // target and foreign key actions are the only further writes such a statement
 // makes; reachingTables accounts for both.
@@ -100,7 +107,7 @@ export function dataStatement(sql) {
   if(word(parts[i],'as'))i+=2;
   const star=parts.some((a,k)=>!a.quoted && /(^|\.)\*$/.test(a.text) && !(parts[k-1]?.text==='(' && parts[k+1]?.text===')'));
   const upsert=parts.some((a,k)=>word(a,'do') && word(parts[k+1],'update'));
-  return {verb,target,conflict,columns:verb==='insert' || verb==='replace'?parts[i]?.text==='(':undefined,upsert,star,names:identifiers(parts)};
+  return {verb,target,conflict,columns:verb==='insert' || verb==='replace'?parts[i]?.text==='(':undefined,upsert,star,names:tableNames(parts),words:identifiers(parts)};
 }
 // The index after the parenthesized group opening at `start`, or the end when unbalanced.
 function closing(parts,start) {
@@ -108,15 +115,15 @@ function closing(parts,start) {
   for(let i=start;i<parts.length;i++){if(parts[i].quoted)continue;if(parts[i].text==='(')depth++;else if(parts[i].text===')' && !--depth)return i+1;}
   return parts.length;
 }
-// The names in the bodies of triggers on `table` that `statements` create, and
-// every name in a trigger this parser cannot bound that names the table.
+// The table names in the bodies of triggers on `table` that `statements`
+// create, and every one in a trigger this parser cannot bound that names the table.
 export function triggerBodies(statements,table) {
   const result=[];
-  for(const list of statements.map(sql=>tokens(sql))) {
+  for(const list of statements.flatMap(splitStatements).map(sql=>tokens(sql))) {
     if(kindOf(list.map(t=>t.quoted?undefined:folded(t.text)))!=='create trigger')continue;
     const created=createdTrigger(list);
-    if(!created){if(identifiers(list).includes(table))result.push(...identifiers(list));}
-    else if(created.on===table)result.push(...identifiers(atoms(list).slice(created.begin+1)));
+    if(!created){if(tableNames(list).includes(table))result.push(...tableNames(list));}
+    else if(created.on===table)result.push(...tableNames(atoms(list).slice(created.begin+1)));
   }
   return result;
 }
@@ -130,10 +137,10 @@ export function schemaChange(sql) {
   if(kind==='alter table' && words.find((w,i)=>i>2 && ['add','rename','drop'].includes(w))==='add')return 'add column';
   if(kind==='create trigger' && createdTrigger(list) || kind==='drop trigger' && droppedTrigger(list))return 'trigger';
 }
-export const statementNames=sql=>identifiers(tokens(sql));
+export const statementNames=sql=>tableNames(tokens(sql));
 const kindOf=words=>words.slice(0,4).filter(w=>!['temp','temporary','unique'].includes(w)).slice(0,2).join(' ');
 const identifiers=list=>list.flatMap(t=>t.quoted?(t.text.startsWith("'")?[]:[folded(identifier(t))]):folded(t.text).split(/[^a-z0-9_$\u0080-\uffff]+/).filter(Boolean));
-const names=(list,reached)=>identifiers(list).some(name=>reached.has(name));
+const names=(list,reached)=>tableNames(list).some(name=>reached.has(name));
 // Tokens with each unquoted ';' split out, and trailing ones dropped.
 function atoms(list) {
   const result=list.flatMap(t=>t.quoted?[t]:t.text.split(/(;)/).filter(Boolean).map(text=>({text})));
