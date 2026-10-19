@@ -3,6 +3,7 @@ import { canonicalJson } from './hash.mjs';
 import { tokens, identifier, folded } from './generated.mjs';
 import { laterData } from './backfills.mjs';
 import { destinationLedger } from './ledgers.mjs';
+import { checkRebuild } from './rebuilds.mjs';
 
 // Applied product migrations in the ledger's own order (ledgers.mjs). A
 // state-bearing ledger may hold an unacknowledged migration whose effects are
@@ -51,8 +52,8 @@ async function placement(db,manifest,cat,replay,ledger,history) {
   const catalogue=cat.tables.map(t=>t.name),archived=catalogue.filter(name=>manifest.tables.some(t=>t.name===name));
   const empty=archived.filter(name=>!manifest.tables.find(t=>t.name===name).count);
   const tables=(await all(db,"SELECT name FROM sqlite_master WHERE type IN ('table','view')")).map(t=>t.name);
-  const replays=laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets:manifest.excludedColumns??{}});
-  return {earlier,replays};
+  const {replays,rebuilt}=laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets:manifest.excludedColumns??{},manifest:manifest.tables});
+  return {earlier,replays,rebuilt};
 }
 // An archive without a migration record that carries its source's migration
 // ledger (an old archive from before that ledger became bookkeeping) records
@@ -84,20 +85,22 @@ export async function sameSchemaMigrations(db,manifest,cat,migrations,history) {
   await placement(db,manifest,cat,await migrations(),ledger,history);
 }
 // An archive made before later migrations restores only when those migrations
-// are additive: new tables, new columns that take a default, or indexes (which
-// archives never carry). Anything else stays a schema_mismatch refusal.
+// are additive, or a proven row-preserving CHECK rebuild: new tables, new
+// columns that take a default, or indexes (which archives never carry).
+// Anything else stays a schema_mismatch refusal.
 export async function additiveBridge(db,manifest,cat,migrations,history) {
   insist(migrations,'schema_mismatch');
   const replay=await migrations(),ledger=await destinationLedger(db)??[],applied=ledger.map(m=>m.name);
   insist(!manifest.migrations || manifest.migrations.every(name=>applied.includes(name)),'schema_mismatch:migrations');
-  const {earlier,replays}=await placement(db,manifest,cat,replay,ledger,history);
+  const {earlier,replays,rebuilt}=await placement(db,manifest,cat,replay,ledger,history);
   const columns={};
   for(const table of manifest.tables) {
     const target=cat.tables.find(t=>t.name===table.name),label=':'+table.name;
     insist(target,'schema_mismatch:table'+label);
     const kept=target.columns.slice(0,table.columns.length),added=target.columns.slice(table.columns.length);
     insist(canonicalJson(kept)===canonicalJson(table.columns) && table.rowidAlias===target.rowidAlias && table.dependencies.every(d=>target.dependencies.includes(d)),'schema_mismatch:columns'+label);
-    if(!added.length){insist(table.sql===target.sql,'schema_mismatch:definition'+label);continue;}
+    const rebuiltChecks=rebuilt.has(folded(table.name)) && checkRebuild(table.sql,target.sql);
+    if(!added.length){insist(table.sql===target.sql || rebuiltChecks,'schema_mismatch:definition'+label);continue;}
     const declared=await all(db,`PRAGMA table_xinfo(${quote(table.name)})`);
     insist(added.every(c=>!c.pk && !c.generated && (!c.notnull || declared.find(d=>d.name===c.name)?.dflt_value!=null)),'schema_mismatch:column_default'+label);
     insist(appended(table.sql,target.sql,added.map(c=>c.name)),'schema_mismatch:definition'+label);

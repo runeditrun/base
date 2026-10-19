@@ -2,6 +2,8 @@ import { statement, quote, insist } from './storage.mjs';
 import { tokens, folded } from './generated.mjs';
 import { changesData, dataStatement, reachingTables, triggerBodies, schemaChange, statementNames } from './migration-statements.mjs';
 import { splitStatements } from './sql-text.mjs';
+import { preservingRebuilds } from './rebuilds.mjs';
+import { replayViews, viewReads } from './replay-views.mjs';
 
 // The data statements of later migrations, judged by the tables they write
 // (bridge.mjs placement). Restored rows never pass through a later migration.
@@ -10,12 +12,13 @@ import { splitStatements } from './sql-text.mjs';
 //   writes reach no catalogue table through a trigger or foreign key action
 //   (reachingTables) changes no restored row, whatever it reads: admitted.
 // - One whose target is a catalogue table the archive does not carry (restored
-//   empty) and that today's rule refuses (it reads archived rows: a backfill)
-//   is replayed at finalize. Every later write to that table must then be a
+//   empty) is replayed at finalize when it inserts seed or backfill rows.
+//   Every later write to that table must then be a
 //   replayable INSERT: they run in migration order, exactly as written, after
 //   the archived rows are inserted and with the destination's triggers still
 //   dropped, so the table holds what the live upgrade gave it. A replay may read
-//   only archived tables (complete by then) and the table itself, by named
+//   only archived tables (complete by then), views over those tables and the
+//   table itself, by named
 //   columns that are not secret; no trigger on the table may write a catalogue
 //   table; no later statement may write it another way (directly or through a
 //   trigger) or change its columns other than by ADD COLUMN.
@@ -25,14 +28,15 @@ import { splitStatements } from './sql-text.mjs';
 // Each chunk the runner's splitter handed over is split again at SQLite's own
 // statement boundaries first (sql-text.mjs), so a trigger glued to the
 // statements after it is judged as the statements it holds.
-// Returns the replays in migration order, or refuses with the first migration
+// Returns the replays in migration order and the proven CHECK rebuilds, or refuses with the first migration
 // (in `unapplied` order) holding a statement that cannot be admitted.
-export function laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets}) {
+export function laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets,manifest}) {
   const split=name=>replay.statements(name).flatMap(splitStatements),fold=list=>list.map(folded);
   const statements=applied.flatMap(split);
   const restorable=fold(catalogue),carried=fold(archived),absent=restorable.filter(name=>!carried.includes(name));
   const reached=reachingTables(statements,carried),writable=reachingTables(statements,restorable);
   const later=unapplied.flatMap(migration=>split(migration).map((sql,index)=>({migration,index,sql,data:dataStatement(sql)})));
+  const {admitted,tables:rebuilt}=preservingRebuilds(later,manifest,tables,statements),views=replayViews(statements);
   const known=fold(tables),outside=later.filter(s=>s.data && !writable.includes(s.data.target)),tainted=new Set();
   // Tables an admitted write fills from archived rows (directly, through its
   // target's triggers, or from another such table) hold rows the restore lacks.
@@ -40,15 +44,17 @@ export function laterData({applied,unapplied,replay,catalogue,archived,empty,tab
   for(let grew=true;grew;)grew=outside.filter(s=>s.data.names.some(name=>carried.includes(name) || tainted.has(name))).map(s=>taint(s.data.target)).some(Boolean);
   const refused=new Set(),writes=new Map();
   for(const s of later) {
-    if(outside.includes(s))continue;
+    if(outside.includes(s) || admitted.has(s))continue;
     s.today=changesData(s.sql,[...reached,...tainted],empty);
     if(s.data && absent.includes(s.data.target)){if(!writes.has(s.data.target))writes.set(s.data.target,[]);writes.get(s.data.target).push(s);}
     else if(s.today)refused.add(s);
   }
   const replays=[];
   for(const [table,list] of writes) {
-    if(!list.some(s=>s.today))continue;
-    const bad=list.filter(s=>!replayable(s,{table,statements,restorable,writable,carried,tables:known,secrets}));
+    // Seed INSERTs into a new table replay too: the rows already present in a
+    // fresh destination must be reset and derived from the restored installation.
+    if(!list.some(s=>s.today || ['insert','replace'].includes(s.data.verb)))continue;
+    const bad=list.filter(s=>!replayable(s,{table,statements,restorable,writable,carried,tables:known,secrets,views}));
     const reach=reachingTables(statements,[table]),other=later.filter(s=>!list.includes(s) && writesAnother(s,table,reach,list));
     if(bad.length || other.length){[...bad,...other].forEach(s=>refused.add(s));continue;}
     replays.push(...list);
@@ -56,13 +62,11 @@ export function laterData({applied,unapplied,replay,catalogue,archived,empty,tab
   const first=later.find(s=>refused.has(s));
   insist(!first,'schema_mismatch:migration_data:'+first?.migration);
   const named=Object.fromEntries(catalogue.map(name=>[folded(name),name]));
-  return later.filter(s=>replays.includes(s)).map(s=>({migration:s.migration,statement:s.index,table:named[s.data.target],sql:s.sql}));
+  return {rebuilt,replays:later.filter(s=>replays.includes(s)).map(s=>({migration:s.migration,statement:s.index,table:named[s.data.target],sql:s.sql}))};
 }
-function replayable({data},{table,statements,restorable,writable,carried,tables,secrets}) {
+function replayable({data},{table,statements,restorable,writable,carried,tables,secrets,views}) {
   if(!['insert','replace'].includes(data.verb) || data.star)return false;
-  const reads=data.names.filter(name=>tables.includes(name) && name!==table);
-  if(!reads.every(name=>carried.includes(name)))return false;
-  if(reads.some(name=>Object.entries(secrets).some(([t,columns])=>folded(t)===name && columns.some(c=>data.words.includes(folded(c))))))return false;
+  if(!viewReads(data.names,data.words,{views,tables,carried,table,secrets}))return false;
   if(triggerBodies(statements,table).some(name=>writable.includes(name)))return false;
   // Foreign key actions: a row the replay deletes or rekeys (REPLACE, upsert) must reach no other catalogue table.
   return !reachingTables(statements,restorable.filter(name=>name!==table)).includes(table);
