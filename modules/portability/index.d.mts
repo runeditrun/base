@@ -28,7 +28,7 @@ export interface ArchivePolicy {
   extraPayloads?: Record<string,{produce:()=>Uint8Array|ReadableStream<Uint8Array>|Promise<Uint8Array|ReadableStream<Uint8Array>>;consume:(source:ReadableStream<Uint8Array>,descriptor:PayloadDescriptor)=>void|Promise<void>}>;
   partBytes?: number;
 }
-export interface Status {id:string;kind:'export'|'import';phase:'building'|'staging'|'applying'|'complete'|'aborted';completed:number;total:number|null;/** Export only: bytes of the parts built so far. */bytes?:number;contentHash:string|null;requiredConfiguration?:string[];bridged?:Bridge;/** Platform bookkeeping ignored in an older archive. */skippedTables?:string[]}
+export interface Status {id:string;kind:'export'|'import';phase:'building'|'staging'|'applying'|'complete'|'aborted';completed:number;total:number|null;/** Import only: inactivity deadline and whether it has passed. */abortableAt?:string|null;stale?:boolean;/** Export only: bytes of the parts built so far. */bytes?:number;contentHash:string|null;requiredConfiguration?:string[];bridged?:Bridge;/** Platform bookkeeping ignored in an older archive. */skippedTables?:string[]}
 /** Later additive migrations an older archive was restored across. */
 export interface Bridge {fromSchema:string;toSchema:string;migrations:string[];tables:string[];columns:Record<string,string[]>}
 /** A runner's replay of the destination's applied migrations: the archive schema identity after a chosen set, and each migration's statements. */
@@ -36,7 +36,7 @@ export interface MigrationReplay {names:string[];statements(name:string):string[
 export interface PortabilityOptions {db:D1Database;buckets?:Record<string,R2Bucket>;policy:ArchivePolicy;migrations?:()=>Promise<MigrationReplay>}
 export interface Portability {
   exports: {create(actor?:string):Promise<string>;advance(id:string,options?:{expectedPart?:number;maxParts?:number}):Promise<Status>;status(id:string):Promise<Status>;download(id:string):Promise<ReadableStream<Uint8Array>>;abort(id:string):Promise<Status>};
-  imports: {create(manifest:Manifest,actor?:string):Promise<string>;uploadPart(id:string,index:number,part:Part):Promise<Status>;finalize(id:string,options:{archiveHash:string;contentHash?:string;laterJournal?:LaterJournal}):Promise<Status>;status(id:string):Promise<Status>;abort(id:string):Promise<Status>;/** Aborts the import left staged by a crashed restore and returns its id; call only as the destination's sole operator. */abortAbandoned():Promise<string|null>};
+  imports: {active(actor?:string):Promise<Status|null>;create(manifest:Manifest,actor?:string):Promise<string>;uploadPart(id:string,index:number,part:Part):Promise<Status>;finalize(id:string,options:{archiveHash:string;contentHash?:string;laterJournal?:LaterJournal}):Promise<Status>;status(id:string):Promise<Status>;abort(id:string):Promise<Status>;/** Aborts the import left staged by a crashed restore and returns its id; call only as the destination's sole operator. */abortAbandoned():Promise<string|null>};
   status(id:string):Promise<Status>;actor(id:string):Promise<string>;
   erasureStatements(table:string,primaryKey:Record<string,Cell>):Promise<D1PreparedStatement[]>;
   redactionStatements():Promise<D1PreparedStatement[]>;
@@ -59,4 +59,4 @@ export const excludedTables:readonly string[];
 /** True when no archive under this policy carries `table`. */
 export function excludedTable(table:string,policy?:Pick<ArchivePolicy,'excludeTables'|'includeTables'>):boolean;
 export const MAX_PART_BYTES:number;
-export class PortabilityError extends Error {code:string;status:number;constructor(code:string,status?:number)}
+export class PortabilityError extends Error {code:string;status:number;jobId?:string;abortableAt?:string|null;constructor(code:string,status?:number)}

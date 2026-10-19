@@ -2639,7 +2639,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "2139349bc3d77eee0204b56614506bf315af9cb58fd944b71d99f47491a34894"
+      "sha256": "ef86d9c938e00d8272740c35014a375b5f935eea67548bb0bbccecc70808116a"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
@@ -2699,7 +2699,11 @@
     },
     "modules/portability/http.mjs": {
       "source": "modules/portability/http.mjs",
-      "sha256": "c4dad3b6ea5c2a5384262e391bfebe83365ba3f934f99050cb3efd54171af16d"
+      "sha256": "3b870041093fc7cf6e1fb91f87c7982b18a4f4b94055a448210aed2bfea0924c"
+    },
+    "modules/portability/import-lease.mjs": {
+      "source": "modules/portability/import-lease.mjs",
+      "sha256": "61c0545b0c7370fdd8e136fb37af59b0d0fb4f396af782b608f7f9834d35bcc7"
     },
     "modules/portability/import-staging.mjs": {
       "source": "modules/portability/import-staging.mjs",
@@ -2707,15 +2711,15 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "3383ae170a431605b0d1483587791ae96b4acded6cab3390c39442935eba29ce"
+      "sha256": "8b5fb7b7c14adb2413202dacb95559000dc6133cde11545aeebe593a6bc8e3ee"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
-      "sha256": "a15e47ec3f7936e2f6bcbdb30d4f319ab95f2388f6c2371149f59a13e9c5dcfc"
+      "sha256": "77a6656f7d3e8c9bac1dac0746dff1c66fb3dafb05931e4aa0d2ea79ccd360e0"
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
-      "sha256": "e29d5ad39ab1af669b0b65746e4deea7279b8b51e82153f4163bcde7153e2c04"
+      "sha256": "8651fdff5da531f722c66563ea3b4a19663ed86666df4b0604c77f3f93d936e4"
     },
     "modules/portability/journal.mjs": {
       "source": "modules/portability/journal.mjs",
