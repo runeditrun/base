@@ -1,3 +1,14 @@
+// A seed can give the shared page a wider wordmark, navigation and terminal
+// font, as Chest does. Exercise that adoption through the built site too.
+export const runLayoutTheme = `
+:root { --rer-font-body: Arial, sans-serif; --rer-font-heading: Arial, sans-serif; }
+body:has(> header.bar) > .bar { padding: 22px clamp(16px, 5.73vw, 88px) 0; }
+body:has(> header.bar) > .bar .brand { gap: 12px; font-weight: 750; letter-spacing: -.035em; }
+body:has(> header.bar) > .bar nav a { font-size: 20px; font-weight: 450; }
+body:has(> header.bar) .code pre { font-size: 15.5px; }
+@media (max-width: 760px) { body:has(> header.bar) .code pre { font-size: 13px; } }
+`;
+
 // The built Run page's command blocks, measured in the browser: the command text
 // the reader must be able to read, and the Copy button laid over the block.
 export const commandBlocks = page => page.evaluate(() => [...document.querySelectorAll('.code')].map(block => {
