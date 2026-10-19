@@ -5,8 +5,8 @@ export interface Session<R extends string = Role> { issuer?: string; subject?: s
 export interface CompletedSession<R extends string = Role> { session: Pick<Session<R>, 'id' | 'kind' | 'createdAt' | 'expiresAt'>; operator: Operator<R>; cookie: string; returnTo: string }
 export interface MailMessage { deliveryId: string; from: string; to: string[]; subject: string; text: string; html: string; headers: Record<string, string> }
 export interface MailSender { send(message: MailMessage): Promise<{ status: 'accepted' | 'rejected' | 'rate_limited' | 'uncertain' | 'development'; provider: string; providerMessageId: string | null; code?: string }> }
-export interface AuthBranding { productName?: string; accentColor?: string; signInPath?: string; /** Same-origin path of the seed's served rer-theme.css. */ theme?: string }
-export interface AuthPresentation { readonly productName: string; readonly accentColor: string; readonly signInPath: string; readonly theme?: string }
+export interface AuthBranding { productName?: string; accentColor?: string; signInPath?: string; /** Same-origin root-relative image pathname served by the installation. */ mark?: string; /** Same-origin path of the seed's served rer-theme.css. */ theme?: string }
+export interface AuthPresentation { readonly productName: string; readonly accentColor: string; readonly signInPath: string; readonly mark?: string; readonly theme?: string }
 export interface LinkPreview { kind: 'magic' | 'invite' | 'step_up' | 'owner'; expiresInMinutes: number }
 /** A step-up confirmation proves the session's operator again; it issues no new session. */
 export interface StepUpConfirmed { stepUp: StepUpAction; returnTo: string; cookie?: undefined }
