@@ -4,6 +4,7 @@ import { readLegacyArchive } from '../modules/portability/format.mjs';
 import { recoverLegacyArchive } from '../modules/portability/legacy-files.mjs';
 import { legacyTargetState, requireLegacyEmpty } from '../modules/portability/legacy-safety.mjs';
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
+import { splitStatements } from '../modules/portability/sql-text.mjs';
 import { appliedMigrations as appliedMigrationNames } from '../modules/portability/bridge.mjs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -16,14 +17,16 @@ import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
 
 // The migrations this installation applied, in its ledger's order, with each
-// file's hash, so a restore can place an older archive within them.
-async function appliedMigrations(root, db, binding, split) {
+// file's hash, so a restore can place an older archive within them. Statements
+// are split at SQLite's own boundaries (sql-text.mjs), not Wrangler's: its
+// splitter can glue a trigger holding CASE ... END to the statements after it.
+async function appliedMigrations(root, db, binding) {
  const config = parseJsonc(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
  const directory = join(root, config.d1_databases.find(entry => entry.binding === binding).migrations_dir ?? 'migrations');
  const names = await appliedMigrationNames(db) ?? [];
  return Promise.all(names.map(async name => {
   const bytes = await readFile(join(directory, name));
-  return { name, statements: split(bytes.toString('utf8')), sha256: createHash('sha256').update(bytes).digest('hex') };
+  return { name, statements: splitStatements(bytes.toString('utf8')), sha256: createHash('sha256').update(bytes).digest('hex') };
  }));
 }
 
@@ -57,7 +60,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
  let proxy;
  try {
   proxy = await getPlatformProxy({ configPath, persist: { path: join(root, '.wrangler/state/v3') }, remoteBindings: false });
-  const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,unstable_splitSqlQuery),policy);
+  const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding),policy);
   const options={ db: proxy.env[binding], buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations };
   if(direction==='legacy-preflight') {
    await requireLegacyEmpty(options,await legacyTargetState(options.db,options.migrations));

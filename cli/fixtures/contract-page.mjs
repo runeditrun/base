@@ -26,12 +26,10 @@ export const splitCardLayout = page => page.locator('.card.split').evaluate(card
     pageSideways: document.documentElement.scrollWidth > document.documentElement.clientWidth + 0.5 };
 });
 
-// The header's site links as a phone shows them. A seed with /docs carries a
-// third link, so add the one the default seed lacks. Reports sideways page
+// The header's site links as a phone shows them. Reports sideways page
 // overflow and any link that is off screen, under 24px, or over another link
 // or the mark.
-export const headerLayout = async page => {
-  await page.locator('.bar nav').evaluate(nav => { if (!nav.querySelector('[href="/docs"]')) nav.insertAdjacentHTML('afterbegin', '<a href="/docs">Docs</a>'); });
+export const headerLayout = page => {
   return page.evaluate(() => {
     const root = document.documentElement, mark = document.querySelector('.bar .brand').getBoundingClientRect();
     const links = [...document.querySelectorAll('.bar nav a')].map(link => ({ text: link.textContent, rect: link.getBoundingClientRect() }));

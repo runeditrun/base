@@ -23,7 +23,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
  for (const key of ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'SETUP_TOKEN', 'SESSION_SECRET', 'OWNER_EMAIL', 'MAIL_API_KEY']) delete process.env[key];
  const provider = ownerProvider(), requests = [], claims = [], progress = [];
  t.after(() => provider.close());
- let claimed = existing, denied = false, builds = 0, failBuild = false, hookToken, returnToken = false;
+ let claimed = existing, denied = false, builds = 0, failBuild = false, hookToken, returnToken = false, signedOut = false;
  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
   const url = new URL(input); requests.push(`${init.method ?? 'GET'} ${url.pathname}`);
   if (url.pathname === '/auth/bootstrap') {
@@ -35,7 +35,15 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
    if (claimed) return Response.json({ error: 'already_initialized' }, { status: 409 });
    claimed = true; return new Response(null, { status: 303, headers: { 'set-cookie': 'session=test; HttpOnly' } });
   }
-  if (url.pathname === '/setup') return new Response(null, { status: 303, headers: { location: '/app' } });
+  if (url.pathname === '/setup') {
+   assert.equal(signedOut, false, 'the hook can finish using its bootstrap session');
+   return new Response(null, { status: 303, headers: { location: '/app' } });
+  }
+  if (url.pathname === '/auth/signout') {
+   assert.equal(new Headers(init.headers).get('cookie'), 'session=test');
+   signedOut = true;
+   return new Response(null, { status: 204 });
+  }
   return provider.fetch(input, init);
  });
  for (const directory of ['dist/server', 'dist/client', 'migrations/core']) await mkdir(join(root, directory), { recursive: true });
@@ -94,6 +102,7 @@ test('conventional legacy function hook claims actual bootstrap, retires re-uplo
  const original = { ...process.env };
  const dry = await f.run({ dryRun: true }); assert.equal(dry.deployed, false); assert.ok(f.requests.length>0); assert.ok(f.requests.every(call=>call.startsWith('GET '))); assert.equal(f.provider.state.writes.length,0);
  const first = await f.run(); assert.equal(first.owner, 'claimed'); assert.equal(f.claims.length, 1);
+ assert.equal(f.requests.filter(call => call === 'POST /auth/signout').length, 1, 'the unused claim session is retired once');
  assert.ok(Object.keys(process.env).length === Object.keys(original).length && Object.entries(original).every(([key, value]) => process.env[key] === value), 'caller environment restored');
  assert.ok(!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
  const next = await f.run(); assert.equal(next.owner, 'kept'); assert.equal(f.claims.length, 1);

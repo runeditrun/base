@@ -68,7 +68,7 @@ const BASE = '*,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-
   + '.bar,main{position:relative;z-index:1}.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;max-width:1360px;margin:0 auto;padding:26px 56px 0}'
   + '.brand{display:inline-flex;align-items:center;gap:12px;font:600 28px/1 var(--rer-font-heading,var(--rer-font-body,inherit));letter-spacing:var(--rer-wordmark-tracking,-.02em);color:var(--site-ink)}.brand img{width:40px;height:40px}'
   // The brand takes only its narrowest width when deciding whether the nav still fits beside it, so a long name wraps the nav onto its own row instead of pushing it past the viewport.
-  + '.bar .brand{flex:1 1 0;max-width:max-content}.bar nav{display:flex;gap:36px;font-weight:500;font-size:16px}.bar nav a:hover{text-decoration:underline;text-underline-offset:4px}'
+  + '.bar .brand{flex:1 1 0;max-width:max-content}.bar nav{display:flex;flex-wrap:wrap;gap:36px;font-weight:500;font-size:16px}.bar nav a:hover{text-decoration:underline;text-underline-offset:4px}'
   + 'h1{font:600 64px/1.08 var(--rer-font-heading,var(--rer-font-body,inherit));letter-spacing:-.03em;color:var(--site-ink);text-wrap:balance}'
   + '.sub{margin-top:24px;color:var(--site-body);font-size:21px;text-wrap:pretty}'
   + '@media(max-width:760px){body{font-size:16px;--art:180px}.bar{padding:18px 16px 0}.brand{font-size:23px;gap:9px}.brand img{width:32px;height:32px}.bar nav{gap:22px;font-size:15px}.bar nav a{min-height:24px}h1{font-size:38px;line-height:1.12}.sub{font-size:16.5px;margin-top:16px}}'
@@ -81,7 +81,9 @@ const HOME = 'main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art)
   + '.link{font-weight:500;text-decoration:underline;text-underline-offset:4px}'
   + '@media(max-width:760px){main{padding:0 16px calc(var(--art) + 40px)}.hero{padding-top:96px}.btn{min-height:56px;font-size:18px}}'
 
-const RUN = 'body{--art:max(20vh,150px)}main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art) + 40px)}.intro{text-align:center;padding-top:36px}.intro h1{font-size:58px}.intro .sub{margin-inline:auto;max-width:760px;margin-top:20px}'
+// Keep overflow visible so a layout defect cannot be clipped away; the header's
+// bar and nav reflow in BASE when a seed's wordmark and links need more room.
+const RUN = 'body{--art:max(20vh,150px);overflow-x:visible}main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art) + 40px)}.intro{text-align:center;padding-top:36px}.intro h1{font-size:58px}.intro .sub{margin-inline:auto;max-width:760px;margin-top:20px}'
   + '.steps{max-width:990px;margin:34px auto 0;display:grid;gap:18px}'
   + '.step{position:relative;display:grid;grid-template-columns:62px 1fr;gap:0 32px;padding:24px 30px 24px 28px;border-radius:24px;background:color-mix(in srgb,var(--rer-surface,#fff) 86%,transparent);border:1px solid var(--site-line);box-shadow:0 24px 48px -36px color-mix(in srgb,var(--site-ink) 45%,transparent);backdrop-filter:blur(6px)}'
   + '.step.option{grid-template-columns:1fr;padding-left:124px}.body{min-width:0}'
