@@ -55,7 +55,7 @@ belong to the current runtime or environment and never travel:
 | Tables (exact names or prefixes ending in `%`) | Reason |
 | --- | --- |
 | `sqlite_%`, `_cf_%` | SQLite and Cloudflare internals. |
-| `d1_migrations`, `_rer_deploy_migrations`, `_rer_portability_migrations`, `rer_migrations` | Destination migration history. Current Base uses the D1 and `_rer_` ledgers; `rer_migrations` is excluded for historical compatibility. |
+| `d1_migrations`, `_rer_deploy_migrations`, `_rer_portability_migrations`, `rer_migrations` | Destination migration history. Base uses the D1 and `_rer_` ledgers; RER Platform's runner writes `rer_migrations`. An old archive that still carries its source's ledger is placed by it (see below); its rows are never restored. |
 | `rer_portability_%` | Transfer jobs, snapshots, staging, journals and recovery bookkeeping. |
 | `rer_mail_development_outbox`, `rer_ai_development_outbox` | Local development effect captures. |
 | `rer_dependency_keys`, `rer_dependency_pending`, `rer_dependency_codes` | Provider secrets and transient linking credentials. |
@@ -210,16 +210,30 @@ table). This applies to normal v2 import and to backup-only v1 recovery.
 
 The Base CLI runners (local Workers and container) pass `createPortability` a
 `migrations` replayer (`migration-history.mjs`, Node only) built from the
-destination's applied migration ledger and migration files. Import replays them
-into a scratch database to find the archive's place in that history:
+destination's applied migration ledger and migration files, with each file's
+SHA-256. The ledger is `_rer_deploy_migrations`, `d1_migrations` (Wrangler or
+the deploy kit) or, on an installation RER Platform installed, its exact
+`rer_migrations(name, sha256, applied_at)` ledger, read in application order
+(rowid) and refused while it holds a partially applied file. Import replays
+them into a scratch database to find the archive's place in that history:
 
 - Archives record the applied migration names in `manifest.migrations` (since
   additive restore). Every recorded migration must be applied here, and
   replaying exactly those must give the archive's schema identity.
-- Older v2 and all v1 archives do not record them; the latest prefix of the
-  applied migrations that gives the archive's schema identity is used. Migrations
-  that change no archived table (indexes, excluded tables) cannot be told apart
-  there and are reported as later.
+- Older archives that still carry their source's migration ledger as a table
+  (`rer_migrations` and the other ledgers above, from before they became
+  bookkeeping) are placed by it. Every name it records must be applied here,
+  with the same file hash (the destination ledger's, else the replayed file's),
+  or the import is refused with `schema_mismatch:migration_history:<migration>`
+  naming the first that differs; replaying exactly those must give the archive's
+  schema identity. Every other applied migration is later, wherever the
+  destination's history orders it. `importArchive` reads the ledger rows from
+  the verified file and passes them to `imports.create(manifest, actor,
+  {ledgers})`; staging refuses any part whose ledger rows differ from them.
+- Other older v2 and all v1 archives do not record them; the latest prefix of
+  the applied migrations that gives the archive's schema identity is used.
+  Migrations that change no archived table (indexes, excluded tables) cannot be
+  told apart there and are reported as later.
 
 Restored rows never pass through the later migrations, so each of them may
 contain only `CREATE TABLE` (not `AS SELECT`), `CREATE INDEX` and
@@ -227,7 +241,11 @@ contain only `CREATE TABLE` (not `AS SELECT`), `CREATE INDEX` and
 restorable tables. A later migration with any other statement that names a
 restorable table, such as an `INSERT`, `UPDATE` or `DELETE` that purges or
 backfills rows or a trigger, is refused with `schema_mismatch`; statements that
-touch only excluded tables are allowed. For archives without a migration record,
+touch only excluded tables are allowed. An archived table the archive holds no
+rows of restores empty, so an `UPDATE` or `DELETE` of it changes nothing and is
+allowed unless it also names a table the archive holds rows of (which it could
+read into its writes); an `INSERT` into it, or any other statement naming it,
+is still refused. For archives without a migration record,
 every migration after the earliest prefix that gives the archive's schema is
 checked, since the archive may predate any of them.
 
@@ -496,6 +514,7 @@ modules/portability/provider-data.mjs
 modules/portability/generated.mjs
 modules/portability/restore-safety.mjs
 modules/portability/bridge.mjs
+modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
 modules/portability/legacy-safety.mjs
 modules/portability/export.mjs

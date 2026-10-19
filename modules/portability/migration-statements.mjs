@@ -13,14 +13,21 @@ import { tokens, identifier, folded } from './generated.mjs';
 // rebuilds, a trigger glued to a further statement) changes data unless it
 // names none of `reached` (reachingTables), as when it only touches
 // operator-auth or other excluded tables that no trigger links to restorable ones.
-export function changesData(sql,reached) {
+// `empty` lists the restorable tables the archive holds no rows of: restore
+// leaves them empty, and an UPDATE or DELETE of an empty table changes nothing
+// (no row fires a trigger either), so such a statement changes data only if it
+// names another reached table (one it could write, or read into its writes).
+// Any other statement naming an empty table still does: an INSERT would leave
+// rows the restore lacks.
+export function changesData(sql,reached,empty=[]) {
   const list=tokens(sql),words=list.map(t=>t.quoted?undefined:folded(t.text)),kind=kindOf(words);
   if(kind==='create table')return topLevelWords(list,words).includes('as');
   if(kind==='create index')return false;
   if(kind==='alter table' && words.find((w,i)=>i>2 && ['add','rename','drop'].includes(w))==='add')return false;
   if(kind==='create trigger' && createdTrigger(list))return false;
   if(kind==='drop trigger' && droppedTrigger(list))return false;
-  return names(list,new Set(reached.map(folded)));
+  const skipped=new Set(['update','delete'].includes(words[0])?empty.map(folded):[]);
+  return names(list,new Set(reached.map(folded).filter(name=>!skipped.has(name))));
 }
 // The restorable tables and every table whose writes reach one through a
 // trigger any of `statements` creates: a write to such a table during a later
