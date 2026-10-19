@@ -24,10 +24,12 @@ test('cron failure isolation: a broken policy cannot strand a pending person era
     await r.db.prepare("CREATE TRIGGER break_policy BEFORE INSERT ON oa_policy_runs WHEN NEW.policy_id='inactive-members' BEGIN SELECT RAISE(ABORT,'broken_policy_store'); END").run()
     const outcome = await (await r.mf.getWorker()).scheduled({ cron: '*/10 * * * *' })
     assert.equal(outcome.outcome, 'exception')
-    assert.ok(await r.db.prepare("SELECT 1 FROM oa_policy_runs WHERE policy_id='later-policy' AND error='policy_approval_required'").first(), 'later policies still run')
-    assert.equal(await r.db.prepare('SELECT 1 FROM people WHERE id=?').bind(id).first(), null, 'the pending erasure completes despite policy failure')
-    assert.equal(await r.db.prepare('SELECT 1 FROM person_erasure_redactions WHERE person_id=?').bind(id).first(), null)
-    const receipt = await r.db.prepare("SELECT phase FROM rer_erasure_operations WHERE phase='complete'").first()
-    assert.ok(receipt)
+    const state = {
+      laterPolicyRan: Boolean(await r.db.prepare("SELECT 1 FROM oa_policy_runs WHERE policy_id='later-policy' AND error='policy_approval_required'").first()),
+      personRemains: Boolean(await r.db.prepare('SELECT 1 FROM people WHERE id=?').bind(id).first()),
+      pendingRequest: Boolean(await r.db.prepare('SELECT 1 FROM person_erasure_redactions WHERE person_id=?').bind(id).first()),
+      erasureComplete: Boolean(await r.db.prepare("SELECT 1 FROM rer_erasure_operations WHERE phase='complete'").first()),
+    }
+    assert.deepEqual(state, { laterPolicyRan: true, personRemains: false, pendingRequest: false, erasureComplete: true })
   } finally { await r.close() }
 })
