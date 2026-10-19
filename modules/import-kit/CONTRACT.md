@@ -233,6 +233,14 @@ append-only (no update, delete or insert over an existing key). A batch that
 rewrites or retires custody carries the product's restore checkpoint, so an
 archive older than the erasure is refused whole under the later journal.
 
+Credential keys are the exact names `token`, `access_token`, `refresh_token`,
+`authorization`, `cookie`, `password`, `api_key`/`apiKey` and `secret`, their
+plurals holding text (`tokens: [...]`, `apiKeys: [...]`), any name with
+`secret`, `subscription` or `functions` before `key` (`secret_key`,
+`x-functions-key`, `Ocp-Apim-Subscription-Key`), `X-Auth` and `pwd`, under an
+object key or as the name of a `[name, value]` pair in a list of them; `sig`
+joins the credential query keys. Names merely containing such letters
+(`keyword`, `monkey`, `signal`, `design`) are not credential keys.
 Credential-key validation permits a JSON boolean under the exact key `secret`,
 a common noncredential visibility flag, and null, an empty string or a mask
 (`****`, `[redacted]`, `[removed]` and similar) under any credential key: they sit
@@ -243,8 +251,9 @@ originals excluded by a parser. Accepted originals remain exact.
 `readFileSource` with `credentials: 'remove'` (the import door's choice) keeps a
 record holding a plain credential value instead. It casts a wider net than the
 refusal above: it drops any field whose name's letters end in a credential word
-(`httpPassword`, `client_secret`, `X-Api-Key`), the `value` of a `{name|key,
-value}` pair naming one, and a URL's (any scheme's) user name, password and
+(`httpPassword`, `client_secret`, `X-Api-Key`) or its plural holding text
+(`apiKeys: [...]`), the `value` of a `{name|key, value}` pair naming one or of
+such a `[name, value]` pair in a list of them, and a URL's (any scheme's) user name, password and
 credential query and fragment parameters, keeping booleans. It reports each
 per record as a `CREDENTIAL_REMOVED` warning diagnostic (field pointer and kind,
 never the value), and withholds the file's original bytes as

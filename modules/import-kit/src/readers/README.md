@@ -87,8 +87,11 @@ credential refusal names only the field kind in its diagnostic `field`.
 `readFileSource` takes `credentials: 'remove'` to keep records that hold a plain
 credential value: the parser sees the value as read, then each record loses its
 credential fields (any key whose letters end in a credential word, such as
-`httpPassword`, `client_secret` or `X-Api-Key`, and the `value` of a
-`{name|key, value}` pair naming one; booleans stay) and its URLs' (any scheme's)
+`httpPassword`, `client_secret`, `X-Api-Key`, `secret_key`,
+`Ocp-Apim-Subscription-Key` or `pwd`, or are `X-Auth`; a plural such as
+`apiKeys` or `tokens` when it holds text; the `value` of a `{name|key, value}`
+pair naming one, and of such a `[name, value]` pair in a list of them; booleans
+stay) and its URLs' (any scheme's)
 user names, passwords and credential query and fragment parameters, with one
 `CREDENTIAL_REMOVED` warning per removal naming the record,
 the field pointer and its kind. The original bytes are then withheld

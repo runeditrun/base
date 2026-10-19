@@ -61,14 +61,11 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   if (current.pending_id) throw new DoorError('namespace_has_pending_import',409);
   // An erasure withdrew the live import's snapshot, so nothing can be compared
   // with it. An owner-session plan retires it as the baseline and plans a new
-  // one; the kit's guards refuse any target an earlier import still holds. A
-  // Business catch-up still answers the snapshot's 410.
-  let head = current.head_id ? await planRow(request,current.head_id) : null;
+  // one, once no earlier import of this source still holds a record the new one
+  // writes. A Business catch-up still answers the snapshot's 410.
+  let head = current.head_id ? await planRow(request,current.head_id) : null, retired: DoorPlanRow | null = null;
   if (head && request.via === 'operator' && (await request.options.database.prepare('SELECT 1 FROM ik_door_plan_chunks WHERE plan_id=?').bind(head.id).first()) === null) {
-    await transact(request.options.database,request.authority,[
-      assertion(sql('NOT EXISTS(SELECT 1 FROM ik_door_plan_chunks WHERE plan_id=?)',head.id)),
-      sql('UPDATE ik_door_namespaces SET head_id=NULL WHERE installation_id=? AND namespace=? AND head_id=? AND pending_id IS NULL',request.access.installationId,request.access.namespace,head.id),
-    ]);
+    retired = head;
     head = null;
   }
   const previous = head ? await loadSnapshot(request,head) : null;
@@ -127,9 +124,26 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   }
   if (request.access.catchup === 'bounded') assertBounded(snapshot,previous!);
   await refuseErased(request,upload,snapshot.plan);
+  if (retired) await retire(request,retired,snapshot.plan);
   await saveSnapshot(request,snapshot,upload,retainedFrom);
   await dropCredentialBytes(request,snapshot,upload);
   return preview(snapshot);
+}
+/** Retire an erasure-withdrawn live import as the namespace's baseline. The kit
+ * never lets a new import write a record another live import holds, so while an
+ * earlier import of this source still holds one the new plan writes, the plan is
+ * refused now, by name, rather than its apply failing later; nothing is retired. */
+async function retire(request: DoorRequest, head: DoorPlanRow, plan: ImportPlan): Promise<void> {
+  const db = request.options.database, writes = new Set(plan.entries.flatMap(entry=>entry.effects.map(e=>canonicalJson([e.targetKind,e.targetId]))));
+  const {results} = await db.prepare(`SELECT d.id AS plan_id,p.target_kind,p.target_id FROM ik_provenance p JOIN ik_door_plans d ON d.job_id=p.job_id
+    WHERE p.reversed=0 AND d.installation_id=? AND d.namespace=?`).bind(request.access.installationId,request.access.namespace).all<{plan_id:string;target_kind:string;target_id:string}>();
+  const holders = [...new Set(results.filter(row=>writes.has(canonicalJson([row.target_kind,row.target_id]))).map(row=>row.plan_id))];
+  if (holders.length) throw new DoorError('earlier_import_holds_records',409,{planIds:holders,
+    reason:'An earlier import of this source, whose snapshot an erasure withdrew, still holds records this plan would write. Undo the earlier import first, then plan again.'});
+  await transact(db,request.authority,[
+    assertion(sql('NOT EXISTS(SELECT 1 FROM ik_door_plan_chunks WHERE plan_id=?)',head.id)),
+    sql('UPDATE ik_door_namespaces SET head_id=NULL WHERE installation_id=? AND namespace=? AND head_id=? AND pending_id IS NULL',request.access.installationId,request.access.namespace,head.id),
+  ]);
 }
 /** The reader removed credential values: the saved plan holds none and withholds
  * the original, so the uploaded bytes that still hold them go once it is saved.
