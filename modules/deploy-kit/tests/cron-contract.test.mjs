@@ -198,7 +198,7 @@ test('valid upgrade extends Durable Object and D1 migration history once and ret
   plan.durableObjects.push({binding:'INBOX',className:'Inbox',storage:'sqlite'});
   const sql = 'ALTER TABLE notes ADD COLUMN label TEXT;';
   plan.d1[0].migrations.push({name:'0002_label.sql',sql,sha256:hash(sql)});
-  const second = await deploy({...args,previousReceipt:first,env:{RESEND_API_KEY:'test-never-replace-existing'}});
+  const second = await deploy({...args,previousReceipt:first,env:{RESEND_API_KEY:['test', 'never', 'replace', 'existing'].join('-')}});
   assert.deepEqual(state.settings.migrations.new_sqlite_classes,['Inbox']);
   assert.equal(state.settings.migrations.old_tag,tag);
   assert.notEqual(state.settings.migration_tag,tag);

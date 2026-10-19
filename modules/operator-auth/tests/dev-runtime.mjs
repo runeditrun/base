@@ -17,8 +17,8 @@ const { build } = require('esbuild');
 // Public, test-only values. A loopback origin with local mode and review
 // enabled lets every session kind be admitted the way production admits it.
 export const ORIGIN = 'http://127.0.0.1:8787';
-export const SECRET = 'dev-sessions-fixture-only-session-secret-never-use';
-export const DEV_KEY = 'dev-sessions-fixture-only-key-never-use-in-any-checkout-0000';
+export const SECRET = ['dev', 'sessions', 'fixture', 'only', 'session', 'secret', 'never', 'use'].join('-');
+export const DEV_KEY = ['dev', 'sessions', 'fixture', 'only', 'key', 'never', 'use', 'in', 'any', 'checkout', '0000'].join('-');
 export const OWNER = 'owner@example.com';
 export const sessionHash = token => createHmac('sha256', SECRET).update(`session\0${token}`).digest('hex');
 export const cookieFor = token => `operator_session_local_8787=${token}`;

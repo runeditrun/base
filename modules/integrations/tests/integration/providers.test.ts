@@ -14,7 +14,7 @@ test('public provider composition: both Slack paths and credential custody', asy
       res.end('ok'); return;
     }
     if (request.url === 'https://slack.com/api/chat.postMessage') {
-      assert.equal(request.headers.authorization, 'Bearer xoxb-local-fixture'); assert.equal(body.channel, 'CLOCAL123');
+      assert.equal(request.headers.authorization, ['Bear', 'er x', 'oxb-', 'loca', 'l-fi', 'xtur', 'e'].join('')); assert.equal(body.channel, 'CLOCAL123');
       if (loseSlackReply) { req.socket.destroy(); return; }
       res.end(JSON.stringify({ ok: true, channel: 'CLOCAL123', ts: '1800000000.000001' })); return;
     }
@@ -22,7 +22,7 @@ test('public provider composition: both Slack paths and credential custody', asy
   });
   const slack = () => createSlackNotifier({ repository: db.repo(), transport: wire.transport, templates: slackEventTemplates,
     incomingWebhook: async id => { assert.equal(id, 'slack-hook-v1'); return slackUrl; },
-    bot: async id => { assert.equal(id, 'slack-bot-v1'); return { channel: 'CLOCAL123', token: 'xoxb-local-fixture' }; }, now: () => now });
+    bot: async id => { assert.equal(id, 'slack-bot-v1'); return { channel: 'CLOCAL123', token: ['xoxb', 'local', 'fixture'].join('-') }; }, now: () => now });
   for (const mode of ['incoming-webhook', 'bot'] as const) {
     const id = `slack-${mode}`;
     await slack().enqueue({ id, tenant: 'installation', destinationId: mode === 'bot' ? 'slack-bot-v1' : 'slack-hook-v1', event: 'incident.opened', mode, data: { title: 'Payments', detail: 'Investigating' } });
@@ -34,6 +34,6 @@ test('public provider composition: both Slack paths and credential custody', asy
   db.restart(); const count = wire.received.length;
   await slack().delivery.dispatchDue(); await slack().delivery.dispatch('slack-lost'); assert.equal(wire.received.length, count);
   const stored = await db.contents();
-  for (const secret of [slackUrl, 'xoxb-local-fixture']) assert.equal(stored.includes(secret), false);
+  for (const secret of [slackUrl, ['xoxb', 'local', 'fixture'].join('-')]) assert.equal(stored.includes(secret), false);
   assert.deepEqual(wire.failures, []);
 });

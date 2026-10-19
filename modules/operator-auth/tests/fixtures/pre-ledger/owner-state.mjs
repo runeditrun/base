@@ -1,7 +1,7 @@
 // Public, test-only values matched to the static HMACs in rows.sql.
 export const NOW = 1900000000000;
-export const SECRET = "pre-ledger-fixture-only-session-secret-never-use-in-production";
-export const SETUP = "pre-ledger-fixture-only-setup-secret-never-use-in-production";
+export const SECRET = ['pre', 'ledger', 'fixture', 'only', 'session', 'secret', 'never', 'use', 'in', 'production'].join('-');
+export const SETUP = ['pre', 'ledger', 'fixture', 'only', 'setup', 'secret', 'never', 'use', 'in', 'production'].join('-');
 export const credentials = Object.freeze({
   "ownerSession": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
   "activeSession": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",

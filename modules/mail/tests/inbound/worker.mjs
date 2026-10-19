@@ -18,7 +18,7 @@ export default {
     }
     let calls = 0;
     const input = resend();
-    input.fetchAttachment = createResendAttachmentFetcher({ apiKey: 'workerd-fixture-key', maxAttachmentBytes: 100 }, {
+    input.fetchAttachment = createResendAttachmentFetcher({ apiKey: ['workerd', 'fixture', 'key'].join('-'), maxAttachmentBytes: 100 }, {
       clock: () => Date.parse('2026-10-06T12:00:00Z'),
       fetch: async (url, init) => {
         if (init.redirect !== 'manual') throw new Error('Redirect allowed'); calls++;

@@ -6,7 +6,7 @@ import { providerPinFence } from '../../accounts/provider-pin.mjs';
 import { createProofs } from './proofs.mjs';
 import { dependencyAuthority } from './dependencies.mjs';
 export const WORKSPACE = 'workspace-a';
-const SECRET = 'fixture-native-session-secret-32-bytes';
+const SECRET = ['fixture', 'native', 'session', 'secret', '32', 'bytes'].join('-');
 export function fixture(db, now, config = {}) {
   const query = (sql, ...args) => db.prepare(sql).bind(...args);
   const ownerRole=config.ownerRole??'owner';

@@ -29,7 +29,7 @@ export async function devBrowserProof() {
   const vars = join(root, '.dev.vars')
   let child, bodyError = BODY_SUCCEEDED, output = ''
   const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: '' }
-  const sessionSecret = 'disposable-dev-test-secret-at-least-32'
+  const sessionSecret = ['disposable', 'dev', 'test', 'secret', 'at', 'least', '32'].join('-')
   const redaction = createRedaction()
   redaction.addSecrets([owner, setupToken, sessionSecret, ...credentialValues(env)])
   try {

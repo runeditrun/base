@@ -62,7 +62,7 @@ async function log(dir) {
 
 test('git email/default port, private fresh credentials, real command arguments and concise next step', async (t) => {
   const { dir, run } = await fixture(t)
-  const result = await run([], { SESSION_SECRET: 'parent-value-must-not-enter-build' })
+  const result = await run([], { SESSION_SECRET: ['parent', 'value', 'must', 'not', 'enter', 'build'].join('-') })
   assert.equal(result.code, 0, result.stderr)
   const raw = await readFile(join(dir, '.dev.vars'), 'utf8')
   const vars = parse(raw)

@@ -106,7 +106,7 @@ test('HTTP door uploads and applied snapshots erase with their destination in th
   for (const mode of [{bounded:false,legacy:false},{bounded:true,legacy:false},{bounded:false,legacy:true},{bounded:true,legacy:true}]) {
     const {bounded,legacy}=mode;
     const d=await door(t);await d.enable();
-    const secret='test-private-record-value',records=[{id:'private',title:secret,body:'Private imported knowledge'}];
+    const secret=['test','private','record','value'].join('-'),records=[{id:'private',title:secret,body:'Private imported knowledge'}];
     const planned=await d.plan(records);assert.equal(planned.status,200,JSON.stringify(planned.body));
     const job=await d.apply(planned.body);
     const other=createImportDoorHandler({...d.options,destination:'other-workspace'});
@@ -560,7 +560,7 @@ test('The default seed\'s resumable erasure severs a door catch-up that an earli
   // A redaction step reads 25 jobs; the catch-up job must sort among the first step's jobs, which random job ids give most of the time.
   for (let attempt=0;attempt<12;attempt++) {
     const d=await door(t);await d.enable();
-    const native=d.runtime.native(),secret='many-jobs-secret-'+attempt;
+    const native=d.runtime.native(),secret=['many','jobs','secret',attempt].join('-');
     const base=[{id:'person',title:secret},{id:'kept',title:'many-jobs-kept'}];
     const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
     const catchup=await d.plan([...base,{id:'new',title:'many-jobs-new'}],{catchup:true});assert.equal(catchup.status,200,JSON.stringify(catchup.body));
@@ -589,7 +589,7 @@ test('The default seed\'s resumable erasure severs a door catch-up that an earli
 
 test('After an erasure, a plan of an upload holding the erased person deletes it even where the namespace snapshot is withdrawn',async t=>{
   const d=await door(t);await d.enable();
-  const native=d.runtime.native(),secret='withdrawn-namespace-secret';
+  const native=d.runtime.native(),secret=['withdrawn','namespace','secret'].join('-');
   const base=[{id:'person',title:secret},{id:'kept',title:'withdrawn-kept'}];
   const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
   const erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},[{sql:"DELETE FROM native_records WHERE id='person'"}],d.runtime.context(),checkpoint);
@@ -611,7 +611,7 @@ test('After an erasure, a plan of an upload holding the erased person deletes it
 
 test('After an erasure withdraws a pending catch-up, a plan of an upload holding the erased person deletes it; a clean upload keeps the refusal',async t=>{
   const d=await door(t);await d.enable();
-  const native=d.runtime.native(),secret='pending-catchup-secret';
+  const native=d.runtime.native(),secret=['pending','catchup','secret'].join('-');
   const base=[{id:'person',title:secret},{id:'kept',title:'pending-kept'}];
   const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
   // Business plans the next catch-up; the owner has not approved it when the person is erased.

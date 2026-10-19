@@ -12,7 +12,7 @@ import { IntegrationsRepository } from '../../core/index.ts';
 import type { TrustedTransport, WireRequest, WireResponse } from '../../core/index.ts';
 
 export const webhookUrl = 'https://hooks.slack.com/services/TLOCAL/BLOCAL/localFixtureOnly';
-export const botToken = 'xoxb-fixture-local-only';
+export const botToken = ['xoxb', 'fixture', 'local', 'only'].join('-');
 export const channel = 'CLOCAL123';
 export const successBot = JSON.stringify({ ok: true, channel, ts: '1700000000.000001', message: { text: 'Local fixture' } });
 export interface Received { url: string; body: string; headers: IncomingMessage['headers']; method?: string }

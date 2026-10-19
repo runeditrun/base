@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.65",
+  "cliVersion": "0.2.66-dev.gr-base-lander-43",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -265,7 +265,7 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "2db50c93bbed832c506f1c67ec158b71134f07c66ddc9cc38b76090d2e8ffa45"
+      "sha256": "56a77c2149626eaa3a69764f25b21421ce0be22ce8a11540350ee9f391e77e1a"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
@@ -2815,7 +2815,7 @@
     },
     "modules/release/sign.mjs": {
       "source": "modules/release/sign.mjs",
-      "sha256": "15e3af9b9b07a60790adaf6e9256bb5cb702aaf7dadba864de00f2fb15b19aa5"
+      "sha256": "7239d3de4947ee25b819a8d1bb56fbaeb107187b1e0de87ae55541f0b6420f42"
     },
     "modules/release/signature.mjs": {
       "source": "modules/release/signature.mjs",
