@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { test } from 'node:test';
 import { browserRuntime, chromium, DEV_KEY, OWNER } from './dev-gate-browser-runtime.mjs';
 
@@ -39,7 +40,18 @@ test('RER_OPEN enters as owner on initial load and same-path fragment navigation
         const gate = cookies.find(cookie => cookie.name.startsWith('rer_dev_gate_'));
         assert.ok(gate);
         assert.equal(gate.httpOnly, true);
-        assert.equal(gate.sameSite, 'Strict');
+        assert.equal(gate.sameSite, 'Lax');
+        // An OAuth provider redirects back from another site: the dev session must hold, the gated sign-in must not open.
+        const other = await crossSiteRedirector();
+        try {
+          const back = await other.allow(page, `${r.origin}/auth/session`);
+          assert.equal(back.url(), `${r.origin}/auth/session`);
+          assert.equal((await back.request().allHeaders())['sec-fetch-site'], 'cross-site');
+          assert.equal(back.status(), 200, 'the dev session survives a cross-site top-level redirect');
+          const enter = await other.allow(page, `${r.origin}/auth/dev/enter?as=signed-out`);
+          assert.equal(enter.status(), 404, 'dev sign-in refuses a cross-site navigation');
+          assert.equal((await context.request.get(`${r.origin}/auth/session`)).status(), 200, 'and the session is untouched');
+        } finally { await other.close(); }
         const gateGets = requests.filter(request => request.method() === 'GET' && new URL(request.url()).pathname === '/__dev/key');
         assert.equal(gateGets.length, 1, 'same-path navigation must work without reloading the waiting document');
         for (const request of requests) {
@@ -80,3 +92,23 @@ test('the hand-off page shows the seed\'s own logo, and its product name as text
     }
   } finally { await browser?.close(); }
 });
+
+// A page on another site (localhost, while the app is on 127.0.0.1): an Allow link
+// whose target 302s to `to`, as a provider's consent page sends the browser back.
+async function crossSiteRedirector() {
+  const server = createServer((request, response) => {
+    const url = new URL(request.url, 'http://localhost'), to = url.searchParams.get('to');
+    if (url.pathname === '/go') return response.writeHead(302, { location: to }).end();
+    response.writeHead(200, { 'content-type': 'text/html' }).end(`<a href="/go?to=${encodeURIComponent(to)}">Allow</a>`);
+  });
+  await new Promise(resolve => server.listen(0, 'localhost', resolve));
+  const origin = `http://localhost:${server.address().port}`;
+  return {
+    async allow(page, to) {
+      await page.goto(`${origin}/?to=${encodeURIComponent(to)}`);
+      const [response] = await Promise.all([page.waitForResponse(response => response.url() === to), page.getByRole('link', { name: 'Allow' }).click()]);
+      return response;
+    },
+    close: () => new Promise(resolve => server.close(resolve)),
+  };
+}

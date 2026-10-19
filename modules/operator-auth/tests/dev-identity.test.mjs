@@ -24,11 +24,17 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     assert.equal(entered.status, 303);
     assert.equal(entered.headers.get('location'), '/app');
     const gate = entered.headers.getSetCookie().find(line => line.startsWith('rer_dev_gate_8787='));
-    assert.match(gate, /; Path=\/; HttpOnly; SameSite=Strict/);
+    assert.match(gate, /; Path=\/; HttpOnly; SameSite=Lax/);
     assert.doesNotMatch(gate, /Domain=/i, 'host-only');
     const both = cookies(entered);
     assert.equal((await r.call('/auth/session', { cookie: both })).status, 200);
     assert.equal((await r.call('/auth/session', { cookie: sessionOnly(both) })).status, 401, 'a dev session without the gate is refused');
+    // A provider's redirect back is a cross-site top-level GET: the session counts, the gated surfaces do not open.
+    const crossSite = { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' };
+    assert.equal((await r.call('/auth/session', { cookie: both, headers: crossSite })).status, 200, 'a dev session survives a cross-site redirect');
+    for (const path of ['/auth/dev/enter?as=admin', '/__dev/personas'])
+      assert.equal((await r.call(path, { cookie: both, headers: crossSite })).status, 404, `${path} refuses a cross-site request`);
+    assert.equal((await r.call('/signin', { cookie: both, headers: crossSite })).headers.get('location'), '/__dev/key');
     const signin = await (await r.call('/signin', { cookie: gateOnly(both) })).text();
     assert.match(signin, /href="\/auth\/dev\/enter\?as=owner/);
     assert.doesNotMatch(signin, /type="email"/);
