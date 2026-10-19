@@ -8,7 +8,7 @@ export async function runHistory(store, request, fence) {
   const more = rows.length > 25;
   const runs = await Promise.all(rows.slice(0, 25).map(async ({ cursor: _, ...run }) => {
     const actions = (await store.statement(`SELECT id,actor_id AS actor,action,value,created_at AS createdAt FROM oa_auth_audit
-      WHERE json_extract(value,'$.runId')=? AND ${fence.sql} ORDER BY rowid`, [run.id, ...fence.args]).all()).results
+      WHERE CASE WHEN json_valid(value) THEN json_extract(value,'$.runId') END=? AND ${fence.sql} ORDER BY rowid`, [run.id, ...fence.args]).all()).results
       .map(action => ({ ...action, value: JSON.parse(action.value) }));
     return { ...run, actions };
   }));

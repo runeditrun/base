@@ -21,7 +21,7 @@ export function actionFence(approval, runId, action, target, now, maxActions) {
     return { sql: '(' + sql + ')', args };
   });
   return { sql: `${approvalGuard.sql} AND EXISTS(SELECT 1 FROM oa_policy_runs WHERE id=? AND approval_id=? AND status='running' AND admitted=1)
-    AND (SELECT COUNT(*) FROM oa_auth_audit WHERE json_extract(value,'$.runId')=? AND action IN ('operators:deactivate','operators:reactivate'))<?
+    AND (SELECT COUNT(*) FROM oa_auth_audit WHERE CASE WHEN json_valid(value) THEN json_extract(value,'$.runId') END=? AND action IN ('operators:deactivate','operators:reactivate'))<?
     AND role!='owner' AND status!='invited' AND id=? AND (${scopes.map(scope => scope.sql).join(' OR ') || '0'})`,
   args: [...approvalGuard.args, runId, approval.id, runId, maxActions, target.id, ...scopes.flatMap(scope => scope.args)] };
 }

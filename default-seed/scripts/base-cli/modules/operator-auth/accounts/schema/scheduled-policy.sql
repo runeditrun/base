@@ -15,4 +15,4 @@ CREATE TABLE IF NOT EXISTS oa_policy_runs (
  admitted INTEGER NOT NULL DEFAULT 0, repeats INTEGER NOT NULL DEFAULT 1, last_seen_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS oa_policy_runs_time ON oa_policy_runs(started_at DESC);
-CREATE INDEX IF NOT EXISTS oa_policy_action_run ON oa_auth_audit(json_extract(value,'$.runId'),action);
+CREATE INDEX IF NOT EXISTS oa_policy_action_run ON oa_auth_audit(CASE WHEN json_valid(value) THEN json_extract(value,'$.runId') END,action);

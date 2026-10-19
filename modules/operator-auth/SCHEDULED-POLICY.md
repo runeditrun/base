@@ -68,7 +68,7 @@ retain separate rows and action history.
 Runs record outcome, timestamps and refusal/error codes. Action audits bind
 `policy:<id>@<sha256>`, approving owner, approval id, unique run id, action and
 target. Refused target attempts also record the attempted action and error code.
-Partial failures retain earlier committed-action audits. The reference handler
+Other auth audit values may be opaque identifiers; policy queries and the run index only extract run ids from valid JSON. Partial failures retain earlier committed-action audits. The reference handler
 attempts every policy despite prior failures, and attempts recording, policies
 and pending erasures independently. Durable policy `AuthError` refusals remain
 recorded; unexpected failures aggregate only after the jobs have been attempted.

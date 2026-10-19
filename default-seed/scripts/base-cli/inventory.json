@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.68-dev.g2a1959fe",
+  "cliVersion": "0.2.68-dev.g6eaf968e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2255,7 +2255,7 @@
     },
     "modules/operator-auth/SCHEDULED-POLICY.md": {
       "source": "modules/operator-auth/SCHEDULED-POLICY.md",
-      "sha256": "4be759fcb45e2e679b648993b4ea54425a65cf288901bac01c342156183c6472"
+      "sha256": "24787544db4d5a0c55e7ca91fffada69965bbf17ec0c5103557a4f4d758de50e"
     },
     "modules/operator-auth/accounts/adapter.mjs": {
       "source": "modules/operator-auth/accounts/adapter.mjs",
@@ -2343,7 +2343,7 @@
     },
     "modules/operator-auth/accounts/schema/operator-auth.sql": {
       "source": "modules/operator-auth/accounts/schema/operator-auth.sql",
-      "sha256": "1a24a5e7d75a93a2479b59b5a7c7a469f17d7f79ac67257b57aae683f400d028"
+      "sha256": "e4cf66f7258c5b85876c16f18fb78fe3c9bd998244634ee267bb921403d01912"
     },
     "modules/operator-auth/accounts/schema/owner-signin.sql": {
       "source": "modules/operator-auth/accounts/schema/owner-signin.sql",
@@ -2359,11 +2359,11 @@
     },
     "modules/operator-auth/accounts/schema/scheduled-policy-hardening.sql": {
       "source": "modules/operator-auth/accounts/schema/scheduled-policy-hardening.sql",
-      "sha256": "96a4796fc99e7445804c6ef9f83a55587e21b0c0760894c32b2e022cb5a80cfb"
+      "sha256": "71726d5009fd671101a49a0071982f710e429b976779fb10ce3d57fe2cb6750f"
     },
     "modules/operator-auth/accounts/schema/scheduled-policy.sql": {
       "source": "modules/operator-auth/accounts/schema/scheduled-policy.sql",
-      "sha256": "9db2ff406375e4eaa81e4096932a499d2417a8dbdccfa8e39aea343ca630ec96"
+      "sha256": "377fa07ed05a95b64385af865b66d695c127a1086c0d85fe093c3eb5bebf3ebe"
     },
     "modules/operator-auth/accounts/settings-page.mjs": {
       "source": "modules/operator-auth/accounts/settings-page.mjs",
@@ -2615,11 +2615,11 @@
     },
     "modules/operator-auth/scheduled/fence.mjs": {
       "source": "modules/operator-auth/scheduled/fence.mjs",
-      "sha256": "a05dbf16a7bbe5ef43c38db0b20084693b3e08403e008053b34dfe521caa76ef"
+      "sha256": "70aea4281747556c1d2f00dbf58174fb6e8f8292be2542a73fc2ab6efd76e9a9"
     },
     "modules/operator-auth/scheduled/history.mjs": {
       "source": "modules/operator-auth/scheduled/history.mjs",
-      "sha256": "05e6dbbaa491f3163404747813c1264053caa03d2fd2649fb15884583a07c091"
+      "sha256": "a87abedfa793c10ddb882b650e13f2c7a2b82231669d7a8a643cff0903219f06"
     },
     "modules/operator-auth/scheduled/index.d.mts": {
       "source": "modules/operator-auth/scheduled/index.d.mts",

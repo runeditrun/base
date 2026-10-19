@@ -5,4 +5,4 @@ UPDATE oa_policy_approvals SET revoked_at=COALESCE(revoked_at,CAST(strftime('%s'
 ALTER TABLE oa_policy_runs ADD COLUMN admitted INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE oa_policy_runs ADD COLUMN repeats INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE oa_policy_runs ADD COLUMN last_seen_at INTEGER;
-CREATE INDEX IF NOT EXISTS oa_policy_action_run ON oa_auth_audit(json_extract(value,'$.runId'),action);
+CREATE INDEX IF NOT EXISTS oa_policy_action_run ON oa_auth_audit(CASE WHEN json_valid(value) THEN json_extract(value,'$.runId') END,action);

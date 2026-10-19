@@ -99,6 +99,10 @@ test('owner run history exposes committed and refused target evidence across pag
     const dormant = await h.person('dormant@example.test', 'member', { sessionDaysAgo: 120 })
     const recent = await h.person('recent@example.test', 'member', { sessionDaysAgo: 1 })
     const approval = await h.approveAs(owner.cookie)
+    // Existing owner sign-in audits store an opaque grant id, alongside the
+    // policy door's structured JSON. Both mutation and history must accept it.
+    await h.db.prepare('INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,?,?,?)')
+      .bind(crypto.randomUUID(), owner.id, 'owner:signin-link', crypto.randomUUID(), h.clock()).run()
     const partial = await h.runWith(async run => {
       await run.execute('operators:deactivate', dormant.id)
       await run.execute('operators:deactivate', recent.id)
