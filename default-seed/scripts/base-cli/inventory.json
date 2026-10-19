@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.67-dev.g79157feb",
+  "cliVersion": "0.2.67-dev.g12ce7e95",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2255,7 +2255,7 @@
     },
     "modules/operator-auth/SCHEDULED-POLICY.md": {
       "source": "modules/operator-auth/SCHEDULED-POLICY.md",
-      "sha256": "3dffba92194b2800a16e21d6998165f900a7fe2ec79e7764377f8db136600a71"
+      "sha256": "4be759fcb45e2e679b648993b4ea54425a65cf288901bac01c342156183c6472"
     },
     "modules/operator-auth/accounts/adapter.mjs": {
       "source": "modules/operator-auth/accounts/adapter.mjs",

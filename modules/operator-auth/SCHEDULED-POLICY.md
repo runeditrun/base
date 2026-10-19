@@ -81,10 +81,12 @@ bounds in the hashed definition and enforcing implementation.
 
 ## Adoption, history and portability
 
-For an existing OA store, apply `accounts/schema/scheduled-policy.sql` if absent,
-then `scheduled-policy-hardening.sql` and `last-signin.sql` as new numbered
-migrations. Preserve applied migration history. Base uses `0029`, `0030` and
-`0031` respectively. The hardening migration revokes existing approvals with
+For a deployment that applied the original scheduled-policy schema, apply
+`scheduled-policy-hardening.sql` and `last-signin.sql` as new numbered migrations.
+When first adding policies to an older OA store, apply the current
+`accounts/schema/scheduled-policy.sql` instead of the hardening migration, plus
+`last-signin.sql` if the sign-in column is absent. Preserve applied migration
+history. Base upgrades its original `0029` with `0030` and `0031`. The hardening migration revokes existing approvals with
 `fresh_approval_required`; owners must approve again with fresh proof. Apply the
 last-sign-in migration after any `oa_sessions` rebuild so its trigger survives.
 Fresh OA schemas include the current tables and trigger.
