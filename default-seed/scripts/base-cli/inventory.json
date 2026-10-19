@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.67-dev.gr-base-lander-44",
+  "cliVersion": "0.2.66-dev.ge2c2905b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2767,7 +2767,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "ccb3fccad217fd3c470dc2bddfc16d3115a393da685ff3436d6a59919a5d3e12"
+      "sha256": "7054dd1244d00e10b963d9704ae296b88145942fdb07fb0bb1c974f8547e612f"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -2811,7 +2811,7 @@
     },
     "modules/release/publication-scan.mjs": {
       "source": "modules/release/publication-scan.mjs",
-      "sha256": "c7f72ddb9d29f5bf5cf24378c9a41fb82016dc946a253d98da4b365d497dbb43"
+      "sha256": "019962d69850320d388716ad94cb1950e01e76f4eca8af83408af5c56432821d"
     },
     "modules/release/publish-handoff.mjs": {
       "source": "modules/release/publish-handoff.mjs",
