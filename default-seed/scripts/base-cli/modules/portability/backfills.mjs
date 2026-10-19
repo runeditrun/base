@@ -1,6 +1,7 @@
 import { statement, quote, insist } from './storage.mjs';
 import { tokens, folded } from './generated.mjs';
 import { changesData, dataStatement, reachingTables, triggerBodies, schemaChange, statementNames } from './migration-statements.mjs';
+import { splitStatements } from './sql-text.mjs';
 
 // The data statements of later migrations, judged by the tables they write
 // (bridge.mjs placement). Restored rows never pass through a later migration.
@@ -21,13 +22,17 @@ import { changesData, dataStatement, reachingTables, triggerBodies, schemaChange
 // - Everything else keeps today's rule (changesData), with the tables admitted
 //   writes fill from archived rows counted as archived: copying one into a
 //   catalogue table is refused, since the restore does not hold its live rows.
+// Each chunk the runner's splitter handed over is split again at SQLite's own
+// statement boundaries first (sql-text.mjs), so a trigger glued to the
+// statements after it is judged as the statements it holds.
 // Returns the replays in migration order, or refuses with the first migration
 // (in `unapplied` order) holding a statement that cannot be admitted.
 export function laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets}) {
-  const statements=applied.flatMap(name=>replay.statements(name)),fold=list=>list.map(folded);
+  const split=name=>replay.statements(name).flatMap(splitStatements),fold=list=>list.map(folded);
+  const statements=applied.flatMap(split);
   const restorable=fold(catalogue),carried=fold(archived),absent=restorable.filter(name=>!carried.includes(name));
   const reached=reachingTables(statements,carried),writable=reachingTables(statements,restorable);
-  const later=unapplied.flatMap(migration=>replay.statements(migration).map((sql,index)=>({migration,index,sql,data:dataStatement(sql)})));
+  const later=unapplied.flatMap(migration=>split(migration).map((sql,index)=>({migration,index,sql,data:dataStatement(sql)})));
   const known=fold(tables),outside=later.filter(s=>s.data && !writable.includes(s.data.target)),tainted=new Set();
   // Tables an admitted write fills from archived rows (directly, through its
   // target's triggers, or from another such table) hold rows the restore lacks.
@@ -57,7 +62,7 @@ function replayable({data},{table,statements,restorable,writable,carried,tables,
   if(!['insert','replace'].includes(data.verb) || data.star)return false;
   const reads=data.names.filter(name=>tables.includes(name) && name!==table);
   if(!reads.every(name=>carried.includes(name)))return false;
-  if(reads.some(name=>Object.entries(secrets).some(([t,columns])=>folded(t)===name && columns.some(c=>data.names.includes(folded(c))))))return false;
+  if(reads.some(name=>Object.entries(secrets).some(([t,columns])=>folded(t)===name && columns.some(c=>data.words.includes(folded(c))))))return false;
   if(triggerBodies(statements,table).some(name=>writable.includes(name)))return false;
   // Foreign key actions: a row the replay deletes or rekeys (REPLACE, upsert) must reach no other catalogue table.
   return !reachingTables(statements,restorable.filter(name=>name!==table)).includes(table);

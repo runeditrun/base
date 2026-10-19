@@ -300,7 +300,17 @@ catalogue (excluded, derived or platform) and no trigger or foreign key action
 table, it changes no restored row and is allowed whatever it reads. Such a table
 then holds live rows the restore lacks, so a later statement that copies it into
 a catalogue table is refused. A statement this parser cannot bound to one table
-keeps the rule above. An archived table the archive holds no
+keeps the rule above. Each chunk a runner's splitter hands over is first split
+again where SQLite itself ends statements (`sql-text.mjs`, sqlite3_complete's
+state machine): a trigger ends only at `; END ;`, so `CASE ... END||x` in its
+body, quoted or commented semicolons never end it, and Wrangler's splitter
+gluing such triggers to the statements after them changes nothing. `rer
+import` replays the installation's migrations with that splitter too. A
+statement names a table only through an identifier that can be one: SQL
+keywords outside table position, function names (also table-valued ones such as
+`pragma_index_list(...)`), the column of a qualified `t.column`, string and blob
+literals, numbers and comments never count. Text Base cannot read to a
+statement boundary, such as an unclosed block comment, is refused. An archived table the archive holds no
 rows of restores empty, so an `UPDATE` or `DELETE` of it changes nothing and is
 allowed unless it also names a table the archive holds rows of (which it could
 read into its writes); an `INSERT` into it, or any other statement naming it,
@@ -627,6 +637,7 @@ modules/portability/restore-safety.mjs
 modules/portability/bridge.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
+modules/portability/sql-text.mjs
 modules/portability/backfills.mjs
 modules/portability/legacy-safety.mjs
 modules/portability/export.mjs

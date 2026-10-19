@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.69-dev.g62f20f46",
+  "cliVersion": "0.2.69-dev.gc8725d19",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -931,7 +931,7 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "630a7a0aec05c20fe1654f43e20cb18683b9bc1be8d56dc2022bae09bb20071e"
+      "sha256": "ca4797dba8415f00efa146a539c369b1855b584907ade7f113ce81700c568fb8"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
@@ -2695,11 +2695,11 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "762ecefbea805bacc833df716a4bfb460d136d58d6c5468714d78a78d3b84a78"
+      "sha256": "a2c822b5fb4862b9b650d3f5624eed5b10bb81d54c1e828c1e21844841f4f8f6"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
-      "sha256": "b0048ed7979930729b91c5d4269eedc093efc8872eee97d65b19a1a798e5254e"
+      "sha256": "1f4973d7e6a30260e16f582c53556738f5d53e2e7a08195645b66f38b5b4ab35"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
@@ -2811,7 +2811,7 @@
     },
     "modules/portability/migration-statements.mjs": {
       "source": "modules/portability/migration-statements.mjs",
-      "sha256": "6b675680fe7f280e5ceb2ba7c9e073f6d8503c5d0dc92c13232f89fe0ec07d01"
+      "sha256": "1abaaefa0265e45dce7f444d24e2a8316ad105acea64afdc18e2475c187a9ed3"
     },
     "modules/portability/payloads.mjs": {
       "source": "modules/portability/payloads.mjs",
@@ -2836,6 +2836,10 @@
     "modules/portability/schema/portability.sql": {
       "source": "modules/portability/schema/portability.sql",
       "sha256": "c7db9042f6d5c571e10297c02df858ad2f3466beb4fa85649fee407cc228747b"
+    },
+    "modules/portability/sql-text.mjs": {
+      "source": "modules/portability/sql-text.mjs",
+      "sha256": "19cd8578a841aa2cdfb40b6acc7cdf3ac73bdd579a60f9ca6819f3f5d2739c18"
     },
     "modules/portability/storage.mjs": {
       "source": "modules/portability/storage.mjs",
