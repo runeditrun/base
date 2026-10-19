@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 export async function finalizingDeploy(t) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer finalization ')));
- t.after(() => rm(root, { recursive: true, force: true }));
+ t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
  for (const path of ['dist/server', 'dist/client', 'migrations/core']) await mkdir(join(root, path), { recursive: true });
  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }] }));
  await writeFile(join(root, 'dist/server/index.js'), 'export default {}');

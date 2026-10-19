@@ -4,7 +4,7 @@ import { access, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { fixture, freePort, pause } from './fixtures/reference.mjs';
+import { fixture, pause } from './fixtures/reference.mjs';
 
 const events = child => child.stdoutText.trim().split('\n').filter(Boolean).map(JSON.parse);
 
@@ -22,9 +22,9 @@ async function stateFiles(directory) {
 }
 
 test('rer demo refuses incomplete settings and serves isolated data without invoking legacy owner preflight', { timeout: 20 * 60_000 }, async t => {
- const f = await fixture('default-seed', t), port = await freePort();
+ const f = await fixture('default-seed', t);
  await f.run(['install', '--json']);
- await f.run(['setup', '--owner-email', 'demo-owner@example.test', '--port', String(port), '--non-interactive', '--json']);
+ await f.run(['setup', '--owner-email', 'demo-owner@example.test', '--non-interactive', '--json']);
  // A pulled migration is absent from setup's old build but belongs in the demo.
  await writeFile(join(f.root, 'migrations/core/9998_demo_upgrade.sql'), 'CREATE TABLE demo_upgrade(value TEXT);\n');
  await f.sql("CREATE TABLE owner_saved(value TEXT); INSERT INTO owner_saved VALUES('owner content')");

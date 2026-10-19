@@ -9,7 +9,7 @@ export async function deployProviderFixture(t, declaration = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-remove-')));
  const provider = ownerProvider({ creationDates: true });
  const saved = { ...process.env };
- t.after(async () => { provider.close(); for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
+ t.after(async () => { provider.close(); for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); });
  Object.assign(process.env, { CI: 'true', CLOUDFLARE_ACCOUNT_ID: provider.accountId, CLOUDFLARE_API_TOKEN: provider.token });
  t.mock.method(globalThis, 'fetch', provider.fetch);
  for (const path of ['dist/server', 'dist/client', 'migrations/core']) await mkdir(join(root, path), { recursive: true });
