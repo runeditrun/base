@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.65
+
+- **Tag-first patch releases (#302).** rer release --tag adopts an existing remote annotated version tag at the exact source commit after its tag Verify passes. The producer captures one immutable tag object and checks object/commit equality before mutation and RELEASED. The existing release-tag Verify rule remains in force.
+- **Current contract validation for every release (#302).** Contract inheritance is disabled. Patch lines must update older contracts to the current format before releasing; local predecessor tags cannot manufacture a passing judgment.
+- **Business import authority (#293).** Seeds can enable their import door at first owner claim and heal an interrupted enable on later owner paths, while preserving an owner's later disablement and key revocations. verifyRerGrant validates exact RER-signed read grants outside the import door.
+
 ## 0.2.64
 
 - **Records start at one import door (#296).** The default seed uses upload, review, apply, reconcile and undo; the legacy importer is removed. Records export/import docs, templates and CLI help start at the door. Installation archives remain a separate backup/restore path. Adopting seeds follow [ADOPTING.md](../modules/import-kit/src/door/ADOPTING.md).
