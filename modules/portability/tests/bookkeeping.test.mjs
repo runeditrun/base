@@ -32,7 +32,7 @@ test('migrated export restores into a fresh migrated target and leaves its bookk
 });
 test('includeTables cannot reintroduce platform tables, including SQLite case aliases',async t=>{
   const source=await migrated(t);
-  for(const name of ['rer_migrations','RER_MIGRATIONS','d1_migrations','_rer_deploy_migrations','_rer_portability_migrations','rer_portability_jobs','rer_command_receipts','rer_erasure_blobs','rer_erasure_guard','rer_erasure_scope','rer_erasure_rates','rer_demo','rer_dependency_keys','rer_dependency_pending','rer_dependency_codes','rer_mail_development_outbox','rer_ai_development_outbox']) {
+  for(const name of ['rer_migrations','RER_MIGRATIONS','ik_d1_assertions','IK_D1_ASSERTIONS','d1_migrations','_rer_deploy_migrations','_rer_portability_migrations','rer_portability_jobs','rer_command_receipts','rer_erasure_blobs','rer_erasure_guard','rer_erasure_scope','rer_erasure_rates','rer_demo','rer_dependency_keys','rer_dependency_pending','rer_dependency_codes','rer_mail_development_outbox','rer_ai_development_outbox']) {
     const input={...policy,includeTables:[name]};
     assert.equal(excludedTable(name,input),true);
     await assert.rejects(createPortability({db:source.db,policy:input}),error=>error.code==='platform_table:'+name && error.message.includes('includeTables'));
