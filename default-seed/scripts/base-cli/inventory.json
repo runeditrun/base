@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.68-dev.gc443b3b7",
+  "cliVersion": "0.2.68-dev.g6fc526fc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2647,7 +2647,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "90f1b36750687451397f7f9be6e68282192f00af0e3f42002f715fdb0793538d"
+      "sha256": "5a5527cc29cf4da55ae98edcc74fc17664337ce87f640a3fe31253995758a236"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
@@ -2707,7 +2707,11 @@
     },
     "modules/portability/http.mjs": {
       "source": "modules/portability/http.mjs",
-      "sha256": "c4dad3b6ea5c2a5384262e391bfebe83365ba3f934f99050cb3efd54171af16d"
+      "sha256": "3b870041093fc7cf6e1fb91f87c7982b18a4f4b94055a448210aed2bfea0924c"
+    },
+    "modules/portability/import-lease.mjs": {
+      "source": "modules/portability/import-lease.mjs",
+      "sha256": "97df004ec17a8b2fbc6ea53dbe1c3d4b8b5ad79f25eacca344609562f61dd761"
     },
     "modules/portability/import-safety.mjs": {
       "source": "modules/portability/import-safety.mjs",
@@ -2719,15 +2723,15 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "41fc94713e4015023aa0c35e90c740d069364766f30f8cc2b0ab5646898bd8f9"
+      "sha256": "2c570b2497fd4d25e660810f1a0e67670c596e0b864c730cfee42a0afe6abd19"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
-      "sha256": "0984922abc96c8b5a658b5d00c415c6558ee2d8c8ef285b82d772f524bee65af"
+      "sha256": "6e63eb2e099e093521fed02786c35d1011d25a46a4ad1ccca6e22c869f2ea4b8"
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
-      "sha256": "9f476bd63470d255ed92a4eb390e67925e43e3c11446f34714b98839d76ca383"
+      "sha256": "417db6c1232f5f0ff1ada7cef3c99e2d49e89c61b7a5a8d87013ef23e1b03d97"
     },
     "modules/portability/journal.mjs": {
       "source": "modules/portability/journal.mjs",
