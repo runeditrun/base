@@ -23,6 +23,7 @@ import { probePnpm } from './pnpm-probe.mjs';
 import { deliveryDeclarationClauses } from './delivery-declarations.mjs';
 import { checkoutPlaceholderMarks } from './placeholder-mark.mjs';
 import { contractStatusClauses } from './contract-status.mjs';
+import { hostedExportCommand } from './hosted-export-command.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
 // too old to record one). defaults: what a server start applies when the person
@@ -128,6 +129,11 @@ export async function check(project, explicitProfile) {
   } catch { add('SC-01.inventory', false, 'Restore the deterministic portable CLI source inventory.'); }
   }
   add('SC-08.portability', typeof adapter?.portability?.export === 'function' && typeof adapter?.portability?.import === 'function', 'Adopt the reviewed mainline complete local portability API; archive support remains unavailable until then.');
+  if (adapter?.portability?.hostedExport !== undefined) {
+   let valid = true;
+   try { await hostedExportCommand(project.root, adapter.portability.hostedExport); } catch { valid = false; }
+   add('SC-08.hosted-export', valid, 'Declare portability.hostedExport as an argv array naming a relative regular checkout script, without absolute paths, traversal or symlinks.');
+  }
   if (adapter?.devIdentity) for (const [id, ok, message] of await devIdentityClauses(project.root, adapter)) add(id, ok, message);
   for (const [id, ok, message] of await authCopyClauses(project.root)) add(id, ok, message);
   clauses.push(...await contractStatusClauses(project.root));

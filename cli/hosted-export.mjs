@@ -1,13 +1,16 @@
 import { heldDeployments } from './deployment-record.mjs';
 import { invalid } from './errors.mjs';
+import { hostedExportCommand } from './hosted-export-command.mjs';
 
-// rer export reads only this computer's copy. A hosted address (--origin, or
-// --target remote) names the hosted install, which rer cannot export yet: the
-// portability export writes snapshot tables into the database it reads, so it
-// never runs against a live hosted one. Refuse before any effect rather than
-// save the local copy under the hosted install's name.
+// Without an explicit hosted implementation, refuse before any effect rather
+// than save the local copy under the hosted install's name. Local portability
+// writes snapshot tables into the database it reads; it cannot read a live one.
 export async function refuseHostedExport(project, options) {
  if (options.origin === undefined && options.target !== 'remote') return;
+ if (options.target === 'remote' && project.adapter?.portability?.hostedExport !== undefined) {
+  await hostedExportCommand(project.root, project.adapter.portability.hostedExport);
+  return;
+ }
  if (project.adapter?.portability?.remote === true) return;
  const origin = options.origin === undefined ? undefined : new URL(options.origin).origin;
  const held = await heldDeployments(project.root);
