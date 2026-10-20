@@ -6,10 +6,11 @@ import re
 import stat
 from public_hygiene import inspect
 from provenance import MANIFESTS, declared_keys
-from project_identity import tree_identity
+from project_identity import FIELDS, tree_identity
 from licenses import license_rules
 from git_history import InspectionError
 from trust_bundle import bundles
+from github_owners import content_owners
 
 DEPENDENCY_DIRS = {'.git', 'node_modules'}
 
@@ -32,9 +33,16 @@ def context(history, commit, config):
             declared.update(declared_keys(history.blob(entry['oid'])))
     identity, invalid = tree_identity(history, history.root_entries(commit))
     blobs = {entry['path']: entry['oid'] for entry in entries if entry['kind'] == 'blob'}
+    owners = set(config.get('githubOwners', ()))
+    owner_cache = config.setdefault('githubOwnerCache', {})
+    for path, oid in blobs.items():
+        key = (path if path in FIELDS else None, oid)
+        if key not in owner_cache:
+            owner_cache[key] = frozenset(content_owners(history.blob(oid), path))
+        owners.update(owner_cache[key])
     trust = bundles(blobs, lambda path: history.blob(blobs[path]))
     return {**config, 'localPaths': frozenset(local), 'declaredSources': frozenset(declared), 'projectIdentity': identity,
-            'trustBundles': trust}, invalid
+            'githubOwners': frozenset(owners), 'trustBundles': trust}, invalid
 
 
 def text_rules(data, path, config, env_hashes, *, commit_message=False):

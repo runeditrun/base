@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.74",
+  "cliVersion": "0.2.74-dev.g43d7cbfd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3053,9 +3053,13 @@
       "source": "scripts/publish-check/git_history.py",
       "sha256": "8a9cacce7ed7fe65befc823ea622573cd9d2ba9c09014f0b2f0e5ece89cb71a1"
     },
+    "scripts/publish-check/github_owners.py": {
+      "source": "scripts/publish-check/github_owners.py",
+      "sha256": "fda449c69ee96e37300172271027927a0b97fe9d7a6b4fd2cf2ce423f1b82aa4"
+    },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
-      "sha256": "2bcc18b36162af8e29ef463704b2cbf85147286eeecf86f8c909c24a9c0adee7"
+      "sha256": "3ebc3a94e0dba38e523cb32d5aa4e09ce6049923905a9b2391fd716366e09a69"
     },
     "scripts/publish-check/gitleaks.py": {
       "source": "scripts/publish-check/gitleaks.py",
@@ -3071,7 +3075,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "7afd5c5584265c8cb8ea264016b499c04bce02e88510e941d3a59dcfc8c30843"
+      "sha256": "daec04caeff654805073642a75d740970e8acdde84f81b347b1cae85463b00f5"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",
@@ -3131,7 +3135,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "985cbf70e00667c744fce9b75496d8fda95d59f29f33e774332ad579d7826347"
+      "sha256": "bd81e72dce917da9637f031a1bcc236fd52f8b20e0ab953ee12d1871218145d9"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",
@@ -3187,7 +3191,7 @@
     },
     "scripts/publish-check/tree_scan.py": {
       "source": "scripts/publish-check/tree_scan.py",
-      "sha256": "a7487424894ab1bc5753040c5533c3036e1c46869eb1bc2e3fd6fab9d0a74743"
+      "sha256": "78dd1aeb5de807fddb07ff2754b4c6c75e657b4a19d3fc76617d50ef247541df"
     },
     "scripts/publish-check/trust_bundle.py": {
       "source": "scripts/publish-check/trust_bundle.py",

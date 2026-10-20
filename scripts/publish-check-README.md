@@ -115,11 +115,20 @@ aside); an MP4/AVIF file needs a sized `ftyp` box with a known brand and a
 `moov` or `meta` box. Text renamed `.gif` or an image with text appended is
 still inspected whole. Known environment values and Gitleaks still see all
 media bytes. Other binary content keeps the shape rule above.
-A bare `word/word` in prose (`commit/tree`, `rer-delegation/1`,
-`` font resource version tokens ``) with no GitHub context nearby (a URL, a repository field, a
-label or command, `repository`, `clone`, `fork`, `upstream`, a repository route)
-is a repository only when one exists privately; a missing answer proves nothing.
-Stated references to missing repositories still fail.
+GitHub URLs and SSH remotes, and `owner/repo` qualified with `#<number>`,
+`@<sha>`, `/pull/`, `/issues/`, `/tree/` or `/blob/`, name repositories.
+A bare `owner/repo` also names a repository when its owner is known from the
+project identity, explicit project/repository/public-base inputs, or a GitHub
+URL anywhere in the same tree. Unmarked pairs use canonical lowercase owner
+spelling; capitalized slash phrases remain prose. URLs, qualifiers and explicit
+declarations retain their existing case handling. Validated logical project
+identities keep their existing metadata treatment. Owner discovery needs no network requests and
+includes current untracked and ignored files before inspecting working content.
+Ordinary slash prose with an unknown owner does not gain repository meaning
+from nearby words. Structured repository declarations, dependencies, actions,
+repository commands and code spans retain their existing checks, including the
+private-only check for ambiguous code spans. Stated references to missing or
+private repositories still fail.
 
 POSIX home prefixes retain their canonical case (`/Users/` and `/home/`); Windows
 home paths are case insensitive. Lowercase application URLs such as `/users/profile`
