@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73",
+  "cliVersion": "0.2.73-dev.gc78d167f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -213,7 +213,7 @@
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "4a1977ec6f153bda36b194e9ec5a7ad38c26702987ea520a6072d285109aa812"
+      "sha256": "16b92ea0a2e8380964727052747eacc9946a6a49cba349e32cdf89f5e43d1826"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
