@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.75
+
+- **Custom-origin owner claims use the recorded app origin (#374).** Native deployment inspection retains the configured public origin from the deployment receipt, so owner claim and status work for custom domains while the ownership guard still refuses a claim at a different origin. Existing workers.dev deployments keep their derived origin.
+- **Run sites can opt into build-coupled docs search (#375).** Site builds prepare the search corpus and runtime, deploys reuse published vectors or generate them through Workers AI, and readback verifies the serving runtime with its exact AI/assets bindings. Search results link to document headings and provider failures refuse publication.
+
 ## 0.2.74
 
 - **Restores replay more later migrations (#359).** Archive admission and replay accept row-less targets and row-less tables (restored in the destination's definition), RAISE-only guard triggers, statements that read views, and row-preserving CHECK rebuilds, so retained archives from before those migrations restore exactly (Vector: 121 tables / 23 rows; Penny with its settings and clock replayed).
