@@ -631,6 +631,34 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.assertNotIn(value, result.stdout + result.stderr)
         self.assertIn('redacted-path-sha256', result.stdout)
 
+    def test_environment_statuses_and_short_words_do_not_block(self):
+        values = {'STATUS_FLAG': 'submitted', 'STRIPE_MODE': 'test',
+                  'NAMECHEAP_API_USER': 'name', 'ACCOUNT_ID': '1234567890'}
+        self.write('settings.mjs', 'export const settings = ' + json.dumps(values) + ';\n')
+        self.commit()
+        with tempfile.TemporaryDirectory() as directory:
+            env = os.path.join(directory, 'synthetic.env')
+            with open(env, 'w') as file:
+                file.write(''.join(f'{key}={value}\n' for key, value in values.items()))
+            report = self.report(env_file=env)
+            self.assertEqual(report['status'], 'PASS')
+            self.assertTrue(report['complete'])
+            self.assertTrue(report['guarantees']['environmentChecked'])
+            self.assertFalse(any(f['rule'] == 'secret.env-match' for f in report['findings']))
+
+    def test_random_environment_secret_still_blocks(self):
+        value = secrets.token_urlsafe(18)
+        self.write('settings.mjs', 'export const value = ' + json.dumps(value) + ';\n')
+        self.commit()
+        with tempfile.TemporaryDirectory() as directory:
+            env = os.path.join(directory, 'synthetic.env')
+            with open(env, 'w') as file:
+                file.write('VALUE=' + value + '\n')
+            report = self.assert_fails('secret.env-match', 'settings.mjs', env_file=env)
+            self.assertTrue(report['complete'])
+            self.assertTrue(report['guarantees']['environmentChecked'])
+            self.assertNotIn(value, json.dumps(report))
+
     def test_environment_value_cannot_be_waived(self):
         value = 'synthetic-environment-value-' + secrets.token_hex(12)
         self.write('settings.txt', 'TOKEN=' + value)
