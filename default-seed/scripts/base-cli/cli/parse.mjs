@@ -17,6 +17,7 @@ export const origin = (host, port) => `http://${host === '::1' ? '[::1]' : host}
 export function parse(argv, cwd = process.cwd(), { independent = false, deferTail = false } = {}) {
  const [verb, ...args] = argv;
  if (!verb || verb === '--help') return { help: true };
+ // Release validates its own flags, including its integer publication scan timeout.
  if (verb === 'release') return { verb, releaseArgs: args };
  if (verb === 'archive') return { verb, archiveArgs: args };
  // rer demo is rer dev --demo.

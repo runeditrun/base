@@ -93,3 +93,16 @@ for (const [names, keepOther] of [
     assertRejectedBeforeEffects(f, ref);
   });
 }
+
+test('CLI rejects invalid scan timeout before release effects', t => {
+  const f = declaredFixture(t);
+  for (const value of ['0', '-1', '7201', 'x', '1.5']) {
+    const result = spawnSync(process.execPath, [cli, 'release', '--repo', f.repo,
+      '--project', f.options.project, '--repository', f.options.repository,
+      '--output', f.options.output, '--tag', '--scan-timeout-seconds', value], { encoding: 'utf8' });
+    assert.equal(result.status, 2, value);
+    assert.equal(existsSync(f.marker), false, value);
+    assert.equal(existsSync(f.options.output), false, value);
+    assert.equal(git(f.repo, ['tag', '--list']), '', value);
+  }
+});

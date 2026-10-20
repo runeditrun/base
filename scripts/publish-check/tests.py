@@ -3,9 +3,12 @@ import hashlib
 import json
 import os
 import secrets
+import select
 import struct
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 import zlib
 from test_repo import ROOT, RepositoryFixture, resolving, generic_credential
@@ -511,6 +514,105 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.assertEqual(help_result.returncode, 0)
         self.assertIn('--public-base', help_result.stdout)
         self.assertEqual(help_result.stderr, '')
+
+    def test_scan_slots_wait_outside_deadline_and_release_after_kill(self):
+        with tempfile.TemporaryDirectory(prefix='scan-slots-test-') as directory:
+            from pathlib import Path
+            home = Path(directory)
+            # CI's checkout can be owned by the host runner. Isolating HOME
+            # must retain trust for this exact source used by runningVersion.
+            subprocess.run(['git', 'config', '--file', str(home / '.gitconfig'),
+                            '--add', 'safe.directory', str(ROOT)], check=True)
+            barrier, entered = home / 'hold', home / 'entered'
+            # Delay only our real Python scan, without replacing its result or
+            # doing CPU work. The slot holder itself remains undelayed.
+            (home / 'sitecustomize.py').write_text(
+                'import os, pathlib, sys, time\n'
+                'if sys.argv[0].endswith("/cli.py") and os.environ.get("SCAN_TEST_HOLD"):\n'
+                '    pathlib.Path(os.environ["SCAN_TEST_ENTERED"]).touch()\n'
+                '    while pathlib.Path(os.environ["SCAN_TEST_HOLD"]).exists(): time.sleep(0.05)\n')
+            env = {**os.environ, 'HOME': directory, 'RER_SCAN_SLOTS': '1', 'PYTHONPATH': directory}
+            children = []
+
+            def start(seconds=20, hold=False, extra_env=None):
+                child = subprocess.Popen(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo),
+                                          '--timeout-seconds', str(seconds)], stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE, text=True,
+                                         env={**env, **({'SCAN_TEST_HOLD': str(barrier),
+                                                        'SCAN_TEST_ENTERED': str(entered)} if hold else {}),
+                                              **(extra_env or {})})
+                children.append(child)
+                return child
+
+            def held():
+                barrier.touch()
+                entered.unlink(missing_ok=True)
+                child = start(hold=True)
+                end = time.monotonic() + 10
+                while not entered.exists() and child.poll() is None and time.monotonic() < end:
+                    time.sleep(0.05)
+                self.assertTrue(entered.exists(), 'first real scan reached its timing barrier')
+                return child
+
+            def waiting(child):
+                ready, _, _ = select.select([child.stderr], [], [], 10)
+                self.assertTrue(ready, 'second scan reports that it is waiting')
+                self.assertIn('waiting for a scan slot', child.stderr.readline())
+                self.assertIsNone(child.poll())
+
+            def passed(child):
+                output, error = child.communicate(timeout=15)
+                self.assertEqual(child.returncode, 0, error + output)
+                self.assertEqual(json.loads(output)['status'], 'PASS')
+                self.assertNotIn('waiting for a scan slot', error, 'waiting is printed only once')
+
+            try:
+                first = held()
+                second = start(seconds=5)
+                waiting(second)
+                time.sleep(6)  # Longer than the second scan's whole deadline.
+                self.assertIsNone(second.poll())
+                barrier.unlink()
+                passed(first)
+                passed(second)
+
+                first = held()
+                second = start()
+                waiting(second)
+                first.kill()  # Our recorded Node PID, including abrupt death.
+                first.communicate(timeout=10)
+                passed(second)
+
+                # The production cap stays one hour. Invoke the same holder
+                # with a short clock through a test-only interpreter shim.
+                first = held()
+                shim = home / 'bin'
+                shim.mkdir()
+                python = shim / 'python3'
+                python.write_text(f'#!{sys.executable}\n'
+                    'import os, sys\n'
+                    f'sys.path.insert(0, {str(ROOT / "scripts/publish-check")!r})\n'
+                    'if any(arg.endswith("/slots.py") for arg in sys.argv):\n'
+                    '    sys.argv = sys.argv[2:]\n'
+                    '    from slots import main\n'
+                    '    raise SystemExit(main(wait_seconds=0.2))\n'
+                    f'os.execv({sys.executable!r}, [{sys.executable!r}, *sys.argv[1:]])\n')
+                python.chmod(0o755)
+                capped = start(extra_env={'PATH': str(shim) + os.pathsep + env['PATH']})
+                waiting(capped)
+                output, _ = capped.communicate(timeout=10)
+                self.assertEqual(capped.returncode, 2)
+                report = json.loads(output)
+                self.assertEqual(report['status'], 'INCOMPLETE')
+                self.assertEqual(report['findings'][0]['rule'], 'scan.slot-timeout')
+                barrier.unlink()
+                passed(first)
+            finally:
+                barrier.unlink(missing_ok=True)
+                for child in children:
+                    if child.poll() is None:
+                        child.terminate()
+                    child.communicate(timeout=10)
 
     def test_message_and_tag(self):
         value = 'ghp_' + secrets.token_hex(20)
