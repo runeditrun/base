@@ -28,7 +28,8 @@ export async function rotateInstallationKey({ root, environment, declaration, en
  retired.set(await installationKeyId(pair.INSTALLATION_KEY_PREVIOUS), pair.INSTALLATION_KEY_PREVIOUS);
  addSecrets([...Object.values(pair), ...retired.values()]);
  await saveSecrets(root, environment, { ...pair, INSTALLATION_KEY_RETIRED: serializeRetired(retired) });
- await resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report});
+ // Routine rotation must not revive envelopes from older retired eras.
+ await resealAndRetire({root, environment, current, previous, pair, retired:new Map(), env, state, owner, report});
  report('Rotated INSTALLATION_KEY, resealed every dependency key, and removed INSTALLATION_KEY_PREVIOUS after verifying the owned Worker. Retired keys remain in private custody for older D1 restores.');
 }
 

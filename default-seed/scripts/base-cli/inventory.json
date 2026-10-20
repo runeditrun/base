@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73-dev.g1dc750ce",
+  "cliVersion": "0.2.73-dev.g96bc0ecc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -363,7 +363,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "276498177c9a17bbefe2c9acc7ab39d7b992295406c2957742c46df07b3542c0"
+      "sha256": "87441598ab6fd32bb8d0632e964730e34ddcc048a6ed750593878927bc726771"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -715,7 +715,7 @@
     },
     "cli/deploy-installation-key.mjs": {
       "source": "cli/deploy-installation-key.mjs",
-      "sha256": "c4c2cbb9ff9b8ad5f6c5452e996e00d828e1eaa4586e84b90544083241b26e4f"
+      "sha256": "0f7dc0d733c59cfb812d10a620f34b1765401ffad72eabea97e4f07fc3a8ef04"
     },
     "cli/deploy-needs.mjs": {
       "source": "cli/deploy-needs.mjs",
@@ -800,6 +800,10 @@
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
       "sha256": "e540e9b5e48d9c27c0b54ca52d12c25273b917004111ebc389c25d08f67b5ada"
+    },
+    "cli/gr300b-replay.probe.mjs": {
+      "source": "cli/gr300b-replay.probe.mjs",
+      "sha256": "a225a817f9fc47b1e5f0af4f07a037f09694ce509088a660a88a5e64ba4ad383"
     },
     "cli/hosted-export-command.mjs": {
       "source": "cli/hosted-export-command.mjs",
@@ -1547,7 +1551,7 @@
     },
     "modules/dependencies/README.md": {
       "source": "modules/dependencies/README.md",
-      "sha256": "60da39936a8077bd8a4eac0fa64d9e51172b26805c774f8ca82bbe2424b88586"
+      "sha256": "79e0eef431e8211ed74a14198a39ba201ad67db3de5e03310ac297834c691d22"
     },
     "modules/dependencies/approval.mjs": {
       "source": "modules/dependencies/approval.mjs",
@@ -1611,7 +1615,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "07e3d4b44eb6f6dacc873d66dcaf0cd951e05898bbaa4e5c6fb890be731842e1"
+      "sha256": "a4a1652a776d95b7e3c5a6e048a21faf83040453cecda0d744cb1803041f6656"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
