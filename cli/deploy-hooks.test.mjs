@@ -17,9 +17,12 @@ import { openDependencyKey, sealDependencyKey } from '../modules/dependencies/se
 
 test('installation rotation publishes both keys atomically, reseals every row and resumes failed reseal or retirement without losing custody', async t => {
  const f = await fixture(t, {declared:true, existing:true, installation:true});
- await f.run({dryRun:true});
+ const previewKey=crypto.randomUUID()+crypto.randomUUID();
+ process.env.INSTALLATION_KEY=previewKey;
+ try { await f.run({dryRun:true}); } finally { delete process.env.INSTALLATION_KEY; }
  assert.equal(f.provider.state.writes.length, 0);
- assert.ok(f.progress.some(line => line.includes('INSTALLATION_KEY') && line.includes('Values are withheld')));
+ assert.ok(f.progress.some(line => line.includes('INSTALLATION_KEY')));
+ assert.equal(f.progress.join('\n').includes(previewKey),false);
  const file = join(f.root, '.rer/deploy/production.secrets.env');
  await assert.rejects(readFile(file), {code:'ENOENT'});
  await f.run();
