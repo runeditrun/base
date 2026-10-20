@@ -110,6 +110,27 @@ it continues to accept serializable object policies. Malformed primary or later
 journal JSON is reported once as `archive_json` with exit 2, before local data
 migrations, without echoing archive content or parser diagnostics.
 
+An installation migrated by Platform has `rer_migrations(name, sha256,
+applied_at)` instead of Wrangler's ledger. Local transfers match each entry to
+exactly one migration file by SHA-256 and preserve its application order. They
+verify all local files are recorded and skip Wrangler; a pending file refuses
+as `migration_ledger:unapplied:<file>` until Platform applies it. Unknown,
+ambiguous or conflicting entries refuse by name, without replaying SQL or
+creating a second ledger.
+
+For old archives containing only Platform's migration names, the seed adapter
+may declare `platformMigrations: {prefix, dataOnly}` on `localPortability`.
+Read `prefix` from the seed's own deploymentSpec packaging `migrationPrefix`
+for this binding's migrations directory. It declares an alias `prefix + file`
+for each file; it does not strip arbitrary prefixes. `dataOnly` is an explicit
+list of installation-specific Platform seed entries without schema files.
+Declare only SQL that seeds data and changes no schema: these names are omitted
+from schema replay. This does not authorize replacing their rows; the archive
+policy still controls that. Archive SQL and names never supply these declarations.
+Custom replay runners can supply each plan entry's `aliases` and pass
+`{dataOnly}` as `migrationReplay`'s third argument. Verified archive ledger
+hashes take precedence over name-only placement where available.
+
 When a policy includes operator-auth tables, local dev identity still never
 travels, and no policy option changes that: export drops `oa_sessions` rows of
 kind `dev`, every credential recorded in `oa_dev_credentials` (and that table's
