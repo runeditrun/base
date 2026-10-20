@@ -23,7 +23,10 @@ export async function appliedMigrations(db) {
 // unless its statement is replayed at finalize (backfills.mjs).
 async function placement(db,manifest,cat,replay,ledger,history) {
   const files=replay.names.map(name=>({name,sha256:replay.sha256?.(name)}));
-  const applied=matchMigrationLedger(ledger,files);
+  // An aligned replayer keeps its existing contract: hashes are optional.
+  // Resolve destination aliases only when its ledger uses different names.
+  let applied=ledger.map(m=>m.name);
+  if(canonicalJson(replay.names)!==canonicalJson(applied))applied=matchMigrationLedger(ledger,files);
   insist(canonicalJson(replay.names)===canonicalJson(applied) && await replay.schemaAfter(applied)===cat.identity,'schema_mismatch');
   const historyEntries=manifest.migrations?.map(name=>({name})) ?? history?.();
   const recorded=historyEntries && matchMigrationLedger(historyEntries,files);

@@ -45,7 +45,7 @@ test('an archive made before later additive migrations restores into the upgrade
  };
  // A migration the archive has and this installation lacks.
  await unlink(migration('1000_later.sql'));
- await refused('exports/current.rer', /schema_mismatch/);
+ await refused('exports/current.rer', /migration_ledger:unknown:1000_later\.sql/);
  // A later migration that renames a column is not additive.
  await writeFile(migration('1000_later.sql'), additive);
  await writeFile(migration('1001_rename.sql'), 'ALTER TABLE computed_entries RENAME COLUMN label TO caption;');
@@ -72,7 +72,7 @@ test('an archive made before later additive migrations restores into the upgrade
  // migration this installation never applied: it is newer, and refused.
  await seed.run(['export', '--output', 'exports/newer.rer']);
  await unlink(migration('1001_index.sql'));
- await refused('exports/newer.rer', /schema_mismatch/);
+ await refused('exports/newer.rer', /migration_ledger:unknown:1001_index\.sql/);
 
  // A fresh installation holds the rows its own migrations insert, as a seed's
  // default settings: they are not the owner's data and do not block a restore.
@@ -91,7 +91,7 @@ test('an archive made before later additive migrations restores into the upgrade
  assert.deepEqual((await seed.data(original))[0].results, rows);
  // A row the migrations did not insert still refuses, naming its table and the next step.
  // The refused newer archive leaves a reset, migrated installation.
- await refused('exports/newer.rer', /schema_mismatch/);
+ await refused('exports/newer.rer', /migration_ledger:unknown:1001_index\.sql/);
  await seed.data("INSERT INTO app_settings VALUES('locale','en-AU')");
  const occupied = await seed.run(['import', '--input', 'exports/settings.rer', '--yes'], 4);
  assert.match(occupied.find(event => event.event === 'error').message, /^Restore refused \(target_not_empty\): table app_settings in this installation already holds rows its migrations did not insert, .*rer reset --yes and rer import --input exports\/settings\.rer --yes again\.$/);
