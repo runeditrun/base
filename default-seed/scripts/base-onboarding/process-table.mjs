@@ -153,7 +153,6 @@ export async function readProcessTable(timeout = inspectionMs, pgid, read = proc
   }, extension)
 }
 
+// Custody follows a process lifetime: exec changes its executable name without
+// changing its PID or start time. Names are metadata, never lifetime identity.
 export const sameBirth = (left, right) => validPid(left?.pid) && left.pid === right?.pid && left.birth === right?.birth
-
-export const sameProcess = (left, right) => validPid(left?.pid) && left?.pid === right?.pid
-  && left?.birth === right?.birth && left?.command === right?.command

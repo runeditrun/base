@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73-dev.g2f31e2fe",
+  "cliVersion": "0.2.73-dev.gd2a65f2a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -201,7 +201,7 @@
     },
     "process-cleanup.mjs": {
       "source": "onboarding/process-cleanup.mjs",
-      "sha256": "659c04cfd8f1b84bda4234c74140b33b9b275a53f8801ccd8c2226cc49a44c39"
+      "sha256": "7a51918592c1f241434d22b2813c9c3cb0945df056719803a0ba991ccff8eaba"
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
@@ -209,15 +209,15 @@
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "b4f08012191dc13ede6d85c928a9782553aa2d61224359a51851e181a54297bd"
+      "sha256": "d33ba3b90be242e7b6bd0c734fbff793f0ae84df2cffad5834f41062c98a3b72"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "16b92ea0a2e8380964727052747eacc9946a6a49cba349e32cdf89f5e43d1826"
+      "sha256": "6ce0568487c59076c891c8c6ab16f3eebee30bfeedfdaad7e44838b66ab4c813"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
-      "sha256": "ad72d744fd4163b4dac4a53e564377adf3b1aa00f82dda4763534a736e721092"
+      "sha256": "e8c9d819600e0b00790212695ec73043030601143b46cc2c95606c17d228f36d"
     },
     "production-assets.mjs": {
       "source": "onboarding/production-assets.mjs",
@@ -1947,7 +1947,7 @@
     },
     "modules/job-queue/command.mjs": {
       "source": "modules/job-queue/command.mjs",
-      "sha256": "3235926e1a988cb934ef53ddea247bd1d6405cc6cb2222e8be25b69ca69c6ec1"
+      "sha256": "98cfd0ce8c5dfd7d7bbd865075e02ce88c472f595ee4f996c1b570f58f5e5fb3"
     },
     "modules/job-queue/config.mjs": {
       "source": "modules/job-queue/config.mjs",
