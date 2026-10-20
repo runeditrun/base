@@ -2995,7 +2995,11 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "6328716b772245d9051b5f2af73b1566a9a02e87b31d0c59ea4980ea44ba2bc6"
+      "sha256": "3ddc65bd292f30b3d59050d2cad69ed1cafabf832cb42c0e2a717ae829faf38a"
+    },
+    "scripts/publish-check/assignment.py": {
+      "source": "scripts/publish-check/assignment.py",
+      "sha256": "01e6a9e9a5e371120b749499ea2b8db1b524bf401607fc180d59b59e3ad13d0e"
     },
     "scripts/publish-check/c2pa.py": {
       "source": "scripts/publish-check/c2pa.py",
@@ -3071,7 +3075,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "7afd5c5584265c8cb8ea264016b499c04bce02e88510e941d3a59dcfc8c30843"
+      "sha256": "96157f7b5600995542d9ef5153e040395abd0f420eebc7928e72ed896355685e"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",

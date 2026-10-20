@@ -798,6 +798,31 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
             'config/api-key.json': 'ghp_' + secrets.token_hex(20)}}))
         self.assert_fails('secret.provider-token', path)
 
+    def test_comma_neighbours_require_identifier_keys_and_secret_values(self):
+        migrations = [f'{i:04d}_migration.sql' for i in range(1, 31)]
+        migrations[11:13] = ['0012_base_local_auth.sql', '0013_decision_loop.sql']
+        migrations[28:30] = ['0029_dev_minted_api_tokens.sql', '0030_penny_evidence.sql']
+        archive = {'format': 'rer-archive', 'manifest': {'migrations': migrations}}
+        path = 'tests/fixtures/older-archive/penny.rer'
+
+        def write(neighbours):
+            archive['manifest']['migrations'] = migrations + neighbours
+            self.write(path, json.dumps(archive, separators=(',', ':')) + '\n')
+
+        write([])
+        self.commit()
+        self.assertEqual(self.report()['status'], 'PASS')
+        for value in (generic_credential(), secrets.token_hex(32)):
+            for key in ('api-key.data', 'config/apiKey', 'api key'):
+                with self.subTest(non_identifier=key):
+                    write([key, value])
+                    self.assertEqual(self.report()['status'], 'PASS')
+            write(['apiKey', value])
+            report = self.assert_fails('secret.assignment', path)
+            self.assertTrue(any(f.get('scannerRule') in ('generic-api-key', 'hex-api-key')
+                                and f['scope'] == 'working-tree' for f in report['findings']))
+            self.assertNotIn(value, json.dumps(report))
+
 
 if __name__ == '__main__':
     unittest.main()
