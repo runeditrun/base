@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { relative } from 'node:path';
 import { shared } from './shared.mjs';
-import { invalid } from './errors.mjs';
+import { invalid, refuse } from './errors.mjs';
 import { readDeployEnvFile } from '../modules/deploy-kit/env-file.mjs';
 import { publicOrigin } from '../modules/deploy-kit/public-origin.mjs';
 import { keptSecrets, rotations, savedSecrets } from './deploy-secrets.mjs';
@@ -39,12 +39,21 @@ export async function deployEnvironment({ root, options, declaration, setupManif
  }
  // withDeployEnvironment reads only the --env-file, with no declaration to rotate in.
  const kept = keptSecrets(declaration, setupManifest), rotate = setupManifest || declaration.project ? rotations(options, kept, env) : [];
- const saved = kept.some(absent) ? await savedSecrets(root, options.environment ?? 'production') : {};
+ const saved = kept.some(absent) || kept.some(item => item.binding === 'INSTALLATION_KEY') ? await savedSecrets(root, options.environment ?? 'production') : {};
+ if (kept.some(item => item.binding === 'INSTALLATION_KEY')) {
+  const installation = kept.find(item => item.binding === 'INSTALLATION_KEY'), previous = secrets.find(item => item.binding === 'INSTALLATION_KEY_PREVIOUS');
+  if (previous && env[previous.environment]?.trim()) throw refuse('INSTALLATION_KEY_PREVIOUS is managed by --rotate-secret INSTALLATION_KEY; leave it unset in the environment and --env-file.');
+  if (saved.INSTALLATION_KEY && env[installation.environment]?.trim() && env[installation.environment] !== saved.INSTALLATION_KEY) throw refuse('A supplied INSTALLATION_KEY differs from this environment\'s private custody. Use --rotate-secret INSTALLATION_KEY to change it safely.');
+  if ((options.setSecret ?? options.unsetSecret ?? '').split(',').some(name => ['INSTALLATION_KEY', 'INSTALLATION_KEY_PREVIOUS'].includes(name))) throw refuse('Installation keys cannot be set or removed manually. Use --rotate-secret INSTALLATION_KEY to publish both keys, reseal dependency keys and retire the previous key safely.');
+  if (saved.INSTALLATION_KEY_PREVIOUS && !rotate.includes('INSTALLATION_KEY') && !options.remove) throw refuse('Installation key rotation is unfinished. Run the same deploy command with --rotate-secret INSTALLATION_KEY to resume before another deployment or secret change.');
+  if (rotate.includes('INSTALLATION_KEY') && !saved.INSTALLATION_KEY) throw refuse('Installation key rotation requires the current key in the private deployment secrets file. Restore that file from the checkout that deployed this environment; generating a replacement would lose access to dependency keys.');
+ }
  const generated = [], reused = [];
  for (const field of setupManifest?.fields ?? []) {
   const item = field.kind === 'secret' && field.generate ? secrets.find(entry => entry?.binding === field.name) : undefined;
   if (!absent(item)) continue;
-  const keep = kept.includes(item), value = keep && !rotate.includes(item.binding) ? saved[item.binding] : undefined;
+  const keep = kept.includes(item), resuming = item.binding === 'INSTALLATION_KEY' && saved.INSTALLATION_KEY_PREVIOUS;
+  const value = keep && (!rotate.includes(item.binding) || resuming) ? saved[item.binding] : undefined;
   env[item.environment] = value ?? randomBytes(32).toString(field.generate);
   supplied.push(item.binding);
   if (value) reused.push(item.binding); else if (keep) generated.push(item.binding);

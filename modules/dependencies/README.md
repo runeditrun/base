@@ -32,7 +32,31 @@ adapter adds OIDC discovery, sessions, domain policy and owner claims.
 same-origin `paths` as absolute URLs, and a per-interface `jwks_uri`.
 `GET /.well-known/rer-link/jwks/INTERFACE` publishes an ES256 public JWK only.
 The unqualified JWKS URL selects the identity interface. The application retains
-its private key in the server database. Sector/install identity survives re-link,
+its private key in the server database as an AES-256-GCM envelope
+`{version:1,kid,iv,ciphertext}`. The 96-bit random IV and 128-bit tag use the
+interface name as AAD. HKDF-SHA-256 derives a dedicated encryption key from
+`INSTALLATION_KEY` with the `rer-at-rest-v1:dependency-key` domain. The envelope's
+`kid` identifies that installation secret; it is separate from the signing JWK's ID.
+`rer setup` generates the secret in the private settings file; hosted deploys
+keep their own generated secret in `.rer/deploy/<environment>.secrets.env`
+(mode 0600), exactly like `SESSION_SECRET`. Neither secret enters archives.
+Pass both installation bindings to `createDependencies` and `AuthConfig`.
+
+A read seals all legacy plaintext rows together in one idempotent D1 batch.
+An optional `INSTALLATION_KEY_PREVIOUS` permits reads across rotation; old rows
+are re-sealed under the current key. Missing keys, malformed envelopes, wrong
+keys and changed interface AAD fail closed with `installation_key_missing` or
+`installation_key_unavailable` (503), without treating ciphertext as plaintext.
+Rotate hosted custody with `rer deploy --rotate-secret INSTALLATION_KEY`:
+rer retains both values privately, publishes both bindings in one Worker version,
+re-seals every row, checks that every row opens with only the current key, then
+retires the previous binding and private value. An interrupted operation resumes
+with the same pair. Keep that environment's private custody when moving checkouts.
+Session rotation never changes this key.
+
+This protects signing keys in a D1 dump or backup obtained without the Worker
+secret. It does not protect them from a compromised Worker or someone holding
+both the database and the installation secret. Sector/install identity survives re-link,
 provider moves and export/import. Keys are isolated per interface.
 
 Provider origins and metadata endpoints require HTTPS. Under `rer dev` (the

@@ -455,3 +455,10 @@ contain only the filename, path, size and modification time. Sensitive-looking
 outbound names are dropped entirely and counted in `withheld`. Symlinks, build
 outputs and dependency trees are skipped. Unsupported syntax yields no signal;
 an empty result is not proof that a repository has no business dependencies.
+
+`INSTALLATION_KEY` has a dedicated rotation path: `rer deploy --rotate-secret INSTALLATION_KEY`
+saves current and previous values privately before publishing both as one Worker
+version, reseals and verifies all dependency keys in the recorded D1, then retires
+the previous binding. Keep `.rer/deploy/<environment>.secrets.env` when moving a
+deployment to another checkout. If rotation stops, run the same command again;
+it resumes the saved pair. Manual set/unset of these bindings is refused.

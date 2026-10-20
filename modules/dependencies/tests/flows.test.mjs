@@ -4,6 +4,7 @@ import { runtime, ORIGIN, ISSUER } from './runtime.mjs';
 import { sign, keys } from '../../operator-auth/identity/oidc/tests/idp.mjs';
 import { LOGOUT_EVENT, FENCE_EVENT } from '../logout.mjs';
 import { createEditorConfigHandler } from '../../editor/server/config-response.mjs';
+import { dependencyStore } from '../store.mjs';
 import { assertion } from '../crypto.mjs';
 import { createPortability } from '../../portability/index.mjs';
 import { readFile } from 'node:fs/promises';
@@ -112,7 +113,9 @@ test('archive drops private link keys and sessions; import retains sector and bi
  const id=await exporter.exports.create();while((await exporter.exports.advance(id,{maxParts:16})).phase==='building'){}
  const text=await new Response(await exporter.exports.download(id)).text(),records=text.trim().split('\n').map(s=>JSON.parse(s));
  const privateKey=source.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key;
- assert.equal(text.includes(JSON.parse(privateKey).d),false);
+ assert.equal(text.includes((await dependencyStore(source.db,source.config).readKey()).key.d),false);
+ assert.equal(text.includes(privateKey),false);assert.equal(text.includes(source.config.INSTALLATION_KEY),false);
+ assert.equal(records[0].tables.some(table=>table.name==='rer_dependency_keys'),false);
  const manifest=records.find(r=>r.kind==='manifest');const restore=await importer.imports.create(manifest);
  for(const part of records.filter(r=>r.kind==='part'))await importer.imports.uploadPart(restore,part.index,part);
  await importer.imports.finalize(restore,{contentHash:records.at(-1).contentHash,archiveHash:records.at(-1).archiveHash});
@@ -139,4 +142,35 @@ test('editor public authorization grants only the current owner and current issu
  r.sqlite.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('new-owner','next@example.com','Next','owner','active',?)").run(r.now());
  r.sqlite.prepare("UPDATE oa_operators SET role='member' WHERE id=?").run(person);
  assert.equal((await editor(owner)).status,403);
+});
+
+
+test('dependency signing keys are sealed, upgraded once and rotated without losing sign-in; missing keys refuse',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();await r.link('error-sink@1');
+ const store=()=>dependencyStore(r.db,r.config);
+ const key=(await store().installation()).key;
+ const raw=()=>r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='oidc-provider@1'").get().private_key;
+ const original=raw(),envelope=JSON.parse(original);
+ assert.equal(envelope.version,1);assert.equal(Object.hasOwn(envelope,'d'),false);assert.equal(original.includes(key.d),false);
+ assert.equal((await login(r)).status,303);
+ // Simulate an existing installation's pre-upgrade rows, preserving its registered signing key.
+ const sibling=(await store().installation('error-sink@1')).key;
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(JSON.stringify(key),'oidc-provider@1');
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(JSON.stringify(sibling),'error-sink@1');
+ assert.equal((await login(r)).status,303);
+ const upgraded=raw();assert.equal(JSON.parse(upgraded).version,1);assert.equal(upgraded.includes(key.d),false);
+ assert.equal(JSON.parse(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='error-sink@1'").get().private_key).version,1);
+ assert.equal((await login(r)).status,303);assert.equal(raw(),upgraded,'upgrade is idempotent');
+ r.config.INSTALLATION_KEY_PREVIOUS=r.config.INSTALLATION_KEY;r.config.INSTALLATION_KEY=crypto.randomUUID()+crypto.randomUUID();r.restart();
+ assert.equal((await login(r)).status,303);const rotated=raw();assert.notEqual(JSON.parse(rotated).kid,JSON.parse(upgraded).kid);
+ delete r.config.INSTALLATION_KEY_PREVIOUS;r.config.SESSION_SECRET=crypto.randomUUID()+crypto.randomUUID();r.restart();assert.equal((await login(r)).status,303);assert.equal(raw(),rotated,'session secret rotation leaves the signing key intact');
+ const current=r.config.INSTALLATION_KEY;delete r.config.INSTALLATION_KEY;r.restart();
+ const refused=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_missing'});assert.equal(raw(),rotated);
+ r.config.INSTALLATION_KEY=crypto.randomUUID()+crypto.randomUUID();r.restart();
+ const wrong=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(wrong.status,503);assert.deepEqual(await wrong.json(),{error:'installation_key_unavailable'});assert.equal(raw(),rotated);
+ // Neither malformed envelopes nor ciphertext moved to another interface become plaintext.
+ r.config.INSTALLATION_KEY=current;r.sqlite.prepare("UPDATE rer_dependency_keys SET private_key=? WHERE interface='oidc-provider@1'").run(JSON.stringify({...JSON.parse(rotated),ciphertext:'invalid'}));r.restart();
+ const corrupt=await r.call('/auth/oidc/auth/start',{body:{}});assert.deepEqual(await corrupt.json(),{error:'installation_key_unavailable'});
+ r.sqlite.prepare("UPDATE rer_dependency_keys SET private_key=? WHERE interface='oidc-provider@1'").run(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='error-sink@1'").get().private_key);
+ const swapped=await r.call('/auth/oidc/auth/start',{body:{}});assert.deepEqual(await swapped.json(),{error:'installation_key_unavailable'});
 });

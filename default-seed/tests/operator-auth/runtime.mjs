@@ -16,6 +16,7 @@ export async function openConsumerRuntime({ config, mailStatus, noMail, demo = f
   const bindings = {
     AUTH_ORIGIN: config.origin, AUTH_LOCAL: String(config.local === true),
     OWNER_EMAIL: config.OWNER_EMAIL, SESSION_SECRET: config.SESSION_SECRET,
+    INSTALLATION_KEY: crypto.randomUUID()+crypto.randomUUID(),
     SETUP_TOKEN: config.SETUP_TOKEN, MAIL_FROM: config.MAIL_FROM,
     ...(demo ? { RER_DEMO: '1' } : {}),
     ...(config.allowList ? { AUTH_ALLOW_LIST: config.allowList.join(',') } : {}),

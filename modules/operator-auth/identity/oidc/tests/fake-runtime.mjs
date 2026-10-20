@@ -46,6 +46,7 @@ export function presets(origin = ORIGIN) {
 
 // schemas: the SQL a store already has (default: a fresh store from the current schema).
 export async function runtime(t, setup = presets(), { schemas } = {}) {
+  setup = { ...setup, core: { INSTALLATION_KEY:crypto.randomUUID()+crypto.randomUUID(), ...setup.core } };
   const directory = await mkdtemp(join(tmpdir(), 'oidc-fake-'));
   const init = () => new Miniflare({ ...convertV4MiniflareOptions({ modules: true, cf: false, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'fake-provider-db' },
     bindings: { TEST_SETUP: JSON.stringify({ ...setup, keys: JSON.parse(KEY_JSON) }) } }), resourcePersistencePath: join(directory, 'state') });

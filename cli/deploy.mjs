@@ -20,6 +20,7 @@ import { cloudflareCredentials, missingCredentialsMessage } from './deploy-needs
 import { keptSecrets, keepSecrets, forgetSecrets } from './deploy-secrets.mjs';
 import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 import { deployProductDirectory, deployProductArguments } from './deploy-product.mjs';
+import { rotateInstallationKey, keepInstallationKey } from './deploy-installation-key.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -85,6 +86,10 @@ export function ownerDeploy(declarationPath, lifecycle) {
     // The kit never replaces a secret its Worker holds: rotation is this explicit change, kept once it is live.
     step = 'secrets';
     for (const binding of rotated) {
+     if (binding === 'INSTALLATION_KEY') {
+      await rotateInstallationKey({ root, environment, declaration, env, owner, state, report: line => store.report(line), addSecrets: values => { redaction.addSecrets(values); store.addSecrets?.(values); } });
+      continue;
+     }
      await owner('secret', ['--set', binding, ...(state ? ['--state', state] : [])]);
      await keepSecrets({ root, environment, kept, env, generated: [binding], reused: [], report: () => {} });
      store.report(`Rotated ${binding} on this environment's Worker to a fresh value kept in .rer/deploy/${environment}.secrets.env, recorded its new version and verified hosted readiness.`);
@@ -99,6 +104,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
     return { bindings, present: Boolean(options.setSecret), deployed: false };
    }
    store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
+   await keepInstallationKey({ root, environment, declaration, env, generated });
    deployed = await owner('deploy', [], env, { notice: line => store.report(line), onCreated: resource => created.push(redaction.redact(resource)) });
    // A generated value the kit did not send stays unknown: the Worker kept its own.
    const sent = supplied.filter(name => deployed.sentSecrets.includes(name)), keptSent = [...generated, ...reused].filter(name => sent.includes(name));

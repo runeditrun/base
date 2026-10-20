@@ -71,6 +71,8 @@ test('git email/default port, private fresh credentials, real command arguments 
   assert.equal(vars.AUTH_LOCAL, 'true')
   assert.equal(vars.MAIL_PROVIDER, 'development')
   assert.equal(vars.MAIL_FROM, 'auth@localhost.test')
+  assert.match(vars.INSTALLATION_KEY, /^[a-f0-9]{64}$/)
+  assert.notEqual(vars.INSTALLATION_KEY, vars.SESSION_SECRET)
   assert.match(vars.SESSION_SECRET, /^[a-f0-9]{64}$/)
   assert.match(vars.SETUP_TOKEN, /^[a-f0-9]{64}$/)
   assert.notEqual(vars.SESSION_SECRET, vars.SETUP_TOKEN)
@@ -84,7 +86,7 @@ test('git email/default port, private fresh credentials, real command arguments 
   assert.ok(result.stdout.includes(logs.path))
   assert.match(result.stdout, /Next: node scripts\/local-dev\.mjs\nOpen: http:\/\/127\.0\.0\.1:8787\/signin\n$/)
   assert.equal((result.stdout.match(/http:\/\//g) ?? []).length, 1)
-  for (const secret of [vars.SESSION_SECRET, vars.SETUP_TOKEN]) assert.ok(!`${result.stdout}${result.stderr}${logs.text}`.includes(secret))
+  for (const secret of [vars.SESSION_SECRET, vars.INSTALLATION_KEY, vars.SETUP_TOKEN]) assert.ok(!`${result.stdout}${result.stderr}${logs.text}`.includes(secret))
 })
 
 test('no email and invalid arguments name flags and create no partial output', async (t) => {
@@ -228,7 +230,7 @@ test('the dev fixture loads private dotenv bindings, excludes inherited bindings
   const command = (await calls(dir)).at(-1)
   assert.equal(command.loadDevVars, 'true')
   assert.equal(command.includeProcessEnv, 'false')
-  for (const secret of [vars.SESSION_SECRET, vars.SETUP_TOKEN]) assert.ok(!`${result.stdout}${result.stderr}`.includes(secret))
+  for (const secret of [vars.SESSION_SECRET, vars.INSTALLATION_KEY, vars.SETUP_TOKEN]) assert.ok(!`${result.stdout}${result.stderr}`.includes(secret))
   assert.match(result.stdout, /SESSION_SECRET=\[redacted\]/)
 })
 

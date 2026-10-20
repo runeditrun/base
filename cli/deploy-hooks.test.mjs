@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, rm, realpath } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, realpath, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -12,15 +12,67 @@ import { ownerTarget, ownerPlan, ownerDeploy } from '../modules/deploy-kit/owner
 import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { owner } from '../onboarding/adapter-auth.mjs';
 import { finalizingDeploy } from './fixtures/finalizing-deploy.mjs';
+import { keyPair } from '../modules/dependencies/crypto.mjs';
+import { openDependencyKey, sealDependencyKey } from '../modules/dependencies/sealing.mjs';
+
+test('installation rotation publishes both keys atomically, reseals every row and resumes failed reseal or retirement without losing custody', async t => {
+ const f = await fixture(t, {declared:true, existing:true, installation:true});
+ await f.run({dryRun:true});
+ assert.equal(f.provider.state.writes.length, 0);
+ assert.ok(f.progress.some(line => line.includes('INSTALLATION_KEY') && line.includes('Values are withheld')));
+ const file = join(f.root, '.rer/deploy/production.secrets.env');
+ await assert.rejects(readFile(file), {code:'ENOENT'});
+ await f.run();
+ const original = f.provider.state.secrets.find(item => item.name === 'INSTALLATION_KEY').value;
+ assert.equal((await stat(file)).mode & 0o777, 0o600);
+ assert.equal(f.git('check-ignore', '.rer/deploy/production.secrets.env'), '.rer/deploy/production.secrets.env');
+ const db = f.provider.state.databases[0].db;
+ const keys = [await keyPair(), await keyPair()];
+ for (let i=0;i<keys.length;i++) db.prepare('INSERT INTO rer_dependency_keys(interface,private_key) VALUES(?,?)').run(`service-${i}@1`, await sealDependencyKey({INSTALLATION_KEY:original}, `service-${i}@1`, keys[i]));
+ const before = db.prepare('SELECT * FROM rer_dependency_keys ORDER BY interface').all();
+ const builds = f.builds(), writes = f.provider.state.writes.length;
+ for (const flag of ['setSecret','unsetSecret']) for (const key of ['INSTALLATION_KEY','INSTALLATION_KEY_PREVIOUS']) await assert.rejects(f.run({[flag]:key}), /cannot be set or removed manually/);
+ assert.equal(f.provider.state.writes.length, writes);
+ const transport = globalThis.fetch, observations = [];
+ t.mock.method(globalThis, 'fetch', async (input, init) => {
+  if (String(input).endsWith('/query')) observations.push(f.provider.state.secrets.filter(item => item.name.startsWith('INSTALLATION_KEY')).map(item => item.name).sort());
+  return transport(input, init);
+ });
+ f.provider.state.failSql = 'UPDATE rer_dependency_keys';
+ await assert.rejects(f.run({rotateSecret:'INSTALLATION_KEY'}), /dependency-rekey-failed/);
+ const saved = await readFile(file, 'utf8');
+ const values = Object.fromEntries(saved.trim().split('\n').map(line=>line.split('=')));
+ assert.equal(values.INSTALLATION_KEY_PREVIOUS, original);
+ assert.notEqual(values.INSTALLATION_KEY, original);
+ assert.deepEqual(db.prepare('SELECT * FROM rer_dependency_keys ORDER BY interface').all(), before);
+ await assert.rejects(f.run(), /rotation is unfinished/);
+ f.provider.state.failSql = null;
+ f.provider.fail('DELETE', /\/secrets\/INSTALLATION_KEY_PREVIOUS$/, {status:403});
+ await assert.rejects(f.run({rotateSecret:'INSTALLATION_KEY'}));
+ assert.equal(await readFile(file, 'utf8'), saved, 'a failed retirement retains both exact keys');
+ assert.equal(f.provider.state.secrets.find(item=>item.name==='INSTALLATION_KEY_PREVIOUS').value, original);
+ for (const row of db.prepare('SELECT * FROM rer_dependency_keys ORDER BY interface').all()) {
+  const opened = await openDependencyKey({INSTALLATION_KEY:values.INSTALLATION_KEY},row.interface,row.private_key,{currentOnly:true});
+  assert.equal(opened.key.kid, keys[Number(row.interface[8])].kid);
+ }
+ await f.run({rotateSecret:'INSTALLATION_KEY'});
+ const retained = await readFile(file, 'utf8');
+ assert.ok(!retained.includes('INSTALLATION_KEY_PREVIOUS='));
+ assert.equal(f.provider.state.secrets.find(item=>item.name==='INSTALLATION_KEY').value, values.INSTALLATION_KEY, 'resume uses the same current key');
+ assert.ok(!f.provider.state.secrets.some(item=>item.name==='INSTALLATION_KEY_PREVIOUS'));
+ assert.equal(f.builds(), builds, 'rotation does not build or run the custom upload hook');
+ assert.ok(observations.length>0 && observations.every(names=>names.join(',')==='INSTALLATION_KEY,INSTALLATION_KEY_PREVIOUS'), 'both bindings are live before any D1 read or write');
+ assert.ok(!f.progress.join('').includes(original) && !f.progress.join('').includes(values.INSTALLATION_KEY));
+});
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
 // provider and hosted HTTP edge are faked. No seed source is modified.
-async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false, namedState = false, queued = false } = {}) {
+async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false, namedState = false, queued = false, installation = false } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-hook-deploy-')));
  const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
  process.env.CI = 'true';
- for (const key of ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'SETUP_TOKEN', 'SESSION_SECRET', 'OWNER_EMAIL', 'MAIL_API_KEY']) delete process.env[key];
+ for (const key of ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'SETUP_TOKEN', 'SESSION_SECRET', 'OWNER_EMAIL', 'MAIL_API_KEY', 'INSTALLATION_KEY', 'INSTALLATION_KEY_PREVIOUS']) delete process.env[key];
  const provider = ownerProvider(), requests = [], claims = [], progress = [];
  t.after(() => provider.close());
  let claimed = existing, denied = false, builds = 0, failBuild = false, hookToken, returnToken = false, signedOut = false;
@@ -53,6 +105,11 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
  await writeFile(join(root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@10.12.4' }));
  const declarationPath = declared ? 'owner-deployment.json' : 'deploy.json';
  const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', vars: {MAIL_PROVIDER:'resend',MAIL_FROM:'owner@example.test'}, secrets: ['OWNER_EMAIL', 'SETUP_TOKEN', 'SESSION_SECRET', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name })) };
+ if (installation) {
+  declaration.d1 = [{binding:'DB'}];
+  declaration.secrets.push({binding:'INSTALLATION_KEY',environment:'INSTALLATION_KEY'}, {binding:'INSTALLATION_KEY_PREVIOUS',environment:'INSTALLATION_KEY_PREVIOUS',optional:true});
+  await writeFile(join(root, 'migrations/core/0001_dependency.sql'), await readFile(new URL('../modules/dependencies/schema/dependencies.sql', import.meta.url)));
+ }
  if (queued) declaration.queues = [{binding:'JOBS'}];
  await writeFile(join(root, declarationPath), JSON.stringify(declaration));
  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\nowner.env\n');
@@ -92,6 +149,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
  };
  if (declared) adapter.deployDeclaration = declarationPath;
  const manifest = { steps: [{ type: 'owner-claim', mode: idp ? 'idp' : 'signed', ...(idp ? { dependency: 'oidc-provider@1' } : {}), path: '/auth/owner-claim', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN' }], fields: ['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ name, kind: 'secret', generate: 'hex' })) };
+ if (installation) manifest.fields.push({name:'INSTALLATION_KEY',kind:'secret',generate:'hex'});
  const project = { root, profile: 'first-party', adapter, setupManifest: manifest };
  const run = (options = {}) => runCommand(project, { verb: 'deploy', forwarded: [], envFile: 'owner.env', json: true, ...options }, { progress: line => progress.push(line), event: () => {} });
  return { root, provider, claims, requests, progress, run, git, adapter, builds: () => builds, deny: (value = true) => { denied = value; }, failBuild: () => { failBuild = true; }, returnToken: () => { returnToken = true; } };

@@ -9,10 +9,12 @@ import {join} from 'node:path';
 const execute=promisify(execFile);
 for(const pathValue of [false,true])for(const ending of ['success','failure'])test(`table: CLI manifest secrets are excluded from every command and redacted on a saved ${ending} rerun${pathValue?' including private path metadata':''}`,async t=>{
  const root=await mkdtemp(join(tmpdir(),'cli-gate-'));t.after(()=>rm(root,{recursive:true,force:true}));
- const names=['COOKIE_KEY','BOOTSTRAP_KEY','OPAQUE_VALUE'];
+ const declaredNames=['COOKIE_KEY','BOOTSTRAP_KEY','OPAQUE_VALUE'];
+ // Installation keys must stay private even for older manifests that never declared them.
+ const names=[...declaredNames,'INSTALLATION_KEY','INSTALLATION_KEY_PREVIOUS'];
  const values=names.map((_,index)=>'synthetic private / value '+index+' ü');
  if(pathValue)values[2]=root;
- const manifest={schema:1,title:'CLI secrets',groups:[],fields:[{name:'ADMIN_EMAIL',label:'Owner',kind:'email',required:true,prefill:'account-email'},...names.map((name,index)=>({name,label:'Private '+index,kind:'secret',required:true,ownerVisible:index!==0,...(index===2?{input:'entered'}:{generate:index===0?'base64':'hex'})}))],steps:[{type:'owner-claim',mode:'setup-token',emailField:'ADMIN_EMAIL',tokenField:'BOOTSTRAP_KEY'}]};
+ const manifest={schema:1,title:'CLI secrets',groups:[],fields:[{name:'ADMIN_EMAIL',label:'Owner',kind:'email',required:true,prefill:'account-email'},...declaredNames.map((name,index)=>({name,label:'Private '+index,kind:'secret',required:true,ownerVisible:index!==0,...(index===2?{input:'entered'}:{generate:index===0?'base64':'hex'})}))],steps:[{type:'owner-claim',mode:'setup-token',emailField:'ADMIN_EMAIL',tokenField:'BOOTSTRAP_KEY'}]};
  await writeFile(join(root,'rer-setup.json'),JSON.stringify(manifest));
  const original=['# pre-base-27 owner settings','AUTH_LOCAL=true','AUTH_ORIGIN=http://127.0.0.1:9999','ADMIN_EMAIL=owner@example.test',...names.map((name,index)=>name+'='+JSON.stringify(values[index]))].join('\n')+'\n';
  await writeFile(join(root,'.dev.vars'),original);
