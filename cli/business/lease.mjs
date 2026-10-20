@@ -35,12 +35,13 @@ export class Lease {
    { token, ...(releasing ? { timeout: 5_000 } : { signal: this.signal }) });
  }
  send(destination, body) { return this.serial(() => this.post(destination, body)); }
- /** One door grant for this lease's export. It is not a task event, so the
-  * platform takes no client event id: a retry simply asks again. */
- importGrant(action) {
+ /** One door grant for one door request of this lease's vendor task (`extra`
+  * is `{review: true}` for a catch-up plan the owner reviews). It is not a task
+  * event, so the platform takes no client event id: a retry simply asks again. */
+ importGrant(action, extra = {}) {
   return this.serial(async () => {
    this.signal.throwIfAborted();
-   return this.api.post(taskPath(this.claim.task.id, 'import-grants'), { fence: this.claim.fence, grant_id: this.claim.grant.id, action }, { token: await this.token(), signal: this.signal });
+   return this.api.post(taskPath(this.claim.task.id, 'import-grants'), { fence: this.claim.fence, grant_id: this.claim.grant.id, action, ...extra }, { token: await this.token(), signal: this.signal });
   });
  }
  heartbeat() {

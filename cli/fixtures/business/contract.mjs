@@ -63,3 +63,11 @@ export function exportOutputs(value) {
   && typeof value.bundle_sha256 === 'string' && /^[0-9a-f]{64}$/.test(value.bundle_sha256), 400, 'business_export_outputs_invalid');
  return value;
 }
+/** An archive completion (the M5 contract, plan section 2 "Archive"): exactly the
+ * door's archive_id and the bundle's SHA-256; Business then runs its own restore-check. */
+export function archiveOutputs(value) {
+ requireValue(value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join() === 'archive_id,bundle_sha256', 409, 'business_archive_outputs_required');
+ requireValue(typeof value.archive_id === 'string' && /^[0-9A-Za-z][0-9A-Za-z_-]{0,127}$/.test(value.archive_id)
+  && typeof value.bundle_sha256 === 'string' && /^[0-9a-f]{64}$/.test(value.bundle_sha256), 400, 'business_archive_outputs_invalid');
+ return value;
+}

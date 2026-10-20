@@ -7,7 +7,7 @@ import { removePermissions, permissionsAdded } from './permissions.mjs';
 import { Api, pause } from './api.mjs';
 import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
-import { vendorHandle } from './export-task.mjs';
+import { vendorHandle } from './vendor-door.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
 import { describe } from './errors.mjs';
 

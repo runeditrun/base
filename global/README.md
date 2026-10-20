@@ -442,10 +442,16 @@ terminal, stores it in the OS keychain and prints only `sentry:read`.
 `rer business next` returns, within 60 seconds, one locally templated
 classification, owner link or agent step, or says what `run` would start, and
 says `Nothing yet` only when no agent step waits. Once an app is claimed and its
-import door is on, its `export.vendor` task is the agent's step: next names the
-owner-typed `rer business vendor-key add <vendor>` (or says the key is already
-stored) and `rer business run`. It never reflects server instructions or raw
-evidence. Owner items cannot be answered from this CLI.
+import door is on, its `export.vendor` task is the agent's step, and so are a
+move's `catchup.vendor` (bringing over what changed in the old tool) and
+`switchoff.archive` (the final archive before switch-off): next names the step,
+the owner-typed `rer business vendor-key add <vendor>` (or says the key is
+already stored) and `rer business run`. A move's owner steps (`freeze.vendor`,
+a `rollback.*` card, `switchoff.cancel`) are named as the owner's, with the
+move's page (`/business/:id/moves/:toolId` when the summary names its
+`tool_id`, else the switch-over board `/business/:id`), never as agent work. It
+never reflects server instructions or raw evidence. Owner items cannot be
+answered from this CLI.
 `rer business answer ID VENDOR uses|sells|both|product-dependency [CONFIDENCE]`
 submits a task-scoped classification through MCP. Choose a vendor ID from the
 question's displayed answer schema, or `none`; the suggested vendor can be
@@ -511,10 +517,33 @@ need inputs the executor task view does not carry yet, and Calendly's folder
 of files has no single-bundle door format yet: these release as `paused` after a
 `configuration_required` event. While an agent step waits (an export, or a
 question for `next`, or the lease an earlier run on this computer still holds),
-run says what it waits for instead of `Nothing yet`.
+run says what it waits for instead of `Nothing yet`; otherwise it names a move's
+owner step with its link before `Nothing yet`.
 
-The current MCP `next_question` filters out owner items. When an owner summary
-is supplied, the CLI displays its browser link and refuses to answer it.
+`rer business run` performs claimed `catchup.vendor` and `switchoff.archive`
+tasks the same way: the claim's grant names the door, the key comes from OS
+credential storage, and the shipped adapter's bundle goes up in 64 KiB chunks,
+each with its own grant, from a private 0600 file removed on every exit.
+
+- A catch-up then plans the upload with `{uploadId, catchup: true}`. Business
+  mints its plan grant under the owner's standing catch-up approval when one
+  covers the tool, and says so with `catchup: "bounded"` on the grant. If the
+  door refuses that with `catchup_requires_proposal:<reason>` (gone, conflicting
+  or rejected records, or a change of 5% or more), run asks
+  `import-grants` for `{action: "plan", review: true}` and plans the same upload
+  again for the owner's review. Run completes with
+  `{upload_id, plan_id, bundle_sha256}`; Business applies a bounded plan under
+  the standing approval and any other only after the owner approves it.
+- An archive calls the door's `archive` action with `{uploadId, tool, takenAt}`
+  (the tool is the vendor's namespace), then `restore-check` with the
+  `archiveId`, and requires both answers to carry the bundle's SHA-256 and size,
+  the key `business-archive/<tool>/<takenAt>` and the same counts. Run completes
+  with `{archive_id, bundle_sha256}`; Business runs its own `restore-check`
+  before the task is done. Archive grants are `uploads`, `archive` and
+  `restore-check`; catch-up grants are `uploads`, `plan` and `status`.
+
+Run prints only counts and the archive key. When an owner summary is supplied,
+the CLI displays its browser link and refuses to answer it.
 
 The four deterministic adapter implementations and their native output formats
 are described in [the adapter guide](cli/business/vendors/README.md).
