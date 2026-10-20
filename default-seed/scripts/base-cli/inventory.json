@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.74-dev.gf94c1c10",
+  "cliVersion": "0.2.74-dev.gc893a253",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3037,6 +3037,22 @@
       "source": "scripts/publish-check/copy_identities.py",
       "sha256": "9b2e620930bf9756939d0f013effb2eb3208dfcb8ad470d8face849359a40961"
     },
+    "scripts/publish-check/credential_assignments.mjs": {
+      "source": "scripts/publish-check/credential_assignments.mjs",
+      "sha256": "69d91fbc8de29c471ef13aec24e96bbbcea26b8a8aeca3e387390d96cdee3317"
+    },
+    "scripts/publish-check/credential_assignments.py": {
+      "source": "scripts/publish-check/credential_assignments.py",
+      "sha256": "106bcc05fc6796cdadb838b85cab9452afd658410362e85b1c5740ca0735f191"
+    },
+    "scripts/publish-check/credential_literals.mjs": {
+      "source": "scripts/publish-check/credential_literals.mjs",
+      "sha256": "ca574cea3cc0da8087c0f2fc0934649a436dd6604228066cecb9851a6782afdf"
+    },
+    "scripts/publish-check/credential_syntax.mjs": {
+      "source": "scripts/publish-check/credential_syntax.mjs",
+      "sha256": "95d7a281de62ac484b226792c62b4c88ff40174de001b0583d7695ac081ff44f"
+    },
     "scripts/publish-check/der.py": {
       "source": "scripts/publish-check/der.py",
       "sha256": "1debcbeec1caa149c979e06979c8f34885264e61e21f0cccf25728674ccfc3d8"
@@ -3075,7 +3091,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "7afd5c5584265c8cb8ea264016b499c04bce02e88510e941d3a59dcfc8c30843"
+      "sha256": "0d5d43f867c3778015c686a1b173e76c7486e4493bd19051b412c5d9c91caca1"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",

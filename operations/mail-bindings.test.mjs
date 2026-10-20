@@ -209,7 +209,7 @@ test('fixed hosted declarations retain credential selection, Cloudflare validati
     await save();
     const env = { [key]: 'synthetic-active', ...(account ? { [account]: 'a'.repeat(32) } : {}) };
     for (const selector of [undefined, '', provider]) assert.equal((await inspectOperations(root, { ...env, MAIL_PROVIDER: selector })).ok, true);
-    assert.equal((await inspectOperations(root, { MAIL_API_KEY: 'wrong-synthetic-value' })).ok, false);
+    assert.equal((await inspectOperations(root, { MAIL_API_KEY: 'synthetic-wrong-synthetic-value' })).ok, false);
     assert.equal((await inspectOperations(root, { ...env, [key]: ' ' })).ok, false);
     assert.equal((await inspectOperations(root, { ...env, MAIL_PROVIDER: 'other' })).loops[0].status, 'mail-provider-mismatch');
     if (account) assert.equal((await inspectOperations(root, { ...env, [account]: 'invalid' })).ok, false);
