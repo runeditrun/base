@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73-dev.gd7135de1",
+  "cliVersion": "0.2.73-dev.g463325dd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -213,7 +213,7 @@
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "4a1977ec6f153bda36b194e9ec5a7ad38c26702987ea520a6072d285109aa812"
+      "sha256": "16b92ea0a2e8380964727052747eacc9946a6a49cba349e32cdf89f5e43d1826"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
@@ -991,7 +991,7 @@
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
-      "sha256": "ac78ec2731dc13af63885eddc40e1dee703dbc3765e900a5533dac9ce1a58e1a"
+      "sha256": "dc0fd0f89a2e046393845f17b354194ea9a143879629b89b8506621eecda5647"
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",
@@ -1947,7 +1947,7 @@
     },
     "modules/job-queue/command.mjs": {
       "source": "modules/job-queue/command.mjs",
-      "sha256": "b87d480e25ca495e2e364f4d945ca5dda97812f8a7cfd766ae46df3e722c5a21"
+      "sha256": "3235926e1a988cb934ef53ddea247bd1d6405cc6cb2222e8be25b69ca69c6ec1"
     },
     "modules/job-queue/config.mjs": {
       "source": "modules/job-queue/config.mjs",

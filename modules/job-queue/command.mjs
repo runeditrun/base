@@ -51,13 +51,16 @@ export async function execute(command, job, config, adopt, signal, onStarted, op
   } finally {
     signal.removeEventListener('abort', abort);
     try {
-      if (owner) await stopGroup(owner, config.killGraceMs);
+      // Managed command stores already own the supervisor and descendants by
+      // PID/birth/command and inherited custody. Use that stronger cleanup on
+      // cancellation; a departed supervisor's group number is not authority.
+      if (options.cleanup) await options.cleanup(child,outcome);
+      else if (owner) await stopGroup(owner, config.killGraceMs);
       else child.kill('SIGKILL'); // The supervisor has not been given GO.
       // Its group is stopped; output still arriving on a dead supervisor's pipes
       // comes from escaped descendants, which the caller's cleanup stops.
       if (outcome?.supervisorEnded) { child.stdout?.destroy(); child.stderr?.destroy(); }
       await exited;
-      await options.cleanup?.(child,outcome);
       if (owner?.socket) await unlink(owner.socket).catch(error => { if (error.code !== 'ENOENT') throw error; });
     } catch (error) { error.keepLease = true; throw error; }
   }
