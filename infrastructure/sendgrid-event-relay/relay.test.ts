@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
 import worker from './src/worker.ts';
-import { verifyRelayRequest } from './src/crypto.ts';
+import { verifySendGridWebhook, verifyRelayRequest } from './src/crypto.ts';
 const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 const bindings = { SENDGRID_WEBHOOK_PUBLIC_KEY: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'), RER_MAIL_RELAY_DESTINATIONS: JSON.stringify({ lamp: { url: 'https://lamp.example/events', secret: 'l'.repeat(32) }, orbit: { url: 'https://orbit.example/events', secret: 'o'.repeat(32) } }) };
 function request(events: object[], override?: { body?: string; timestamp?: string }) {
@@ -98,4 +98,92 @@ test('a failed later chunk requests replay; replay includes prior chunks for rec
   fail=false;
   assert.equal((await worker.fetch(request(events),bindings)).status,204);
   assert.deepEqual(calls.slice(2).flat(),Array.from({length:205},(_,i)=>i));
+});
+
+
+test('registered seed receives only a whole signed scope, byte exact, independently of legacy delivery', async t => {
+  const seed = { rer_seed: 'spool', rer_test_installation: 'test-installation' };
+  const target = { seed: 'spool', installationId: 'test-installation', url: 'https://mail-relay-scratch.runeditrun.com/events', expiresAt: Date.now() + 60_000 };
+  const environment = (entry = target) => ({ ...bindings, RER_MAIL_RELAY_SEEDS: JSON.stringify({ version: 1, targets: [entry] }) });
+  const counters: Record<string, number>[] = [];
+  t.mock.method(console, 'info', (_message: string, counts: Record<string, number>) => { counters.push(counts); });
+  t.mock.method(console, 'warn', () => {});
+  let targetStatus = 204, legacyStatus = 204, dnsAddress = '104.16.1.1', dnsFailure = false;
+  let seedCalls = 0, legacyCalls = 0;
+  let expectedBody = new Uint8Array(), expectedHeaders = new Headers();
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    if (url.startsWith('https://cloudflare-dns.com/')) {
+      if (dnsFailure) throw new Error('network edge unavailable');
+      return Response.json({ Status: 0, Answer: [{ type: 1, data: dnsAddress }] });
+    }
+    assert.equal(init.redirect, 'manual');
+    assert.ok(init.signal);
+    const headers = new Headers(init.headers);
+    assert.ok(headers.get('user-agent'));
+    if (url === target.url) {
+      seedCalls++;
+      assert.deepEqual(new Uint8Array(init.body as Uint8Array), expectedBody);
+      for (const header of ['x-twilio-email-event-webhook-signature', 'x-twilio-email-event-webhook-timestamp']) {
+        assert.equal(headers.get(header), expectedHeaders.get(header));
+      }
+      assert.equal(headers.has('x-rer-mail-signature'), false);
+      assert.equal(await verifySendGridWebhook({ publicKey: bindings.SENDGRID_WEBHOOK_PUBLIC_KEY,
+        timestamp: headers.get('x-twilio-email-event-webhook-timestamp')!, signature: headers.get('x-twilio-email-event-webhook-signature')!, rawBody: expectedBody }), true);
+      return new Response(null, { status: targetStatus, headers: targetStatus === 302 ? { location: 'http://127.0.0.1/private' } : {} });
+    }
+    legacyCalls++;
+    assert.equal(url, 'https://lamp.example/events');
+    assert.equal(await verifyRelayRequest({ secret: 'l'.repeat(32), timestamp: headers.get('x-rer-mail-timestamp')!,
+      signature: headers.get('x-rer-mail-signature')!, rawBody: String(init.body) }), true);
+    return new Response(null, { status: legacyStatus });
+  });
+  async function send(events: object[], env = environment()) {
+    const body = ' [ \n' + events.map(event => JSON.stringify(event)).join(', \n') + '\n ] ';
+    expectedBody = new TextEncoder().encode(body);
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    expectedHeaders = new Headers({ 'x-twilio-email-event-webhook-timestamp': timestamp,
+      'x-twilio-email-event-webhook-signature': sign('sha256', Buffer.from(timestamp + body), privateKey).toString('base64') });
+    return worker.fetch(new Request('https://relay.example/events', { method: 'POST', body, headers: expectedHeaders }), env);
+  }
+  const event = { ...seed, rer_product: 'lamp', event: 'delivered', label: 'é 🚀' };
+  assert.equal((await send([event, event])).status, 204);
+  assert.equal(seedCalls, 1); assert.equal(legacyCalls, 1);
+  assert.equal(counters.at(-1)!.delivered, 1);
+  // One transient retry, with the original bytes and provider headers each time.
+  targetStatus = 503;
+  assert.equal((await send([event])).status, 204);
+  assert.equal(seedCalls, 3); assert.equal(counters.at(-1)!.targetFailures, 1);
+  targetStatus = 302;
+  assert.equal((await send([event])).status, 204);
+  assert.equal(seedCalls, 4);
+  targetStatus = 204; legacyStatus = 503;
+  assert.equal((await send([event])).status, 503);
+  assert.equal(seedCalls, 5); // legacy failure never prevents seed delivery
+  legacyStatus = 204;
+  for (const events of [[{ ...event, rer_seed: 'unknown' }], [event, { rer_product: 'lamp' }],
+    [event, { ...event, rer_test_installation: 'another' }], [event, { ...event, rer_seed: 'another' }]]) {
+    assert.equal((await send(events)).status, 204);
+    assert.equal(seedCalls, 5);
+  }
+  assert.equal(counters.filter(counts => counts.mixedBatches).length, 3);
+  assert.equal((await send([event], environment({ ...target, expiresAt: Date.now() - 1 }))).status, 204);
+  assert.equal(counters.at(-1)!.expired, 1);
+  for (const address of ['127.0.0.1', '10.0.0.1', '169.254.169.254', '::1', '::ffff:127.0.0.1', 'fd00::1', 'fe80::1']) {
+    dnsAddress = address;
+    assert.equal((await send([event])).status, 204);
+    assert.equal(counters.at(-1)!.configurationFailures, 1);
+  }
+  dnsFailure = true;
+  assert.equal((await send([event])).status, 204);
+  assert.equal(counters.at(-1)!.configurationFailures, 1);
+  for (const url of ['http://mail-relay-scratch.runeditrun.com/events', 'https://user:password@mail-relay-scratch.runeditrun.com/events',
+    'https://127.0.0.1/events', 'https://[::1]/events', 'https://localhost/events', 'https://arbitrary.example/events']) {
+    assert.equal((await send([event], environment({ ...target, url }))).status, 204);
+    assert.equal(counters.at(-1)!.configurationFailures, 1);
+  }
+  assert.equal(seedCalls, 5);
+  // An invalid provider signature cannot reach either route.
+  const before = legacyCalls;
+  assert.equal((await worker.fetch(request([event], { body: '[]' }), environment())).status, 401);
+  assert.equal(legacyCalls, before); assert.equal(seedCalls, 5);
 });
