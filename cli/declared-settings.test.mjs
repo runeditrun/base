@@ -57,7 +57,7 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
 `);
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/native-settings', runtime: { requirements: [] }, requiredEnvironment: [],
    seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local declared-settings flow.' }])) }));
-  const settings = { [originKey]: origin, [emailKey]: email, OWNER_NAME: 'Owner', ...(declaration === 'adapter' ? {} : {SESSION_SECRET: 'test-synthetic-retained-session'}), ...(declaration === 'manifest' ? { SETUP_TOKEN: 'test-synthetic-retained-bootstrap' } : {}) };
+  const settings = { [originKey]: origin, [emailKey]: email, OWNER_NAME: 'Owner', ...(declaration === 'adapter' ? {} : {SESSION_SECRET: 'test-synthetic-retained-session'}), ...(declaration === 'manifest' ? { SETUP_TOKEN: 'synthetic-test-synthetic-retained-bootstrap' } : {}) };
   const encode = values => format === 'json' ? JSON.stringify(values, null, 2) + '\n' : '# Retained private settings\n' + Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n') + '\n';
   const bytes = encode(settings), path = join(root, file);
   await writeFile(path, bytes, { mode: 0o600 });

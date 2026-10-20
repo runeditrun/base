@@ -420,8 +420,8 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
 
 test('vendor exports strip credential values before upload, keeping every record, empty credential fields and pagination', async t => {
  const { exportVendor } = await import('./business/vendors/index.mjs');
- const key = 'fixture-vendor-read-key', apiKey = 'fixture-account-api-key-value', password = 'fixture-basic-auth-pass';
- const shapes = ['fixture-functions-key', 'fixture-apim-key', 'fixture-x-auth', 'fixture-secret-key', 'fixture-pwd', 'fixture-api-keys-item', 'fixture-tokens-item', 'fixture-tuple-token', 'fixture-sas-sig', 'fixture-auth-token', 'fixture-session-id', 'fixture-auth-container-token', 'fixture-credentials-password',
+ const key = 'fixture-vendor-read-key', apiKey = 'synthetic-fixture-account-api-key-value', password = 'synthetic-fixture-basic-auth-pass';
+ const shapes = ['fixture-functions-key', 'fixture-apim-key', 'fixture-x-auth', 'fixture-secret-key', 'fixture-pwd', 'fixture-api-keys-item', 'fixture-tokens-item', 'fixture-tuple-token', 'fixture-sas-sig', 'fixture-auth-token', 'fixture-session-id', 'fixture-auth-container-token', 'synthetic-fixture-credentials-password',
   'fixture-token-auth', 'fixture-application-key', 'fixture-user-key', 'fixture-hapikey', 'fixture-basic-auth-param', 'fixture-account-key',
   'fixture-keycloak-value', 'fixture-keycloak-secret', 'fixture-credential-value', 'fixture-smtp-pass', 'fixture-passphrase', 'fixture-jwt', 'fixture-jsessionid', 'fixture-phpsessid', 'fixture-signature-pair'];
  const secrets = [key, apiKey, password, 'fixture-header-secret', 'fixture-integration-key', 'fixture-http-password', 'fixture-pair-secret', 'fixture-query-key', 'fixture-fragment-token', ...shapes];
@@ -440,7 +440,7 @@ test('vendor exports strip credential values before upload, keeping every record
   // Common credential shapes beyond those, and names that only look like credential names.
   { id: 9000032, url: 'https://acct.blob.core.windows.net/c/b?sv=2020-08-04&sig=fixture-sas-sig&signal=1&token_auth=fixture-token-auth&application_key=fixture-application-key&user_key=fixture-user-key&PHPSESSID=fixture-phpsessid#hapikey=fixture-hapikey&basic_auth=fixture-basic-auth-param&AccountKey=fixture-account-key&state=s',
    customHttpHeaders: { 'x-functions-key': 'fixture-functions-key', 'Ocp-Apim-Subscription-Key': 'fixture-apim-key', 'X-Auth': 'fixture-x-auth' }, secret_key: 'fixture-secret-key', pwd: 'fixture-pwd', apiKeys: ['fixture-api-keys-item'], tokens: ['fixture-tokens-item'],
-   headers: [['Authorization', 'Bearer fixture-tuple-token'], ['Session-Id', 'fixture-session-id'], ['Accept', '*/*']], authToken: 'fixture-auth-token', auth: { type: 'bearer', token: 'fixture-auth-container-token' }, credentials: { password: 'fixture-credentials-password' }, apiKey: null,
+   headers: [['Authorization', 'Bearer fixture-tuple-token'], ['Session-Id', 'fixture-session-id'], ['Accept', '*/*']], authToken: 'fixture-auth-token', auth: { type: 'bearer', token: 'fixture-auth-container-token' }, credentials: { password: 'synthetic-fixture-credentials-password' }, apiKey: null,
    // Generic member names under auth and credential(s) (a Keycloak realm user, nodemailer, an API key credential), names that are credentials
    // everywhere, and a Postman header pair.
    owner: { username: 'ann', credentials: [{ type: 'password', value: 'fixture-keycloak-value', temporary: false }, { type: 'password', secretData: '{"value":"fixture-keycloak-secret"}' }] },

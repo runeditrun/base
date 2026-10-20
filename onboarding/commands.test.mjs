@@ -105,7 +105,7 @@ test('readiness fails immediately on a child error without displaying its privat
 });
 
 test('shared sinks redact a credential split between stdout and stderr',async t=>{
- let child;const f=await fixture(t,()=>child=fakeChild());const secret='split-across-both-descriptors-test';f.store.addSecrets(secret);
+ let child;const f=await fixture(t,()=>child=fakeChild());const secret='synthetic-split-across-both-descriptors-test';f.store.addSecrets(secret);
  const pending=f.store.run('Capture','unused');child.stdout.write(secret.slice(0,12));child.stderr.write(secret.slice(12)+'\n');child.finish(1);
  let failure;await assert.rejects(pending,error=>{failure=error;return true;});
  for(const text of [f.terminal(),f.state.logs.join('\n'),await readFile(f.store.logPath,'utf8'),installationFailureMessage(failure)])assert.ok(!text.includes(secret));
@@ -124,7 +124,7 @@ test('an already-cancelled attempt never starts its command',async t=>{
 });
 
 test('exit diagnostics snapshot buffered output without flushing a partial held credential',async t=>{
- const f=await fixture(t),child=fakeChild(),secret='HELD_CREDENTIAL_ACROSS_EXIT_TEST';
+ const f=await fixture(t),child=fakeChild(),secret='synthetic-HELD_CREDENTIAL_ACROSS_EXIT_TEST';
  f.store.addSecrets(secret);f.store.track('Starting application',child);
  const pending=f.store.waitForReady('Starting application',child,()=>new Promise(()=>{}),{timeoutMs:1000,intervalMs:5});
  let failure;const rejected=assert.rejects(pending,error=>{failure=error;return true;});

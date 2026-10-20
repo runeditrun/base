@@ -278,7 +278,7 @@ if (process.env.FAIL_DEPLOY && command === 'deploy') { console.error(JSON.string
 if (command === 'deploy') { mkdirSync('.rer/deploy', { recursive: true }); writeFileSync('.rer/deploy/production.json', JSON.stringify({ receipt: { origin: 'https://fixture-production.example.workers.dev' } })); }
 console.log(JSON.stringify({ ok: true, command, token: process.env.CLOUDFLARE_API_TOKEN }));
 `;
-const account = 'a'.repeat(32), token = 'test-synthetic-cloudflare-token-value';
+const account = 'a'.repeat(32), token = 'synthetic-test-synthetic-cloudflare-token-value';
 function hosting(extra = {}) {
  return hooks({ features: { localTrialWithoutEmail: true, hosting: true }, hosting: ownerAccountHosting({ cli: 'owner-cli.mjs', secrets: ({ vars }) => ({ AUTH_SECRET: vars.SESSION_SECRET }) }), ...extra });
 }
@@ -290,8 +290,8 @@ test('owner-account hosting deploys with the owner\'s account and token, checks 
  let app;
  const path = process.env.EXPECTED_TOKEN;
  process.env.EXPECTED_TOKEN = token;
- await writeFile(join(f.root, '.dev.vars'), 'SESSION_SECRET=test-synthetic-session-value-for-hosting\n', { mode: 0o600 });
- process.env.EXPECTED_SECRET = 'test-synthetic-session-value-for-hosting';
+ await writeFile(join(f.root, '.dev.vars'), 'SESSION_SECRET=synthetic-test-synthetic-session-value-for-hosting\n', { mode: 0o600 });
+ process.env.EXPECTED_SECRET = 'synthetic-test-synthetic-session-value-for-hosting';
  try { await localInstaller(hosting()).install(f.root, { ...input, target: 'remote', accountId: account, apiToken: token }, store, child => { app = child; }); }
  finally { process.env.EXPECTED_TOKEN = path; delete process.env.EXPECTED_SECRET; }
  t.after(async () => { if (app) await store.stop(app); });
