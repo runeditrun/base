@@ -2,6 +2,7 @@
 import argparse
 import json
 import re
+from pathlib import Path
 from history_scan import scan
 from public_base import parse as parse_public_base, PublicBaseError
 from report import new_report
@@ -12,6 +13,9 @@ def flag_name(value):
     # control characters from an untrusted command line.
     match = re.match(r'--?[A-Za-z][A-Za-z0-9_-]*', value)
     return match.group() if match else None
+
+
+TIMEOUT = json.loads(Path(__file__).with_name('timeout.json').read_text())
 
 
 class SafeParser(argparse.ArgumentParser):
@@ -44,9 +48,9 @@ def seconds(value):
     try:
         result = float(value)
     except ValueError:
-        raise argparse.ArgumentTypeError('invalid timeout; expected a number greater than 0 and at most 7200') from None
-    if not 0 < result <= 7200:
-        raise argparse.ArgumentTypeError('invalid timeout; expected a number greater than 0 and at most 7200')
+        raise argparse.ArgumentTypeError(f"invalid timeout; expected a number greater than 0 and at most {TIMEOUT['max']}") from None
+    if not 0 < result <= TIMEOUT['max']:
+        raise argparse.ArgumentTypeError(f"invalid timeout; expected a number greater than 0 and at most {TIMEOUT['max']}")
     return result
 
 
@@ -56,7 +60,7 @@ def main():
     parser.add_argument('--ref', default='HEAD')
     for option in ('public-base', 'env-file', 'project', 'repository', 'cache-dir', 'annotation-file'):
         parser.add_argument('--' + option)
-    parser.add_argument('--timeout-seconds', type=seconds, default=300)
+    parser.add_argument('--timeout-seconds', type=seconds, default=TIMEOUT['default'])
     args = parser.parse_args()
     if args.public_base is not None:
         try:

@@ -12,11 +12,13 @@ import { releasePublicBase } from './public-base.mjs';
 import { prepareTagAdoption, confirmTagAdoption, assertTagAdoption } from './tag-adoption.mjs';
 import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark.mjs';
 import { cleanupTemporary } from './cleanup.mjs';
+import { parseTimeoutSeconds } from '../../scripts/publish-check/timeout.mjs';
 
 // Failure output belongs to the private receipt, not the site preview.
 const withoutOutput = gates => JSON.parse(JSON.stringify(gates, (key, value) => key === 'output' ? undefined : value));
 
-export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, localVerify = false, allowPlaceholderMark = false, verifyWorkflow }) {
+export async function release({ repo, ref = 'HEAD', output, project, repository, dryRun = false, tag = false, cleanHistory: clean = false, envFile, onto, publicBase, localVerify = false, allowPlaceholderMark = false, verifyWorkflow, scanTimeoutSeconds }) {
+  if (scanTimeoutSeconds !== undefined) scanTimeoutSeconds = parseTimeoutSeconds(scanTimeoutSeconds, { integer: true });
   if (!/^[\w.-]+\/[\w.-]+$/.test(project ?? '')) throw Error('--project must be publisher/name');
   if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?$/i.test(repository ?? '')) throw Error('--repository must be a credential-free GitHub repository URL');
   if (onto !== undefined && clean) throw Error('--onto and --clean-history are mutually exclusive');
@@ -60,8 +62,8 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
     const exported = destination ? publicChild(source, temporary, destination, publicParent, Boolean(tag))
       : clean ? cleanHistory(source, temporary, Boolean(tag)) : null;
     let report = exported
-      ? publicationScan(exported.repo, exported.commit, envFile, project, repository, scanBase)
-      : sourcePublicationScan(source, temporary, envFile, project, repository, scanBase, Boolean(tag), adopted);
+      ? publicationScan(exported.repo, exported.commit, envFile, project, repository, scanBase, undefined, scanTimeoutSeconds)
+      : sourcePublicationScan(source, temporary, envFile, project, repository, scanBase, Boolean(tag), adopted, scanTimeoutSeconds);
     if (destination) {
       assertPublicTree(exported.repo, exported.commit, source.tree);
       if (report.status === 'PASS' && (report.complete !== true || report.guarantees?.historyScanned !== true ||

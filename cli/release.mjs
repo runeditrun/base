@@ -1,3 +1,5 @@
+import { parseTimeoutSeconds, timeoutBounds } from '../scripts/publish-check/timeout.mjs';
+
 // Preserve release's accepted parser, producer, receipt and validation exits.
 const releaseHelp = `Usage: rer release --repo DIR --project PUBLISHER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
 
@@ -22,6 +24,9 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --verify-workflow NAME_OR_FILE
                          Override the seed's declared GitHub verification workflow
                          by name or file (case-insensitive).
+  --scan-timeout-seconds N
+                         Publication scan deadline in integer seconds (1..${timeoutBounds.max}).
+                         Omit to use the scanner default.
   --clean-history        Prepare a parentless public export.
   --onto GITHUB_URL#BRANCH
                          Prepare a public child of the destination's current branch;
@@ -52,6 +57,10 @@ export async function dispatchRelease(args) {
   for (let index = 0; index < args.length; index++) {
    if(args[index]==='--no-queue'){}
    else if (args[index] === '--tag') options.tag = args[index + 1]?.startsWith('v') ? args[++index] : true;
+   else if (args[index] === '--scan-timeout-seconds') {
+    try { options.scanTimeoutSeconds = parseTimeoutSeconds(args[++index], { integer: true }); }
+    catch (error) { throw Error(`--scan-timeout-seconds: ${error.message}`); }
+   }
    else if (args[index] === '--clean-history') options.cleanHistory = true;
    else if (args[index] === '--dry-run') options.dryRun = true;
    else if (args[index] === '--allow-placeholder-mark') options.allowPlaceholderMark = true;

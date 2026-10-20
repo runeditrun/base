@@ -1,8 +1,37 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { emittedRuntime, setupToken, owner } from './emitted-runtime.mjs'
+import { scheduledHarness, definition } from './scheduled-harness.mjs'
 
 const cookieOf = response => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
+
+test('scheduled approval refuses a definition whose snapshotted id differs from the requested policy', async () => {
+  let changingId = false
+  const h = await scheduledHarness({ definitions: () => {
+    if (!changingId) return [definition({ id: 'other-policy' })]
+    let reads = 0
+    return [{
+      ...definition(),
+      // Selection sees the requested id; canonicalization sees another policy.
+      get id() { return ++reads <= 2 ? 'inactive-members' : 'other-policy' },
+    }]
+  } })
+  try {
+    const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
+    const listing = await h.json(await h.call('/auth/policies', { cookie: owner.cookie }))
+    changingId = true
+    const response = await h.post('/auth/policy/approve', {
+      policyId: 'inactive-members', versionHash: listing.policies[0].versionHash,
+    }, owner.cookie)
+    assert.equal(response.status, 503, await response.clone().text())
+    assert.equal((await response.json()).error, 'invalid_policy')
+    assert.equal((await h.db.prepare('SELECT COUNT(*) AS count FROM oa_policy_approvals').first()).count, 0)
+    let entered = false
+    const run = await h.runWith(async () => { entered = true })
+    assert.deepEqual([run.status, run.error], ['refused', 'invalid_policy'])
+    assert.equal(entered, false)
+  } finally { await h.close() }
+})
 
 test('scheduled Worker door: exact owner approval bounds actions, audits runs, and stops on edits, revocation or owner demotion', async () => {
   const r = await emittedRuntime()

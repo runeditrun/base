@@ -4,12 +4,15 @@ import { mkdtempSync, readFileSync, openSync, closeSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runningVersion } from '../cli/version.mjs';
+import { parseTimeoutSeconds, timeoutBounds } from './publish-check/timeout.mjs';
 
 const args = process.argv.slice(2);
-let seconds = 300;
+let seconds = timeoutBounds.default;
 for (let i = 0; i < args.length; i++) {
   const raw = args[i] === '--timeout-seconds' ? args[i + 1] : args[i].startsWith('--timeout-seconds=') ? args[i].slice(18) : null;
-  if (raw !== null && Number(raw) > 0 && Number(raw) <= 7200) seconds = Number(raw);
+  if (raw !== null) {
+    try { seconds = parseTimeoutSeconds(raw); } catch { /* Python reports invalid arguments. */ }
+  }
 }
 const scratch = mkdtempSync(join(tmpdir(), 'publish-check-'));
 const output = join(scratch, 'report.json');
@@ -28,11 +31,21 @@ process.on('SIGINT', interrupt);
 process.on('SIGTERM', interrupt);
 let report, code = 2;
 try {
-  child = spawn('python3', ['-B', new URL('./publish-check/cli.py', import.meta.url).pathname, ...args], {
-    detached: true, stdio: ['ignore', fd, 'ignore'], env: { ...process.env, TMPDIR: scratch },
+  child = spawn('python3', ['-B', new URL('./publish-check/slots.py', import.meta.url).pathname, ...args], {
+    detached: true, stdio: ['pipe', fd, 'inherit', 'pipe'], env: { ...process.env, TMPDIR: scratch },
   });
   closeSync(fd);
-  timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
+  let messages = '';
+  child.stdio[3].setEncoding('utf8');
+  child.stdio[3].on('data', data => {
+    messages += data;
+    for (let at; (at = messages.indexOf('\n')) !== -1;) {
+      const message = messages.slice(0, at);
+      messages = messages.slice(at + 1);
+      if (message === 'acquired' && !timer) timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
+      else if (message.startsWith('scan.')) reason ??= message;
+    }
+  });
   const result = await new Promise(resolve => {
     child.once('error', () => resolve(null));
     child.once('close', value => resolve(value));
