@@ -17,6 +17,7 @@ export const origin = (host, port) => `http://${host === '::1' ? '[::1]' : host}
 export function parse(argv, cwd = process.cwd(), { independent = false, deferTail = false } = {}) {
  const [verb, ...args] = argv;
  if (!verb || verb === '--help') return { help: true };
+ if (verb === 'listing') return { verb, listingArgs: args };
  if (verb === 'release') return { verb, releaseArgs: args };
  if (verb === 'archive') return { verb, archiveArgs: args };
  // rer demo is rer dev --demo.
@@ -104,7 +105,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys(verbs).join(', ')}, signin, release\nRun rer VERB --help for flags.\n`;
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys(verbs).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n`;
  const known = verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
  return `${door}Usage: rer ${verb} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;

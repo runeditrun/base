@@ -18,6 +18,7 @@ export async function main(argv = process.argv.slice(2)) {
   options = parse(argv,process.cwd(),{deferTail:true}); out = output(options);
   if (options.help) return showHelp(options,out);
   if (options.verb === 'archive') return (await import('./archive.mjs')).archiveCommand(options.archiveArgs,out);
+  if (options.verb === 'listing') return (await import('./listing.mjs')).dispatchListing(options.listingArgs);
   if (options.verb === 'release') return (await import('./release.mjs')).dispatchRelease(options.releaseArgs);
   const independent = await parsingProfile(options.cwd)==='independent'&&!['describe','check','doctor'].includes(options.verb);
   options=parse(argv,process.cwd(),{independent});out=output(options);

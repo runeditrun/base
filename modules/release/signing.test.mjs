@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
@@ -11,8 +11,11 @@ const root = resolve(import.meta.dirname, '../..');
 const cli = (args, input) => spawnSync(process.execPath, [resolve(root, 'bin/rer.mjs'), 'release', ...args],
   { cwd: root, input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
 
-test('release CLI signs produced bytes, verifies offline, and refuses a changed document', async t => {
+test('release CLI signs produced bytes, verifies offline, and refuses changed signed marks and documents', async t => {
   const f = fixture(t);
+  mkdirSync(resolve(f.repo, 'public/brand'), { recursive: true });
+  writeFileSync(resolve(f.repo, 'public/brand/mark.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h10v10z"/></svg>');
+  f.commit();
   const produced = await release({ ...f.options, project: 'octocat/hello-world', repository: 'https://github.com/octocat/hello-world' });
   assert.equal(produced.status, 'RELEASED');
   const entryPath = resolve(f.temporary, 'entry.json'), anchorsPath = resolve(f.temporary, 'anchors.json');
@@ -39,6 +42,12 @@ test('release CLI signs produced bytes, verifies offline, and refuses a changed 
   assert.equal(accepted.status, 0, 'Receipt verification succeeds');
   assert.equal(resultIs(accepted, { verdict: 'VERIFIED' }), true, 'The signed artifact is verified');
   const manifestPath = resolve(f.options.output, produced.siteRelease.path);
+  const mark = resolve(dirname(manifestPath), JSON.parse(readFileSync(manifestPath)).listing.brand.mark);
+  const markBytes = readFileSync(mark); writeFileSync(mark, '<svg/>');
+  const changedMark = verify(); publicOutput(changedMark.stdout, changedMark.stderr);
+  assert.equal(changedMark.status, 1, 'A changed mark is refused');
+  assert.equal(resultIs(changedMark, { verdict: 'REFUSED', code: 'DIGEST_MISMATCH' }), true);
+  writeFileSync(mark, markBytes);
   const document = resolve(dirname(manifestPath), JSON.parse(readFileSync(manifestPath)).artifacts[0].path);
   const bytes = readFileSync(document); bytes[0] ^= 1; writeFileSync(document, bytes);
   const refused = verify();
