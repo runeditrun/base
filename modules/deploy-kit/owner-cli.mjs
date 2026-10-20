@@ -13,11 +13,12 @@ import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
 import { ownerSignin } from './owner-signin.mjs';
+import { ownerRekey } from './owner-rekey.mjs';
 import { refuseLocalModels } from './local-only.mjs';
 import { publicOrigin } from './public-origin.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
-const usage = 'usage: owner-cli.mjs deploy|dry-run|health|remove|inspect|record-owner|signin --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
+const usage = 'usage: owner-cli.mjs deploy|dry-run|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
 
 /** The owner's committed source and existing local build. Run the seed's build first. */
 async function ownerArtifact(root, product) {
@@ -33,7 +34,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string',multiple:true},unset:{type:'string',multiple:true},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
   const {positionals:[command,...rest],values} = parsed;
-  if (!['deploy','dry-run','health','secret','remove','inspect','record-owner','signin'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (!['deploy','dry-run','health','secret','remove','inspect','record-owner','signin','rekey'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
   if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
   await refuseLocalModels(resolve(cwd));
@@ -71,6 +72,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     : await ownerTarget(api,{project:declaration.project,environment:values.environment});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${target.environment}.json`);
   if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
+  if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env});
   if (command === 'secret') {
     // Every named secret is changed in one Worker version, or none is.
     const named = [...new Set(values.set ?? values.unset)], declared = Array.isArray(declaration.secrets) ? declaration.secrets : [];
@@ -102,7 +104,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');
     const rows = await api.request(`/workers/scripts/${target.worker}/secrets`);
     assert(Array.isArray(rows), 'invalid-secret-list');
-    return {ok:true, origin:target.origin, versionId:live.versionId, retiredSecrets, ownerClaim:state.ownerClaim, liveSecrets:rows.map(row => row.name)};
+    // Native uploaders record their configured app origin with the deployment identity.
+    return {ok:true, origin:state.receipt.origin ?? target.origin, versionId:live.versionId, retiredSecrets, ownerClaim:state.ownerClaim, liveSecrets:rows.map(row => row.name)};
   }
   const current = retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
   artifact ??= await ownerArtifact(root,values.product);

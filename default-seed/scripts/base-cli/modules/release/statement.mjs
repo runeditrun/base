@@ -18,6 +18,7 @@ export async function readArtifact(directory) {
   if (!pathOK(manifestPath) || !/^site\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\/release\.json$/.test(manifestPath)) refuse('PATH_UNSAFE');
   const base = posix.dirname(manifestPath);
   const selected = new Map();
+  const isAsset = path => path.startsWith(`${base}/assets/`);
   const walk = (relative = '') => {
     for (const name of readdirSync(resolve(root, relative)).sort()) {
       const path = relative ? `${relative}/${name}` : name;
@@ -32,9 +33,9 @@ export async function readArtifact(directory) {
       if (stat.isSymbolicLink() || (!stat.isDirectory() && !stat.isFile())) refuse('PATH_UNSAFE');
       if (stat.isFile() && stat.size > FILE_LIMIT) refuse('INPUT_TOO_LARGE');
       if (stat.isDirectory()) {
-        if (!ancillary && path !== 'site' && path !== posix.dirname(base) && path !== base && path !== `${base}/documents` && !path.startsWith(`${base}/documents/`)) refuse('FILE_UNDECLARED');
+        if (!ancillary && path !== 'site' && path !== posix.dirname(base) && path !== base && path !== `${base}/documents` && !path.startsWith(`${base}/documents/`) && path !== `${base}/assets` && !isAsset(path)) refuse('FILE_UNDECLARED');
         walk(path);
-      } else if (required.includes(path) || path === manifestPath || path.startsWith(`${base}/documents/`)) {
+      } else if (required.includes(path) || path === manifestPath || path.startsWith(`${base}/documents/`) || isAsset(path)) {
         selected.set(path, stat.size);
         if (selected.size > 256) refuse('INPUT_TOO_LARGE');
       } else if (!ancillary && !['PUBLISH.md', 'site/registry.json', SIGNATURE_FILE].includes(path)) refuse('FILE_UNDECLARED');
@@ -62,14 +63,17 @@ export async function readArtifact(directory) {
   if (!Array.isArray(manifest.artifacts)) refuse('STATEMENT_INVALID');
   const declared = new Set();
   for (const artifact of manifest.artifacts) {
-    if (!pathOK(artifact?.path) || !artifact.path.startsWith('documents/')) refuse('PATH_UNSAFE');
+    if (!pathOK(artifact?.path) || !(artifact.path.startsWith('documents/') || artifact.path.startsWith(`assets/seeds/${manifest.listing.id}/`))) refuse('PATH_UNSAFE');
     const path = `${base}/${artifact.path}`;
     if (declared.has(path)) refuse('STATEMENT_INVALID');
     declared.add(path);
     if (!files.has(path)) refuse('FILE_MISSING');
     match(path, artifact.sha256);
   }
-  for (const path of files.keys()) if (path.startsWith(`${base}/documents/`) && !declared.has(path)) refuse('FILE_UNDECLARED');
+  for (const path of files.keys()) if ((path.startsWith(`${base}/documents/`) || isAsset(path)) && !declared.has(path)) refuse('FILE_UNDECLARED');
+  for (const path of [manifest.listing.brand?.mark, manifest.listing.brand?.markLight, ...(manifest.listing.shots ?? []).map(shot => typeof shot === 'string' ? shot : shot.path)].filter(Boolean)) {
+    if (!pathOK(path) || !declared.has(`${base}/${path}`)) refuse('FILE_MISSING');
+  }
   return { root, receipt, subject, files, entries };
 }
 

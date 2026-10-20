@@ -106,7 +106,7 @@ export function compareVersion(a, b) {
   return 0;
 }
 const requiredFiles = ['public-source.tar', 'release-receipt.json', 'publish-check.json'];
-const filePattern = /^(public-source\.tar|release-receipt\.json|publish-check\.json|site\/[a-z0-9]+(?:-[a-z0-9]+)*\/[^/]+\/(?:release\.json|documents\/.+))$/;
+const filePattern = /^(public-source\.tar|release-receipt\.json|publish-check\.json|site\/[a-z0-9]+(?:-[a-z0-9]+)*\/[^/]+\/(?:release\.json|documents\/.+|assets\/seeds\/[a-z0-9]+(?:-[a-z0-9]+)*\/.+))$/;
 function safePath(path) {
   return validRelativePath(path) && matches(path, filePattern);
 }
@@ -131,7 +131,8 @@ export function validateStatement(s) {
     if (releases.length !== 1 || releases[0].path.split('/')[2] !== s.version) refuse('STATEMENT_INVALID');
     const prefix = releases[0].path.slice(0, -'release.json'.length);
     if (requiredFiles.some(path => !s.files.some(f => f.path === path))
-      || s.files.some(f => f.path.startsWith('site/') && !f.path.startsWith(prefix))) refuse('STATEMENT_INVALID');
+      || s.files.some(f => f.path.startsWith('site/') && (!f.path.startsWith(prefix)
+        || (f.path.startsWith(prefix + 'assets/') && !f.path.startsWith(prefix + `assets/seeds/${releases[0].path.split('/')[1]}/`))))) refuse('STATEMENT_INVALID');
   } catch (error) { sanitized(error, 'STATEMENT_INVALID'); }
 }
 function parseJSON(value, code) {

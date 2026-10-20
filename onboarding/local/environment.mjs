@@ -13,7 +13,7 @@ export function localVariables(text) {
 
 // Inherited application bindings never reach a build or migration command.
 // The default names are the Base operator-auth and mail bindings.
-export const applicationBindings = /^(SESSION_SECRET|SETUP_TOKEN|OWNER_EMAIL|AUTH_|MAIL_|OIDC_|AI_|MODELS_|RER_MODELS_)/
+export const applicationBindings = /^(SESSION_SECRET|INSTALLATION_KEY(?:_PREVIOUS)?$|SETUP_TOKEN|OWNER_EMAIL|AUTH_|MAIL_|OIDC_|AI_|MODELS_|RER_MODELS_)/
 
 export function buildEnvironment(bindings = applicationBindings, inherited = process.env) {
   const env = { ...inherited, CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false', WRANGLER_SEND_METRICS: 'false' }
@@ -23,7 +23,7 @@ export function buildEnvironment(bindings = applicationBindings, inherited = pro
 }
 
 // Values printed by a child are redacted when their name marks a credential.
-export const secretValues = (vars) => Object.entries(vars).filter(([key]) => /SECRET|TOKEN|API_KEY/.test(key)).map(([, value]) => value).filter(Boolean)
+export const secretValues = (vars) => Object.entries(vars).filter(([key]) => /SECRET|TOKEN|API_KEY|^INSTALLATION_KEY(?:_PREVIOUS)?$/.test(key)).map(([, value]) => value).filter(Boolean)
 
 export function localOrigin(vars) {
   let url

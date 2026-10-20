@@ -1,3 +1,4 @@
+import { dependencyStore } from '../store.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -42,7 +43,7 @@ async function changePin(r,proof,change) {
  // extra revocation, so a stale pin alone must defeat setup-session authority.
  const issuer=change==='moved pin'?'https://next.example':ISSUER;
  const next=await provider({issuer,alg:'ES256',method:'private_key_jwt',rerInterfaces:['oidc-provider@1.0.0']});
- const privateKey=JSON.parse(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='oidc-provider@1'").get().private_key);
+ const privateKey=(await dependencyStore(r.db,r.config).readKey()).key;
  const auth=createOperatorAuth({db:r.db,clock:r.now,fetch:issuer===ISSUER?r.fetch:network([next]),clientIp:()=> '192.0.2.1',config:{...r.config,dependencies:false,OIDC_TRANSACTION_SECRET:'static-fixture-transaction-secret-thirty-two-bytes',providers:[{id:'auth',preset:'auth',issuer,clientId:'app-client',privateKey}]}});
  const path=change==='unlinked pin'?'/auth/providers/unlink':'/auth/providers/relink';
  assert.equal((await createAuthHandler(auth)(r.request(path,{cookie:proof,body:{provider:'auth'}}))).status,200,change);

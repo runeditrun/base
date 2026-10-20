@@ -4,10 +4,7 @@ import { readLegacyArchive } from '../modules/portability/format.mjs';
 import { recoverLegacyArchive } from '../modules/portability/legacy-files.mjs';
 import { legacyTargetState, requireLegacyEmpty } from '../modules/portability/legacy-safety.mjs';
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
-import { migrationStatements } from '../modules/portability/migration-sql.mjs';
-import { appliedMigrations as appliedMigrationNames } from '../modules/portability/bridge.mjs';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createPortability, PortabilityError, readArchive } from '../modules/portability/index.mjs';
@@ -15,19 +12,7 @@ import { transferProgress } from '../modules/portability/progress.mjs';
 import { nativeFailure, stateBytes } from './portability-progress.mjs';
 import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
-
-// The migrations this installation applied, in its ledger's order, with each
-// file's hash, so a restore can place an older archive within them. Reproduce
-// the runner's stored SQL text, then recover SQLite's statement boundaries.
-async function appliedMigrations(root, db, binding, split) {
- const config = parseJsonc(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
- const directory = join(root, config.d1_databases.find(entry => entry.binding === binding).migrations_dir ?? 'migrations');
- const names = await appliedMigrationNames(db) ?? [];
- return Promise.all(names.map(async name => {
-  const bytes = await readFile(join(directory, name));
-  return { name, statements: migrationStatements(bytes.toString('utf8'), split), sha256: createHash('sha256').update(bytes).digest('hex') };
- }));
-}
+import { appliedMigrations, platformMigrationDeclaration, platformMigrationPreflight } from './portability-migrations.mjs';
 
 // Transfers read only the D1 database and R2 buckets. A configuration with just
 // those keeps the app's other bindings out of the proxy: a Durable Object class
@@ -40,7 +25,7 @@ async function dataConfiguration(root) {
  return path;
 }
 
-async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery }) {
+async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery, platformMigrations }) {
  // Lines for the person go to the CLI over IPC, which prints them as the command's progress.
  const progress = transferProgress(line => process.send({ progress: line }));
  if (!legacyRecovery && ['export', 'import'].includes(direction)) progress({ phase: 'start', direction, bytes: direction === 'export' ? await stateBytes(join(root, '.wrangler/state')) : (await stat(path)).size });
@@ -51,6 +36,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   if(journal)for await(const record of fileRecords(journal)) {}
  }
  policy = await loadPolicy(root, policy, policyModule);
+ const declaration=platformMigrationDeclaration(platformMigrations);
  if (direction === 'policy-preflight') return { checkedPolicy: true };
  const { getPlatformProxy, unstable_splitSqlQuery } = createRequire(join(root, 'package.json'))('wrangler');
 
@@ -59,7 +45,8 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
  let proxy;
  try {
   proxy = await getPlatformProxy({ configPath, persist: { path: join(root, '.wrangler/state/v3') }, remoteBindings: false });
-  const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,unstable_splitSqlQuery),policy);
+  if(direction==='migration-preflight')return await platformMigrationPreflight(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery);
+  const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery),policy,declaration);
   const options={ db: proxy.env[binding], buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations };
   if(direction==='legacy-preflight') {
    await requireLegacyEmpty(options,await legacyTargetState(options.db,options.migrations));
@@ -81,10 +68,10 @@ const reply = message => new Promise(resolve => process.send(message, () => { pr
 try { await reply({ ok: true, ...await run(process.argv[2], JSON.parse(process.argv[3])) }); }
 catch (error) {
  // Erasure-fence refusals name the fence: an older archive is refused, not a failed transfer.
- const refusal = error instanceof PortabilityError && (error.status === 409 || ['wrong_product', 'schema_mismatch', 'table_inventory', 'configuration_inventory', 'erased_row', 'erasure_epoch', 'later_journal', 'invalid_journal', 'staged_validation'].includes(error.code.split(':')[0]));
+ const refusal = error instanceof PortabilityError && (error.status === 409 || ['wrong_product', 'schema_mismatch', 'migration_ledger', 'table_inventory', 'configuration_inventory', 'erased_row', 'erasure_epoch', 'later_journal', 'invalid_journal', 'staged_validation'].includes(error.code.split(':')[0]));
  const exitCode = error.message === 'archive_json' ? 2 : refusal || error.code === 'EEXIST' ? 4 : 1;
  // Report only symbolic codes; native database errors can contain private data.
- const reason = error instanceof PortabilityError ? error.code.split(':')[0] : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
+ const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
  // A later migration that changes restorable data is named: it is a file of this installation.
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
  // A populated destination names its table or bucket: schema names, never row data.

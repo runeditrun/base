@@ -21,8 +21,9 @@ const rooms = { name: '0001_rooms.sql', sql: `CREATE TABLE rooms(id TEXT PRIMARY
 CREATE TABLE members(room TEXT NOT NULL REFERENCES rooms(id),user TEXT NOT NULL,PRIMARY KEY(room,user));` };
 const changes = `CREATE TABLE room_changes(room TEXT PRIMARY KEY,revision INTEGER NOT NULL);
 INSERT INTO room_changes SELECT id,0 FROM rooms;`;
-const log = `CREATE TABLE membership_log(seq INTEGER PRIMARY KEY AUTOINCREMENT,room TEXT NOT NULL,user TEXT NOT NULL,action TEXT NOT NULL,at TEXT NOT NULL);
+const log = `CREATE TABLE membership_log(seq INTEGER PRIMARY KEY AUTOINCREMENT,room TEXT NOT NULL,user TEXT NOT NULL,action TEXT NOT NULL,at TEXT NOT NULL,private_note TEXT);
 CREATE INDEX membership_log_room ON membership_log(room,seq);`;
+const carriedLog = log.replace(' AUTOINCREMENT', '');
 const backfill = `INSERT INTO membership_log(room,user,action,at) SELECT room,user,'baseline',strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM members;`;
 const journal = { name: '0002_journal.sql', sql: `${changes}
 ${log}
@@ -35,15 +36,16 @@ async function apply(db, migrations) {
   for (const migration of migrations) await db.batch([...statements(migration), `INSERT INTO d1_migrations(name) VALUES('${migration.name}')`].map(sql => db.prepare(sql)));
 }
 // A D1 database that applied `migrations`, served with a replay of them.
-async function installed(t, migrations, wrap = db => db) {
+async function installed(t, migrations, wrap = db => db, rules = policy) {
   const target = await database(t, [ledger], policy);
   await apply(target.db, migrations);
-  const replay = async () => migrationReplay(migrations.map(m => ({ name: m.name, statements: migrationStatements(m.sql, split) })), policy);
-  return { ...target, service: await createPortability({ db: wrap(target.db), buckets: { FILES: target.bucket }, policy, migrations: replay }) };
+  const replay = async () => migrationReplay(migrations.map(m => ({ name: m.name, statements: migrationStatements(m.sql, split) })), rules);
+  return { ...target, service: await createPortability({ db: wrap(target.db), buckets: { FILES: target.bucket }, policy: rules, migrations: replay }) };
 }
-async function source(t, first = rooms) {
-  const installation = await installed(t, [first]);
+async function source(t, first = rooms, extra = [], rules = policy) {
+  const installation = await installed(t, [first], undefined, rules);
   await installation.db.batch(["INSERT INTO rooms VALUES('r1','Launch'),('r2','Support')", "INSERT INTO members VALUES('r1','u1'),('r1','u2'),('r2','u1')"].map(sql => installation.db.prepare(sql)));
+  if (extra.length) await installation.db.batch(extra.map(sql => installation.db.prepare(sql)));
   return { ...installation, archive: await bundle(installation.service) };
 }
 const select = async (db, sql) => (await db.prepare(sql).all()).results;
@@ -84,7 +86,29 @@ test('an archive predating a journal backfill restores to the live upgrade, and 
   assert.deepEqual((await membership(target.db)).at(-1), { seq: 4, room: 'r2', user: 'u3', action: 'join' });
 });
 
-test('a write to an excluded table reading archived rows is admitted; a backfill of a carried table, an archived UPDATE or a second writer stay refused', async t => {
+test('a carried journal replays INSERT or REPLACE over its archived rows exactly like a live upgrade', async t => {
+  const carried = { name: rooms.name, sql: `${rooms.sql}\n${carriedLog}` };
+  for (const verb of ['INSERT OR IGNORE', 'REPLACE']) {
+    const { db: live, archive } = await source(t, carried, ["INSERT INTO membership_log(seq,room,user,action,at) VALUES(8,'r1','u0','archived','2026-10-20T00:00:00Z')"]);
+    const added = verb === 'REPLACE' ? "ALTER TABLE membership_log ADD COLUMN origin TEXT NOT NULL DEFAULT 'retained';\n" : '';
+    const mirror = { name: '0002_baseline.sql', sql: `${added}${verb} INTO membership_log(room,user,action,at) SELECT room,user,'baseline','2026-10-20T01:00:00Z' FROM members ORDER BY room,user;` };
+    await apply(live, [mirror]);
+    const expected = await select(live, 'SELECT * FROM membership_log ORDER BY seq');
+    assert.equal(expected.length, 4);
+
+    const target = await installed(t, [carried, mirror], failingOnce);
+    const id = await stage(target.service, archive);
+    await assert.rejects(finalize(target.service, archive, id));
+    assert.deepEqual([await membership(target.db), ...await archived(target.db)], [[], [], []]);
+    const status = await finalize(target.service, archive, id);
+    assert.equal(status.phase, 'complete');
+    assert.equal(JSON.stringify(await select(target.db, 'SELECT * FROM membership_log ORDER BY seq')), JSON.stringify(expected));
+    assert.deepEqual(await archived(target.db), await archived(live));
+    assert.deepEqual(status.bridged.replayed, [{ migration: mirror.name, statement: added ? 1 : 0, table: 'membership_log', rows: 3 }]);
+  }
+});
+
+test('excluded writes are admitted; carried UPDATE/DELETE, another writer and non-archived reads stay refused', async t => {
   const { archive } = await source(t);
   const admitted = { name: '0002_changes.sql', sql: changes };
   const target = await installed(t, [rooms, admitted]);
@@ -92,16 +116,34 @@ test('a write to an excluded table reading archived rows is admitted; a backfill
   assert.equal(status.phase, 'complete');
   assert.equal(status.bridged?.replayed, undefined);
 
-  const carried = { name: '0001_rooms.sql', sql: `${rooms.sql}\n${log}` };
+  const carried = { name: '0001_rooms.sql', sql: `${rooms.sql}\n${carriedLog}` };
+  const olderCarried = await source(t, carried, ["INSERT INTO membership_log(room,user,action,at) VALUES('r1','u0','archived','2026-10-20T00:00:00Z')"]);
+  const secretPolicy = { ...policy, secretColumns: { membership_log: ['private_note'] } };
+  const withSecret = await source(t, carried, ["INSERT INTO membership_log(room,user,action,at,private_note) VALUES('r1','u0','archived','now','omitted')"], secretPolicy);
+  const sequenced = { name: rooms.name, sql: `${rooms.sql}\n${log}` };
+  const withSequenceGap = await source(t, sequenced, ["INSERT INTO membership_log(seq,room,user,action,at) VALUES(8,'r1','u0','archived','now'),(100,'r1','u9','deleted','now')", 'DELETE FROM membership_log WHERE seq=100']);
   const refusals = [
-    [await source(t, carried), [carried, { name: '0002_baseline.sql', sql: backfill }]],
+    [olderCarried, [carried, { name: '0002_update.sql', sql: "UPDATE membership_log SET action='changed';" }]],
+    [olderCarried, [carried, { name: '0002_delete.sql', sql: 'DELETE FROM membership_log;' }]],
+    [olderCarried, [carried, { name: '0002_second_writer.sql', sql: `${backfill}\nDELETE FROM membership_log WHERE user='u2';` }]],
+    [olderCarried, [carried, { name: '0002_baseline.sql', sql: backfill }, { name: '0003_second_insert.sql', sql: "INSERT INTO membership_log(room,user,action,at) SELECT room,user,'other','now' FROM members;" }]],
+    [olderCarried, [carried, { name: '0002_from_excluded.sql', sql: `${changes}\nINSERT INTO membership_log(room,user,action,at) SELECT room,'u0','baseline','now' FROM room_changes;` }]],
+    [olderCarried, [carried, { name: '0002_positional.sql', sql: "INSERT INTO membership_log SELECT seq+100,room,user,action,at,private_note FROM membership_log;" }]],
+    [olderCarried, [carried, { name: '0002_star.sql', sql: 'INSERT INTO membership_log(seq,room,user,action,at,private_note) SELECT * FROM membership_log;' }]],
+    [withSecret, [carried, { name: '0002_secret.sql', sql: "INSERT INTO membership_log(room,user,action,at) SELECT room,user,private_note,at FROM membership_log;" }], secretPolicy],
+    [withSecret, [carried, { name: '0002_secret_view.sql', sql: "CREATE VIEW journal_notes AS SELECT room,user,private_note AS note,at FROM membership_log;\nINSERT INTO membership_log(room,user,action,at) SELECT room,user,note,at FROM journal_notes;" }], secretPolicy],
+    [withSequenceGap, [sequenced, { name: '0002_autoincrement.sql', sql: backfill }]],
+    [olderCarried, [carried, { name: '0002_physical_rowid.sql', sql: "INSERT INTO membership_log(room,user,action,at) SELECT room,user,CAST(rowid AS TEXT),'now' FROM members;" }]],
+    [olderCarried, [carried, { name: '0002_physical_rowid_view.sql', sql: "CREATE VIEW physical_members AS SELECT room,user,rowid AS position FROM members;\nINSERT INTO membership_log(room,user,action,at) SELECT room,user,CAST(position AS TEXT),'now' FROM physical_members;" }]],
     [{ archive }, [rooms, { name: '0002_titles.sql', sql: "UPDATE rooms SET title=upper(title) WHERE id IN (SELECT room FROM members);" }]],
     [{ archive }, [rooms, { name: '0002_journal.sql', sql: `${journal.sql}\nDELETE FROM membership_log WHERE user='u2';` }]],
     [{ archive }, [rooms, { name: '0002_from_excluded.sql', sql: `${changes}\n${log}\nINSERT INTO membership_log(room,user,action,at) SELECT room,'u0','baseline','now' FROM room_changes;` }]],
   ];
-  for (const [{ archive: older }, migrations] of refusals) {
-    const destination = await installed(t, migrations);
-    await assert.rejects(destination.service.imports.create(older.manifest), new RegExp('schema_mismatch:migration_data:' + migrations[1].name), migrations[1].name);
-    assert.deepEqual([await membership(destination.db).catch(() => []), ...await archived(destination.db)], [[], [], []]);
+  for (const [{ archive: older }, migrations, rules = policy] of refusals) {
+    await t.test(migrations[1].name, async scenario => {
+      const destination = await installed(scenario, migrations, undefined, rules);
+      await assert.rejects(destination.service.imports.create(older.manifest), new RegExp('schema_mismatch:migration_data:' + migrations[1].name), migrations[1].name);
+      assert.deepEqual([await membership(destination.db).catch(() => []), ...await archived(destination.db)], [[], [], []]);
+    });
   }
 });

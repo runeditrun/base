@@ -26,7 +26,7 @@ import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 import { deployProductDirectory, deployProductArguments, DeployProductError } from './deploy-product.mjs';
 
 export function validateDeployOptions(options) {
- const changes = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret', options.rotateSecret && '--rotate-secret'].filter(Boolean);
+ const changes = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret', options.rotateSecret && '--rotate-secret', options.reopenInstallationKey && '--reopen-installation-key'].filter(Boolean);
  if (changes.length > 1 || changes.length && options.dryRun) throw invalid(`Use ${changes.join(', ')}${options.dryRun ? ' and --dry-run' : ''} on separate runs.`);
  if (options.remove && !options.yes) throw invalid(`${deployAgain(options)} --remove deletes this environment's Worker and every D1, R2, KV and queue rer created for it, with their data. Add --yes to confirm.`);
 }
@@ -86,11 +86,13 @@ export async function deployCommand(context) {
   const { signIn } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
   const needed = neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: true });
   reportNeeded(store, needed);
+  if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
   return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
  };
  // Custom hooks historically ignored these flags. Only the ownership controller
  // may perform them; neither a build nor a custom upload runs here.
- if (options.remove || options.setSecret || options.unsetSecret) return ownerDeploy(path, adapter)(context);
+ if (options.remove || options.setSecret || options.unsetSecret || options.reopenInstallationKey) return ownerDeploy(path, adapter)(context);
+ if (options.rotateSecret?.split(',').includes('INSTALLATION_KEY')) return ownerDeploy(path, adapter)(context);
  // A hook that deployed through the kit keeps what its Worker holds: rotate there as a secret change.
  if (options.rotateSecret && !adapter.deploy.managesHostedOwner && await hookState(root, options.environment ?? 'production')) return ownerDeploy(path, adapter)(context);
  if (adapter.deploy.managesHostedOwner) { const result = await adapter.deploy(context); return options.dryRun ? dryRun(result) : result; }

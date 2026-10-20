@@ -1,3 +1,4 @@
+import { dependencyStore } from '../store.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createOperatorAuth, createAuthHandler } from '../../operator-auth/index.mjs';
@@ -31,7 +32,7 @@ async function move(r, proof) {
     }
     return transport(url, init);
   };
-  const dependencies = createDependencies({ db: r.db, origin: ORIGIN, name: 'App', provider: issuer, auth: r.auth(), clock: r.now, fetch: fetcher });
+  const dependencies = createDependencies({ db: r.db, INSTALLATION_KEY:r.config.INSTALLATION_KEY, origin: ORIGIN, name: 'App', provider: issuer, auth: r.auth(), clock: r.now, fetch: fetcher });
   return { response: await dependencies.handle(r.request('/.well-known/rer-link/callback', { body: { issuer, code } })), next, fetcher };
 }
 
@@ -104,7 +105,7 @@ test('pending approval retains the approving session pin through provider redemp
   const proof = await r.proof(), gate = r.pauseLink(), pending = r.link('error-sink@1');
   await gate.ready;
   try {
-    const privateKey = JSON.parse(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='oidc-provider@1'").get().private_key);
+    const privateKey = (await dependencyStore(r.db,r.config).readKey()).key;
     const auth = createOperatorAuth({ db: r.db, clock: r.now, fetch: r.fetch, clientIp: () => '192.0.2.1', config: {
       ...r.config, dependencies: false, OIDC_TRANSACTION_SECRET: 'static-fixture-transaction-secret-thirty-two-bytes',
       providers: [{ id: 'auth', preset: 'auth', issuer: ISSUER, clientId: 'app-client', privateKey }],

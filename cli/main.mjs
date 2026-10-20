@@ -18,6 +18,7 @@ export async function main(argv = process.argv.slice(2)) {
   options = parse(argv,process.cwd(),{deferTail:true}); out = output(options);
   if (options.help) return showHelp(options,out);
   if (options.verb === 'archive') return (await import('./archive.mjs')).archiveCommand(options.archiveArgs,out);
+  if (options.verb === 'listing') return (await import('./listing.mjs')).dispatchListing(options.listingArgs);
   if (options.verb === 'release') return (await import('./release.mjs')).dispatchRelease(options.releaseArgs);
   const independent = await parsingProfile(options.cwd)==='independent'&&!['describe','check','doctor'].includes(options.verb);
   options=parse(argv,process.cwd(),{independent});out=output(options);
@@ -63,7 +64,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   // A hosted address never exports this computer's copy under its name.
   if (options.verb === 'export' && project.profile === 'first-party') await (await import('./hosted-export.mjs')).refuseHostedExport(project, options);
-  if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret) {
+  if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret && !options.reopenInstallationKey) {
    const { deliveryDeclarationClauses } = await import('./delivery-declarations.mjs');
    const failures = (await deliveryDeclarationClauses(project.root)).filter(clause => !clause.ok);
    if (failures.length) throw new RerError('invalid_deployment_declaration', failures.map(clause => clause.message).join('\n'), 1);
