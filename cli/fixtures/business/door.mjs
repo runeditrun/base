@@ -53,8 +53,33 @@ export async function door(t) {
   }
   return { uploadId: upload.id, bundleSha256: upload.bundleSha256, received: [...upload.chunks].map(([ordinal, chunk]) => ({ ordinal, sha256: sha256(chunk), size: chunk.length })), complete };
  }
- // Uptime's reader: one saved v3 monitors page per NDJSON line.
- const read = bytes => bytes.toString('utf8').trim().split('\n').flatMap(line => JSON.parse(line).data);
+ // Each seed's reader for its namespace, cut to the source records it plans (the
+ // seeds' own readers check the same bundles in the export evidence):
+ // Uptime's UptimeRobot monitors (one saved v3 page per NDJSON line), Spool's
+ // Sentry organization bundle, Oncall's saved PagerDuty responses and Lamp's
+ // saved Sorry public responses.
+ const readers = {
+  uptimerobot: bytes => bytes.toString('utf8').trim().split('\n').flatMap(line => JSON.parse(line).data),
+  sentry(bytes) {
+   const bundle = JSON.parse(bytes.toString('utf8'));
+   if (bundle.format !== 'spool-sentry-org-export' || bundle.version !== 1 || !bundle.collections.some(item => item.kind === 'projects') || !bundle.collections.some(item => item.kind === 'releases')) refuse('unsupported_bundle');
+   return [{ id: `manifest:${bundle.organization.slug}` }, ...bundle.collections.flatMap(item => item.pages.flatMap(page => page.response.map(row => ({ id: `${item.kind}:${item.project}:${row.version ?? row.eventID ?? row.id}` }))))];
+  },
+  pagerduty(bytes) {
+   const bundle = JSON.parse(bytes.toString('utf8')), single = { users: 'user', schedules: 'schedule', escalation_policies: 'escalation_policy' };
+   if (Object.keys(bundle).join() !== 'users,schedules,overrides,escalation_policies') refuse('unsupported_bundle');
+   return Object.entries(bundle).flatMap(([kind, saved]) => saved.flatMap(response => (response[kind] ?? [response[single[kind]]]).map(row => ({ id: `${kind}:${row.id}` }))));
+  },
+  sorry(bytes) {
+   const bundle = JSON.parse(bytes.toString('utf8')), files = new Map(bundle.files.map(file => [file.name, JSON.parse(file.text)]));
+   if (bundle.source !== 'sorry' || bundle.publicAccessAcknowledged !== true || !files.has('sorry-status.json')) refuse('unsupported_bundle');
+   const rows = resource => [...files].filter(([name]) => new RegExp(`^sorry-${resource}(?:-\\d+)?\\.json$`).test(name)).flatMap(([, value]) => value[resource]);
+   const notices = rows('notices');
+   if (notices.some(notice => !files.has(`sorry-notice-${notice.id}.json`))) refuse('incomplete_bundle');
+   return [...rows('components').map(row => ({ id: `component:${row.id}` })), ...notices.map(row => ({ id: `notice:${row.id}` }))];
+  },
+ };
+ const read = (bytes, namespace = 'uptimerobot') => readers[namespace](bytes);
  const counts = monitors => ({ input: monitors.length, unique: monitors.length, duplicates: 0, mapped: monitors.length, unmapped: 0, rejected: 0, effects: monitors.length, byKind: { monitor: monitors.length } });
  function uploaded(id, namespace) {
   const upload = state.uploads.get(id);
@@ -71,7 +96,7 @@ export async function door(t) {
    if (grant.catchup === 'bounded' && !kept.standing) refuse('standing_approval_mismatch', 403);
    return kept.preview;
   }
-  const monitors = read(upload.bytes), baseline = state.baselines.get(grant.namespace);
+  const monitors = read(upload.bytes, grant.namespace), baseline = state.baselines.get(grant.namespace);
   if (baseline && body.catchup !== true) refuse('catchup_required', 409);
   if (!baseline && (body.catchup === true || grant.catchup === 'bounded')) refuse('catchup_requires_baseline', 409);
   const ids = monitors.map(monitor => String(monitor.id)), additions = baseline ? ids.filter(id => !baseline.includes(id)) : ids;
@@ -96,7 +121,7 @@ export async function door(t) {
   state.baselines.set(kept.namespace, kept.ids);
  }
  const answer = archive => ({ archiveId: archive.id, key: `business-archive/${archive.tool}/${archive.takenAt}`, tool: archive.tool, takenAt: archive.takenAt,
-  bundleSha256: sha256(archive.bytes), bytes: archive.bytes.length, counts: counts(read(archive.bytes)) });
+  bundleSha256: sha256(archive.bytes), bytes: archive.bytes.length, counts: counts(read(archive.bytes, archive.namespace)) });
  function archive(body, namespace) {
   if (Object.keys(body).some(key => !['uploadId', 'tool', 'takenAt'].includes(key))) refuse('invalid_archive_input');
   if (typeof body.tool !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(body.tool)) refuse('invalid_tool');

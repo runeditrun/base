@@ -68,8 +68,9 @@ export function client({ origin, headers, route, signal, limits, counters, key }
     const url = new URL(path, origin);
     if (url.origin !== origin || url.username || url.password || url.hash || !route(url)) fail('INVALID_REFERENCE');
     if (++counters.requests > limits.requests) fail('REQUEST_LIMIT');
-    // At most one request per second; no automatic retry or rate-limit hammering.
-    const pause = 1000 - (Date.now() - lastRequest);
+    // At most one request per `spacing` (a second unless the adapter's limits say
+    // otherwise); no automatic retry or rate-limit hammering.
+    const pause = (limits.spacing ?? 1000) - (Date.now() - lastRequest);
     if (pause > 0) await delay(pause, undefined, { signal });
     lastRequest = Date.now();
     const timeout = AbortSignal.timeout(30_000);
@@ -95,9 +96,10 @@ export function client({ origin, headers, route, signal, limits, counters, key }
     }
     const bytes = Buffer.concat(chunks);
     // A reflected authentication key must never become a vendor artifact.
-    if (bytes.includes(Buffer.from(key))) fail('CREDENTIAL_IN_RESPONSE');
-    let body;
-    try { body = JSON.parse(bytes.toString('utf8')); } catch { fail('INVALID_JSON'); }
-    return { body, headers: response.headers };
+    if (key && bytes.includes(Buffer.from(key))) fail('CREDENTIAL_IN_RESPONSE');
+    let text, body;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); body = JSON.parse(text); } catch { fail('INVALID_JSON'); }
+    // `text` is the response exactly as received, for adapters whose bundle keeps original bytes.
+    return { body, text, headers: response.headers };
   };
 }
