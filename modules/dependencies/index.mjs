@@ -19,7 +19,7 @@ export function createDependencies({db,origin,name,provider,interfaces=[{interfa
   insist(actor.operator.id===current?.id,'owner_required',403);return actor;
  }
  async function document() {
-  const installation=await store.installation(interfaces[0]?.interface??INTERFACE);
+  const installation=await store.identity();
   const linked=await Promise.all(interfaces.map(d=>store.link(d.interface)));
   return {name,version:1,origin,sector_id:installation.sector_id,dependencies:interfaces.map((d,i)=>({provider:linked[i]?.issuer??d.provider??null,interface:d.interface,optional:d.optional??true,cardinality:1,paths:d.paths.map(p=>origin+p),jwks_uri:origin+'/.well-known/rer-link/jwks/'+d.interface})),provides,
    claim:interfaces.some(d=>d.interface===INTERFACE) && (native?await native.unclaimed():!await db.prepare('SELECT 1 FROM oa_operators LIMIT 1').first()),callback:origin+CALLBACK,jwks_uri:origin+'/.well-known/rer-link/jwks'};

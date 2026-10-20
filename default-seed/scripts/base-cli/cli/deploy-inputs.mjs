@@ -45,7 +45,10 @@ export async function deployEnvironment({ root, options, declaration, setupManif
   if (previous && env[previous.environment]?.trim()) throw refuse('INSTALLATION_KEY_PREVIOUS is managed by --rotate-secret INSTALLATION_KEY; leave it unset in the environment and --env-file.');
   if (saved.INSTALLATION_KEY && env[installation.environment]?.trim() && env[installation.environment] !== saved.INSTALLATION_KEY) throw refuse('A supplied INSTALLATION_KEY differs from this environment\'s private custody. Use --rotate-secret INSTALLATION_KEY to change it safely.');
   if ((options.setSecret ?? options.unsetSecret ?? '').split(',').some(name => ['INSTALLATION_KEY', 'INSTALLATION_KEY_PREVIOUS'].includes(name))) throw refuse('Installation keys cannot be set or removed manually. Use --rotate-secret INSTALLATION_KEY to publish both keys, reseal dependency keys and retire the previous key safely.');
-  if (saved.INSTALLATION_KEY_PREVIOUS && !rotate.includes('INSTALLATION_KEY') && !options.remove) throw refuse('Installation key rotation is unfinished. Run the same deploy command with --rotate-secret INSTALLATION_KEY to resume before another deployment or secret change.');
+  if (saved.INSTALLATION_KEY_PREVIOUS && !options.remove) {
+   if (saved.INSTALLATION_KEY_REOPEN && options.reopenInstallationKey !== saved.INSTALLATION_KEY_REOPEN) throw refuse(`Installation key reopen is unfinished. Run the same deploy command with --reopen-installation-key ${saved.INSTALLATION_KEY_REOPEN} to resume before another deployment or secret change.`);
+   if (!saved.INSTALLATION_KEY_REOPEN && !rotate.includes('INSTALLATION_KEY')) throw refuse('Installation key rotation is unfinished. Run the same deploy command with --rotate-secret INSTALLATION_KEY to resume before another deployment or secret change.');
+  }
   if (rotate.includes('INSTALLATION_KEY') && !saved.INSTALLATION_KEY) throw refuse('Installation key rotation requires the current key in the private deployment secrets file. Restore that file from the checkout that deployed this environment; generating a replacement would lose access to dependency keys.');
  }
  const generated = [], reused = [];

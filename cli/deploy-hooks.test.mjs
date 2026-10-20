@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, realpath, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { randomBytes } from 'node:crypto';
+import { parse } from './parse.mjs';
 import { execFileSync } from 'node:child_process';
 import { runCommand } from './lifecycle.mjs';
 import { ownerProvider } from '../modules/deploy-kit/tests/owner-provider.mjs';
@@ -13,11 +15,11 @@ import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { owner } from '../onboarding/adapter-auth.mjs';
 import { finalizingDeploy } from './fixtures/finalizing-deploy.mjs';
 import { keyPair } from '../modules/dependencies/crypto.mjs';
-import { openDependencyKey, sealDependencyKey } from '../modules/dependencies/sealing.mjs';
+import { openDependencyKey, sealDependencyKey, installationKeyId } from '../modules/dependencies/sealing.mjs';
 
 test('installation rotation publishes both keys atomically, reseals every row and resumes failed reseal or retirement without losing custody', async t => {
  const f = await fixture(t, {declared:true, existing:true, installation:true});
- const previewKey=crypto.randomUUID()+crypto.randomUUID();
+ const previewKey=randomBytes(32).toString('hex');
  process.env.INSTALLATION_KEY=previewKey;
  try { await f.run({dryRun:true}); } finally { delete process.env.INSTALLATION_KEY; }
  assert.equal(f.provider.state.writes.length, 0);
@@ -32,6 +34,7 @@ test('installation rotation publishes both keys atomically, reseals every row an
  const db = f.provider.state.databases[0].db;
  const keys = [await keyPair(), await keyPair()];
  for (let i=0;i<keys.length;i++) db.prepare('INSERT INTO rer_dependency_keys(interface,private_key) VALUES(?,?)').run(`service-${i}@1`, await sealDependencyKey({INSTALLATION_KEY:original}, `service-${i}@1`, keys[i]));
+ db.prepare('INSERT INTO rer_dependency_installation(singleton,sector_id,keys_sealed,key_ids) VALUES(1,?,1,?)').run(crypto.randomUUID(),JSON.stringify([await installationKeyId(original)]));
  const before = db.prepare('SELECT * FROM rer_dependency_keys ORDER BY interface').all();
  const builds = f.builds(), writes = f.provider.state.writes.length;
  for (const flag of ['setSecret','unsetSecret']) for (const key of ['INSTALLATION_KEY','INSTALLATION_KEY_PREVIOUS']) await assert.rejects(f.run({[flag]:key}), /cannot be set or removed manually/);
@@ -66,6 +69,51 @@ test('installation rotation publishes both keys atomically, reseals every row an
  assert.equal(f.builds(), builds, 'rotation does not build or run the custom upload hook');
  assert.ok(observations.length>0 && observations.every(names=>names.join(',')==='INSTALLATION_KEY,INSTALLATION_KEY_PREVIOUS'), 'both bindings are live before any D1 read or write');
  assert.ok(!f.progress.join('').includes(original) && !f.progress.join('').includes(values.INSTALLATION_KEY));
+});
+
+test('retired custody reopens a pre-rotation D1 restore explicitly and survives interrupted retirement', async t => {
+ const f = await fixture(t, {declared:true, existing:true, installation:true, ownRecord:true, returnState:true, namedState:true});
+ await f.run();
+ const file = join(f.root, '.rer/deploy/production.secrets.env');
+ const current = () => f.provider.state.secrets.find(item => item.name === 'INSTALLATION_KEY').value;
+ const first = current(), key = await keyPair(), contract = 'restore@1';
+ const raw = await sealDependencyKey({INSTALLATION_KEY:first}, contract, key), kid = JSON.parse(raw).kid;
+ const db = f.provider.state.databases[0].db;
+ db.prepare('INSERT INTO rer_dependency_installation(singleton,sector_id,keys_sealed,key_ids) VALUES(1,?,1,?)').run(crypto.randomUUID(),JSON.stringify([kid]));
+ db.prepare('INSERT INTO rer_dependency_keys(interface,private_key) VALUES(?,?)').run(contract, raw);
+ await f.run({rotateSecret:'INSTALLATION_KEY'});
+ await f.run({rotateSecret:'INSTALLATION_KEY'});
+ const custody = await readFile(file, 'utf8');
+ assert.ok(custody.includes(`INSTALLATION_KEY_RETIRED=${kid}:`), 'every retired key remains in private custody');
+ assert.equal(custody.split('INSTALLATION_KEY_RETIRED=')[1].split('\n')[0].split(',').length, 2);
+ assert.equal((await stat(file)).mode & 0o777, 0o600);
+ const active = current(), builds = f.builds();
+ assert.equal(parse(['deploy','--reopen-installation-key',kid]).reopenInstallationKey,kid);
+ for (const options of [{dryRun:true}, {rotateSecret:'INSTALLATION_KEY'}, {setSecret:'SESSION_SECRET'}, {remove:true,yes:true}]) await assert.rejects(f.run({...options,reopenInstallationKey:kid}), {code:'invalid_invocation'});
+ // Simulate D1 Time Travel replacing a row with its pre-rotation ciphertext.
+ db.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(raw, contract);
+ await assert.rejects(openDependencyKey({INSTALLATION_KEY:active},contract,raw,{knownKeyIds:[kid]}), {code:'installation_key_version_unknown'});
+ const writes = f.provider.state.writes.length;
+ await writeFile(file, custody.replace(/^INSTALLATION_KEY_RETIRED=.*\n/m, ''));
+ await assert.rejects(f.run({reopenInstallationKey:kid}), {code:'installation_key_unavailable'});
+ assert.equal(f.provider.state.writes.length,writes,'missing custody refuses before any provider write');
+ await writeFile(file,custody);
+ f.provider.fail('DELETE', /\/secrets\/INSTALLATION_KEY_PREVIOUS$/, {status:403});
+ await assert.rejects(f.run({reopenInstallationKey:kid}));
+ await assert.rejects(f.run(), /reopen is unfinished/);
+ await assert.rejects(f.run({rotateSecret:'INSTALLATION_KEY'}), /reopen is unfinished/);
+ const opened = await openDependencyKey({INSTALLATION_KEY:active},contract,db.prepare('SELECT private_key FROM rer_dependency_keys WHERE interface=?').get(contract).private_key,{currentOnly:true});
+ assert.equal(opened.key.kid,key.kid);
+ const result = await f.run({reopenInstallationKey:kid});
+ assert.equal(result.reopened,kid);
+ assert.ok(current()===active,'reopen keeps the current installation key');
+ const retained = await readFile(file,'utf8');
+ assert.ok(retained.includes(`INSTALLATION_KEY_RETIRED=${kid}:`));
+ assert.ok(!retained.includes('INSTALLATION_KEY_PREVIOUS='));
+ assert.ok(!retained.includes('INSTALLATION_KEY_REOPEN='));
+ assert.ok(!f.provider.state.secrets.some(item=>['INSTALLATION_KEY_PREVIOUS','INSTALLATION_KEY_RETIRED'].includes(item.name)));
+ assert.equal(f.builds(),builds);
+ assert.ok(!f.progress.join('').includes(first) && !f.progress.join('').includes(active));
 });
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
@@ -112,6 +160,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
   declaration.d1 = [{binding:'DB'}];
   declaration.secrets.push({binding:'INSTALLATION_KEY',environment:'INSTALLATION_KEY'}, {binding:'INSTALLATION_KEY_PREVIOUS',environment:'INSTALLATION_KEY_PREVIOUS',optional:true});
   await writeFile(join(root, 'migrations/core/0001_dependency.sql'), await readFile(new URL('../modules/dependencies/schema/dependencies.sql', import.meta.url)));
+  await writeFile(join(root, 'migrations/core/0002_keys-sealed.sql'), await readFile(new URL('../modules/dependencies/schema/keys-sealed.sql', import.meta.url)));
  }
  if (queued) declaration.queues = [{binding:'JOBS'}];
  await writeFile(join(root, declarationPath), JSON.stringify(declaration));

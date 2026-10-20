@@ -20,7 +20,7 @@ import { cloudflareCredentials, missingCredentialsMessage } from './deploy-needs
 import { keptSecrets, keepSecrets, forgetSecrets } from './deploy-secrets.mjs';
 import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 import { deployProductDirectory, deployProductArguments } from './deploy-product.mjs';
-import { rotateInstallationKey, keepInstallationKey } from './deploy-installation-key.mjs';
+import { rotateInstallationKey, reopenInstallationKey, keepInstallationKey } from './deploy-installation-key.mjs';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -32,9 +32,9 @@ export function ownerDeploy(declarationPath, lifecycle) {
   if (local) throw refuse(`${declarationPath} names the local-only key ${local} as a deploy binding or secret. Remove it; local dev keys never reach a deployment.`);
   const environment = options.environment ?? 'production';
   const again = deployAgain(options);
-  const change = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret', options.rotateSecret && '--rotate-secret'].filter(Boolean);
+  const change = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret', options.rotateSecret && '--rotate-secret', options.reopenInstallationKey && '--reopen-installation-key'].filter(Boolean);
   // The command that finishes what this run started: the same verb, never a plain deploy in its place.
-  const retry = options.remove ? `${again} --remove --yes` : options.setSecret ? `${again} --set-secret ${options.setSecret}` : options.unsetSecret ? `${again} --unset-secret ${options.unsetSecret}` : options.rotateSecret ? `${again} --rotate-secret ${options.rotateSecret}` : again;
+  const retry = options.remove ? `${again} --remove --yes` : options.setSecret ? `${again} --set-secret ${options.setSecret}` : options.unsetSecret ? `${again} --unset-secret ${options.unsetSecret}` : options.rotateSecret ? `${again} --rotate-secret ${options.rotateSecret}` : options.reopenInstallationKey ? `${again} --reopen-installation-key ${options.reopenInstallationKey}` : again;
   if (change.length > 1 || change.length && options.dryRun) throw invalid(`Use ${change.join(', ')}${options.dryRun ? ' and --dry-run' : ''} on separate runs.`);
   if (options.remove && !options.yes) throw invalid(`${again} --remove deletes this environment's Worker and every D1, R2, KV and queue rer created for it, with their data. Add --yes to confirm.`);
   const productDirectory = change.length ? undefined : deployProductDirectory(declaration);
@@ -81,6 +81,11 @@ export function ownerDeploy(declarationPath, lifecycle) {
     await forgetSecrets(root, environment);
     store.report(`Removed ${result.removed.join(', ') || 'nothing (already gone)'}; read back: none of them remains.`);
     return { removed: result.removed, deployed: false };
+   }
+   if (options.reopenInstallationKey) {
+    step = 'secrets';
+    await reopenInstallationKey({ root, environment, declaration, env, owner, state, kid: options.reopenInstallationKey, report: line => store.report(line), addSecrets: values => { redaction.addSecrets(values); store.addSecrets?.(values); } });
+    return { reopened: options.reopenInstallationKey, deployed: false };
    }
    if (options.rotateSecret) {
     // The kit never replaces a secret its Worker holds: rotation is this explicit change, kept once it is live.

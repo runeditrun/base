@@ -193,6 +193,7 @@ test('linked Auth browser failures inherit the configured sign-in URL while APIs
   const r = await fixture(t, [authProvider()], { providers: [], dependencies: true,
     branding: { signInPath: '/member/sign-in?next=%2Fapp%3Ftab%3Done%26view%3Dtwo&notice=old#email' } });
   r.sqlite.exec(await readFile(new URL('../../../../dependencies/schema/dependencies.sql', import.meta.url), 'utf8'));
+  r.sqlite.exec(await readFile(new URL('../../../../dependencies/schema/keys-sealed.sql', import.meta.url), 'utf8'));
   r.sqlite.prepare('INSERT INTO rer_dependency_link VALUES(?,?,?,?,?,?)').run('oidc-provider@1', 'https://idp.example', 'client', '{}', 0, Date.now());
   r.sqlite.prepare('INSERT INTO rer_dependency_keys VALUES(?,?)').run('oidc-provider@1', JSON.stringify(clientKey.ES256.private));
   await r.bootstrap();

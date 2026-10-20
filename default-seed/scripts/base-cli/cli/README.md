@@ -459,6 +459,35 @@ an empty result is not proof that a repository has no business dependencies.
 `INSTALLATION_KEY` has a dedicated rotation path: `rer deploy --rotate-secret INSTALLATION_KEY`
 saves current and previous values privately before publishing both as one Worker
 version, reseals and verifies all dependency keys in the recorded D1, then retires
-the previous binding. Keep `.rer/deploy/<environment>.secrets.env` when moving a
-deployment to another checkout. If rotation stops, run the same command again;
-it resumes the saved pair. Manual set/unset of these bindings is refused.
+the previous binding. Every retired key remains in the same private 0600,
+Git-ignored `.rer/deploy/<environment>.secrets.env` custody as `SESSION_SECRET`,
+in `INSTALLATION_KEY_RETIRED=<kid>:<value>[,<kid>:<value>...]`. Retired values
+never enter routine Worker bindings or installation archives. Back up this file
+securely and copy it when moving the deployment to another checkout. If rotation
+stops, run the same command again; it resumes the saved pair. Manual set/unset of
+these bindings is refused.
+
+A D1 backup or Time Travel restore from before a rotation can restore ciphertext
+that needs a retired key. Reopen only that key explicitly:
+
+```sh
+rer deploy --reopen-installation-key KID
+```
+
+Use the envelope's installation `kid` or its entry in private retired custody;
+this ID is different from the signing JWK's ID. Include the original deployment's
+`--environment` and `--env-file` when applicable. This command publishes the
+current key and selected retired key as `INSTALLATION_KEY_PREVIOUS`, reseals all
+dependency keys through the recorded D1, verifies them under the current key,
+then removes the previous binding while retaining all retired custody. It skips
+the build and upload hook. A failure preserves the exact pair and reopen marker;
+repeat the same command before other deploy changes. Missing retired custody
+refuses with `installation_key_unavailable` before any provider write: recover
+the private file or relink dependencies. For backups spanning several rotations,
+retain every historical key; unrelated ciphertext never silently regenerates keys.
+
+Base versions before #367 cannot open sealed dependency keys. Roll forward to a
+sealing-capable Base version after restoring D1; rolling code back cannot decrypt
+the rows. The CLI has no old-Base capability receipt or code rollback command,
+so it cannot preflight an out-of-band provider rollback. Current Base rejects a
+sealed key passed to its plaintext signing path with `installation_key_sealed_rollback`.
