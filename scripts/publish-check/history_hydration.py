@@ -38,8 +38,11 @@ def prepare(history):
             # Explicit object wants cover selected commits fetched outside the
             # remote's configured branch refspecs too. stdin keeps one batch
             # even when a full history exceeds the command argument limit.
+            # Refetch encourages automatic repacking. Detached maintenance can
+            # outlive inspection and write into a caller's disposable repo
+            # during cleanup, so hydration must not start it.
             history.run('fetch', '--quiet', '--refetch', '--no-filter', '--no-tags',
-                        '--no-recurse-submodules', '--no-write-fetch-head', '--stdin', '--', names[0],
+                        '--no-auto-maintenance', '--no-recurse-submodules', '--no-write-fetch-head', '--stdin', '--', names[0],
                         input=b'\n'.join(before) + b'\n')
         except InspectionError:
             raise missing_blob(history, before[0].decode()) from None
