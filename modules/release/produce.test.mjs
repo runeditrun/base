@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -14,6 +14,14 @@ const git = (repo, ...args) => execFileSync('git', ['-C', repo, '-c', 'user.name
 
 test('successful producer verifies, tags the exact commit, exports bytes and pins site artifacts', async t => {
   const f = fixture(t);
+  // The fixture declares a public source repository for listing. Replace only
+  // its GitHub visibility HTTP edge; operator login is not a test prerequisite.
+  const commands = resolve(f.temporary, 'network'); mkdirSync(commands);
+  const gh = resolve(commands, 'gh');
+  writeFileSync(gh, `#!${process.execPath}\nprocess.stdout.write('HTTP/2.0 200 OK\\r\\n\\r\\n{"private":false}');\n`);
+  chmodSync(gh, 0o755);
+  const priorPath = process.env.PATH; process.env.PATH = commands + ':' + priorPath;
+  t.after(() => { process.env.PATH = priorPath; });
   Object.assign(f.files, {
     'public/brand/mark.svg': '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h10v10z"/></svg>',
     'shots/workbench.webp': Buffer.from('UklGRmYAAABXRUJQVlA4TFkAAAAvP8b5AAfQ//73v/8BAEX6/58i+p/63//+97///e9///vf//73v//973//+9///ve///3vf//73//+97///e9///vf//73v//973//+9///ve///3vf/+7BQA=', 'base64'),
