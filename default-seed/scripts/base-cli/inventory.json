@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73",
+  "cliVersion": "0.2.73-dev.gfa38858f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2707,11 +2707,11 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "ee1fe932c2726423d571fdcfeb5e37057cc058bb54b4fa12f1400b9a3ede987b"
+      "sha256": "977a15a16c6d2103c30eb5aec62385e5741913936b10ad2f9e7344a63e7c686f"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
-      "sha256": "1f4973d7e6a30260e16f582c53556738f5d53e2e7a08195645b66f38b5b4ab35"
+      "sha256": "a8650af77c571380a8092a270313526e79a89b1d44ff3b71ab81496fe20022e3"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
@@ -2719,7 +2719,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "d365a81cb5b73363b8a1a8b5626306932436b99d39c1c6f834c50b01d1bcb695"
+      "sha256": "31de3a422bd050609949ce869ab17b71eb82e2c7a088f79090b42f4498cb3926"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -2823,7 +2823,7 @@
     },
     "modules/portability/migration-statements.mjs": {
       "source": "modules/portability/migration-statements.mjs",
-      "sha256": "1abaaefa0265e45dce7f444d24e2a8316ad105acea64afdc18e2475c187a9ed3"
+      "sha256": "f4c3f6895f499cc988dbf81492d8a477d63ef754d7a5b3e515761930370733a1"
     },
     "modules/portability/payloads.mjs": {
       "source": "modules/portability/payloads.mjs",
@@ -2840,6 +2840,14 @@
     "modules/portability/provider-data.mjs": {
       "source": "modules/portability/provider-data.mjs",
       "sha256": "705cbebbb02df1f4ed4e01f0fa0e7c5ea94fc70c1907ee82cd350d082a075505"
+    },
+    "modules/portability/rebuilds.mjs": {
+      "source": "modules/portability/rebuilds.mjs",
+      "sha256": "625f28cbe8ac7fc73acb5f6cb6497a3342be24143c2dfb7450f3718dd5968344"
+    },
+    "modules/portability/replay-views.mjs": {
+      "source": "modules/portability/replay-views.mjs",
+      "sha256": "86fe27bce062825e399cea780efaf0c0d29870f4ec14733a960a15b404d1ce9b"
     },
     "modules/portability/restore-safety.mjs": {
       "source": "modules/portability/restore-safety.mjs",
