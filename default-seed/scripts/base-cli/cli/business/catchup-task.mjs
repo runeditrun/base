@@ -22,7 +22,7 @@ const beyond = {
  */
 export function runCatchup({ lease, task, grant, directory, say, ownerPage }) {
  return withUploadedBundle({ lease, task, grant, directory, say,
-  doing: (name, origin) => `Bringing over recent ${name} changes through the shipped read-only adapter. The key stays on this computer; records go only to the app's import door at ${origin}.` },
+  doing: (name, origin, keyed) => `Bringing over recent ${name} changes through the shipped read-only adapter. ${keyed ? 'The key stays on this computer; records' : 'Records'} go only to the app's import door at ${origin}.` },
  async ({ origin, uploadId, bundle, fresh }) => {
   let planGrant = await fresh('plan'), refused = null, preview;
   try { preview = await door(planGrant, { uploadId, catchup: true }, lease.signal); }

@@ -29,7 +29,8 @@ const usage = `Usage: rer business VERB
   status [--json]                Pairing, service, current task and checkpoint
   disconnect                     Revoke this computer, then remove local credentials and additions;
                                  inside an agent sandbox it names the one command that finishes
-Vendors: sentry, uptimerobot, pagerduty, calendly. Owner approvals stay in the browser.
+Vendors: sentry, uptimerobot, pagerduty, calendly (with a read-only key); sorry (its public page,
+no key). Owner approvals stay in the browser.
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
 `;

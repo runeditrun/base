@@ -28,9 +28,11 @@ export function taskStore(state) {
   return { id: task.summary.task_id, business_id: 'biz', kind: task.summary.kind, kind_version: 1,
    state: task.phase, fence: task.fence, lease_expires_at: task.phase === 'leased' ? task.lease : null,
    checkpoint: Object.fromEntries(numeric.filter(key => Number.isSafeInteger(task.checkpoint[key]) && task.checkpoint[key] >= 0).map(key => [key, task.checkpoint[key]])),
-   ...(task.summary.question ? { question: task.summary.question } : {}) };
+   ...(task.summary.question ? { question: task.summary.question } : {}),
+   // An export's non-secret adapter inputs reach only the executor holding its lease (platform executorTaskView).
+   ...(task.summary.kind === 'export.vendor' && task.phase === 'leased' && task.summary.export_inputs ? { export_inputs: task.summary.export_inputs } : {}) };
  }
- function summary(task) { return { ...task.summary, state: task.phase, fence: task.fence }; }
+ function summary(task) { const { export_inputs: _, ...rest } = task.summary; return { ...rest, state: task.phase, fence: task.fence }; }
  function grant(task, fence) {
   const value = task.grants.get(fence);
   requireValue(value, 409);

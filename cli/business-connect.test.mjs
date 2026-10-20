@@ -651,6 +651,99 @@ test('an agent exports a vendor into its app\'s import door: next names the owne
  await assert.rejects(readFile(join(home, 'fake-keychain.json')), { code: 'ENOENT' }, 'disconnect removes the vendor key');
 });
 
+test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs its leased task carries: next asks for a key only where the vendor needs one, and each bundle plans in its app\'s door', async t => {
+ const remote = await fixtureServer(t), seed = await door(t), home = join(directory, 'vendors-home'), stateDir = join(home, '.rer-business');
+ const env = { RER_BUSINESS_STATE_DIR: stateDir };
+ const vendorEnv = { ...env, NODE_OPTIONS: `--import=${join(fixture, 'register.mjs')} --import=${join(fixture, 'vendor-edge.mjs')}` };
+ await connect(home, remote, { env });
+ seed.state.stateDir = stateDir; remote.state.door = seed;
+ const outputs = [], keys = { sentry: 'fixture-sentry-read-only-token-never-output', pagerduty: 'fixture-pagerduty-read-only-key-never-output' };
+ const vendorLog = async host => (await readFile(join(home, 'vendor-requests.log'), 'utf8').catch(() => '')).trim().split('\n').filter(line => line.startsWith(`${host} `));
+ const since = '2026-07-01T00:00:00.000Z';
+ const moves = [
+  { vendor: 'sentry', name: 'Sentry', host: 'us.sentry.io', records: 1 + 2 + 40 + 240, inputs: { organization: { id: '4500001', slug: 'fixture-org', region: 'us' }, window: { since } } },
+  // The plan moves every rota and keeps PagerDuty as the pager; no window is stated, so it is the full history.
+  { vendor: 'pagerduty', name: 'PagerDuty', host: 'api.pagerduty.com', records: 150 + 3 + 3 + 1, inputs: { window: { since: '1970-01-01T00:00:00.000Z' }, schedules: 'all' } },
+  { vendor: 'sorry', name: 'Sorry', host: 'status.fixture-sorry.example', records: 30 + 30, inputs: { page: { host: 'status.fixture-sorry.example' } } },
+ ];
+
+ // A Sentry export whose task does not carry its organization yet waits for Business, released as paused.
+ remote.state.exportVendor = 'sentry';
+ remote.state.tasks = [{ task_id: 'biz:spool:export:sentry-early', kind: 'export.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Export Sentry history' }];
+ const early = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(early);
+ assert.equal(early.code, 1, early.stdout);
+ assert.ok(early.stderr.includes('Sentry organization and export window, which this task does not carry yet') && !early.stdout.includes('Nothing yet'), early.stderr);
+ assert.equal(remote.state.released.reason, 'paused');
+ assert.ok(remote.state.requests.some(entry => entry.route === '/api/business/tasks/biz%3Aspool%3Aexport%3Asentry-early/events' && entry.body.event?.payload.question === 'configuration_required'));
+ assert.equal(seed.state.requests.length, 0, 'nothing reaches the door without the inputs');
+
+ const refusedKey = await cli(home, ['business','vendor-key','add','sorry'], { terminal: true, input: 'not-a-key\n', env }); outputs.push(refusedKey);
+ assert.notEqual(refusedKey.code, 0); assert.ok((refusedKey.stdout + refusedKey.stderr).includes('Sorry needs no key'), refusedKey.stderr);
+
+ for (const move of moves) {
+  const id = `biz:export:${move.vendor}`, route = `/api/business/tasks/${encodeURIComponent(id)}`;
+  remote.state.exportVendor = move.vendor;
+  remote.state.tasks = [{ task_id: id, kind: 'export.vendor', state: 'ready', runner: 'executor', fence: 0, title: `Export ${move.name} history`, export_inputs: move.inputs }];
+  const next = await cli(home, ['business','next'], { env }); outputs.push(next);
+  assert.equal(next.code, 0, next.stderr);
+  assert.ok((`\n${next.stdout}`).includes(`\nAgent: ${id}\n`) && /\nThen run: .*business run\n$/.test(next.stdout) && !next.stdout.includes('Nothing yet'), next.stdout);
+  if (move.vendor === 'sorry') assert.ok(next.stdout.includes('Vendor key: none; Sorry is read from its public page') && !next.stdout.includes('vendor-key'), next.stdout);
+  else {
+   assert.ok(next.stdout.includes(`business vendor-key add ${move.vendor}\n`), next.stdout);
+   const added = await cli(home, ['business','vendor-key','add',move.vendor], { terminal: true, input: keys[move.vendor] + '\n', env }); outputs.push(added);
+   assert.equal(added.code, 0, added.stderr);
+  }
+  const doorBefore = seed.state.requests.length, grantsBefore = remote.state.importGrants ?? 0, modesBefore = seed.state.bundleModes.length;
+  const exported = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(exported);
+  assert.equal(exported.code, 0, exported.stderr);
+  assert.equal(remote.state.phase, 'done', `Business completed the ${move.name} export after its door held the plan`);
+  const plan = seed.state.plans.at(-1), upload = seed.state.uploads.get(plan.uploadId);
+  assert.equal(plan.records, move.records, `${move.name}: the door's reader planned every exported record`);
+  assert.deepEqual(remote.state.requests.find(entry => entry.route === `${route}/complete`).body.outputs, { upload_id: plan.uploadId, plan_id: plan.planId, bundle_sha256: plan.bundleSha256 });
+  assert.ok(exported.stdout.includes(`Import preview ready in ${seed.origin}: ${move.records} source records; ${move.records} to create`) && exported.stdout.includes('Nothing was imported'), exported.stdout);
+  // 64 KiB chunks in order, each door request with its own grant from Business, then one plan.
+  const requests = seed.state.requests.slice(doorBefore), uploads = requests.filter(entry => entry.url === '/api/rer/import/uploads');
+  assert.ok(upload.totalChunks >= 2 && uploads.length === upload.totalChunks && upload.name === `${move.vendor}-export.json`, `${move.name}: ${upload.totalChunks} chunks`);
+  assert.deepEqual(uploads.map(entry => JSON.parse(entry.body).index), [...uploads.keys()]);
+  assert.ok(uploads.slice(0, -1).every(entry => Buffer.from(JSON.parse(entry.body).base64, 'base64').length === 65_536));
+  assert.deepEqual(requests.map(entry => entry.url.slice('/api/rer/import/'.length)), [...uploads.map(() => 'uploads'), 'plan']);
+  assert.equal(new Set(requests.map(entry => entry.authorization)).size, requests.length, 'every door request carries a fresh grant');
+  assert.equal(remote.state.importGrants - grantsBefore, requests.length, 'each grant was asked of Business for one request');
+  assert.ok(seed.state.bundleModes.length > modesBefore && seed.state.bundleModes.every(mode => mode === 0o600), JSON.stringify(seed.state.bundleModes));
+  assert.ok(!(await readdir(stateDir)).some(name => name.endsWith('.bundle')), 'the bundle is removed after completion');
+  // The adapter read the vendor with the task's inputs: with the stored key, or anonymously from Sorry's public page.
+  const log = await vendorLog(move.host);
+  assert.ok(log.length > 0 && log.every(line => line.endsWith(move.vendor === 'sorry' ? ' anonymous' : ' authorized')), log.join('\n'));
+  const bundle = JSON.parse(upload.bytes.toString('utf8'));
+  if (move.vendor === 'sentry') {
+   assert.deepEqual(bundle.organization, move.inputs.organization);
+   assert.equal(bundle.window.start, since);
+   assert.ok(log.some(line => line.includes('/organizations/fixture-org/issues/') && line.includes(`start=${encodeURIComponent(since)}`)), log.join('\n'));
+  }
+  if (move.vendor === 'pagerduty') {
+   assert.deepEqual(bundle.schedules.map(saved => saved.schedule.id), ['PS0001', 'PS0002', 'PS0003']);
+   // Oncall compares final timelines over at most 31 days: whole UTC days, ending two weeks ahead.
+   const [, from, to] = /since=([^&]+)&until=([^& ]+)/.exec(log.find(line => line.includes('/overrides?'))).map(decodeURIComponent);
+   assert.ok(Date.parse(to) - Date.parse(from) === 31 * 86_400_000 && Date.parse(to) % 86_400_000 === 0 && Date.parse(to) > Date.now() + 13 * 86_400_000, `${from} to ${to}`);
+  }
+  if (move.vendor === 'sorry') {
+   assert.deepEqual([bundle.source, bundle.publicUrl, bundle.publicAccessAcknowledged], ['sorry', 'https://status.fixture-sorry.example', true]);
+   assert.equal(bundle.files.length, 1 + 2 + 2 + 30);
+  }
+ }
+ assert.equal(seed.state.nativeWrites, 0, 'every export is a zero-write preview');
+
+ // Neither key is printed, sent to Business or the door, or kept outside the OS store; vendor records are never printed.
+ const printed = outputs.map(result => result.stdout + result.stderr).join('');
+ for (const key of Object.values(keys)) {
+  assert.ok(!printed.includes(key), 'no key is printed');
+  assert.ok(!JSON.stringify(remote.state.requests).includes(key) && !JSON.stringify(seed.state.requests).includes(key), 'no key reaches Business or the door');
+  for (const name of await readdir(stateDir)) assert.ok(!(await readFile(join(stateDir, name), 'utf8')).includes(key), `${name} holds no key`);
+ }
+ assert.ok(!/TypeError: Cannot read|Responder 1|Elevated checkout errors/.test(printed), 'no vendor record is printed');
+ assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
+});
+
 test('an agent catches up and archives a vendor through its app\'s import door, and next names freeze, rollback cards and cancellation as the owner\'s steps with their links', async t => {
  const remote = await fixtureServer(t), seed = await door(t), home = join(directory, 'switch-home'), stateDir = join(home, '.rer-business');
  const env = { RER_BUSINESS_STATE_DIR: stateDir };
