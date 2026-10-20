@@ -54,7 +54,7 @@ async function placement(db,manifest,cat,replay,ledger,history) {
   // restorable. Trigger DDL itself changes no row, nor does an UPDATE or DELETE
   // of a table the archive holds no rows of (migration-statements.mjs). A data
   // statement that writes only tables outside the catalogue is admitted
-  // whatever it reads; a backfill of a table the archive lacks is replayed.
+  // whatever it reads; eligible catalogue backfills are replayed.
   const catalogue=cat.tables.map(t=>t.name),archivedTables=catalogue.filter(name=>manifest.tables.some(t=>t.name===name));
   const empty=archivedTables.filter(name=>!manifest.tables.find(t=>t.name===name).count);
   const tables=(await all(db,"SELECT name FROM sqlite_master WHERE type IN ('table','view')")).map(t=>t.name);
@@ -75,8 +75,10 @@ export async function sameSchemaMigrations(db,manifest,cat,migrations,history) {
     if(manifest.migrations)matchMigrationLedger(manifest.migrations.map(name=>({name})),ledger);
     insist(!manifest.migrations || applied.every(name=>manifest.migrations.includes(name)),'schema_mismatch:migrations');return;
   }
-  // Same schema: every catalogue table is archived, so nothing is replayed.
-  await placement(db,manifest,cat,await migrations(),ledger,history);
+  // A data-only migration leaves the schema unchanged but still needs its
+  // carried-table replay plan retained for finalize.
+  const bridge=await additiveBridge(db,manifest,cat,migrations,history);
+  return bridge.replays?.length?bridge:undefined;
 }
 // An archive made before later migrations restores only when those migrations
 // are additive, or a proven row-preserving CHECK rebuild: new tables, new

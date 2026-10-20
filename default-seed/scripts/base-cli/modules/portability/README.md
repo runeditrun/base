@@ -343,7 +343,7 @@ literals, numbers and comments never count. Text Base cannot read to a
 statement boundary, such as an unclosed block comment, is refused. An archived table the archive holds no
 rows of restores empty, so an `UPDATE` or `DELETE` of it changes nothing and is
 allowed regardless of what it reads: no row can change or fire a trigger. An
-ordinary `INSERT` into it remains refused. For archives without a migration record,
+`INSERT` into it must qualify for replay below. For archives without a migration record,
 every migration after the earliest prefix that gives the archive's schema is
 checked, since the archive may predate any of them.
 
@@ -358,11 +358,18 @@ destination definition, so a row rejected by its CHECK fails the whole atomic
 restore; no row is skipped or coerced. Other statements still face the usual
 data classifier, and a proven preserving block is not a competing backfill writer.
 
-A backfill of a catalogue table the archive does not carry (one a later
-migration adds, restored empty) is **replayed** instead of refused: an
-`INSERT ... SELECT` (or `INSERT ... VALUES`) into that table. Finalize empties
-the table (resetting its `AUTOINCREMENT` counter, as the live upgrade created
-it) and runs each of its later writes in migration order, exactly as written,
+A backfill of a catalogue table is **replayed** instead of refused when it is
+an eligible `INSERT ... SELECT` (or `INSERT ... VALUES`) or `REPLACE`. A table
+the archive carries keeps its archived rows, including when it carries none:
+the replay runs over the rows the live migration would have found there. It
+must name its target columns and be the table's only later writer. For a table
+with `AUTOINCREMENT`, carried-table replay is refused: the archive does not
+retain `sqlite_sequence`'s high-water mark, so generated keys could differ.
+Reads of a keyed table's unarchived hidden `rowid`, `_rowid_` or `oid` also
+refuse, including through views: restoring its keys can change physical rowids.
+For a table the archive lacks (one a later migration adds), finalize empties the table
+(resetting its `AUTOINCREMENT` counter, as the live upgrade created it).
+Finalize runs the eligible writes in migration order, exactly as written,
 after every archived row is inserted and while the destination's triggers are
 still dropped, in the same atomic D1 transaction as the rest of the restore. The
 table then holds what the live upgrade gave it. Time functions such as
@@ -370,8 +377,7 @@ table then holds what the live upgrade gave it. Time functions such as
 `INSERT ... SELECT` without `ORDER BY` assigns new keys in the order SQLite
 scans the restored rows. Rows the restore normalizes (import safety) are read
 as restored. The restore is refused with
-`schema_mismatch:migration_data:<migration>` instead when the archive carries
-the table (even with no rows), when a write to it is not a plain `INSERT` or
+`schema_mismatch:migration_data:<migration>` instead when a write is not an `INSERT` or
 `REPLACE`, reads any table other than archived ones and itself (including through
 a view resolved from applied migration history), selects `*` or
 a secret column, when a trigger on it or a foreign key action from it reaches a
@@ -387,7 +393,8 @@ an INSERT reading a view must still resolve entirely to carried tables.
 
 The same check runs when the archive's schema identity equals the destination's:
 a later migration that only purges or backfills rows leaves the schema unchanged,
-yet the archive's rows never passed through it. Such an archive is refused with
+yet the archive's rows never passed through it. Eligible carried-table backfills
+replay here too; other rewrites are refused with
 `schema_mismatch:migration_data:<migration>` (local `rer import` exit 4, naming
 the migration) before any staging or import job; one whose later migrations only
 add indexes or touch excluded tables restores as usual. Without a replayer, an
