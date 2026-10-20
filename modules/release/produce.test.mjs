@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -14,6 +14,22 @@ const git = (repo, ...args) => execFileSync('git', ['-C', repo, '-c', 'user.name
 
 test('successful producer verifies, tags the exact commit, exports bytes and pins site artifacts', async t => {
   const f = fixture(t);
+  // The fixture declares a public source repository for listing. Replace only
+  // its GitHub visibility HTTP edge; operator login is not a test prerequisite.
+  const commands = resolve(f.temporary, 'network'); mkdirSync(commands);
+  const gh = resolve(commands, 'gh');
+  writeFileSync(gh, `#!${process.execPath}\nprocess.stdout.write('HTTP/2.0 200 OK\\r\\n\\r\\n{"private":false}');\n`);
+  chmodSync(gh, 0o755);
+  const priorPath = process.env.PATH; process.env.PATH = commands + ':' + priorPath;
+  t.after(() => { process.env.PATH = priorPath; });
+  Object.assign(f.files, {
+    'public/brand/mark.svg': '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h10v10z"/></svg>',
+    'shots/workbench.webp': Buffer.from('UklGRmYAAABXRUJQVlA4TFkAAAAvP8b5AAfQ//73v/8BAEX6/58i+p/63//+97///e9///vf//73v//973//+9///ve///3vf//73//+97///e9///vf//73v//973//+9///ve///3vf/+7BQA=', 'base64'),
+    'rer-project.json': JSON.stringify({ projectId: f.options.project, sourceRepository: f.options.repository }),
+    'RELEASE.json': JSON.stringify({ version: '1.2.3', screenshots: [{ path: 'shots/workbench.webp', alt: 'The workbench', caption: 'Current work.', width: 1600, height: 1000 }] }),
+  });
+  for (const [path, bytes] of Object.entries(f.files)) { mkdirSync(resolve(f.repo, path, '..'), { recursive: true }); writeFileSync(resolve(f.repo, path), bytes); }
+  f.sha = f.commit();
   const receipt = await release(f.options);
   assert.equal(receipt.status, 'RELEASED', JSON.stringify(receipt));
   assert.equal(receipt.gates.verify.tests, 1);
@@ -32,6 +48,13 @@ test('successful producer verifies, tags the exact commit, exports bytes and pin
   const manifestPath = resolve(f.options.output, receipt.siteRelease.path);
   const manifest = JSON.parse(readFileSync(manifestPath));
   assert.equal(manifest.provenance.revision, f.sha);
+  const standalone = resolve(f.temporary, 'listing');
+  const read = spawnSync(process.execPath, [resolve(root, 'bin/rer.mjs'), 'listing', '--repo', f.repo, '--ref', f.sha, '--output', standalone], { encoding: 'utf8' });
+  assert.equal(read.status, 0, read.stderr);
+  const listing = JSON.parse(readFileSync(resolve(standalone, 'listing.json')));
+  for (const [key, value] of Object.entries(listing)) assert.deepEqual(manifest.listing[key], value);
+  assert.equal(manifest.listing.shots.length, 1);
+  assert.equal(manifest.listing.look.shotsAt, manifest.listing.look.app);
   assert.equal(manifest.provenance.publication, 'local-release');
   assert.deepEqual(manifest.listing.clauses, [{ id: 'TEST-001', title: 'Exact bytes', text: 'Export the verified committed bytes.' }]);
   for (const artifact of manifest.artifacts) assert.equal(hash(readFileSync(resolve(manifestPath, '..', artifact.path))), artifact.sha256);

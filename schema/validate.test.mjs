@@ -235,10 +235,10 @@ test('an unsupported keyword in an unused $def throws', () => {
   const probe = {
     type: 'object',
     properties: { a: { type: 'string' } },
-    $defs: { unused: { type: 'array', maxItems: 1 } }
+    $defs: { unused: { type: 'object', maxProperties: 1 } }
   };
   assert.deepEqual(validate(probe, { a: 'x' }), [], 'validate cannot see an unused $def');
-  assert.throws(() => checkSchema(probe), /unsupported schema keyword "maxItems" at #\/\$defs\/unused/);
+  assert.throws(() => checkSchema(probe), /unsupported schema keyword "maxProperties" at #\/\$defs\/unused/);
 });
 
 test('an unsupported keyword on an absent property throws', () => {
@@ -278,4 +278,16 @@ test('a type name the validator does not know throws, in either form', () => {
   const union = { type: 'object', properties: { edition: { type: ['string', 'nul'] } } };
   assert.deepEqual(validate(union, JSON.parse('{"edition": null}')), ['$.edition: expected string or nul, got null']);
   assert.throws(() => checkSchema(union), /unsupported type "nul" at #\/properties\/edition/);
+});
+
+
+test('release authors can declare structured shots and invalid galleries are refused', () => {
+  const release = JSON.parse(RELEASE);
+  const shot = { path: 'shots/workbench.webp', alt: 'The workbench', caption: 'Current work.', width: 1600, height: 1000 };
+  release.screenshots = [shot];
+  assert.deepEqual(validate(releaseSchema, release), []);
+  release.screenshots = Array.from({ length: 6 }, (_, i) => ({ ...shot, path: `shots/workbench-${i}.webp` }));
+  assert.ok(validate(releaseSchema, release).length > 0);
+  release.screenshots = [{ path: 'shots/incomplete.webp' }];
+  assert.ok(validate(releaseSchema, release).length > 0);
 });

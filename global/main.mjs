@@ -45,7 +45,7 @@ pins (installed first by any verb when node_modules holds another), else its ven
                        of a checkout that pins the rer package use it).
 
 Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy, signin, export,
-import, doctor, describe, check, release. Run rer VERB --help in a checkout for its flags.
+import, doctor, describe, check, release, listing. Run rer VERB --help in a checkout for its flags.
 `;
 
 // The checkout verbs that install the pinned package before they run when
@@ -64,6 +64,7 @@ export async function main(argv) {
  // verb never inherits it.
  delete process.env[localDefaults];
  if (verb === 'update') return (await import('./update/command.mjs')).update(argv.slice(1));
+ if (verb === 'listing') return (await import('../cli/listing.mjs')).dispatchListing(argv.slice(1));
  if (verb === 'business') return (await import('../cli/business/command.mjs')).businessCommand(argv.slice(1));
  if (verb === 'companion') return (await import('../cli/companion/command.mjs')).companionCommand(argv.slice(1));
  const notice = await import('./update/notice.mjs');
