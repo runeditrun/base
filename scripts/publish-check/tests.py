@@ -471,6 +471,10 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         with tempfile.TemporaryDirectory(prefix='scan-slots-test-') as directory:
             from pathlib import Path
             home = Path(directory)
+            # CI's checkout can be owned by the host runner. Isolating HOME
+            # must retain trust for this exact source used by runningVersion.
+            subprocess.run(['git', 'config', '--file', str(home / '.gitconfig'),
+                            '--add', 'safe.directory', str(ROOT)], check=True)
             barrier, entered = home / 'hold', home / 'entered'
             # Delay only our real Python scan, without replacing its result or
             # doing CPU work. The slot holder itself remains undelayed.
