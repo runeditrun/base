@@ -28,8 +28,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   const skippedTables=original.tables.filter(table=>platformTable(table.name)).map(table=>table.name);
   const cat=await catalogue(db,config),upgrade=config.acceptedSchemas[original.schema];
   const same=manifest.schema===cat.identity,history=()=>archivedHistory(original,ledgers);
-  const {replays,...bridge}=same || upgrade?{}:await additiveBridge(db,manifest,cat,context.migrations,history);
-  if(same && !upgrade)await sameSchemaMigrations(db,manifest,cat,context.migrations,history);
+  const {replays,...bridge}=upgrade?{}:same?(await sameSchemaMigrations(db,manifest,cat,context.migrations,history)??{}):await additiveBridge(db,manifest,cat,context.migrations,history);
   if(!bridge.fromSchema)insist(canonicalJson(manifest.tables.map(x=>x.name))===canonicalJson(cat.tables.map(x=>x.name)),'table_inventory');
   if(!upgrade && !bridge.fromSchema)for(const table of manifest.tables) {
     const target=cat.tables.find(t=>t.name===table.name);

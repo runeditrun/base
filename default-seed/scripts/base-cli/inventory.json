@@ -2707,11 +2707,11 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "977a15a16c6d2103c30eb5aec62385e5741913936b10ad2f9e7344a63e7c686f"
+      "sha256": "f701b0ec9b0d989c6fd1f5cd1181b6864c9fba8691428f08cfc258afacdd1b5e"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
-      "sha256": "a8650af77c571380a8092a270313526e79a89b1d44ff3b71ab81496fe20022e3"
+      "sha256": "a88285118530930da46d597a7d3be2425002fe124b20da308bf62cb6299165ab"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
@@ -2719,7 +2719,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "31de3a422bd050609949ce869ab17b71eb82e2c7a088f79090b42f4498cb3926"
+      "sha256": "c6e2e00fce4a364a34665b4b9ef18cee3a06103898bcf5bec26a8e6935161231"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -2787,7 +2787,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "8943751fa7335017a307878f677e59f11edd7c2f816dd6b1eef0360ab8200ed5"
+      "sha256": "2d5450cbed26051795ee3e4d79d019c5115c49c0d568f355d6f9045df43223a3"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
