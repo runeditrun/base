@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import unicodedata
 from repository_intent import declarations, commands
 
 SLUG = r'[A-Za-z0-9][A-Za-z0-9_.-]{0,99}'
@@ -20,7 +21,8 @@ REPOSITORY_HOST = '(?:' + '|'.join('(?a:' + re.escape(host) + ')' + PORT + route
 URL = re.compile(r'(?i)' + URL_BOUNDARY + r'(?:(?a:' + TRANSPORT + ')' + USERINFO + REPOSITORY_HOST +
                  r'|(?a:git@github\.com:))(' + PAIR + r')(?![A-Za-z0-9_.-])')
 FULL = re.compile(PAIR + r'\Z')
-TOKEN = re.compile(URL_BOUNDARY + '(' + PAIR + r')(?![A-Za-z0-9_.-])')
+IDENTITY_FIELDS = {'edition.json': 'id', 'sources.lock.json': 'edition', 'rer-project.json': 'projectId'}
+TOKEN = re.compile(r'(?<![\w./@+-])(' + PAIR + r')(?![A-Za-z0-9_.-])')
 QUALIFIER = re.compile(r'(?:#[0-9]+(?![A-Za-z0-9_])|@[a-fA-F0-9]{7,40}(?![A-Za-z0-9_])|/(?:pull|issues|tree|blob)/)')
 METADATA = re.compile(r'(?i)(?:^|/)(?:[^/]+\.(?:json|ya?ml|toml)|\.gitmodules)$')
 # GitHub documents these web auth endpoints, not repository namespaces.
@@ -99,8 +101,16 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None, k
     found = {normalize(m.group(1)) for m in URL.finditer(repository_text)
              if not SPONSORS_URL.match(repository_text, m.start())}
     for match in TOKEN.finditer(repository_text):
+        # A non-ASCII slug continuation cannot turn an invalid identifier into
+        # a shorter valid repository token.
+        if match.end() < len(repository_text) and unicodedata.category(repository_text[match.end()])[0] in 'LMN':
+            continue
         repository = normalize(match[1])
-        if repository.split('/')[0] in known_owners or QUALIFIER.match(repository_text, match.end()):
+        # Unmarked prose uses canonical owner spelling. Capitalized slash
+        # phrases do not become repositories just because a vendor owns one.
+        known = match[1].split('/')[0] in known_owners
+        logical = path in IDENTITY_FIELDS and project_identity is not None and repository == normalize(project_identity)
+        if QUALIFIER.match(repository_text, match.end()) or (known and not logical):
             found.add(repository)
     # A URL in an explicit repository declaration has stronger context than
     # its coincident service spelling. Never erase the original text first.
@@ -150,7 +160,7 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None, k
                 document = json.loads(text, object_pairs_hook=RepositoryObject)
             except ValueError:
                 document = None
-            identity_field = {'edition.json': 'id', 'sources.lock.json': 'edition', 'rer-project.json': 'projectId'}.get(path.rsplit('/', 1)[-1])
+            identity_field = IDENTITY_FIELDS.get(path.rsplit('/', 1)[-1])
             identity = document.get(identity_field) if isinstance(document, dict) and identity_field else None
             logical = path in ('edition.json', 'sources.lock.json', 'rer-project.json') and identity == project_identity
             if isinstance(identity, str) and FULL.fullmatch(identity) and not logical:

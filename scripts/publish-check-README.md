@@ -119,7 +119,10 @@ GitHub URLs and SSH remotes, and `owner/repo` qualified with `#<number>`,
 `@<sha>`, `/pull/`, `/issues/`, `/tree/` or `/blob/`, name repositories.
 A bare `owner/repo` also names a repository when its owner is known from the
 project identity, explicit project/repository/public-base inputs, or a GitHub
-URL anywhere in the same tree. Owner discovery needs no network requests and
+URL anywhere in the same tree. Unmarked pairs use canonical lowercase owner
+spelling; capitalized slash phrases remain prose. URLs, qualifiers and explicit
+declarations retain their existing case handling. Validated logical project
+identities keep their existing metadata treatment. Owner discovery needs no network requests and
 includes current untracked and ignored files before inspecting working content.
 Ordinary slash prose with an unknown owner does not gain repository meaning
 from nearby words. Structured repository declarations, dependencies, actions,
