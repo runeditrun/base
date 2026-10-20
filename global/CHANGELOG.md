@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.74
+
+- **Restores replay more later migrations (#359).** Archive admission and replay accept row-less targets and row-less tables (restored in the destination's definition), RAISE-only guard triggers, statements that read views, and row-preserving CHECK rebuilds, so retained archives from before those migrations restore exactly (Vector: 121 tables / 23 rows; Penny with its settings and clock replayed).
+- **Publication scans share machine-wide slots (#363).** `publish-check` takes 1 of `RER_SCAN_SLOTS` (default 3) slots per machine and waits for one outside its own deadline, so concurrent scans no longer fail on the 300 s timeout under load; `rer release --scan-timeout-seconds <n>` (1-7200) forwards a longer scan deadline. Defaults are unchanged.
+- **Replay schema identity splits migrations like the runner (#370).** Restore placement splits each applied migration the way the installation runner does, so a `--` comment inside a CREATE TABLE no longer makes a same-version restore refuse with `schema_mismatch`.
+- **Publication scan hydration no longer races its own cleanup (#366).** The history refetch runs with `--no-auto-maintenance`, so a detached git GC cannot write into a partial clone's temporary directory while it is removed.
+- **Scheduled policy door hardening (#369).** The run cap counts only a run's own action audit rows (refusals and expiries no longer use it up), a forged `policy_expired` result is recorded as a failure (only the audited sweeper expires runs), a snapshot whose id does not match its policy is refused, expired runs show as 'Expired run', and crash expiry covers every stale running run atomically with its audit row.
+
 ## 0.2.73
 
 - **Local dev sessions survive OAuth callbacks (#361).** The dev-gate cookie `rer_dev_gate_<port>` is now SameSite=Lax, like the session cookie it guards, so a provider's top-level redirect back to a local connector callback (Xero, Slack) carries the dev session instead of answering 401. The new `gate.admitsSession` is the dev-session check; `gate.admits` (dev sign-in, personas, one-click /signin) still refuses a cookie-only request marked `Sec-Fetch-Site: cross-site`. Only the dev gate (`rer dev`/`rer demo`) changes; production session cookies keep their SameSite.
