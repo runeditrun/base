@@ -1671,7 +1671,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "c01c8790e43589b768d37066500a11bffbf5533db40613e63503ad2fdd024185"
+      "sha256": "064580a8a5b169719126f8f14e433ea9bf0ff617946c3e6328255173dd9bb02f"
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",

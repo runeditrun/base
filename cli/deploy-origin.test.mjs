@@ -108,3 +108,48 @@ test('custom deploy hooks receive the declared public origin from native JSON se
  assert.equal(result.owner, 'claimed');
  assert.ok(new URL(result.origin).hostname.endsWith('.workers.dev'));
 });
+
+test('native deploy claims only the recorded app origin and keeps workers.dev deployments unchanged', async t => {
+ for (const scenario of ['custom', 'workers-dev-claim', 'other-origin-claim', 'no-custom-domain']) await t.test(scenario, async t => {
+  const { root } = await checkout(t, { ...declaration, publicSettings: ['APP_HOST'] });
+  const { claims } = account(t), network = globalThis.fetch;
+  const args = ['--declaration', 'deploy.json', '--environment', 'production'];
+  const command = verb => ownerKit([verb, ...args], process.env, { cwd: root });
+  const custom = scenario !== 'no-custom-domain', appHost = 'operator.example.test';
+  await writeFile(join(root, 'deploy.env'), `OWNER_EMAIL=owner@example.test\n${custom ? `APP_HOST=${appHost}\n` : ''}`, { mode: 0o600 });
+  let workersOrigin, recordedOrigin, inspected;
+  t.mock.method(globalThis, 'fetch', (input, init) => {
+   const url = new URL(input);
+   // The custom hostname serves the same hosted app at the network edge.
+   return network(url.hostname === appHost ? new URL(url.pathname + url.search, workersOrigin) : input, init);
+  });
+  const adapter = { ...lifecycle, deployDeclaration: 'deploy.json', settings: ['deploy.env'],
+   hooks: { ...lifecycle.hooks, secrets: { file: 'deploy.env' } },
+   deploy: async () => {
+    const deployed = await command('deploy');
+    workersOrigin = deployed.origin;
+    recordedOrigin = process.env.APP_HOST ? `https://${process.env.APP_HOST}` : workersOrigin;
+    // Native uploaders retain provider identity with their configured app origin in this record.
+    const state = JSON.parse(await readFile(deployed.state, 'utf8'));
+    state.receipt.origin = recordedOrigin;
+    await writeFile(deployed.state, JSON.stringify(state));
+    inspected = await command('inspect');
+    const origin = scenario === 'workers-dev-claim' ? workersOrigin : scenario === 'other-origin-claim' ? 'https://elsewhere.example.test' : recordedOrigin;
+    const response = await fetch(new URL('/auth/bootstrap', origin), { method: 'POST', redirect: 'manual',
+     headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: process.env.SETUP_TOKEN }) });
+    assert.equal(response.status, 303);
+    return { ...deployed, deployed: true, origin: recordedOrigin, owner: 'claimed' };
+   } };
+  const run = () => deployCommand({ root, adapter, options: { envFile: 'deploy.env' }, store: store(), setupManifest: manifest });
+  if (scenario.endsWith('-claim')) {
+   await assert.rejects(run(), /owner-claim-origin-mismatch/);
+   assert.deepEqual(claims, [], 'a mismatched bootstrap never reaches the hosted app');
+  } else {
+   const result = await run();
+   assert.equal(result.origin, recordedOrigin);
+   assert.equal(result.owner, 'claimed');
+   assert.deepEqual(claims, [{ origin: recordedOrigin, matches: true }]);
+  }
+  assert.equal(inspected.origin, recordedOrigin);
+ });
+});
