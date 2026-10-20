@@ -37,6 +37,7 @@ test('owner CLI deploys with only the owner token and account id, then re-runs a
   assert.deepEqual({...first,versionId:undefined},{ok:true,changed:true,worker:'vector-production',origin:'https://vector-production.fixture-account.workers.dev',versionId:undefined,
     created:['d1:vector-production-db','r2:vector-production-files'],sentSecrets:['SESSION_SECRET'],retiredSecrets:[],state:join(root,'.rer/deploy/production.json')});
   assert.equal(provider.state.databases[0].db.prepare("SELECT name FROM sqlite_master WHERE name='projects'").get().name,'projects');
+  assert.equal((await main(['inspect','--declaration','deploy.json','--environment','production'],inputs(provider),options)).origin,first.origin);
   const writes = provider.state.writes.length, bytes = await readFile(first.state);
   const second = await main(argv,inputs(provider),options);
   assert.equal(second.changed,false); assert.deepEqual(second.created,[]);
@@ -52,6 +53,24 @@ test('owner CLI deploys with only the owner token and account id, then re-runs a
   assert.equal(answers,2);
   assert.equal(provider.state.writes.length,writes);
   assert.deepEqual(await readFile(first.state),bytes);
+});
+
+test('owner CLI inspection uses the native receipt origin even when current settings differ or are absent', async t => {
+  const provider = ownerProvider(); t.after(() => provider.close());
+  const root = await seed(t), options = {fetch:provider.fetch,cwd:root,notice:() => {}};
+  const args = ['--declaration','deploy.json','--environment','production'];
+  const deployed = await main(['deploy',...args],inputs(provider),options);
+  // A native uploader records its configured app origin alongside the real provider identity.
+  const state = JSON.parse(await readFile(deployed.state,'utf8'));
+  state.receipt.origin = 'https://operator.example.test';
+  await writeFile(deployed.state,JSON.stringify(state));
+  for (const env of [inputs(provider),inputs(provider,{APP_HOST:'changed.example.test'})]) {
+    assert.equal((await main(['inspect',...args],env,options)).origin,state.receipt.origin);
+  }
+  // Older records without an origin retain the account's derived workers.dev origin.
+  delete state.receipt.origin;
+  await writeFile(deployed.state,JSON.stringify(state));
+  assert.equal((await main(['inspect',...args],inputs(provider),options)).origin,deployed.origin);
 });
 
 test('owner CLI names only its two Cloudflare inputs and refuses uncommitted source before any provider write', async t => {
