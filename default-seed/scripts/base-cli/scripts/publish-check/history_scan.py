@@ -16,6 +16,7 @@ from tree_scan import context, text_rules, working_files, working_regular
 from public_hygiene import reference_rules
 from content_identities import ContentIdentities, candidate as identity_candidate
 from checksum_maps import ChecksumMaps
+from credential_assignments import text_rules, Findings
 
 
 def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, repository=None, *, cache_dir=None, timeout=300, annotation_file=None):

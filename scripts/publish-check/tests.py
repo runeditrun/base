@@ -52,6 +52,22 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
         self.commit()
         self.assert_fails('secret.assignment', 'settings.ts')
 
+    def test_hosted_credential_assignment_through_cli(self):
+        value = generic_credential()
+        for literal in ('synthetic-' + value, '../modules/inbound-email/credentials', value):
+            self.write('settings.ts', "// configuration\nconst INBOUND_EMAIL_TOKEN = '" + literal + "';\n")
+            result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
+                                    capture_output=True, text=True, timeout=120)
+            report = json.loads(result.stdout)
+            self.assertTrue(literal not in result.stdout + result.stderr, 'diagnostics must never contain the value')
+            if literal == value:
+                self.assertEqual(result.returncode, 1)
+                self.assertTrue(any(f['rule'] == 'SEC-3' and f['path'] == 'settings.ts' and f['line'] == 2
+                                    for f in report['findings']))
+            else:
+                self.assertEqual(result.returncode, 0, report)
+                self.assertEqual(report['status'], 'PASS')
+
     def test_copy_digests_require_same_tree_regular_preimages_and_exact_locations(self):
         files = {'base/runtime/api-key.mjs': b'export const enabled = true;\n',
                  'base/runtime/token-cache.py': b'cache = {}\n'}
