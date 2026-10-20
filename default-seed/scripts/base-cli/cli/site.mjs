@@ -1,4 +1,4 @@
-import { readFile, rename, rm, mkdir } from 'node:fs/promises';
+import { cp, readFile, rename, rm, mkdir } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { contained } from './project.mjs';
@@ -9,10 +9,11 @@ import { shared } from './shared.mjs';
 import { unpublishedIdentities } from './site-private.mjs';
 import { privateSitePaths } from './site-inputs.mjs';
 import { redactSiteText } from './site-diagnostics.mjs';
+import { siteRuntime, buildSiteRuntime, runtimeSummary } from './site-runtime.mjs';
 
 // The run site: a seed's static marketing pages, /run and docs, built from
 // edition identity with no installation data. A seed opts in with
-// commandAdapter's `site: { entry, output, declaration, config? }`: the module
+// commandAdapter's `site: { entry, output, declaration, config?, runtime? }`: the module
 // whose sitePages({ styles }) returns the pages, the ignored folder the build
 // writes, the deploy declaration naming the run site's domain, and optionally
 // the Vite config holding the plugins the site pages need.
@@ -23,6 +24,8 @@ export function declaredSite(project) {
  if (!site) throw refuse('This checkout declares no run site. A seed opts in with site: { entry, output, declaration } in its command adapter; see SEED-COMMAND-CONTRACT.md.');
  if (!relativePath(site.entry) || !relativePath(site.output) || !relativePath(site.declaration) || (site.config !== undefined && !relativePath(site.config)) || (site.clientConfig !== undefined && !relativePath(site.clientConfig)) || ['src', 'public', 'node_modules', 'migrations'].some(top => site.output === top || site.output.startsWith(top + '/'))) throw invalid('The declared run site needs relative entries/configs, an output folder outside src, public and node_modules, and a deploy declaration.');
  if (site.clients !== undefined && (!site.clients || Array.isArray(site.clients) || typeof site.clients !== 'object' || Object.entries(site.clients).some(([name, entry]) => !/^[a-z][a-z0-9-]*$/i.test(name) || !relativePath(entry)))) throw invalid('Run site clients is a map of island names to relative client entry paths.');
+ const runtime = siteRuntime(site.runtime);
+ if (runtime && (runtime.corpus.startsWith(site.output + '/') || site.output.startsWith(runtime.corpus + '/'))) throw invalid('Search corpus must be outside the published site assets.');
  return site;
 }
 
@@ -46,19 +49,20 @@ async function privateValues(project) {
 }
 
 /** Render the run site into its declared folder, check it and replace the previous build. */
-export async function buildSite(project, store, signal) {
+export async function buildSite(project, store, signal, { prepare = false, deployment } = {}) {
  const site = declaredSite(project);
  await contained(project.root, site.entry);
  if (site.config) await contained(project.root, site.config);
  if (site.clientConfig) await contained(project.root, site.clientConfig);
  for (const entry of Object.values(site.clients ?? {})) await contained(project.root, entry);
+ if (site.runtime) await contained(project.root, site.runtime.corpus, { optional: true });
  const folder = await contained(project.root, site.output, { optional: true });
  await mkdir(dirname(folder), { recursive: true });
  const staging = `${folder}.building-${process.pid}`;
  await rm(staging, { recursive: true, force: true });
  try {
   await mkdir(staging);
-  try { await store.run('Building the run site', process.execPath, [fileURLToPath(new URL('./site-render.mjs', import.meta.url)), project.root, site.entry, staging, site.config ?? '', JSON.stringify({entries:site.clients ?? {}, config:site.clientConfig, privatePaths:privateSitePaths(project.adapter)})], { cwd: project.root, signal, heavy: false }); }
+  try { await store.run('Building the run site', process.execPath, [fileURLToPath(new URL('./site-render.mjs', import.meta.url)), project.root, site.entry, staging, site.config ?? '', JSON.stringify({entries:site.clients ?? {}, config:site.clientConfig, privatePaths:privateSitePaths(project.adapter), ...(site.runtime ? {runtime:site.runtime, corpus:`${staging}.corpus.json`} : {})})], { cwd: project.root, signal, heavy: false }); }
   catch (error) {
    const code = await readFile(`${staging}.refusal`, 'utf8').catch(() => '');
    if (code === 'site_private_input') throw new RerError(code, 'Run site client imports a private installation file or a file outside the seed and its declared dependencies.', 4);
@@ -69,25 +73,40 @@ export async function buildSite(project, store, signal) {
    if (diagnostic) throw commandFailure(redactSiteText(diagnostic.message), diagnostic);
    throw error;
   }
-  const checked = await checkSite(staging, {root:project.root, ...await privateValues(project)});
+  const privacy = await privateValues(project);
+  const checkOptions = {root:project.root, ...privacy, ...(site.runtime ? {runtime:site.runtime} : {})};
+  let checked = await checkSite(staging, checkOptions);
+  let runtime;
+  if (site.runtime) {
+   try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging, { prepare, domain:deployment?.domain, compatibilityDate:deployment?.compatibilityDate, store, signal }); }
+   catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search preparation failed; publication stopped. Check the previous artifact and Workers AI availability.', 1); }
+   if (prepare) checked = await checkSite(staging, checkOptions);
+   const corpus = await contained(project.root, site.runtime.corpus, {optional:true});
+   await mkdir(dirname(corpus), {recursive:true});
+   await cp(`${staging}.corpus.json`, corpus);
+  }
   await rm(folder, { recursive: true, force: true });
   await rename(staging, folder);
-  return { folder, ...checked };
- } finally { await Promise.all([staging, `${staging}.render`, `${staging}.refusal`].map(path => rm(path, { recursive: true, force: true }))); }
+  return { folder, ...checked, ...(runtime ? {runtime} : {}) };
+ } finally { await Promise.all([staging, `${staging}.render`, `${staging}.refusal`, `${staging}.corpus.json`].map(path => rm(path, { recursive: true, force: true }))); }
 }
 
-async function siteDeployment(project, options, folder) {
+async function siteDeployment(project, options, folder, runtime) {
  const site = declaredSite(project), environment = options.environment ?? 'production';
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Malformed ${path}.`); } };
  const app = await read(project.adapter.deploy?.declaration ?? 'deploy.json'), declaration = await read(site.declaration);
  const { sitePlan } = await import('../modules/deploy-kit/site.mjs');
- try { return sitePlan({ project: app.project, environment, compatibilityDate: app.compatibilityDate, declaration, assets: folder }); }
+ try { return sitePlan({ project: app.project, environment, compatibilityDate: app.compatibilityDate, declaration, assets: folder, runtime }); }
  catch (error) { throw invalid(`The run site deploy declaration is invalid (${error.message}). ${site.declaration} holds {"version": 1, "domain": "<apex hostname>"}.`); }
 }
 
 /** `rer build --site` and `rer deploy --site [--dry-run]`. */
 export async function siteCommand(project, options, store, signal, out) {
- const built = await buildSite(project, store, signal);
+ const prepare = options.verb !== 'build' && !options.dryRun;
+ if (prepare && declaredSite(project).runtime && ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'].some(name => !process.env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required, with the run site token permissions in the deploy-kit README.');
+ const declaration = declaredSite(project);
+ const deployment = prepare && declaration.runtime ? await siteDeployment(project, options, '/') : undefined;
+ const built = await buildSite(project, store, signal, {prepare, deployment});
  if (!options.json && built.references.unresolved.length) {
   out.human(`Run site references: ${built.references.unresolved.length} runtime resource target(s) could not be resolved statically:`);
   for (const {asset, kind} of built.references.unresolved) out.human(`  ${asset}: ${kind}`);
@@ -96,13 +115,23 @@ export async function siteCommand(project, options, store, signal, out) {
   // Output redaction masks an inherited PWD (a credential-shaped name), so the
   // checkout-relative folder is named too.
   const path = relative(project.root, built.folder);
-  if (!options.json) out.human(`Run site written to ${path} (${built.pages} pages, ${built.files} files): ${built.folder}`);
-  return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references } };
+  if (!options.json) {
+   out.human(`Run site written to ${path} (${built.pages} pages, ${built.files} files): ${built.folder}`);
+   if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; bindings ASSETS, AI; corpus ${built.runtime.corpusHash}; vectors prepared only on a real deploy`);
+  }
+  return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references, ...(built.runtime ? {runtime:runtimeSummary(built.runtime)} : {}) } };
  }
- const plan = await siteDeployment(project, options, built.folder);
- const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, its only binding the assets (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${plan.assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
+ const plan = await siteDeployment(project, options, built.folder, built.runtime);
+ const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS and AI' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${plan.assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
   `  custom domains: ${plan.hostnames.join(', ')}; workers.dev off`, ...plan.redirects.map(rule => `  redirect in the Worker: ${rule.from} -> ${rule.to} (${rule.status}, keeps ${rule.keeps.join(' and ')})`)];
- const summary = { worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets: plan.assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
+ const { collectFiles } = await import('../modules/deploy-kit/artifact.mjs');
+ const { siteFingerprint } = await import('../modules/deploy-kit/site.mjs');
+ const files = await collectFiles(built.folder);
+ const runtime = runtimeSummary(built.runtime);
+ if (runtime) human.push(`  runtime: ${runtime.type}; module ${runtime.module}; endpoint ${runtime.endpoint}; bindings ${runtime.bindings.join(', ')}; model ${runtime.model}; pooling ${runtime.pooling}; corpus ${runtime.corpusHash}`);
+ const fingerprint = siteFingerprint(plan, files, {preparing:Boolean(runtime) && !prepare});
+ if (runtime) human.push(`  fingerprint: ${fingerprint}${prepare ? '' : ' (vectors prepared only on a real deploy)'}`);
+ const summary = { ...(runtime ? {runtime, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets: plan.assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
  if (options.dryRun) {
   if (options.json) out.event('site', summary); else for (const line of human) out.human(line);
   store.report('deploy --site: dry run complete; no deployment occurred and no provider request was made.');
@@ -112,13 +141,12 @@ export async function siteCommand(project, options, store, signal, out) {
  if (names.some(name => !process.env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required, with the run site token permissions in the deploy-kit README.');
  if (!options.json) for (const line of human) out.human(line);
  const { cloudflare } = await import('../modules/deploy-kit/provider.mjs');
- const { collectFiles } = await import('../modules/deploy-kit/artifact.mjs');
  const { siteDeploy, siteReadbackSummary } = await import('../modules/deploy-kit/site.mjs');
  const environment = options.environment ?? 'production';
  try {
   const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
   // The receipt is for the person; ownership is read from the provider, so a fresh checkout deploys too.
-  const result = await siteDeploy({ api, plan, files: await collectFiles(built.folder), receiptPath: join(project.root, '.rer', 'deploy', `site-${environment}.json`) });
+  const result = await siteDeploy({ api, plan, files, receiptPath: join(project.root, '.rer', 'deploy', `site-${environment}.json`) });
   return { dryRun: false, deployed: true, origin: result.origin, site: summary };
  } catch (error) {
   if (error instanceof RerError) throw error;

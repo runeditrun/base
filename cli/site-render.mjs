@@ -19,6 +19,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { buildClients, writeSiteAsset } from './site-client.mjs';
 import { htmlElements } from './site-markup.mjs';
+import { searchCorpus } from './site-runtime.mjs';
 import { redactSiteOutput, siteBuildDiagnostic } from './site-diagnostics.mjs';
 import { ContractError, parseContract } from '../foundation/runtime/seed-contract.mjs';
 
@@ -64,7 +65,8 @@ try {
  await writeFile(join(server, 'package.json'), '{"type":"module"}\n');
  module = await import(pathToFileURL(join(server, chunk.fileName)).href);
  if (typeof module.sitePages !== 'function') fail(`${entry} must export sitePages(), returning { pages: [{ path, html }], assets: [public paths] }.`);
- const clientBuild = await buildClients(vite, root, output, clientJSON ? JSON.parse(clientJSON) : {}), clients = clientBuild.clients;
+ const options = clientJSON ? JSON.parse(clientJSON) : {};
+ const clientBuild = await buildClients(vite, root, output, options), clients = clientBuild.clients;
  styles = [...new Set([...styles,...clientBuild.styles])];
  const build = await module.sitePages({ styles, clients, ...(contract ? { contract } : {}) });
  if (!Array.isArray(build?.pages) || !Array.isArray(build.assets)) fail('sitePages() returns { pages, assets }.');
@@ -77,6 +79,10 @@ try {
   written.add(file);
   await mkdir(dirname(join(output, file)), { recursive: true });
   await writeFile(join(output, file), page.html);
+ }
+ if (options.runtime) {
+  const pages = build.pages.map(page => ({...page, ids:new Set(htmlElements(page.html).map(element=>element.attributes.get('id')).filter(Boolean))}));
+  await writeFile(options.corpus, JSON.stringify(searchCorpus(pages, build.searchPages)));
  }
  const publicDirectory = resolve(root, 'public');
  for (const asset of build.assets) {
