@@ -106,7 +106,7 @@ test('registered seed receives only a whole signed scope, byte exact, independen
   const target = { seed: 'spool', installationId: 'test-installation', url: 'https://mail-relay-scratch.runeditrun.com/events', expiresAt: Date.now() + 60_000 };
   const environment = (entry = target) => ({ ...bindings, RER_MAIL_RELAY_SEEDS: JSON.stringify({ version: 1, targets: [entry] }) });
   const counters: Record<string, number>[] = [];
-  t.mock.method(console, 'info', (_message: string, counts: Record<string, number>) => { counters.push(counts); });
+  t.mock.method(console, 'info', (message: string, counts: Record<string, number>) => { if (message === 'Mail seed relay counts') counters.push(counts); });
   t.mock.method(console, 'warn', () => {});
   let targetStatus = 204, legacyStatus = 204, dnsAddress = '104.16.1.1', dnsFailure = false;
   let seedCalls = 0, legacyCalls = 0;

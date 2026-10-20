@@ -56,6 +56,7 @@ export default {
     let events: unknown;
     try { events = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody)); } catch { return new Response('Invalid event body.', { status: 400 }); }
     if (!Array.isArray(events) || events.length > 10_000 || events.some(event => !event || typeof event !== 'object' || Array.isArray(event))) return new Response('Invalid event body.', { status: 400 });
+    console.info('Mail provider relay counts', { verified: 1, events: events.length });
     const batches = new Map<string, object[]>();
     for (const event of events) {
       if (typeof event.rer_product !== 'string' || !Object.hasOwn(configured, event.rer_product)) continue;
@@ -86,6 +87,7 @@ export default {
       return true;
     }));
     await seedDelivery;
+    console.info('Mail product relay counts', { batches: results.length, delivered: results.filter(Boolean).length, failed: results.filter(result => !result).length });
     // A failed destination makes SendGrid replay the signed batch. Successful
     // destinations must durably deduplicate sg_event_id before acknowledging.
     return new Response(null, { status: results.every(Boolean) ? 204 : 503 });

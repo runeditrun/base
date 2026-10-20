@@ -114,3 +114,6 @@ than a decoded/re-encoded representation. Input remains bounded to 1 MiB and
 
 Typecheck: `tsc --project infrastructure/sendgrid-event-relay/tsconfig.json`.
 Run the receiver tests above and the dry build, not the full Base suite locally.
+Product and provider logs likewise contain only verified-event and batch outcome
+counts. Worker custom-domain delivery uses `global_fetch_strictly_public` so
+same-zone requests enter the public Worker route.
