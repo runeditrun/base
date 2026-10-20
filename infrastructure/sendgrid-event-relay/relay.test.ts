@@ -111,6 +111,7 @@ test('registered seed receives only a whole signed scope, byte exact, independen
   t.mock.method(console, 'warn', () => {});
   let targetStatus = 204, legacyStatus = 204, dnsAddress = '104.16.1.1', dnsFailure = false;
   let seedCalls = 0, legacyCalls = 0;
+  const legacyProducts: string[][] = [];
   let expectedBody = new Uint8Array(), expectedHeaders = new Headers();
   for (const method of ['resolve4', 'resolve6'] as const) {
     t.mock.method(dns, method, async () => {
@@ -135,8 +136,10 @@ test('registered seed receives only a whole signed scope, byte exact, independen
       return new Response(null, { status: targetStatus, headers: targetStatus === 302 ? { location: 'http://127.0.0.1/private' } : {} });
     }
     legacyCalls++;
-    assert.equal(url, 'https://lamp.example/events');
-    assert.equal(await verifyRelayRequest({ secret: 'l'.repeat(32), timestamp: headers.get('x-rer-mail-timestamp')!,
+    const product = url === 'https://orbit.example/events' ? 'orbit' : 'lamp';
+    assert.equal(url, `https://${product}.example/events`);
+    legacyProducts.push(JSON.parse(String(init.body)).map((event: { rer_product: string }) => event.rer_product));
+    assert.equal(await verifyRelayRequest({ secret: (product === 'lamp' ? 'l' : 'o').repeat(32), timestamp: headers.get('x-rer-mail-timestamp')!,
       signature: headers.get('x-rer-mail-signature')!, rawBody: String(init.body) }), true);
     return new Response(null, { status: legacyStatus });
   });
@@ -169,6 +172,13 @@ test('registered seed receives only a whole signed scope, byte exact, independen
     assert.equal(seedCalls, 5);
   }
   assert.equal(counters.filter(counts => counts.mixedBatches).length, 3);
+  // Equal seed/test markers do not authorize disclosure across products.
+  const beforeProducts = legacyProducts.length;
+  assert.equal((await send([event, { ...event, rer_product: 'orbit' }])).status, 204);
+  assert.equal(seedCalls, 5);
+  assert.equal(counters.at(-1)!.mixedBatches, 1);
+  assert.equal(counters.at(-1)!.delivered, 0);
+  assert.deepEqual(legacyProducts.slice(beforeProducts).sort((a, b) => a[0].localeCompare(b[0])), [['lamp'], ['orbit']]);
   assert.equal((await send([event], environment({ ...target, expiresAt: Date.now() - 1 }))).status, 204);
   assert.equal(counters.at(-1)!.expired, 1);
   for (const address of ['127.0.0.1', '10.0.0.1', '169.254.169.254', '::1', '::ffff:127.0.0.1', 'fd00::1', 'fe80::1']) {

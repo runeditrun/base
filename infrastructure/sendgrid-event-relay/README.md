@@ -87,8 +87,10 @@ non-HTTPS schemes, nondefault ports and redirects are refused. This bounded
 contract can expand only when a similarly safe destination door exists.
 
 Raw seed forwarding occurs **only if every event in the entire signed array
-has the same registered seed and test installation**. Empty, unknown, expired,
-or mixed-scope batches have no raw delivery; legacy product delivery continues.
+has the same registered seed, test installation and rer_product**. Differing
+products, including a mix of product-tagged and untagged events, count as mixed
+batches. Empty, unknown, expired, or mixed-scope batches have no raw delivery;
+legacy product delivery continues.
 The seed receives the original body bytes and the original
 `X-Twilio-Email-Event-Webhook-Signature` and
 `X-Twilio-Email-Event-Webhook-Timestamp` values. Verify them with the webhook's

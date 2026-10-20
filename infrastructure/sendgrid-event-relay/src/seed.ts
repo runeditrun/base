@@ -37,7 +37,7 @@ export async function deliverSeed(events: Event[], rawBody: Uint8Array<ArrayBuff
     }
     // The provider signature covers the WHOLE array, never a filtered subset.
     const first = events[0];
-    const mixed = events.some(event => event.rer_seed !== first.rer_seed || event.rer_test_installation !== first.rer_test_installation);
+    const mixed = events.some(event => event.rer_seed !== first.rer_seed || event.rer_test_installation !== first.rer_test_installation || event.rer_product !== first.rer_product);
     if (mixed) counts.mixedBatches++;
     if (!mixed && !counts.unknown && !counts.expired && target) {
       try { await requirePublicDns(seedTarget(target.url).hostname); }
