@@ -17,7 +17,7 @@ class CopyDigestTests(RepositoryFixture, unittest.TestCase):
         revision = secrets.token_hex(20)
         digests = {path: hashlib.sha256(data).hexdigest() for path, data in files.items()}
         record = dict(schemaVersion=1, padding='é中🌍 "\\',
-                      moduleCommits={'apiKey': revision}, copies=[dict(
+                      moduleCommits={'operator-auth': revision}, copies=[dict(
                           padding='naïve 🌱', path=path, originPath='runtime/' + path.rsplit('/', 1)[-1],
                           revision=revision, files={path: digest}, modes={path: '100644'})
                           for path, digest in digests.items()])

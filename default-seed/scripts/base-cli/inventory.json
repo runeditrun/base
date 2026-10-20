@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73",
+  "cliVersion": "0.2.73-dev.g0d61845a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {

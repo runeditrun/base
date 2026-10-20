@@ -54,13 +54,14 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
 
     def test_hosted_credential_assignment_through_cli(self):
         value = generic_credential()
-        for literal in ('synthetic-' + value, '../modules/inbound-email/credentials', value):
+        backlog_fixture = 'cron-' + 'backlog-fixture-' + 'signing-token'
+        for literal in ('synthetic-' + value, '../modules/inbound-email/credentials', value, backlog_fixture):
             self.write('settings.ts', "// configuration\nconst INBOUND_EMAIL_TOKEN = '" + literal + "';\n")
             result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
                                     capture_output=True, text=True, timeout=120)
             report = json.loads(result.stdout)
             self.assertTrue(literal not in result.stdout + result.stderr, 'diagnostics must never contain the value')
-            if literal == value:
+            if literal in (value, backlog_fixture):
                 self.assertEqual(result.returncode, 1)
                 self.assertTrue(any(f['rule'] == 'SEC-3' and f['path'] == 'settings.ts' and f['line'] == 2
                                     for f in report['findings']))
