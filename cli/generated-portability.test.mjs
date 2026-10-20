@@ -4,7 +4,7 @@ import { copyFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
 
-test('public local export/import/export recomputes stored and virtual columns in a fresh installation',async t=>{
+test('public local export/import/export preserves commented migration schemas and recomputes generated columns in a fresh installation',async t=>{
  const source=await portabilityFixture(t),target=await portabilityFixture(t);
  // Export performs the same real migrations as an owner's installed reference.
  await source.run(['export','--output','exports/empty.rer']);
@@ -16,6 +16,8 @@ test('public local export/import/export recomputes stored and virtual columns in
  const first=(await source.run(['export','--output','exports/first.rer'])).at(-1);
  const archive=(await readFile(join(source.root,'exports/first.rer'),'utf8')).trim().split('\n').map(JSON.parse);
  const table=archive[0].tables.find(table=>table.name==='computed_entries');
+ const liveSQL=(await source.data("SELECT sql FROM sqlite_master WHERE name='computed_entries'"))[0].results[0].sql;
+ assert.equal(table.sql,liveSQL,'the archive records the runner-built catalogue text');
  assert.deepEqual(table.columns.filter(column=>column.generated).map(column=>[column.name,column.generated]),[['total','stored'],['description','virtual']]);
  const rows=archive.filter(record=>record.kind==='part').flatMap(part=>part.items).filter(item=>item.table==='computed_entries');
  assert.equal(rows.length,3);

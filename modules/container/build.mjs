@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { parseJsonc } from '../../cli/jsonc.mjs';
 import { portabilityPlan } from './portability-schema.mjs';
+import { migrationStatements } from '../portability/migration-sql.mjs';
 import { checkBoundary } from './boundary.mjs';
 import { localDurableObjects } from './durable-objects.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
@@ -75,7 +76,7 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  const rewrites = await readMigrationRewrites(root);
  const inventory = withRewrites(await containerMigrationInventory(root,{config:workerConfig,configFile}),rewrites);
  const migrations = Object.fromEntries((workerConfig.d1_databases ?? []).map(db => [db.binding,[]]));
- for (const {binding,...migration} of inventory) migrations[binding].push({...migration,statements:split(migration.sql)});
+ for (const {binding,...migration} of inventory) migrations[binding].push({...migration,statements:migrationStatements(migration.sql,split)});
  const entry = engine === 'workerd' ? 'dist/server/'+workerConfig.main : 'dist/server/index.mjs';
  await readFile(join(root,entry));
  if (engine === 'node' && workerConfig.kv_namespaces?.length) throw new Error('Node container does not support KV');

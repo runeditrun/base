@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { createPortability, readArchive, canonicalJson, sha256 } from '../index.mjs';
 import { makePart, ContentVerifier, ArchiveVerifier } from '../format.mjs';
 import { migrationReplay } from '../migration-history.mjs';
+import { migrationStatements } from '../migration-sql.mjs';
 
 // Archives taken before a later migration, restored through the public
 // service into a destination whose ledger applied it. Migrations are split by
@@ -42,7 +43,7 @@ function binding(db) {
     },
   };
 }
-const plan = migrations => migrations.map(({ name, sql, statements }) => ({ name, statements: statements ?? split(sql) }));
+const plan = (migrations, splitter = split) => migrations.map(({ name, sql, statements }) => ({ name, statements: statements ?? splitter(sql) }));
 // A database that applied `migrations`, with a Wrangler ledger unless `ledger` is false.
 function database(migrations, { ledger = true } = {}) {
   const db = new DatabaseSync(':memory:');
@@ -54,7 +55,7 @@ function database(migrations, { ledger = true } = {}) {
   }
   return db;
 }
-const service = (db, migrations, input = policy) => createPortability({ db: binding(db), policy: input, migrations: async () => migrationReplay(plan(migrations), input) });
+const service = (db, migrations, input = policy) => createPortability({ db: binding(db), policy: input, migrations: async () => migrationReplay(plan(migrations, sql => migrationStatements(sql, split)), input) });
 async function archive(portability) {
   const id = await portability.exports.create();
   while ((await portability.exports.advance(id, { maxParts: 10 })).phase === 'building') {}

@@ -10,7 +10,9 @@ import { useWorkspaceDependencies } from './workspace-dependencies.mjs';
 const base=resolve(import.meta.dirname,'../..');
 export const generatedSQL=`CREATE TABLE computed_entries (
   id TEXT PRIMARY KEY,
+  -- Quantity and unit price are the stored invoice inputs.
   quantity INTEGER NOT NULL,
+  /* SQLite computes both totals from these base cells. */
   unit_price INTEGER NOT NULL,
   label TEXT,
   total INTEGER GENERATED ALWAYS AS (quantity * unit_price) STORED,

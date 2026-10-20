@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { database, bundle, stage } from './regression-helpers.mjs';
 import { createPortability } from '../index.mjs';
 import { migrationReplay } from '../migration-history.mjs';
+import { migrationStatements } from '../migration-sql.mjs';
 
 // An archive taken before a migration that adds a journal table excluded from
 // archives and a membership log the archive lacks, each backfilled from archived
@@ -37,7 +38,7 @@ async function apply(db, migrations) {
 async function installed(t, migrations, wrap = db => db) {
   const target = await database(t, [ledger], policy);
   await apply(target.db, migrations);
-  const replay = async () => migrationReplay(migrations.map(m => ({ name: m.name, statements: statements(m) })), policy);
+  const replay = async () => migrationReplay(migrations.map(m => ({ name: m.name, statements: migrationStatements(m.sql, split) })), policy);
   return { ...target, service: await createPortability({ db: wrap(target.db), buckets: { FILES: target.bucket }, policy, migrations: replay }) };
 }
 async function source(t, first = rooms) {
