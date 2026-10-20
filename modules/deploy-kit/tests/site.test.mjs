@@ -7,8 +7,16 @@ import { randomUUID } from 'node:crypto';
 import { cloudflare } from '../provider.mjs';
 import { collectFiles } from '../artifact.mjs';
 import { sitePlan, siteDeploy, siteDeclaration, siteReadbackSummary } from '../site.mjs';
+import * as siteKit from '../site.mjs';
+import { hash } from '../validation.mjs';
 
 const app = { project: 'runeditrun/cradle', environment: 'production', compatibilityDate: '2026-09-08' };
+
+function searchRuntime(overrides = {}) {
+  const contract = { corpusHash: hash('search corpus'), model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls' };
+  return { type: 'docs-search', module: 'docs-search', endpoint: '/docs/search', bindings: ['ASSETS', 'AI'], ...contract,
+    source: `const contract = ${JSON.stringify(contract)}; export default { fetch(request, env) { return env.ASSETS.fetch(request); } };`, ...overrides };
+}
 
 async function site(t) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-site-deploy-')));
@@ -32,6 +40,100 @@ test('a run site declaration names only an apex domain, and its plan never names
   assert.deepEqual(plan.redirects.map(({ from, to, status }) => ({ from, to, status })), [{ from: 'https://www.run-cradle.com/*', to: 'https://run-cradle.com/', status: 301 }]);
   // No app environment name can produce the site Worker's name.
   for (const environment of ['production', 'site', 'production-site', 'site-production']) assert.notEqual(sitePlan({ ...app, environment, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/x' }).worker, sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/x' }).appWorker);
+});
+
+test('site fingerprints preserve assets-only identity and bind search code, model, corpus and vector bytes', () => {
+  const options = { ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/checkout/dist/site' };
+  const plain = sitePlan(options), files = [{ path: 'index.html', sha256: hash('home') }, { path: 'docs-search-vectors.json', sha256: hash('vectors') }];
+  assert.equal(siteKit.siteFingerprint(plain, files), hash({ files, config: plain.assetsConfig, module: hash(siteKit.SITE_WORKER), compatibilityDate: plain.compatibilityDate }));
+  const runtime = searchRuntime(), search = sitePlan({ ...options, runtime });
+  assert.deepEqual(search.bindings, ['ASSETS', 'AI']);
+  assert.deepEqual(search.runtime, runtime);
+  const fingerprint = siteKit.siteFingerprint(search, files);
+  assert.notEqual(fingerprint, siteKit.siteFingerprint(plain, files));
+  for (const change of [{ source: `${runtime.source}\n// rebuilt` }, { model: '@cf/baai/bge-large-en-v1.5' }, { corpusHash: hash('new corpus') }])
+    assert.notEqual(siteKit.siteFingerprint(sitePlan({ ...options, runtime: searchRuntime(change) }), files), fingerprint);
+  assert.notEqual(siteKit.siteFingerprint(search, files.map(file => file.path === 'docs-search-vectors.json' ? { ...file, sha256: hash('new vectors') } : file)), fingerprint);
+  assert.throws(() => siteKit.siteFingerprint(search, files.slice(0, 1)), /missing-site-search-vectors/);
+  for (const change of [{ type: 'custom' }, { bindings: ['ASSETS', 'AI', 'DB'] }, { endpoint: '/custom' }, { annotations: {} }, { pooling: 'mean' }])
+    assert.throws(() => sitePlan({ ...options, runtime: searchRuntime(change) }), /invalid-site-runtime/);
+});
+
+test('search deploy uploads the generated runtime and verifies exact serving version modules and AI bindings', async t => {
+  const { siteProvider } = await import('./site-provider.mjs');
+  for (const scenario of ['search upload', 'missing AI', 'missing ASSETS', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']) await t.test(scenario, async t => {
+    const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
+    t.after(() => provider.close());
+    await writeFile(join(folder, 'docs-search-vectors.json'), JSON.stringify({ model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls', corpusHash: hash('search corpus'), chunks: [] }));
+    const runtime = searchRuntime();
+    const plan = sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: folder, runtime });
+    const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
+    let uploadedVersion;
+    const observed = { ...api, async request(path, options) {
+      const result = await api.request(path, options);
+      if (path === `/workers/scripts/${plan.worker}` && options?.method === 'PUT') {
+        uploadedVersion = provider.state.version.id;
+        const bindings = provider.state.version.resources.bindings;
+        const content = provider.state.content.get(uploadedVersion);
+        if (scenario === 'missing AI') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'AI');
+        if (scenario === 'missing ASSETS') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'ASSETS');
+        if (scenario === 'wrong AI type') bindings.find(binding => binding.name === 'AI').type = 'plain_text';
+        if (scenario === 'extra binding') bindings.push({ type: 'plain_text', name: 'UNEXPECTED', text: 'value' });
+        if (scenario === 'module changed') content.files[0].bytes = Buffer.from(`${runtime.source}\n// changed`);
+        if (scenario === 'model changed') content.files[0].bytes = Buffer.from(runtime.source.replace(runtime.model, '@cf/baai/bge-large-en-v1.5'));
+        if (scenario === 'pooling changed') content.files[0].bytes = Buffer.from(runtime.source.replace('cls', 'mean'));
+        if (scenario === 'corpus changed') content.files[0].bytes = Buffer.from(runtime.source.replace(runtime.corpusHash, hash('different corpus')));
+        if (scenario === 'wrong entry') { content.files[0].path = 'other.mjs'; content.entry = 'other.mjs'; }
+        if (scenario === 'extra module') content.files.push({ path: 'other.mjs', type: 'application/javascript+module', bytes: Buffer.from('export default {};') });
+        if (scenario === 'settings differ') provider.state.settings.bindings = [];
+      }
+      if (scenario === 'final readback changed' && path.endsWith('/subdomain')) provider.state.content.get(uploadedVersion).files[0].bytes = Buffer.from(`${runtime.source}\n// changed`);
+      return result;
+    } };
+    const run = async () => siteDeploy({ api: observed, plan, files: await collectFiles(folder), receiptPath });
+    if (scenario === 'search upload' || scenario === 'settings differ') {
+      const result = await run();
+      assert.equal(result.origin, 'https://run-cradle.com');
+      assert.equal(provider.state.content.get(uploadedVersion).files[0].bytes.toString(), runtime.source);
+      assert.deepEqual(provider.state.version.resources.bindings, [{ type: 'assets', name: 'ASSETS' }, { type: 'ai', name: 'AI' }]);
+      assert.ok(provider.state.calls.some(call => call.path.endsWith('/content/v2') && call.search.includes(uploadedVersion)), 'reads content of uploaded serving version');
+      assert.equal(provider.state.settings.main_module, siteKit.SITE_MODULE);
+    } else {
+      await assert.rejects(run(), /owned-resource-replaced/, scenario);
+      assert.equal(provider.state.domains.length, scenario === 'final readback changed' ? 2 : 0, 'both Worker readbacks enforce the runtime');
+      await assert.rejects(readFile(receiptPath), { code: 'ENOENT' });
+    }
+  });
+});
+
+test('search deploy waits for the uploaded runtime instead of checking an older serving runtime, and waits for its version content visibility', async t => {
+  const { siteProvider } = await import('./site-provider.mjs');
+  for (const scenario of ['previous runtime', 'missing content']) await t.test(scenario, async t => {
+    const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
+    t.after(() => provider.close());
+    const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
+    const options = { ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: folder };
+    await siteDeploy({ api, plan: sitePlan(options), files: await collectFiles(folder), receiptPath });
+    const deployments = structuredClone(provider.state.deployments);
+    await writeFile(join(folder, 'docs-search-vectors.json'), JSON.stringify({ corpusHash: hash('search corpus') }));
+    let uploaded = false, lagging = 0, elapsed = 0, sleeps = 0;
+    const observed = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: async (input, init = {}) => {
+      const response = await provider.fetch(input, init), url = new URL(input);
+      if (init.method === 'PUT' && /\/workers\/scripts\/[^/]+$/.test(url.pathname)) uploaded = true;
+      if (uploaded && scenario === 'previous runtime' && url.pathname.endsWith('/deployments') && ++lagging <= 2)
+        return Response.json({ success: true, errors: [], result: { deployments } });
+      if (uploaded && scenario === 'missing content' && url.pathname.endsWith('/content/v2') && ++lagging <= 2)
+        return Response.json({ success: false, errors: [{ code: 100146, message: 'Version not found' }] }, { status: 404 });
+      return response;
+    } });
+    const writes = provider.state.writes.length;
+    const result = await siteDeploy({ api: observed, plan: sitePlan({ ...options, runtime: searchRuntime() }), files: await collectFiles(folder), receiptPath,
+      readiness: { totalMs: 9000, clock: () => elapsed, sleep: async ms => { elapsed += ms; sleeps++; } } });
+    assert.equal(result.origin, 'https://run-cradle.com');
+    assert.equal(sleeps, 2);
+    assert.ok(lagging >= 3);
+    assert.equal(provider.state.writes.slice(writes).filter(write => write.path === `/workers/scripts/${result.receipt.worker}`).length, 1);
+  });
 });
 
 // Ownership is read from the provider: a fresh checkout (a CI runner, no .rer/)

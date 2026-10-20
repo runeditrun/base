@@ -26,6 +26,9 @@ importers:
       ajv-formats:
         specifier: 3.0.1
         version: 3.0.1(ajv@8.18.0)
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       miniflare:
         specifier: 5.20260907.0-alpha
         version: 5.20260907.0-alpha(patch_hash=9751f9c5ed79171ed70eb94667e6bb26ba08a0d5392f86d09a6ae7ad4819ddeb)(@types/node@24.19.2)
@@ -84,6 +87,9 @@ importers:
       drizzle-kit:
         specifier: 0.31.10
         version: 0.31.10
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       typescript:
         specifier: 5.9.3
         version: 5.9.3

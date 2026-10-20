@@ -261,9 +261,62 @@ The Worker mounts two shared responses before its documents: `setupStateResponse
 
 **Sign-in hint: `login_hint`.** The shared sign-in page (`createSignInHandler`, `modules/operator-auth/signin`) accepts one optional query parameter, `login_hint=<email>`, and uses it to fill in the email field of its email-link form. Only a complete email address is used; anything else is ignored, the form is never submitted for the visitor, and the visitor still presses **Email a sign-in link**. The platform's **Open app** link for a claimed owner, a seed's own links to its sign-in route and the Lobby all use this one name: `/signin?login_hint=owner%40example.com`, with `returnTo` alongside when needed. The Lobby adds it to its **Sign in** link only on an instance served on this computer (a loopback or `*.localhost` origin) with exactly one active owner; a hosted instance's Lobby stays the same page for every visitor and never names its owner.
 
-The **run site** (`run-<seed>.com`) is static: the seed's approved homepage with its primary action reading **Run <Seed>** and linking to `/run`, the Run page at `/run` (step 1 is the installer, `curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node; step 2 is `rer dev <owner>/<repo>` for the seed's own repository, which needs nothing the installer did not put on PATH, with `cd <folder> && rer dev` to start it again; `npx -y @runeditrun/rer dev <owner>/<repo>` is offered only as the one-line alternative for someone who already has Node 22 or later; `foundation/runtime/run-site.ts`), its docs at `/docs/*` when it serves docs, and a `404` page. It never links an instance-only route (`/signin`, `/login`, `/sign-in`, `/setup`, `/app`, `/auth/*`). A seed opts in with the `commandAdapter` option `site: { entry, output, declaration, config }`: `entry` is a module whose `sitePages({ styles })` returns `{ pages: [{ path, html }], assets: [paths under public/] }`. `rer build --site` builds it for Node with the checkout's own Vite (TypeScript, TSX, JSON and CSS imports work, and a React page renders with `renderToStaticMarkup`); the optional `config` names a Vite config holding the plugins the site pages need, such as a docs virtual module or a CSS toolchain (never the app's own `vite.config.ts`, whose Worker plugins do not run in Node). The CSS the entry's modules import compiles to one stylesheet under `/site-assets/`, with the files it references; `styles` lists its site path for each page to link in its head. `output` is the ignored folder `rer build --site` writes (`dist/site` in Base's seeds), with `/` as `index.html`, `/run` as `run.html` and `/docs/a` as `docs/a.html`; `declaration` is the run site deploy declaration, `{"version": 1, "domain": "<apex hostname>"}` (`deploy-site.json`). The build reads no installation data. Before replacing the folder it refuses a site without an index or Run page, with a link that does not resolve on Cloudflare's static assets or reaches an instance-only route, with a page or style that loads from another origin, with server code, Wrangler configuration, migrations, settings or data files, with the dev layer, or with any of the checkout's owner identity, secrets or dev key. `rer dev` builds and serves it as `RER_SITE`; `rer deploy --site` publishes it (see the deploy-kit README, Run site). A Worker that reads `deploy-site.json` in `vite dev` lists it in `server.fs.allow`.
+The **run site** (`run-<seed>.com`) serves rendered public pages, with an optional docs-search runtime: the seed's approved homepage with its primary action reading **Run <Seed>** and linking to `/run`, the Run page at `/run` (step 1 is the installer, `curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node; step 2 is `rer dev <owner>/<repo>` for the seed's own repository, which needs nothing the installer did not put on PATH, with `cd <folder> && rer dev` to start it again; `npx -y @runeditrun/rer dev <owner>/<repo>` is offered only as the one-line alternative for someone who already has Node 22 or later; `foundation/runtime/run-site.ts`), its docs at `/docs/*` when it serves docs, and a `404` page. It never links an instance-only route (`/signin`, `/login`, `/sign-in`, `/setup`, `/app`, `/auth/*`). A seed opts in with the `commandAdapter` option `site: { entry, output, declaration, config }`: `entry` is a module whose `sitePages({ styles })` returns `{ pages: [{ path, html }], assets: [paths under public/] }`. `rer build --site` builds it for Node with the checkout's own Vite (TypeScript, TSX, JSON and CSS imports work, and a React page renders with `renderToStaticMarkup`); the optional `config` names a Vite config holding the plugins the site pages need, such as a docs virtual module or a CSS toolchain (never the app's own `vite.config.ts`, whose Worker plugins do not run in Node). The CSS the entry's modules import compiles to one stylesheet under `/site-assets/`, with the files it references; `styles` lists its site path for each page to link in its head. `output` is the ignored folder `rer build --site` writes (`dist/site` in Base's seeds), with `/` as `index.html`, `/run` as `run.html` and `/docs/a` as `docs/a.html`; `declaration` is the run site deploy declaration, `{"version": 1, "domain": "<apex hostname>"}` (`deploy-site.json`). The build reads no installation data. Before replacing the folder it refuses a site without an index or Run page, with a link that does not resolve on Cloudflare's static assets or reaches an instance-only route, with a page or style that loads from another origin, with server code, Wrangler configuration, migrations, settings or data files, with the dev layer, or with any of the checkout's owner identity, secrets or dev key. `rer dev` builds and serves it as `RER_SITE`; `rer deploy --site` publishes it (see the deploy-kit README, Run site). A Worker that reads `deploy-site.json` in `vite dev` lists it in `server.fs.allow`.
 
-**Deploying the run site from CI.** `rer deploy --site` keeps no state it depends on: it proves the site Worker and its Custom Domains are its own from the provider (the Worker's live version carries its `rer-site:` annotation; each domain's service is that Worker), so a fresh checkout, such as a GitHub Actions runner, deploys over the site it deployed before, and a Worker or domain of the same name it did not make is still refused. The www to apex 301 lives in the Base-generated site Worker. The run-site deploy token (the `run-site` environment's `CLOUDFLARE_API_TOKEN`) carries Workers Scripts: Edit on the account and Zone: Read, DNS: Edit, Workers Routes: Edit and Dynamic URL Redirects: Edit on the run site zones. A seed's `.github/workflows/run-site.yml` runs, after `pnpm install --frozen-lockfile`, `pnpm exec rer deploy --site` with `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in its environment (vendored mode: `node scripts/rer.mjs deploy --site`); `.rer/deploy/site-production.json` is a receipt for the person and needs no cache. The workflow runs on every push to `main` with no `paths` filter, so a push that changes only `CONTRACT.md` redeploys the site.
+### Optional docs-search runtime
+
+A site with docs may select Base's docs-search module in its command adapter:
+
+```ts
+site: {
+  entry: 'src/site/pages.tsx', output: 'dist/site',
+  declaration: 'deploy-site.json', config: 'vite.site.config.ts',
+  clients: { docsSearch: 'src/site/docs-search/client.ts' },
+  runtime: {
+    type: 'docs-search', module: 'docs-search', bindings: ['ASSETS', 'AI'],
+    endpoint: '/docs/search', corpus: '.rer/docs-search/corpus.json',
+  },
+}
+```
+
+`module: 'docs-search'` selects the Base-owned implementation, not seed
+JavaScript. This optional runtime declares only `ASSETS` and Workers AI (`AI`);
+it does not accept arbitrary application bindings, seed ownership annotations or
+a separate Wrangler deployment. `deploy-site.json` remains the same domain-only
+declaration. Sites without `runtime` keep the assets-only deployment. Package mode installs the pinned bundler with rer; vendored adopters declare `esbuild` as a devDependency (the maintained seed pins 0.28.2).
+
+The entry's one `sitePages({ styles, clients, contract })` render returns
+`{ pages, assets, searchPages }`, where `searchPages` is
+`[{ href, searchSections: [{ anchor, titlePath, text }] }]`. `titlePath` is the
+array of heading titles. Sections come from the same rendered docs and heading
+anchors as the HTML; do not rerender or crawl the published site for the corpus.
+The renderer writes `searchPages` to the declared `corpus` path, an ignored
+staging output outside the public assets. Its parent (`.rer/docs-search` here)
+is also the inferred preparation/cache directory.
+
+Copy the optional UI source from `modules/site/docs-search` to the seed's
+selected source path, render `SearchField`, import `search.css`, and load
+`clients.docsSearch` as a module script on the docs pages that use it. The seed
+supplies `--ink`, `--ink-soft`, `--rule` and `--paper` through its existing theme.
+The island queries the declared same-origin endpoint. Adoption preserves the
+seed's approved page layout and copy.
+
+`rer build --site` and `rer deploy --site --dry-run` render and validate locally
+with no provider requests or embedding calls. The plan identifies runtime type,
+module, bindings, endpoint, fixed model `@cf/baai/bge-base-en-v1.5`, pooling `cls`,
+`corpusHash`, module digest and deployment fingerprint. Vectors are prepared
+only for real deployment; a local build does not provide live semantic search.
+
+A real deploy renders once, prepares the vectors, then publishes the rendered
+assets, `docs-search-vectors.json` and Base-owned query module together in one
+site deployment. Preparation reuses vectors from the inferred local cache and
+`https://<site domain>/docs-search-vectors.json` only when the model, pooling,
+chunk hash and vector dimensions match. A previous-index 404 means first index;
+all other fetch or embedding failures stop before publication. The model and
+pooling belong to the selected module. See the deploy-kit Run site guidance for
+provider permissions and deployment ownership.
+
+**Deploying the run site from CI.** `rer deploy --site` keeps no state it depends on: it proves the site Worker and its Custom Domains are its own from the provider (the Worker's live version carries its `rer-site:` annotation; each domain's service is that Worker), so a fresh checkout, such as a GitHub Actions runner, deploys over the site it deployed before, and a Worker or domain of the same name it did not make is still refused. The www to apex 301 lives in the Base-generated site Worker. The run-site deploy token (the `run-site` environment's `CLOUDFLARE_API_TOKEN`) carries Workers Scripts: Edit on the account and Zone: Read and Workers Routes: Edit on the run site zones. A docs-search runtime additionally requires Workers AI: Read/Edit on the account for embeddings and its AI binding; assets-only sites need no Workers AI permission. A seed's `.github/workflows/run-site.yml` runs, after `pnpm install --frozen-lockfile`, `pnpm exec rer deploy --site` in the `run-site` environment with `CLOUDFLARE_ACCOUNT_ID` from `vars.CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from `secrets.CLOUDFLARE_API_TOKEN` (vendored mode: `node scripts/rer.mjs deploy --site`); `.rer/deploy/site-production.json` is a receipt for the person and needs no cache. The workflow runs on every push to `main` with no `paths` filter, so a push that changes only `CONTRACT.md` redeploys the site.
 
 ## Contract status
 
