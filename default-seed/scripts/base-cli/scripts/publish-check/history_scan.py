@@ -7,6 +7,7 @@ from public_base import PublicBaseError
 from gitleaks import executable, inspect as secrets, rule as secret_rule
 from hygiene_config import CONFIG, load_config
 from github_refs import GitHubResolver, local_dependencies
+from github_owners import input_owners, content_owners
 from destination import destination, INVALID
 from env_values import load_hashes
 from licenses import EXCEPTIONS, exceptions, license_rules, registry
@@ -33,6 +34,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         report['source'] = dict(commit=history.commit, tree=history.commit_tree(history.commit).decode())
         report['publicBase'] = dict(ref=history.public_label, commit=history.public_commit) if public_base else None
         config = load_config(history.selected(CONFIG))
+        config['githubOwners'] = input_owners(project, repository, public_base)
         reviewed_bytes = history.selected(REVIEWED)
         reviewed = load_reviewed(reviewed_bytes) if reviewed_bytes else {}
         add = Findings(report, reviewed, hashes).add
@@ -67,7 +69,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             for rule in license_rules(history.blob(license_oid) if license_oid else None, recorded):
                 bucket = 'warnings' if rule == 'license.missing' and public_base and scope == 'newly-public' and release_license_good else None
                 add(rule, 'LICENSE', commit, license_oid, scope, bucket)
-            signature = (config_tree['declaredSources'], config_tree['projectIdentity'], frozenset(config_tree['trustBundles'].items()))
+            signature = (config_tree['declaredSources'], config_tree['projectIdentity'], config_tree['githubOwners'],
+                         frozenset(config_tree['trustBundles'].items()))
             for entry in entries:
                 path, oid = entry['path'], entry['oid']
                 seen_blobs.add(oid)
@@ -92,6 +95,12 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                     add('provenance.declared-source', path, commit, oid, entry_scope)
         report['history'].update(commits=len(history.commits), trees=len(seen_trees), blobs=len(seen_blobs))
         selected_context, _ = timings.call('working-tree.context', context, history, history.commit, config)
+        # Discover owners before inspecting any current file, including ignored
+        # or untracked URLs; classification must not depend on traversal order.
+        working_owners = set(config['githubOwners'])
+        for path, data in working_files(Path(history.repo)):
+            working_owners.update(content_owners(data, path))
+        working_context = {**selected_context, 'githubOwners': frozenset(working_owners)}
         working_paths = []
         working_identities = {}
         for path, data in working_files(Path(history.repo)):
@@ -103,7 +112,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             # their known immutable identity; new bytes have no history identity.
             entry = entries_by_commit[history.commit].get(path)
             oid = entry['oid'] if entry and entry['kind'] == 'blob' and history.blob(entry['oid']) == data else None
-            rules, _, references = timings.call('working-tree.text', text_rules, data, path, selected_context, hashes)
+            rules, _, references = timings.call('working-tree.text', text_rules, data, path, working_context, hashes)
             public_oid = public_paths.get(path)
             scope = 'pre-existing' if public_oid and (public_oid == oid or history.blob(public_oid) == data) else 'working-tree'
             for rule in rules:

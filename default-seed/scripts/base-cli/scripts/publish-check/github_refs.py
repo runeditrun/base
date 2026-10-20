@@ -20,6 +20,8 @@ REPOSITORY_HOST = '(?:' + '|'.join('(?a:' + re.escape(host) + ')' + PORT + route
 URL = re.compile(r'(?i)' + URL_BOUNDARY + r'(?:(?a:' + TRANSPORT + ')' + USERINFO + REPOSITORY_HOST +
                  r'|(?a:git@github\.com:))(' + PAIR + r')(?![A-Za-z0-9_.-])')
 FULL = re.compile(PAIR + r'\Z')
+TOKEN = re.compile(URL_BOUNDARY + '(' + PAIR + r')(?![A-Za-z0-9_.-])')
+QUALIFIER = re.compile(r'(?:#[0-9]+(?![A-Za-z0-9_])|@[a-fA-F0-9]{7,40}(?![A-Za-z0-9_])|/(?:pull|issues|tree|blob)/)')
 METADATA = re.compile(r'(?i)(?:^|/)(?:[^/]+\.(?:json|ya?ml|toml)|\.gitmodules)$')
 # GitHub documents these web auth endpoints, not repository namespaces.
 SERVICE_URL = re.compile(r'(?i)' + URL_BOUNDARY + r'(?a:https?://|(?<!:)//)' + USERINFO +
@@ -84,19 +86,22 @@ def references(text, path, local_paths=frozenset(), project_identity=None):
     return stated | ambiguous
 
 
-def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
+def reference_sets(text, path, local_paths=frozenset(), project_identity=None, known_owners=frozenset()):
     """Split `owner/name` tokens into stated repositories and ambiguous ones.
 
-    A stated reference has GitHub context: a URL, a repository field, a labelled
-    or commanded mention, a repository route. An ambiguous token is a bare
-    word/word in prose (`commit/tree`, `rer-delegation/1`, `dmsans/v17`): it is
-    a repository only if one answers to that name privately, never because none
-    does.
+    URLs, qualified tokens and bare pairs with a known GitHub owner are stated
+    references, as are structured declarations and repository commands. Plain
+    slash prose does not acquire repository meaning from nearby words. Retain
+    the private-only check for ambiguous code spans.
     """
     ambiguous = set()
     repository_text = SERVICE_URL.sub('', text)
     found = {normalize(m.group(1)) for m in URL.finditer(repository_text)
              if not SPONSORS_URL.match(repository_text, m.start())}
+    for match in TOKEN.finditer(repository_text):
+        repository = normalize(match[1])
+        if repository.split('/')[0] in known_owners or QUALIFIER.match(repository_text, match.end()):
+            found.add(repository)
     # A URL in an explicit repository declaration has stronger context than
     # its coincident service spelling. Never erase the original text first.
     found.update(explicit_references(repository_text, path))
@@ -123,11 +128,16 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
                 continue
             # A plain multi-segment path is ambiguous; GitHub's repository
             # routes, a labeled field or a GitHub command disambiguate it.
-            labeled = explicit and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)github|gh\s', match['label']))
+            labeled = explicit and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)gh\s', match['label']))
             if REPOSITORY_ROUTE.match(suffix) or labeled:
                 found.add(normalize(repository))
             elif not suffix:
                 if explicit:
+                    # An unmarked pair after a prose word such as "GitHub"
+                    # is not a declaration. Code markup and clone/fork commands
+                    # retain their existing repository context.
+                    if not match['markup'] and not re.match(r'(?i)clone|fork', match['label']):
+                        continue
                     weak = re.fullmatch(r'(?i)source', match['label']) and not re.search(r'(?i)repository|repo', markdown[match.start():match.start('reference')])
                 else:
                     line_start = markdown.rfind('\n', 0, match.start()) + 1
