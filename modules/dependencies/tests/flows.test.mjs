@@ -4,6 +4,8 @@ import { runtime, ORIGIN, ISSUER } from './runtime.mjs';
 import { sign, keys } from '../../operator-auth/identity/oidc/tests/idp.mjs';
 import { LOGOUT_EVENT, FENCE_EVENT } from '../logout.mjs';
 import { createEditorConfigHandler } from '../../editor/server/config-response.mjs';
+import { dependencyStore, resealDependencyKeys } from '../store.mjs';
+import { createDependencies } from '../index.mjs';
 import { assertion } from '../crypto.mjs';
 import { createPortability } from '../../portability/index.mjs';
 import { readFile } from 'node:fs/promises';
@@ -112,7 +114,9 @@ test('archive drops private link keys and sessions; import retains sector and bi
  const id=await exporter.exports.create();while((await exporter.exports.advance(id,{maxParts:16})).phase==='building'){}
  const text=await new Response(await exporter.exports.download(id)).text(),records=text.trim().split('\n').map(s=>JSON.parse(s));
  const privateKey=source.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key;
- assert.equal(text.includes(JSON.parse(privateKey).d),false);
+ assert.equal(text.includes((await dependencyStore(source.db,source.config).readKey()).key.d),false);
+ assert.equal(text.includes(privateKey),false);assert.equal(text.includes(source.config.INSTALLATION_KEY),false);
+ assert.equal(records[0].tables.some(table=>table.name==='rer_dependency_keys'),false);
  const manifest=records.find(r=>r.kind==='manifest');const restore=await importer.imports.create(manifest);
  for(const part of records.filter(r=>r.kind==='part'))await importer.imports.uploadPart(restore,part.index,part);
  await importer.imports.finalize(restore,{contentHash:records.at(-1).contentHash,archiveHash:records.at(-1).archiveHash});
@@ -139,4 +143,109 @@ test('editor public authorization grants only the current owner and current issu
  r.sqlite.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('new-owner','next@example.com','Next','owner','active',?)").run(r.now());
  r.sqlite.prepare("UPDATE oa_operators SET role='member' WHERE id=?").run(person);
  assert.equal((await editor(owner)).status,403);
+});
+
+
+test('dependency signing keys are sealed, upgraded once and rotated without losing sign-in; missing keys refuse',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();await r.link('error-sink@1');
+ const store=()=>dependencyStore(r.db,r.config);
+ const key=(await store().installation()).key;
+ const raw=()=>r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='oidc-provider@1'").get().private_key;
+ const original=raw(),envelope=JSON.parse(original);
+ assert.equal(envelope.version,1);assert.equal(Object.hasOwn(envelope,'d'),false);assert.equal(original.includes(key.d),false);
+ assert.equal((await login(r)).status,303);
+ // Simulate an existing installation before its sealing migration.
+ r.sqlite.exec("UPDATE rer_dependency_installation SET keys_sealed=0,key_ids='[]'");
+ // Preserve its registered signing key.
+ const sibling=(await store().installation('error-sink@1')).key;
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(JSON.stringify(key),'oidc-provider@1');
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(JSON.stringify(sibling),'error-sink@1');
+ assert.equal((await login(r)).status,303);
+ const upgraded=raw();assert.equal(JSON.parse(upgraded).version,1);assert.equal(upgraded.includes(key.d),false);
+ assert.equal(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='error-sink@1'").get().private_key,JSON.stringify(sibling),'a read upgrades only its interface');
+ await resealDependencyKeys(r.db,r.config);
+ assert.equal(r.sqlite.prepare('SELECT keys_sealed FROM rer_dependency_installation').get().keys_sealed,1);
+ assert.equal((await login(r)).status,303);assert.equal(raw(),upgraded,'upgrade is idempotent');
+ r.config.INSTALLATION_KEY_PREVIOUS=r.config.INSTALLATION_KEY;r.config.INSTALLATION_KEY=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');r.restart();
+ assert.equal((await login(r)).status,303);const rotated=raw();assert.notEqual(JSON.parse(rotated).kid,JSON.parse(upgraded).kid);await resealDependencyKeys(r.db,r.config);
+ delete r.config.INSTALLATION_KEY_PREVIOUS;r.config.SESSION_SECRET=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');r.restart();assert.equal((await login(r)).status,303);assert.equal(raw(),rotated,'session secret rotation leaves the signing key intact');
+ const current=r.config.INSTALLATION_KEY;delete r.config.INSTALLATION_KEY;r.restart();
+ const refused=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_missing'});assert.equal(raw(),rotated);
+ r.config.INSTALLATION_KEY=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');r.restart();
+ const wrong=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(wrong.status,503);assert.deepEqual(await wrong.json(),{error:'installation_key_unavailable'});assert.equal(raw(),rotated);
+ // Neither malformed envelopes nor ciphertext moved to another interface become plaintext.
+ r.config.INSTALLATION_KEY=current;r.sqlite.prepare("UPDATE rer_dependency_keys SET private_key=? WHERE interface='oidc-provider@1'").run(JSON.stringify({...JSON.parse(rotated),ciphertext:'invalid'}));r.restart();
+ const corrupt=await r.call('/auth/oidc/auth/start',{body:{}});assert.deepEqual(await corrupt.json(),{error:'installation_key_unavailable'});
+ r.sqlite.prepare("UPDATE rer_dependency_keys SET private_key=? WHERE interface='oidc-provider@1'").run(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='error-sink@1'").get().private_key);
+ const swapped=await r.call('/auth/oidc/auth/start',{body:{}});assert.deepEqual(await swapped.json(),{error:'installation_key_unavailable'});
+});
+
+
+test('an unreadable sibling row leaves healthy sign-in, document, JWKS and link callback working',async t=>{
+ for(const damage of ['corrupt','retired']) await t.test(damage,async t=>{
+  const r=await runtime(t);await r.bootstrap();await r.link();await r.link('error-sink@1');
+  await r.approve('error-sink@1');const badCode=await r.code('error-sink@1');
+  const old=r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='error-sink@1'").get().private_key;
+  if(damage==='retired') {
+   r.config.INSTALLATION_KEY_PREVIOUS=r.config.INSTALLATION_KEY;r.config.INSTALLATION_KEY=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');
+   await resealDependencyKeys(r.db,r.config);delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();
+  }
+  r.sqlite.prepare("UPDATE rer_dependency_keys SET private_key=? WHERE interface='error-sink@1'").run(damage==='corrupt'?JSON.stringify({...JSON.parse(old),ciphertext:'invalid'}):old);
+  const start=await r.call('/auth/oidc/auth/start',{body:{}}),document=await r.call('/.well-known/rer-dependencies'),jwks=await r.call('/.well-known/rer-link/jwks/oidc-provider@1');
+  assert.deepEqual([start.status,document.status,jwks.status],[303,200,200]);
+  const reordered=createDependencies({db:r.db,...r.config,name:'App',auth:r.auth(),interfaces:[{interface:'error-sink@1',paths:['/errors/callback']},{interface:'oidc-provider@1',paths:r.identityPaths}]});
+  assert.equal((await reordered.handle(r.request('/.well-known/rer-dependencies'))).status,200,'the public document needs no interface private key');
+  const grant=await r.idp.authorize(start.headers.get('location'));
+  assert.equal((await r.call(`/auth/oidc/auth/callback?code=${grant.code}&state=${grant.state}`,{cookie:start.headers.get('set-cookie')})).status,303);
+  assert.equal((await r.link()).status,200);
+  for(const response of [await r.call('/.well-known/rer-link/jwks/error-sink@1'),await r.call('/.well-known/rer-link/callback',{body:{issuer:ISSUER,interface:'error-sink@1',code:badCode}})]) {
+   assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:damage==='retired'?'installation_key_version_unknown':'installation_key_unavailable'});
+  }
+ });
+});
+
+test('a restored pre-rotation row needs the retired key and reopens without changing its public identity',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();
+ const before=r.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key;
+ const publicBefore=await (await r.call('/.well-known/rer-link/jwks')).json();
+ const retired=r.config.INSTALLATION_KEY;
+ r.config.INSTALLATION_KEY_PREVIOUS=retired;r.config.INSTALLATION_KEY=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');
+ await resealDependencyKeys(r.db,r.config);delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=?').run(before);
+ const refused=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_version_unknown'});
+ r.config.INSTALLATION_KEY_PREVIOUS=retired;await resealDependencyKeys(r.db,r.config);delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();
+ assert.equal((await login(r)).status,303);assert.deepEqual(await (await r.call('/.well-known/rer-link/jwks')).json(),publicBefore);
+});
+
+test('a fully sealed installation refuses a plaintext signing key injected by a database writer',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();
+ const key=(await dependencyStore(r.db,r.config).readKey()).key;
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=?').run(JSON.stringify(key));
+ const refused=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_unavailable'});
+});
+
+test('plaintext-only signing refuses a sealed key with a typed rollback error',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();
+ const envelope=JSON.parse(r.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key);
+ await assert.rejects(assertion(envelope,{sub:'rollback'}),e=>e.code==='installation_key_sealed_rollback' && e.status===503);
+});
+
+test('installation key custody refuses passphrases outside the generated secret format',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();r.config.INSTALLATION_KEY='a guessed passphrase that is comfortably longer than thirty two characters';r.restart();
+ const refused=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_missing'});
+});
+
+test('sealed rows authenticate the explicit storage purpose, interface, version and key ID',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();
+ const value=JSON.parse(r.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key);
+ const root=await crypto.subtle.importKey('raw',new TextEncoder().encode(r.config.INSTALLATION_KEY),'HKDF',false,['deriveKey']);
+ const key=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:new TextEncoder().encode('rer-at-rest-v1'),info:new TextEncoder().encode('rer-at-rest-v1:dependency-key')},root,{name:'AES-GCM',length:256},false,['decrypt']);
+ const bytes=s=>Uint8Array.from(atob(s.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0));
+ const open=aad=>crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(value.iv),additionalData:new TextEncoder().encode(aad),tagLength:128},key,bytes(value.ciphertext));
+ const jwk=JSON.parse(new TextDecoder().decode(await open(`rer-at-rest-v1|rer_dependency_keys|oidc-provider@1|1|${value.kid}`)));
+ assert.equal(jwk.kid,(await dependencyStore(r.db,r.config).readKey()).key.kid);
+ await assert.rejects(open(`rer-at-rest-v1|another_table|oidc-provider@1|1|${value.kid}`));
+ await assert.rejects(open(`rer-at-rest-v1|rer_dependency_keys|oidc-provider@1|2|${value.kid}`));
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=?').run(JSON.stringify({...value,kid:crypto.randomUUID()}));
+ const tampered=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(tampered.status,503);assert.deepEqual(await tampered.json(),{error:'installation_key_unavailable'});
 });

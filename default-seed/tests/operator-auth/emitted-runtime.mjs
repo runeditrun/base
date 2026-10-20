@@ -57,6 +57,7 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
     bindings: {
       AUTH_ORIGIN: origin, AUTH_LOCAL: production ? 'false' : 'true', OWNER_EMAIL: owner, SETUP_TOKEN: setupToken,
       SESSION_SECRET: 'disposable-test-only-session-secret-00001',
+      INSTALLATION_KEY: crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),''),
       AUTH_REVIEW_ENABLED: 'true',
       ...(devKey ? { RER_DEV_KEY: devKey } : {}),
       ...(demo ? { RER_DEMO: '1' } : {}),

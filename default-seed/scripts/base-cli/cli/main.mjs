@@ -64,7 +64,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   // A hosted address never exports this computer's copy under its name.
   if (options.verb === 'export' && project.profile === 'first-party') await (await import('./hosted-export.mjs')).refuseHostedExport(project, options);
-  if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret) {
+  if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret && !options.reopenInstallationKey) {
    const { deliveryDeclarationClauses } = await import('./delivery-declarations.mjs');
    const failures = (await deliveryDeclarationClauses(project.root)).filter(clause => !clause.ok);
    if (failures.length) throw new RerError('invalid_deployment_declaration', failures.map(clause => clause.message).join('\n'), 1);

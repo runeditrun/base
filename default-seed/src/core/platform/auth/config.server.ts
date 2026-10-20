@@ -11,6 +11,8 @@ export function authConfig(env: Bindings): AuthConfig {
     origin: env.AUTH_ORIGIN,
     OWNER_EMAIL: env.OWNER_EMAIL,
     SESSION_SECRET: env.SESSION_SECRET,
+    INSTALLATION_KEY: env.INSTALLATION_KEY,
+    INSTALLATION_KEY_PREVIOUS: env.INSTALLATION_KEY_PREVIOUS,
     SETUP_TOKEN: env.SETUP_TOKEN,
     MAIL_FROM: env.MAIL_FROM,
     local: env.AUTH_LOCAL === 'true',

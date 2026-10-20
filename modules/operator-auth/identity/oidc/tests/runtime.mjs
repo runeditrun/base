@@ -31,6 +31,7 @@ export function authProvider(overrides = {}, fake = {}) {
 }
 
 export async function runtime(entries = [authProvider()], core = {}) {
+  core = { INSTALLATION_KEY: crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),''), ...core };
   const dir = await mkdtemp(join(tmpdir(), 'oidc-test-')); const file = join(dir, 'auth.sqlite');
   let sqlite = new DatabaseSync(file); sqlite.exec(schema + oidcSchema);
   sqlite.exec('INSERT INTO oa_auth_settings(singleton,idp_sign_in) VALUES(1,1)');
