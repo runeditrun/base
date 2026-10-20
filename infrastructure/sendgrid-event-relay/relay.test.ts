@@ -176,7 +176,7 @@ test('registered seed receives only a whole signed scope, byte exact, independen
   dnsFailure = true;
   assert.equal((await send([event])).status, 204);
   assert.equal(counters.at(-1)!.configurationFailures, 1);
-  for (const url of ['http://mail-relay-scratch.runeditrun.com/events', 'https://user:password@mail-relay-scratch.runeditrun.com/events',
+  for (const url of ['http://mail-relay-scratch.runeditrun.com/events', 'https://fixture-user:fixture-password@mail-relay-scratch.runeditrun.com/events',
     'https://127.0.0.1/events', 'https://[::1]/events', 'https://localhost/events', 'https://arbitrary.example/events']) {
     assert.equal((await send([event], environment({ ...target, url }))).status, 204);
     assert.equal(counters.at(-1)!.configurationFailures, 1);

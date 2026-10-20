@@ -5,7 +5,8 @@ export interface SeedRegistry { version: 1; targets: SeedRegistration[] }
 export function seedRegistry(value?: string): SeedRegistry {
   if (!value) return { version: 1, targets: [] };
   if (value.length > 16_384) throw new Error('Invalid seed registry');
-  const registry = JSON.parse(value) as SeedRegistry;
+  let registry: SeedRegistry;
+  try { registry = JSON.parse(value); } catch { throw new Error('Invalid seed registry JSON'); }
   if (registry?.version !== 1 || !Array.isArray(registry.targets) || registry.targets.length > 8) throw new Error('Invalid seed registry');
   const scopes = new Set<string>();
   for (const entry of registry.targets) {
