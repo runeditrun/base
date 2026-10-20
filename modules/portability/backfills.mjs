@@ -74,6 +74,13 @@ function replayable({data},{table,statements,restorable,writable,carried,tables,
     // sqlite_sequence's high-water mark is not archived, so replay cannot
     // reproduce a carried AUTOINCREMENT table's live key allocation.
     if(!data.columns || autoincrement(manifest.find(t=>folded(t.name)===table).sql))return false;
+    // Keyed tables carry their key columns, not their hidden physical rowids.
+    // Treat unarchived aliases as unreadable cells, including through views.
+    secrets={...secrets};
+    for(const t of manifest)if(!t.rowidAlias) {
+      const hidden=['rowid','_rowid_','oid'].filter(name=>!t.columns.some(c=>folded(c.name)===name));
+      secrets[t.name]=[...(secrets[t.name]??[]),...hidden];
+    }
   }
   // A carried target participates in secret checks, even through a view.
   if(!viewReads(data.names,data.words,{views,tables,carried,table:carried.includes(table)?undefined:table,secrets}))return false;

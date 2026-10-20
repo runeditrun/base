@@ -133,6 +133,8 @@ test('excluded writes are admitted; carried UPDATE/DELETE, another writer and no
     [withSecret, [carried, { name: '0002_secret.sql', sql: "INSERT INTO membership_log(room,user,action,at) SELECT room,user,private_note,at FROM membership_log;" }], secretPolicy],
     [withSecret, [carried, { name: '0002_secret_view.sql', sql: "CREATE VIEW journal_notes AS SELECT room,user,private_note AS note,at FROM membership_log;\nINSERT INTO membership_log(room,user,action,at) SELECT room,user,note,at FROM journal_notes;" }], secretPolicy],
     [withSequenceGap, [sequenced, { name: '0002_autoincrement.sql', sql: backfill }]],
+    [olderCarried, [carried, { name: '0002_physical_rowid.sql', sql: "INSERT INTO membership_log(room,user,action,at) SELECT room,user,CAST(rowid AS TEXT),'now' FROM members;" }]],
+    [olderCarried, [carried, { name: '0002_physical_rowid_view.sql', sql: "CREATE VIEW physical_members AS SELECT room,user,rowid AS position FROM members;\nINSERT INTO membership_log(room,user,action,at) SELECT room,user,CAST(position AS TEXT),'now' FROM physical_members;" }]],
     [{ archive }, [rooms, { name: '0002_titles.sql', sql: "UPDATE rooms SET title=upper(title) WHERE id IN (SELECT room FROM members);" }]],
     [{ archive }, [rooms, { name: '0002_journal.sql', sql: `${journal.sql}\nDELETE FROM membership_log WHERE user='u2';` }]],
     [{ archive }, [rooms, { name: '0002_from_excluded.sql', sql: `${changes}\n${log}\nINSERT INTO membership_log(room,user,action,at) SELECT room,'u0','baseline','now' FROM room_changes;` }]],

@@ -344,6 +344,8 @@ the replay runs over the rows the live migration would have found there. It
 must name its target columns and be the table's only later writer. For a table
 with `AUTOINCREMENT`, carried-table replay is refused: the archive does not
 retain `sqlite_sequence`'s high-water mark, so generated keys could differ.
+Reads of a keyed table's unarchived hidden `rowid`, `_rowid_` or `oid` also
+refuse, including through views: restoring its keys can change physical rowids.
 For a table the archive lacks (one a later migration adds), finalize empties the table
 (resetting its `AUTOINCREMENT` counter, as the live upgrade created it).
 Finalize runs the eligible writes in migration order, exactly as written,
