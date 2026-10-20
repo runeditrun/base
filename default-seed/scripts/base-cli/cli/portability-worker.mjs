@@ -69,7 +69,9 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   await ensurePortabilitySchema(proxy.env[binding], await portabilityPlan(unstable_splitSqlQuery));
   if(legacyRecovery)return await recoverLegacyArchive(options,path,legacyRecovery.output,transient,legacyRecovery.acknowledged);
   const service = await createPortability(options);
-  // This checkout's operation lock means no other import can be running: staging left behind is a crashed restore's.
+  // This checkout's operation lock means no other import can be running. Abort
+  // the recorded abandoned job, dropping only its exact staging copies and
+  // sidecars before the replacement import creates its own scratch tables.
   if (direction === 'import' && await service.imports.abortAbandoned()) process.send({ progress: 'Cleaned up an unfinished earlier import: a restore that stopped part-way left its staged data here. Its staging is removed and this import starts from the beginning.' });
   return await (direction === 'export' ? exportArchive(service,path,transient,progress) : importArchive(service,path,transient,journal,progress));
  } finally { await proxy?.dispose(); await rm(configPath, { force: true }); }

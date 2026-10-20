@@ -59,6 +59,7 @@ belong to the current runtime or environment and never travel:
 | `sqlite_%`, `_cf_%` | SQLite and Cloudflare internals. |
 | `d1_migrations`, `_rer_deploy_migrations`, `_rer_portability_migrations`, `rer_migrations` | Destination migration history. Base uses the D1 and `_rer_` ledgers; RER Platform's runner writes `rer_migrations`. An old archive that still carries its source's ledger is placed by it (see below); its rows are never restored. |
 | `rer_portability_%` | Transfer jobs, snapshots, staging, journals and recovery bookkeeping. |
+| `ik_d1_assertions` | Import-kit CHECK guards, cleared within every successful migration or batch. Never owner data. |
 | `rer_mail_development_outbox`, `rer_ai_development_outbox` | Local development effect captures. |
 | `rer_dependency_keys`, `rer_dependency_pending`, `rer_dependency_codes` | Provider secrets and transient linking credentials. |
 | `rer_command_receipts` | Command replay receipts tied to the source installation. |
@@ -241,6 +242,12 @@ mandatory tables are removed from the effective schema before compatibility
 checks; this does not waive checks on any remaining table. `imports.status(id)`
 reports their names in `skippedTables`. File and HTTP CLI imports print one line
 when any are skipped: `Skipped platform bookkeeping tables: <names>.`
+
+An old archive may carry an empty `ik_d1_assertions` table. Import skips it so
+later import-kit guard migrations do not count as writes to restored data.
+An archive declaring rows in that table is refused with
+`invalid_bookkeeping_rows:<table>` (HTTP 409): a successful guard unit cannot
+leave those rows committed.
 
 Version 1 archives lack this binding and are refused with
 `legacy_archive_unverifiable` (HTTP 409; local `rer import` exit 4), before

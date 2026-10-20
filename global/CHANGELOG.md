@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.73
+
+- **Local dev sessions survive OAuth callbacks (#361).** The dev-gate cookie `rer_dev_gate_<port>` is now SameSite=Lax, like the session cookie it guards, so a provider's top-level redirect back to a local connector callback (Xero, Slack) carries the dev session instead of answering 401. The new `gate.admitsSession` is the dev-session check; `gate.admits` (dev sign-in, personas, one-click /signin) still refuses a cookie-only request marked `Sec-Fetch-Site: cross-site`. Only the dev gate (`rer dev`/`rer demo`) changes; production session cookies keep their SameSite.
+- **Import door test fixtures are synthetic or derived at runtime (#360).** Platform's source credential scan over every seed-vendored Base file finds 0 credential-shaped literals (was 2, in door.test.ts), so seeds that vendor Base pass the catalogue pin scan.
+- **Import-kit assertion guards are bookkeeping (#355).** `ik_d1_assertions` is excluded on export and skipped on restore, a nonempty guard table is refused, and a `staged_table` refusal names its table.
+- **Archive imports drop their staging tables (#354).** `rer import` removes its own `rer_portability_stage_*` tables when an import completes and when it is refused.
+- **`rer export --target remote` runs a seed's declared hosted export (#358).** An adapter's `portability.hostedExport` argv runs from the checkout with `--remote --environment production --out <file> [--origin <url>]`, and its outcome is preserved; invalid argv or script paths fail `rer check` and are refused before running. Undeclared seeds are unchanged.
+- **Publication scan usage errors report `scan.usage` (#357).** Invalid flags, missing values, invalid timeouts and malformed `--public-base` arguments exit 2 (INCOMPLETE) with one value-free `scan.usage` finding listing the valid flags, and one stderr line pointing to `--help`.
+- **`rer deploy --dry-run` applies the real owner-name check (#356).** A dry run accepts and refuses the same owner input as a real deploy, and a saved owner claim satisfies both.
+
+## 0.2.72
+
+- **The import door creates jobs for multi-MB sources (#346).** Job creation is chunked within D1's statement and RPC limits, with server-side checkpoints, so a resumed creation continues where it stopped and a partly staged job is never applied; the plan codec is honoured and the original is retained once. A 6.9 MB people export (6,083 people) and a 3,000-person dependency graph plan, create, apply and undo through the default seed's door, where the same export previously failed its first apply with import_door_conflict. ADOPTING.md step 4 names owner opt-in as the recommended consent path.
+- **/contract fits 320 px (#349).** The shared header bar and nav wrap (the brand's min-content decides) and phone links get a 24 px minimum height, so the /contract header has no sideways scroll at 320 px (scrollWidth 329 → 320).
+
 ## 0.2.71
 
 - **Restores split migrations at SQLite's own statement boundaries (#344).** The portability classifier re-splits each migration chunk with sql-text.mjs splitStatements (the sqlite3_complete state machine: a trigger ends only at `; END ;`, so `CASE … END` never ends it) and counts only real table names, never keywords, function names, qualified columns, literals or comments; the secret-column check still sees every identifier. rer import's replay uses the same splitter. Slate's retained archive restores past 0038.

@@ -5,6 +5,9 @@ import { contained } from './project.mjs';
 import { missing, refuse } from './errors.mjs';
 import { locateExport, locateImport } from './archive-path.mjs';
 export async function transfer(project, options, signal, custody) {
+ if (options.verb === 'export' && options.target === 'remote' && project.adapter.portability?.hostedExport !== undefined) {
+  return (await import('./hosted-export-command.mjs')).runHostedExport(project, options, custody.store, signal);
+ }
  const direction = options.verb, file = direction === 'export' ? options.output : options.input;
  if (!file) throw missing(`Provide --${direction === 'export' ? 'output' : 'input'} FILE.`);
  if (direction === 'import' && !options.yes) throw refuse('Import requires explicit --yes confirmation.');
