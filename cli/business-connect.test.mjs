@@ -2,6 +2,7 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
+import { door } from './fixtures/business/door.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -553,7 +554,7 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  remote.state.tasks = [{ task_id: 'sandbox-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
  // next has nothing to answer, and says run has work and how to start it.
  const ready = await cli(home, ['business','next'], { env }), escaped = stateDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
- assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run\nNothing yet\\.\n$`));
+ assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run\n$`), 'an agent step waits, so next never says Nothing yet');
  const scanned = await cli(home, ['business','run','--once'], { env });
  assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
  assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);
@@ -643,4 +644,82 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  }
  assert.ok(!(await readdir(otherHome)).includes('.claude'), 'nothing is written under ~/.claude');
  assert.equal((await cli(otherHome, ['business','disconnect'], { env: otherEnv })).code, 0);
+});
+
+test('an agent exports a vendor into its app\'s import door: next names the owner-typed key step, run sends 64 KiB chunks with fresh grants and leaves a preview, and nothing secret is printed or kept', async t => {
+ const remote = await fixtureServer(t), seed = await door(t), home = join(directory, 'export-home'), stateDir = join(home, '.rer-business');
+ const env = { RER_BUSINESS_STATE_DIR: stateDir }, escaped = stateDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+ // The shipped adapter's fixed vendor origin is answered at the network edge.
+ const vendorEnv = { ...env, NODE_OPTIONS: `--import=${join(fixture, 'register.mjs')} --import=${join(fixture, 'vendor-edge.mjs')}` };
+ await connect(home, remote, { env });
+ seed.state.stateDir = stateDir;
+ // Claim is done and the app's door is on: the export is the agent's step.
+ remote.state.door = seed;
+ remote.state.tasks = [{ task_id: 'biz:seed:uptime:export:tool1', kind: 'export.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Export UptimeRobot history', instruction: 'untrusted-run-command-canary' }];
+ const outputs = [];
+ const next = await cli(home, ['business','next'], { env }); outputs.push(next);
+ assert.equal(next.code, 0, next.stderr);
+ assert.match(next.stdout, new RegExp(`(?:^|\\n)Agent: biz:seed:uptime:export:tool1\\n[\\s\\S]*ask the owner to type this in their own terminal[\\s\\S]*\\n  RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business vendor-key add uptimerobot\\nThen run: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run\\n$`), next.stdout);
+ assert.ok(!next.stdout.includes('Nothing yet') && !next.stdout.includes('untrusted-run-command-canary'), next.stdout);
+
+ // Without the owner's key, run hands the task back as paused and names the owner's command, not "Nothing yet".
+ const keyless = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(keyless);
+ assert.equal(keyless.code, 1, keyless.stdout);
+ assert.ok(keyless.stderr.includes('business vendor-key add uptimerobot') && !keyless.stdout.includes('Nothing yet'), keyless.stderr);
+ assert.equal(remote.state.released.reason, 'paused');
+ assert.ok(remote.state.requests.some(entry => entry.route === '/api/business/tasks/biz%3Aseed%3Auptime%3Aexport%3Atool1/events' && entry.body.event?.payload.question === 'owner_required'));
+ assert.equal(seed.state.requests.length, 0, 'nothing reaches the door without a key');
+
+ // The owner types the key in a terminal; it goes to the OS credential store (the fixture keychain seam).
+ const key = 'fixture-uptimerobot-read-only-key-never-output';
+ const added = await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: key + '\n', env }); outputs.push(added);
+ assert.equal(added.code, 0, added.stderr);
+ const stored = await cli(home, ['business','next'], { env }); outputs.push(stored);
+ assert.ok(stored.stdout.includes("the owner's read-only UptimeRobot key is stored") && stored.stdout.includes('business vendor-key add uptimerobot'), stored.stdout);
+
+ // An earlier run here was stopped mid-export and Business still holds its lease: next names the export step and run
+ // says it waits for that lease to end, never "Nothing yet".
+ const [exportTask] = remote.state.tasks;
+ remote.state.tasks = [{ ...exportTask, state: 'leased', fence: 3 }];
+ const heldNext = await cli(home, ['business','next'], { env }); outputs.push(heldNext);
+ const heldRun = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(heldRun);
+ assert.equal(heldRun.code, 0, heldRun.stderr);
+ assert.ok(heldNext.stdout.includes('Agent: biz:seed:uptime:export:tool1') && !heldNext.stdout.includes('Nothing yet'), heldNext.stdout);
+ assert.ok(heldRun.stdout.includes('Waiting for the server to hand back the task this computer was doing when it stopped; its earlier lease has not ended yet.') && !heldRun.stdout.includes('Nothing yet'), heldRun.stdout);
+ assert.equal(seed.state.requests.length, 0, 'nothing reaches the door while the earlier lease holds');
+ // The lease ends and Business hands the export back.
+ remote.state.tasks = [exportTask];
+
+ const grantsBefore = remote.state.importGrants;
+ const exported = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(exported);
+ assert.equal(exported.code, 0, exported.stderr);
+ assert.equal(remote.state.phase, 'done', 'Business completed the export after its door held the plan');
+ // The completion reports identifiers only: the door's upload and plan and the bundle's hash.
+ const completed = remote.state.requests.find(entry => entry.route === '/api/business/tasks/biz%3Aseed%3Auptime%3Aexport%3Atool1/complete');
+ assert.deepEqual(completed.body.outputs, { upload_id: seed.state.plans[0].uploadId, plan_id: seed.state.plans[0].planId, bundle_sha256: seed.state.plans[0].bundleSha256 });
+ assert.ok(exported.stdout.includes(`Import preview ready in ${seed.origin}: 600 source records; 600 to create, 0 to update, 0 unchanged, 0 rejected. Nothing was imported`), exported.stdout);
+ assert.deepEqual((await readFile(join(home, 'vendor-requests.log'), 'utf8')).trim().split('\n'), ['/v3/monitors?limit=200 authorized', '/v3/monitors?limit=200&cursor=page2 authorized'], 'the shipped adapter read the vendor with the stored key');
+ // 64 KiB chunks, each with its own single-use grant, then the plan: a preview with no native writes.
+ const [upload] = seed.state.uploads.values(), uploads = seed.state.requests.filter(entry => entry.url === '/api/rer/import/uploads');
+ assert.ok(upload.totalChunks >= 2 && uploads.length === upload.totalChunks && upload.name === 'uptimerobot-monitors.json', `${upload.totalChunks} chunks`);
+ assert.deepEqual(uploads.map(entry => JSON.parse(entry.body).index), [...uploads.keys()]);
+ assert.ok(uploads.slice(0, -1).every(entry => Buffer.from(JSON.parse(entry.body).base64, 'base64').length === 65_536));
+ const authorizations = seed.state.requests.map(entry => entry.authorization);
+ assert.equal(new Set(authorizations).size, authorizations.length, 'every door request carries a fresh grant');
+ assert.equal(remote.state.importGrants - grantsBefore, authorizations.length, 'each grant was asked of Business for one request');
+ assert.equal(seed.state.plans.length, 1); assert.equal(seed.state.nativeWrites, 0, 'the import is a zero-write preview');
+ assert.deepEqual(upload.bytes.toString('utf8').trim().split('\n').flatMap(line => JSON.parse(line).data).map(monitor => monitor.id), Array.from({ length: 600 }, (_, index) => 800000 + index));
+ // The bundle was a private 0600 state file while it uploaded, and is gone after completion.
+ assert.ok(seed.state.bundleModes.length >= 2 && seed.state.bundleModes.every(mode => mode === 0o600), JSON.stringify(seed.state.bundleModes));
+ assert.ok(!(await readdir(stateDir)).some(name => name.endsWith('.bundle')), 'the bundle is removed after completion');
+ // The key is never printed, sent to Business or the door, or kept outside the OS store; vendor records are never printed.
+ const printed = outputs.map(result => result.stdout + result.stderr).join('');
+ assert.ok(!printed.includes(key) && !printed.includes('Fixture monitor'), 'neither the key nor vendor records are printed');
+ assert.ok(!JSON.stringify(remote.state.requests).includes(key) && !JSON.stringify(seed.state.requests).includes(key), 'the key reaches neither Business nor the door');
+ for (const name of await readdir(stateDir)) assert.ok(!(await readFile(join(stateDir, name), 'utf8')).includes(key), `${name} holds no key`);
+ assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(key), 'the key lives in the OS credential store');
+ // With the export done and nothing else waiting, next and run say so.
+ assert.ok((await cli(home, ['business','next'], { env })).stdout.endsWith('Nothing yet.\n'));
+ assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
+ await assert.rejects(readFile(join(home, 'fake-keychain.json')), { code: 'ENOENT' }, 'disconnect removes the vendor key');
 });

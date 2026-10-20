@@ -156,6 +156,12 @@ export async function server(t) {
    if (route === '/api/business/executors/token') return send(mint(request, body));
    if (route === '/api/business/mcp') return mcp(request, body, send);
    if (route === '/api/business/executors/claim') { requireDevice(request); return send(tasks.claim(body)); }
+   const granting = /^\/api\/business\/tasks\/([^/]+)\/import-grants$/.exec(route);
+   if (granting) {
+    if (request.headers.authorization === `Bearer ${device}`) { requireDevice(request); requireValue(false, 403); }
+    const id = decodeURIComponent(granting[1]); bearer(request, 'tasks', id);
+    return send(tasks.importGrant(id, body));
+   }
    const match = /^\/api\/business\/tasks\/([^/]+)\/(heartbeat|events|complete|release|uploads)$/.exec(route);
    if (match) {
     if (request.headers.authorization === `Bearer ${device}`) { requireDevice(request); requireValue(false, 403); }

@@ -1,4 +1,4 @@
-import { actionBody, classificationOutput, closed, integer, requireValue } from './contract.mjs';
+import { actionBody, classificationOutput, closed, exportOutputs, identifier, integer, requireValue } from './contract.mjs';
 
 const expires = () => new Date(Date.now() + 600_000).toISOString();
 const numeric = ['page', 'total', 'records_done', 'bytes_done', 'progress'];
@@ -40,10 +40,12 @@ export function taskStore(state) {
   runnable(task); requireValue(task.phase === 'ready', 409);
   task.phase = 'leased'; task.fence++; task.lease = expires();
   const id = `grant-${task.summary.task_id}-${task.fence}`, local = task.summary.kind === 'discover.local';
+  // A vendor export names its app's import door once that door is ready (platform grantView).
+  const door = task.summary.kind === 'export.vendor' && state.door;
   task.grants.set(task.fence, { id, task_id: task.summary.task_id, fence: task.fence,
-   destination: local ? state.destination ?? `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/uploads` : task.summary.kind === 'classify.row' ? 'none' : 'unavailable:no-linked-installation',
-   quota_bytes: local ? state.quotaBytes ?? 2 * 1024 * 1024 : 0,
-   ...(local || task.summary.kind === 'classify.row' ? {} : { available: false, reason: 'no-linked-installation' }),
+   destination: local ? state.destination ?? `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/uploads` : task.summary.kind === 'classify.row' ? 'none' : door ? `${door.origin}/api/rer/import/uploads` : 'unavailable:no-linked-installation',
+   quota_bytes: local ? state.quotaBytes ?? 2 * 1024 * 1024 : door ? 2 * 1024 * 1024 : 0,
+   ...(local || task.summary.kind === 'classify.row' ? {} : door ? { import_grants: `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/import-grants` } : { available: false, reason: 'no-linked-installation' }),
    consent: local ? { id: 'consent1', scope: { paths: [state.root] } } : null });
   state.grants.set(id, state.uploadedBytes ?? 0); sync(task);
  }
@@ -69,7 +71,8 @@ export function taskStore(state) {
  function action(id, action, body, mcp = false) {
   actionBody(action, body, mcp);
   const task = find(id); runnable(task);
-  if (body.outputs !== undefined) {
+  if (action === 'complete' && task.summary.kind === 'export.vendor') exportOutputs(body.outputs);
+  else if (body.outputs !== undefined) {
    if (task.summary.kind === 'classify.row') classificationOutput(body.outputs, task.summary.question?.answer_schema);
    else requireValue(Object.keys(body.outputs).length === 0, 409);
   }
@@ -106,6 +109,10 @@ export function taskStore(state) {
     if (task.summary.kind === 'classify.row') {
      requireValue(!state.refuseQuestion && body.outputs !== undefined, 409);
      state.questionCompleted = body.outputs;
+    } else if (task.summary.kind === 'export.vendor') {
+     // The platform's check (exportPreviewCheck): the door holds the reported plan, for the reported upload, of exactly the reported bundle.
+     const { upload_id, plan_id, bundle_sha256 } = body.outputs;
+     requireValue(state.door?.state.plans.some(plan => plan.planId === plan_id && plan.uploadId === upload_id && plan.bundleSha256 === bundle_sha256 && !plan.failureCode), 409, 'business_export_preview_mismatch');
     } else requireValue(task.summary.kind === 'discover.local' && state.uploads.length > 0, 409);
     task.phase = 'done'; task.lease = null;
    }
@@ -125,5 +132,18 @@ export function taskStore(state) {
   return result;
  }
  function heartbeatControls(body) { return { controls: [], cursor: body.cursor ?? 0, cancel_requested: false }; }
- return { find, summary, claim, action };
+ /** POST /api/business/tasks/:taskId/import-grants (platform executors/grants.ts issueImportGrant). */
+ function importGrant(id, body) {
+  closed(body, ['fence', 'grant_id', 'action']); integer(body.fence); identifier(body.grant_id);
+  requireValue(['uploads', 'plan', 'status'].includes(body.action));
+  const task = find(id); runnable(task);
+  requireValue(task.summary.kind === 'export.vendor', 409);
+  const bound = grant(task, body.fence);
+  requireValue(bound.id === body.grant_id && task.fence === body.fence && task.phase === 'leased' && Date.parse(task.lease) > Date.now() && state.door, 409);
+  state.importGrants = (state.importGrants ?? 0) + 1;
+  const namespace = state.exportVendor ?? 'uptimerobot';
+  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${state.door.mint(body.action, namespace)}`,
+   action: body.action, namespace, expires_at: new Date(Date.now() + 300_000).toISOString() };
+ }
+ return { find, summary, claim, action, importGrant };
 }

@@ -54,3 +54,12 @@ export function classificationOutput(value, schema) {
  requireValue(usage.includes(value.usage) && schema.properties?.usage?.enum?.includes(value.usage));
  requireValue(Number.isFinite(value.confidence) && value.confidence >= 0 && value.confidence <= 1);
 }
+/** An export.vendor completion (platform business/imports.ts exportOutputs):
+ * exactly the door's upload_id and plan_id and the bundle's SHA-256. */
+export function exportOutputs(value) {
+ const id = /^[0-9A-Za-z][0-9A-Za-z_-]{0,127}$/;
+ requireValue(value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join() === 'bundle_sha256,plan_id,upload_id', 409, 'business_export_outputs_required');
+ requireValue(typeof value.upload_id === 'string' && id.test(value.upload_id) && typeof value.plan_id === 'string' && id.test(value.plan_id)
+  && typeof value.bundle_sha256 === 'string' && /^[0-9a-f]{64}$/.test(value.bundle_sha256), 400, 'business_export_outputs_invalid');
+ return value;
+}

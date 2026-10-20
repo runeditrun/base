@@ -3,16 +3,16 @@ import { access, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Api, taskPath, pause } from './api.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
-import { nextQuestions, ownerLink, waitingFor } from './questions.mjs';
-import { lockSupervisor, stateDirectory, saveState } from './state.mjs';
+import { nextQuestions, ownerLink, waitingFor, agentWaiting } from './questions.mjs';
+import { lockSupervisor, stateDirectory, saveState, loadState } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
+import { runExport, ExportWaiting, vendorHandle } from './export-task.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
-const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-installation', 'installation-import-origin-unavailable', 'installation-owner-claim-unconfigured', 'connected-seed-import-required']);
 const checkIn = 25_000;
 
 /** Work this computer's tasks. It says what it is doing and what it waits
@@ -20,7 +20,9 @@ const checkIn = 25_000;
  * every exit, including Ctrl-C, SIGTERM and a closed terminal (SIGHUP). */
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
- const parked = new Set(), unlock = await lockSupervisor(), stop = new AbortController();
+ // Tasks this run handed back as paused, with what each waits for. An export
+ // waiting only for the owner's vendor key is picked up again once it is stored.
+ const parked = new Map(), unlock = await lockSupervisor(), stop = new AbortController();
  // A terminal's Ctrl-C reaches npx and this process together, and npx then
  // forwards another SIGINT, which can arrive at any moment until this process
  // has exited. So the handlers stay for the rest of the process: a repeated
@@ -30,10 +32,14 @@ export async function run({ once = false } = {}) {
  const interrupted = signal => () => { unlock.now(); stop.abort(Object.assign(Error('Business supervisor stopped.'), { signal })); };
  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, interrupted(signal));
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(() => stop.abort(Error('Business supervisor stopped for disconnect.')), () => {}); }, 250);
- let progress, said = '', held = null;
+ let progress, said = '', held = null, summaries = [];
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
+ // An agent step that waits is said in its own words, never as "Nothing yet".
+ const waits = () => [...new Set([...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
  try {
   progress = await loadProgress();
+  // A claim saved before this computer stopped is the task it was doing.
+  held = progress.pendingClaim?.task_id ?? null;
   await unlink(join(directory, 'disconnect')).catch(error => { if (error.code !== 'ENOENT') throw error; });
   if (!once) process.stdout.write(`Business run is working this computer's tasks for ${ownerLink(state)}. It checks in every ${checkIn / 1000} seconds and keeps going until you stop it (Ctrl-C).\n`);
   do {
@@ -43,11 +49,14 @@ export async function run({ once = false } = {}) {
     return;
    }
    if (!progress.pendingClaim) {
-    const summaries = await nextQuestions(api, stop.signal);
+    summaries = await nextQuestions(api, stop.signal);
+    const handles = (await loadState())?.vendorHandles ?? [];
+    for (const [id, wait] of parked) if (wait.keyMissing && handles.includes(vendorHandle(wait.keyMissing))) parked.delete(id);
     const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
     if (!selected) {
-     say(waitingFor(state));
-     if (once) { process.stdout.write('Nothing yet.\n'); return; }
+     const waiting = waits();
+     say(waiting.length ? waiting.join('\n') : waitingFor(state));
+     if (once) { if (!waiting.length) process.stdout.write('Nothing yet.\n'); return; }
      await pause(checkIn, stop.signal); continue;
     }
     held = selected.state === 'leased' ? selected.task_id : null;
@@ -67,8 +76,14 @@ export async function run({ once = false } = {}) {
     progress = {}; await saveProgress(progress);
     // A task this computer held before it was stopped stays leased until the
     // lease ends; then the server returns it to ready with its checkpoint.
-    if (!claimed.task && interrupted) say('Waiting for the server to hand back the scan this computer was doing when it stopped; its earlier lease has not ended yet.');
-    if (once && !claimed.task) { if (!interrupted) say(waitingFor(state)); process.stdout.write('Nothing yet.\n'); return; }
+    if (!claimed.task && interrupted) say('Waiting for the server to hand back the task this computer was doing when it stopped; its earlier lease has not ended yet.');
+    if (once && !claimed.task) {
+     // Only with no agent step waiting does run say "Nothing yet".
+     const waiting = interrupted ? [] : waits();
+     if (!interrupted) say(waiting.length ? waiting.join('\n') : waitingFor(state));
+     if (!interrupted && !waiting.length) process.stdout.write('Nothing yet.\n');
+     return;
+    }
     continue;
    }
    if (!kinds.has(claimed.task.kind) || claimed.task.kind_version !== 1) throw Error('Business server returned an unimplemented task kind.');
@@ -78,28 +93,31 @@ export async function run({ once = false } = {}) {
     progress.current = { kind: claimed.task.kind, checkpoint: claimed.task.checkpoint, uploadedBytes: claimed.task.checkpoint?.bytes_done ?? 0 };
     await saveProgress(progress);
     if (claimed.task.kind === 'export.vendor') {
-     // A destination is not upload authority. Keep vendor keys local until
-     // the seed's signed import grant and chunk transport are connected.
-     await lease.send(taskPath(claimed.task.id, 'events'), { event: { kind: 'question', payload: { question: 'connected_runner_required' } } });
-     parked.add(claimed.task.id);
-     if (claimed.grant.available === false && claimed.grant.destination === `unavailable:${claimed.grant.reason}`) {
-      const reason = unavailableReasons.has(claimed.grant.reason) ? claimed.grant.reason : 'connected-seed-import-required';
-      throw Error(`Business vendor export unavailable: ${reason}. Task released as paused.`);
+     try {
+      const done = await runExport({ lease, task: claimed.task, grant: claimed.grant, directory, say, ownerPage: ownerLink(state) });
+      finished = true;
+      say(done);
+     } catch (error) {
+      if (!(error instanceof ExportWaiting) || lease.signal.aborted) throw error;
+      // Business shows the owner what this export waits for; the lease goes back as paused.
+      parked.set(claimed.task.id, { message: error.message, keyMissing: error.keyMissing });
+      await lease.send(taskPath(claimed.task.id, 'events'), { event: { kind: 'question', payload: { question: error.question } } });
+      throw error;
      }
-     throw Error('Business vendor export needs a connected seed upload grant and execution-input contract.');
+    } else {
+     const page = claimed.task.checkpoint?.page;
+     say(page ? `Resuming the names-only scan of this computer's allowed folders from page ${page + 1}.` : 'Scanning this computer\'s allowed folders for tool names (names only; no file contents leave this computer).');
+     const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
+      send: (destination, body) => lease.send(destination, body), stateDir: directory,
+      saveCheckpoint: async checkpoint => {
+       await lease.checkpointSaved(checkpoint);
+       if (checkpoint.page) process.stdout.write(`Sent page ${checkpoint.page} of ${checkpoint.total}; the server has ${checkpoint.records_done} names and saved this checkpoint.\n`);
+      } });
+     await lease.complete(); finished = true;
+     await result.cleanup();
+     if (!state.discovered) { state.discovered = true; await saveState(state); }
+     say('Business discover.local completed and checked by the server.');
     }
-    const page = claimed.task.checkpoint?.page;
-    say(page ? `Resuming the names-only scan of this computer's allowed folders from page ${page + 1}.` : 'Scanning this computer\'s allowed folders for tool names (names only; no file contents leave this computer).');
-    const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
-     send: (destination, body) => lease.send(destination, body), stateDir: directory,
-     saveCheckpoint: async checkpoint => {
-      await lease.checkpointSaved(checkpoint);
-      if (checkpoint.page) process.stdout.write(`Sent page ${checkpoint.page} of ${checkpoint.total}; the server has ${checkpoint.records_done} names and saved this checkpoint.\n`);
-     } });
-    await lease.complete(); finished = true;
-    await result.cleanup();
-    if (!state.discovered) { state.discovered = true; await saveState(state); }
-    say('Business discover.local completed and checked by the server.');
    } catch (error) { failure = lease.signal.aborted ? lease.signal.reason : error; }
    finally {
     if (!finished && failure?.status !== 401) {
