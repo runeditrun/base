@@ -39,6 +39,25 @@ export async function destinationLedger(db) {
 }
 const entry=row=>({name:row.name,...(typeof row.sha256==='string'?{sha256:row.sha256}:{})});
 
+// Resolve ledger identities against the destination's own migration files.
+// Hash-bearing entries must identify exactly one file; a coinciding name may
+// confirm that file, but cannot point at another one. Hashless native rows
+// retain exact-name matching. The caller keeps the destination's replay order.
+export function matchMigrationLedger(entries,files) {
+  return entries.map(m=>{
+    const named=files.find(file=>file.name===m.name);
+    if(m.sha256===undefined) {
+      insist(named,'migration_ledger:unknown:'+m.name,409);
+      return named.name;
+    }
+    const matches=files.filter(file=>file.sha256===m.sha256);
+    insist(matches.length,'migration_ledger:unknown:'+m.name,409);
+    insist(matches.length===1,'migration_ledger:ambiguous:'+m.name,409);
+    insist(!named || named===matches[0],'migration_ledger:conflict:'+m.name,409);
+    return matches[0].name;
+  });
+}
+
 /** The ledger tables an archive carries (old archives carried rer_migrations before it became bookkeeping). */
 export const archivedLedgerTables=manifest=>manifest.tables.filter(t=>ledgerNames.includes(identifier(t.name)));
 
