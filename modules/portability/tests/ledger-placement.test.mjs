@@ -25,7 +25,7 @@ const plan=[
 const archived=['0001_items.sql','0900_jobs.sql','0950_policies.sql'];
 const platformLedger='CREATE TABLE rer_migrations (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)';
 const nativeLedger='CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)';
-const replay=files=>async()=>migrationReplay(files.map(({name,sql,sha256})=>({name,statements:[sql],sha256})),policy);
+const replay=files=>async()=>migrationReplay(files.map(({name,sql,sha256,aliases})=>({name,statements:[sql],sha256,aliases})),policy);
 
 async function platformDestination(t,{native=false,prefix='',files=plan}={}) {
   const target=await database(t,[native?nativeLedger:platformLedger],policy);
@@ -115,5 +115,21 @@ test('ambiguous file hashes, conflicting names and the first unknown hashless en
     await assert.rejects(importArchive(target.service,path,[]),error=>error.code===`migration_ledger:${kind}:${name}`);
     assert.deepEqual(await all(target.db,'SELECT * FROM items'),[]);
     assert.deepEqual(await all(target.db,'SELECT id FROM rer_portability_jobs'),[]);
+  });
+});
+
+test('name-only archives use declared deployment names and refuse an ambiguous alias before staging',async t=>{
+  for(const ambiguous of [false,true])await t.test(ambiguous?'ambiguous':'declared',async t=>{
+    const files=plan.map(m=>({...m,aliases:['delivered-'+m.name]}));
+    if(ambiguous)files[1].aliases.push('delivered-'+files[0].name);
+    const target=await platformDestination(t,{native:true,files});
+    const {path,source}=await retainedArchive(t,{native:true,prefix:'delivered-'});
+    if(ambiguous) {
+      await assert.rejects(importArchive(target.service,path,[]),error=>error.code==='migration_ledger:ambiguous:delivered-0001_items.sql');
+      assert.deepEqual(await all(target.db,'SELECT id FROM rer_portability_jobs'),[]);
+    } else {
+      await importArchive(target.service,path,[]);
+      assert.deepEqual(await all(target.db,'SELECT * FROM items'),await all(source.db,'SELECT * FROM items'));
+    }
   });
 });

@@ -22,14 +22,15 @@ export async function appliedMigrations(db) {
 // rewrites restorable data is refused, whether or not it changes the schema,
 // unless its statement is replayed at finalize (backfills.mjs).
 async function placement(db,manifest,cat,replay,ledger,history) {
-  const files=replay.names.map(name=>({name,sha256:replay.sha256?.(name)}));
+  const files=replay.names.map(name=>({name,sha256:replay.sha256?.(name),aliases:replay.aliases?.(name)}));
   // An aligned replayer keeps its existing contract: hashes are optional.
   // Resolve destination aliases only when its ledger uses different names.
   let applied=ledger.map(m=>m.name);
-  if(canonicalJson(replay.names)!==canonicalJson(applied))applied=matchMigrationLedger(ledger,files);
+  if(canonicalJson(replay.names)!==canonicalJson(applied))applied=matchMigrationLedger(ledger,files,replay);
   insist(canonicalJson(replay.names)===canonicalJson(applied) && await replay.schemaAfter(applied)===cat.identity,'schema_mismatch');
-  const historyEntries=manifest.migrations?.map(name=>({name})) ?? history?.();
-  const recorded=historyEntries && matchMigrationLedger(historyEntries,files);
+  const archived=history?.();
+  const historyEntries=manifest.migrations?.map(name=>archived?.find(entry=>entry.name===name) ?? {name}) ?? archived;
+  const recorded=historyEntries && matchMigrationLedger(historyEntries,files,replay);
   let earlier,unapplied;
   if(recorded) {
     earlier=applied.filter(name=>recorded.includes(name));
@@ -54,10 +55,10 @@ async function placement(db,manifest,cat,replay,ledger,history) {
   // of a table the archive holds no rows of (migration-statements.mjs). A data
   // statement that writes only tables outside the catalogue is admitted
   // whatever it reads; a backfill of a table the archive lacks is replayed.
-  const catalogue=cat.tables.map(t=>t.name),archived=catalogue.filter(name=>manifest.tables.some(t=>t.name===name));
-  const empty=archived.filter(name=>!manifest.tables.find(t=>t.name===name).count);
+  const catalogue=cat.tables.map(t=>t.name),archivedTables=catalogue.filter(name=>manifest.tables.some(t=>t.name===name));
+  const empty=archivedTables.filter(name=>!manifest.tables.find(t=>t.name===name).count);
   const tables=(await all(db,"SELECT name FROM sqlite_master WHERE type IN ('table','view')")).map(t=>t.name);
-  const {replays,rebuilt}=laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets:manifest.excludedColumns??{},manifest:manifest.tables});
+  const {replays,rebuilt}=laterData({applied,unapplied,replay,catalogue,archived:archivedTables,empty,tables,secrets:manifest.excludedColumns??{},manifest:manifest.tables});
   return {applied,earlier,replays,rebuilt};
 }
 // An archive with the destination's schema identity can still predate later
