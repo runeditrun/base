@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73-dev.g0d61845a",
+  "cliVersion": "0.2.73-dev.g29c1f69d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3027,7 +3027,7 @@
     },
     "scripts/publish-check/credential_assignments.py": {
       "source": "scripts/publish-check/credential_assignments.py",
-      "sha256": "102c2588bcf532347b2f29023a9728910be55986a59e94607b16dadb8c050815"
+      "sha256": "106bcc05fc6796cdadb838b85cab9452afd658410362e85b1c5740ca0735f191"
     },
     "scripts/publish-check/credential_literals.mjs": {
       "source": "scripts/publish-check/credential_literals.mjs",

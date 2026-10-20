@@ -46,11 +46,12 @@ class AssignmentScanner:
 scanner = AssignmentScanner()
 
 
-def text_rules(data, path, config, env_hashes, *, commit_message=False):
+def text_rules(data, path, config, env_hashes, **message_options):
     rules, provenance, references = publication_text_rules(data, path, config, env_hashes,
-                                                         commit_message=commit_message)
-    # Hosted source scanning covers archive files, not Git messages or path text.
-    if path not in ('@commit-message', '@tag-message'):
+                                                         **message_options)
+    # History explicitly supplies True for commits and False for annotated tags.
+    # File calls omit that flag, even when the file has a metadata-looking name.
+    if 'commit_message' not in message_options:
         rules.update(scanner.findings(data, path))
     return rules, provenance, references
 
