@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73-dev.g96bc0ecc",
+  "cliVersion": "0.2.73-dev.g63b1a479",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -800,10 +800,6 @@
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
       "sha256": "e540e9b5e48d9c27c0b54ca52d12c25273b917004111ebc389c25d08f67b5ada"
-    },
-    "cli/gr300b-replay.probe.mjs": {
-      "source": "cli/gr300b-replay.probe.mjs",
-      "sha256": "a225a817f9fc47b1e5f0af4f07a037f09694ce509088a660a88a5e64ba4ad383"
     },
     "cli/hosted-export-command.mjs": {
       "source": "cli/hosted-export-command.mjs",
