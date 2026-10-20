@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.75-dev.g58dc718e",
+  "cliVersion": "0.2.75-dev.g066110de",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3043,7 +3043,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "6328716b772245d9051b5f2af73b1566a9a02e87b31d0c59ea4980ea44ba2bc6"
+      "sha256": "cb0054c99e4608766e97158557002fb13771744d87e700241a6fa34d3b3c7189"
     },
     "scripts/publish-check/c2pa.py": {
       "source": "scripts/publish-check/c2pa.py",
@@ -3091,7 +3091,7 @@
     },
     "scripts/publish-check/env_values.py": {
       "source": "scripts/publish-check/env_values.py",
-      "sha256": "a2cbbe311d8e43db4bf7cc530d314fa5f7154c99f5d33ea072c24de4353aa1a4"
+      "sha256": "d26d0dca907a808f3a8850e7d013f5a73f5b3358bf89e49959420c9615c9ddd5"
     },
     "scripts/publish-check/font_licence.py": {
       "source": "scripts/publish-check/font_licence.py",
