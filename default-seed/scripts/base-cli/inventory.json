@@ -939,7 +939,7 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "095d1a61cdfdeb18c2e4080b73d7015e83aa055fe6bb1fe0ef11237cd77652b0"
+      "sha256": "5e3c9c7a53e6f254af310e2f3842ca17ebd851c8175abb7c602f1d07e04a027b"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
@@ -1231,7 +1231,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "ec0600ac7ee27e3cfc7da47e25beea28dc90cce832d682efb1abe7cd5a04b182"
+      "sha256": "b3ab7174af977b3eb5e88bd0e0abf7b0f494211088b0ef483ecedd2baaa87f6a"
     },
     "modules/container/demo-egress.mjs": {
       "source": "modules/container/demo-egress.mjs",
@@ -2820,6 +2820,10 @@
     "modules/portability/migration-history.mjs": {
       "source": "modules/portability/migration-history.mjs",
       "sha256": "8ce67cea4f4626ea212df3ac514b0b16746c55fe4ef75413f1b47935da8af63e"
+    },
+    "modules/portability/migration-sql.mjs": {
+      "source": "modules/portability/migration-sql.mjs",
+      "sha256": "8bda4ab14f193dac4cdc5e9ee3e2d4f98dd14d7fe2b81031d36bb8e6479e9366"
     },
     "modules/portability/migration-statements.mjs": {
       "source": "modules/portability/migration-statements.mjs",

@@ -22,7 +22,13 @@ test('built container applies the same complete ordered migration inventory as d
  `);
  await writeFile(join(root,'wrangler.jsonc'),JSON.stringify({name:'container-migrations',main:'src/server.ts',compatibility_date:'2026-09-01',d1_databases:[{binding:'DB',database_name:'notes',database_id:'00000000-0000-0000-0000-000000000000',migrations_dir:'migrations/core'}]}));
  const sql=[
-  ['core','0200_notes.sql','CREATE TABLE notes(id INTEGER PRIMARY KEY,value TEXT);'],
+  ['core','0200_notes.sql',`CREATE TABLE notes(
+   id INTEGER PRIMARY KEY,
+   -- The note's original text.
+   value TEXT /* Kept across container restarts. */
+  );
+  CREATE TRIGGER notes_insert AFTER INSERT ON notes BEGIN SELECT CASE WHEN NEW.value IS NULL THEN 'empty' ELSE 'note' END||NEW.id; END;
+  CREATE INDEX notes_value ON notes(value);`],
   ['base','0001_owner.sql',"INSERT INTO notes VALUES(1,'owner');"],
   ['import','0002_import.sql',"INSERT INTO notes VALUES(2,'imported');"],
   ['updates','0003_update.sql',"UPDATE notes SET value='updated' WHERE id=2;"],
