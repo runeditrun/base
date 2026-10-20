@@ -437,7 +437,8 @@ run outside the sandbox; until then `status` says revoked, never paired.
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
 `remove` deletes it. The same commands support `uptimerobot`, `pagerduty` and
-`calendly`. Never put a key in command arguments, chat or a URL.
+`calendly`. Sorry's export reads its public status page and needs no key. Never
+put a key in command arguments, chat or a URL.
 
 `rer business next` returns, within 60 seconds, one locally templated
 classification, owner link or agent step, or says what `run` would start, and
@@ -446,7 +447,11 @@ import door is on, its `export.vendor` task is the agent's step, and so are a
 move's `catchup.vendor` (bringing over what changed in the old tool) and
 `switchoff.archive` (the final archive before switch-off): next names the step,
 the owner-typed `rer business vendor-key add <vendor>` (or says the key is
-already stored) and `rer business run`. A move's owner steps (`freeze.vendor`,
+already stored, or that the vendor needs none) and `rer business run`. Run reads
+the adapter's non-secret inputs from the leased task's `export_inputs` (Sentry's
+organization and window, PagerDuty's window and `schedules: 'all'` (every rota
+moves), Sorry's page host); a task that does not carry them yet is handed
+back as paused until Business has them. A move's owner steps (`freeze.vendor`,
 a `rollback.*` card, `switchoff.cancel`) are named as the owner's, with the
 move's page (`/business/:id/moves/:toolId` when the summary names its
 `tool_id`, else the switch-over board `/business/:id`), never as agent work. It

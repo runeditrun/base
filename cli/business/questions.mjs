@@ -4,7 +4,7 @@ import { sensitive } from './detector.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
-import { titledVendor, keyStep, vendorNames, vendorHandle } from './vendor-door.mjs';
+import { titledVendor, keyStep, keyed, vendorNames, vendorHandle } from './vendor-door.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
@@ -136,8 +136,9 @@ export async function next() {
   const vendor = titledVendor(item.kind, item.title), name = vendor ? vendorNames[vendor] : 'vendor';
   const stored = vendor && (state.vendorHandles ?? []).includes(vendorHandle(vendor));
   process.stdout.write(`Agent: ${id}\nStep: ${vendorSteps[item.kind](name)}\n`
-   + (stored ? `Vendor key: the owner's read-only ${name} key is stored in this computer's OS credential storage. To replace it, ${keyStep(vendor)}\n`
-    : `Vendor key: ${keyStep(vendor)}${vendor ? '' : `\n  where <vendor> is the tool this step reads: ${Object.keys(vendorNames).join(' | ')}`}\n`)
+   + (vendor && !keyed(vendor) ? `Vendor key: none; ${name} is read from its public page, with no key.\n`
+    : stored ? `Vendor key: the owner's read-only ${name} key is stored in this computer's OS credential storage. To replace it, ${keyStep(vendor)}\n`
+    : `Vendor key: ${keyStep(vendor)}${vendor ? '' : `\n  where <vendor> is the tool this step reads: ${Object.keys(vendorNames).filter(keyed).join(' | ')}`}\n`)
    + `Then run: ${businessCommand('run')}\n`);
   return;
  }

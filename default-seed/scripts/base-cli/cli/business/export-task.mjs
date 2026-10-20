@@ -6,7 +6,7 @@ import { withUploadedBundle, door, checkedPreview, plural } from './vendor-door.
  * Returns the line to say. */
 export function runExport({ lease, task, grant, directory, say, ownerPage }) {
  return withUploadedBundle({ lease, task, grant, directory, say,
-  doing: (name, origin) => `Exporting ${name} through the shipped read-only adapter. The key stays on this computer; records go only to the app's import door at ${origin}.` },
+  doing: (name, origin, keyed) => `Exporting ${name} through the shipped read-only adapter. ${keyed ? 'The key stays on this computer; records' : 'Records'} go only to the app's import door at ${origin}.` },
  async ({ origin, uploadId, bundle, fresh }) => {
   const preview = await door(await fresh('plan'), { uploadId }, lease.signal), { records, created, updated, unchanged, rejected } = checkedPreview(preview, bundle);
   // Identifiers only: Business reads that plan from the door with its own grants

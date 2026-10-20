@@ -15,12 +15,15 @@ with their own supported readers and native adapters.
 
 `exportVendor(vendor, {key, inputs, checkpoint, signal})` is an async generator.
 It yields `{name, bytes: Buffer, checkpoint}`. Keys remain in memory and are
-attached only to GET requests on the adapter's fixed HTTPS origin. Redirects,
+attached only to GET requests on the adapter's fixed HTTPS origin. Sorry reads a
+public status page and takes no key (`key` must be absent); `KEYED_VENDORS` lists
+the vendors that need one. Redirects,
 caller origins, arbitrary paths and credential-bearing pagination are refused.
 No export runs merely by importing these modules. No account export was run
 during implementation.
 
-`VENDORS` is the closed vendor enum. `VENDOR_CAPABILITIES` describes the adapter,
+`VENDORS` is the closed vendor enum (`sentry`, `uptimerobot`, `pagerduty`,
+`calendly`, `sorry`). `VENDOR_CAPABILITIES` describes the adapter,
 required vendor-key capability, native importer format, layout and read scopes.
 These adapters cannot verify that a supplied key itself has read-only scope;
 the owner must create the documented read-only key where the vendor offers one.
@@ -51,7 +54,8 @@ import. Never treat a partial stream as a completed bundle.
 Every item is at most 1 MiB. Exports are bounded to 1,000 requests, one request
 per second, 30 seconds per request, 2 MiB/499 API records for Sentry,
 512 KiB/500 records for PagerDuty, and 8 MiB/2,500 records for UptimeRobot and
-Calendly. The output bound includes JSON framing and Calendly's manifest.
+Calendly. Sorry follows Lamp's reader: at most 200 requests (one saved file
+each), one every 125 ms, 8 MiB of responses, 5,000 records and a 16 MiB bundle. The output bound includes JSON framing and Calendly's manifest.
 Limits stop rather than truncate. AbortSignal stops waits, HTTP reads and
 emission. HTTP errors contain only a fixed code and numeric status; network,
 parsing and unexpected errors never expose response text, URLs or key values.
@@ -110,9 +114,23 @@ pagination link is still refused.
 * `pagerduty`: `start`/`end` (or `since`/`until`). Exports users, schedule details
   with layers/final coverage, overrides for the window and escalation policies.
   Schedule listing only discovers IDs and is not duplicated in the bundle.
+  Oncall compares a schedule's final timeline over at most 31 days, so the
+  Business CLI passes a window of at most 31 whole UTC days ending two weeks
+  ahead.
   Overrides retain full boundaries with `overflow=true` and add `schedule_id`,
   as Oncall's documented bundle requires. Incident history and paging
   configuration are not fetched.
+* `sorry`: `page: {host}`, the public status page's host name (a public DNS
+  name; no scheme, port, path, IP address or local name). Reads, anonymously,
+  `/api/v1/status`, every `components` and `notices` page (`meta.next_page`) and
+  each notice's detail with its components and full update history, like Lamp's
+  public Move in. The bundle is Lamp's door `sorry` source: `{source: 'sorry',
+  publicUrl, publicAccessAcknowledged: true, files: [{name, text}]}`, each file
+  the original response text under the name Lamp's reader requires
+  (`sorry-status.json`, `sorry-components[-N].json`, `sorry-notices[-N].json`,
+  `sorry-notice-<id>.json`). Every response came from the page's own public API,
+  so it is public by construction; Lamp still refuses private or
+  audience-scoped records, and public responses carry no subscribers.
 * `calendly`: optional `asOf` timestamp (recommended for a repeatable catch-up).
   An omitted timestamp is captured at first invocation and retained on resume.
   Downloads the current user, event types, availability schedules, per-type
@@ -129,6 +147,8 @@ their file-writing command wrappers.
 
 * [Dial downloader at 6014c99875dd002545e194ab23a7852d30e94e01](https://github.com/just-every/run-dial/blob/6014c99875dd002545e194ab23a7852d30e94e01/scripts/move-in/download.mjs).
 * [Uptime guide at 157686b52ecc652d64250a30ec224f1a47355a6c](https://github.com/just-every/run-uptime/blob/157686b52ecc652d64250a30ec224f1a47355a6c/docs/moving-from-uptimerobot.md).
+* [Lamp's Sorry public reader at a0179bfe](https://github.com/just-every/run-lamp/blob/a0179bfe/src/core/features/statuspage-import/sorry/fetch.ts)
+  and its door source (`door-plan.ts` `doorExport`).
 * [Oncall guide at 4f928effc3ce735f3d246bb8a3c4bbb8436cae6b](https://github.com/just-every/run-oncall/blob/4f928effc3ce735f3d246bb8a3c4bbb8436cae6b/docs/move-in.md).
 * Spool's proposal-cited `app/docs/SENTRY-SWITCHING.md` and
   `app/src/domain/sentry-import/source.ts`, local source commit
