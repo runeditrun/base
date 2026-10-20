@@ -72,7 +72,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     : await ownerTarget(api,{project:declaration.project,environment:values.environment});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${target.environment}.json`);
   if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
-  if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env});
+  if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice});
   if (command === 'secret') {
     // Every named secret is changed in one Worker version, or none is.
     const named = [...new Set(values.set ?? values.unset)], declared = Array.isArray(declaration.secrets) ? declaration.secrets : [];

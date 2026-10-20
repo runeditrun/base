@@ -26,7 +26,7 @@ export async function sealDependencyKey(config, contract, value) {
  const { key, kid } = await material(config.INSTALLATION_KEY);
  return JSON.stringify({ version: 1, kid, ...await encryptJson(key, aad(contract, kid), value) });
 }
-export async function openDependencyKey(config, contract, raw, { currentOnly = false, allowPlaintext = false, knownKeyIds } = {}) {
+export async function openDependencyKey(config, contract, raw, { currentOnly = false, allowPlaintext = false, knownKeyIds, retiredKeys = [] } = {}) {
  requireInstallationKey(config);
  let value;try { value = JSON.parse(raw); } catch { fail(); }
  // Only a complete legacy private JWK is upgradeable. An envelope, even a
@@ -36,7 +36,7 @@ export async function openDependencyKey(config, contract, raw, { currentOnly = f
   return { key: value, reseal: true };
  }
  if (!value || value.version !== 1 || typeof value.kid !== 'string' || typeof value.iv !== 'string' || typeof value.ciphertext !== 'string' || Object.keys(value).sort().join(',') !== 'ciphertext,iv,kid,version') fail();
- const secrets = [config.INSTALLATION_KEY, ...(!currentOnly && validSecret(config.INSTALLATION_KEY_PREVIOUS) ? [config.INSTALLATION_KEY_PREVIOUS] : [])];
+ const secrets = [config.INSTALLATION_KEY, ...(!currentOnly ? [...(validSecret(config.INSTALLATION_KEY_PREVIOUS) ? [config.INSTALLATION_KEY_PREVIOUS] : []), ...retiredKeys] : [])];
  let matched = false;
  for (let i = 0; i < secrets.length; i++) {
   try {
@@ -46,7 +46,7 @@ export async function openDependencyKey(config, contract, raw, { currentOnly = f
    const jwk = await decryptJson(key, aad(contract, kid), value);
    if (!privateJwk(jwk)) continue;
    return { key: jwk, reseal: i > 0 };
-  } catch { /* Try only the optional previous secret, then refuse. */ }
+  } catch { /* Try the remaining explicitly supplied custody, then refuse. */ }
  }
  // Known version IDs contain no key material. They distinguish a missing
  // retired version from tampering or a wrong supplied installation secret.

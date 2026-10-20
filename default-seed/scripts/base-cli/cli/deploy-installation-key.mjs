@@ -1,6 +1,7 @@
 import { savedSecrets, saveSecrets, savedSecretsFile, liveSecretNames } from './deploy-secrets.mjs';
 import { refuse, RerError } from './errors.mjs';
 import { installationKeyId } from '../modules/dependencies/sealing.mjs';
+import { retiredInstallationKeys as parseRetiredKeys } from '../modules/dependencies/custody.mjs';
 import { shared } from './shared.mjs';
 import { join } from 'node:path';
 
@@ -23,11 +24,11 @@ export async function rotateInstallationKey({ root, environment, declaration, en
  if (saved.INSTALLATION_KEY_REOPEN) throw refuse('Installation key reopen is unfinished. Resume --reopen-installation-key with the saved key ID before rotating.');
  const pair = { INSTALLATION_KEY: saved.INSTALLATION_KEY_PREVIOUS ? saved.INSTALLATION_KEY : env[current.environment], INSTALLATION_KEY_PREVIOUS: saved.INSTALLATION_KEY_PREVIOUS ?? saved.INSTALLATION_KEY };
  if (!pair.INSTALLATION_KEY || pair.INSTALLATION_KEY === pair.INSTALLATION_KEY_PREVIOUS) throw refuse('Installation key rotation requires distinct current and previous keys.');
- addSecrets(Object.values(pair));
  const retired = await retiredInstallationKeys(saved);
  retired.set(await installationKeyId(pair.INSTALLATION_KEY_PREVIOUS), pair.INSTALLATION_KEY_PREVIOUS);
+ addSecrets([...Object.values(pair), ...retired.values()]);
  await saveSecrets(root, environment, { ...pair, INSTALLATION_KEY_RETIRED: serializeRetired(retired) });
- await resealAndRetire({root, environment, current, previous, pair, env, state, owner});
+ await resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report});
  report('Rotated INSTALLATION_KEY, resealed every dependency key, and removed INSTALLATION_KEY_PREVIOUS after verifying the owned Worker. Retired keys remain in private custody for older D1 restores.');
 }
 
@@ -40,9 +41,9 @@ export async function reopenInstallationKey({ root, environment, declaration, en
  if (!saved.INSTALLATION_KEY || !retired.has(kid)) throw unavailable('The requested retired installation key is not in this environment\'s private custody. Restore the private deployment secrets file from the deploying checkout, or relink dependencies. Nothing was uploaded.');
  if (saved.INSTALLATION_KEY_PREVIOUS && (saved.INSTALLATION_KEY_REOPEN !== kid || saved.INSTALLATION_KEY_PREVIOUS !== retired.get(kid))) throw refuse('Another installation key operation is unfinished. Resume its recorded rotation or reopen first.');
  const pair = { INSTALLATION_KEY: saved.INSTALLATION_KEY, INSTALLATION_KEY_PREVIOUS: retired.get(kid) };
- addSecrets(Object.values(pair));
+ addSecrets([...Object.values(pair), ...retired.values()]);
  await saveSecrets(root, environment, {...pair, INSTALLATION_KEY_REOPEN:kid});
- await resealAndRetire({root, environment, current, previous, pair, env, state, owner});
+ await resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report});
  report(`Reopened retired installation key ${kid}, resealed and verified every dependency key with the current key, and removed INSTALLATION_KEY_PREVIOUS. Retired custody is retained.`);
 }
 
@@ -50,23 +51,15 @@ const unavailable = message => new RerError('installation_key_unavailable', mess
 const serializeRetired = retired => [...retired].map(([kid, value]) => `${kid}:${value}`).join(',');
 
 async function retiredInstallationKeys(saved) {
- const retired = new Map();
- if (!saved.INSTALLATION_KEY_RETIRED) return retired;
- try {
-  for (const entry of saved.INSTALLATION_KEY_RETIRED.split(',')) {
-   const [kid, value, extra] = entry.split(':');
-   if (extra !== undefined || !kid || retired.has(kid) || await installationKeyId(value) !== kid) throw new Error('invalid-retired-custody');
-   retired.set(kid, value);
-  }
- } catch { throw unavailable('Retired installation key custody is invalid. Restore the private deployment secrets file before rotating or reopening. Nothing was uploaded.'); }
- return retired;
+ try { return await parseRetiredKeys(saved.INSTALLATION_KEY_RETIRED); }
+ catch { throw unavailable('Retired installation key custody is invalid. Restore the private deployment secrets file before rotating or reopening. Nothing was uploaded.'); }
 }
 
-async function resealAndRetire({root, environment, current, previous, pair, env, state, owner}) {
+async function resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report}) {
  const values = { ...env, [current.environment]: pair.INSTALLATION_KEY, [previous.environment]: pair.INSTALLATION_KEY_PREVIOUS };
  const extra = state ? ['--state', state] : [];
  await owner('secret', ['--set', current.binding, '--set', previous.binding, ...extra], values);
- await owner('rekey', extra, values);
+ await owner('rekey', extra, {...values, INSTALLATION_KEY_RETIRED:serializeRetired(retired)}, {notice:report});
  await owner('secret', ['--unset', previous.binding, ...extra], values);
  // The retired key stays private after its binding is read back absent.
  const retained = await savedSecrets(root, environment);

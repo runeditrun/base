@@ -468,7 +468,7 @@ stops, run the same command again; it resumes the saved pair. Manual set/unset o
 these bindings is refused.
 
 A D1 backup or Time Travel restore from before a rotation can restore ciphertext
-that needs a retired key. Reopen only that key explicitly:
+that needs retired keys. Select a retained key explicitly:
 
 ```sh
 rer deploy --reopen-installation-key KID
@@ -480,10 +480,18 @@ this ID is different from the signing JWK's ID. Include the original deployment'
 current key and selected retired key as `INSTALLATION_KEY_PREVIOUS`, reseals all
 dependency keys through the recorded D1, verifies them under the current key,
 then removes the previous binding while retaining all retired custody. It skips
-the build and upload hook. A failure preserves the exact pair and reopen marker;
+the build and upload hook. CLI-side rekey receives every validated retired key
+in custody, allowing a mid-rotation snapshot with multiple retired envelope IDs
+to reopen with either ID; these additional keys are never Worker bindings.
+Reopen/rekey prints the D1 `key_ids` tail and custody availability for each history
+ID before opening rows, even when the tail is unavailable. A whole pre-rotation
+restore whose history tail is unavailable reports `installation_key_unavailable`;
+`installation_key_version_unknown` applies to a known row ID only after that
+history custody check succeeds.
+A failure preserves the exact pair and reopen marker;
 repeat the same command before other deploy changes. Missing retired custody
 refuses with `installation_key_unavailable` before any provider write: recover
-the private file or relink dependencies. For backups spanning several rotations,
+the private file before reopening. For backups spanning several rotations,
 retain every historical key; unrelated ciphertext never silently regenerates keys.
 
 Base versions before #367 cannot open sealed dependency keys. Roll forward to a

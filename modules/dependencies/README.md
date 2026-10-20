@@ -68,10 +68,19 @@ Restoring D1 backups or Time Travel from before a rotation may require an older
 key. `rer deploy --reopen-installation-key KID` explicitly publishes the current
 key and that retained retired key as `INSTALLATION_KEY_PREVIOUS`, re-seals and
 verifies every row under the current key, then removes the previous binding.
+CLI-side rekey uses every validated retired key in private custody, so a
+mid-rotation snapshot containing rows under multiple retired keys can be reopened
+with either retained ID. Only the selected pair is published to the Worker.
+Reopen/rekey reports the D1 `key_ids` tail and whether each history ID is in
+custody before opening rows, including when the tail check refuses the restore.
 It retains retired custody and resumes the same pair after interruption. Missing
 retired custody refuses with `installation_key_unavailable`; recover the private
-file or relink the affected dependencies. A historically known envelope key ID
-whose key is no longer configured yields `installation_key_version_unknown`;
+file before reopening. A whole pre-rotation D1 restore also restores `key_ids`:
+if its tail is absent from configured custody, reads refuse with
+`installation_key_unavailable` before inspecting envelopes. When that custody
+check succeeds, a historically known envelope key ID whose key is no longer
+configured yields `installation_key_version_unknown` (for example, a row-only
+restore that retains the current installation history);
 wrong configuration, malformed ciphertext and unrecognised key IDs yield
 `installation_key_unavailable`. Neither failure generates a replacement key.
 
