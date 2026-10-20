@@ -27,6 +27,20 @@ Hexadecimal credential assignments also use a Gitleaks rule without generic
 entropy or English stopword filters. Both assignment rules go through the same
 location-bound Source/module identity classification; provider and environment findings
 remain independent.
+`assignment.py` narrows only comma-separated pairs: the complete left token
+must contain only letters, digits, underscores or hyphens. Gitleaks still
+requires a secret-shaped right value, using its inherited entropy/length policy
+or the hex rule. Native locations bind the check to the full key in files and
+messages, so a filename or path's key-like suffix cannot become a key. Other
+assignment operators retain their existing grammar.
+
+`env_values.py` only hashes decoded dotenv values that have at least 16
+characters, have Shannon entropy greater than 3.5 bits per character (the pinned
+Gitleaks generic-api-key threshold), or start with a known token prefix:
+`sk_`, `sk-`, `pk_live`, `ghp_`, `github_pat_`, `xox`, `AKIA`, `SG.`, or `eyJ`.
+Prefix matching is case-sensitive. Ordinary short words, statuses and short
+numeric IDs therefore do not become environment matches. Eligible values are still
+compared only through in-memory digests and cannot be waived.
 `tree_scan.py` applies the kept text and licence policy. `history_scan.py`
 assigns release, working-tree and historical scopes. Inspection returns each
 text's repository references instead of resolving them; `history_scan.py`

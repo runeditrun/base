@@ -53,7 +53,7 @@ globalThis.fetch = async url => {
  const descriptor = JSON.parse(await readFile(join(root, 'OPERATIONS.json'), 'utf8'));
  delete descriptor.seedContract;
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(descriptor));
- const secretArgument = 'https://service.invalid/?token=private-fixture';
+ const secretArgument = 'synthetic-https://service.invalid/?token=private-fixture';
  const privateFailure = run(['verify', '--', secretArgument], { RER_NODE_AUTO: '0' });
  assert.equal(privateFailure.status, 3);
  assert.ok(!privateFailure.stdout.includes(secretArgument));

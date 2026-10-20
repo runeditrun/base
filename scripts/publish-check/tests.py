@@ -55,6 +55,28 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
         self.commit()
         self.assert_fails('secret.assignment', 'settings.ts')
 
+    def test_hosted_credential_assignment_through_cli(self):
+        value = generic_credential()
+        backlog_fixture = 'cron-' + 'backlog-fixture-' + 'signing-token'
+        cases = [('settings.ts', literal) for literal in
+                 ('synthetic-' + value, '../modules/inbound-email/credentials', value, backlog_fixture)]
+        cases.extend((path, value) for path in ('@commit-message', '@tag-message'))
+        for path, literal in cases:
+            for previous in ('settings.ts', '@commit-message', '@tag-message'):
+                (self.repo / previous).unlink(missing_ok=True)
+            self.write(path, "// configuration\nconst INBOUND_EMAIL_TOKEN = '" + literal + "';\n")
+            result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
+                                    capture_output=True, text=True, timeout=120)
+            report = json.loads(result.stdout)
+            self.assertTrue(literal not in result.stdout + result.stderr, 'diagnostics must never contain the value')
+            if literal in (value, backlog_fixture):
+                self.assertEqual(result.returncode, 1)
+                self.assertTrue(any(f['rule'] == 'SEC-3' and f['path'] == path and f['line'] == 2
+                                    for f in report['findings']))
+            else:
+                self.assertEqual(result.returncode, 0, report)
+                self.assertEqual(report['status'], 'PASS')
+
     def test_copy_digests_require_same_tree_regular_preimages_and_exact_locations(self):
         files = {'base/runtime/api-key.mjs': b'export const enabled = true;\n',
                  'base/runtime/token-cache.py': b'cache = {}\n'}
@@ -631,6 +653,34 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.assertNotIn(value, result.stdout + result.stderr)
         self.assertIn('redacted-path-sha256', result.stdout)
 
+    def test_environment_statuses_and_short_words_do_not_block(self):
+        values = {'STATUS_FLAG': 'submitted', 'STRIPE_MODE': 'test',
+                  'NAMECHEAP_API_USER': 'name', 'ACCOUNT_ID': '1234567890'}
+        self.write('settings.mjs', 'export const settings = ' + json.dumps(values) + ';\n')
+        self.commit()
+        with tempfile.TemporaryDirectory() as directory:
+            env = os.path.join(directory, 'synthetic.env')
+            with open(env, 'w') as file:
+                file.write(''.join(f'{key}={value}\n' for key, value in values.items()))
+            report = self.report(env_file=env)
+            self.assertEqual(report['status'], 'PASS')
+            self.assertTrue(report['complete'])
+            self.assertTrue(report['guarantees']['environmentChecked'])
+            self.assertFalse(any(f['rule'] == 'secret.env-match' for f in report['findings']))
+
+    def test_random_environment_secret_still_blocks(self):
+        value = secrets.token_urlsafe(18)
+        self.write('settings.mjs', 'export const value = ' + json.dumps(value) + ';\n')
+        self.commit()
+        with tempfile.TemporaryDirectory() as directory:
+            env = os.path.join(directory, 'synthetic.env')
+            with open(env, 'w') as file:
+                file.write('VALUE=' + value + '\n')
+            report = self.assert_fails('secret.env-match', 'settings.mjs', env_file=env)
+            self.assertTrue(report['complete'])
+            self.assertTrue(report['guarantees']['environmentChecked'])
+            self.assertNotIn(value, json.dumps(report))
+
     def test_environment_value_cannot_be_waived(self):
         value = 'synthetic-environment-value-' + secrets.token_hex(12)
         self.write('settings.txt', 'TOKEN=' + value)
@@ -797,6 +847,31 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.write(path, json.dumps({**manifest, 'controllerFiles': {
             'config/api-key.json': 'ghp_' + secrets.token_hex(20)}}))
         self.assert_fails('secret.provider-token', path)
+
+    def test_comma_neighbours_require_identifier_keys_and_secret_values(self):
+        migrations = [f'{i:04d}_migration.sql' for i in range(1, 31)]
+        migrations[11:13] = ['0012_base_local_auth.sql', '0013_decision_loop.sql']
+        migrations[28:30] = ['0029_dev_minted_api_tokens.sql', '0030_penny_evidence.sql']
+        archive = {'format': 'rer-archive', 'manifest': {'migrations': migrations}}
+        path = 'tests/fixtures/older-archive/penny.rer'
+
+        def write(neighbours):
+            archive['manifest']['migrations'] = migrations + neighbours
+            self.write(path, json.dumps(archive, separators=(',', ':')) + '\n')
+
+        write([])
+        self.commit()
+        self.assertEqual(self.report()['status'], 'PASS')
+        for value in (generic_credential(), secrets.token_hex(32)):
+            for key in ('api-key.data', 'config/apiKey', 'api key'):
+                with self.subTest(non_identifier=key):
+                    write([key, value])
+                    self.assertEqual(self.report()['status'], 'PASS')
+            write(['apiKey', value])
+            report = self.assert_fails('secret.assignment', path)
+            self.assertTrue(any(f.get('scannerRule') in ('generic-api-key', 'hex-api-key')
+                                and f['scope'] == 'working-tree' for f in report['findings']))
+            self.assertNotIn(value, json.dumps(report))
 
 
 if __name__ == '__main__':

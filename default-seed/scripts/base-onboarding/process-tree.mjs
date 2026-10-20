@@ -1,7 +1,7 @@
 import { scopedProcesses } from './process-scope.mjs'
-import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth, sameProcess, validPid } from './process-table.mjs'
+import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
 
-// Retain PID/start/command identities after close. An exclusive inherited marker
+// Retain PID/start identities across exec and after close. An inherited marker
 // recovers descendants after reparenting; group membership and cwd never grant
 // ownership. Inspect executable identity only for actual custody candidates.
 export async function readOwnedTree(child, previous = [], timeout = inspectionMs, scope = previous.scope) {
@@ -9,12 +9,12 @@ export async function readOwnedTree(child, previous = [], timeout = inspectionMs
   const table = await readProcessTable(timeout)
   const candidates = table.filter(member => previous.some(saved => sameBirth(member, saved)))
   let owned = (await Promise.all(candidates.map(member => readProcessIdentity(member.pid, timeout))))
-    .filter(member => member && previous.some(saved => sameProcess(member, saved)))
+    .filter(member => member && previous.some(saved => sameBirth(member, saved)))
   if (scope) {
     for (const member of await scopedProcesses(scope, table, timeout, previous)) {
       if (owned.some(saved => sameBirth(saved, member))) continue
       const live = await readProcessIdentity(member.pid, timeout)
-      if (sameBirth(member, live) && !owned.some(saved => sameProcess(saved, live))) owned.push(live)
+      if (sameBirth(member, live) && !owned.some(saved => sameBirth(saved, live))) owned.push(live)
     }
   } else if (!previous.length && child.exitCode == null && child.signalCode == null) {
     const leader = await readProcessIdentity(child.pid, timeout)

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { listingContent } from './listing.mjs';
 import { parseContract } from '../../foundation/runtime/seed-contract.mjs';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -30,13 +31,15 @@ export function catalogue(source, project, repository, gates, dryRun) {
   const docs = ['seed.json', 'CONTRACT.md', 'AGENTS.md', 'LICENSE', 'RELEASE.json',
     ...['README.md', 'BASELINE.md', 'OPERATIONS.md', 'ACCEPTANCE.md'].filter(path => source.entries.has(path))];
   const artifacts = docs.map(path => ({ path: `documents/${path}`, target: `agents/seeds/${s.id}/${path}`, sha256: sha256(source.bytes(path)) }));
+  const content = source.listingContent ?? listingContent(source, repository);
+  artifacts.push(...content.assets.map(asset => ({ path: asset.path, target: asset.path, sha256: sha256(asset.bytes) })));
   const listing = { id: s.id, name: s.name, licence: 'MIT', repository, category: s.category,
     categoryLabel: s.categoryLabel ?? s.category, version: s.version, oneLiner: s.description,
     summary: s.description, maturity: s.maturity, replaces: s.replaces ?? [], clauses: contract,
     clauseCount: contract.length, nonGoals: s.nonGoals ?? [], externals: (s.externals ?? []).map(e => ({
       name: e.name ?? e.id, reason: e.reason ?? e.why, required: e.required, data: e.data ?? [], adapters: e.adapters ?? [],
     })), extensionPoints: Array.isArray(s.extensionPoints) ? s.extensionPoints : Object.values(s.extensionPoints ?? {}).flat(),
-    shots: [], landing: null, hasReadme: docs.includes('README.md'), hasBaseline: docs.includes('BASELINE.md'), manifestFile: 'seed.json' };
+    ...content.listing, landing: null, hasReadme: docs.includes('README.md'), hasBaseline: docs.includes('BASELINE.md'), manifestFile: 'seed.json' };
   for (const key of ['scope', 'spine', 'composition', 'operatingCost', 'limits', 'accessibility']) if (s[key] !== undefined) listing[key] = s[key];
   return { schemaVersion: 1, project, release: s.version, provenance: {
     kind: dryRun ? 'release-preview' : 'publisher-release', repository, revision: source.commit, tree: source.tree,
@@ -50,10 +53,11 @@ export function catalogue(source, project, repository, gates, dryRun) {
 
 export function writeCatalogue(source, output, manifest) {
   const directory = resolve(output, 'site', source.seed.id, source.seed.version);
+  const assets = new Map((source.listingContent ?? listingContent(source, manifest.listing.repository)).assets.map(asset => [asset.path, asset.bytes]));
   for (const artifact of manifest.artifacts) {
     const path = resolve(directory, artifact.path);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, source.bytes(artifact.path.slice('documents/'.length)), { flag: 'wx' });
+    writeFileSync(path, artifact.path.startsWith('documents/') ? source.bytes(artifact.path.slice('documents/'.length)) : assets.get(artifact.path), { flag: 'wx' });
   }
   const bytes = json(manifest);
   const releasePath = `${source.seed.id}/${source.seed.version}/release.json`;

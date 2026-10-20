@@ -336,16 +336,16 @@ test('a redeploy whose app echoes a secret in its unhealthy answer keeps no secr
  const { root, git } = await checkout(t, { secrets: [{ binding: 'SESSION_SECRET', environment: 'SESSION_SECRET' }] });
  const { provider } = account(t);
  const run = () => ownerDeploy('deploy.json', { ...lifecycle, hooks: {} })({ root, options: {}, store: store(), setupManifest: manifest });
- process.env.SESSION_SECRET = 'deployed-session-secret-value';
+ process.env.SESSION_SECRET = 'synthetic-deployed-session-secret-value';
  await run();
  await writeFile(join(root, 'dist/server/index.js'), 'export default {scheduled(){},fetch(){return 1}}');
  git('commit', '--allow-empty', '-qm', 'second');
  const exhaust = virtualReadiness(t);
  provider.state.healthOverride = () => { exhaust(); return new Response(`bad SESSION ${provider.state.secrets.find(item => item.name === 'SESSION_SECRET').value} here`, { status: 503 }); };
- await assert.rejects(run(), error => /health/.test(error.message) && !error.message.includes('deployed-session-secret-value'));
+ await assert.rejects(run(), error => /health/.test(error.message) && !error.message.includes('synthetic-deployed-session-secret-value'));
  const state = await readFile(join(root, '.rer/deploy/production.json'), 'utf8');
  assert.equal(JSON.parse(state).receipt.health.attempts.at(-1).status, 503);
- assert.ok(!state.includes('deployed-session-secret-value'));
+ assert.ok(!state.includes('synthetic-deployed-session-secret-value'));
 });
 
 for (const options of [{ setSecret: 'SESSION_SECRET' }, { unsetSecret: 'SESSION_SECRET' }]) test(`explicit secret ${options.setSecret ? 'set' : 'unset'} fails after applied unhealthy version without requiring source or build`, async t => {

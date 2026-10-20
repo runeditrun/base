@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.76
+
+- **Patch the maintained TanStack Start security closure (#386).** The default seed and foundation carry the patched Start and server-core dependencies for GHSA-qx66-fv34-fjm8.
+- **Restore across native and Platform migration ledgers (#368, #380, #379).** Match migration files by digest, preserve alias-aware ledger checks, and replay later inserts into carried tables after archived rows are restored.
+- **Carry seed listing metadata through releases (#372).** Listing facts and reusable screenshots follow the release artifact.
+- **Keep runtime custody through exec (#352) and measure actual dev write paths (#383).** Process custody stays within the installation root, and disk admission measures the seed's write paths with the WSL temporary-directory floor.
+- **Correct publication scanning (#371, #387, #389).** Use hosted credential-assignment rules, reject comma-neighbour false assignments, and match environment values only when secret-shaped. Documentation examples use public repository references or explicit logical identifiers.
+
 ## 0.2.75
 
 - **Custom-origin owner claims use the recorded app origin (#374).** Native deployment inspection retains the configured public origin from the deployment receipt, so owner claim and status work for custom domains while the ownership guard still refuses a claim at a different origin. Existing workers.dev deployments keep their derived origin.

@@ -50,7 +50,7 @@ test('hosting registers its token and added secrets before output outside comman
  const state = { logs: [] }; let terminal = '';
  const store = await createCommands(root, state, { terminal: chunk => { terminal += chunk; } });
  t.after(async () => { await store.closeCommands(); await rm(root, { recursive: true, force: true }); });
- const token = 'test-synthetic-hosting-registration-token', secret = 'test-synthetic-hosting-registration-secret';
+ const token = 'synthetic-test-synthetic-hosting-registration-token', secret = 'test-synthetic-hosting-registration-secret';
  let calls = 0;
  const hook = ownerAccountHosting({ cli: 'owner-cli.mjs', secrets: { AUTH_SECRET: secret } });
  await hook({

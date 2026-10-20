@@ -103,3 +103,102 @@ test('RER_SERVER_LIMIT_FILE sets the limit for a start over its own RER_SERVER_L
   await assert.rejects(()=>checkCapacity(join(directory,'e3'),{...base,RER_SERVER_LIMIT_FILE:missing},{explicitOnly:true,limit:10}),error=>error.exitCode===4&&error.message.includes(missing));
  }finally{for(const client of clients.reverse())await client.close();await rm(directory,{recursive:true,force:true});}
 });
+
+// Exercise the installed launcher's public door with real exported applications.
+// Registry corruption must never turn a stop into authority over another run.
+test('dev and demo stop only their checkout, preserving a caller-group sleeper and foreign/recycled registry identities', {timeout:20*60_000}, async t=>{
+ const {fixture,pause,freePort}=await import('./fixtures/reference.mjs');
+ const {spawn}=await import('node:child_process');
+ const {readFile,realpath}=await import('node:fs/promises');
+ const {randomUUID}=await import('node:crypto');
+ const {processInfo}=await import('../modules/job-queue/processes.mjs');
+ const {readProcessTable}=await import('../onboarding/process-table.mjs');
+ const {identity}=await import('../modules/job-queue/identity.mjs');
+ const {transaction}=await import('../modules/job-queue/storage.mjs');
+ const {launchPath,readWorker}=await import('../global/launch/state.mjs');
+ // Stop serving before fixture cleanup removes its registry, also on failure.
+ const fixtures=[],context={after:action=>fixtures.push(action),diagnostic:text=>t.diagnostic(text)};
+ const a=await fixture('default-seed',context),b=await fixture('default-seed',context);
+ const roots=await Promise.all([a,b].map(f=>realpath(f.root)));
+ const registry=a.registry,statePath=join(registry,'state.json');
+ const launcher=join(import.meta.dirname,'../global/rer.mjs');
+ const children=[],owners=[];
+ const scope=randomUUID();
+ // No detached flag: this unrelated process shares the test caller's group.
+ const sleeper=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',env:{...process.env,RER_ONBOARDING_PROCESS_OWNER:scope}});
+ const sleeperDone=new Promise(resolve=>sleeper.once('close',resolve));
+ const editor=await identity();
+ t.after(async()=>{
+  for(const child of children)if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await child.done;}
+  for(const owner of owners){
+   const live=await processInfo(owner.pid);
+   if(live&&!live.zombie&&live.start===owner.start){
+    process.kill(owner.pid,'SIGTERM');
+    const deadline=Date.now()+15_000;
+    while(Date.now()<deadline){const current=await processInfo(owner.pid);if(!current||current.zombie||current.start!==owner.start)break;await pause(50);}
+   }
+  }
+  sleeper.kill('SIGTERM');await sleeperDone;
+  await editor.close();
+  for(const action of fixtures.reverse())await action();
+ });
+ const run=(f,args)=>{const child=f.launch([launcher,...args],process.execPath,{RER_SERVERS_DIR:registry});children.push(child);return child;};
+ const stop=async(f,mode)=>{const child=run(f,[mode,'--stop','--json']);assert.equal(await child.done,0,child.stderrText);return child;};
+ const read=async()=>JSON.parse(await readFile(statePath,'utf8'));
+ const aliveSleeper=()=>assert.doesNotThrow(()=>process.kill(sleeper.pid,0),'unrelated caller-group sleeper survives');
+ const table=await readProcessTable();
+ assert.equal(table.find(item=>item.pid===sleeper.pid).pgid,table.find(item=>item.pid===process.pid).pgid,'sleeper really shares the caller group');
+ // A genuine preparing worker remains stoppable with the strengthened identity.
+ const preparing=run(a,['dev','--json']);
+ const launchDirectory=launchPath(roots[0],{RER_SERVERS_DIR:registry});
+ let worker;
+ const claimDeadline=Date.now()+30_000;
+ while(!(worker=await readWorker(launchDirectory))){assert.ok(Date.now()<claimDeadline,'launch worker claims its checkout');await pause(25);}
+ owners.push(worker);
+ await stop(a,'dev');
+ assert.notEqual(await preparing.done,0,'a stopped preparation never announces readiness');
+ assert.ok(!preparing.stdoutText.includes('"event":"ready"'));
+ aliveSleeper();
+ for(const f of [a,b]){
+  await f.run(['install','--json']);
+  await f.run(['setup','--port',String(await freePort()),'--owner-email','stop-owner@example.test','--non-interactive','--json']);
+ }
+ for(const mode of ['dev','demo']){
+  const started=[];
+  for(const f of [a,b]){
+   const child=run(f,[mode,'--json',...(mode==='demo'?['--foreground']:[])]);
+   const deadline=Date.now()+180_000;
+   while(!child.stdoutText.includes('"event":"ready"')){
+    assert.equal(child.exitCode,null,'server reaches readiness');
+    assert.ok(Date.now()<deadline,'server readiness deadline');await pause(50);
+   }
+   if(mode==='dev')assert.equal(await child.done,0,'piped dev detaches after readiness');
+   const records=(await read()).running;
+   for(const item of records)if(roots.includes(item.checkout)&&!owners.some(owner=>owner.pid===item.owner.pid))owners.push(item.owner);
+   const record=records.find(item=>item.checkout===roots[[a,b].indexOf(f)]);
+   assert.ok(record);started.push(record);
+   assert.equal((await fetch(record.url+'/health')).status,200);
+  }
+  const [left,right]=started;
+  const recycled={...left,generation:randomUUID(),owner:{...left.owner,pid:sleeper.pid,start:'a previous process birth'},runtime:{pid:sleeper.pid,token:scope}};
+  // A dead record belonging to a different root is not this stop's cleanup job.
+  const foreign={...recycled,checkout:join(roots[1],'previous run'),generation:randomUUID()};
+  // Even a copied live capability, relabelled as A, must not stop B.
+  const copied={...right,checkout:left.checkout,generation:randomUUID(),owner:{...right.owner,checkout:left.checkout}};
+  await transaction(registry,editor.info,state=>{state.running.unshift(recycled,foreign,copied);});
+  if(mode==='dev'){
+   const directory=launchPath(roots[0],{RER_SERVERS_DIR:registry});
+   const current=await processInfo(sleeper.pid);
+   await writeFile(join(directory,'worker.json'),JSON.stringify({pid:sleeper.pid,start:current.start,command:current.title,checkout:roots[0],token:randomUUID()}));
+  }
+  const stopped=await stop(a,mode);
+  aliveSleeper();
+  assert.equal((await fetch(right.url+'/health')).status,200,`${mode} in B still serves after A stops`);
+  await assert.rejects(fetch(left.url+'/health'),`${mode} in A is stopped`);
+  assert.match(stopped.stderrText,/drop|stale|foreign|unverified/i,'a stale entry is explained');
+  assert.ok(!(await read()).running.some(item=>[recycled.generation,copied.generation].includes(item.generation)),'recycled and copied entries are dropped');
+  await stop(b,mode);aliveSleeper();
+  await assert.rejects(fetch(right.url+'/health'),`${mode} in B stops when B asks`);
+  t.diagnostic(`${mode}: A stopped, B stayed healthy until its own stop, caller-group sleeper and foreign PID survived`);
+ }
+});

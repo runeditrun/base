@@ -1,7 +1,20 @@
 """Read dotenv values into in-memory digests; never retain or report plaintext."""
+from collections import Counter
 import hashlib
+from math import log2
 import re
 from pathlib import Path
+
+
+TOKEN_PREFIXES = ('sk_', 'sk-', 'pk_live', 'ghp_', 'github_pat_', 'xox', 'AKIA', 'SG.', 'eyJ')
+
+
+def secret_shaped(value: str) -> bool:
+    if len(value) >= 16 or value.startswith(TOKEN_PREFIXES):
+        return True
+    # Gitleaks 8.30.1's inherited generic-api-key rule uses 3.5 bits/character.
+    frequencies = (count / len(value) for count in Counter(value).values())
+    return -sum(p * log2(p) for p in frequencies) > 3.5
 
 
 def digest(value):
@@ -69,6 +82,6 @@ def value_hashes(text):
             end = len(text) if end < 0 else end
             value = re.split(r'\s+#', text[cursor:end], maxsplit=1)[0].strip()
         cursor = end + 1
-        if value:
+        if value and secret_shaped(value):
             hashes.add(digest(value.encode()))
     return hashes

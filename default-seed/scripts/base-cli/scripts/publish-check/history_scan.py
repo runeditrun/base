@@ -16,6 +16,8 @@ from tree_scan import context, text_rules, working_files, working_regular
 from public_hygiene import reference_rules
 from content_identities import ContentIdentities, candidate as identity_candidate
 from checksum_maps import ChecksumMaps
+from credential_assignments import text_rules, Findings
+from assignment import is_assignment
 
 
 def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, repository=None, *, cache_dir=None, timeout=300, annotation_file=None):
@@ -137,6 +139,9 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                     def read_regular(path, scoped_entries=scoped_entries):
                         entry = scoped_entries.get(path)
                         return (history.blob(entry['oid']), entry['mode']) if entry and entry['kind'] == 'blob' and entry['mode'] in ('100644', '100755') else None
+                    held = working_regular(Path(history.repo), path) if mode == 'dir' else read_regular(path)
+                    if held and not is_assignment(held[0], hit):
+                        continue
                     if identity_scope not in checksums:
                         checksums[identity_scope] = timings.call('checksums.prepare', ChecksumMaps,
                             working_paths if mode == 'dir' else scoped_entries,
@@ -150,7 +155,6 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                             continue
                     else:
                         # Identity documents use their own exact structural locations.
-                        held = working_regular(Path(history.repo), path) if mode == 'dir' else read_regular(path)
                         if held and checksums[identity_scope].matches(held[0], hit):
                             continue
                 add(secret_rule(hit['RuleID']), path, commit, oid, scope, scanner_rule=hit['RuleID'])
@@ -181,7 +185,10 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             length = (data + b'\n').count(b'\n')
             lines.append((count, count + length, path, commit, scope))
             count += length
-        for hit in timings.call('gitleaks.messages', secrets, binary, 'stdin', data=b''.join(messages), timeout=timeout):
+        message_data = b''.join(messages)
+        for hit in timings.call('gitleaks.messages', secrets, binary, 'stdin', data=message_data, timeout=timeout, redact=False):
+            if not is_assignment(message_data, hit):
+                continue
             line = hit.get('StartLine', 0)
             location = next(((p, c, s) for start, end, p, c, s in lines if start <= line < end), ('@message', None, 'newly-public'))
             add(secret_rule(hit['RuleID']), location[0], location[1], scope=location[2], scanner_rule=hit['RuleID'])

@@ -17,9 +17,8 @@ export function git(repo, ...args) {
   } catch { throw Error('Git source operation failed'); }
 }
 
-export function inspectSource(repo, ref) {
+export function committedSource(repo, ref, { hydrateFrom } = {}) {
   repo = realpathSync(repo);
-  if (git(repo, 'status', '--porcelain', '--untracked-files=all').length) throw Error('Release requires a clean source checkout');
   const commit = git(repo, 'rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`).toString().trim();
   const tree = git(repo, 'rev-parse', `${commit}^{tree}`).toString().trim();
   const records = git(repo, 'ls-tree', '-r', '-z', commit).toString().split('\0').filter(Boolean);
@@ -33,15 +32,29 @@ export function inspectSource(repo, ref) {
   const bytes = path => {
     const entry = entries.get(path);
     if (!entry || entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) throw Error('Release input must be a committed ordinary file');
+    if (hydrateFrom) {
+      try { git(repo, 'cat-file', '-e', entry.oid); }
+      catch { git(repo, 'fetch', '--no-tags', hydrateFrom, entry.oid); }
+    }
     return git(repo, 'cat-file', 'blob', entry.oid);
   };
   const seed = JSON.parse(bytes('seed.json'));
-  const pkg = JSON.parse(bytes('package.json'));
-  const release = JSON.parse(bytes('RELEASE.json'));
+  const release = entries.has('RELEASE.json') ? JSON.parse(bytes('RELEASE.json')) : {};
+  // Read this object alone: show/log may inspect unavailable parents in a
+  // shallow partial clone, even when only the timestamp was requested.
+  const committedAt = /^committer .* (\d+) [+-]\d{4}$/m.exec(git(repo, 'cat-file', 'commit', commit).toString())?.[1];
+  if (!committedAt) throw Error('Invalid Git commit timestamp');
+  const timestamp = new Date(Number(committedAt) * 1000).toISOString();
+  return { repo, commit, tree, entries, bytes, seed, release, timestamp, tag: `v${seed.version}` };
+}
+
+export function inspectSource(repo, ref) {
+  if (git(repo, 'status', '--porcelain', '--untracked-files=all').length) throw Error('Release requires a clean source checkout');
+  const source = committedSource(repo, ref), { seed, release } = source;
+  const pkg = JSON.parse(source.bytes('package.json'));
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/.test(seed.version) ||
       pkg.version !== seed.version || release.version !== seed.version || !pkg.scripts?.verify) throw Error('Seed, package and release versions must agree, and verify must exist');
-  const timestamp = git(repo, 'log', '-1', '--format=%cI', commit).toString().trim();
-  return { repo, commit, tree, entries, bytes, seed, release, timestamp, tag: `v${seed.version}` };
+  return source;
 }
 
 export function newOutput(repo, output) {
