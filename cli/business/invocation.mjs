@@ -1,5 +1,5 @@
 import { accessSync, statSync, constants } from 'node:fs';
-import { delimiter, join, sep } from 'node:path';
+import { delimiter, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const npx = 'npx -y @runeditrun/rer';
@@ -22,4 +22,11 @@ export function rerCommand(env = process.env) {
  if (fileURLToPath(import.meta.url).split(sep).includes('_npx')) return npx;
  if (env.RER_INVOKED_AS) return word(env.RER_INVOKED_AS);
  return onPath(env.PATH) ? 'rer' : npx;
+}
+
+// A rer business command the person can paste into another shell, such as a
+// terminal outside an agent sandbox: it names the state folder when one was chosen.
+export function businessCommand(verb, env = process.env) {
+ const folder = env.RER_BUSINESS_STATE_DIR;
+ return `${folder && !folder.includes('\0') ? `RER_BUSINESS_STATE_DIR=${word(resolve(folder))} ` : ''}${rerCommand(env)} business ${verb}`;
 }
