@@ -90,7 +90,7 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
   }
   // A recycled PID must not transfer a token reading to its successor. PGID may
   // legitimately change, so follow the same birth identity across that change.
-  // The caller rechecks each match's full PID/start/command identity.
+  // The caller rechecks each match's PID/start identity, including across exec.
   return matches
 }
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createConnection } from 'node:net';
 import { deliverGroupSignal, processInfo, stopGroup } from '../processes.mjs';
 import { setup, until, client, worker, noLivePids, cli } from './helpers.mjs';
@@ -173,4 +174,26 @@ test('a queued command survives probes that close its identity socket mid-write'
   const result = await job.done;
   assert.equal(result.code, 0, result.stderr);
   assert.doesNotMatch(result.stderr, /EPIPE|ECONNRESET/);
+});
+
+test('a managed store still stops a queued supervisor that retitles itself after launch', async t => {
+  const { directory } = await setup(t);
+  const { createCommands } = await import('../../../onboarding/commands.mjs');
+  const store = await createCommands(directory, { logs: [] }, { terminal: () => {} });
+  // Like supervisor.mjs: it retitles itself after launch and never exits on its own.
+  const child = store.spawn('retitling supervisor', process.execPath, ['-e',
+    'process.stdin.once("data",()=>{process.title="rer-job-supervisor-fixture";console.log("retitled")});setInterval(()=>{},1000)'],
+  { stdio: ['pipe'] });
+  const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve(signal)));
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    await exited; await store.closeCommands();
+  });
+  // The store captures custody at launch; retitle only after that capture.
+  await delay(1000);
+  const retitled = new Promise(resolve => child.stdout.once('data', resolve));
+  child.stdin.write('go\n'); await retitled;
+  assert.match((await processInfo(child.pid)).title, /^rer-job-supervisor-fixture/);
+  await store.stop(child);
+  assert.equal(await exited, 'SIGTERM');
 });

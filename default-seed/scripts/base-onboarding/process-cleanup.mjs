@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
-import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth, sameProcess, validPid } from './process-table.mjs'
+import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
 import { readOwnedTree } from './process-tree.mjs'
 
 const graceMs = 1000
@@ -8,7 +8,7 @@ const cleanupMs = 30000
 const pollMs = process.platform === 'darwin' ? 5 : 25
 const isZombie = (member) => member.state.startsWith('Z')
 const isStopped = (member) => /^[Tt]/.test(member.state)
-const key = (member) => `${member.pid}:${member.birth}:${member.command}`
+const key = (member) => `${member.pid}:${member.birth}`
 const isLeaf = (member, group) => !group.some((other) => other.ppid === member.pid)
 
 // Ask every owned process to shut down gracefully, including supervisors that
@@ -24,7 +24,7 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const inspect = async (timeout) => {
     const current = await readOwnedTree(child, ownership, timeout)
     // Retain departed group leaders as provenance, not as signal targets.
-    for (const member of current) if (!ownership.some(saved => sameProcess(saved, member))) ownership.push(member)
+    for (const member of current) if (!ownership.some(saved => sameBirth(saved, member))) ownership.push(member)
     return current
   }
   let group
@@ -45,7 +45,7 @@ export async function stopOwnedGroup(child, signal, ownership) {
     // signal. Never send a negative/group signal that can kill parents first.
     const current = requireLeaf ? await readProcessTable(inspectionMs) : []
     const target = await readProcessIdentity(member.pid, inspectionMs)
-    if (!sameProcess(member, target) || isZombie(target)) return false
+    if (!sameBirth(member, target) || isZombie(target)) return false
     if (requireLeaf && !isLeaf(target, current)) return false
     if (name === 'SIGKILL' && !isStopped(target)) return false
     if (requireLeaf && target.pid === pgid && current.some(other => other.pid !== pgid
@@ -66,7 +66,7 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const leader = ownership.find(member => member.pid === pgid)
   if (leader && child.exitCode == null && child.signalCode == null) {
     const live = await readProcessIdentity(pgid, inspectionMs)
-    if (sameProcess(leader, live) && live.ppid === process.pid && !isZombie(live)) {
+    if (sameBirth(leader, live) && live.ppid === process.pid && !isZombie(live)) {
       try { process.kill(pgid, signal); signalled.set(key(live), Date.now()) }
       catch (error) { if (error.code !== 'ESRCH') throw new Error(`Could not send ${signal} to owned process ${pgid}.`) }
     }

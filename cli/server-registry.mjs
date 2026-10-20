@@ -32,12 +32,13 @@ async function request(record, action) {
  return new Promise((resolveRequest,reject)=>{
   const socket=createConnection(record.control);let text='';
   socket.setTimeout(35000,()=>socket.destroy(Error('Managed server did not complete cleanup.')));
-  socket.on('connect',()=>socket.end(JSON.stringify({token:record.token,action})));
+  socket.on('connect',()=>socket.end(JSON.stringify({token:record.token,checkout:record.checkout,generation:record.generation,action})));
   socket.on('data',chunk=>{text+=chunk;if(text.length>16384)socket.destroy(Error('Invalid managed server reply.'));});
-  socket.on('end',()=>{try{const value=JSON.parse(text);if(value.token!==record.token)throw Error('Unverified server');resolveRequest(value);}catch(error){reject(error);}});
+  socket.on('end',()=>{try{const value=JSON.parse(text);if(value.token!==record.token||value.checkout!==record.checkout||value.generation!==record.generation)throw Error('Unverified checkout server');resolveRequest(value);}catch(error){reject(error);}});
   socket.on('error',reject);
  });
 }
+export const serverStatus = record => request(record,'status');
 
 // A new server starts only while this much memory is available. An idle dev
 // server holds 0.5-1.3 GiB (preview 0.4-0.8 GiB), so 1.5 GiB leaves room for the
@@ -107,42 +108,61 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
  }
  const change=async action=>{await (secured??=secure());return transaction(directory,lifetime.info,action,{validateState});};
  let owned, control, closing;
- async function inspect(state) {
+ async function inspect(state,{recover=false}={}) {
   const kept=[];
   for(const record of state.running){
-   let live;try{live=await alive(record.owner);}catch{throw refuse(`Unverifiable server identity: ${description(record)}. Preserve it for inspection.`);}
+   let current;
+   try{current=await processInfo(record.owner?.pid);}catch{current=undefined;}
+   let live=false;
+   // Other roots remain counted under their existing lifetime protocol; this
+   // client never acquires stop/recovery authority over those live records.
+   if(record.checkout!==checkout||record.owner?.checkout===record.checkout&&current&&current.title===record.owner.command){
+    try{live=await alive(record.owner);}catch{}
+   }
    if(live) kept.push(record);
    else {
-    const current=await processInfo(record.owner.pid);
-    if(current&&!current.zombie&&current.start===record.owner.start)throw refuse(`Server lifetime cannot be verified: ${description(record)}. Preserve its process.`);
-    // A runtime capability grants recovery only to the captured process scope.
-    if(record.runtime) {
+    // Fleet inspection is passive. In particular --stop never recovers an
+    // abandoned runtime, nor grants custody to a replacement at a recycled PID.
+    // Only a new start in the owning checkout may recover its dead owner's scope.
+    if(recover&&record.checkout===checkout&&record.owner?.checkout===checkout&&current===null&&record.runtime) {
      const { shared }=await import('./shared.mjs');
      const { recoverCommand }=await shared('command-recovery.mjs');
      await recoverCommand(record.runtime);
     }
+    process.stderr.write(`Dropped stale or unverified ${record.mode} server entry for ${record.checkout}; no stop signal was sent to its recorded PID.\n`);
    }
   }
   state.running=kept;
  }
- async function existing(mode,options,{stop=false}={}) {
+ async function existing(mode,options) {
   return change(async state=>{
-   await inspect(state);const record=state.running.find(item=>item.checkout===checkout);
+   await inspect(state,{recover:true});const record=state.running.find(item=>item.checkout===checkout);
    if(!record)return null;
    if(record.mode!==mode)throw refuse(`This checkout already owns ${description(record)}.`);
-   if(!stop && (options.supplied.has('--host')&&record.host!==undefined&&options.host!==record.host || options.supplied.has('--port')&&record.port!==undefined&&options.port!==record.port || options.supplied.has('--idle-timeout')&&options.idleTimeout!==record.idleTimeout))throw refuse(`Options conflict with ${description(record)}.`);
+   if(options.supplied.has('--host')&&record.host!==undefined&&options.host!==record.host || options.supplied.has('--port')&&record.port!==undefined&&options.port!==record.port || options.supplied.has('--idle-timeout')&&options.idleTimeout!==record.idleTimeout)throw refuse(`Options conflict with ${description(record)}.`);
    return record;
   });
  }
- async function stop(mode,options) {
+ async function stop(mode) {
   try{await lstat(join(directory,'state.json'));}catch(error){if(error.code==='ENOENT')return;throw error;}
-  const record=await existing(mode,options,{stop:true});if(!record)return;
-  await request(record,'stop');
-  await change(state=>{state.running=state.running.filter(item=>item.generation!==record.generation);});
+  // Capture the generations once: a later start is a separate run, even in
+  // this root, and must not be caught by a continuing stop lookup.
+  const records=await change(async state=>{await inspect(state);return state.running.filter(item=>item.checkout===checkout);});
+  for(const record of records){
+   if(record.mode!==mode)throw refuse(`This checkout already owns ${description(record)}.`);
+   // A status reply proves this root and generation before a stop request.
+   try{await serverStatus(record);}
+   catch{
+    await change(state=>{state.running=state.running.filter(item=>item.generation!==record.generation);});
+    process.stderr.write(`Dropped foreign or unverified ${mode} server entry for ${checkout}; no stop request was sent.\n`);continue;
+   }
+   await request(record,'stop');
+   await change(state=>{state.running=state.running.filter(item=>item.generation!==record.generation);});
+  }
  }
  async function reserve(mode,options) {
   return change(async state=>{
-   await inspect(state);
+   await inspect(state,{recover:true});
    const same=state.running.find(item=>item.checkout===checkout);
    if(same)return {existing:same};
    // Journeys are listed but uncounted: they neither use nor lower the cap.
@@ -152,7 +172,8 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
    // Unreadable memory is not a reason to refuse; only a reading below the floor is.
    const available=journey||floor===0?NaN:await memory();
    if(available<floor)throw refuse(memoryMessage(counted,available,floor,mode));
-   owned={checkout,mode,journey,generation:randomUUID(),token:randomUUID(),owner:lifetime.info,limit:fileLimit?fileLimit.limit:limit,explicit:explicit||Boolean(fileLimit),startedAt:Number(process.hrtime.bigint()/1000000n),idleTimeout:options.idleTimeout};
+   const {title:command}=await processInfo(process.pid);
+   owned={checkout,mode,journey,generation:randomUUID(),token:randomUUID(),owner:{...lifetime.info,checkout,command},limit:fileLimit?fileLimit.limit:limit,explicit:explicit||Boolean(fileLimit),startedAt:Number(process.hrtime.bigint()/1000000n),idleTimeout:options.idleTimeout};
    owned.lastActivity=owned.startedAt;owned.active=0;
    const name=`rer-server-${createHash('sha256').update(owned.generation).digest('hex').slice(0,20)}.sock`;
    owned.control=join(tmpdir(),name);if(Buffer.byteLength(owned.control)>=100)owned.control=join('/tmp',name);
@@ -165,7 +186,11 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
    let text='';socket.setTimeout(35000,()=>socket.destroy());
    socket.on('data',data=>{text+=data;if(text.length>1024)socket.destroy();});
    socket.on('end',async()=>{
-    try{const request=JSON.parse(text);if(request.token!==owned.token)throw Error('Invalid capability');socket.end(JSON.stringify({...await handler(request.action),token:owned.token}));}
+    try{
+     const request=JSON.parse(text);
+     if(request.token!==owned.token||request.action==='stop'&&(request.checkout!==checkout||request.generation!==owned.generation))throw Error('Invalid checkout capability');
+     socket.end(JSON.stringify({...await handler(request.action),token:owned.token,checkout,generation:owned.generation}));
+    }
     catch{socket.destroy();}
    });
   });
