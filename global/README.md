@@ -190,8 +190,13 @@ or does not report its own (`rer describe` reports `defaults`), so a current
 checkout never records a limit you did not set.
 A start is never refused for machine load alone unless `RER_SERVERS_LOAD_THRESHOLD`
 or `RER_JOBS_LOAD_THRESHOLD` is set; memory and disk guards stay. The disk guard
-needs 15 GiB free; `RER_SERVERS_DISK_FLOOR_GIB=N` changes it (CI runners may set
-it lower, for example 4; people should not).
+measures installed `node_modules` and `.wrangler` (including local D1 state). It
+requires twice those bytes plus 256 MiB, with a 1 GiB minimum, on the checkout,
+the selected temporary directory (`TMPDIR`, then `TMP`/`TEMP`, then the OS
+default), and the actual `RER_SERVERS_DIR` or home registry directory. A refusal
+names the path and exact free and required bytes.
+`RER_SERVERS_DISK_FLOOR_GIB=N` explicitly replaces this estimate (GiB, decimals
+allowed, 0 disables the floor).
 
 ## The front door
 

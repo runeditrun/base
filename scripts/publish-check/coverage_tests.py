@@ -145,6 +145,34 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         with resolving('missing'):
             self.deleted('source.txt', 'https://github.com/' + 'owner/absent-app', 'hygiene.github-missing')
 
+    def test_slash_prose_and_known_owner_repository_references(self):
+        prose = ('| BIF-024 | Status gap: the risk/impact view is missing |\n'
+                 'Vector or Jira issues and GitHub issues/PRs\n')
+        self.write('CONTRACT.md', prose)
+        self.commit()
+        with resolving('incomplete') as asked:
+            self.assertEqual(self.report()['status'], 'PASS')
+        self.assertEqual(asked, set())
+
+        private = 'just-every/' + 'private-pegboard'
+        missing = 'runeditrun/' + 'site'
+        public = 'just-every/' + 'public-research'
+        qualified = {f'short-{index}/missing': suffix for index, suffix in enumerate(
+            ('#24', '@' + 'a' * 40, '/pull/1', '/issues/2', '/tree/main', '/blob/main/file'))}
+        # The owner URL is in another file, after the contract in tree order.
+        self.write('RESEARCH.md', 'https://github.com/' + public)
+        self.write('CONTRACT.md', prose + f'see {private} for research\nhttps://github.com/{missing}\n')
+        self.write('QUALIFIED.txt', '\n'.join(repo + suffix for repo, suffix in qualified.items()))
+        self.commit()
+        with resolving(lambda repo: 'public' if repo == public else
+                       'private' if repo == private else 'missing') as asked:
+            report = self.report()
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertEqual(asked, {public, private, missing, *qualified})
+        self.assertEqual({(f['path'], f['rule']) for f in report['findings']},
+                         {('CONTRACT.md', 'hygiene.github-private'), ('CONTRACT.md', 'hygiene.github-missing'),
+                          ('QUALIFIED.txt', 'hygiene.github-missing')})
+
     def test_archive_path_in_code_span_is_not_a_repository(self):
         self.write('GUIDE.md', 'Save archives at `exports/x.rer`.')
         self.commit()

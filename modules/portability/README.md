@@ -110,6 +110,27 @@ it continues to accept serializable object policies. Malformed primary or later
 journal JSON is reported once as `archive_json` with exit 2, before local data
 migrations, without echoing archive content or parser diagnostics.
 
+An installation migrated by Platform has `rer_migrations(name, sha256,
+applied_at)` instead of Wrangler's ledger. Local transfers match each entry to
+exactly one migration file by SHA-256 and preserve its application order. They
+verify all local files are recorded and skip Wrangler; a pending file refuses
+as `migration_ledger:unapplied:<file>` until Platform applies it. Unknown,
+ambiguous or conflicting entries refuse by name, without replaying SQL or
+creating a second ledger.
+
+For old archives containing only Platform's migration names, the seed adapter
+may declare `platformMigrations: {prefix, dataOnly}` on `localPortability`.
+Read `prefix` from the seed's own deploymentSpec packaging `migrationPrefix`
+for this binding's migrations directory. It declares an alias `prefix + file`
+for each file; it does not strip arbitrary prefixes. `dataOnly` is an explicit
+list of installation-specific Platform seed entries without schema files.
+Declare only SQL that seeds data and changes no schema: these names are omitted
+from schema replay. This does not authorize replacing their rows; the archive
+policy still controls that. Archive SQL and names never supply these declarations.
+Custom replay runners can supply each plan entry's `aliases` and pass
+`{dataOnly}` as `migrationReplay`'s third argument. Verified archive ledger
+hashes take precedence over name-only placement where available.
+
 When a policy includes operator-auth tables, local dev identity still never
 travels, and no policy option changes that: export drops `oa_sessions` rows of
 kind `dev`, every credential recorded in `oa_dev_credentials` (and that table's
@@ -322,7 +343,7 @@ literals, numbers and comments never count. Text Base cannot read to a
 statement boundary, such as an unclosed block comment, is refused. An archived table the archive holds no
 rows of restores empty, so an `UPDATE` or `DELETE` of it changes nothing and is
 allowed regardless of what it reads: no row can change or fire a trigger. An
-ordinary `INSERT` into it remains refused. For archives without a migration record,
+`INSERT` into it must qualify for replay below. For archives without a migration record,
 every migration after the earliest prefix that gives the archive's schema is
 checked, since the archive may predate any of them.
 
@@ -337,11 +358,18 @@ destination definition, so a row rejected by its CHECK fails the whole atomic
 restore; no row is skipped or coerced. Other statements still face the usual
 data classifier, and a proven preserving block is not a competing backfill writer.
 
-A backfill of a catalogue table the archive does not carry (one a later
-migration adds, restored empty) is **replayed** instead of refused: an
-`INSERT ... SELECT` (or `INSERT ... VALUES`) into that table. Finalize empties
-the table (resetting its `AUTOINCREMENT` counter, as the live upgrade created
-it) and runs each of its later writes in migration order, exactly as written,
+A backfill of a catalogue table is **replayed** instead of refused when it is
+an eligible `INSERT ... SELECT` (or `INSERT ... VALUES`) or `REPLACE`. A table
+the archive carries keeps its archived rows, including when it carries none:
+the replay runs over the rows the live migration would have found there. It
+must name its target columns and be the table's only later writer. For a table
+with `AUTOINCREMENT`, carried-table replay is refused: the archive does not
+retain `sqlite_sequence`'s high-water mark, so generated keys could differ.
+Reads of a keyed table's unarchived hidden `rowid`, `_rowid_` or `oid` also
+refuse, including through views: restoring its keys can change physical rowids.
+For a table the archive lacks (one a later migration adds), finalize empties the table
+(resetting its `AUTOINCREMENT` counter, as the live upgrade created it).
+Finalize runs the eligible writes in migration order, exactly as written,
 after every archived row is inserted and while the destination's triggers are
 still dropped, in the same atomic D1 transaction as the rest of the restore. The
 table then holds what the live upgrade gave it. Time functions such as
@@ -349,8 +377,7 @@ table then holds what the live upgrade gave it. Time functions such as
 `INSERT ... SELECT` without `ORDER BY` assigns new keys in the order SQLite
 scans the restored rows. Rows the restore normalizes (import safety) are read
 as restored. The restore is refused with
-`schema_mismatch:migration_data:<migration>` instead when the archive carries
-the table (even with no rows), when a write to it is not a plain `INSERT` or
+`schema_mismatch:migration_data:<migration>` instead when a write is not an `INSERT` or
 `REPLACE`, reads any table other than archived ones and itself (including through
 a view resolved from applied migration history), selects `*` or
 a secret column, when a trigger on it or a foreign key action from it reaches a
@@ -366,7 +393,8 @@ an INSERT reading a view must still resolve entirely to carried tables.
 
 The same check runs when the archive's schema identity equals the destination's:
 a later migration that only purges or backfills rows leaves the schema unchanged,
-yet the archive's rows never passed through it. Such an archive is refused with
+yet the archive's rows never passed through it. Eligible carried-table backfills
+replay here too; other rewrites are refused with
 `schema_mismatch:migration_data:<migration>` (local `rer import` exit 4, naming
 the migration) before any staging or import job; one whose later migrations only
 add indexes or touch excluded tables restores as usual. Without a replayer, an
@@ -690,11 +718,12 @@ all existing migrations and their ledger. Wire package.json:
 Before copying, capture the source checkout's actual origin with
 `git remote get-url origin` and its full revision with `git rev-parse HEAD`.
 Record this component in `edition.json`, replacing `ORIGIN` and `PIN` with those
-values. Keep the real source provenance in the edition's component and source
+values and `MODULE_ID` with the component's existing edition identifier. Keep
+the real source provenance in the edition's component and source
 lock rather than embedding a repository address in the copied module:
 
 ```json
-{"id":"runeditrun/portability","role":"module","source":{"kind":"local","paths":["vendor/base/modules/portability"],"origin":{"repository":"ORIGIN","revision":"PIN","paths":["modules/portability"]}}}
+{"id":"MODULE_ID","role":"module","source":{"kind":"local","paths":["vendor/base/modules/portability"],"origin":{"repository":"ORIGIN","revision":"PIN","paths":["modules/portability"]}}}
 ```
 
 Follow the seed's edition-authoring source-lock workflow, then prove the copy:

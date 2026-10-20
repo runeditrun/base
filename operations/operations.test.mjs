@@ -193,10 +193,10 @@ test('project configuration validation is optional, local and redacts exceptions
   descriptor.configuration = { module: 'config.mjs' };
   await writeFile(join(root, 'config.mjs'), 'export function validateConfiguration(env) { throw new Error(env.SECRET); }');
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(descriptor));
-  const report = await inspectOperations(root, { SECRET: 'private-project-value' });
+  const report = await inspectOperations(root, { SECRET: 'synthetic-private-project-value' });
   assert.equal(report.configuration, 'invalid');
   assert.equal(report.ok, false);
-  assert.equal(JSON.stringify(report).includes('private-project-value'), false);
+  assert.equal(JSON.stringify(report).includes('synthetic-private-project-value'), false);
 });
 
 test('v2 source map accepts selected mail input names and check names missing values without exposing them in JSON', async t => {

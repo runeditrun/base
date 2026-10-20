@@ -11,6 +11,8 @@ import { writePublishHandoff } from './publish-handoff.mjs';
 import { releasePublicBase } from './public-base.mjs';
 import { prepareTagAdoption, confirmTagAdoption, assertTagAdoption } from './tag-adoption.mjs';
 import { placeholderMarks, placeholderMessage } from '../../cli/placeholder-mark.mjs';
+import { listingContent } from './listing.mjs';
+import { previousListing } from './previous-listing.mjs';
 import { cleanupTemporary } from './cleanup.mjs';
 import { parseTimeoutSeconds } from '../../scripts/publish-check/timeout.mjs';
 
@@ -37,6 +39,7 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
   if (typeof tag === 'string' && tag !== source.tag) throw Error('Requested tag must match the committed release version');
   const existing = git(source.repo, 'tag', '--list', source.tag).toString().trim();
   if (existing && tag && !dryRun && (onto !== undefined || clean)) throw Error('Release tag already exists; choose a new committed version');
+  source.listingContent = listingContent(source, repository, previousListing(source, repository));
   // Validate metadata before installs or output writes.
   catalogue(source, project, repository, { verify: { status: 'PENDING' }, publishCheck: { status: 'PENDING' } }, preview);
   const destination = onto !== undefined ? publicDestination(onto, repository, source.repo) : null;

@@ -5,22 +5,34 @@
 // the registered server and everything they spawned -- has exited. It says
 // what it stopped, or exits non-zero naming what is still running.
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { rm } from 'node:fs/promises';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { readProcessTable, sameBirth } from '../../onboarding/process-table.mjs';
 import { delegate } from '../delegate.mjs';
 import { liveServers } from '../registry.mjs';
+import { serverStatus } from '../../cli/server-registry.mjs';
 import { LaunchFailure } from './failure.mjs';
-import { liveWorker, serverRecord, stopRequest } from './state.mjs';
+import { readWorker, serverRecord, stopRequest } from './state.mjs';
 
 export async function stopLaunch(target, devArgs, { checkout, directory }) {
  // Written before looking for a worker: one that claims the launch after this
  // look reads it and ends itself (worker.mjs).
  await stopRequest.write(directory);
- const holder = await liveWorker(directory);
- const launch = holder ? await tree([holder]) : [];
- if (holder) await endWorker(holder);
+ const holder = await readWorker(directory);
+ const verified = holder && await verifiedWorker(holder, checkout);
+ const launch = verified ? await tree([holder]) : [];
+ if (verified) await endWorker(holder, checkout);
+ else if (holder) {
+  await rm(join(directory, 'worker.json'), { force: true });
+  process.stderr.write(`Dropped foreign or unverified launch worker entry for ${checkout}; no signal was sent.\n`);
+ }
  // Only now: a worker stopped while its server came up has registered it.
- const record = (await liveServers()).find(item => item.checkout === checkout);
+ let record;
+ for (const candidate of (await liveServers()).filter(item => item.checkout === checkout)) {
+  try { await serverStatus(candidate); record = candidate; break; } catch {}
+ }
  const started = await serverRecord.read(directory);
  const server = await tree([record?.owner, record?.runtimeProcess, started, started?.spawned]);
  await delegate(target, ['dev', ...devArgs]);
@@ -28,15 +40,25 @@ export async function stopLaunch(target, devArgs, { checkout, directory }) {
  const left = await exited([...launch, ...server], 15000);
  if (left.length) {
   const pids = left.map(item => item.pid).join(' ');
-  process.stderr.write(`rer dev --stop: ${left.length === 1 ? 'a process' : `${left.length} processes`} of this checkout's dev server ${left.length === 1 ? 'is' : 'are'} still running 15 seconds after the stop (PID ${pids}). Stop ${left.length === 1 ? 'it' : 'them'} with kill -TERM ${pids}, then run rer dev --stop again.\n`);
+  process.stderr.write(`rer dev --stop: ${left.length === 1 ? 'a process' : `${left.length} processes`} recorded for this checkout's dev server ${left.length === 1 ? 'is' : 'are'} still running 15 seconds after the stop (PID ${pids}). Preserve these processes and inspect their ownership before stopping them.\n`);
   return 1;
  }
- if (!devArgs.includes('--json')) process.stdout.write(said({ checkout, record, started, server, holder, launch }) + '\n');
+ if (!devArgs.includes('--json')) process.stdout.write(said({ checkout, record, started, server, holder:verified?holder:undefined, launch }) + '\n');
  return 0;
 }
 
 // SIGTERM the preparing worker and wait for it to exit.
-async function endWorker(holder) {
+async function verifiedWorker(holder, checkout) {
+ if (!Number.isSafeInteger(holder.pid) || holder.pid < 2 || typeof holder.token !== 'string') return false;
+ const current = await processInfo(holder.pid);
+ const worker = fileURLToPath(new URL('./worker.mjs', import.meta.url));
+ return Boolean(current && !current.zombie && current.start === holder.start
+  && holder.checkout === checkout && current.title === holder.command
+  && current.title.includes(`${worker} ${checkout} ${holder.token} `));
+}
+
+async function endWorker(holder, checkout) {
+ if (!await verifiedWorker(holder, checkout)) return;
  try { process.kill(holder.pid, 'SIGTERM'); } catch (error) { if (error.code === 'ESRCH') return; throw error; }
  for (let waited = 0; waited < 60000; waited += 250) {
   const current = await processInfo(holder.pid);

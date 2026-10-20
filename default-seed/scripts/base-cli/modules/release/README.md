@@ -123,7 +123,8 @@ metadata and Git blobs are never loaded as producer code.
 
 With `--tag`, passing gates produce `public-source.tar`, containing the checked tree's
 exact ordinary files without Git history, and a hash-pinned site bundle:
-`site/<id>/<version>/release.json`, published documents and `site/registry.json`.
+`site/<id>/<version>/release.json`, published documents, listing assets and
+`site/registry.json`.
 Export attributes cannot silently omit or substitute bytes. The site metadata
 comes from committed seed and contract data; no screenshots, install guarantees
 or verified maturity claims are invented. Copy the reviewed bundle into the site
@@ -338,6 +339,135 @@ Generated source commits and annotated tags identify Run Edit Run with the
 non-contact address `releases@runeditrun.invalid`. Provenance remains bound to
 the source commit and tree; the Git author address is not a delivery destination.
 
+## Listing metadata and assets
+
+`rer release` adds `slug`, `homepage`, `headline`, `brand`, structured `shots`
+and `look` to the existing `release.json` listing. All inputs come from the
+selected committed tree. Asset paths are relative to the bundle directory:
+`assets/seeds/<id>/mark.svg`, optional `mark-light.svg`, and screenshot filenames.
+The slug is the repository name without its `run-` prefix; the asset directory
+uses `seed.json.id`, which can differ from the slug.
+
+To produce the same listing fields and asset bytes between releases:
+
+```sh
+rer listing --repo /path/to/seed --ref COMMIT_SHA --output /path/to/new-directory
+```
+
+This writes `listing.json` containing `slug`, `homepage`, `headline`, `brand`,
+`shots` and `look`, plus the referenced files under `assets/seeds/<id>/`.
+It reads the selected ref even with a dirty working tree. The output must be a
+new directory outside the source. This command runs no release gates, creates
+no tags and performs no signing. It needs a committed
+`rer-project.json.sourceRepository` or a credential-free GitHub `origin` to
+identify the repository. Previous-shot selection can read advertised remote tags.
+
+### Seed author fields
+
+| Committed input | Listing value and default |
+| --- | --- |
+| `seed.json.homepage` | `homepage`; optional, defaults to `https://run-<slug>.com`; credential-free HTTP(S) URL |
+| `seed.json.headline` | `headline`; optional nonempty text, otherwise `null` |
+| `seed.json.brand.mark` | SVG source path; defaults to `public/brand/mark.svg` |
+| `seed.json.brand.markLight` | Optional SVG variant; defaults to `public/brand/mark-light.svg` when present |
+| `src/branding.json` → `primaryColor` | `brand.colours.accent` |
+| `public/rer-theme.css` → `--rer-text`, `--rer-page` | `brand.colours.ink`, `brand.colours.paper` |
+
+Brand paths are repository-relative. An explicitly declared mark must exist and
+contain SVG. Legacy seeds without a default mark emit `brand.mark: null`;
+an absent default light variant emits `brand.markLight: null`. Missing branding
+colours emit `null`. The producer copies the committed SVG bytes to the bundle's
+standard mark filenames.
+
+### Look fingerprints
+
+`look.home` and `look.app` fingerprint these default glob arrays:
+
+```json
+{
+  "home": ["public/brand/**", "src/branding.json", "public/rer-theme.css", "public/fonts/**", "src/site/**", "!src/site/docs/**"],
+  "app": ["public/brand/**", "src/branding.json", "public/**/*.{css,js,mjs,html}", "src/ui/**", "src/**/*.css", "src/client/**"]
+}
+```
+
+Declare `look.home` and/or `look.app` in committed `rer-project.json` to replace
+the respective default array. An omitted array keeps its default. Patterns are
+repository-relative; `!` patterns exclude any matching path regardless of array
+order. Mark declarations do not implicitly add files to either glob set:
+include nonstandard mark paths in the appropriate overrides.
+
+For each set, the producer sorts matching committed blob paths in JavaScript
+string order and hashes UTF-8 records of `path`, NUL, Git blob object ID, LF.
+The result is `sha256:<hex>`. No browser or capture runs. With the defaults,
+backend-only changes outside these sets leave both fingerprints unchanged;
+homepage and app changes affect the sets covering their files.
+
+### Release screenshots and reuse
+
+Authors declare committed screenshots in `RELEASE.json`:
+
+```json
+{
+  "screenshots": [
+    {
+      "path": ".github/assets/release/01-issues.webp",
+      "alt": "Issue list with grouped errors",
+      "caption": "Group related errors and open an issue to investigate.",
+      "width": 1600,
+      "height": 1000
+    }
+  ]
+}
+```
+
+When supplied, the array must contain 1–5 still WebP files, each with nonempty
+alt text and caption, encoded dimensions exactly 1600×1000 and size at most
+300 KiB. Dimensions are checked in the image bytes as well as the declaration.
+Source paths must be repository-relative, and filenames must be unique across
+the set because the bundle keeps only each basename. The listing preserves
+`path`, `alt`, `caption`, `width` and `height`, rewriting paths to
+`assets/seeds/<id>/<filename>.webp`.
+
+Screenshots remain optional for legacy releases. Without screenshots or reused
+history, `shots` is `[]` and `look.shotsAt` is `null`. Missing screenshots and
+stale screenshots are not release gates; malformed declared screenshots fail
+input validation. A free-text screenshot note does not populate this array.
+
+For reuse, the producer reads publicly advertised version tags (`vX.Y.Z`, including prereleases) from the
+origin/destination remote, limited to versions at or below the selected version
+and excluding tags targeting the selected commit. Local-only tags cannot supply
+history. It processes prior tags in SemVer order, reading each tag's committed
+`RELEASE.json` and shot bytes to preserve historical `shotsAt`:
+
+- Unchanged `look.app` reuses the previous shots and their `shotsAt`.
+- Changed `look.app` with the same source screenshot paths and bytes keeps the
+  previous shots and `shotsAt`, making stale shots visible as `shotsAt != app`.
+  Editing only alt text or captions cannot claim a fresh capture.
+- A changed screenshot set with a changed app records `shotsAt = app` when
+  screenshots are present.
+
+The producer does not capture images. The live homepage still is a separate sync
+artifact and is not included in the signed release bundle.
+
+### Adopting this in seed release work
+
+Commit the seed fields, look overrides and structured screenshots before
+selecting the release SHA. Release authors capture fresh demo-data app shots
+when `look.app` changes; an unchanged app reuses its gallery. Use the listing
+command to inspect fingerprints and packaged assets before release.
+
+For Spool, set `seed.json.brand.mark` to `public/theme/spool-mark.svg` and extend
+the `look.home` override to cover `public/theme/landing*`, `src/ui/landing/**`
+and `public/theme/spool-mark.svg` alongside the relevant default patterns.
+Because an override replaces its array, retain every default pattern still
+needed. Include the theme mark in `look.app` too if it appears in the app.
+
+The B6 release-template follow-up carries the completed bundle to
+`~/.orchestrator/listings/bundles/<slug>/<version>/` and posts the `RELEASED`
+line to the sync lane as well as the import lane. Look landings post `LOOK`
+with the seed and commit. Those template/sync actions are separate from
+`rer release` and `rer listing`; neither command edits or deploys a site.
+
 ## Signing and checking release receipts
 
 `rer release keygen` creates a publisher key and its proof-of-possession anchor
@@ -366,8 +496,10 @@ as `rer-release.dsse.json` beside the receipt. The statement binds the public
 repository, tag, commit, tree and tag object, and hashes `public-source.tar`,
 `release-receipt.json`, `publish-check.json`, the bundle's single
 `site/<id>/<version>/release.json`, and every document under that bundle's
-`documents/` directory. The envelope is an artifact file; signing does not
-change the existing release or registry pins.
+`documents/` directory, plus the listing's referenced mark, light mark and
+screenshot files under `assets/seeds/<id>/`. Signing and receipt verification
+check those asset hashes against the actual bytes. The envelope is an artifact
+file; signing does not change the existing release or registry pins.
 
 After writing the signature, `sign` prints (but never runs) a shell-quoted
 `gh release upload` command for attaching `rer-release.dsse.json` to the
