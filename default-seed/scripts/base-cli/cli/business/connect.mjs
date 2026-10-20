@@ -3,10 +3,11 @@ import { join } from 'node:path';
 import { Api, originUrl, identifier, pause } from './api.mjs';
 import { loadState, saveState, credentialHandle, loadPending, savePending, clearPending, checkStateWritable } from './state.mjs';
 import { createCredentialStore } from './keychain.mjs';
-import { applyOptIns } from './opt-ins.mjs';
-import { rerCommand } from './invocation.mjs';
+import { applyChoices } from './choices.mjs';
+import { rerCommand, businessCommand } from './invocation.mjs';
 import { Stopped } from './errors.mjs';
-import { deviceName, workingFolder } from './device.mjs';
+import { agentKind, deviceName, workingFolder } from './device.mjs';
+import { revokedText } from './local-commands.mjs';
 
 // Approval moves the server's pairing expiry to ten minutes after approval, and
 // approval can come up to the code's own expiry. Keep the pending pairing until
@@ -27,10 +28,11 @@ export async function connect({ code, origin } = {}) {
  let pending = await loadPending();
  origin = originUrl(origin ?? stored?.origin ?? pending?.origin);
  if (stored) {
+  if (stored.revoked) throw Error(`This computer was ${revokedText(stored)}\nThen connect with a new code from ${stored.origin}/business.`);
   if (stored.origin !== origin) throw Error(`This computer is already connected to Business at ${stored.origin}. Run ${rerCommand()} business disconnect before connecting it elsewhere.`);
   const credential = await createCredentialStore().get(credentialHandle(origin));
   if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then connect again with a new code from ${origin}/business.`);
-  await applyOptIns(new Api(origin, credential), stored);
+  await connected(new Api(origin, credential), stored);
   return;
  }
  if (pending && Date.parse(pending.expires_at) <= Date.now()) { await clearPending(); pending = null; }
@@ -60,7 +62,7 @@ export async function connect({ code, origin } = {}) {
    const name = deviceName(), folder = workingFolder();
    const response = await api.post('/api/business/executors/pair', {
     code, ...(name ? { device_name: name } : {}), ...(folder ? { working_folder: folder } : {}),
-    os: process.platform === 'darwin' ? 'macos' : 'linux', agent_kind: process.env.CODEX_HOME ? 'codex' : process.env.CLAUDECODE ? 'claude' : 'other', capabilities,
+    os: process.platform === 'darwin' ? 'macos' : 'linux', agent_kind: agentKind(), capabilities,
    }).catch(error => { throw error.status === 401 ? Error(`Business did not accept code ${code}: it has expired or was already used${error.reason ? ` (the server said: ${error.reason})` : ''}. Create a new code in ${origin}/business.`) : error; });
    const expires = Math.min(Date.now() + 600_000, Date.parse(response?.expires_at));
    if (response?.status !== 'pending_approval' || !/^\d{6}$/.test(response.confirmation_number) || typeof response.pairing_token !== 'string' || !response.pairing_token || !Number.isFinite(expires) || expires <= Date.now()) throw Error('Business server returned an invalid pairing response.');
@@ -84,13 +86,14 @@ export async function connect({ code, origin } = {}) {
    }
    if (result?.status === 'paired') {
     if (typeof result.device_credential !== 'string') throw Error('Business server returned an invalid device credential.');
-    const state = { version: 1, origin, businessId: identifier(result.business_id), executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false };
+    const folder = workingFolder();
+    const state = { version: 1, origin, businessId: identifier(result.business_id), executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false, ...(folder ? { workingFolder: folder } : {}) };
     // No authenticated request (including activation) before both durable writes.
     await store.set(handle, result.device_credential);
     try { await saveState(state); } catch (error) { await store.delete(handle); throw error; }
     await clearPending();
     process.stdout.write('Approved. Device credential stored in OS credential storage.\n');
-    await applyOptIns(new Api(origin, result.device_credential), state);
+    await connected(new Api(origin, result.device_credential), state);
     return;
    }
    if (['denied', 'refused', 'expired'].includes(result?.status)) {
@@ -108,6 +111,14 @@ export async function connect({ code, origin } = {}) {
  } finally {
   process.off('SIGINT', onInterrupt); process.off('SIGTERM', onTerminate);
  }
+}
+
+// The first device-authenticated request activates the computer and applies
+// the owner's choices; later choices reach it through run and next.
+async function connected(api, state) {
+ const { serviceInstalled } = await applyChoices(api, state);
+ process.stdout.write(`This computer is connected to Business at ${state.origin}.\n`);
+ process.stdout.write(serviceInstalled || state.applied?.installService === true ? 'The background service works tasks after this chat ends.\n' : `Run ${businessCommand('run')} to work tasks; it applies the owner's choices at each check-in.\n`);
 }
 
 export function localRoot(path) {

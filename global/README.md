@@ -407,7 +407,12 @@ service). Connect reads them as `optIns` from device-authenticated
 `awakeConsent` and `installService`; the CLI prints only the sentences. Only
 `true` enables an option. Undecided (`null`) options are listed with a browser
 link; an older server without this route (it answers 403 or 404) leaves all
-options undecided. Run connect again after the owner decides. The first
+options undecided. Connect never has to run again after the owner decides:
+`rer business run` (at every check-in) and `rer business next` read the choices
+again, apply each one that changed (a `false` removes what an earlier `true`
+added) and print which choices they applied. A choice this session cannot apply,
+such as Claude Code rules in `~/.claude` from inside an agent sandbox, is named
+with its cause and tried again at the next check-in. The first
 device-authenticated request happens after both the credential and local
 pairing state are stored, so a storage failure cannot activate the computer.
 A service installed with `RER_BUSINESS_STATE_DIR` set keeps that folder. Background
@@ -423,16 +428,35 @@ run outside the sandbox (in Codex, approve running that command outside the
 sandbox when it asks); later commands
 only read the credential and run inside the sandbox. Do not install a
 background service or change user settings unless the owner enables those
-options and the sandbox permits their locations.
+options and the sandbox permits their locations. Inside that sandbox macOS also
+refuses to remove the Keychain item (`security` exits 161 and leaves it), so
+`disconnect` revokes on the server, exits 0, says "revoked on the server; the
+local credential is still stored" and names the one command that removes it when
+run outside the sandbox; until then `status` says revoked, never paired.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
 `remove` deletes it. The same commands support `uptimerobot`, `pagerduty` and
-`calendly`. Never put a key in command arguments, chat or a URL.
+`calendly`. Sorry's export reads its public status page and needs no key. Never
+put a key in command arguments, chat or a URL.
 
-`rer business next` returns one locally templated classification or owner link,
-or `Nothing yet`, within 60 seconds. It never reflects server instructions or
-raw evidence. Owner items cannot be answered from this CLI.
+`rer business next` returns, within 60 seconds, one locally templated
+classification, owner link or agent step, or says what `run` would start, and
+says `Nothing yet` only when no agent step waits. Once an app is claimed and its
+import door is on, its `export.vendor` task is the agent's step, and so are a
+move's `catchup.vendor` (bringing over what changed in the old tool) and
+`switchoff.archive` (the final archive before switch-off): next names the step,
+the owner-typed `rer business vendor-key add <vendor>` (or says the key is
+already stored, or that the vendor needs none) and `rer business run`. Run reads
+the adapter's non-secret inputs from the leased task's `export_inputs` (Sentry's
+organization and window, PagerDuty's window and `schedules: 'all'` (every rota
+moves), Sorry's page host); a task that does not carry them yet is handed
+back as paused until Business has them. A move's owner steps (`freeze.vendor`,
+a `rollback.*` card, `switchoff.cancel`) are named as the owner's, with the
+move's page (`/business/:id/moves/:toolId` when the summary names its
+`tool_id`, else the switch-over board `/business/:id`), never as agent work. It
+never reflects server instructions or raw evidence. Owner items cannot be
+answered from this CLI.
 `rer business answer ID VENDOR uses|sells|both|product-dependency [CONFIDENCE]`
 submits a task-scoped classification through MCP. Choose a vendor ID from the
 question's displayed answer schema, or `none`; the suggested vendor can be
@@ -449,7 +473,12 @@ device through device-authenticated `DELETE /api/business/executors/self` before
 removing its service, device and vendor credentials, state and introduced Claude
 rules, preserving preexisting settings and unrelated edits. It says "Device
 revoked" only after the server confirms (`{"revoked":true}`, or 401 for a device
-already revoked). A server without that route (403 or 404) leaves the computer
+already revoked). If this session may not remove the credential, a key, the
+service or the rules after the server revoked the computer, disconnect still
+exits 0: it names what is left and the one command (with
+`RER_BUSINESS_STATE_DIR` when set) that finishes outside the agent sandbox, and
+keeps only that record, so `status` and every other command say revoked. A
+server without that route (403 or 404) leaves the computer
 connected: disconnect says so, names the browser page to revoke it in and keeps
 everything for a later disconnect. Any other failure exits 1 and also keeps the
 credential for a retry. With no stored device credential, nothing is sent and
@@ -461,25 +490,68 @@ completion checks. Only the browser consent's paths are scanned. Names-only
 snapshots and page boundaries are saved privately so a killed supervisor can
 resume from its server checkpoint without rescanning a changed tree. Snapshots
 are removed after completion. A missing snapshot for an acknowledged page is
-an explicit error. Revocation stops the supervisor on its next 401.
+an explicit error. Revocation stops the supervisor on its next 401; it then
+removes the device credential if it may and `status` says revoked. While it
+waits, `run` says what for: the owner's permission to scan the folder connect
+ran in (with the Your tools link) until this computer's scan is done, then the
+owner's next step. It removes `run.lock` on every exit, including Ctrl-C,
+SIGTERM and a closed terminal (SIGHUP); a lock whose process is gone, or that
+has not been refreshed for two minutes, is cleared on the next start.
 
-**Remaining export blockers:** grants for linked, configured targets now resolve
-to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare
-`upload_authorization: seed_import_grant_required` but supply no signed seed
-import authority. Vendor task inputs, adapter resume checkpoints and the chunk
-assembly/upload contract are also absent. The CLI releases these tasks before
-reading a vendor key; background mode parks them, and `run --once` reports the
-dependency as a command failure. An unavailable destination reports its reason
-and releases with `paused` after a `connected_runner_required` event.
-Vendor export remains blocked.
+`rer business run` also performs claimed `export.vendor` tasks into the app's
+import door. The claim's grant names the door (`/api/rer/import/uploads` on the
+app's HTTPS origin) and `import_grants`; every door request asks
+`POST /api/business/tasks/:taskId/import-grants` for its own short-lived
+RER-signed grant (`uploads` or `plan`; apply is the server's alone after the
+owner's wave approval), and the first grant's namespace names the vendor. The
+read-only vendor key is read from OS credential storage, never from arguments,
+the environment or a file. The shipped adapter runs into a private 0600
+`export-<id>.bundle` file in the state folder, each item checked by the outbound
+detector; the bundle is sent in 64 KiB chunks, then planned, which leaves a
+zero-write preview in the door. Run then completes the task with outputs
+`{upload_id, plan_id, bundle_sha256}` (identifiers only); Business reads that
+plan from the door with its own grants and completes the task only if it is the
+plan of exactly that bundle. Run prints only counts and removes the bundle on
+every exit. Without the key, run
+releases the task as `paused` after an `owner_required` event and names the
+owner's command; a running supervisor picks the export up once the key is
+stored. A door that is not ready releases it as `paused` after a
+`connected_runner_required` event, naming the reason. UptimeRobot needs no
+other input. Sentry (its organization and window) and PagerDuty (its window)
+need inputs the executor task view does not carry yet, and Calendly's folder
+of files has no single-bundle door format yet: these release as `paused` after a
+`configuration_required` event. While an agent step waits (an export, or a
+question for `next`, or the lease an earlier run on this computer still holds),
+run says what it waits for instead of `Nothing yet`; otherwise it names a move's
+owner step with its link before `Nothing yet`.
 
-The current MCP `next_question` filters out owner items. When an owner summary
-is supplied, the CLI displays its browser link and refuses to answer it.
+`rer business run` performs claimed `catchup.vendor` and `switchoff.archive`
+tasks the same way: the claim's grant names the door, the key comes from OS
+credential storage, and the shipped adapter's bundle goes up in 64 KiB chunks,
+each with its own grant, from a private 0600 file removed on every exit.
+
+- A catch-up then plans the upload with `{uploadId, catchup: true}`. Business
+  mints its plan grant under the owner's standing catch-up approval when one
+  covers the tool, and says so with `catchup: "bounded"` on the grant. If the
+  door refuses that with `catchup_requires_proposal:<reason>` (gone, conflicting
+  or rejected records, or a change of 5% or more), run asks
+  `import-grants` for `{action: "plan", review: true}` and plans the same upload
+  again for the owner's review. Run completes with
+  `{upload_id, plan_id, bundle_sha256}`; Business applies a bounded plan under
+  the standing approval and any other only after the owner approves it.
+- An archive calls the door's `archive` action with `{uploadId, tool, takenAt}`
+  (the tool is the vendor's namespace), then `restore-check` with the
+  `archiveId`, and requires both answers to carry the bundle's SHA-256 and size,
+  the key `business-archive/<tool>/<takenAt>` and the same counts. Run completes
+  with `{archive_id, bundle_sha256}`; Business runs its own `restore-check`
+  before the task is done. Archive grants are `uploads`, `archive` and
+  `restore-check`; catch-up grants are `uploads`, `plan` and `status`.
+
+Run prints only counts and the archive key. When an owner summary is supplied,
+the CLI displays its browser link and refuses to answer it.
 
 The four deterministic adapter implementations and their native output formats
-are described in [the adapter guide](cli/business/vendors/README.md). Their
-presence does not enable export until the seed import authority and remaining
-transport contracts are connected.
+are described in [the adapter guide](cli/business/vendors/README.md).
 
 ## Local engineering companion
 
