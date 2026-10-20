@@ -3055,7 +3055,7 @@
     },
     "scripts/publish-check/history_hydration.py": {
       "source": "scripts/publish-check/history_hydration.py",
-      "sha256": "f86071745f5fd3b49f41f18d1ec7a13e220f47c86b2f9afb5975afee9b20b090"
+      "sha256": "6d5da8b9bf0c2d21df05f79bed028f92208f478f34c43627af081c0edf7104eb"
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
