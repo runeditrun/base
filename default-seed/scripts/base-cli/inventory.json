@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.73",
+  "cliVersion": "0.2.73-dev.g0350e43e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1079,7 +1079,7 @@
     },
     "cli/site-runtime.mjs": {
       "source": "cli/site-runtime.mjs",
-      "sha256": "48bd7a4c53e4c48e156c20332685f263ce9bb9b6a226ea546c24fcadbbc2776e"
+      "sha256": "d8bb7d44794833994ae8560121b6ee49aa7c8b8df56a8d6efb231626173ddc80"
     },
     "cli/site-syntax.mjs": {
       "source": "cli/site-syntax.mjs",
@@ -2983,7 +2983,7 @@
     },
     "modules/site/docs-search/artifacts.mjs": {
       "source": "modules/site/docs-search/artifacts.mjs",
-      "sha256": "7f5fe07712f098aee56f79e2d8664c26237b8688c0d8022623c809c13c7daa82"
+      "sha256": "8c21c7d8183927544050510df2af45f5dd482937aab7b4d6cbebb2f2393caab8"
     },
     "modules/site/docs-search/client.ts": {
       "source": "modules/site/docs-search/client.ts",

@@ -1,7 +1,8 @@
 // The only executable site extension: Base's build-coupled docs search.
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { invalid } from './errors.mjs';
 import { contained } from './project.mjs';
@@ -41,7 +42,7 @@ export async function buildSiteRuntime(project, declaration, corpus, assets, { p
   const output = await contained(project.root, dirname(declaration.corpus), { optional: true });
   await store.run('Preparing docs search', process.execPath, [fileURLToPath(new URL('./site-prepare.mjs', import.meta.url)), corpus, assets, output, declaration.endpoint, compatibilityDate, domain], {cwd:project.root, signal, heavy:false});
  }
- const { build } = await import('esbuild');
+ const { build } = createRequire(join(project.root, 'package.json'))('esbuild');
  const worker = fileURLToPath(new URL('../modules/site/docs-search/worker.ts', import.meta.url));
  const contract = { endpoint: declaration.endpoint, corpusHash, model, pooling };
  const bundled = await build({ absWorkingDir: dirname(worker), stdin: { contents: `import {createSearchWorker} from ${JSON.stringify(worker)};export default createSearchWorker(${JSON.stringify(contract)});`,

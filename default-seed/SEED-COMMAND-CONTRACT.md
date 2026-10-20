@@ -283,7 +283,7 @@ site: {
 JavaScript. This optional runtime declares only `ASSETS` and Workers AI (`AI`);
 it does not accept arbitrary application bindings, seed ownership annotations or
 a separate Wrangler deployment. `deploy-site.json` remains the same domain-only
-declaration. Sites without `runtime` keep the assets-only deployment. Package mode installs the pinned bundler with rer; vendored adopters declare `esbuild` as a devDependency (the maintained seed pins 0.28.2).
+declaration. Sites without `runtime` keep the assets-only deployment. Search-enabled seeds declare `esbuild` as a devDependency (the maintained seed pins 0.28.2). Both package and vendored runtimes use that checkout's build toolchain.
 
 The entry's one `sitePages({ styles, clients, contract })` render returns
 `{ pages, assets, searchPages }`, where `searchPages` is
