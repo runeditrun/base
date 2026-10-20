@@ -197,7 +197,8 @@ def inspect_text(data, path, config, *, commit_message=False, binary_content=Non
             if not (binary(data) if binary_content is None else binary_content) or any(stored_host(email) for email in emails):
                 rules.add('hygiene.email')
     ref_text, provenance = provenance_text(text, path, config.get('declaredSources', frozenset()))
-    stated, ambiguous = reference_sets(ref_text, path, config.get('localPaths', frozenset()), config.get('projectIdentity'))
+    stated, ambiguous = reference_sets(ref_text, path, config.get('localPaths', frozenset()),
+                                      config.get('projectIdentity'), config.get('githubOwners', frozenset()))
     references = set()
     for repository in stated | ambiguous:
         # A future source identity does not assert current GitHub visibility.
@@ -214,8 +215,8 @@ def reference_rules(references, states):
     rules = set()
     for repository, ambiguous, pending in references:
         state = states[repository]
-        # A bare word/word with no GitHub context names a repository only when
-        # one exists privately; that no repository answers to it proves nothing.
+        # An ambiguous code span retains its private-only check; a missing
+        # repository does not turn an otherwise unqualified code path into one.
         if state == 'missing' and ambiguous and not pending:
             continue
         if state == 'missing' and pending:

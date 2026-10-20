@@ -18,7 +18,7 @@ const base = resolve(import.meta.dirname, '..'), fixtures = join(import.meta.dir
 const macOS = process.platform === 'darwin';
 // Public repositories stand in for the app's identity; nothing is fetched from them.
 const repository = 'runeditrun/base', projectId = 'app-1', origin = `https://github.com/${repository}.git`;
-const codexToken = 'fixture-codex-access-token-0001';
+const codexToken = 'synthetic-fixture-codex-access-token-0001';
 let directory, launcher, providers;
 before(async () => {
  directory = await realpath(await mkdtemp(join(tmpdir(), 'rer-companion-')));
@@ -148,7 +148,7 @@ test('run turns a job into an exact-commit isolated checkout inside the OS bound
  await mkdir(join(home, '.codex'));
  await writeFile(join(home, '.codex/auth.json'), JSON.stringify({ OPENAI_API_KEY: null, tokens: { access_token: codexToken } }));
  await writeFile(join(home, '.codex/config.toml'), '[mcp_servers.host]\ncommand = "host-mcp"\n');
- const env = { GITHUB_TOKEN: 'fixture-github-token', CLOUDFLARE_API_TOKEN: 'fixture-cloudflare-token', GIT_TEMPLATE_DIR: template, GIT_DIR: join(root, 'wrong-git-dir'), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: join(template, 'hooks') };
+ const env = { GITHUB_TOKEN: 'synthetic-fixture-github-token', CLOUDFLARE_API_TOKEN: 'fixture-cloudflare-token', GIT_TEMPLATE_DIR: template, GIT_DIR: join(root, 'wrong-git-dir'), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: join(template, 'hooks') };
 
  assert.equal((await companion(['codex-auth'], { home, state, env })).code, 0);
  assert.equal(existsSync(join(state, 'executor-home/.codex/config.toml')), false, 'only auth.json is copied');
@@ -250,7 +250,7 @@ test('an uncertain running job is never restarted on its own, and a revoked devi
  assert.equal(server.posted('/events').at(-1).body.payload.status, 'needs_input', 'a resume without a live executor asks the owner to reconcile');
  assert.equal((await readState(state)).active.status, 'running');
 
- server.token = 'fixture-device-key-revoked';
+ server.token = 'synthetic-fixture-device-key-revoked';
  const revoked = await companion(['run'], { home, state });
  assert.equal(revoked.code, 1, 'a revoked device ends the runner');
 });

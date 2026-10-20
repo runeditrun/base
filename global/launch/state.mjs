@@ -10,7 +10,7 @@
 //   stop.json     when rer dev --stop last ran: a launch requested before it stops
 //   pin-install.json  the process installing the checkout's pinned rer package
 import { createHash } from 'node:crypto';
-import { appendFile, link, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, link, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { serversDirectory } from '../registry.mjs';
@@ -35,9 +35,10 @@ async function live(holder) {
 }
 
 export async function liveWorker(directory) {
- const holder = await readJson(join(directory, 'worker.json'));
+ const holder = await readWorker(directory);
  return await live(holder) ? holder : undefined;
 }
+export const readWorker = directory => readJson(join(directory, 'worker.json'));
 
 // A claim file is written to a private file first and hard-linked into place,
 // so it appears complete or not at all: a process finding it never reads a
@@ -101,8 +102,8 @@ export async function settledPinInstall(checkout, { env = process.env, signal, o
 export async function claimLaunch(directory, token) {
  const path = join(directory, 'worker.json');
  for (let attempt = 0; attempt < 3; attempt++) {
-  const { start } = await processInfo(process.pid);
-  if (await linkClaim(path, { token, pid: process.pid, start, startedAt: Date.now(), events: `events-${token}.jsonl` })) {
+  const { start, title: command } = await processInfo(process.pid), checkout = await realpath(process.cwd());
+  if (await linkClaim(path, { token, pid: process.pid, start, command, checkout, startedAt: Date.now(), events: `events-${token}.jsonl` })) {
    for (const entry of await readdir(directory)) if (/^events-.*\.jsonl$/.test(entry) && entry !== `events-${token}.jsonl`) await rm(join(directory, entry), { force: true });
    return true;
   }

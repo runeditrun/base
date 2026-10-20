@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import unicodedata
 from repository_intent import declarations, commands
 
 SLUG = r'[A-Za-z0-9][A-Za-z0-9_.-]{0,99}'
@@ -20,6 +21,9 @@ REPOSITORY_HOST = '(?:' + '|'.join('(?a:' + re.escape(host) + ')' + PORT + route
 URL = re.compile(r'(?i)' + URL_BOUNDARY + r'(?:(?a:' + TRANSPORT + ')' + USERINFO + REPOSITORY_HOST +
                  r'|(?a:git@github\.com:))(' + PAIR + r')(?![A-Za-z0-9_.-])')
 FULL = re.compile(PAIR + r'\Z')
+IDENTITY_FIELDS = {'edition.json': 'id', 'sources.lock.json': 'edition', 'rer-project.json': 'projectId'}
+TOKEN = re.compile(r'(?<![\w./@+-])(' + PAIR + r')(?![A-Za-z0-9_.-])')
+QUALIFIER = re.compile(r'(?:#[0-9]+(?![A-Za-z0-9_])|@[a-fA-F0-9]{7,40}(?![A-Za-z0-9_])|/(?:pull|issues|tree|blob)/)')
 METADATA = re.compile(r'(?i)(?:^|/)(?:[^/]+\.(?:json|ya?ml|toml)|\.gitmodules)$')
 # GitHub documents these web auth endpoints, not repository namespaces.
 SERVICE_URL = re.compile(r'(?i)' + URL_BOUNDARY + r'(?a:https?://|(?<!:)//)' + USERINFO +
@@ -84,19 +88,30 @@ def references(text, path, local_paths=frozenset(), project_identity=None):
     return stated | ambiguous
 
 
-def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
+def reference_sets(text, path, local_paths=frozenset(), project_identity=None, known_owners=frozenset()):
     """Split `owner/name` tokens into stated repositories and ambiguous ones.
 
-    A stated reference has GitHub context: a URL, a repository field, a labelled
-    or commanded mention, a repository route. An ambiguous token is a bare
-    word/word in prose (`commit/tree`, `rer-delegation/1`, `dmsans/v17`): it is
-    a repository only if one answers to that name privately, never because none
-    does.
+    URLs, qualified tokens and bare pairs with a known GitHub owner are stated
+    references, as are structured declarations and repository commands. Plain
+    slash prose does not acquire repository meaning from nearby words. Retain
+    the private-only check for ambiguous code spans.
     """
     ambiguous = set()
     repository_text = SERVICE_URL.sub('', text)
     found = {normalize(m.group(1)) for m in URL.finditer(repository_text)
              if not SPONSORS_URL.match(repository_text, m.start())}
+    for match in TOKEN.finditer(repository_text):
+        # A non-ASCII slug continuation cannot turn an invalid identifier into
+        # a shorter valid repository token.
+        if match.end() < len(repository_text) and unicodedata.category(repository_text[match.end()])[0] in 'LMN':
+            continue
+        repository = normalize(match[1])
+        # Unmarked prose uses canonical owner spelling. Capitalized slash
+        # phrases do not become repositories just because a vendor owns one.
+        known = match[1].split('/')[0] in known_owners
+        logical = path in IDENTITY_FIELDS and project_identity is not None and repository == normalize(project_identity)
+        if QUALIFIER.match(repository_text, match.end()) or (known and not logical):
+            found.add(repository)
     # A URL in an explicit repository declaration has stronger context than
     # its coincident service spelling. Never erase the original text first.
     found.update(explicit_references(repository_text, path))
@@ -123,11 +138,16 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
                 continue
             # A plain multi-segment path is ambiguous; GitHub's repository
             # routes, a labeled field or a GitHub command disambiguate it.
-            labeled = explicit and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)github|gh\s', match['label']))
+            labeled = explicit and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)gh\s', match['label']))
             if REPOSITORY_ROUTE.match(suffix) or labeled:
                 found.add(normalize(repository))
             elif not suffix:
                 if explicit:
+                    # An unmarked pair after a prose word such as "GitHub"
+                    # is not a declaration. Code markup and clone/fork commands
+                    # retain their existing repository context.
+                    if not match['markup'] and not re.match(r'(?i)clone|fork', match['label']):
+                        continue
                     weak = re.fullmatch(r'(?i)source', match['label']) and not re.search(r'(?i)repository|repo', markdown[match.start():match.start('reference')])
                 else:
                     line_start = markdown.rfind('\n', 0, match.start()) + 1
@@ -140,7 +160,7 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
                 document = json.loads(text, object_pairs_hook=RepositoryObject)
             except ValueError:
                 document = None
-            identity_field = {'edition.json': 'id', 'sources.lock.json': 'edition', 'rer-project.json': 'projectId'}.get(path.rsplit('/', 1)[-1])
+            identity_field = IDENTITY_FIELDS.get(path.rsplit('/', 1)[-1])
             identity = document.get(identity_field) if isinstance(document, dict) and identity_field else None
             logical = path in ('edition.json', 'sources.lock.json', 'rer-project.json') and identity == project_identity
             if isinstance(identity, str) and FULL.fullmatch(identity) and not logical:
