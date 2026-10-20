@@ -38,10 +38,34 @@ for (const cleanHistory of [false, true]) {
       const notes = `Public source: ${f.options.repository}`;
       writeFileSync(resolve(f.repo, 'RELEASE.json'), JSON.stringify({ version: '1.2.3', publicReleaseNotes: notes }));
       const source = f.commit();
+      // Record real scanner invocations without replacing its implementation.
+      const calls = resolve(f.temporary, 'scanner-arguments.jsonl');
+      const wrapper = resolve(f.temporary, 'record-node.py');
+      writeFileSync(wrapper, `#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+if any(arg.endswith("scripts/publish-check.mjs") for arg in args):
+    with open(${JSON.stringify(calls)}, "a", encoding="utf-8") as stream:
+        stream.write(json.dumps(args) + "\\n")
+os.execv(${JSON.stringify(process.execPath)}, [${JSON.stringify(process.execPath)}, *args])
+`);
+      chmodSync(wrapper, 0o755);
+      const preload = resolve(f.temporary, 'record-node.mjs');
+      writeFileSync(preload, `if (process.argv[1] === ${JSON.stringify(cli)}) process.execPath = ${JSON.stringify(wrapper)};`);
+      const timeout = dryRun ? undefined : cleanHistory ? '7200' : '600';
       const result = spawnSync(process.execPath, [cli, 'release', '--repo', f.repo, '--project', f.options.project,
         '--repository', f.options.repository + '.git', '--output', f.options.output, '--tag', 'v1.2.3', '--local-verify',
-        ...(cleanHistory ? ['--clean-history'] : []), ...(dryRun ? ['--dry-run'] : [])], { encoding: 'utf8' });
+        ...(cleanHistory ? ['--clean-history'] : []), ...(dryRun ? ['--dry-run'] : []),
+        ...(timeout === undefined ? [] : ['--scan-timeout-seconds', timeout])],
+      { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` } });
       assert.equal(result.status, 0, result.stderr);
+      const scannerCalls = readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      assert.equal(scannerCalls.length, 1);
+      for (const args of scannerCalls) {
+        const index = args.indexOf('--timeout-seconds');
+        if (timeout === undefined) assert.equal(index, -1, 'omitted release timeout must leave scanner default alone');
+        else { assert.ok(index >= 0); assert.equal(args[index + 1], timeout); }
+      }
       const receipt = JSON.parse(result.stdout);
       assert.equal(receipt.status, dryRun ? 'DRY_RUN' : 'RELEASED');
       assert.equal(receipt.source.commit, source);

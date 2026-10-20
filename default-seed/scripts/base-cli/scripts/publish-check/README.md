@@ -33,7 +33,12 @@ text's repository references instead of resolving them; `history_scan.py`
 resolves the whole scan's references at once through `github_refs.py`
 (GraphQL batches, a REST lookup for any repository a batch leaves in doubt) and
 then adds their rules. The Node entry point bounds
-the whole operation and stops its private process group on timeout/cancellation.
+the scan after slot acquisition and stops its private process group on
+timeout/cancellation. `slots.py` obtains one per-user `fcntl.flock` slot before
+starting the scanner. The holder watches Node's pipe for abrupt parent death;
+its worker inherits the lock so it cannot outlive its slot. Queueing has its
+own one-hour cap. `timeout.json` supplies the shared default and upper bound
+to Python and the Node/release validator.
 
 Git message records carry their kind explicitly. Only commit records enable the
 bounded public coauthor address rule described in the command guide; a file named

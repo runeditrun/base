@@ -13,7 +13,15 @@ arguments remain `--public-base <url>#<branch>`, `--project <owner>/<repo>`,
 `--repository https://github.com/<owner>/<repo>`, `--env-file /path/to/file`,
 `--cache-dir /path` and `--timeout-seconds N`. The default total deadline is
 300 seconds and the maximum is 7200; expiry stops the scan's process group and
-returns INCOMPLETE. `--cache-dir` is accepted for caller compatibility and no
+returns INCOMPLETE. The deadline starts after acquiring a machine-wide per-user
+scan slot. Up to three scans run at once; `RER_SCAN_SLOTS` accepts an integer
+from 1 to 8 to adjust that limit. Advisory locks in `~/.cache/rer/scan-slots`
+are released automatically when their holders exit. A queued scan prints
+`waiting for a scan slot` once to stderr and polls every two seconds. Waiting
+does not consume its scan deadline; after 60 minutes it returns INCOMPLETE with
+`scan.slot-timeout`. `rer release --scan-timeout-seconds N` forwards an integer
+from 1 to 7200 to this deadline; omitting it keeps the 300-second default.
+`--cache-dir` is accepted for caller compatibility and no
 longer creates a resumable cache.
 
 Output change: the v3 report now includes `scanner` and secret findings include
