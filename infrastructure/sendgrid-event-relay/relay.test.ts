@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
+import { promises as dns } from 'node:dns';
 import { test } from 'node:test';
 import worker from './src/worker.ts';
 import { verifySendGridWebhook, verifyRelayRequest } from './src/crypto.ts';
@@ -111,11 +112,13 @@ test('registered seed receives only a whole signed scope, byte exact, independen
   let targetStatus = 204, legacyStatus = 204, dnsAddress = '104.16.1.1', dnsFailure = false;
   let seedCalls = 0, legacyCalls = 0;
   let expectedBody = new Uint8Array(), expectedHeaders = new Headers();
+  for (const method of ['resolve4', 'resolve6'] as const) {
+    t.mock.method(dns, method, async () => {
+      if (dnsFailure) throw Object.assign(new Error('network edge unavailable'), { code: 'ETIMEOUT' });
+      return [dnsAddress];
+    });
+  }
   t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
-    if (url.startsWith('https://cloudflare-dns.com/')) {
-      if (dnsFailure) throw new Error('network edge unavailable');
-      return Response.json({ Status: 0, Answer: [{ type: 1, data: dnsAddress }] });
-    }
     assert.equal(init.redirect, 'manual');
     assert.ok(init.signal);
     const headers = new Headers(init.headers);

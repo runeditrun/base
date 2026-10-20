@@ -11,17 +11,18 @@ async function main() {
     throw new Error('Registration requires a registry file and authenticated RunEditRun account');
   }
   const registry = seedRegistry(await readFile(path, 'utf8'));
-  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/domains`, {
-    headers: { authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` }, redirect: 'error', signal: AbortSignal.timeout(5_000),
-  });
-  if (!response.ok) { await response.body?.cancel(); throw new Error('Cannot establish authoritative Worker custom domains'); }
-  const result = await response.json() as { success: boolean; result: { hostname: string; service: string; environment: string }[] };
-  if (!result.success || !Array.isArray(result.result)) throw new Error('Cannot establish authoritative Worker custom domains');
   for (const target of registry.targets) {
     const hostname = seedTarget(target.url).hostname;
     if (target.expiresAt <= Date.now()) throw new Error('Registration is expired');
-    if (!result.result.some(domain => domain.hostname === hostname && domain.service !== 'rer-sendgrid-event-relay' && domain.environment === 'production')) {
-      throw new Error('Target is not a RunEditRun account Worker custom domain');
+    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/domains?hostname=${encodeURIComponent(hostname)}`, {
+      headers: { authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` }, redirect: 'error', signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) { await response.body?.cancel(); throw new Error('Cannot establish authoritative Worker custom domains'); }
+    const result = await response.json() as { success: boolean; result: { hostname: string; service: string; environment: string; enabled: boolean; zone_name: string }[] };
+    if (!result.success || !Array.isArray(result.result)) throw new Error('Cannot establish authoritative Worker custom domains');
+    if (!result.result.some(domain => domain.hostname === hostname && domain.service !== 'rer-sendgrid-event-relay' &&
+        domain.environment === 'production' && domain.enabled && domain.zone_name === 'runeditrun.com')) {
+      throw new Error('Target is not an enabled RunEditRun account Worker custom domain');
     }
     await requirePublicDns(hostname);
   }

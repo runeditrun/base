@@ -1,3 +1,5 @@
+import { promises as dns } from 'node:dns';
+
 // Seed tests use owner-controlled Worker custom domains. Registration checks
 // the account's authoritative Worker route as well as DNS; arbitrary origins
 // cannot be made safe by checking DNS then letting fetch resolve a second time.
@@ -24,16 +26,25 @@ function publicAddress(address: string): boolean {
     !(a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) && !(a === 203 && b === 0 && c === 113);
 }
 
+async function records(query: () => Promise<string[]>): Promise<string[]> {
+  try { return await query(); }
+  catch (error) {
+    // One family may be absent. NXDOMAIN, transport errors and malformed
+    // answers never establish a usable target.
+    if ((error as { code?: string }).code === 'ENODATA') return [];
+    throw new Error('Seed DNS lookup failed');
+  }
+}
+
 export async function requirePublicDns(hostname: string): Promise<void> {
-  const answers = await Promise.all([1, 28].map(async type => {
-    const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
-      headers: { accept: 'application/dns-json' }, redirect: 'error', signal: AbortSignal.timeout(1_500),
-    });
-    if (!response.ok) { await response.body?.cancel(); throw new Error('Seed DNS lookup failed'); }
-    const result = await response.json() as { Status?: number; Answer?: { type: number; data: string }[] };
-    if (result.Status !== 0) throw new Error('Seed DNS lookup failed');
-    return (result.Answer ?? []).filter(answer => answer.type === 1 || answer.type === 28).map(answer => answer.data);
-  }));
-  const addresses = answers.flat();
-  if (!addresses.length || addresses.some(address => !publicAddress(address))) throw new Error('Seed DNS is not entirely public');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // Workers implements these two methods with its built-in DoH resolver.
+    // The deadline bounds delivery even if a resolver never settles.
+    const addresses = await Promise.race([
+      Promise.all([records(() => dns.resolve4(hostname)), records(() => dns.resolve6(hostname))]).then(answers => answers.flat()),
+      new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Seed DNS deadline exceeded')), 1_500); }),
+    ]);
+    if (!addresses.length || addresses.some(address => !publicAddress(address))) throw new Error('Seed DNS is not entirely public');
+  } finally { clearTimeout(timer); }
 }

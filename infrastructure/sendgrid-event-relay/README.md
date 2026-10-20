@@ -98,7 +98,7 @@ and omitted even when one of their events is the test receipt: this feature
 cannot promise every test receipt in shared SendGrid batching conditions.
 
 Seed delivery runs independently of the legacy product outcomes. It has a
-1.5-second DNS deadline per parallel lookup, a three-second target timeout,
+1.5-second deadline for the two parallel DNS lookups, a three-second target timeout,
 and at most one retry after 250 ms for transport errors, HTTP 429 or 5xx.
 Redirects and other 4xx responses get no retry. Seed failure never changes a
 successful legacy result into 503. Counts contain only unknown/expired events,
@@ -117,3 +117,8 @@ Run the receiver tests above and the dry build, not the full Base suite locally.
 Product and provider logs likewise contain only verified-event and batch outcome
 counts. Worker custom-domain delivery uses `global_fetch_strictly_public` so
 same-zone requests enter the public Worker route.
+DNS uses the runtime's built-in `node:dns` resolver (`resolve4`/`resolve6`),
+with `nodejs_compat` enabled. Direct HTTPS requests to the resolver from the
+staging Worker failed at transport; the built-in resolver was proved separately
+before replacing that path. An absent address family is allowed; any other DNS
+error, timeout, or nonpublic answer rejects seed delivery.
