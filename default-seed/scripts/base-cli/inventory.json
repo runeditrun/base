@@ -995,7 +995,7 @@
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",
-      "sha256": "896d8049c07db150ecc29d90d0627e02b3f981a213331a2d03ae9c8e8819a084"
+      "sha256": "9b8493c3824b09506459e3294fb34b285b65c969ad7a4036eb11d93cc33ad0b7"
     },
     "cli/settings.mjs": {
       "source": "cli/settings.mjs",

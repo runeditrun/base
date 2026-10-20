@@ -1,6 +1,6 @@
 import test, {before, after} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile, writeFile, rm, symlink, stat, statfs, access, readdir, readlink} from 'node:fs/promises';
+import {readFile, writeFile, rm, symlink, stat, statfs, access, readdir, readlink, mkdir, mkdtemp, truncate} from 'node:fs/promises';
 import {join} from 'node:path';
 import {loadavg, freemem, tmpdir} from 'node:os';
 import {createServer} from 'node:net';
@@ -43,7 +43,7 @@ async function ready(child, {root = f.root, origin = url} = {}) {
   const output = child.stdoutText + child.stderrText;
   const reasons = [
    ['load refusal', /this computer is busy\. Its 1-minute load/],
-   ['disk refusal', /Server startup requires 15 GiB free/],
+   ['disk refusal', /Server startup requires .* bytes free/],
    ['state custody refusal', /An active local operation owns the state\./],
    ['port collision', /EADDRINUSE|address already in use/],
    ['readiness deadline', /readiness deadline exceeded/],
@@ -200,14 +200,41 @@ for (const mode of ['dev', 'preview']) test(`rer ${mode} runs the declared sched
  } finally {await writeFile(config, original);}
 });
 
-// The disk floor is 15 GiB unless a CI or managed build runner sets
-// RER_SERVERS_DISK_FLOOR_GIB; the refusal says which floor and path it measured.
-test('server startup refuses below the disk floor, naming the floor, the free space and the variable', async () => {
- const gib = 1024n ** 3n, volume = free => async () => ({bavail: free / 4096n, bsize: 4096n});
- const admitted = (free, env) => serverResources(f.root, {disk: volume(free), env});
- await assert.rejects(admitted(14n * gib, {}), error => error.exitCode === 4 && /requires 15 GiB free[^]*14\.0 GiB free[^]*RER_SERVERS_DISK_FLOOR_GIB/.test(error.message) && error.message.includes(f.root));
- await assert.doesNotReject(admitted(14n * gib, {RER_SERVERS_DISK_FLOOR_GIB: '4'}));
- await assert.rejects(admitted(3n * gib, {RER_SERVERS_DISK_FLOOR_GIB: '3.5'}), error => /requires 3\.5 GiB free/.test(error.message));
+test('server startup measures write paths, sizes the disk floor to the seed, and honours the override', async t => {
+ const gib = 1024n ** 3n, root = await mkdtemp(join(tmpdir(), 'rer-disk-'));
+ t.after(() => rm(root, {recursive: true, force: true}));
+ const temporary = join(root, 'temporary'), registry = join(root, 'servers');
+ await Promise.all([temporary, registry, join(root, 'node_modules'), join(root, '.wrangler/state/v3/d1')].map(path => mkdir(path, {recursive: true})));
+ const env = {TMPDIR: temporary, RER_SERVERS_DIR: registry}, seen = new Set();
+ const admitted = (free = 4n * gib, extra = {}, volumes = new Map()) => serverResources(root, {env: {...env, ...extra}, disk: async path => {
+  seen.add(path);
+  // The OS default temp volume is small; the selected TMPDIR has room.
+  return {bavail: volumes.get(path) ?? (path === tmpdir() ? 64n * 1024n ** 2n : free), bsize: 1n};
+ }});
+ await assert.doesNotReject(admitted(32n * gib));
+ for (const path of [root, temporary, registry]) assert.ok(seen.has(path), `measured write path ${path}`);
+ assert.ok(!seen.has(tmpdir()), 'an unused default temp filesystem cannot refuse startup');
+ await assert.doesNotReject(admitted(), 'a small seed does not require a fixed large floor');
+ let initialNeed;
+ const shortage = path => error => {
+  const needed = /requires (\d+) bytes free/.exec(error.message)?.[1];
+  assert.equal(error.exitCode, 4);
+  assert.ok(error.message.includes(path));
+  assert.match(error.message, /0 bytes free/);
+  assert.match(error.message, /RER_SERVERS_DISK_FLOOR_GIB/);
+  assert.ok(BigInt(needed) > 0n);
+  initialNeed ??= BigInt(needed);
+  return true;
+ };
+ for (const path of [root, temporary, registry]) await assert.rejects(admitted(4n * gib, {}, new Map([[path, 0n]])), shortage(path));
+ // Real measured dependency and D1 bytes increase the admission requirement.
+ for (const path of [join(root, 'node_modules/dependency.bin'), join(root, '.wrangler/state/v3/d1/database.sqlite')]) {
+  await writeFile(path, ''); await truncate(path, Number(gib));
+ }
+ await assert.rejects(admitted(), error => BigInt(/requires (\d+) bytes free/.exec(error.message)?.[1]) > initialNeed);
+ await assert.doesNotReject(admitted(gib / 2n, {RER_SERVERS_DISK_FLOOR_GIB: '0.25'}));
+ await assert.doesNotReject(admitted(0n, {RER_SERVERS_DISK_FLOOR_GIB: '0'}));
+ await assert.rejects(admitted(3n * gib, {RER_SERVERS_DISK_FLOOR_GIB: '3.5'}), error => error.message.includes(`${7n * gib / 2n} bytes`));
  for (const value of ['', 'lots', '-1', '4GiB', '1e3']) await assert.rejects(admitted(100n * gib, {RER_SERVERS_DISK_FLOOR_GIB: value}), error => error.exitCode === 4 && error.message.includes('RER_SERVERS_DISK_FLOOR_GIB'), value);
  // Through the real command: an invalid value refuses before anything starts.
  const invalid = f.launch(['scripts/rer.mjs', 'dev', '--json'], process.execPath, {RER_SERVERS_DISK_FLOOR_GIB: 'lots'});
