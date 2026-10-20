@@ -119,10 +119,13 @@ export async function readProcessIdentity(pid, timeout = inspectionMs) {
   return withinBound(timeout, (remaining) => psIdentity(pid, remaining))
 }
 
+// macOS ps comm is read from the process's own argv, which process.title
+// rewrites (the job supervisor retitles itself after launch). ucomm is the
+// kernel's executable name: set only by exec, so it survives a retitle.
 async function psIdentity(pid, timeout) {
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'comm='],
+    ({ stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'ucomm='],
       { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
   } catch (error) { if (error.code === 1 && !error.stdout?.trim()) return; throw transient('Could not inspect process identity.') }
   const match = stdout.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.{24})\s+(.+?)\s*$/)
@@ -150,7 +153,6 @@ export async function readProcessTable(timeout = inspectionMs, pgid, read = proc
   }, extension)
 }
 
+// Custody follows a process lifetime: exec changes its executable name without
+// changing its PID or start time. Names are metadata, never lifetime identity.
 export const sameBirth = (left, right) => validPid(left?.pid) && left.pid === right?.pid && left.birth === right?.birth
-
-export const sameProcess = (left, right) => validPid(left?.pid) && left?.pid === right?.pid
-  && left?.birth === right?.birth && left?.command === right?.command
