@@ -2,7 +2,7 @@ import { all, quote, insist } from './storage.mjs';
 import { canonicalJson } from './hash.mjs';
 import { tokens, identifier, folded } from './generated.mjs';
 import { laterData } from './backfills.mjs';
-import { destinationLedger } from './ledgers.mjs';
+import { destinationLedger, matchMigrationLedger } from './ledgers.mjs';
 import { checkRebuild } from './rebuilds.mjs';
 
 // Applied product migrations in the ledger's own order (ledgers.mjs). A
@@ -22,9 +22,11 @@ export async function appliedMigrations(db) {
 // rewrites restorable data is refused, whether or not it changes the schema,
 // unless its statement is replayed at finalize (backfills.mjs).
 async function placement(db,manifest,cat,replay,ledger,history) {
-  const applied=ledger.map(m=>m.name);
+  const files=replay.names.map(name=>({name,sha256:replay.sha256?.(name)}));
+  const applied=matchMigrationLedger(ledger,files);
   insist(canonicalJson(replay.names)===canonicalJson(applied) && await replay.schemaAfter(applied)===cat.identity,'schema_mismatch');
-  const recorded=manifest.migrations ?? archivedApplied(history?.(),ledger,replay);
+  const historyEntries=manifest.migrations?.map(name=>({name})) ?? history?.();
+  const recorded=historyEntries && matchMigrationLedger(historyEntries,files);
   let earlier,unapplied;
   if(recorded) {
     earlier=applied.filter(name=>recorded.includes(name));
@@ -53,21 +55,7 @@ async function placement(db,manifest,cat,replay,ledger,history) {
   const empty=archived.filter(name=>!manifest.tables.find(t=>t.name===name).count);
   const tables=(await all(db,"SELECT name FROM sqlite_master WHERE type IN ('table','view')")).map(t=>t.name);
   const {replays,rebuilt}=laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets:manifest.excludedColumns??{},manifest:manifest.tables});
-  return {earlier,replays,rebuilt};
-}
-// An archive without a migration record that carries its source's migration
-// ledger (an old archive from before that ledger became bookkeeping) records
-// exactly which migrations its rows passed through. Each must be one the
-// destination applied, with the same file hash where the ledger records one:
-// the destination ledger's, else the replayed file's. The ledger itself is
-// never restored (bookkeeping.mjs). history: [{name,sha256?}] from
-// ledgers.mjs archivedHistory, undefined when the archive carries no ledger.
-function archivedApplied(history,ledger,replay) {
-  for(const m of history??[]) {
-    const applied=ledger.find(x=>x.name===m.name);
-    insist(applied && (m.sha256===undefined || m.sha256===(applied.sha256??replay.sha256?.(m.name))),'schema_mismatch:migration_history:'+m.name);
-  }
-  return history?.map(m=>m.name);
+  return {applied,earlier,replays,rebuilt};
 }
 // An archive with the destination's schema identity can still predate later
 // migrations that changed only data (a purge or a backfill) or added an index.
@@ -79,8 +67,10 @@ function archivedApplied(history,ledger,replay) {
 export async function sameSchemaMigrations(db,manifest,cat,migrations,history) {
   const ledger=await destinationLedger(db),applied=ledger?.map(m=>m.name);
   if(!applied)return;
-  insist(!manifest.migrations || manifest.migrations.every(name=>applied.includes(name)),'schema_mismatch:migrations');
-  if(!migrations){insist(!manifest.migrations || applied.every(name=>manifest.migrations.includes(name)),'schema_mismatch:migrations');return;}
+  if(!migrations){
+    if(manifest.migrations)matchMigrationLedger(manifest.migrations.map(name=>({name})),ledger);
+    insist(!manifest.migrations || applied.every(name=>manifest.migrations.includes(name)),'schema_mismatch:migrations');return;
+  }
   // Same schema: every catalogue table is archived, so nothing is replayed.
   await placement(db,manifest,cat,await migrations(),ledger,history);
 }
@@ -90,9 +80,8 @@ export async function sameSchemaMigrations(db,manifest,cat,migrations,history) {
 // Anything else stays a schema_mismatch refusal.
 export async function additiveBridge(db,manifest,cat,migrations,history) {
   insist(migrations,'schema_mismatch');
-  const replay=await migrations(),ledger=await destinationLedger(db)??[],applied=ledger.map(m=>m.name);
-  insist(!manifest.migrations || manifest.migrations.every(name=>applied.includes(name)),'schema_mismatch:migrations');
-  const {earlier,replays,rebuilt}=await placement(db,manifest,cat,replay,ledger,history);
+  const replay=await migrations(),ledger=await destinationLedger(db)??[];
+  const {applied,earlier,replays,rebuilt}=await placement(db,manifest,cat,replay,ledger,history);
   const columns={};
   for(const table of manifest.tables) {
     const target=cat.tables.find(t=>t.name===table.name),label=':'+table.name;

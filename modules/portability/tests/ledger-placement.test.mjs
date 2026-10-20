@@ -18,34 +18,35 @@ const policy={product:'platform-ledger'};
 const plan=[
   ['0001_items.sql','CREATE TABLE items(id TEXT PRIMARY KEY,value TEXT)'],
   ['1270_roles.sql','CREATE TABLE roles(id TEXT PRIMARY KEY,role TEXT)'],
-  ['0900_jobs.sql','CREATE TABLE jobs(id TEXT PRIMARY KEY,state TEXT)'],
+  ['0900_jobs.sql','CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,state TEXT)'],
   ['0950_policies.sql','CREATE TABLE policies(id TEXT PRIMARY KEY,rule TEXT)'],
   ['1280_policy_rules.sql',"UPDATE policies SET rule='comment-deletion' WHERE rule='launch'"],
 ].map(([name,sql])=>({name,sql,sha256:createHash('sha256').update(sql).digest('hex')}));
 const archived=['0001_items.sql','0900_jobs.sql','0950_policies.sql'];
 const platformLedger='CREATE TABLE rer_migrations (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)';
-const replay=async()=>migrationReplay(plan.map(({name,sql})=>({name,statements:[sql]})),policy);
+const nativeLedger='CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)';
+const replay=files=>async()=>migrationReplay(files.map(({name,sql,sha256})=>({name,statements:[sql],sha256})),policy);
 
-async function platformDestination(t) {
-  const target=await database(t,[platformLedger],policy);
-  for(const m of plan)await target.db.batch([target.db.prepare(m.sql),target.db.prepare('INSERT INTO rer_migrations(name,sha256) VALUES(?,?)').bind(m.name,m.sha256)]);
-  return {...target,service:await createPortability({db:target.db,buckets:{FILES:target.bucket},policy,migrations:replay})};
+async function platformDestination(t,{native=false,prefix='',files=plan}={}) {
+  const target=await database(t,[native?nativeLedger:platformLedger],policy);
+  for(const m of files)await target.db.batch([target.db.prepare(m.sql),native?target.db.prepare('INSERT INTO d1_migrations(name) VALUES(?)').bind(m.name):target.db.prepare('INSERT INTO rer_migrations(name,sha256) VALUES(?,?)').bind(prefix+m.name,m.sha256)]);
+  return {...target,service:await createPortability({db:target.db,buckets:{FILES:target.bucket},policy,migrations:replay(files)})};
 }
 const ledgerRows=async db=>(await db.prepare('SELECT rowid,* FROM rer_migrations ORDER BY rowid').all()).results;
 
 // An archive from before rer_migrations became bookkeeping: the source's own
 // ledger travels as a table, and the manifest records no migrations.
-async function retainedArchive(t,{policies=[],ledger=archived.map(name=>plan.find(m=>m.name===name))}={}) {
+async function retainedArchive(t,{policies=[],ledger=archived.map(name=>plan.find(m=>m.name===name)),native=false,prefix=''}={}) {
   const source=await database(t,plan.filter(m=>archived.includes(m.name)).map(m=>m.sql),policy);
   await source.db.prepare("INSERT INTO items VALUES('item-1','Asha Chen')").run();
   await source.db.prepare("INSERT INTO jobs VALUES('job-1','queued')").run();
   for(const id of policies)await source.db.prepare("INSERT INTO policies VALUES(?,'launch')").bind(id).run();
   const {manifest,parts}=await bundle(source.service);
   assert.equal(manifest.migrations,undefined);
-  const table={name:'rer_migrations',sql:platformLedger,columns:[{name:'name',type:'TEXT',notnull:0,pk:1},{name:'sha256',type:'TEXT',notnull:1,pk:0},{name:'applied_at',type:'TEXT',notnull:1,pk:0}],dependencies:[],count:ledger.length,rowidAlias:null};
+  const table={name:native?'d1_migrations':'rer_migrations',sql:native?nativeLedger:platformLedger,columns:native?[{name:'id',type:'INTEGER',notnull:0,pk:1},{name:'name',type:'TEXT',notnull:0,pk:0},{name:'applied_at',type:'TEXT',notnull:1,pk:0}]:[{name:'name',type:'TEXT',notnull:0,pk:1},{name:'sha256',type:'TEXT',notnull:1,pk:0},{name:'applied_at',type:'TEXT',notnull:1,pk:0}],dependencies:[],count:ledger.length,rowidAlias:null};
   const tables=[...manifest.tables,table].sort((a,b)=>a.name<b.name?-1:1);
   const old={...manifest,tables,schema:await sha256(canonicalJson(tables.map(({name,sql})=>({name,sql}))))};
-  const rows=[...parts.flatMap(p=>p.items),...ledger.map((m,index)=>({kind:'row',table:'rer_migrations',index,row:{name:m.name,sha256:m.sha256,applied_at:'2026-10-01 09:00:00'}}))];
+  const rows=[...parts.flatMap(p=>p.items),...ledger.map((m,index)=>({kind:'row',table:table.name,index,row:{name:prefix+m.name,...(native?{id:index+1}:{sha256:m.sha256}),applied_at:'2026-10-01 09:00:00'}}))];
   rows.sort((a,b)=>tables.findIndex(x=>x.name===a.table)-tables.findIndex(x=>x.name===b.table) || a.index-b.index);
   const part=await makePart(0,rows);old.partCount=1;
   const content=new ContentVerifier(old),integrity=new ArchiveVerifier(old);
@@ -74,7 +75,7 @@ test('an archived ledger whose hash differs from the applied migration refuses, 
   const target=await platformDestination(t),before=await ledgerRows(target.db);
   const ledger=archived.map(name=>plan.find(m=>m.name===name)).map(m=>m.name==='0900_jobs.sql'?{...m,sha256:createHash('sha256').update(m.sql+'\n-- edited').digest('hex')}:m);
   const {path}=await retainedArchive(t,{ledger});
-  await assert.rejects(importArchive(target.service,path,[]),error=>error.code==='schema_mismatch:migration_history:0900_jobs.sql');
+  await assert.rejects(importArchive(target.service,path,[]),error=>error.code==='migration_ledger:unknown:0900_jobs.sql');
   assert.deepEqual(await all(target.db,'SELECT * FROM items'),[]);
   assert.deepEqual(await all(target.db,'SELECT id FROM rer_portability_jobs'),[]);
   assert.deepEqual(await ledgerRows(target.db),before);
@@ -86,4 +87,33 @@ test('a later UPDATE refuses when the archive holds rows of its table',async t=>
   await assert.rejects(importArchive(target.service,path,[]),error=>error.code==='schema_mismatch:migration_data:1280_policy_rules.sql');
   assert.deepEqual(await all(target.db,'SELECT * FROM policies'),[]);
   assert.deepEqual(await ledgerRows(target.db),before);
+});
+
+
+test('Platform-prefixed and native ledgers place the same files in either direction, including native to native',async t=>{
+  for(const sourceNative of [false,true])for(const targetNative of [false,true])await t.test(`${sourceNative?'native':'Platform'} to ${targetNative?'native':'Platform'}`,async t=>{
+    const target=await platformDestination(t,{native:targetNative,prefix:targetNative?'':'core-'});
+    const ledgerTable=targetNative?'d1_migrations':'rer_migrations';
+    const before=await all(target.db,`SELECT * FROM ${ledgerTable} ORDER BY rowid`);
+    const {path,source}=await retainedArchive(t,{native:sourceNative,prefix:sourceNative?'':'core-'});
+    const receipt=await importArchive(target.service,path,[]);
+    assert.deepEqual(receipt.bridged.migrations,['1270_roles.sql','1280_policy_rules.sql']);
+    for(const table of ['items','jobs','policies'])assert.deepEqual(await all(target.db,`SELECT * FROM ${table} ORDER BY id`),await all(source.db,`SELECT * FROM ${table} ORDER BY id`));
+    assert.deepEqual(await all(target.db,`SELECT * FROM ${ledgerTable} ORDER BY rowid`),before);
+  });
+});
+
+test('ambiguous file hashes, conflicting names and the first unknown hashless entry refuse without staging rows',async t=>{
+  for(const kind of ['ambiguous','conflict','unknown'])await t.test(kind,async t=>{
+    const jobs=plan.find(m=>m.name==='0900_jobs.sql');
+    const files=kind==='ambiguous'?[...plan,{...jobs,name:'1290_jobs_copy.sql'}]:plan;
+    const target=await platformDestination(t,{native:true,files});
+    const ledger=archived.map(name=>plan.find(m=>m.name===name)).map(m=>m===jobs?{...m,name:kind==='conflict'?'1270_roles.sql':kind==='unknown'?'missing-first.sql':m.name}:m);
+    if(kind==='unknown')ledger.push({...jobs,name:'missing-second.sql'});
+    const {path}=await retainedArchive(t,{ledger,native:kind==='unknown'});
+    const name=kind==='conflict'?'1270_roles.sql':kind==='unknown'?'missing-first.sql':jobs.name;
+    await assert.rejects(importArchive(target.service,path,[]),error=>error.code===`migration_ledger:${kind}:${name}`);
+    assert.deepEqual(await all(target.db,'SELECT * FROM items'),[]);
+    assert.deepEqual(await all(target.db,'SELECT id FROM rer_portability_jobs'),[]);
+  });
 });

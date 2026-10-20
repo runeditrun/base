@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.72-dev.g864b8b31",
+  "cliVersion": "0.2.72-dev.g9dc0108c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -935,7 +935,7 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "ca4797dba8415f00efa146a539c369b1855b584907ade7f113ce81700c568fb8"
+      "sha256": "6cc08afa046b4bf7f53ff4e3aa8d9e13888f18f352dab9d93747cc18d406f93e"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
@@ -2715,7 +2715,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "31de3a422bd050609949ce869ab17b71eb82e2c7a088f79090b42f4498cb3926"
+      "sha256": "978007c6b01458b2b7a5d5aceff25cc39d95cadc971708a54e7ff0ca823cfd34"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -2799,7 +2799,7 @@
     },
     "modules/portability/ledgers.mjs": {
       "source": "modules/portability/ledgers.mjs",
-      "sha256": "0e61bf0202c4fa87a693fae7548fc6d532f2edc1971c6cd232a71bc0e67209b1"
+      "sha256": "9840d8ef353ca9e9e8e78a88470683e6872904131c7533e6e2aa3d2bf72c74d6"
     },
     "modules/portability/legacy-files.mjs": {
       "source": "modules/portability/legacy-files.mjs",
