@@ -391,6 +391,16 @@ Eligible constant seed INSERTs replay too. Statements confined to tables added
 after the archive retain their existing admission when they need no replay;
 an INSERT reading a view must still resolve entirely to carried tables.
 
+A table created and dropped by the applied history remains a read dependency
+even though it is absent from the destination. When its single CREATE, bounded
+INSERT fills and DROP all follow the archive, finalize can reconstruct that
+transient table in migration order, consume it and drop it in the same atomic
+transaction. Its fills may read archived cells and new tables reconstructed by
+the same plan; those dependencies must all qualify. Transient foreign keys,
+writing triggers and other schema mutations do not qualify. Unsupported
+transient reads keep the prior migration-data admission or refusal, and are
+never scheduled against a missing table. No archive format change is needed.
+
 The same check runs when the archive's schema identity equals the destination's:
 a later migration that only purges or backfills rows leaves the schema unchanged,
 yet the archive's rows never passed through it. Eligible carried-table backfills
@@ -691,6 +701,7 @@ modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
 modules/portability/sql-text.mjs
 modules/portability/backfills.mjs
+modules/portability/transient-tables.mjs
 modules/portability/rebuilds.mjs
 modules/portability/replay-views.mjs
 modules/portability/legacy-safety.mjs
