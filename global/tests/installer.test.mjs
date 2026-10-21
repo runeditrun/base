@@ -32,7 +32,8 @@ async function runPageCommands() {
  const { sitePages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
  const html = sitePages({ styles: [], clients: {} }).pages.find(page => page.path === '/run').html;
  const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
- return [...html.matchAll(/<pre[^>]*><code>([^<]*)<\/code><\/pre>/g)].map(match => match[1].replace(/&(amp|lt|gt|quot|#39);/g, entity => entities[entity]));
+ // A block's command is its text: inline spans only keep words together when it wraps.
+ return [...html.matchAll(/<pre[^>]*><code>([\s\S]*?)<\/code><\/pre>/g)].map(match => match[1].replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39);/g, entity => entities[entity]));
 }
 
 // The built package again under another version, optionally with extra raw entries.
