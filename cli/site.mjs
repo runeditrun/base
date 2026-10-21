@@ -10,6 +10,7 @@ import { unpublishedIdentities } from './site-private.mjs';
 import { privateSitePaths } from './site-inputs.mjs';
 import { redactSiteText } from './site-diagnostics.mjs';
 import { siteRuntime, buildSiteRuntime, runtimeSummary } from './site-runtime.mjs';
+import { siteRateLimit } from '../modules/deploy-kit/site-runtime.mjs';
 
 // The run site: a seed's static marketing pages, /run and docs, built from
 // edition identity with no installation data. A seed opts in with
@@ -129,9 +130,11 @@ export async function siteCommand(project, options, store, signal, out) {
  const files = await collectFiles(built.folder);
  const runtime = runtimeSummary(built.runtime);
  if (runtime) human.push(`  runtime: ${runtime.type}; module ${runtime.module}; endpoint ${runtime.endpoint}; bindings ${runtime.bindings.join(', ')}; model ${runtime.model}; pooling ${runtime.pooling}; corpus ${runtime.corpusHash}`);
+ const rateLimit = runtime ? { ...siteRateLimit(plan.worker), scope: 'cloudflare-location', consistency: 'eventual' } : undefined;
+ if (rateLimit) human.push('  search admission: '+rateLimit.simple.limit+' per '+rateLimit.simple.period+'s; namespace '+rateLimit.namespace_id+'; location-local, eventually consistent; no hard account-wide spend cap');
  const fingerprint = siteFingerprint(plan, files, {preparing:Boolean(runtime) && !prepare});
  if (runtime) human.push(`  fingerprint: ${fingerprint}${prepare ? '' : ' (vectors prepared only on a real deploy)'}`);
- const summary = { ...(runtime ? {runtime, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets: plan.assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
+ const summary = { ...(runtime ? {runtime, rateLimit, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets: plan.assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
  if (options.dryRun) {
   if (options.json) out.event('site', summary); else for (const line of human) out.human(line);
   store.report('deploy --site: dry run complete; no deployment occurred and no provider request was made.');

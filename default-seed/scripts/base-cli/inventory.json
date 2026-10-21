@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.76-dev.g14cedd4d",
+  "cliVersion": "0.2.76-dev.gf334a47e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1095,7 +1095,7 @@
     },
     "cli/site.mjs": {
       "source": "cli/site.mjs",
-      "sha256": "7b89c54d3b6be0c93f70703799852f53b372ab564c4ca3aa2ec06df491d873d5"
+      "sha256": "d69bf406f0cf5eb60a39d795d91bf6a8adf2a5844c26b8958c46a5db0126ab78"
     },
     "cli/sqlite-notice.mjs": {
       "source": "cli/sqlite-notice.mjs",

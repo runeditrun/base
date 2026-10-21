@@ -67,10 +67,23 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
    cwd:root,env:{PATH:process.env.PATH,HOME:join(directory,'home'),CI:'true',RER_NO_UPDATE_CHECK:'1',RER_TEST_NETWORK:network,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token},maxBuffer:1024*1024})}; }
   catch(error) { return {code:error.code,stdout:error.stdout,stderr:error.stderr}; }
  };
+ const declared=await readFile(adapter,'utf8');
+ await writeFile(adapter,declared.replace("['ASSETS','AI','SEARCH_RATE_LIMITER']","['ASSETS','AI']"));
+ const missingLimiter=await command('build');
+ assert.notEqual(missingLimiter.code,0);
+ assert.match(missingLimiter.stdout+missingLimiter.stderr,/SEARCH_RATE_LIMITER/);
+ await writeFile(adapter,declared);
  for (const argv of [['build'],['deploy','--dry-run']]) {
   const result = await command(...argv);
   assert.equal(result.code,0,result.stdout+result.stderr);
   assert.match(result.stdout,/docs-search/);
+  if (argv.includes('--dry-run')) {
+   const plan=result.stdout.trim().split('\n').map(line=>JSON.parse(line)).find(row=>row.event==='site');
+   assert.equal(plan.rateLimit.simple.limit,10);
+   assert.equal(plan.rateLimit.simple.period,60);
+   assert.equal(plan.rateLimit.scope,'cloudflare-location');
+   assert.equal(plan.rateLimit.consistency,'eventual');
+  }
  }
  assert.equal(requests,0,'build and dry run make zero network requests');
  await assert.rejects(readFile(join(root,'dist/site/docs-search-vectors.json')),{code:'ENOENT'});
