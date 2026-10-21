@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.77-dev.g57abbeb1",
+  "cliVersion": "0.2.77-dev.gf69acd39",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -795,7 +795,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "e36a6cc12d05a4eef13633c37541f65bfdc5a241e7eb970ab5c3c2263abd321a"
+      "sha256": "9065d3fb6aa0a7e70e566e5f0b2ba3bf3fb00dfe7d976783d6e21dd4baf41c02"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -2480,10 +2480,6 @@
     "modules/import-kit/src/provenance/json-snapshot.ts": {
       "source": "modules/import-kit/src/provenance/json-snapshot.ts",
       "sha256": "0f966fc02c2605bdb055b9db13fb954d499f64439ab5e4873137c8d825c4b212"
-    },
-    "modules/import-kit/src/provenance/numeric-credentials.ts": {
-      "source": "modules/import-kit/src/provenance/numeric-credentials.ts",
-      "sha256": "dd21174c30a70a93e984a06a30f1045d1d36ca0d6a789c676c1cc183605f66c4"
     },
     "modules/import-kit/src/provenance/resumable-sha256.ts": {
       "source": "modules/import-kit/src/provenance/resumable-sha256.ts",
