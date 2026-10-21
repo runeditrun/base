@@ -273,17 +273,56 @@ site: {
   declaration: 'deploy-site.json', config: 'vite.site.config.ts',
   clients: { docsSearch: 'src/site/docs-search/client.ts' },
   runtime: {
-    type: 'docs-search', module: 'docs-search', bindings: ['ASSETS', 'AI'],
+    type: 'docs-search', module: 'docs-search', bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER'],
     endpoint: '/docs/search', corpus: '.rer/docs-search/corpus.json',
   },
 }
 ```
 
 `module: 'docs-search'` selects the Base-owned implementation, not seed
-JavaScript. This optional runtime declares only `ASSETS` and Workers AI (`AI`);
+JavaScript. This optional runtime declares `ASSETS`, Workers AI (`AI`) and the Base-owned Workers Rate Limiting binding (`SEARCH_RATE_LIMITER`);
 it does not accept arbitrary application bindings, seed ownership annotations or
 a separate Wrangler deployment. `deploy-site.json` remains the same domain-only
 declaration. Sites without `runtime` keep the assets-only deployment. Search-enabled seeds declare `esbuild` as a devDependency (the maintained seed pins 0.28.2). Both package and vendored runtimes use that checkout's build toolchain.
+
+Search adoption must add SEARCH_RATE_LIMITER to the previously two-binding
+declaration; old declarations are refused with the required shape. No arbitrary
+binding or application fallback is accepted. The generated version binds a
+worker-derived numeric rate-limit namespace, with 10 admissions per 60 seconds,
+and readback verifies its name, type, namespace and policy at that exact version.
+The binding metadata and query-module bytes both contribute to the fingerprint.
+This adds only Worker version metadata, with no separate provider provisioning.
+
+Search normalizes case, Unicode compatibility and whitespace, and caches public
+results for 60 seconds in the location-local Cache API. Keys include the corpus
+digest and a query digest; responses contain no visitor headers or identity.
+Uncached equal queries share work within an isolate; caches are evictable and
+neither cross-isolate nor cross-location coalescing is promised. A cache hit or
+an in-flight result uses no new inference. Uncached inference checks the rate
+binding using an origin-scoped digest of CF-Connecting-IP. Shared/NAT addresses
+share admission; a missing address or binding, invalid vector, or provider failure
+returns 503 without fabricating results. A denial returns 429, Retry-After: 60
+and a plain retry message; failures are never cached.
+
+Cloudflare documents this rate limiter as location-local, permissive and
+eventually consistent. The configured 10/minute policy and a measured local test
+are **not a hard account-wide or even exact multi-isolate spending ceiling**.
+Multiple visitors/locations and concurrent counter propagation can exceed it.
+A Cache API read/modify/write counter would also lose concurrent updates, so it
+is not used for admission. An authoritative global ceiling would require another
+explicit, reviewed contract (for example serialized accounting); this runtime
+does not declare or provision that service.
+
+Ranking combines cosine and corpus-weighted lexical evidence over the existing
+chunks. Document frequency is counted per heading; common product words carry
+less weight. Exact leaf/page headings receive priority, with one-edit and typed
+prefix matches at useful word lengths. Semantic-only candidates use a 0.42 floor
+instead of 0.55 to retain weak paraphrases; lexical admission requires multiple
+topic words or a complete heading. Scores combine 55% cosine and 45% lexical
+evidence plus heading boosts. These are ranking rules, not calibrated relevance
+probabilities; real-provider acceptance remains an independent edition gate.
+Stable href/snippet tie breaks and heading deduplication keep five bounded results.
+Published anchors, embedding text, model/pooling and content hashes are unchanged.
 
 The entry's one `sitePages({ styles, clients, contract })` render returns
 `{ pages, assets, searchPages }`, where `searchPages` is

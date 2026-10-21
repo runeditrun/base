@@ -7,11 +7,10 @@ import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { siteProvider } from '../modules/deploy-kit/tests/site-provider.mjs';
-import { sitePreview } from './site-preview.mjs';
-import { freePort } from '../global/tests/harness.mjs';
+import { searchRuntime } from './fixtures/docs-search/runtime.mjs';
+import { siteRateLimit } from '../modules/deploy-kit/site-runtime.mjs';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
@@ -23,7 +22,7 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  await exportReference(base, root);
  await symlink(join(base, 'default-seed/node_modules'), join(root, 'node_modules'), 'dir');
  const adapter = join(root, 'scripts/installer/local.mjs');
- await writeFile(adapter, (await readFile(adapter, 'utf8')).replace('site: {', `site: { runtime: { type:'docs-search', module:'docs-search', bindings:['ASSETS','AI'], endpoint:'/docs/search', corpus:'.rer/docs-search/corpus.json' }, clients: { docsSearch:'scripts/base-cli/modules/site/docs-search/client.ts' },`));
+ await writeFile(adapter, (await readFile(adapter, 'utf8')).replace('site: {', `site: { runtime: { type:'docs-search', module:'docs-search', bindings:['ASSETS','AI','SEARCH_RATE_LIMITER'], endpoint:'/docs/search', corpus:'.rer/docs-search/corpus.json' }, clients: { docsSearch:'scripts/base-cli/modules/site/docs-search/client.ts' },`));
  const pages = join(root, 'src/site/pages.tsx');
  await writeFile(adapter, (await readFile(adapter, 'utf8')).replace("entry: 'src/site/pages.ts'", "entry: 'src/site/pages.tsx'"));
  const source = `import {createElement} from 'react'; import {renderToStaticMarkup} from 'react-dom/server';
@@ -87,23 +86,59 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  assert.equal(embeddings,calls,'a clean runner reuses published vectors');
  assert.match(deployed.stderr,/reused=1 embedded=0/);
  const moduleBytes = provider.state.content.get(provider.state.version.id).files[0].bytes;
- const workerPath = join(directory,'published.mjs'); await writeFile(workerPath,moduleBytes);
- const {default:worker} = await import(pathToFileURL(workerPath));
- const preview = await sitePreview(join(root,'dist/site'),{ports:[await freePort()]});
- t.after(()=>preview.close());
- const assetOrigin = `http://127.0.0.1:${preview.port}`;
+ const local = searchRuntime({source:moduleBytes.toString(), assets:join(root,'dist/site'), network, rateLimit:siteRateLimit('test-site')});
+ t.after(()=>local.dispose());
+ const request = (query, visitor, options = {}) => local.dispatchFetch('https://run-search.example.test/docs/search?q='+encodeURIComponent(query), {headers:{'CF-Connecting-IP':visitor}, ...options});
+ const measure = async (name, queries, visitor, parallel = false) => {
+  const before = embeddings;
+  const responses = parallel ? await Promise.all(queries.map(query=>request(query,visitor))) : await (async()=>{const rows=[]; for(const query of queries) rows.push(await request(query,visitor));return rows;})();
+  const counts = {calls:embeddings-before, ok:responses.filter(row=>row.status===200).length, limited:responses.filter(row=>row.status===429).length};
+  for (const response of responses) {
+   assert.equal(response.headers.get('cache-control'),'no-store');
+   if(response.status===429) { assert.equal(response.headers.get('retry-after'),'60'); assert.match((await response.json()).error,/Too many searches/); }
+   else assert.equal(response.status,200);
+  }
+  console.log(name,JSON.stringify(counts)); return counts;
+ };
+ assert.deepEqual(await measure('repeated',Array.from({length:30},(_,i)=>i%2?'  RESTORE   ARCHIVE  ':'restore archive'),'192.0.2.1'),{calls:1,ok:30,limited:0});
+ assert.deepEqual(await measure('distinct',Array.from({length:30},(_,i)=>'archive task '+i),'192.0.2.2'),{calls:10,ok:10,limited:20});
+ assert.deepEqual(await measure('simultaneous repeated',Array(30).fill('simultaneous restore'),'192.0.2.3',true),{calls:1,ok:30,limited:0});
+ assert.deepEqual(await measure('simultaneous distinct',Array.from({length:30},(_,i)=>'parallel task '+i),'192.0.2.4',true),{calls:10,ok:10,limited:20});
+ const beforeBounds=embeddings;
+ assert.equal((await request('x','192.0.2.5')).status,200);
+ assert.equal((await request('x'.repeat(241),'192.0.2.5')).status,400);
+ assert.equal((await request('archive','192.0.2.5',{method:'POST'})).status,405);
+ assert.equal(embeddings,beforeBounds);
+ failure=true;
+ assert.equal((await request('uncached outage','192.0.2.5')).status,503);
+ failure=false;
+ assert.equal((await request('uncached outage','192.0.2.5')).status,200,'provider failures are not cached');
+ // A second generated entry with a new corpus digest must not reuse the first
+ // entry's cached result, even if the same location's Cache API survives.
+ const {buildSiteRuntime}=await import('./site-runtime.mjs');
+ const corpusFile=join(root,'.rer/docs-search/corpus.json');
+ const corpus=JSON.parse(await readFile(corpusFile,'utf8'));
+ corpus[0].searchSections[0].text+=' This archive has a newly published instruction.';
+ await writeFile(corpusFile,JSON.stringify(corpus));
+ const changed=await buildSiteRuntime({root}, {type:'docs-search',module:'docs-search',bindings:['ASSETS','AI','SEARCH_RATE_LIMITER'],endpoint:'/docs/search'},corpusFile,join(root,'dist/site'));
+ assert.notEqual(changed.corpusHash,previous.corpusHash);
+ const stale = searchRuntime({source:changed.source,assets:join(root,'dist/site'),network,rateLimit:siteRateLimit('stale-test')});
+ t.after(()=>stale.dispose());
+ const beforeStale=embeddings;
+ const staleResponse=await stale.dispatchFetch('https://run-search.example.test/docs/search?q=restore+archive',{headers:{'CF-Connecting-IP':'192.0.2.7'}});
+ assert.equal(staleResponse.status,503); assert.equal(embeddings,beforeStale,'stale corpus is rejected before inference');
+
+ let browserVisitor='192.0.2.6';
  const runtime = createServer(async (req,res) => {
-  const response = await worker.fetch(new Request(`https://run-search.example.test${req.url}`,{method:req.method}),{
-   ASSETS:{fetch:request=>fetch(assetOrigin+new URL(request.url).pathname)},
-   AI:{run:async (model,input) => { const response=await fetch(network,{method:'POST',headers:{'x-test-destination':`https://api.cloudflare.com/ai/run/${model}`},body:JSON.stringify(input)}); if(!response.ok) throw Error('provider refused'); return (await response.json()).result; }},
-  });
+  const response = await local.dispatchFetch('https://run-search.example.test'+req.url,{method:req.method,headers:{'CF-Connecting-IP':browserVisitor}});
   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
  });
  await new Promise(resolve=>runtime.listen(0,'127.0.0.1',resolve));
  t.after(()=>new Promise(resolve=>{runtime.closeAllConnections();runtime.close(resolve);}));
  const origin=`http://127.0.0.1:${runtime.address().port}`;
- const browser=await chromium.launch({headless:true}); t.after(()=>browser.close());
+ const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']}); t.after(()=>browser.close());
  for (const width of [1440,390]) {
+  browserVisitor=width===1440?'192.0.2.6':'192.0.2.8';
   const page=await browser.newPage({viewport:{width,height:900}});
   await page.goto(origin+'/docs/backups');
   await page.getByRole('combobox').fill('restore archive');
@@ -116,7 +151,12 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
   failure=true;
   await page.getByRole('combobox').fill('provider outage');
   await page.getByRole('status').filter({hasText:'Search unavailable'}).waitFor();
-  await page.close(); failure=false;
+  failure=false;
+  for(let i=0;i<12;i++) await request('browser burst '+width+' '+i,browserVisitor);
+  await page.getByRole('combobox').fill('limit message '+width);
+  await page.getByRole('status').filter({hasText:'Too many searches. Try again in a minute.'}).waitFor();
+  if(process.env.RER_SEARCH_EVIDENCE) await page.screenshot({path:join(process.env.RER_SEARCH_EVIDENCE,'search-rate-limit-'+width+'.png')});
+  await page.close();
  }
  const writes=provider.state.writes.length, version=provider.state.version.id;
  failure=true;

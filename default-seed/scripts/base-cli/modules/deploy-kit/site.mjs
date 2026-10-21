@@ -11,7 +11,7 @@ export { servedVersion, siteReadbackSummary } from './site-readback.mjs';
 
 /* A seed's run site (run-<seed>.com): the folder `rer build --site` writes,
  * served on the owner's own account by a Base-generated module Worker (no
- * seed code). Its default binding is its assets; opt-in docs search adds AI
+ * seed code). Its default binding is its assets; opt-in docs search adds AI and a local rate limiter
  * and an immutable Base-generated search bundle. The Worker runs
  * first on every request: www.<domain> gets a 301 to the apex with path and
  * query kept, and everything else is answered from the assets. It has no
@@ -81,7 +81,7 @@ export function siteFingerprint(plan, files, { preparing = false } = {}) {
     const vectors = files.find(file => file.path === 'docs-search-vectors.json');
     assert(preparing || vectors && /^[a-f0-9]{64}$/.test(vectors.sha256), 'missing-site-search-vectors');
     identity.runtime = { type: runtime.type, module: runtime.module, endpoint: runtime.endpoint, bindings: runtime.bindings,
-      model: runtime.model, pooling: runtime.pooling, corpusHash: runtime.corpusHash, vectors: preparing ? 'prepare-on-deploy' : vectors.sha256 };
+      model: runtime.model, pooling: runtime.pooling, corpusHash: runtime.corpusHash, rateLimit: siteRuntimeBindings(runtime, plan.worker).find(binding => binding.type === 'ratelimit'), vectors: preparing ? 'prepare-on-deploy' : vectors.sha256 };
   }
   return hash(identity);
 }
@@ -113,7 +113,7 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
 
   const jwt = await uploadAssets(api, plan.worker, files);
   const body = new FormData();
-  body.set('metadata', new Blob([JSON.stringify({ main_module: SITE_MODULE, compatibility_date: plan.compatibilityDate, bindings: siteRuntimeBindings(runtime),
+  body.set('metadata', new Blob([JSON.stringify({ main_module: SITE_MODULE, compatibility_date: plan.compatibilityDate, bindings: siteRuntimeBindings(runtime, plan.worker),
     assets: { jwt, config: { ...plan.assetsConfig, run_worker_first: true } }, annotations: { 'workers/message': `rer-site:${fingerprint}` } })], { type: 'application/json' }));
   body.set(SITE_MODULE, new Blob([runtime?.source ?? SITE_WORKER], { type: 'application/javascript+module' }), SITE_MODULE);
   const window = readiness.window ?? readinessWindow(readiness);

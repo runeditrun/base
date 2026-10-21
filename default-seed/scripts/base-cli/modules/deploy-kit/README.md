@@ -197,13 +197,28 @@ A seed can opt into docs search through its command adapter's `site.runtime`:
 
 ```ts
 runtime: {
-  type: 'docs-search', module: 'docs-search', bindings: ['ASSETS', 'AI'],
+  type: 'docs-search', module: 'docs-search', bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER'],
   endpoint: '/docs/search', corpus: '.rer/docs-search/corpus.json',
 }
 ```
 
 This selects Base's docs-search implementation rather than seed JavaScript.
-The site Worker adds the query endpoint and the Workers AI binding; its asset
+Adopters of the former two-binding contract must explicitly add
+SEARCH_RATE_LIMITER. The fixed policy admits 10 uncached searches per visitor
+address per 60 seconds in a Cloudflare location; its namespace is derived from
+the site Worker name. Upload metadata, deployment fingerprint and exact-version
+readback include the namespace and policy. No separate rate-limit resource or
+zone ruleset is created. Missing admission support fails closed before inference.
+
+Normalized public query results are cached for 60 seconds, keyed by corpus and
+query digests; concurrent equal requests coalesce only inside an isolate. The
+Cache API is location-local and evictable. The Workers rate limiter is also
+location-local and eventually consistent, so this is abuse mitigation, **not a
+hard account-wide spend ceiling**. Shared visitor addresses share admission.
+No raw visitor address or query is written to a shared response or cache key.
+429 includes Retry-After: 60; other provider/index failures return 503 and are
+not cached. See SEED-COMMAND-CONTRACT.md for ranking and scope limits.
+The site Worker adds the query endpoint, Workers AI and SEARCH_RATE_LIMITER bindings; its asset
 handling, www redirect, ownership checks and Custom Domains stay the same.
 No application binding, seed-defined ownership annotation or separate Wrangler
 configuration/deployment is accepted. The domain declaration is unchanged.

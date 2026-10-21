@@ -117,12 +117,12 @@ export async function siteCommand(project, options, store, signal, out) {
   const path = relative(project.root, built.folder);
   if (!options.json) {
    out.human(`Run site written to ${path} (${built.pages} pages, ${built.files} files): ${built.folder}`);
-   if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; bindings ASSETS, AI; corpus ${built.runtime.corpusHash}; vectors prepared only on a real deploy`);
+   if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; bindings ASSETS, AI, SEARCH_RATE_LIMITER; corpus ${built.runtime.corpusHash}; vectors prepared only on a real deploy`);
   }
   return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references, ...(built.runtime ? {runtime:runtimeSummary(built.runtime)} : {}) } };
  }
  const plan = await siteDeployment(project, options, built.folder, built.runtime);
- const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS and AI' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${plan.assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
+ const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS, AI and SEARCH_RATE_LIMITER' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${plan.assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
   `  custom domains: ${plan.hostnames.join(', ')}; workers.dev off`, ...plan.redirects.map(rule => `  redirect in the Worker: ${rule.from} -> ${rule.to} (${rule.status}, keeps ${rule.keeps.join(' and ')})`)];
  const { collectFiles } = await import('../modules/deploy-kit/artifact.mjs');
  const { siteFingerprint } = await import('../modules/deploy-kit/site.mjs');
