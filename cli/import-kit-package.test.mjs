@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { buildPackage } from '../scripts/rer-package.mjs';
 import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { integrity } from '../scripts/rer-package/registry.mjs';
@@ -18,16 +19,17 @@ test('packed D1 public entry supports reviewed conversion and preserved reversal
  t.after(() => rm(root, { recursive: true, force: true }));
  const bytes = await readFile(await buildPackage(base, join(root, 'built')));
  await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), join(root, 'node_modules/@runeditrun/rer'));
- const bundled = await build({
+ const bundledEntry = join(root, 'worker-entry.mjs');
+ await build({
   absWorkingDir: root, stdin: { contents: "export * from '@runeditrun/rer/modules/import-kit/d1';", resolveDir: root },
-  bundle: true, write: false, platform: 'node', format: 'esm', logLevel: 'silent',
+  bundle: true, outfile: bundledEntry, platform: 'node', format: 'esm', logLevel: 'silent',
  });
- const kit = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+ const kit = await import(pathToFileURL(bundledEntry).href);
  const r = await runtime(t);
  const adapter = { ...targets, async preparePreservedUndo(db, destination, effects) {
   const rows = await targets.list(db, destination);
   return {
-   observations: effects.map(effect => ({ effectId: effect.provenance.id, current: rows.find(row => row.targetId === effect.expected.targetId && row.targetKind === effect.expected.targetKind) ?? null })),
+   observations: effects.map(effect => ({ effectId: effect.provenance.id, current: rows.find(row => row.targetId === effect.expected.targetId && row.targetKind === effect.expected.targetKind) ?? null, entity: { table: 'contacts', recordId: effect.expected.targetId } })),
    dependencies: [], guards: [targets.matchesCount(rows.length, destination), ...rows.map(row => targets.matches(row, destination, row.targetKind, row.targetId))],
   };
  } };
