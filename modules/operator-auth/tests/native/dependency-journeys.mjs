@@ -6,7 +6,8 @@ export async function approveLink(r,issuer,cookie) {
   assert.equal(result.status,200,await result.clone().text());
 }
 export async function rawLink(r,issuer) {
-  await r.call('/.well-known/rer-dependencies');
+  assert.equal((await r.call('/.well-known/rer-dependencies')).status,200);
+  assert.equal((await r.call('/.well-known/rer-link/jwks/oidc-provider@1')).status,200);
   const grant=await post(r,'/__fake/link-code');assert.equal(grant.status,200);
   return post(r,'/.well-known/rer-link/callback',{issuer,code:(await grant.json()).code});
 }

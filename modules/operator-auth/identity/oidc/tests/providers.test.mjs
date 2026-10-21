@@ -193,7 +193,7 @@ test('with dependency support on, the owner unlinks and relinks a static provide
   // The default seed's shape: Auth comes through the dependency link, other providers are static.
   const base = presets(), setup = { ...base, providers: base.providers.filter(p => p.id !== 'auth'), core: { dependencies: true } };
   const read = path => readFile(new URL(path, import.meta.url), 'utf8');
-  const r = await runtime(t, setup, { schemas: await Promise.all(['../../../accounts/schema/operator-auth.sql', '../schema/oidc.sql', '../../../../dependencies/schema/dependencies.sql', '../../../../dependencies/schema/approval-attempt.sql'].map(read)) });
+  const r = await runtime(t, setup, { schemas: await Promise.all(['../../../accounts/schema/operator-auth.sql', '../schema/oidc.sql', '../../../../dependencies/schema/dependencies.sql', '../../../../dependencies/schema/approval-attempt.sql', '../../../../dependencies/schema/keys-sealed.sql'].map(read)) });
   await r.db.prepare('INSERT INTO oa_auth_settings(singleton,idp_sign_in) VALUES(1,1)').run();
   const owner = await r.bootstrap();
   const google = await signedIn(r, await r.login('google'), 'owner@example.com');

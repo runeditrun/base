@@ -28,7 +28,7 @@ test('setup on an earlier install adds missing managed secrets and keeps every s
  const managed = name => ({ name, label: name, kind: 'secret', input: 'managed', required: true, ownerVisible: false, generate: 'hex' });
  await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Upgraded install', groups: [], fields: [
   { name: 'ADMIN_EMAIL', label: 'Owner email', kind: 'email', required: true },
-  managed('SUBSCRIBER_SECRET'), managed('SESSION_SECRET'), managed('SETUP_TOKEN'),
+  managed('SUBSCRIBER_SECRET'), managed('SESSION_SECRET'), managed('INSTALLATION_KEY'), managed('SETUP_TOKEN'),
   { name: 'CLAIM_TOKEN', label: 'Claim token', kind: 'secret', required: true, ownerVisible: true, generate: 'hex' },
  ], steps: [{ type: 'extension', id: 'native-owner' }] }));
  // The real installer lifecycle stops at the seed's start hook and records the
@@ -60,12 +60,12 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
  const upgraded = await readFile(path, 'utf8');
  assert.ok(upgraded.startsWith(earlier + '\n'), 'saved bytes stay exactly as they were');
  const added = Object.fromEntries(upgraded.slice(earlier.length + 1).trim().split('\n').map(line => line.split('=')));
- assert.deepEqual(Object.keys(added).sort(), ['SESSION_SECRET', 'SETUP_TOKEN']);
+ assert.deepEqual(Object.keys(added).sort(), ['INSTALLATION_KEY', 'SESSION_SECRET', 'SETUP_TOKEN']);
  for (const value of Object.values(added)) {
   assert.match(value, /^[0-9a-f]{64}$/);
   assert.ok(!result.stdout.includes(value) && !result.stderr.includes(value), 'a generated secret was printed');
  }
- assert.ok(JSON.parse(await readFile(join(root, 'handoff.json'), 'utf8')).includes('SESSION_SECRET'), 'the application receives the added secret');
+ assert.ok(JSON.parse(await readFile(join(root, 'handoff.json'), 'utf8')).includes('INSTALLATION_KEY'), 'the application receives the added secret');
  assert.equal((await stat(path)).mode & 0o777, 0o600);
  setup();
  assert.equal(await readFile(path, 'utf8'), upgraded, 'a later setup keeps the upgraded settings exactly');

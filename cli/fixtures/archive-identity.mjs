@@ -35,7 +35,8 @@ export async function originalArchiveIdentity(f, origin) {
  return archiveIdentityRuntime(f, origin, async () => {
   const identity = await nativeSignIn(f, origin);
   const response = await fetch(origin + '/.well-known/rer-dependencies');
-  assert.equal(response.status, 200, 'the real dependency document creates the installation sector and key');
+  assert.equal(response.status, 200, 'the real dependency document creates the installation sector');
+  assert.equal((await fetch(origin + '/.well-known/rer-link/jwks/oidc-provider@1')).status, 200, 'the real interface JWKS creates its sealed signing key');
   return { ...identity, sector: (await response.json()).sector_id };
  });
 }

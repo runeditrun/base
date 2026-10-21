@@ -9,6 +9,8 @@ export interface Bindings {
   FILES?: R2Bucket
   OWNER_EMAIL: string
   SESSION_SECRET: string
+  INSTALLATION_KEY?: string
+  INSTALLATION_KEY_PREVIOUS?: string
   SETUP_TOKEN?: string
   AUTH_ORIGIN: string
   AUTH_LOCAL?: string

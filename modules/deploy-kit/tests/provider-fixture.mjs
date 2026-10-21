@@ -75,6 +75,24 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
           return ok({success:true,type:'import',status:'error',errors:[error.message],messages:[]});
         }
       }
+      // Bound single queries and batch requests use the real SQLite transaction.
+      if (body.batch || body.params) {
+        const statements = body.batch ?? [body];
+        write(method,path,body);
+        try {
+          row.db.exec('BEGIN');
+          const results = statements.map(({sql,params = []}) => {
+            if (state.failSql && sql.includes(state.failSql)) throw Error('failure');
+            const before = row.db.prepare('SELECT total_changes() n').get().n;
+            const statement = row.db.prepare(sql);
+            const results = statement.columns().length ? statement.all(...params) : (statement.run(...params), []);
+            return {success:true,results,meta:{changes:row.db.prepare('SELECT total_changes() n').get().n-before}};
+          });
+          row.db.exec('COMMIT'); return ok(results);
+        } catch {
+          row.db.exec('ROLLBACK'); return Response.json({success:false,errors:[{code:1,message:'failure'}]});
+        }
+      }
       const sql = body.sql;
       // D1 refuses a compound SELECT of more than five terms (measured 17 Oct 2026).
       if (/^SELECT /i.test(sql) && (sql.match(/\b(?:UNION|INTERSECT|EXCEPT)\b/gi) ?? []).length > 4) return Response.json({success:false,errors:[{code:7500,message:'too many terms in compound SELECT: SQLITE_ERROR'}]},{status:400});

@@ -46,13 +46,14 @@ export function presets(origin = ORIGIN) {
 
 // schemas: the SQL a store already has (default: a fresh store from the current schema).
 export async function runtime(t, setup = presets(), { schemas } = {}) {
+  setup = { ...setup, core: { INSTALLATION_KEY:crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),''), ...setup.core } };
   const directory = await mkdtemp(join(tmpdir(), 'oidc-fake-'));
   const init = () => new Miniflare({ ...convertV4MiniflareOptions({ modules: true, cf: false, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'fake-provider-db' },
     bindings: { TEST_SETUP: JSON.stringify({ ...setup, keys: JSON.parse(KEY_JSON) }) } }), resourcePersistencePath: join(directory, 'state') });
   let mf = init();
   t.after(async () => { await mf.dispose(); await rm(directory, { recursive: true, force: true }); });
   let db = await mf.getD1Database('DB');
-  for (const sql of schemas ?? [await read(setup.native?'../../../tests/native/schema.sql':'../../../accounts/schema/operator-auth.sql'), await read('../schema/oidc.sql'), ...(setup.native?[await read('../../../../dependencies/schema/dependencies.sql'),await read('../../../../dependencies/schema/approval-attempt.sql')]:[])]) await applySql(db, sql);
+  for (const sql of schemas ?? [await read(setup.native?'../../../tests/native/schema.sql':'../../../accounts/schema/operator-auth.sql'), await read('../schema/oidc.sql'), ...(setup.native?[await read('../../../../dependencies/schema/dependencies.sql'),await read('../../../../dependencies/schema/approval-attempt.sql'),await read('../../../../dependencies/schema/keys-sealed.sql')]:[])]) await applySql(db, sql);
   if(!schemas && !setup.native) await db.prepare('INSERT INTO oa_auth_settings(singleton,idp_sign_in) VALUES(1,1)').run();
   for (const sql of ['CREATE TABLE fixture_grants(code TEXT PRIMARY KEY, issuer TEXT NOT NULL, payload TEXT NOT NULL)', 'CREATE TABLE fixture_state(key TEXT PRIMARY KEY, value TEXT NOT NULL)', 'CREATE TABLE test_mail(id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL)', 'CREATE TABLE fixture_hook_calls(session_id TEXT NOT NULL, method TEXT NOT NULL)', 'CREATE TABLE fixture_requests(id INTEGER PRIMARY KEY AUTOINCREMENT, issuer TEXT NOT NULL, uri TEXT NOT NULL)']) await db.prepare(sql).run();
   const call = (path, { method = 'GET', input, cookie, headers = {}, form } = {}) => mf.dispatchFetch('http://localhost/__test_dispatch', { method: 'POST', redirect: 'manual', body: JSON.stringify({

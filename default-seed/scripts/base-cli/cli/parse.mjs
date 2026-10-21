@@ -94,9 +94,10 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   options[key] = names.join(',');
  }
  if (options.rotateSecret !== undefined && !/^[A-Z][A-Z0-9_]{0,63}(?:,[A-Z][A-Z0-9_]{0,63}){0,15}$/.test(options.rotateSecret)) throw invalid('--rotate-secret names generated secret bindings, separated by commas, such as SESSION_SECRET.');
- if(verb==='deploy'&&options.demo&&(options.site||['platform','image','bindAddress','httpPort','httpsPort','envFile','host','setSecret','unsetSecret','rotateSecret'].some(key=>options[key]!==undefined)))throw invalid('--demo takes only --environment, --dry-run and --remove --yes: the hosted demo is its own Worker on demo.<domain>.');
+ if (options.reopenInstallationKey !== undefined && !/^[A-Za-z0-9_-]{43}$/.test(options.reopenInstallationKey)) throw invalid('--reopen-installation-key takes the installation key ID from a sealed envelope or private retired custody.');
+ if(verb==='deploy'&&options.demo&&(options.site||['platform','image','bindAddress','httpPort','httpsPort','envFile','host','setSecret','unsetSecret','rotateSecret','reopenInstallationKey'].some(key=>options[key]!==undefined)))throw invalid('--demo takes only --environment, --dry-run and --remove --yes: the hosted demo is its own Worker on demo.<domain>.');
  if(verb==='deploy'&&options.demo&&options.remove&&(options.dryRun||!options.yes))throw invalid(options.dryRun?'Use --remove and --dry-run on separate runs.':'deploy --demo --remove deletes the hosted demo\'s Worker, its demo.<domain> Custom Domain. Add --yes to confirm.');
- if ((options.remove || options.setSecret || options.unsetSecret || options.rotateSecret) && options.site) throw invalid('--remove, --set-secret, --unset-secret and --rotate-secret act on the application Worker, not the run site.');
+ if ((options.remove || options.setSecret || options.unsetSecret || options.rotateSecret || options.reopenInstallationKey) && options.site) throw invalid('--remove, --set-secret, --unset-secret, --rotate-secret and --reopen-installation-key act on the application Worker, not the run site.');
  if (options.origin !== undefined) {
   let url; try { url = new URL(options.origin); } catch { throw invalid('Provide a valid credential-free origin.'); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw invalid('Provide a credential-free HTTP origin without a path.');
