@@ -17,13 +17,16 @@ For seed integration, follow [the door adoption guide](../door/ADOPTING.md)
 first. The D1 primitives below back that shared pipeline; do not mount separate
 job creation/apply routes beside it. Keep native readers and target adapters.
 
-Import `src/d1/index.ts` in Workers with `nodejs_compat`. This entry point does
+Import `@runeditrun/rer/modules/import-kit/d1` from a supplying rer release
+after 0.2.77 in TypeScript Workers with `nodejs_compat` (or `src/d1/index.ts`
+when working in Base source). The package carries TypeScript source for the
+Worker bundler and includes the shared D1 transport. This entry point does
 not import `node:sqlite` or the optional file/API readers. Products that need the
 readers can explicitly import `src/readers/index.ts`. The synchronous Node API and its guarantees remain
 unchanged. D1 uses the same reviewed plans, source identities, retained originals,
 provenance and inert-effect policy through an asynchronous native SQL port.
 
-Copy the shared [D1 transport](../../../d1-transport/index.mjs) and its
+When copying Base source directly, copy the shared [D1 transport](../../../d1-transport/index.mjs) and its
 [types](../../../d1-transport/index.d.mts), preserving their sibling location
 beside the import-kit directory.
 The D1 entry uses this shared transport automatically. It accounts for actual

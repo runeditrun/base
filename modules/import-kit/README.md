@@ -376,7 +376,8 @@ limits and byte custody.
 ## Cloudflare D1 Workers
 
 The additive asynchronous [D1 port](./src/d1/README.md) is available through
-`src/d1/index.ts`. It supports native SQL effects, reviewed jobs, durable bounded
+`@runeditrun/rer/modules/import-kit/d1` in a supplying rer release after 0.2.77
+(or `src/d1/index.ts` when working in Base source). It supports native SQL effects, reviewed jobs, durable bounded
 resume, original custody and conflict-safe undo in the same D1 batch as its
 journal. Products supply native snapshot predicates and current-session SQL
 permission predicates. Use its D1-specific API and numbered schema migration;
@@ -399,8 +400,8 @@ Use `readD1ImportUndoReport().outcome` (`pending`, `undone` or `compensated`) fo
 the product result: the engine's terminal `job.state` remains `undone`, including
 compensated work.
 
-Current rer 0.2.77 lacks these APIs. Adoption requires a reviewed vendored Base
-revision containing them or a future rer release that supplies them, the additive
+Current rer 0.2.77 lacks these APIs. Adoption through the package uses
+`@runeditrun/rer/modules/import-kit/d1` from a supplying release, the additive
 conversion migration, a complete native adapter and proof through the seed's own
 public door. Updating Base alone does not adopt or release the capability in a
 seed.

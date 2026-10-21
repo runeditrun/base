@@ -322,9 +322,40 @@ line that still names it. A later refresh is a version bump:
 | `@runeditrun/rer/modules/release/export`, `/publication-scan`, `/source`, `/signature` | release export, publication scan and shared signature verifier | `scripts/base-cli/modules/release/*.mjs` |
 | `@runeditrun/rer/modules/deploy-kit/owner`, `/owner-cli`, `/prepare`, `/provider` | deploy kit | `scripts/base-cli/modules/deploy-kit/*.mjs` |
 | `@runeditrun/rer/modules/operator-auth`, `/dev`, `/dev-admission`, `/accounts/native`, `/identity/email-link` | operator auth | `scripts/base-cli/modules/operator-auth/index.mjs`, `dev/index.mjs`, `dev-admission.mjs`, `accounts/native.mjs`, `identity/email-link/index.mjs` |
+| `@runeditrun/rer/modules/import-kit/d1` | asynchronous D1 import, reviewed reversal-policy conversion and preserved-undo preview (TypeScript Worker entry) | `scripts/base-cli/modules/import-kit/src/d1/index.ts` |
 | `@runeditrun/rer/modules/erasure/fence` | erasure fence statements | `scripts/base-cli/modules/erasure/fence.mjs` |
 | `@runeditrun/rer/modules/owner-claim`, `/modules/dependencies` | owner claim, dependency links | `scripts/base-cli/modules/owner-claim/index.mjs`, `dependencies/index.mjs` |
 | `@runeditrun/rer/internal/PATH` | any other package file, for tests | `scripts/base-cli/PATH`, and `scripts/base-onboarding/PATH` with PATH under `onboarding/` |
+
+### D1 import kit
+
+In a TypeScript Worker with `nodejs_compat`, import the D1 API from the package:
+
+```ts
+import {
+  convertD1ReversalPolicy,
+  previewD1PreservedUndo,
+  d1ReversalPolicyConversionSchema,
+} from '@runeditrun/rer/modules/import-kit/d1';
+```
+
+This is a TypeScript source entry for the Worker's bundler. Node's built-in type
+stripping does not compile TypeScript dependencies inside `node_modules`; a Node
+consumer must compile or bundle the entry with TypeScript support too. The package
+includes its shared D1 transport and D1 runtime dependencies, without the synchronous
+SQLite engine, optional readers or import UI.
+
+Apply the additive `d1ReversalPolicyConversionSchema` in a new numbered migration
+before converting an existing strict job; never rewrite an applied migration.
+Preview the completed or undoing job with its current authorized context, review
+the dispositions, then pass that preview's `reviewedFingerprint` to
+`convertD1ReversalPolicy(jobId, context, { to: 'preserve-conflicts',
+reviewedFingerprint })`. Preview is read-only. Conversion requires current undo
+authority and preserves custody; repeated conversion refuses. Native adapters must
+supply the complete dependency observations and guards described in the packaged
+`modules/import-kit/src/d1/README.md`. Use `readD1ImportUndoReport().outcome` for the
+later result (`undone` or `compensated`). This entry first ships in a supplying
+release after rer 0.2.77; adopters still need their own public-door proof.
 
 ## Verbs
 

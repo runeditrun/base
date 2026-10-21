@@ -71,6 +71,7 @@
     "./modules/portability/legacy-safety": "./modules/portability/legacy-safety.mjs",
     "./modules/portability/migration-history": "./modules/portability/migration-history.mjs",
     "./modules/portability/storage": "./modules/portability/storage.mjs",
+    "./modules/import-kit/d1": "./modules/import-kit/src/d1/index.ts",
     "./modules/erasure/fence": "./modules/erasure/fence.mjs",
     "./modules/deploy-kit/migration-ledger": "./modules/deploy-kit/migration-ledger.mjs",
     "./modules/deploy-kit/owner": "./modules/deploy-kit/owner.mjs",
