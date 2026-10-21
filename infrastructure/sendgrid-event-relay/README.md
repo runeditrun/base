@@ -51,3 +51,76 @@ product are sent sequentially with an eight-second timeout per request; products
 run independently (at most eight configured destinations). A failed chunk stops
 that product and returns 503 for the provider batch. SendGrid retries the whole
 batch, so receivers must durably deduplicate every event already acknowledged.
+
+## Isolated seed tests
+
+Send `custom_args: { "rer_seed": "spool", "rer_test_installation": "test-id" }`
+on the test mail. SendGrid emits these fields at the top level of each event.
+An account operator registers that exact pair with a short expiry (milliseconds
+since epoch, at most seven days ahead) in the optional secret
+`RER_MAIL_RELAY_SEEDS`:
+
+```json
+{"version":1,"targets":[{"seed":"spool","installationId":"test-id","url":"https://seed-test.runeditrun.com/events","expiresAt":1793000000000}]}
+```
+
+Use a fresh expiry, not the illustrative timestamp. At most eight registrations
+fit in the 16 KiB registry. Remove the entry to deregister. No HTTP registration
+door exists: only the authenticated account operator may update the secret.
+Before installing a registry, run `node infrastructure/sendgrid-event-relay/register.ts registry.json`
+with `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` supplied by the approved
+custody door. Capture stdout privately, check exit success, then pipe that file
+into `wrangler secret put RER_MAIL_RELAY_SEEDS --config infrastructure/sendgrid-event-relay/wrangler.jsonc`.
+Do not pipe a failed preflight directly into a secret update.
+
+Registration deliberately supports only single-label `*.runeditrun.com` custom
+domains authoritatively mapped to another Worker in the RunEditRun account.
+The operator must retain that Worker route while registered and remove the
+registration before changing or deleting the route. Arbitrary external origins
+are refused: a DNS lookup followed by ordinary Worker fetch cannot pin the
+second resolution. Worker routes keep the approved target at Cloudflare's
+public edge rather than an arbitrary origin. Both registration and delivery
+also require successful A/AAAA lookups with at least one address and no private,
+loopback, link-local or special-purpose addresses. DNS failure closes the seed
+route and reports only a configuration-failure count. IP URLs, credentials,
+non-HTTPS schemes, nondefault ports and redirects are refused. This bounded
+contract can expand only when a similarly safe destination door exists.
+
+Raw seed forwarding occurs **only if every event in the entire signed array
+has the same registered seed, test installation and rer_product**. Differing
+products, including a mix of product-tagged and untagged events, count as mixed
+batches. Empty, unknown, expired, or mixed-scope batches have no raw delivery;
+legacy product delivery continues.
+The seed receives the original body bytes and the original
+`X-Twilio-Email-Event-Webhook-Signature` and
+`X-Twilio-Email-Event-Webhook-Timestamp` values. Verify them with the webhook's
+own public key, before parsing; durably deduplicate provider event IDs.
+No signature is manufactured for a filtered subset. Mixed batches are counted
+and omitted even when one of their events is the test receipt: this feature
+cannot promise every test receipt in shared SendGrid batching conditions.
+
+Seed delivery runs independently of the legacy product outcomes. It has a
+1.5-second deadline for the two parallel DNS lookups, a three-second target timeout,
+and at most one retry after 250 ms for transport errors, HTTP 429 or 5xx.
+Redirects and other 4xx responses get no retry. Seed failure never changes a
+successful legacy result into 503. Counts contain only unknown/expired events,
+mixed batches, configuration failures, delivery failures and delivery successes;
+no target, recipient, event body, signature or key is logged or stored.
+
+Legacy `rer_product` selection, <=100-event chunks, sequential per-product order,
+HMAC bytes, eight-target bound and 503 whole-batch replay remain unchanged.
+Both forwarding routes send an explicit `User-Agent: RunEditRun-Mail-Relay/1`.
+Provider verification consumes original bytes (including any UTF-8 BOM) rather
+than a decoded/re-encoded representation. Input remains bounded to 1 MiB and
+10,000 event objects. The seed registry cannot invalidate legacy configuration.
+
+Typecheck: `tsc --project infrastructure/sendgrid-event-relay/tsconfig.json`.
+Run the receiver tests above and the dry build, not the full Base suite locally.
+Product and provider logs likewise contain only verified-event and batch outcome
+counts. Worker custom-domain delivery uses `global_fetch_strictly_public` so
+same-zone requests enter the public Worker route.
+DNS uses the runtime's built-in `node:dns` resolver (`resolve4`/`resolve6`),
+with `nodejs_compat` enabled. Direct HTTPS requests to the resolver from the
+staging Worker failed at transport; the built-in resolver was proved separately
+before replacing that path. An absent address family is allowed; any other DNS
+error, timeout, or nonpublic answer rejects seed delivery.
