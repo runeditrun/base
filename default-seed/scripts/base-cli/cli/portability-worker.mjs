@@ -12,7 +12,7 @@ import { transferProgress } from '../modules/portability/progress.mjs';
 import { nativeFailure, stateBytes } from './portability-progress.mjs';
 import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
-import { appliedMigrations, platformMigrationDeclaration, platformMigrationPreflight } from './portability-migrations.mjs';
+import { appliedMigrations, platformMigrationDeclaration, nativeMigrationPreflight } from './portability-migrations.mjs';
 
 // Transfers read only the D1 database and R2 buckets. A configuration with just
 // those keeps the app's other bindings out of the proxy: a Durable Object class
@@ -45,7 +45,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
  let proxy;
  try {
   proxy = await getPlatformProxy({ configPath, persist: { path: join(root, '.wrangler/state/v3') }, remoteBindings: false });
-  if(direction==='migration-preflight')return await platformMigrationPreflight(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery);
+  if(direction==='migration-preflight')return await nativeMigrationPreflight({root,db:proxy.env[binding],binding,platformMigrations});
   const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery),policy,declaration);
   const options={ db: proxy.env[binding], buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations };
   if(direction==='legacy-preflight') {

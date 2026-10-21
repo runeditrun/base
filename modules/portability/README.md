@@ -114,8 +114,8 @@ An installation migrated by Platform has `rer_migrations(name, sha256,
 applied_at)` instead of Wrangler's ledger. Local transfers match each entry to
 exactly one migration file by SHA-256 and preserve its application order. They
 verify all local files are recorded and skip Wrangler; a pending file refuses
-as `migration_ledger:unapplied:<file>` until Platform applies it. Unknown,
-ambiguous or conflicting entries refuse by name, without replaying SQL or
+as `migration_ledger:unapplied` until Platform applies it. Unknown,
+ambiguous or conflicting entries refuse with constant codes, without replaying SQL or
 creating a second ledger.
 
 For old archives containing only Platform's migration names, the seed adapter
@@ -130,6 +130,86 @@ policy still controls that. Archive SQL and names never supply these declaration
 Custom replay runners can supply each plan entry's `aliases` and pass
 `{dataOnly}` as `migrationReplay`'s third argument. Verified archive ledger
 hashes take precedence over name-only placement where available.
+
+### Before an adapter's native migrations
+
+Seed adapters sometimes prepare schema before calling `localPortability`.
+`rer import` and `rer export` dispatch to the seed's portability adapter; a
+check inside the later transfer cannot protect that earlier native apply.
+Call `nativeMigrationPreflight` immediately before **each** such Wrangler step,
+for both import and export. The maintained Node entry point is
+`@runeditrun/rer/portability-migrations`; a vendored CLI uses
+`scripts/base-cli/cli/portability-migrations.mjs`.
+
+```js
+import { getPlatformProxy } from 'wrangler';
+import { join } from 'node:path';
+import { nativeMigrationPreflight } from '@runeditrun/rer/portability-migrations';
+
+// Inside the seed's local portability adapter, before its existing native apply:
+const proxy = await getPlatformProxy({
+  configPath: join(root, 'wrangler.jsonc'),
+  persist: { path: join(root, '.wrangler/state/v3') },
+  remoteBindings: false,
+});
+let nativeApply;
+try {
+  ({ nativeApply } = await nativeMigrationPreflight({
+    root, db: proxy.env.DB, binding: 'DB',
+    platformMigrations: { prefix: 'core-', dataOnly: [] },
+  }));
+} finally { await proxy.dispose(); }
+if (nativeApply) {
+  await store.run('Preparing archive schema', 'pnpm', [
+    'exec', 'wrangler', 'd1', 'migrations', 'apply', database,
+    '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc',
+  ], { cwd: root, signal });
+}
+// Continue the seed's archive/attachment checks and localPortability transfer.
+```
+
+Use the seed's actual binding, database and deployment prefix, with the same
+`platformMigrations` declaration on `localPortability`. Omit the declaration
+when none is needed. The helper reads this binding's `migrations_dir` in the
+root's `wrangler.jsonc` (default `migrations`) and hashes the original file
+bytes. It uses the transfer's `destinationLedger` and `matchMigrationLedger`,
+including declared aliases and data-only entries. It does not split or execute
+the migration SQL. Pass the real target's D1-compatible binding; inspection of
+another database or persistence directory cannot authorize this apply. Keep
+destination writers stopped and hold the adapter's normal operation lock
+through inspection, apply and transfer. This local example authorizes no remote
+provider operation.
+
+| Existing history | Result before native apply |
+| --- | --- |
+| No migration ledger | `{nativeApply:true}`; ordinary fresh Wrangler setup. |
+| Compatible `d1_migrations`, every recorded row matching a checkout file | `{nativeApply:true}`; Wrangler may apply its pending files. Plain Wrangler names remain supported; tracked history uses its hashes and applied states. |
+| Sole, fully applied matching `rer_migrations` | `{nativeApply:false}`; preserve Platform's ledger and skip Wrangler. |
+| Any pending checkout file with Platform history | `migration_ledger:unapplied`; apply it through the owning runner first. |
+| Multiple ledgers, even empty | `migration_ledger:multiple`; reconcile history through its owning runner. |
+| Legacy `_rer_deploy_migrations` alone | `migration_ledger:runner`; use its owning runner, which can adopt the history. |
+| Invalid ledger shape, row or binding | `migration_ledger:incompatible` or `migration_ledger:binding`. |
+| Partial Platform batch or non-applied tracked row | `migration_ledger:uncertain`; resolve the incomplete operation first. |
+| Unknown hash/name, ambiguous hash/alias or conflicting name/hash | `migration_ledger:unknown`, `:ambiguous` or `:conflict`; use the matching checkout and declaration. |
+
+Refusals throw `PortabilityError` with status 409 and a constant `code`;
+ledger values never enter these diagnostics. Propagate failures and stop before
+native apply. IO and provider failures also propagate. A successful check
+creates no ledger, changes no row and does not attest unrecorded historical
+bytes in a plain Wrangler ledger. It never silently skips pending migrations.
+RER's native `localPortability` invokes this same entry point in its
+`migration-preflight` worker before its own Wrangler step, then reads applied
+history again for transfer.
+
+The implementation ships in the RER CLI, not the Worker portability module.
+Package-mode seeds need a future `@runeditrun/rer` release containing this
+export and an exact pin/lock update; version 0.2.77 does not expose it.
+Vendored seeds need a reviewed Base CLI-copy refresh with
+`node scripts/export-cli.mjs SEED_ROOT` from the selected Base source and their
+normal copy/provenance checks. Copy the complete CLI dependency inventory,
+not this file alone. Either route also needs the seed-owned adapter call above
+before its earlier native apply. This Base change releases no package and
+adopts no seed.
 
 When a policy includes operator-auth tables, local dev identity still never
 travels, and no policy option changes that: export drops `oa_sessions` rows of

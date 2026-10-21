@@ -11,6 +11,7 @@
     "./adapter": "./cli/adapter.mjs",
     "./deploy": "./cli/deploy.mjs",
     "./portability": "./cli/portability.mjs",
+    "./portability-migrations": "./cli/portability-migrations.mjs",
     "./errors": "./cli/errors.mjs",
     "./jsonc": "./cli/jsonc.mjs",
     "./parse": "./cli/parse.mjs",

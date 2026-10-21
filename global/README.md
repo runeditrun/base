@@ -291,6 +291,7 @@ line that still names it. A later refresh is a version bump:
 | `@runeditrun/rer/adapter` | `commandAdapter` | `scripts/base-cli/cli/adapter.mjs` |
 | `@runeditrun/rer/deploy` | `ownerDeploy` | `scripts/base-cli/cli/deploy.mjs` |
 | `@runeditrun/rer/portability` | `localPortability` | `scripts/base-cli/cli/portability.mjs` |
+| `@runeditrun/rer/portability-migrations` | `nativeMigrationPreflight`, before an adapter's Wrangler apply (contract in `modules/portability/README.md`) | `scripts/base-cli/cli/portability-migrations.mjs` |
 | `@runeditrun/rer/errors` | the CLI's error helpers | `scripts/base-cli/cli/errors.mjs` |
 | `@runeditrun/rer/jsonc` | JSONC reading | `scripts/base-cli/cli/jsonc.mjs` |
 | `@runeditrun/rer/parse`, `/scheduled` | CLI argument parsing, scheduled-job helpers | `scripts/base-cli/cli/parse.mjs`, `scheduled.mjs` |

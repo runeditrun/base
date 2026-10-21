@@ -53,12 +53,12 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   // Do not apply pending product migrations to a populated recovery target.
   // Check real existing bindings first; finalize repeats this under the lock.
   if(legacyRecovery)await nativeWorker(store,'legacy-preflight',input,signal);
-  const {platformLedger}=await nativeWorker(store,'migration-preflight',input,signal);
+  const {nativeApply}=await nativeWorker(store,'migration-preflight',input,signal);
   // Local migrations need no provider account: wrangler runs without credentials.
   // Its info lines (the local location and "Use --remote if you want to access
   // the remote instance") only confuse a local backup; warnings and errors print.
   const { dependencyEnvironment } = await shared('dependency-environment.mjs');
-  if(!platformLedger)await store.run('Applying local data migrations', 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], {
+  if(nativeApply)await store.run('Applying local data migrations', 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], {
    cwd: root, signal, env: { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG: 'warn' },
   });
   const receipt=await nativeWorker(store,direction,input,signal);
