@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.77
+
+- **Dependency signing keys are sealed at rest with a rotatable installation key (#367, #382).** Each interface's private signing key is stored as an AES-256-GCM envelope under a key derived from the generated `INSTALLATION_KEY` setting, which setup and hosted deploys keep beside `SESSION_SECRET` and archives never carry. Legacy plaintext keys upgrade once. `rer deploy --rotate-secret INSTALLATION_KEY` re-seals every row and retires the previous binding; `rer deploy --reopen-installation-key KID` reopens a D1 restore from before a rotation with retained private custody, reporting the D1 key history first. Missing or wrong keys fail closed with `installation_key_missing` or `installation_key_unavailable`.
+- **The Run page keeps its install command whole at the shell pipe.** At phone widths the command wraps before the URL, or after its last slash, never beside `| sh`; Copy still copies the exact command.
+- **The misbound-port startup check no longer races the app's own sockets.** Its test picks the wrong port the way rer picks its internal one, outside the OS ephemeral range, so the app's Miniflare sockets cannot take it before Vite binds.
+
 ## 0.2.76
 
 - **Patch the maintained TanStack Start security closure (#386).** The default seed and foundation carry the patched Start and server-core dependencies for GHSA-qx66-fv34-fjm8.
