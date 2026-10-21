@@ -12,7 +12,7 @@ import { classifyUndo } from './undo-snapshot.ts';
 import { nativeStagingScope } from './native-staging-context.ts';
 import { validateReversalJournal } from './reversal-journal.ts';
 import { exactRows } from './sets.ts';
-import { sql } from './database.ts';
+import { sql, guard } from './database.ts';
 
 export class D1ReversalPolicyConversionError extends Error {
   readonly code: 'IMPORT_CONVERSION_UNAVAILABLE' | 'IMPORT_CONVERSION_REVIEW_CHANGED' | 'IMPORT_CONVERSION_ALREADY_CONVERTED';
@@ -45,17 +45,26 @@ export async function preparePreservedPreview(id: string, context: D1ImportConte
     guards.push(...exactRows('ik_batches', ['job_id','action','position','end_position','fence'], batches, sql('job_id=?', id)));
   }
   const rows = (await context.storage.database.prepare('SELECT * FROM ik_provenance WHERE job_id=? ORDER BY ordinal DESC,effect_ordinal DESC').bind(id).all()).results;
-  const effects: D1UndoEffect[] = [], previous: typeof state.dispositions = [];
+  const effects: D1UndoEffect[] = [], previous: typeof state.dispositions = [], previousGuards: D1Sql[] = [];
   for (const raw of rows) {
     const p = await validatedProvenance(raw, context, guards) as D1ProvenanceRow;
     // Retention of a replacement would release predecessor history. Conversion
     // cannot authorize that, even if the adapter calls the row unchanged today.
-    if (p.predecessorId !== undefined) throw unavailable('predecessor-history');
+    if (!p.reversed && p.predecessorId !== undefined) throw unavailable('predecessor-history');
     const effect = plan.entries[raw.ordinal].effects[raw.effect_ordinal];
     const expected = { destination: p.destination, targetKind: p.targetKind, targetId: p.targetId, revision: p.appliedRevision, value: effect.value, ...(effect.attachment ? { attachment: effect.attachment } : {}) };
     if (p.reversed) {
       if (state.policy === 'strict' && job.state !== 'undoing') throw unavailable('superseded');
-      if (state.policy === 'strict') previous.push({ jobId: id, effectId: p.id, targetKind: p.targetKind, targetId: p.targetId, entity: { table: p.targetKind, recordId: p.targetId }, disposition: 'reversed', reason: 'unchanged', expected: undoEvidence(expected, context), observed: undoEvidence(null, context), protectedBy: [], evidence: { priorStrictReversal: true } });
+      if (state.policy === 'strict') {
+        // A strict journal has no effect dispositions. A present replacement
+        // could instead be a successor's retained effect: never relabel that
+        // as an earlier successful strict reversal. Require its exact restored
+        // before-image (or absence), and fence it through publication.
+        const restored = await context.storage.targets.read(context.storage.database, context.destination, p.targetKind, p.targetId) ?? null;
+        if (canonicalJson(restored) !== canonicalJson(p.before ?? null)) throw unavailable('unfenceable-previous-reversal');
+        previousGuards.push(guard(context.storage.targets.matches(restored, context.destination, p.targetKind, p.targetId)));
+        previous.push({ jobId: id, effectId: p.id, targetKind: p.targetKind, targetId: p.targetId, entity: { table: p.targetKind, recordId: p.targetId }, disposition: 'reversed', reason: 'unchanged', expected: undoEvidence(expected, context), observed: undoEvidence(restored, context), protectedBy: [], evidence: { priorStrictReversal: true } });
+      }
     } else effects.push({ provenance: p, expected, retained: state.dispositions.some(d => d.effectId === p.id && d.disposition === 'retained') });
   }
   let decision: ReturnType<typeof classifyUndo>;
@@ -64,10 +73,11 @@ export async function preparePreservedPreview(id: string, context: D1ImportConte
     if (error instanceof Error && /^(IMPORT_UNDO_|IMPORT_NATIVE_SET_GUARD_REQUIRED|INVALID_UNDO_OWNERSHIP)/.test(error.message)) throw unavailable('unfenceable');
     throw error;
   }
-  guards.push(...decision.guards);
+  const nativeGuards = [...previousGuards, ...decision.guards];
+  guards.push(...nativeGuards);
   const dispositions = [...state.dispositions, ...previous, ...decision.ordered];
-  const reviewedFingerprint = sha256(canonicalJson({ jobId: id, fingerprint: job.fingerprint, state: job.state, fence: job.fence, policy: state.policy, binding: state.binding, dispositions, guards: decision.guards.map(g => ({ sql: g.sql, params: g.params ?? [] })) }));
-  return { ...current, guards, nativeGuards: decision.guards, previous, reviewedFingerprint, dispositions, policy: state.policy };
+  const reviewedFingerprint = sha256(canonicalJson({ jobId: id, fingerprint: job.fingerprint, state: job.state, fence: job.fence, policy: state.policy, binding: state.binding, dispositions, guards: nativeGuards.map(g => ({ sql: g.sql, params: g.params ?? [] })) }));
+  return { ...current, guards, nativeGuards, previous, reviewedFingerprint, dispositions, policy: state.policy };
 }
 
 export async function previewD1PreservedUndo(id: string, context: D1ImportContext): Promise<D1PreservedUndoPreview> {

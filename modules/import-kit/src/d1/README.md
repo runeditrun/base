@@ -889,6 +889,9 @@ with the policy hash, and baseline report dispositions for effects already
 reversed by strict undo. It does not repeat those native reversals or rewrite
 provenance, originals, source claims or history. Refusal leaves no partial
 conversion state; there is no automatic policy switch or silent re-conversion.
+An earlier strict reversal must still have its exact restored before-image or
+absence. A recreated or superseding target makes that baseline unfenceable;
+conversion refuses rather than misreporting retained later work as reversed.
 
 | Job or review condition | Conversion result |
 | --- | --- |
