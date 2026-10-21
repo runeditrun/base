@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.76-dev.gf334a47e",
+  "cliVersion": "0.2.76-dev.gf1377053",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1771,7 +1771,7 @@
     },
     "modules/deploy-kit/site-runtime.mjs": {
       "source": "modules/deploy-kit/site-runtime.mjs",
-      "sha256": "bd2f839f5a43ec8062750072204b2ff7e23c876a05ae6bc3e929eab2a71d7c41"
+      "sha256": "ada60781cb461bf58242e5ee4381ff334000b04ec7866e5c794ed5f56149fff8"
     },
     "modules/deploy-kit/site.mjs": {
       "source": "modules/deploy-kit/site.mjs",
@@ -3033,8 +3033,12 @@
       "source": "modules/site/docs-search/lexical.ts",
       "sha256": "9debdacdff7daa71eb4a6694bfc51e52147af28f9a51880d667840392604cd6b"
     },
-    "modules/site/docs-search/policy.ts": {
-      "source": "modules/site/docs-search/policy.ts",
+    "modules/site/docs-search/policy.d.mts": {
+      "source": "modules/site/docs-search/policy.d.mts",
+      "sha256": "0440ff9a5b7da7774956df7daa79c1cb871370217ef716fdd83c8bb1aa4ec79b"
+    },
+    "modules/site/docs-search/policy.mjs": {
+      "source": "modules/site/docs-search/policy.mjs",
       "sha256": "1b113f147b9280597d8562c01ce7bb9ec967169b4bb6802ad044bf00a6fa9962"
     },
     "modules/site/docs-search/retrieve.ts": {
@@ -3055,7 +3059,7 @@
     },
     "modules/site/docs-search/worker.ts": {
       "source": "modules/site/docs-search/worker.ts",
-      "sha256": "0c0612ce1c3c624844d4237a6d9cfc359f953ce02275d4173976ef3c9815b3c3"
+      "sha256": "886fcf989e39e7948749a4ed3764eb1b13a48fc84a8c5d3ccb4b2c39b293cab5"
     },
     "operations/README.md": {
       "source": "operations/README.md",

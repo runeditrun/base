@@ -5,12 +5,15 @@ import { promisify } from 'node:util';
 import { createServer } from 'node:http';
 import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { siteProvider } from '../modules/deploy-kit/tests/site-provider.mjs';
 import { searchRuntime, searchRuntimeOptions } from './fixtures/docs-search/runtime.mjs';
 import { siteRateLimit } from '../modules/deploy-kit/site-runtime.mjs';
+import { buildPackage } from '../scripts/rer-package.mjs';
+import { integrity } from '../scripts/rer-package/registry.mjs';
+import { readPackage } from '../global/update/archive.mjs';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
@@ -62,8 +65,9 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  await new Promise(resolve => edge.listen(0,'127.0.0.1',resolve));
  t.after(() => new Promise(resolve => {edge.closeAllConnections();edge.close(resolve);}));
  const network = `http://127.0.0.1:${edge.address().port}`;
+ let cli=join(base,'bin/rer.mjs');
  const command = async (...argv) => {
-  try { return {code:0,...await run(process.execPath,['--import',join(base,'cli/fixtures/docs-search/network.mjs'),join(base,'bin/rer.mjs'),...argv,'--site','--json','--no-queue'],{
+  try { return {code:0,...await run(process.execPath,['--import',join(base,'cli/fixtures/docs-search/network.mjs'),cli,...argv,'--site','--json','--no-queue'],{
    cwd:root,env:{PATH:process.env.PATH,HOME:join(directory,'home'),CI:'true',RER_NO_UPDATE_CHECK:'1',RER_TEST_NETWORK:network,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token},maxBuffer:1024*1024})}; }
   catch(error) { return {code:error.code,stdout:error.stdout,stderr:error.stderr}; }
  };
@@ -73,6 +77,16 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  assert.notEqual(missingLimiter.code,0);
  assert.match(missingLimiter.stdout+missingLimiter.stderr,/SEARCH_RATE_LIMITER/);
  await writeFile(adapter,declared);
+ // Exercise the actual package at a physical node_modules path: Node refuses
+ // direct TypeScript imports there, even when checkout/vendored tests succeed.
+ const archive=await readFile(await buildPackage(base,join(directory,'packed')));
+ const packaged=join(directory,'package-host/node_modules/@runeditrun/rer');
+ for(const entry of readPackage(archive,{integrity:integrity(archive)})) {
+  const target=join(packaged,entry.path);
+  await mkdir(dirname(target),{recursive:true}); await writeFile(target,entry.data);
+ }
+ for (const executable of [cli,join(packaged,'bin/rer.mjs')]) {
+ cli=executable;
  for (const argv of [['build'],['deploy','--dry-run']]) {
   const result = await command(...argv);
   assert.equal(result.code,0,result.stdout+result.stderr);
@@ -85,7 +99,8 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
    assert.equal(plan.rateLimit.consistency,'eventual');
   }
  }
- assert.equal(requests,0,'build and dry run make zero network requests');
+ }
+ assert.equal(requests,0,'vendored and packaged build/dry-run make zero network requests');
  await assert.rejects(readFile(join(root,'dist/site/docs-search-vectors.json')),{code:'ENOENT'});
  let deployed = await command('deploy');
  assert.equal(deployed.code,0,deployed.stdout+deployed.stderr);

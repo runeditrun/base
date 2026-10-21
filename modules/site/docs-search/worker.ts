@@ -1,5 +1,5 @@
 import { createSearcher } from './retrieve';
-import { searchPolicy } from './policy';
+import { searchPolicy } from './policy.mjs';
 import type { Embed, SearchIndex, SearchResult } from './types';
 
 type Environment = {

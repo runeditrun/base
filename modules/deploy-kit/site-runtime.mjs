@@ -1,5 +1,5 @@
 import { assert, hash } from './validation.mjs';
-import { searchPolicy } from '../site/docs-search/policy.ts';
+import { searchPolicy } from '../site/docs-search/policy.mjs';
 
 /** Only the immutable Base docs-search bundle may extend the site Worker. */
 export function siteRuntime(runtime) {
