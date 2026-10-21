@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.77-dev.g4a4978a1",
+  "cliVersion": "0.2.77-dev.g9a413a3e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2751,11 +2751,11 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "352cb9ca00923217104b0b7a4267696d6127e4f31a3e49ef18bbb905249802cd"
+      "sha256": "db480c94ac9b3d84ce4aef1e568df84b09b7d8959d13cf5881c519a2130ea1e5"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
-      "sha256": "1805c23b6140da54de0c9e3f9b22637aba92b54544fb076d96e370a4d6450302"
+      "sha256": "7db91ebf1905f5f22096dc5078e987957ccabe8433fd5217632780ee37ba0ea5"
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
@@ -2912,6 +2912,10 @@
     "modules/portability/storage.mjs": {
       "source": "modules/portability/storage.mjs",
       "sha256": "33b0585d9c38658c647c5785231c87397cec26d4630c16eab2405db59d317355"
+    },
+    "modules/portability/transient-tables.mjs": {
+      "source": "modules/portability/transient-tables.mjs",
+      "sha256": "ab979701cb97593daab22d623c6b6dc413c35efdc20ac7a5cebbd9d62b12cbdd"
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
