@@ -8,7 +8,7 @@ export function searchRuntime({ source, assets, network, rateLimit }) {
   log: new Log(LogLevel.ERROR),
   workers: [{
    name: 'search-site', modules: true, script: source, compatibilityDate: '2026-09-08',
-   assets: { directory: assets, binding: 'ASSETS', run_worker_first: true },
+   assets: { directory: assets, binding: 'ASSETS', run_worker_first: true, routerConfig:{has_user_worker:true}, assetConfig:{html_handling:'auto-trailing-slash',not_found_handling:'404-page'} },
    ratelimits: { SEARCH_RATE_LIMITER: { namespace_id: rateLimit.namespace_id, simple: rateLimit.simple } },
    serviceBindings: { AI: 'ai-edge' },
   }, {
