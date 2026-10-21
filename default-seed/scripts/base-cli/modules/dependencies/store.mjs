@@ -2,13 +2,15 @@ import { keyPair } from './crypto.mjs';
 import { requireInstallationKey, installationKeyId, sealDependencyKey, openDependencyKey } from './sealing.mjs';
 import { AuthError } from '../operator-auth/errors.mjs';
 
-async function sealingState(db, config, row) {
+async function sealingState(db, config, row, { retiredKeys = [], report } = {}) {
  requireInstallationKey(config);
  const state = row ?? await db.prepare('SELECT keys_sealed,key_ids FROM rer_dependency_installation WHERE singleton=1').first();
  const ids = JSON.parse(state?.key_ids ?? '[]'), current = await installationKeyId(config.INSTALLATION_KEY);
  const previous = config.INSTALLATION_KEY_PREVIOUS ? await installationKeyId(config.INSTALLATION_KEY_PREVIOUS) : null;
- if (ids.length && ![current, previous].includes(ids.at(-1))) throw new AuthError('installation_key_unavailable', 503);
- return { current, ids, options: { allowPlaintext: !state?.keys_sealed, knownKeyIds: ids.length ? ids : undefined } };
+ const available = [current, previous, ...await Promise.all(retiredKeys.map(installationKeyId))];
+ report?.({keyIds:ids, tail:ids.at(-1) ?? null, custody:ids.map(kid => ({kid, available:available.includes(kid)}))});
+ if (ids.length && !available.includes(ids.at(-1))) throw new AuthError('installation_key_unavailable', 503);
+ return { current, ids, options: { allowPlaintext: !state?.keys_sealed, knownKeyIds: ids.length ? ids : undefined, retiredKeys } };
 }
 // Closing the legacy branch is atomic with the last per-row upgrade. This SQL
 // checks envelope shape only; reads never decrypt a sibling interface's key.
@@ -16,8 +18,8 @@ const finishUpgrade = (db, current) => db.prepare(`UPDATE rer_dependency_install
 
 // Rekey alone opens the entire table, then checks the complete current set
 // (including concurrent replacements) before authorizing key retirement.
-export async function resealDependencyKeys(db, config = {}) {
- const state = await sealingState(db, config);
+export async function resealDependencyKeys(db, config = {}, custody = {}) {
+ const state = await sealingState(db, config, undefined, custody);
  const rows = (await db.prepare('SELECT interface,private_key FROM rer_dependency_keys').all()).results;
  const updates = [];
  for (const row of rows) {

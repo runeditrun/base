@@ -71,6 +71,36 @@ test('installation rotation publishes both keys atomically, reseals every row an
  assert.ok(!f.progress.join('').includes(original) && !f.progress.join('').includes(values.INSTALLATION_KEY));
 });
 
+test('routine installation rotation refuses a replayed retired-era signing key after relink', async t => {
+ const f = await fixture(t, {declared:true, existing:true, installation:true});
+ await f.run();
+ const current = () => f.provider.state.secrets.find(item => item.name === 'INSTALLATION_KEY').value;
+ const first = current(), contract = 'relinked@1', oldKey = await keyPair();
+ const retiredRaw = await sealDependencyKey({INSTALLATION_KEY:first}, contract, oldKey);
+ const db = f.provider.state.databases[0].db;
+ db.prepare('INSERT INTO rer_dependency_installation(singleton,sector_id,keys_sealed,key_ids) VALUES(1,?,1,?)').run(crypto.randomUUID(),JSON.stringify([await installationKeyId(first)]));
+ db.prepare('INSERT INTO rer_dependency_keys(interface,private_key) VALUES(?,?)').run(contract, retiredRaw);
+ await f.run({rotateSecret:'INSTALLATION_KEY'});
+ // Relinking replaces the signing JWK under the current installation key.
+ const second = current(), relinkedKey = await keyPair();
+ const relinkedRaw = await sealDependencyKey({INSTALLATION_KEY:second}, contract, relinkedKey);
+ db.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(relinkedRaw, contract);
+ const history = db.prepare('SELECT key_ids FROM rer_dependency_installation').get().key_ids;
+ // A D1 writer replays the genuine envelope from before the first rotation.
+ db.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(retiredRaw, contract);
+ await assert.rejects(openDependencyKey({INSTALLATION_KEY:second},contract,retiredRaw,{knownKeyIds:JSON.parse(history)}), {code:'installation_key_version_unknown'});
+ await assert.rejects(f.run({rotateSecret:'INSTALLATION_KEY'}), /dependency-rekey-failed/);
+ assert.equal(db.prepare('SELECT private_key FROM rer_dependency_keys WHERE interface=?').get(contract).private_key,retiredRaw);
+ assert.equal(db.prepare('SELECT key_ids FROM rer_dependency_installation').get().key_ids,history);
+ // Repair the replay and resume the saved rotation pair; only the relinked JWK lives.
+ db.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(relinkedRaw, contract);
+ await f.run({rotateSecret:'INSTALLATION_KEY'});
+ const liveRaw = db.prepare('SELECT private_key FROM rer_dependency_keys WHERE interface=?').get(contract).private_key;
+ assert.equal((await openDependencyKey({INSTALLATION_KEY:current()},contract,liveRaw,{currentOnly:true})).key.kid,relinkedKey.kid);
+ assert.ok(!f.provider.state.secrets.some(item=>item.name==='INSTALLATION_KEY_PREVIOUS'));
+ assert.ok(!f.progress.join('').includes(first) && !f.progress.join('').includes(second) && !f.progress.join('').includes(current()));
+});
+
 test('retired custody reopens a pre-rotation D1 restore explicitly and survives interrupted retirement', async t => {
  const f = await fixture(t, {declared:true, existing:true, installation:true, ownRecord:true, returnState:true, namedState:true});
  await f.run();
@@ -82,6 +112,9 @@ test('retired custody reopens a pre-rotation D1 restore explicitly and survives 
  db.prepare('INSERT INTO rer_dependency_installation(singleton,sector_id,keys_sealed,key_ids) VALUES(1,?,1,?)').run(crypto.randomUUID(),JSON.stringify([kid]));
  db.prepare('INSERT INTO rer_dependency_keys(interface,private_key) VALUES(?,?)').run(contract, raw);
  await f.run({rotateSecret:'INSTALLATION_KEY'});
+ const second = current(), sibling = 'sibling@1', siblingKey = await keyPair();
+ const siblingRaw = await sealDependencyKey({INSTALLATION_KEY:second}, sibling, siblingKey), siblingKid = JSON.parse(siblingRaw).kid;
+ db.prepare('INSERT INTO rer_dependency_keys(interface,private_key) VALUES(?,?)').run(sibling, siblingRaw);
  await f.run({rotateSecret:'INSTALLATION_KEY'});
  const custody = await readFile(file, 'utf8');
  assert.ok(custody.includes(`INSTALLATION_KEY_RETIRED=${kid}:`), 'every retired key remains in private custody');
@@ -93,6 +126,13 @@ test('retired custody reopens a pre-rotation D1 restore explicitly and survives 
  // Simulate D1 Time Travel replacing a row with its pre-rotation ciphertext.
  db.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(raw, contract);
  await assert.rejects(openDependencyKey({INSTALLATION_KEY:active},contract,raw,{knownKeyIds:[kid]}), {code:'installation_key_version_unknown'});
+ // Restore the complete mid-rotation snapshot: history still [k0], rows k0/k1.
+ const restore = () => {
+  db.prepare('UPDATE rer_dependency_installation SET key_ids=?').run(JSON.stringify([kid]));
+  db.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(raw, contract);
+  db.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(siblingRaw, sibling);
+ };
+ restore();
  const writes = f.provider.state.writes.length;
  await writeFile(file, custody.replace(/^INSTALLATION_KEY_RETIRED=.*\n/m, ''));
  await assert.rejects(f.run({reopenInstallationKey:kid}), {code:'installation_key_unavailable'});
@@ -106,6 +146,7 @@ test('retired custody reopens a pre-rotation D1 restore explicitly and survives 
  assert.equal(opened.key.kid,key.kid);
  const result = await f.run({reopenInstallationKey:kid});
  assert.equal(result.reopened,kid);
+ assert.ok(f.progress.some(line=>line.includes(kid)), 'reopen exposes the D1 history ID in diagnostics');
  assert.ok(current()===active,'reopen keeps the current installation key');
  const retained = await readFile(file,'utf8');
  assert.ok(retained.includes(`INSTALLATION_KEY_RETIRED=${kid}:`));
@@ -113,7 +154,13 @@ test('retired custody reopens a pre-rotation D1 restore explicitly and survives 
  assert.ok(!retained.includes('INSTALLATION_KEY_REOPEN='));
  assert.ok(!f.provider.state.secrets.some(item=>['INSTALLATION_KEY_PREVIOUS','INSTALLATION_KEY_RETIRED'].includes(item.name)));
  assert.equal(f.builds(),builds);
- assert.ok(!f.progress.join('').includes(first) && !f.progress.join('').includes(active));
+ // Either retired ID may select the published pair; local rekey needs both.
+ restore();await f.run({reopenInstallationKey:siblingKid});
+ for(const [contract,expectedKey] of [['restore@1',key],[sibling,siblingKey]]) {
+  const raw=db.prepare('SELECT private_key FROM rer_dependency_keys WHERE interface=?').get(contract).private_key;
+  assert.equal((await openDependencyKey({INSTALLATION_KEY:active},contract,raw,{currentOnly:true})).key.kid,expectedKey.kid);
+ }
+ assert.ok(!f.progress.join('').includes(first) && !f.progress.join('').includes(second) && !f.progress.join('').includes(active));
 });
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the

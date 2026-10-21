@@ -1,6 +1,7 @@
 import { assert, uuid } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
 import { checkResourceIdentity, readOwnerState, sameDeployment, withStateLock, ownerResourceName } from './owner.mjs';
+import { retiredInstallationKeys } from '../dependencies/custody.mjs';
 
 /** The D1 REST batch is one transaction, matching the Worker's db.batch contract.
  * Nothing from query responses/errors is allowed into deployment diagnostics. */
@@ -24,7 +25,7 @@ function database(api, id) {
 
 /** Reseal the dependency rows in the declared DB only while the receipt still
  * proves both the Worker and its recorded D1 resource belong to this deployment. */
-export async function ownerRekey({ api, target, statePath, declaration, env }) {
+export async function ownerRekey({ api, target, statePath, declaration, env, notice = line => console.error(line) }) {
  return withStateLock(statePath, async () => {
   const state = await readOwnerState(statePath, target);
   assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
@@ -52,7 +53,15 @@ export async function ownerRekey({ api, target, statePath, declaration, env }) {
   let result;
   try {
    const { resealDependencyKeys } = await import('../dependencies/store.mjs');
-   result = await resealDependencyKeys(database(api, entry.id), config);
+   const retired = await retiredInstallationKeys(env.INSTALLATION_KEY_RETIRED);
+   result = await resealDependencyKeys(database(api, entry.id), config, {
+    retiredKeys:[...retired.values()],
+    report: status => {
+     // D1 is untrusted: only well-formed public key IDs enter diagnostics.
+     const publicId = kid => /^[A-Za-z0-9_-]{43}$/.test(kid) ? kid : '(invalid key ID)';
+     notice(`D1 key_ids tail: ${status.tail === null ? '(empty)' : publicId(status.tail)}; custody: ${status.custody.map(({kid,available}) => `${publicId(kid)}=${available ? 'in custody' : 'unavailable'}`).join(', ') || '(empty)'}`);
+    },
+   });
   } catch { throw new Error('dependency-rekey-failed'); }
   await owned();
   return { ok: true, resealed: result.resealed };

@@ -217,6 +217,53 @@ test('a restored pre-rotation row needs the retired key and reopens without chan
  assert.equal((await login(r)).status,303);assert.deepEqual(await (await r.call('/.well-known/rer-link/jwks')).json(),publicBefore);
 });
 
+test('a whole pre-rotation restore refuses unavailable custody and reports its D1 tail before rekey',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();
+ const installation=r.sqlite.prepare('SELECT key_ids FROM rer_dependency_installation').get();
+ const raw=r.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key;
+ const retired=r.config.INSTALLATION_KEY;
+ r.config.INSTALLATION_KEY_PREVIOUS=retired;r.config.INSTALLATION_KEY=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');
+ await resealDependencyKeys(r.db,r.config);delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();
+ r.sqlite.prepare('UPDATE rer_dependency_installation SET key_ids=?').run(installation.key_ids);
+ r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=?').run(raw);
+ const refused=await r.call('/auth/oidc/auth/start',{body:{}});
+ assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_unavailable'});
+ const diagnostics=[];
+ await assert.rejects(resealDependencyKeys(r.db,r.config,{report:status=>diagnostics.push(status)}),{code:'installation_key_unavailable'});
+ const ids=JSON.parse(installation.key_ids);
+ assert.deepEqual(diagnostics,[{keyIds:ids,tail:ids.at(-1),custody:ids.map(kid=>({kid,available:false}))}]);
+ r.config.INSTALLATION_KEY_PREVIOUS=retired;
+ await resealDependencyKeys(r.db,r.config,{report:status=>diagnostics.push(status)});
+ assert.deepEqual(diagnostics.at(-1).custody,ids.map(kid=>({kid,available:true})));
+ delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();assert.equal((await login(r)).status,303);
+});
+
+test('a mid-rotation snapshot reopens with all retired custody and relinks both interfaces without unlinking',async t=>{
+ const r=await runtime(t);await r.bootstrap();await r.link();await r.link('error-sink@1');
+ const publicBefore=await (await r.call('/.well-known/rer-link/jwks')).json();
+ const sector=(await r.dependencies().document()).sector_id, k0=r.config.INSTALLATION_KEY;
+ const installation=r.sqlite.prepare('SELECT key_ids FROM rer_dependency_installation').get();
+ r.config.INSTALLATION_KEY_PREVIOUS=k0;r.config.INSTALLATION_KEY=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');r.restart();
+ await dependencyStore(r.db,r.config).readKey('error-sink@1');
+ const k1=r.config.INSTALLATION_KEY, snapshot=r.sqlite.prepare('SELECT * FROM rer_dependency_keys ORDER BY interface').all();
+ assert.equal(new Set(snapshot.map(row=>JSON.parse(row.private_key).kid)).size,2);
+ assert.equal(r.sqlite.prepare('SELECT key_ids FROM rer_dependency_installation').get().key_ids,installation.key_ids);
+ await resealDependencyKeys(r.db,r.config);
+ r.config.INSTALLATION_KEY_PREVIOUS=k1;r.config.INSTALLATION_KEY=crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'');
+ await resealDependencyKeys(r.db,r.config);delete r.config.INSTALLATION_KEY_PREVIOUS;
+ for(const previous of [k0,k1]) {
+  r.sqlite.prepare('UPDATE rer_dependency_installation SET key_ids=?').run(installation.key_ids);
+  for(const row of snapshot)r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=? WHERE interface=?').run(row.private_key,row.interface);
+  r.config.INSTALLATION_KEY_PREVIOUS=previous;
+  await resealDependencyKeys(r.db,r.config,{retiredKeys:[k0,k1]});
+  delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();
+  assert.equal((await login(r)).status,303);
+  for(const contract of ['oidc-provider@1','error-sink@1'])assert.equal((await r.link(contract)).status,200);
+  assert.equal((await r.dependencies().document()).sector_id,sector);
+  assert.deepEqual(await (await r.call('/.well-known/rer-link/jwks')).json(),publicBefore);
+ }
+});
+
 test('a fully sealed installation refuses a plaintext signing key injected by a database writer',async t=>{
  const r=await runtime(t);await r.bootstrap();await r.link();
  const key=(await dependencyStore(r.db,r.config).readKey()).key;

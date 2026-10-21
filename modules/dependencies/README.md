@@ -58,20 +58,39 @@ keys and changed interface AAD fail closed with `installation_key_missing` or
 Rotate hosted custody with `rer deploy --rotate-secret INSTALLATION_KEY`:
 rer retains both values privately, publishes both bindings in one Worker version,
 re-seals every row, checks that every row opens with only the current key, then
-retires the previous Worker binding. Every retired private value stays in the
-same 0600, Git-ignored file as `SESSION_SECRET`, in
+retires the previous Worker binding. Routine rotation uses only the current/previous
+pair; older retired keys require explicit reopen. By default, every retired
+private value stays in the same 0600, Git-ignored file as `SESSION_SECRET`, in
 `INSTALLATION_KEY_RETIRED=<kid>:<value>[,<kid>:<value>...]`; none is routinely
 bound to the Worker. An interrupted operation resumes with the same pair. Back
 up this private custody securely and retain it when moving checkouts.
+
+Retain each retired key until no D1 Time Travel recovery point or exported backup
+predates the completed rotation that retired it or otherwise needs that key.
+After any rotation or reopen has finished, edit
+`.rer/deploy/<environment>.secrets.env` and remove only its `<kid>:<value>` entry
+from `INSTALLATION_KEY_RETIRED`, keeping valid comma separators; remove the
+assignment if no entries remain. Preserve the current key, all other entries
+and the file's owned 0600 permissions. There is no per-key removal command;
+reopening a removed ID refuses before provider writes unless its custody is restored.
 
 Restoring D1 backups or Time Travel from before a rotation may require an older
 key. `rer deploy --reopen-installation-key KID` explicitly publishes the current
 key and that retained retired key as `INSTALLATION_KEY_PREVIOUS`, re-seals and
 verifies every row under the current key, then removes the previous binding.
+CLI-side reopen rekey uses every validated retired key in private custody, so a
+mid-rotation snapshot containing rows under multiple retired keys can be reopened
+with either retained ID. Only the selected pair is published to the Worker.
+Reopen/rekey reports the D1 `key_ids` tail and whether each history ID is in
+custody before opening rows, including when the tail check refuses the restore.
 It retains retired custody and resumes the same pair after interruption. Missing
 retired custody refuses with `installation_key_unavailable`; recover the private
-file or relink the affected dependencies. A historically known envelope key ID
-whose key is no longer configured yields `installation_key_version_unknown`;
+file before reopening. A whole pre-rotation D1 restore also restores `key_ids`:
+if its tail is absent from configured custody, reads refuse with
+`installation_key_unavailable` before inspecting envelopes. When that custody
+check succeeds, a historically known envelope key ID whose key is no longer
+configured yields `installation_key_version_unknown` (for example, a row-only
+restore that retains the current installation history);
 wrong configuration, malformed ciphertext and unrecognised key IDs yield
 `installation_key_unavailable`. Neither failure generates a replacement key.
 
