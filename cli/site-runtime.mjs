@@ -12,8 +12,8 @@ const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 export function siteRuntime(value) {
  if (value === undefined) return;
  if (!value || Object.keys(value).sort().join() !== 'bindings,corpus,endpoint,module,type' || value.type !== 'docs-search' || value.module !== 'docs-search'
-  || JSON.stringify(value.bindings) !== '["ASSETS","AI"]' || value.endpoint !== '/docs/search'
-  || !/^\.rer\/(?:[a-z0-9_-]+\/)+corpus\.json$/.test(value.corpus ?? '')) throw invalid('Run site runtime must declare { type: "docs-search", module: "docs-search", bindings: ["ASSETS", "AI"], endpoint: "/docs/search", corpus: ".rer/docs-search/corpus.json" }.');
+  || JSON.stringify(value.bindings) !== '["ASSETS","AI","SEARCH_RATE_LIMITER"]' || value.endpoint !== '/docs/search'
+  || !/^\.rer\/(?:[a-z0-9_-]+\/)+corpus\.json$/.test(value.corpus ?? '')) throw invalid('Run site runtime must declare { type: "docs-search", module: "docs-search", bindings: ["ASSETS", "AI", "SEARCH_RATE_LIMITER"], endpoint: "/docs/search", corpus: ".rer/docs-search/corpus.json" }.');
  return value;
 }
 

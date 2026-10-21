@@ -10,6 +10,7 @@ import { unpublishedIdentities } from './site-private.mjs';
 import { privateSitePaths } from './site-inputs.mjs';
 import { redactSiteText } from './site-diagnostics.mjs';
 import { siteRuntime, buildSiteRuntime, runtimeSummary } from './site-runtime.mjs';
+import { siteRateLimit } from '../modules/deploy-kit/site-runtime.mjs';
 
 // The run site: a seed's static marketing pages, /run and docs, built from
 // edition identity with no installation data. A seed opts in with
@@ -117,21 +118,23 @@ export async function siteCommand(project, options, store, signal, out) {
   const path = relative(project.root, built.folder);
   if (!options.json) {
    out.human(`Run site written to ${path} (${built.pages} pages, ${built.files} files): ${built.folder}`);
-   if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; bindings ASSETS, AI; corpus ${built.runtime.corpusHash}; vectors prepared only on a real deploy`);
+   if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; bindings ASSETS, AI, SEARCH_RATE_LIMITER; corpus ${built.runtime.corpusHash}; vectors prepared only on a real deploy`);
   }
   return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references, ...(built.runtime ? {runtime:runtimeSummary(built.runtime)} : {}) } };
  }
  const plan = await siteDeployment(project, options, built.folder, built.runtime);
- const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS and AI' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${plan.assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
+ const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS, AI and SEARCH_RATE_LIMITER' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${plan.assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
   `  custom domains: ${plan.hostnames.join(', ')}; workers.dev off`, ...plan.redirects.map(rule => `  redirect in the Worker: ${rule.from} -> ${rule.to} (${rule.status}, keeps ${rule.keeps.join(' and ')})`)];
  const { collectFiles } = await import('../modules/deploy-kit/artifact.mjs');
  const { siteFingerprint } = await import('../modules/deploy-kit/site.mjs');
  const files = await collectFiles(built.folder);
  const runtime = runtimeSummary(built.runtime);
  if (runtime) human.push(`  runtime: ${runtime.type}; module ${runtime.module}; endpoint ${runtime.endpoint}; bindings ${runtime.bindings.join(', ')}; model ${runtime.model}; pooling ${runtime.pooling}; corpus ${runtime.corpusHash}`);
+ const rateLimit = runtime ? { ...siteRateLimit(plan.worker), scope: 'cloudflare-location', consistency: 'eventual' } : undefined;
+ if (rateLimit) human.push('  search admission: '+rateLimit.simple.limit+' per '+rateLimit.simple.period+'s; namespace '+rateLimit.namespace_id+'; location-local, eventually consistent; no hard account-wide spend cap');
  const fingerprint = siteFingerprint(plan, files, {preparing:Boolean(runtime) && !prepare});
  if (runtime) human.push(`  fingerprint: ${fingerprint}${prepare ? '' : ' (vectors prepared only on a real deploy)'}`);
- const summary = { ...(runtime ? {runtime, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets: plan.assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
+ const summary = { ...(runtime ? {runtime, rateLimit, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets: plan.assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
  if (options.dryRun) {
   if (options.json) out.event('site', summary); else for (const line of human) out.human(line);
   store.report('deploy --site: dry run complete; no deployment occurred and no provider request was made.');

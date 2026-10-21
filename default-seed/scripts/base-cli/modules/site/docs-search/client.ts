@@ -109,6 +109,10 @@ function mount(root: HTMLElement): () => void {
         const endpoint = new URL(baseEndpoint);
         endpoint.searchParams.set('q', query);
         const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: 'application/json' } });
+        if (response.status === 429) {
+          if (current === revision && !controller.signal.aborted) message('Too many searches. Try again in a minute.');
+          return;
+        }
         if (!response.ok) throw new Error('Search request failed');
         const results = readResults(await response.json());
         if (current !== revision || controller.signal.aborted) return;

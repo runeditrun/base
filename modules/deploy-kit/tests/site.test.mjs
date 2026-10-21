@@ -9,12 +9,13 @@ import { collectFiles } from '../artifact.mjs';
 import { sitePlan, siteDeploy, siteDeclaration, siteReadbackSummary } from '../site.mjs';
 import * as siteKit from '../site.mjs';
 import { hash } from '../validation.mjs';
+import { siteRateLimit } from '../site-runtime.mjs';
 
 const app = { project: 'runeditrun/cradle', environment: 'production', compatibilityDate: '2026-09-08' };
 
 function searchRuntime(overrides = {}) {
   const contract = { corpusHash: hash('search corpus'), model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls' };
-  return { type: 'docs-search', module: 'docs-search', endpoint: '/docs/search', bindings: ['ASSETS', 'AI'], ...contract,
+  return { type: 'docs-search', module: 'docs-search', endpoint: '/docs/search', bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER'], ...contract,
     source: `const contract = ${JSON.stringify(contract)}; export default { fetch(request, env) { return env.ASSETS.fetch(request); } };`, ...overrides };
 }
 
@@ -47,7 +48,7 @@ test('site fingerprints preserve assets-only identity and bind search code, mode
   const plain = sitePlan(options), files = [{ path: 'index.html', sha256: hash('home') }, { path: 'docs-search-vectors.json', sha256: hash('vectors') }];
   assert.equal(siteKit.siteFingerprint(plain, files), hash({ files, config: plain.assetsConfig, module: hash(siteKit.SITE_WORKER), compatibilityDate: plain.compatibilityDate }));
   const runtime = searchRuntime(), search = sitePlan({ ...options, runtime });
-  assert.deepEqual(search.bindings, ['ASSETS', 'AI']);
+  assert.deepEqual(search.bindings, ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER']);
   assert.deepEqual(search.runtime, runtime);
   const fingerprint = siteKit.siteFingerprint(search, files);
   assert.notEqual(fingerprint, siteKit.siteFingerprint(plain, files));
@@ -55,13 +56,13 @@ test('site fingerprints preserve assets-only identity and bind search code, mode
     assert.notEqual(siteKit.siteFingerprint(sitePlan({ ...options, runtime: searchRuntime(change) }), files), fingerprint);
   assert.notEqual(siteKit.siteFingerprint(search, files.map(file => file.path === 'docs-search-vectors.json' ? { ...file, sha256: hash('new vectors') } : file)), fingerprint);
   assert.throws(() => siteKit.siteFingerprint(search, files.slice(0, 1)), /missing-site-search-vectors/);
-  for (const change of [{ type: 'custom' }, { bindings: ['ASSETS', 'AI', 'DB'] }, { endpoint: '/custom' }, { annotations: {} }, { pooling: 'mean' }])
+  for (const change of [{ type: 'custom' }, { bindings: ['ASSETS', 'AI'] }, { bindings: ['ASSETS', 'AI', 'DB'] }, { endpoint: '/custom' }, { annotations: {} }, { pooling: 'mean' }])
     assert.throws(() => sitePlan({ ...options, runtime: searchRuntime(change) }), /invalid-site-runtime/);
 });
 
 test('search deploy uploads the generated runtime and verifies exact serving version modules and AI bindings', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['search upload', 'missing AI', 'missing ASSETS', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']) await t.test(scenario, async t => {
+  for (const scenario of ['search upload', 'missing AI', 'missing ASSETS', 'missing limiter', 'wrong namespace', 'wrong limit', 'wrong period', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']) await t.test(scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     await writeFile(join(folder, 'docs-search-vectors.json'), JSON.stringify({ model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls', corpusHash: hash('search corpus'), chunks: [] }));
@@ -77,6 +78,10 @@ test('search deploy uploads the generated runtime and verifies exact serving ver
         const content = provider.state.content.get(uploadedVersion);
         if (scenario === 'missing AI') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'AI');
         if (scenario === 'missing ASSETS') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'ASSETS');
+        if (scenario === 'missing limiter') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'SEARCH_RATE_LIMITER');
+        if (scenario === 'wrong namespace') bindings.find(binding => binding.name === 'SEARCH_RATE_LIMITER').namespace_id = '1';
+        if (scenario === 'wrong limit') bindings.find(binding => binding.name === 'SEARCH_RATE_LIMITER').simple.limit++;
+        if (scenario === 'wrong period') bindings.find(binding => binding.name === 'SEARCH_RATE_LIMITER').simple.period = 10;
         if (scenario === 'wrong AI type') bindings.find(binding => binding.name === 'AI').type = 'plain_text';
         if (scenario === 'extra binding') bindings.push({ type: 'plain_text', name: 'UNEXPECTED', text: 'value' });
         if (scenario === 'module changed') content.files[0].bytes = Buffer.from(`${runtime.source}\n// changed`);
@@ -95,7 +100,7 @@ test('search deploy uploads the generated runtime and verifies exact serving ver
       const result = await run();
       assert.equal(result.origin, 'https://run-cradle.com');
       assert.equal(provider.state.content.get(uploadedVersion).files[0].bytes.toString(), runtime.source);
-      assert.deepEqual(provider.state.version.resources.bindings, [{ type: 'assets', name: 'ASSETS' }, { type: 'ai', name: 'AI' }]);
+      assert.deepEqual(provider.state.version.resources.bindings, [{ type: 'assets', name: 'ASSETS' }, { type: 'ai', name: 'AI' }, siteRateLimit(plan.worker)]);
       assert.ok(provider.state.calls.some(call => call.path.endsWith('/content/v2') && call.search.includes(uploadedVersion)), 'reads content of uploaded serving version');
       assert.equal(provider.state.settings.main_module, siteKit.SITE_MODULE);
     } else {
