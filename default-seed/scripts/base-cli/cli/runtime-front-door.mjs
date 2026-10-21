@@ -21,7 +21,7 @@ export async function runtimeFrontDoor({ host, port, activity, door, devKey, ori
 // ports to every other socket (the runtime's own listeners, outbound requests),
 // so the runtime's bind could find it taken. Choose a free port the OS never
 // assigns on its own instead.
-async function runtimeLoopbackPort(publicPort) {
+export async function runtimeLoopbackPort(publicPort) {
  const [first, last] = await ephemeralRange();
  const candidates = [[10000, first - 1], [last + 1, 65535]].filter(([low, high]) => low <= high);
  if (!candidates.length) throw Error(`The OS assigns every local port from 10000 (ephemeral range ${first}-${last}); leave part of that space outside the range for the local runtime.`);

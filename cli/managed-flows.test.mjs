@@ -6,7 +6,7 @@ import {loadavg, freemem, tmpdir} from 'node:os';
 import {createServer} from 'node:net';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {fixture, freePort, pause} from './fixtures/reference.mjs';
+import {fixture, pause} from './fixtures/reference.mjs';
 import {processTree, remainingProcesses} from './fixtures/process-tree.mjs';
 import {queuedCommands} from './fixtures/queued-commands.mjs';
 import {serverResources} from './server-resources.mjs';
@@ -288,11 +288,15 @@ test('legacy rer dev --login opens automatically as owner without a mail route',
 
 test('managed startup reports a real misbound application port and stops its descendants', {timeout: 300000}, async t => {
  const adapter=join(f.root,'scripts/installer/local.mjs'),original=await readFile(adapter,'utf8');
+ // The runtime target picks the misbound port as rer picks its internal one: free,
+ // never the assigned port, outside the OS ephemeral range. The app's own listen(0)
+ // sockets (Miniflare starts before Vite binds) can then never take it first.
+ const loopbackPorts=JSON.stringify(new URL('./runtime-front-door.mjs',import.meta.url).href);
  for(const mode of ['dev','preview']){
-  const wrongPort=await freePort(),target=mode==='dev'?'developmentTarget':'previewTarget';
-  const assignedPortFile=join(f.root,`.rer-misbound-${mode}-port.json`);
-  const replacement=`${mode}: async context=>{await (await import('node:fs/promises')).writeFile(${JSON.stringify(assignedPortFile)},JSON.stringify(context.runtimePort),{mode:0o600});const target=${target}(context);${mode==='dev'?`target[1][target[1].indexOf('--port')+1]=${JSON.stringify(String(wrongPort))};`:`target[2].env.RER_RUNTIME_PORT=${JSON.stringify(String(wrongPort))};`}return target;}`;
-  const observed=new Map(),controls=new Set();let child,listener,expectedPort,healthyWrongPort=false,proxyFailed=false,primaryFailure;
+  const target=mode==='dev'?'developmentTarget':'previewTarget';
+  const portsFile=join(f.root,`.rer-misbound-${mode}-ports.json`),partialPortsFile=portsFile+'.partial';
+  const replacement=`${mode}: async context=>{const fs=await import('node:fs/promises'),wrongPort=await (await import(${loopbackPorts})).runtimeLoopbackPort(context.runtimePort);await fs.writeFile(${JSON.stringify(partialPortsFile)},JSON.stringify({assigned:context.runtimePort,wrong:wrongPort}),{mode:0o600});await fs.rename(${JSON.stringify(partialPortsFile)},${JSON.stringify(portsFile)});const target=${target}(context);${mode==='dev'?`target[1][target[1].indexOf('--port')+1]=String(wrongPort);`:`target[2].env.RER_RUNTIME_PORT=String(wrongPort);`}return target;}`;
+  const observed=new Map(),controls=new Set();let child,ports,listener,expectedPort,wrongPort,healthyWrongPort=false,proxyFailed=false,primaryFailure;
   try{
    await writeFile(adapter,original.replace(`${mode}: ${target}`,replacement));
    child=f.start([mode,'--json']);
@@ -305,16 +309,20 @@ test('managed startup reports a real misbound application port and stops its des
      throw error;
     });
     for(const row of registry.running)if(tree.some(item=>item.pid===row.owner.pid))controls.add(row.control);
-    listener??=await ownedListener(tree,wrongPort);
+    ports??=await readFile(portsFile,'utf8').then(JSON.parse,error=>{
+     if(error.code==='ENOENT')return undefined;
+     throw error;
+    });
+    if(ports)listener??=await ownedListener(tree,ports.wrong);
     if(listener&&!proxyFailed&&tree.some(item=>item.pid===listener.pid&&item.start===listener.start)){
-     healthyWrongPort=(await healthStatus(`http://127.0.0.1:${wrongPort}`)).healthy;
+     healthyWrongPort=(await healthStatus(`http://127.0.0.1:${ports.wrong}`)).healthy;
      if(healthyWrongPort)proxyFailed=(await healthStatus(url)).status===404;
     }
     await pause(250);
    }
    assert.notEqual(child.exitCode,null,'misbound real application cannot wait indefinitely');
    assert.equal(await child.done,1);
-   expectedPort=JSON.parse(await readFile(assignedPortFile,'utf8'));
+   ({assigned:expectedPort,wrong:wrongPort}=JSON.parse(await readFile(portsFile,'utf8')));
    const failure=events(child).find(event=>event.event==='error');
    assert.ok(listener&&Number.isInteger(listener.pid),'an owned process really listened on the misbound port');
    assert.ok(healthyWrongPort,'the real application was healthy on the misbound listener');
@@ -337,7 +345,7 @@ test('managed startup reports a real misbound application port and stops its des
    primaryFailure=error;throw error;
   }finally{
    try{await writeFile(adapter,original);}
-   finally{try{if(child)try{await f.stop(child);}catch(error){if(!primaryFailure)throw error;t.diagnostic('Owned teardown also failed after the reported startup failure');}}finally{await rm(assignedPortFile,{force:true});}}
+   finally{try{if(child)try{await f.stop(child);}catch(error){if(!primaryFailure)throw error;t.diagnostic('Owned teardown also failed after the reported startup failure');}}finally{await rm(portsFile,{force:true});await rm(partialPortsFile,{force:true});}}
   }
  }
 });
