@@ -122,6 +122,9 @@ test('real D1 reviewed strict conversion preserves custody, current undo authori
   await assert.rejects(convert(preview.reviewedFingerprint), /IMPORT_ATOMIC_GUARD/);
   assert.deepEqual(await snapshot(), denied);
   await r.db().prepare('UPDATE sessions SET enabled=1').run();
+  const beforeReadOnly = await snapshot();
+  await assert.rejects(convert(preview.reviewedFingerprint, { ...context(), authorization: { principalId: 'owner', predicate: action => ({ sql: action === 'read' ? '1' : '0' }) } }), /IMPORT_ATOMIC_GUARD/);
+  assert.deepEqual(await snapshot(), beforeReadOnly);
   await assert.rejects(convert(preview.reviewedFingerprint, { ...context(), authorization: { ...context().authorization, principalId: 'other' } }), /JOB_BINDING_MISMATCH/);
   await r.db().prepare("INSERT INTO later_activity VALUES('late','ledger','0','settled payment')").run();
   await refuse(() => convert(preview.reviewedFingerprint), 'IMPORT_CONVERSION_REVIEW_CHANGED');
@@ -133,7 +136,8 @@ test('real D1 reviewed strict conversion preserves custody, current undo authori
   assert.deepEqual(await snapshot(), beforeRace);
   await r.db().prepare('DROP TRIGGER revoke_conversion').run();
   const before = await snapshot();
-  await convert(fresh.reviewedFingerprint);
+  const undoOnly = { ...context(), authorization: { principalId: 'owner', predicate: (action: string) => action === 'undo' ? r.context().authorization.predicate('undo', 'workspace') : { sql: '0' } } };
+  await convert(fresh.reviewedFingerprint, undoOnly);
   const after = await snapshot();
   for (const table of ['ik_provenance','ik_sources','ik_originals','ik_original_sets','ik_d1_original_chunks','ik_d1_history','ik_d1_entries','ik_batches','ik_d1_plan_chunks','contacts','evidence','later_activity']) assert.deepEqual(after[table], before[table]);
   const report = await readD1ImportUndoReport(job.id, context());

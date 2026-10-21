@@ -3,7 +3,7 @@ import type { D1ReversalPolicyConversion } from './undo-types.ts';
 import { canonicalJson, sha256 } from '../provenance/identity.ts';
 import { requestContext } from './budget.ts';
 import { atomic, preparedAtomic, withinBatchBytes, readonlyChecks, sql, readAtomic } from './database.ts';
-import { stored } from './jobs.ts';
+import { stored, storedReads } from './jobs.ts';
 import { changed, putRow, updateRows, ExpectedState } from './expected-state.ts';
 import { insertJsonRows } from './sets.ts';
 import { reversalState, policyHash, reportHash, reversalGuards } from './undo-state.ts';
@@ -33,6 +33,8 @@ export async function convertD1ReversalPolicy(id: string, context: D1ImportConte
     ...reversalGuards(id, { policy: 'preserve-conflicts', binding: record.policyHash, cursor: reports.length, hash: reportHash(reports), rows: reports, dispositions: previous, conversion: record }),
   ])];
   if (!withinBatchBytes(context, preparedAtomic(context, 'undo', statements))) throw unavailable('transport');
-  await atomic(context, 'undo', statements);
+  // Preserved reports and the conversion record add two reads to the original
+  // strict return path. Admit them before committing, never fail after publish.
+  await atomic(context, 'undo', statements, storedReads(job) + 2);
   return (await stored(id, { ...context, reversalPolicy: undefined }, 'undo')).job;
 }
