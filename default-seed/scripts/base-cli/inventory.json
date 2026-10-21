@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.77-dev.g8bb0165a",
+  "cliVersion": "0.2.77-dev.ge95c63a8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -939,7 +939,7 @@
     },
     "cli/portability-migrations.mjs": {
       "source": "cli/portability-migrations.mjs",
-      "sha256": "b43c64b05e48a360151188f47d2af450d06c6e2933c5f81181ceb3221ba6f163"
+      "sha256": "3fa30852c5163c45842bacc7000439ae18d8367165898601e5c014e473b3a0b7"
     },
     "cli/portability-policy.mjs": {
       "source": "cli/portability-policy.mjs",
@@ -2751,7 +2751,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "9ece998ceed5db7f495a332b388c548d8e719c1265ef87923fa897a18b5bc34e"
+      "sha256": "bc9deb1e85a1d931cd826f9c432a919ffb548c1f73ec6ef7195e21f103aa90a3"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",

@@ -49,7 +49,9 @@ export async function nativeMigrationPreflight({root,db,binding='DB',platformMig
  insist(table!=='_rer_deploy_migrations','migration_ledger:runner',409);
  const files=await inventory(root,binding,declaration);
  try {
-  const applied=matchMigrationLedger(await destinationLedger(db),files,declaration);
+  const ledger=await destinationLedger(db),applied=matchMigrationLedger(ledger,files,declaration);
+  // Wrangler skips only literal filenames, not transfer aliases or hashes.
+  if(table==='d1_migrations')insist(ledger.every(row=>files.some(file=>file.name===row.name)),'migration_ledger:incompatible',409);
   if(table==='rer_migrations')for(const file of files)insist(applied.includes(file.name),'migration_ledger:unapplied',409);
  } catch(error) {
   // Ledger contents can contain private values. Report constant categories,

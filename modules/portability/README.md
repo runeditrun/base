@@ -172,10 +172,14 @@ Use the seed's actual binding, database and deployment prefix, with the same
 `platformMigrations` declaration on `localPortability`. Omit the declaration
 when none is needed. The helper reads this binding's `migrations_dir` in the
 root's `wrangler.jsonc` (default `migrations`) and hashes the original file
-bytes. It uses the transfer's `destinationLedger` and `matchMigrationLedger`,
-including declared aliases and data-only entries. It does not split or execute
-the migration SQL. Pass the real target's D1-compatible binding; inspection of
-another database or persistence directory cannot authorize this apply. Keep
+bytes. It uses the transfer's `destinationLedger` and `matchMigrationLedger`.
+Platform history and archive transfer retain declared aliases, hash identities
+and data-only entries. Native history additionally requires every recorded name
+to equal a checkout filename: Wrangler skips files by literal name, so an alias,
+hash-only relocation or unmapped data-only row cannot authorize native apply.
+It does not split or execute the migration SQL. Pass the real target's
+D1-compatible binding; inspection of another database or persistence directory
+cannot authorize this apply. Keep
 destination writers stopped and hold the adapter's normal operation lock
 through inspection, apply and transfer. This local example authorizes no remote
 provider operation.
@@ -183,7 +187,8 @@ provider operation.
 | Existing history | Result before native apply |
 | --- | --- |
 | No migration ledger | `{nativeApply:true}`; ordinary fresh Wrangler setup. |
-| Compatible `d1_migrations`, every recorded row matching a checkout file | `{nativeApply:true}`; Wrangler may apply its pending files. Plain Wrangler names remain supported; tracked history uses its hashes and applied states. |
+| Compatible `d1_migrations`, every recorded name exactly equal to its checkout filename | `{nativeApply:true}`; Wrangler may apply its pending files. Plain Wrangler names remain supported; tracked history must also match hashes and applied states. |
+| Native alias-only or hash-only relocation, or an unmapped native data-only row | `migration_ledger:incompatible`; restore the matching checkout or reconcile through the owning runner before native apply. |
 | Sole, fully applied matching `rer_migrations` | `{nativeApply:false}`; preserve Platform's ledger and skip Wrangler. |
 | Any pending checkout file with Platform history | `migration_ledger:unapplied`; apply it through the owning runner first. |
 | Multiple ledgers, even empty | `migration_ledger:multiple`; reconcile history through its owning runner. |
