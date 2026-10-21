@@ -388,6 +388,23 @@ ownership/dependency snapshots; retained edits keep their original attribution.
 See [D1 evolution 0001 and adoption instructions](./src/d1/README.md#adopting-preserved-conflict-undo-evolution-0001)
 before updating a deployed D1 schema or adapter.
 
+Existing strict D1 jobs switch policy only through the public reviewed
+`previewD1PreservedUndo` / `convertD1ReversalPolicy` flow. Eligible jobs are
+`completed` or `undoing`; conversion checks current undo authority, the job's
+binding and the exact reviewed snapshot, then atomically appends its conversion
+record and journal evidence with the new policy binding. It leaves provenance,
+originals, claims and history unchanged. See the
+[conversion decision table and migration requirements](./src/d1/README.md#reviewed-conversion-of-existing-strict-jobs).
+Use `readD1ImportUndoReport().outcome` (`pending`, `undone` or `compensated`) for
+the product result: the engine's terminal `job.state` remains `undone`, including
+compensated work.
+
+Current rer 0.2.77 lacks these APIs. Adoption requires a reviewed vendored Base
+revision containing them or a future rer release that supplies them, the additive
+conversion migration, a complete native adapter and proof through the seed's own
+public door. Updating Base alone does not adopt or release the capability in a
+seed.
+
 ### Erasing fields in retained shared records
 
 Use `retireD1ImportCustody` from `src/d1/index.ts` to erase a person and journal

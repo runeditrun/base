@@ -29,7 +29,7 @@ const inline = "json_valid(plan_json) AND json_type(plan_json,'$.d1Plan') IS NUL
  * it is not valid JSON, or where a preserved job's reversal report reads every entry. */
 export async function ownerHeads(db: D1Database, ids: string[]): Promise<any[]> {
   const rows: any[] = [];
-  for (const chunk of jsonChunks([...new Set(ids)])) rows.push(...(await db.prepare(`SELECT id,destination,namespace,mapping_version,principal_id,fingerprint,state,checkpoint,total,reversal_policy,reversal_policy_hash,reversal_cursor,reversal_hash,
+  for (const chunk of jsonChunks([...new Set(ids)])) rows.push(...(await db.prepare(`SELECT id,destination,namespace,mapping_version,principal_id,fingerprint,state,checkpoint,total,reversal_policy,reversal_policy_hash,reversal_cursor,reversal_hash,reversal_conversion_hash,
     CASE WHEN ${inline} AND NOT (reversal_policy='preserve-conflicts' AND reversal_cursor<>0) THEN NULL ELSE plan_json END AS plan_json,
     CASE WHEN ${inline} THEN json_extract(plan_json,'$.version','$.destination','$.namespace','$.mappingVersion','$.principalId','$.fingerprint') END AS header,
     CASE WHEN ${inline} THEN json_array_length(plan_json,'$.entries') END AS entries,
