@@ -42,7 +42,8 @@ export function createSearchWorker({ corpusHash, endpoint = '/docs/search', inde
         const key = new Request(new URL(`/.rer/docs-search-cache/${corpusHash}/${await digest(JSON.stringify([model, pooling, query]))}`, url.origin));
         // Cache API is location-local and evictable. Single-flight below is only
         // isolate-local; neither mechanism is an account-wide accounting system.
-        const cache = caches.default;
+        // The DOM type omits the Workers default Cache API extension.
+        const cache = (caches as CacheStorage & { default: Cache }).default;
         const cached = await cache.match(key);
         if (cached) return json(await cached.json());
         let work = pending.get(key.url);

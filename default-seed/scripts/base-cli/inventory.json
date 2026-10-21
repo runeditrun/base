@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.76-dev.g4f074888",
+  "cliVersion": "0.2.76-dev.g14cedd4d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3055,7 +3055,7 @@
     },
     "modules/site/docs-search/worker.ts": {
       "source": "modules/site/docs-search/worker.ts",
-      "sha256": "3e271f46eb486161bf3f134f36b66c4e1afa6f65145cb738d8c7f1e7c02e831b"
+      "sha256": "0c0612ce1c3c624844d4237a6d9cfc359f953ce02275d4173976ef3c9815b3c3"
     },
     "operations/README.md": {
       "source": "operations/README.md",
