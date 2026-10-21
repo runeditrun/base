@@ -30,6 +30,7 @@ export async function preparePreservedPreview(id: string, context: D1ImportConte
   // Undo authority, including its approval predicates, with no assertion writes.
   await readAtomic(context, [], undefined, 'undo');
   const current = await stored(id, context, 'undo'), { job, plan } = current, state = reversalState(job);
+  if (state.conversionHash === undefined || !await context.storage.database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ik_d1_policy_conversions'").first()) throw unavailable('schema');
   if (!['completed','undoing'].includes(job.state)) throw unavailable('state');
   if (!context.storage.targets.preparePreservedUndo) throw unavailable('unfenceable');
   const guards: D1Sql[] = [...boundary(job, plan, 'undo'), ...custodyGuards(plan, id)];

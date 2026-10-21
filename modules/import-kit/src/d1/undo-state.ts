@@ -12,7 +12,7 @@ import { erasedDisposition, redactedEvidenceMatches } from './erasure-dispositio
 
 export const EMPTY_REVERSAL_HASH = sha256('[]');
 export const policyHash = (id: string, fingerprint: string, selected: D1ReversalPolicy) => sha256(canonicalJson([id, fingerprint, selected, 'reversal-policy-v1']));
-export interface ReversalState { policy: D1ReversalPolicy; binding: string | null; cursor: number; hash: string; rows: any[]; dispositions: D1UndoDisposition[]; conversion?: D1ReversalPolicyConversion }
+export interface ReversalState { policy: D1ReversalPolicy; binding: string | null; cursor: number; hash: string; rows: any[]; dispositions: D1UndoDisposition[]; conversion?: D1ReversalPolicyConversion; conversionHash?: string | null }
 const states = new WeakMap<ImportJob, ReversalState>();
 export function policy(context: Pick<D1ImportContext, 'reversalPolicy'>): D1ReversalPolicy {
   const value = context.reversalPolicy ?? 'strict';
@@ -36,7 +36,7 @@ export async function loadReversalState(raw: any, plan: ImportPlan, context: D1I
   const conversion = await loadConversion(raw, context);
   if (selected === 'strict') {
     if (cursor !== 0 || hash !== EMPTY_REVERSAL_HASH || snapshot?.tables.has('ik_d1_reversal_reports') && snapshot.rows('ik_d1_reversal_reports','job_id',[raw.id]).length !== 0) throw new Error('IMPORT_REVERSAL_INTEGRITY');
-    return { policy: selected, binding, cursor, hash, rows: [], dispositions: [] };
+    return { policy: selected, binding, cursor, hash, rows: [], dispositions: [], conversionHash: raw.reversal_conversion_hash };
   }
   const results=reports??(snapshot?.tables.has('ik_d1_reversal_reports')?snapshot.rows('ik_d1_reversal_reports','job_id',[raw.id]).sort((a,b)=>a.position-b.position):(await context.storage.database.prepare('SELECT r.*,p.reversed AS native_reversed FROM ik_d1_reversal_reports r LEFT JOIN ik_provenance p ON p.id=r.effect_id AND p.job_id=r.job_id WHERE r.job_id=? ORDER BY r.position').bind(raw.id).all()).results);
   if (results.length !== cursor || reportHash(results) !== hash) throw new Error('IMPORT_REVERSAL_INTEGRITY');
@@ -54,7 +54,7 @@ export async function loadReversalState(raw: any, plan: ImportPlan, context: D1I
     return d;
   });
   if (!['undoing','undone','rolling_back','rolled_back'].includes(raw.state) && cursor !== 0) throw new Error('IMPORT_REVERSAL_INTEGRITY');
-  return { policy: selected, binding, cursor, hash, rows: results, dispositions, ...(conversion ? { conversion } : {}) };
+  return { policy: selected, binding, cursor, hash, rows: results, dispositions, conversionHash: raw.reversal_conversion_hash, ...(conversion ? { conversion } : {}) };
 }
 export function attachReversal(job: ImportJob, state: ReversalState): void { states.set(job, state); }
 export function reversalState(job: ImportJob): ReversalState {
@@ -63,7 +63,7 @@ export function reversalState(job: ImportJob): ReversalState {
   return state;
 }
 export function reversalGuards(id: string, state: ReversalState): D1Sql[] {
-  return [...conversionGuards(id, state.conversion), guard(sql('EXISTS(SELECT 1 FROM ik_jobs WHERE id=? AND reversal_policy=? AND reversal_policy_hash IS ? AND reversal_cursor=? AND reversal_hash=?)', id, state.policy, state.binding, state.cursor, state.hash)),
+  return [...(state.conversionHash !== undefined || state.conversion ? conversionGuards(id, state.conversion) : []), guard(sql('EXISTS(SELECT 1 FROM ik_jobs WHERE id=? AND reversal_policy=? AND reversal_policy_hash IS ? AND reversal_cursor=? AND reversal_hash=?)', id, state.policy, state.binding, state.cursor, state.hash)),
     ...exactRows('ik_d1_reversal_reports', ['job_id','effect_id','position','record_json'], state.rows, sql('job_id=?', id), undefined, undefined, {key:'job_id',values:[id]}),
     // Every disposition still requires its exact native provenance state. One
     // JSON snapshot per byte-bounded chunk avoids a three-bind predicate for

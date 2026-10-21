@@ -924,6 +924,10 @@ Existing installations must apply `d1ReversalPolicyConversionSchema` after the
 existing D1 schemas in a new product-owned numbered migration before using
 these operations. `initializeD1ImportStorage` installs it automatically. The
 earlier preserved-undo evolution alone does not install conversion storage.
+Existing plan/apply/read/undo calls continue to work on that earlier schema;
+the new conversion and preview operations refuse with the `schema` reason until
+their additive migration is installed. Updating kit source does not silently
+adopt conversion or require an edit to an existing seed migration.
 
 Current rer 0.2.77 lacks this API. A seed adopts a reviewed vendored Base revision
 containing the capability, or a future rer release that supplies it, and proves
