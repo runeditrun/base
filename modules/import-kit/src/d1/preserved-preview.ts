@@ -15,8 +15,11 @@ import { exactRows } from './sets.ts';
 import { sql } from './database.ts';
 
 export class D1ReversalPolicyConversionError extends Error {
-  constructor(public readonly code: 'IMPORT_CONVERSION_UNAVAILABLE' | 'IMPORT_CONVERSION_REVIEW_CHANGED' | 'IMPORT_CONVERSION_ALREADY_CONVERTED', public readonly reason: string) {
+  readonly code: 'IMPORT_CONVERSION_UNAVAILABLE' | 'IMPORT_CONVERSION_REVIEW_CHANGED' | 'IMPORT_CONVERSION_ALREADY_CONVERTED';
+  readonly reason: string;
+  constructor(code: D1ReversalPolicyConversionError['code'], reason: string) {
     super(`${code}: ${reason}`); this.name = 'D1ReversalPolicyConversionError';
+    this.code = code; this.reason = reason;
   }
 }
 export const unavailable = (reason: string) => new D1ReversalPolicyConversionError('IMPORT_CONVERSION_UNAVAILABLE', reason);

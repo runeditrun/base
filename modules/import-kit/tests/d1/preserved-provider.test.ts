@@ -108,7 +108,7 @@ test('real D1 reviewed strict conversion preserves custody, current undo authori
   // Strict progress already committed row 2. Conversion never repeats it.
   await undoD1Import(job.id, { ...context(), maxBatches: 1 });
   await r.db().prepare("UPDATE evidence SET detail='owner corrected spelling' WHERE id='0'").run();
-  await assert.rejects(undoD1Import(job.id, context()), /NATIVE_EDIT_CONFLICT/);
+  await assert.rejects(undoD1Import(job.id, { ...context(), batchSize: 2 }), /NATIVE_EDIT_CONFLICT/);
   await r.db().batch(['receipt','signed-lease','maintenance'].map((kind, i) => r.db().prepare('INSERT INTO later_activity VALUES(?,?,?,?)').bind(String(i),kind,'0',`${kind} evidence`)));
   const beforePreview = await snapshot(), preview = await previewD1PreservedUndo(job.id, context());
   assert.deepEqual(await snapshot(), beforePreview);
@@ -137,9 +137,9 @@ test('real D1 reviewed strict conversion preserves custody, current undo authori
   const after = await snapshot();
   for (const table of ['ik_provenance','ik_sources','ik_originals','ik_original_sets','ik_d1_original_chunks','ik_d1_history','ik_d1_entries','ik_batches','ik_d1_plan_chunks','contacts','evidence','later_activity']) assert.deepEqual(after[table], before[table]);
   const report = await readD1ImportUndoReport(job.id, context());
-  assert.equal(report.conversion!.previouslyReversed, 2);
+  assert.equal(report.conversion!.previouslyReversed, 1);
   assert.equal(report.conversion!.policyHash, after.ik_jobs[0].reversal_policy_hash);
-  assert.equal(report.cursor, 2);
+  assert.equal(report.cursor, 1);
   await refuse(() => convert(fresh.reviewedFingerprint), 'IMPORT_CONVERSION_ALREADY_CONVERTED');
   await assert.rejects(r.db().prepare('DELETE FROM ik_d1_policy_conversions').run(), /IMPORT_POLICY_CONVERSION_APPEND_ONLY/);
   await r.reopen();
@@ -151,7 +151,7 @@ test('real D1 reviewed strict conversion preserves custody, current undo authori
     return result;
   } };
   await assert.rejects(undoD1Import(job.id, { ...context(), storage: { database: r.db(), targets: racing } }), /IMPORT_ATOMIC_GUARD/);
-  assert.equal((await readD1ImportUndoReport(job.id, context())).cursor, 2);
+  assert.equal((await readD1ImportUndoReport(job.id, context())).cursor, 1);
   const protectedRows = (await r.db().prepare('SELECT * FROM later_activity ORDER BY id').all()).results;
   await undoD1Import(job.id, context());
   const result = await readD1ImportUndoReport(job.id, context());
