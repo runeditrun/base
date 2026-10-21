@@ -111,7 +111,7 @@ test('registered seed receives only a whole signed scope, byte exact, independen
   t.mock.method(console, 'warn', () => {});
   let targetStatus = 204, legacyStatus = 204, dnsAddress = '104.16.1.1', dnsFailure = false;
   let seedCalls = 0, legacyCalls = 0;
-  const legacyProducts: string[][] = [];
+  let r1Forwards: { url: string; body: string; headers: Headers }[] | undefined;
   let expectedBody = new Uint8Array(), expectedHeaders = new Headers();
   for (const method of ['resolve4', 'resolve6'] as const) {
     t.mock.method(dns, method, async () => {
@@ -136,11 +136,13 @@ test('registered seed receives only a whole signed scope, byte exact, independen
       return new Response(null, { status: targetStatus, headers: targetStatus === 302 ? { location: 'http://127.0.0.1/private' } : {} });
     }
     legacyCalls++;
-    const product = url === 'https://orbit.example/events' ? 'orbit' : 'lamp';
-    assert.equal(url, `https://${product}.example/events`);
-    legacyProducts.push(JSON.parse(String(init.body)).map((event: { rer_product: string }) => event.rer_product));
-    assert.equal(await verifyRelayRequest({ secret: (product === 'lamp' ? 'l' : 'o').repeat(32), timestamp: headers.get('x-rer-mail-timestamp')!,
-      signature: headers.get('x-rer-mail-signature')!, rawBody: String(init.body) }), true);
+    if (r1Forwards) {
+      r1Forwards.push({ url, body: String(init.body), headers });
+    } else {
+      assert.equal(url, 'https://lamp.example/events');
+      assert.equal(await verifyRelayRequest({ secret: 'l'.repeat(32), timestamp: headers.get('x-rer-mail-timestamp')!,
+        signature: headers.get('x-rer-mail-signature')!, rawBody: String(init.body) }), true);
+    }
     return new Response(null, { status: legacyStatus });
   });
   async function send(events: object[], env = environment()) {
@@ -173,12 +175,26 @@ test('registered seed receives only a whole signed scope, byte exact, independen
   }
   assert.equal(counters.filter(counts => counts.mixedBatches).length, 3);
   // Equal seed/test markers do not authorize disclosure across products.
-  const beforeProducts = legacyProducts.length;
-  assert.equal((await send([event, { ...event, rer_product: 'orbit' }])).status, 204);
+  const partitions: { url: string; body: string; headers: Headers }[] = [];
+  r1Forwards = partitions;
+  try {
+    assert.equal((await send([event, { ...event, rer_product: 'orbit' }])).status, 204);
+  } finally { r1Forwards = undefined; }
   assert.equal(seedCalls, 5);
   assert.equal(counters.at(-1)!.mixedBatches, 1);
   assert.equal(counters.at(-1)!.delivered, 0);
-  assert.deepEqual(legacyProducts.slice(beforeProducts).sort((a, b) => a[0].localeCompare(b[0])), [['lamp'], ['orbit']]);
+  assert.equal(partitions.length, 2);
+  for (const [expectedEvent, expectedUrl, secret] of [
+    [event, 'https://lamp.example/events', 'l'.repeat(32)],
+    [{ ...event, rer_product: 'orbit' }, 'https://orbit.example/events', 'o'.repeat(32)],
+  ] as const) {
+    const partition = partitions.find(({ body }) => JSON.parse(body)[0]?.rer_product === expectedEvent.rer_product);
+    assert.ok(partition);
+    assert.equal(partition.url, expectedUrl);
+    assert.deepEqual(JSON.parse(partition.body), [expectedEvent]);
+    assert.equal(await verifyRelayRequest({ secret, timestamp: partition.headers.get('x-rer-mail-timestamp')!,
+      signature: partition.headers.get('x-rer-mail-signature')!, rawBody: partition.body }), true);
+  }
   assert.equal((await send([event], environment({ ...target, expiresAt: Date.now() - 1 }))).status, 204);
   assert.equal(counters.at(-1)!.expired, 1);
   for (const address of ['127.0.0.1', '10.0.0.1', '169.254.169.254', '::1', '::ffff:127.0.0.1', 'fd00::1', 'fe80::1']) {
