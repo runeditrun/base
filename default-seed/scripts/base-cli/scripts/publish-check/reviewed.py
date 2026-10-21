@@ -26,8 +26,10 @@ def load_reviewed(data):
     result = {}
     for entry in document['findings']:
         fields = {'rule', 'path', 'blob', 'reason', 'reviewer', 'date'}
-        if not isinstance(entry, dict) or set(entry) not in (fields, fields | {'fixtureValuesSha256'}, fields | {'containedFixtures'}) or entry['rule'] not in RULES | SECRET_RULES | FORBIDDEN | {'license.holder'}:
+        if not isinstance(entry, dict) or set(entry) not in (fields, fields | {'fixtureValuesSha256'}, fields | {'containedFixtures'}):
             raise ValueError('invalid reviewed entry')
+        if entry['rule'] not in RULES | SECRET_RULES | FORBIDDEN | {'license.holder'}:
+            raise ValueError(f"rule {entry['rule']} is non-reviewable; see scripts/publish-check-README.md#reviewed-findings for remediation")
         if not all(isinstance(entry[k], str) and entry[k].strip() for k in fields):
             raise ValueError('invalid reviewed entry')
         if not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', entry['blob']):

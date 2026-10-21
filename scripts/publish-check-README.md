@@ -143,10 +143,40 @@ in selected `PUBLISH-EXCEPTIONS.json` or Base's `license-exceptions.json`, bound
 to the exact licence bytes with `rule`, `path`, `holder`, `date`, `sha256`, and
 `reason`. This checks publication policy, not legal validity.
 
+## Reviewed findings
+
 A selected `.publish-check/reviewed.json` may contain exact rule/path/blob
-identities with `reason`, `reviewer` and `date` for hygiene and licence-holder
-findings. Provider tokens, known environment values and missing licences cannot be
-waived. Generic scanner findings may be reviewed by exact rule/path/blob identity. Historical binary metadata decoders and contained-fixture inspection are
+identities with nonempty `reason`, `reviewer` and `date` for only these reviewable
+rules:
+
+- Hygiene: `hygiene.local-path`, `hygiene.github-private`,
+  `hygiene.github-missing`, `hygiene.email`, `hygiene.internal-reference`.
+- Generic Gitleaks findings: `secret.assignment`, `secret.private-key`,
+  `secret.jwt`, `secret.url-credentials`, `secret.authorization`,
+  `secret.shaped-file`.
+- Licence holder: `license.holder`.
+
+SEC-3 credential assignments are **non-reviewable**, even for a verified
+synthetic test constant and an exact matching rule/path/blob identity. Other
+credential-class rules outside the list above are also non-reviewable; there is
+no blanket credential waiver. Provider tokens (`secret.provider-token`), known
+environment values (`secret.env-match`) and missing licences (`license.missing`)
+cannot be waived. Their review records are parsed for compatibility, but a
+matching finding stays blocking and adds `reviewed.forbidden`. Any rule outside
+the accepted review schema, including SEC-3, rejects the review document and
+makes the scan `scan.configuration-incomplete`.
+
+First establish whether a flagged value is a credential. Remove and rotate real
+credentials. For a verified synthetic constant, rewrite the constant so it no
+longer matches, using the leading fixture/test/example marker semantics described
+above, then rescan. Changing the working file does not clear historical findings:
+re-author an unpublished commit to remove the matching literal, or use the
+approved clean-history publication path (`rer release --clean-history`) when
+retaining private history. Do not add a SEC-3 review record to bypass the finding.
+
+## Coverage limits
+
+Historical binary metadata decoders and contained-fixture inspection are
 removed, along with screenshot and file-size policy. Existing contained-fixture
 review fields are accepted for command compatibility without decoding them. Compressed archives,
 compressed PNG text, other image metadata, C2PA, CBOR, COSE, JUMBF and exotic Git

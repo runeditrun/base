@@ -3271,7 +3271,7 @@
     },
     "scripts/publish-check/reviewed.py": {
       "source": "scripts/publish-check/reviewed.py",
-      "sha256": "fb6676f8eff7098da50ccf165366305fb08afc5e24c6b733425c4ad3cb8de28e"
+      "sha256": "8be85ae1ff3deeeb7f34b7fffc2e5bf4c191e2b1443d0061e2a5083895324564"
     },
     "scripts/publish-check/scan_timings.py": {
       "source": "scripts/publish-check/scan_timings.py",
