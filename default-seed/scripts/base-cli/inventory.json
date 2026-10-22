@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.78-dev.g057408c5",
+  "cliVersion": "0.2.78-dev.ge1fcf74e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1115,7 +1115,7 @@
     },
     "cli/upstream-agent.mjs": {
       "source": "cli/upstream-agent.mjs",
-      "sha256": "3762acb0177c07682a991f4793091a2e1efe95709bbd7dd0ffec25bf9cd16b10"
+      "sha256": "dc2b22e01c2969ebe11040cd274d454c5c6b37b2d0177641287e44c9e1809820"
     },
     "cli/version.mjs": {
       "source": "cli/version.mjs",
