@@ -22,6 +22,7 @@ export async function exportProducer({root = process.cwd(), config, output = 'sc
       if (name.startsWith('generators/')) await mkdir(join(destination.directory,'generators'), {recursive:true});
       let bytes = await readFile(join(source,name));
       if (name === 'ai.mjs') bytes = Buffer.from(bytes.toString('utf8').replace("from '../ai/native/policy.mjs'", "from './ai-policy.mjs'"));
+      if (bytes.includes("from '../ai/native/names.mjs'")) bytes = Buffer.from(bytes.toString('utf8').replace("from '../ai/native/names.mjs'", "from './ai-names.mjs'"));
       if (name === 'setup-manifest.mjs') {
         const portable = bytes.toString('utf8')
           .replace("from '../../schema/setup-validation.mjs'", "from './schema/setup-validation.mjs'")
@@ -33,6 +34,7 @@ export async function exportProducer({root = process.cwd(), config, output = 'sc
     const aiRoot = fileURLToPath(new URL('../ai/', import.meta.url));
     await writeFile(join(destination.directory,'ai-policy.mjs'), (await readFile(join(aiRoot,'native/policy.mjs'),'utf8')).replace("from '../errors.mjs'", "from './ai-errors.mjs'"), {flag:'wx'});
     await writeFile(join(destination.directory,'ai-errors.mjs'), await readFile(join(aiRoot,'errors.mjs')), {flag:'wx'});
+    await writeFile(join(destination.directory,'ai-names.mjs'), await readFile(join(aiRoot,'native/names.mjs')), {flag:'wx'});
     await mkdir(join(destination.directory,'schema'), {recursive:true});
     for (const name of schemaFiles) await writeFile(join(destination.directory,'schema',name), await readFile(join(schemaSource,name)), {flag:'wx'});
     await writeFile(destination.manifest, `${JSON.stringify(config,null,2)}\n`, {flag:'wx'});
