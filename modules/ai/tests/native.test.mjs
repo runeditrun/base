@@ -12,10 +12,12 @@ test('reference app requires current owner, same origin and trusted declaration 
   const response=await post(r,options.body??text('unauthorized'),options);assert.ok(response.status>=400);assert.match(response.headers.get('cache-control'),/no-store/);
  }
  assert.equal(r.hits.length,0);
- await (await r.db).prepare("UPDATE oa_operators SET role='member'").run();
- assert.equal((await post(r,text('member'))).status,403);
- await (await r.db).prepare("UPDATE oa_operators SET role='owner'").run();
- await (await r.db).prepare('UPDATE oa_sessions SET revoked_at=?').bind(Date.now()).run();
+ assert.equal((await r.call('/auth/invite',{cookie:r.cookie,body:{email:'member@example.test',displayName:'Synthetic Member',role:'member'}})).status,202);
+ const token=new URL(r.mails.at(-1).text.match(/https?:\/\/\S+/)[0]).searchParams.get('token');
+ const joined=await r.call('/auth/confirm',{body:{token}});assert.equal(joined.status,303);
+ const member=joined.headers.get('set-cookie').split(';')[0];
+ assert.equal((await post(r,text('member'),{cookie:member})).status,403);
+ assert.equal((await r.call('/auth/signout',{cookie:r.cookie,body:{}})).status,204);
  assert.equal((await post(r,image('revoked'))).status,403);
  assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie})).status,403);
  assert.equal(r.hits.length,0);

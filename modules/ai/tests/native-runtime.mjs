@@ -19,9 +19,10 @@ export function samplePng(width = 1, height = 1) {
 }
 export async function nativeRuntime(t,{request=declaration,policy=authority,provider,bindings={}}={}) {
  const folder=await mkdtemp(join(tmpdir(),'rer-ai-native-'));
- const hits=[];let publicBucket=false;
- const env={AUTH_ORIGIN:bindings.AUTH_LOCAL === 'true' ? 'http://127.0.0.1:8787' : 'https://reference.test',OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-session-secret-for-native-ai-tests-0001',SETUP_TOKEN:'synthetic-setup-token-for-native-ai-tests-0001',INSTALLATION_KEY:'a'.repeat(64),RER_AI_REQUEST:JSON.stringify(request),RER_AI_AUTHORITY:JSON.stringify(policy),RER_AI_ACCOUNT_ID:'a'.repeat(32),RER_AI_BUCKET_NAME:'synthetic-ai-images',RER_AI_PRIVACY_TOKEN:'synthetic-privacy-token',...bindings};
+ const hits=[],mails=[];let publicBucket=false;
+ const env={AUTH_ORIGIN:bindings.AUTH_LOCAL === 'true' ? 'http://127.0.0.1:8787' : 'https://reference.test',OWNER_EMAIL:'owner@example.test',MAIL_PROVIDER:'resend',MAIL_FROM:'auth@example.test',MAIL_API_KEY:'synthetic-native-ai-mail-1',SESSION_SECRET:'synthetic-session-secret-for-native-ai-tests-0001',SETUP_TOKEN:'synthetic-setup-token-for-native-ai-tests-0001',INSTALLATION_KEY:'a'.repeat(64),RER_AI_REQUEST:JSON.stringify(request),RER_AI_AUTHORITY:JSON.stringify(policy),RER_AI_ACCOUNT_ID:'a'.repeat(32),RER_AI_BUCKET_NAME:'synthetic-ai-images',RER_AI_PRIVACY_TOKEN:'synthetic-privacy-token',...bindings};
  const init=()=>new Miniflare({...convertV4MiniflareOptions({modules:true,script:built.outputFiles[0].text,compatibilityDate:'2026-09-08',bindings:env,d1Databases:{DB:'ai-auth'},r2Buckets:{AI_IMAGES:'ai-images'},durableObjects:{AI_BUDGET:{className:'AiAuthority',useSQLite:true}},outboundService:async request=>{
+  if(request.url==='https://api.resend.com/emails'){mails.push(await request.json());return Response.json({id:'synthetic-native-ai-mail-1'});}
   if(request.url.startsWith('https://api.cloudflare.com/'))return Response.json({success:true,result:request.url.endsWith('/managed')?{enabled:publicBucket}:{domains:[]}});
   if(request.url==='https://provider.test/infer'){
    const body=await request.json();hits.push(body);
@@ -39,5 +40,5 @@ export async function nativeRuntime(t,{request=declaration,policy=authority,prov
  const bootstrap=await call('/auth/bootstrap',{body:{token:env.SETUP_TOKEN,displayName:'Synthetic Owner'}});
  if(bootstrap.status!==303)throw Error(`Bootstrap failed ${bootstrap.status}: ${await bootstrap.text()}`);
  const cookie=bootstrap.headers.get('set-cookie').split(';')[0];
- return {call,cookie,hits,get db(){return mf.getD1Database('DB');},get bucket(){return mf.getR2Bucket('AI_IMAGES');},public(value){publicBucket=value;},async restart(change={}){await mf.dispose();Object.assign(env,change);mf=init();await mf.ready;},async status(){const r=await call('/api/ai',{cookie,body:{action:'status'}});return {status:r.status,...await r.json()};}};
+ return {call,cookie,hits,mails,get db(){return mf.getD1Database('DB');},get bucket(){return mf.getR2Bucket('AI_IMAGES');},public(value){publicBucket=value;},async restart(change={}){await mf.dispose();Object.assign(env,change);mf=init();await mf.ready;},async status(){const r=await call('/api/ai',{cookie,body:{action:'status'}});return {status:r.status,...await r.json()};}};
 }
