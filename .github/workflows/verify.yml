@@ -112,8 +112,11 @@ jobs:
           df -Pk "$GITHUB_WORKSPACE"
       - name: Install checkout prerequisites
         run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git
+          # This apt phase runs before checkout/cache restore; bound it too.
+          timeout --kill-after=10s 300s bash -ec '
+            apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update
+            DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends ca-certificates git
+          '
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
@@ -128,6 +131,18 @@ jobs:
           test ! -d default-seed/node_modules
           test ! -d "$HOME/.cache/ms-playwright"
           printf 'Clean Linux: no Node, pnpm, dependencies or browser cache before restore\n'
+      - name: Read the pinned Playwright version for the apt cache
+        id: apt-cache-inputs
+        run: |
+          version=$(sed -n 's/^readonly PLAYWRIGHT_VERSION=//p' scripts/agent-bootstrap.sh)
+          test -n "$version"
+          printf 'playwright=%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - name: Cache apt package archives
+        if: ${{ !inputs.clean_bootstrap }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ~/.cache/rer-apt/archives
+          key: base-apt-ubuntu24-${{ runner.arch }}-playwright-${{ steps.apt-cache-inputs.outputs.playwright }}-${{ hashFiles('scripts/agent-bootstrap.sh') }}
       - name: Cache shared pnpm store and Playwright browsers
         if: ${{ !inputs.clean_bootstrap }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684

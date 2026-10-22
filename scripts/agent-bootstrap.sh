@@ -37,11 +37,36 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 readonly repo_root
 cd "$repo_root"
 
-"${root[@]}" apt-get update
-"${root[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  ca-certificates curl git libatomic1 python3 tar unzip
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
+# Keep archives outside Docker's /var/cache/apt cleanup hook. The workflow
+# restores this directory only after recording the clean-container preconditions.
+readonly apt_archives="$HOME/.cache/rer-apt/archives"
+mkdir -p "$apt_archives"
+readonly apt_config="$scratch/apt.conf"
+cat > "$apt_config" <<APT
+Dir::Cache::archives "$apt_archives";
+APT::Keep-Downloaded-Packages "true";
+Acquire::Retries "2";
+Acquire::http::Timeout "30";
+Acquire::https::Timeout "30";
+APT
+apt_phase() {
+  local label=$1 status
+  shift
+  printf 'Bootstrap apt: %s (five-minute deadline)\n' "$label"
+  if "${root[@]}" env APT_CONFIG="$apt_config" timeout --kill-after=10s 300s "$@"; then
+    printf 'Bootstrap apt: %s complete\n' "$label"
+  else
+    status=$?
+    fail "apt phase '$label' failed (exit $status; deadline 300s). Inspect the apt download log before rerunning."
+  fi
+}
+apt_phase 'toolchain packages' bash -c '
+  apt-get update &&
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates curl git libatomic1 python3 tar unzip
+'
 "${root[@]}" env GITLEAKS_INSTALL_DIR="$BIN_DIR" bash "$repo_root/scripts/install-gitleaks.sh"
 if [[ ! -x "$node_home/bin/node" ]] || [[ $("$node_home/bin/node" --version) != "v${NODE_VERSION}" ]]; then
   archive="node-v${NODE_VERSION}-linux-${arch}.tar.gz"
@@ -70,7 +95,11 @@ hash -r
 pnpm --config.only-built-dependencies=esbuild --config.only-built-dependencies=workerd \
   install --frozen-lockfile
 pnpm --dir modules/mail install --frozen-lockfile --ignore-workspace --ignore-scripts
-pnpm --dir default-seed exec playwright install --with-deps chromium
+# Bound apt separately from the browser download, while retaining every OS
+# dependency and the real browser/workerd probes below. Pass APT_CONFIG through
+# privilege elevation so Playwright's own apt-get uses the same archive cache.
+apt_phase 'Chromium OS dependencies' pnpm --dir default-seed exec playwright install-deps chromium
+pnpm --dir default-seed exec playwright install chromium
 
 # Resolve the actual locked Wrangler runtime and launch the actual Chromium.
 # These checks fail if an optional native binary or an OS library is missing.
