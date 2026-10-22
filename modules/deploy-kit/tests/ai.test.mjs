@@ -1,12 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {mkdir,mkdtemp,readFile,realpath,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {cloudflare,ownerTarget,ownerPlan,ownerDeploy,deploy} from '../index.mjs';
+import {cloudflare,ownerTarget,ownerPlan,ownerDeploy,ownerHealth,deploy} from '../index.mjs';
+import {main} from '../owner-cli.mjs';
 import {hash} from '../validation.mjs';
 import {renderConfig,verifyBindings} from '../render.mjs';
 import {ownerProvider} from './owner-provider.mjs';
+import {checkImageVariables} from '../../container/image-variables.mjs';
+import {deployInputs} from '../../container/deploy-input.mjs';
+import {validateCandidateSpec} from '../../delivery-producer/spec.mjs';
 const model='@cf/qwen/qwen3.8-27b';
 const request={schema:1,provider:'cloudflare',transport:'native',binding:'AI',budgetBinding:'AI_BUDGET',imageBinding:'AI_IMAGES',textModels:[model],imageModels:[],purposes:[{id:'site-read',kind:'text',model}],limits:{calls:10,units:10000000,microUsd:10000000},operations:{textCalls:2,maxInputBytes:10000,maxOutputTokens:1024,imageUnits:0,timeoutMs:1000}};
 
@@ -81,4 +86,95 @@ test('both deployment doors bind approved payer and source before any provider o
   }
  }
  await assert.rejects(readFile(join(folder,'owner.json')),e=>e.code==='ENOENT');
+});
+
+test('reserved AI names on every channel and unpaired approval at every entry are refused before any write',async t=>{
+ const provider=ownerProvider();t.after(()=>provider.close());const api=cloudflare(provider);
+ const target=await ownerTarget(api,{project:'synthetic',environment:'production'});
+ const root=await realpath(await mkdtemp(join(tmpdir(),'native-ai-sweep-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const git=(...args)=>execFileSync('git',['-c','user.email=fixture@example.test','-c','user.name=Fixture','-c','commit.gpgsign=false',...args],{cwd:root,encoding:'utf8'}).trim();
+ for(const dir of ['dist/server','dist/client','migrations/core','cells'])await mkdir(join(root,dir),{recursive:true});
+ await writeFile(join(root,'.gitignore'),'dist/\n.rer/\ncells/\n');git('init','-q');git('add','.');git('commit','-qm','sweep');
+ const sha=git('rev-parse','HEAD'),{artifact:inert,declaration:declared,env:{RER_AI_AUTHORITY:approved}}=deploymentInputs(target);
+ const artifact={...inert,source:{sha,tree:git('rev-parse','HEAD^{tree}')}},approval=change=>JSON.stringify({...JSON.parse(approved),sourceSha:sha,...change});
+ await writeFile(join(root,'dist/server/index.js'),Buffer.from(inert.modules[0].base64,'base64'));
+ const env={CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token,RER_AI_AUTHORITY:approval(),RER_AI_PRIVACY_TOKEN:'synthetic-private-custody-token-1',SEED_CONFIG_0:'synthetic-seed-config'};
+ const {ai:_,...plain}={...declared,secrets:[]};
+ let cells=0;
+ const cli=async(command,declaration,extra=[],values=env)=>{
+  const file=`cells/${cells++}.json`;await writeFile(join(root,file),JSON.stringify(declaration));
+  await writeFile(join(root,'dist/server/wrangler.json'),JSON.stringify({main:'index.js',no_bundle:true,rules:[{type:'ESModule',globs:['**/*.js','**/*.mjs']}],...(declaration.ai?{ai:{binding:'AI'}}:{})}));
+  return main([command,'--declaration',file,'--environment','production',...extra],values,{fetch:provider.fetch,cwd:root,notice:()=>{}});
+ };
+ // The one legitimate path: declared ai, the owner's separate approval and the approved private token.
+ assert.equal((await cli('deploy',declared)).changed,true);assert.equal((await cli('health',declared)).ok,true);
+ const statePath=join(root,'.rer/deploy/production.json'),plans={plain:ownerPlan(target,plain,artifact),ai:ownerPlan(target,declared,artifact,{env})},results=[];
+ const refused=async(cell,run,code='ai_policy_conflict',{held=false}={})=>{
+  const bytes=await readFile(statePath),writes=provider.state.writes.length;
+  // Another run's lock: an entry that locked or settled before refusing would report owner-state-locked instead.
+  // Held secrets are read from the live Worker, which owner deploy does only under its own lock.
+  if(!held)await writeFile(statePath+'.lock','other-run\n');
+  let error;try{await run();}catch(e){error=e;}finally{if(!held)await rm(statePath+'.lock');}
+  assert.equal(error?.code,code,`${cell}: ${error?.code??error?.message}`);
+  assert.equal(provider.state.writes.length,writes,cell);assert.deepEqual(await readFile(statePath),bytes,cell);
+  results.push(`${cell}: ${code}${error.resource?` ${error.resource}`:''}`);
+ };
+ const seeded={'seed variable':{...plain,vars:{RER_AI_AUTHORITY:approval()}},'origin variable':{...plain,originVar:'RER_AI_REQUEST'},
+  'public origin setting':{...plain,originVar:'APP_ORIGIN',publicOriginSetting:'RER_AI_AUTHORITY'},
+  'secret binding':{...plain,secrets:[{binding:'RER_AI_AUTHORITY',environment:'SEED_CONFIG_0'}]},'secret source':{...plain,secrets:[{binding:'APP_TOKEN',environment:'RER_AI_PRIVACY_TOKEN'}]},
+  'private token without ai':{...plain,secrets:declared.secrets},
+  ...Object.fromEntries(['d1','r2','kv','queues'].map(kind=>[`${kind} binding`,{...plain,[kind]:[{binding:'RER_AI_RESOURCE'}]}])),
+  'Durable Object binding':{...plain,durableObjects:[{binding:'RER_AI_BUDGET',className:'AiAuthority',storage:'sqlite'}]},'service binding':{...plain,services:[{binding:'RER_AI_SERVICE',project:'upstream'}]},
+  'ai: seed policy variable':{...declared,vars:{RER_AI_ACCOUNT_ID:provider.accountId}},'ai: optional private token':{...declared,secrets:[{...declared.secrets[0],optional:true}]},
+  'ai: private token from another source':{...declared,secrets:[{binding:'RER_AI_PRIVACY_TOKEN',environment:'SEED_CONFIG_0'}]},'ai: native binding':{...declared,ai:{...declared.ai,binding:'RER_AI_NATIVE'}}};
+ for(const [channel,declaration] of Object.entries(seeded)){
+  await refused(`${channel} x ownerPlan`,()=>ownerPlan(target,declaration,artifact,{env}));
+  for(const command of ['deploy','dry-run','health'])await refused(`${channel} x CLI ${command}`,()=>cli(command,declaration));
+  // The secret entry reads only secrets: it runs where the reserved name is in that channel.
+  const secret=declaration.secrets.find(item=>/RER_AI_/.test(item.binding+item.environment)&&!(declaration.ai&&item===declared.secrets[0]));
+  if(secret)await refused(`${channel} x CLI secret --set`,()=>cli('secret',declaration,['--set',secret.binding]));
+ }
+ const supplied={'plan variable':{...plans.plain,vars:{RER_AI_AUTHORITY:approval()}},'plan secret binding':{...plans.plain,secrets:[{binding:'RER_AI_AUTHORITY',environment:'SEED_CONFIG_0'}]},
+  'plan secret source':{...plans.plain,secrets:[{binding:'APP_TOKEN',environment:'RER_AI_PRIVACY_TOKEN'}]},'plan resource binding':{...plans.plain,r2:[{binding:'RER_AI_RESOURCE',name:'synthetic-production-rer-ai-resource'}]},
+  'ai plan: extra variable':{...plans.ai,vars:{...plans.ai.vars,RER_AI_FUTURE:'synthetic'}},'ai plan: extra secret':{...plans.ai,secrets:[...plans.ai.secrets,{binding:'RER_AI_FUTURE',environment:'SEED_CONFIG_0'}]}};
+ const doors={ownerDeploy:(plan,paired=artifact)=>ownerDeploy({api,target,plan,artifact:paired,statePath,env}),deploy:(plan,paired=artifact)=>deploy({api,plan,artifact:paired,env}),ownerHealth:plan=>ownerHealth({api,target,plan,statePath})};
+ for(const [channel,plan] of Object.entries(supplied))for(const [door,run] of Object.entries(doors))await refused(`${channel} x ${door}`,()=>run(plan));
+ // Secrets the live Worker already holds: an upload inherits declared ones and keeps every other one.
+ provider.state.secrets.push({name:'RER_AI_FUTURE',value:'synthetic-held'});
+ for(const [door,run] of Object.entries(doors))await refused(`held secret x ${door}`,()=>run(plans.ai),undefined,{held:true});
+ for(const command of ['deploy','dry-run','health'])await refused(`held secret x CLI ${command}`,()=>cli(command,declared),undefined,{held:true});
+ await refused('held secret x CLI secret --set',()=>cli('secret',declared,['--set','RER_AI_PRIVACY_TOKEN']),undefined,{held:true});
+ provider.state.secrets=provider.state.secrets.filter(item=>item.name!=='RER_AI_FUTURE');
+ for(const door of ['ownerDeploy','deploy'])await refused(`held private token with ai off x ${door}`,()=>doors[door](plans.plain),undefined,{held:true});
+ for(const command of ['deploy','dry-run'])await refused(`held private token with ai off x CLI ${command}`,()=>cli(command,plain),undefined,{held:true});
+ // An interrupted secret change whose successor is ready to settle: no stale approval may settle it.
+ const saved=JSON.parse(await readFile(statePath));
+ saved.pendingSecret={bindings:['EXTRA'],present:true,versionId:saved.receipt.provider.versionId,names:provider.state.secrets.map(item=>item.name)};
+ await api.request(`/workers/scripts/${target.worker}/secrets`,{method:'PUT',body:{name:'EXTRA',text:'synthetic-extra-secret',type:'secret_text'}});await writeFile(statePath,JSON.stringify(saved));
+ for(const [cell,change] of Object.entries({'stale source approval':{sourceSha:'7'.repeat(40)},'approval for another payer':{accountId:'b'.repeat(32)}}))
+  for(const command of ['deploy','dry-run','health'])await refused(`${cell} x CLI ${command}`,()=>cli(command,declared,[],{...env,RER_AI_AUTHORITY:approval(change)}));
+ const moved={...artifact,source:{...artifact.source,sha:'7'.repeat(40)}},elsewhere={...target,accountId:'b'.repeat(32)};
+ const payer=ownerPlan(elsewhere,declared,artifact,{env:{...env,RER_AI_AUTHORITY:approval({accountId:elsewhere.accountId})}});
+ for(const door of ['ownerDeploy','deploy']){
+  await refused(`artifact paired with another source x ${door}`,()=>doors[door](plans.ai,moved),'ai-source-approval-mismatch');
+  await refused(`plan for another payer x ${door}`,()=>doors[door](payer),'ai-installation-account-mismatch');
+ }
+ await refused('approval for another deployment x ownerHealth',()=>doors.ownerHealth(ownerPlan(target,declared,moved,{env:{...env,RER_AI_AUTHORITY:approval({sourceSha:moved.source.sha})}})),'ai-source-approval-mismatch');
+ assert.equal((await cli('health',declared)).ok,true);assert.equal(JSON.parse(await readFile(statePath)).pendingSecret,undefined);
+ // Producers outside the owner kit bind names directly: container settings, built variables and packages.
+ await writeFile(join(root,'deploy.json'),JSON.stringify(plain));await writeFile(join(root,'cells/container.env'),'RER_AI_AUTHORITY={}\n',{mode:0o600});
+ await refused('setting x container deploy',()=>deployInputs({root,envFile:'cells/container.env'}));
+ await refused('built variable x container image and hosted demo build',()=>checkImageVariables(root,{RER_AI_REQUEST:'{}'},[]));
+ const spec={schema:1,resources:[],migrations:[],compatibilityDate:'2026-09-08',compatibilityFlags:[],durableObjects:[],durableObjectMigrations:[],publicVariables:{},secretNames:[],schedules:[],queueConsumers:[],healthPath:'/health',recovery:'none'};
+ validateCandidateSpec(spec);
+ for(const [cell,change] of Object.entries({'package variable':{publicVariables:{RER_AI_AUTHORITY:'{}'}},'package secret':{secretNames:['RER_AI_PRIVACY_TOKEN']},'package binding':{resources:[{kind:'r2',binding:'RER_AI_RESOURCE'}]},'package surface variable':{surfaces:{app:{path:'/',originVariable:'RER_AI_REQUEST'}}}}))
+  await refused(`${cell} x delivery package`,()=>validateCandidateSpec({...spec,...change}));
+ // Turning AI off: remove the token while it is declared, then deploy without ai. Lookalike names stay ordinary.
+ assert.equal((await cli('secret',declared,['--unset','RER_AI_PRIVACY_TOKEN'])).ok,true);
+ const lookalikes={AI_ENABLED:'false',rer_ai_authority:'synthetic-case-lookalike',APP_RER_AI_AUTHORITY:'synthetic-prefixed-lookalike'};
+ assert.equal((await cli('deploy',{...plain,vars:lookalikes})).changed,true);
+ const bound=provider.state.settings.bindings;
+ assert.ok(!bound.some(item=>item.name.startsWith('RER_AI_')||item.type==='ai'));
+ for(const [name,text] of Object.entries(lookalikes))assert.ok(bound.some(item=>item.name===name&&item.text===text));
+ t.diagnostic(results.join('\n'));
 });

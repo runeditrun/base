@@ -1,5 +1,6 @@
 import { validateAiDeclaration } from './ai.mjs';
 import {array, bindingPattern, keys, string, strings} from './bindings.mjs';
+import {refuseAiNames} from '../ai/native/names.mjs';
 
 const pathPattern = /^\/[A-Za-z0-9/_.~-]*$/;
 const signInPath = value => typeof value === 'string' && /^\/(?!\/)[a-zA-Z0-9/_-]*$/.test(value);
@@ -28,6 +29,7 @@ export function validateDeclarations(spec) {
       if (surface.signIn !== undefined && (name !== 'app' || !validSignIn(surface.signIn))) throw Error('Invalid project sign-in declaration');
       if (surface.hostnameVariable !== undefined && surface.originVariable !== undefined) throw Error('Surface must choose one address variable');
       for (const field of ['hostnameVariable','originVariable']) if (surface[field] !== undefined) string(surface[field], field, bindingPattern);
+      refuseAiNames({names:[surface.hostnameVariable, surface.originVariable]});
       if (surface.originVariable !== undefined) {
         const previous = origins.get(surface.originVariable);
         if (previous !== undefined) throw Error(`Duplicate originVariable ${surface.originVariable} on surfaces.${previous} and surfaces.${name}`);

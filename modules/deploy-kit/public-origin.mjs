@@ -1,10 +1,13 @@
 import { assert, identifier } from './validation.mjs';
+import { refuseAiNames } from '../ai/native/names.mjs';
 
 // This public setting changes only originVar, never the deployment target.
 export function publicOrigin(declaration, env = {}) {
   const setting = declaration.publicOriginSetting;
   if (setting === undefined) return undefined;
   assert(identifier(setting) && identifier(declaration.originVar), 'invalid-public-origin-setting');
+  // Installation authority is never read as a public setting nor written to the origin variable.
+  refuseAiNames({names:[setting,declaration.originVar]});
   const value = env[setting];
   if (value === undefined) return undefined;
   // Check the input as well as URL's result: URL normalizes away empty query,

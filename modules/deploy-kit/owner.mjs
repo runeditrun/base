@@ -431,8 +431,11 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
 /** Independent read-only health of the last owner deployment recorded in the state file. */
 export async function ownerHealth({api: provider, target, plan, statePath, fetch = globalThis.fetch, healthOptions = {}}) {
   const api = withSettledLists(withScopeHints(provider));
+  assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   validatePlan(plan); validateAiPlan(plan); assertOwnerNames(target, plan);
   const state = await readOwnerState(statePath, target);
   assert(state.receipt, 'missing-owner-receipt');
+  // Health reads the recorded deployment: an approval must be this account's and pair with its source.
+  validateAiDeployment(plan,api.accountId,state.receipt.source?.sha);
   return verifyHealth({...healthOptions, api, plan, receipt:state.receipt, fetch});
 }

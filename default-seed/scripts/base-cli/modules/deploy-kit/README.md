@@ -516,5 +516,9 @@ prices and held-proof records. Missing approval returns `ai_hosting_unproven`.
 The consumer derives the payer account/private-bucket name, requires the privacy
 secret, renders `type:ai`, and checks exact readback. A built undeclared raw AI
 binding, binding conflict, account mismatch or undeclared readback fails closed.
+No declaration, supplied plan, secret change or held secret may bind another
+`RER_AI_*` name (`ai_policy_conflict`). The owner CLI checks the current build's
+plan, approval, account and source before it takes the state lock or settles an
+earlier secret change; health also pairs the approval with the recorded deployment.
 Provider/account qualification remains held; no inference runs during deployment. See the [AI consumer candidate](../ai/native/README.md)
 for the policy/budget contract and separate provider/hosting qualification gates.

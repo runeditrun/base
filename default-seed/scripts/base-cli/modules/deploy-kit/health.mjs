@@ -8,6 +8,7 @@ import { reconcileResources, reconcileTriggers } from './resources.mjs';
 import { migrate } from './migrations.mjs';
 import { bindingsFor, verifyBindings } from './render.mjs';
 import { waitHealth } from './health-request.mjs';
+import { refuseAiNames } from '../ai/native/names.mjs';
 
 function healthError(message, code, lastResult) {
   const error = new Error(message); error.code = code; error.lastResult = lastResult; return error;
@@ -72,6 +73,7 @@ export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fe
     assert(!readiness?.window || readiness.window.remaining() > 0, 'missing-deployed-secret');
     const secrets = await api.request(`/workers/scripts/${plan.worker}/secrets`);
     assert(Array.isArray(secrets) && secrets.every(row => typeof row?.name === 'string' && row.type === 'secret_text'), 'invalid-secret-list');
+    refuseAiNames({ai:plan.ai !== undefined,held:secrets.map(row => row.name)});
     if (plan.secrets.every(x => x.optional || secrets.some(y => y.name === x.binding && y.type === 'secret_text'))) break;
     assert(readiness?.freshUpload && readiness.window?.remaining() > 0, 'missing-deployed-secret');
     await readiness.window.pause();

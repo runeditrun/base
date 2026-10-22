@@ -3,6 +3,7 @@ import { extname } from 'node:path';
 import { assert, hash, hexId, uuid } from './validation.mjs';
 import { moduleType, assetType } from './artifact.mjs';
 import { RUN_WORKER_FIRST } from './render.mjs';
+import { refuseAiNames } from '../ai/native/names.mjs';
 
 export async function activeWorker(api, worker) {
   let settings;
@@ -46,6 +47,8 @@ export async function secretBindings(api, worker, plan, env, exists) {
   const present = exists ? await api.request(`/workers/scripts/${worker}/secrets`) : [];
   assert(Array.isArray(present) && present.every(x => typeof x.name === 'string' && x.type === 'secret_text'),'invalid-secret-list');
   const bindings = []; const names = present.map(x => x.name);
+  // The upload inherits declared secrets and keeps every other one the Worker holds.
+  refuseAiNames({ai:plan.ai !== undefined,held:names});
   const supplied = item => typeof env[item.environment] === 'string' && env[item.environment].trim();
   // An optional secret neither held nor supplied stays unbound; the app treats it as not connected.
   const unset = plan.secrets.filter(item => item.optional && !names.includes(item.binding) && !supplied(item)).map(item => item.binding);

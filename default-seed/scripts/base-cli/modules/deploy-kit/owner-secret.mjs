@@ -6,6 +6,7 @@ import { waitHealth } from './health-request.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
 import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDeployment, refuse, recordSecretChange, settlePendingSecret } from './owner.mjs';
 import { uploadSecretCopy, deploySecretCopy } from './owner-secret-copy.mjs';
+import { refuseAiNames } from '../ai/native/names.mjs';
 
 /** Set (each `value` given) or remove Worker secrets of the owner's last deployment as one
  * new Worker version, then record that version in the state file, so the next deploy
@@ -39,6 +40,8 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
     const path = `/workers/scripts/${target.worker}/secrets`;
     const names = secretNames(await api.request(path));
     assert(names, 'invalid-secret-list');
+    // The new version keeps every other secret: it may hold no reserved name the deployed approval does not cover.
+    refuseAiNames({ai:state.receipt.config?.ai !== undefined,held:present ? [...names,...bindings] : names.filter(name => !bindings.includes(name))});
     // Removing secrets the Worker does not hold changes nothing; the rest of a removal still runs.
     const writes = present ? changes : changes.filter(change => names.includes(change.binding));
     const existed = writes.some(change => names.includes(change.binding)), changed = writes.length > 0, copy = writes.length > 1;

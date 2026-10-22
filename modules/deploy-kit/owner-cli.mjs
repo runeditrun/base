@@ -16,6 +16,8 @@ import { ownerSignin } from './owner-signin.mjs';
 import { ownerRekey } from './owner-rekey.mjs';
 import { refuseLocalModels } from './local-only.mjs';
 import { publicOrigin } from './public-origin.mjs';
+import { validateAiDeployment } from './ai.mjs';
+import { refuseAiNames } from '../ai/native/names.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
 const usage = 'usage: owner-cli.mjs deploy|dry-run|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
@@ -81,6 +83,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     ? {accountId:api.accountId,project:declaration.project,environment:values.environment,worker:ownerWorkerName(declaration.project,values.environment)}
     : await ownerTarget(api,{project:declaration.project,environment:values.environment});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${target.environment}.json`);
+  // The recorded installation must be this account's before any lock, settlement or change.
+  const recorded = await readOwnerState(statePath,target);
   if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
   if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice});
   if (command === 'secret') {
@@ -88,14 +92,28 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     const named = [...new Set(values.set ?? values.unset)], declared = Array.isArray(declaration.secrets) ? declaration.secrets : [];
     const undeclared = named.filter(binding => !declared.some(entry => entry?.binding === binding));
     if (undeclared.length) { const error = new Error('undeclared-secret'); error.resource = undeclared.map(binding => `secret:${binding}`).join(', '); throw error; }
+    // Setting binds a runtime name from its source; removing one never does.
+    if (values.set !== undefined) refuseAiNames({ai:declaration.ai !== undefined,secrets:named.map(binding => declared.find(entry => entry?.binding === binding))});
     const changes = named.map(binding => ({binding, value:values.set === undefined ? undefined : env[declared.find(entry => entry?.binding === binding).environment]}));
     return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
+  const unretired = ({retiredSecrets = []}) => retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
+  let plan;
+  if (['deploy','dry-run','health'].includes(command)) {
+    // The current build's plan and approval are checked before settlement, which locks and may write state.
+    artifact ??= await ownerArtifact(root,values.product,declaration.ai);
+    plan = ownerPlan(target,unretired(recorded),artifact,{localOnlyKeys,env});
+    validateAiDeployment(plan,api.accountId,artifact.source.sha);
+    // Health reads the recorded deployment, so the approval must pair with its source too.
+    if (command === 'health' && recorded.receipt) validateAiDeployment(plan,api.accountId,recorded.receipt.source?.sha);
+  }
   // A dry run only reads state: settling an interrupted change may write it.
-  const state = command === 'dry-run' ? await readOwnerState(statePath,target) : await settleOwnerState({api,target,statePath});
+  const state = command === 'dry-run' ? recorded : await settleOwnerState({api,target,statePath});
   if (command === 'dry-run') assert(!state.pendingSecret, 'secret-change-unsettled');
   const {retiredSecrets = []} = state;
+  // Settlement can retire or restore a declared secret; the plan follows the settled list.
+  if (plan && String(retiredSecrets) !== String(recorded.retiredSecrets ?? [])) plan = ownerPlan(target,unretired(state),artifact,{localOnlyKeys,env});
   if (command === 'record-owner') return withStateLock(statePath, async () => {
     const current = await readOwnerState(statePath, target);
     assert(current.receipt && !current.pendingUpload && !current.pendingSecret, 'missing-owner-receipt');
@@ -117,9 +135,6 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     // Native uploaders record their configured app origin with the deployment identity.
     return {ok:true, origin:state.receipt.origin ?? target.origin, versionId:live.versionId, retiredSecrets, ownerClaim:state.ownerClaim, liveSecrets:rows.map(row => row.name)};
   }
-  const current = retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
-  artifact ??= await ownerArtifact(root,values.product,declaration.ai);
-  const plan = ownerPlan(target,current,artifact,{localOnlyKeys,env});
   if (command === 'dry-run') {
     const checked = withScopeHints(api);
     const exists = await workerSettings(checked,target.worker) !== null;
@@ -136,7 +151,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   // Dispatch is the provider's: on some accounts a new Cron starts only at the account scheduler's next refresh.
   if (plan.crons.length) notice(cronNotice);
   // The fingerprint names every declared secret, retired ones too: an untouched repeat after the claim is a no-op.
-  const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env}).secrets;
+  const declaredSecrets = unretired(state) === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env}).secrets;
   const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness});
   requestWindow = window;
   const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {

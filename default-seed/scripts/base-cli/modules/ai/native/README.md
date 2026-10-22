@@ -70,6 +70,21 @@ owner-only deployment environment or private `--env-file`. Its installation is
 the derived Worker name (for example `lamp-production`), environment is
 `production`, and tenant is the server-owned installation tenant. Do not put
 `RER_AI_*` variables in seed-controlled `vars`; the consumer derives them.
+
+The whole `RER_AI_` namespace belongs to installation authority. Without an
+`ai` declaration no channel may bind one of these names: variables, the origin
+variable or its public setting, secret bindings or the environment names they
+are read from, resource, service and native bindings, or secrets the live
+Worker already holds (an upload inherits declared secrets and keeps every
+other one). With approved `ai`, deployment derives the four policy variables
+and binds only the approved `RER_AI_PRIVACY_TOKEN` secret. Supplied plans and
+secret changes pass the same check, and anything else is refused with
+`ai_policy_conflict` before it is uploaded. Container settings and built
+variables, hosted demo builds and delivery packages never carry these names.
+Case and prefix lookalikes such as `APP_RER_AI_AUTHORITY` are ordinary names.
+To turn native AI off, first remove the token with
+`rer deploy --unset-secret RER_AI_PRIVACY_TOKEN` while it is still declared,
+then remove `ai` and that secret from the declaration and deploy.
 The first declaration above requests zero spending until both the seed request
 and separate permitted policy explicitly authorize larger finite limits.
 

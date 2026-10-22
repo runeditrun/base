@@ -2,9 +2,13 @@ import {readFile} from 'node:fs/promises';
 import {deliveryDeclarationSources} from '../../cli/delivery-declarations.mjs';
 import {sourcePath} from '../delivery-producer/migrations.mjs';
 import {usesManagedMail,validateMailSpec} from '../delivery-producer/mail.mjs';
+import {refuseAiNames} from '../ai/native/names.mjs';
 
-/** Admit only the managed-mail contract's public config through legacy secret declarations. */
+/** Built variables reach the container and hosted-demo runtimes by name: none may be a
+ * reserved AI name. Admit only the managed-mail contract's public config through legacy
+ * secret declarations. */
 export async function checkImageVariables(root,vars,secrets) {
+ refuseAiNames({names:Object.keys(vars)});
  const overlaps=secrets.filter(secret=>Object.hasOwn(vars,secret.binding));
  if (!overlaps.length) return;
  const publicMail=new Set(),privateNames=new Set();

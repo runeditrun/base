@@ -27,7 +27,7 @@ export async function deployEnvironment({ root, options, declaration, setupManif
   if (value !== undefined) env[originSetting] = value;
  }
  try { publicOrigin(declaration, env); }
- catch { throw invalid('Declare publicOriginSetting beside originVar and set it to an HTTPS origin (https://host[:port]), without credentials, path, query or fragment.'); }
+ catch (error) { if (error.code === 'ai_policy_conflict') throw error; throw invalid('Declare publicOriginSetting beside originVar and set it to an HTTPS origin (https://host[:port]), without credentials, path, query or fragment.'); }
  const secrets = Array.isArray(declaration.secrets) ? declaration.secrets : [];
  const absent = item => item && !env[item.environment]?.trim();
  const emailField = setupManifest?.steps?.find(step => step.type === 'owner-claim')?.emailField;
