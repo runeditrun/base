@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.78-dev.gc60b6612",
+  "cliVersion": "0.2.78",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -999,7 +999,7 @@
     },
     "cli/server-proxy.mjs": {
       "source": "cli/server-proxy.mjs",
-      "sha256": "3593ce42e24e2e02bd85c72ae2155fc85616311bae7ba1ac68cf92f68ed3e093"
+      "sha256": "78527672b718d443a6c753e7f12fdeef5bf0c272732e6e634674df990b22b7c5"
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
@@ -1112,6 +1112,10 @@
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
       "sha256": "bf0a4727930d749563a0c675b1b0715350bc1b4321154dea653d154fdc7e878b"
+    },
+    "cli/upstream-agent.mjs": {
+      "source": "cli/upstream-agent.mjs",
+      "sha256": "dc2b22e01c2969ebe11040cd274d454c5c6b37b2d0177641287e44c9e1809820"
     },
     "cli/version.mjs": {
       "source": "cli/version.mjs",
