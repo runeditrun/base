@@ -35,7 +35,7 @@ export async function nativeRuntime(t,{request=declaration,policy=authority,prov
  t.after(async()=>{await mf.dispose();await rm(folder,{recursive:true,force:true});});
  const db=await mf.getD1Database('DB');
  for(const sql of schema.replace(/^--.*$/gm,'').match(/CREATE TRIGGER[\s\S]*?END;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g))await db.prepare(sql).run();
- const call=async(path,{body,cookie,origin=env.AUTH_ORIGIN,method=body===undefined?'GET':'POST',headers={}}={})=>mf.dispatchFetch('http://localhost/',{method:'POST',body:JSON.stringify({url:env.AUTH_ORIGIN+path,method,headers:{host:new URL(env.AUTH_ORIGIN).host,origin,...(body===undefined?{}:{'content-type':'application/json'}),...(cookie?{cookie}:{}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})})});
+ const call=async(path,{body,cookie,origin=env.AUTH_ORIGIN,method=body===undefined?'GET':'POST',headers={}}={})=>mf.dispatchFetch('http://localhost/',{method:'POST',body:JSON.stringify({url:env.AUTH_ORIGIN+path,method,headers:{host:new URL(env.AUTH_ORIGIN).host,origin,'cf-connecting-ip':'192.0.2.1',...(body===undefined?{}:{'content-type':'application/json'}),...(cookie?{cookie}:{}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})})});
  const bootstrap=await call('/auth/bootstrap',{body:{token:env.SETUP_TOKEN,displayName:'Synthetic Owner'}});
  if(bootstrap.status!==303)throw Error(`Bootstrap failed ${bootstrap.status}: ${await bootstrap.text()}`);
  const cookie=bootstrap.headers.get('set-cookie').split(';')[0];
