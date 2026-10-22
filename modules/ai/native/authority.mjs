@@ -47,7 +47,6 @@ export class AiAuthority {
       }
       if (!['generate','start','finish','cancel'].includes(input.action) || !name(input.command)) fail('ai_invalid_request',400);
       if (purpose.kind === 'image') await this.privacy();
-      const maximum = reservation(policy,purpose);
       // Only currently specified native contracts can be selected. Unknown ids never inherit an adapter.
       if (purpose.kind === 'text' && purpose.model !== '@cf/qwen/qwen3.8-27b') fail('ai_provider_unproven',503);
       if (purpose.kind === 'image' && purpose.model !== '@cf/black-forest-labs/flux-2-dev') fail('ai_provider_unproven',503);
@@ -55,6 +54,14 @@ export class AiAuthority {
       if (input.second !== undefined) fail('ai_invalid_request',400);
       const hash = await digest(canonical([purpose,input.input]));
       const id = await digest(canonical([policy.installation,policy.environment,policy.tenant,purpose.id,purpose.kind === 'image' ? 'stable' : input.command]));
+      if (purpose.kind === 'image') {
+        const existing = this.ledger.findImage(policy.tenant,purpose.id);
+        if (existing) {
+          if (existing.digest !== hash) fail('ai_operation_conflict');
+          return this.image(policy,purpose,{operation:existing,fresh:false},input.input);
+        }
+      }
+      const maximum = reservation(policy,purpose);
       if (input.action === 'cancel') {
         const operation = this.ledger.operation(id);
         if (!operation || operation.tenant !== policy.tenant || operation.purpose !== purpose.id || operation.kind !== 'text') fail('ai_operation_conflict');

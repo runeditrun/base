@@ -122,10 +122,11 @@ test('corrupt or replaced private objects cannot be read, overwritten or regener
  assert.equal((await post(r,image('second'))).status,409);assert.equal(r.hits.length,1);
 });
 
-test('worker restart after image dispatch preserves uncertain purpose and never sends again',async t=>{
+test('worker restart after image dispatch preserves uncertain purpose and never sends again',{timeout:15000},async t=>{
  let dispatched,complete;
  const started=new Promise(resolve=>{dispatched=resolve;});
  const held=new Promise(resolve=>{complete=resolve;});
+ t.after(()=>complete());
  const r=await nativeRuntime(t,{provider:async()=>{dispatched();await held;return Response.json({image:samplePng().toString('base64')});}});
  const pending=post(r,image('first')).catch(()=>null);
  await started;
