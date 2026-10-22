@@ -47,20 +47,29 @@ readonly apt_config="$scratch/apt.conf"
 cat > "$apt_config" <<APT
 Dir::Cache::archives "$apt_archives";
 APT::Keep-Downloaded-Packages "true";
+APT::Update::Error-Mode "any";
 Acquire::Retries "2";
 Acquire::http::Timeout "30";
 Acquire::https::Timeout "30";
 APT
 apt_phase() {
-  local label=$1 status
+  local label=$1 status attempt started=$SECONDS
   shift
-  printf 'Bootstrap apt: %s (five-minute deadline)\n' "$label"
-  if "${root[@]}" env APT_CONFIG="$apt_config" timeout --kill-after=10s 300s "$@"; then
-    printf 'Bootstrap apt: %s complete\n' "$label"
-  else
-    status=$?
-    fail "apt phase '$label' failed (exit $status; deadline 300s). Inspect the apt download log before rerunning."
-  fi
+  # Three fresh connections, including kill grace/backoff, stay below 300s.
+  # Keep the archive directory (including partial downloads) across attempts.
+  for attempt in 1 2 3; do
+    printf 'Bootstrap apt: %s attempt %s/3 (90s deadline)\n' "$label" "$attempt"
+    if "${root[@]}" env APT_CONFIG="$apt_config" timeout --kill-after=5s 90s \
+      bash -ec 'dpkg --configure -a; "$@"' bash "$@"; then
+      printf 'Bootstrap apt: %s complete (attempts=%s seconds=%s)\n' "$label" "$attempt" "$((SECONDS - started))"
+      return 0
+    else
+      status=$?
+      printf 'Bootstrap apt: %s attempt %s/3 failed (exit %s seconds=%s)\n' "$label" "$attempt" "$status" "$((SECONDS - started))" >&2
+    fi
+    if (( attempt < 3 )); then sleep "$((attempt * 2))"; fi
+  done
+  fail "apt phase '$label' failed after 3 attempts (exit $status; 90s per attempt; seconds=$((SECONDS - started))). Inspect the apt download log."
 }
 apt_phase 'toolchain packages' bash -c '
   apt-get update &&
