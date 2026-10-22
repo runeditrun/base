@@ -2,11 +2,11 @@
 // group. RER_PROXY_BASELINE names an unmodified server-proxy.mjs from main.
 import assert from 'node:assert/strict';
 import { mkdir,readFile,writeFile,copyFile } from 'node:fs/promises';
-import { join,resolve } from 'node:path';
+import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { fixture,pause,chromium } from '../fixtures/reference.mjs';
-import { useWorkspaceDependencies } from '../fixtures/workspace-dependencies.mjs';
+import { fixture,pause,chromium } from '../../fixtures/reference.mjs';
+import { useWorkspaceDependencies } from '../../fixtures/workspace-dependencies.mjs';
 
 const cleanups=[],context={after:fn=>cleanups.push(fn),diagnostic:message=>console.error(message)};
 const evidence=process.env.RER_TEST_EVIDENCE_DIRECTORY;
@@ -14,7 +14,7 @@ assert.ok(evidence,'Set RER_TEST_EVIDENCE_DIRECTORY outside the checkout');
 await mkdir(evidence,{recursive:true});
 const baseline=process.env.RER_PROXY_BASELINE;
 assert.ok(baseline,'Set RER_PROXY_BASELINE to the original proxy source');
-const candidate=await readFile(new URL('../server-proxy.mjs',import.meta.url));
+const candidate=await readFile(new URL('../../server-proxy.mjs',import.meta.url));
 const results=[];
 try {
  const f=await fixture('default-seed',context);
