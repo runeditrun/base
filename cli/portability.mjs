@@ -1,3 +1,4 @@
+import { refuseAiRestore } from './ai-custody.mjs';
 import { lstat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { relative } from 'node:path';
@@ -17,6 +18,7 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   }
   if(legacyRecovery && (!legacyRecovery.acknowledged || await lstat(legacyRecovery.output).catch(error=>{if(error.code==='ENOENT')return null;throw error;})))throw refuse('Legacy recovery requires acknowledgement and a new output archive path.');
   if (direction === 'import') {
+   await refuseAiRestore(root);
    // Refuse damaged or unverifiable archives before migrations open the
    // destination database. Worker and finalization verify again before publish.
    try {

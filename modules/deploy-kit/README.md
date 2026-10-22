@@ -509,3 +509,8 @@ tokens should be left unset so rer issues a fresh one. The existing owner is
 kept, and a successful claim retires the one-time token. A hook that fails
 without an HTTP exchange can only supply its own cause. Seeds copy this guide
 and `RUN-LOCALLY.md` for these recovery instructions.
+
+Native Workers AI declarations are recognized but explicitly refused with
+`ai_hosting_unproven` before owner-account deployment. Readback also rejects any
+undeclared `ai` binding. See the [AI consumer candidate](../ai/native/README.md)
+for the policy/budget contract and separate provider/hosting qualification gates.

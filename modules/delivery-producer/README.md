@@ -177,3 +177,16 @@ Run `pnpm verify:delivery-producer`. It is included in `pnpm verify`.
 Repository syntax fixtures use host templates expanded by their test consumers.
 The shared producer and publisher cases retain their exact URL spelling, case,
 length and rejection checks without declaring synthetic GitHub repositories.
+
+## Native AI capability requests
+
+`artifact.specInputs.ai` uses the strict schema in the
+[consumer guide](../ai/native/README.md), including exact models, finite purposes,
+AI/SQLite/R2 binding references, bounded operations and requested limits. The
+producer validates matching Wrangler bindings and rejects undeclared raw AI or
+namespace conflicts. `rer check` emits the matching `delivery.ai.*` clause.
+A request is not installation spending approval. Free/Assisted owner deployment
+and Managed package generation explicitly refuse native AI until their
+installation policy and held-key provider gates are completed. Existing mail
+support does not establish AI support. AI data is not portable with DO storage;
+restore must keep inference disabled until custody is reconciled.
