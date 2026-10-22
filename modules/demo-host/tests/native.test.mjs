@@ -18,7 +18,8 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     // The seed's Worker build as rer deploy --demo receives it, including a tiny
     // WebAssembly module (add) and a data module the app imports.
     const app = join(folder, 'bundle/app'), server = join(app, 'dist/server');
-    for (const file of ['modules/demo-host/tests/native-app.mjs', 'modules/owner-claim/verify.mjs', 'modules/operator-auth/loopback.mjs']) await cp(join(base, file), join(server, file));
+    for (const file of ['modules/demo-host/tests/native-app.mjs', 'modules/owner-claim/verify.mjs', 'modules/operator-auth/loopback.mjs', 'modules/dependencies/sealing.mjs',
+      'modules/operator-auth/errors.mjs', 'modules/operator-auth/identity/oidc/aes-gcm.mjs', 'modules/operator-auth/identity/oidc/errors.mjs']) await cp(join(base, file), join(server, file));
     await writeFile(join(server, 'modules/demo-host/tests/native-add.wasm'), Buffer.from('0061736d0100000001070160027f7f017f030201000707010361646400000a09010700200020016a0b', 'hex'));
     await writeFile(join(server, 'modules/demo-host/tests/native-data.bin'), Buffer.from([7, 8, 9]));
     await mkdir(join(app, 'dist/client/assets'), { recursive: true });
@@ -73,6 +74,17 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     }
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
     assert.deepEqual([await (await fetch('/health-client', a)).json(), await (await fetch('/health-client', b)).json()], ['203.0.113.1', '203.0.113.2'], "the seed's /health during start sees each visitor's client address");
+    // A public request to each copy's dependency door finds its own installation
+    // key, kept for the copy's lifetime and never another visitor's.
+    const keyIds = [];
+    for (const cookies of [a, b, a]) {
+      const door = await fetch('/.well-known/rer-dependencies', cookies.match(/rer_demo=[^;]+/)[0]);
+      const body = await door.json();
+      assert.equal(door.status, 200, body.error);
+      keyIds.push(body.kid);
+    }
+    assert.equal(keyIds[2], keyIds[0], 'a copy keeps its installation key');
+    assert.notEqual(keyIds[1], keyIds[0], 'two visitors never share an installation key');
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);
     assert.deepEqual(await (await fetch('/items', b)).json(), [{ name: 'sample' }]);
     assert.deepEqual(await (await fetch('/d1-session', b)).json(), { names: ['sample'], bookmark: 'string', unknown: true, warnings: 1 }, 'D1 sessions read the visitor database; an unknown D1 method reads undefined and warns once');
