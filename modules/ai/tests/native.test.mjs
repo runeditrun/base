@@ -141,3 +141,25 @@ test('worker restart after image dispatch preserves uncertain purpose and never 
  assert.equal(r.hits.length,1);
  const state=await r.status();assert.equal(state.totals.calls,1);assert.ok(['dispatching','uncertain'].includes(state.calls[0].status));
 });
+
+test('lost R2 acknowledgement adopts the real object after restart without another inference',async t=>{
+ const r=await nativeRuntime(t,{bindings:{TEST_R2_LOST_WRITE:'true'}});
+ const initial=await post(r,image('first'));assert.equal(initial.status,502);
+ assert.equal((await (await r.bucket).list()).objects.length,1);
+ const held=(await r.status()).totals;
+ await r.restart({TEST_R2_LOST_WRITE:'false'});
+ assert.equal((await post(r,image('second'))).status,200);assert.equal(r.hits.length,1);
+ assert.deepEqual((await r.status()).totals,held);
+});
+
+test('restart after validated provider output before R2 create retains liability and refuses regeneration',{timeout:15000},async t=>{
+ let notify,release,count=0,hold=true;
+ const started=new Promise(resolve=>{notify=resolve;}),waiting=new Promise(resolve=>{release=resolve;});
+ t.after(()=>release());
+ const r=await nativeRuntime(t,{privacy:async()=>{if(++count===3&&hold){notify();await waiting;}}});
+ const pending=post(r,image('first')).catch(()=>null);
+ await started;await r.restart();hold=false;release();await pending;
+ assert.equal((await (await r.bucket).list()).objects.length,0);
+ assert.equal((await post(r,image('second'))).status,409);assert.equal(r.hits.length,1);
+ const state=await r.status();assert.equal(state.totals.calls,1);assert.ok(state.operations[0].object_digest);assert.equal(state.calls[0].status,'dispatching');
+});

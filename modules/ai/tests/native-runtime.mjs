@@ -17,13 +17,13 @@ export function samplePng(width = 1, height = 1) {
  const header=Buffer.alloc(13);header.writeUInt32BE(width,0);header.writeUInt32BE(height,4);header[8]=8;header[9]=6;
  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(Buffer.from([0,25,50,75,255]))),chunk('IEND',Buffer.alloc(0))]);
 }
-export async function nativeRuntime(t,{request=declaration,policy=authority,provider,bindings={}}={}) {
+export async function nativeRuntime(t,{request=declaration,policy=authority,provider,privacy,bindings={}}={}) {
  const folder=await mkdtemp(join(tmpdir(),'rer-ai-native-'));
  const hits=[],mails=[];let publicBucket=false;
  const env={AUTH_ORIGIN:bindings.AUTH_LOCAL === 'true' ? 'http://127.0.0.1:8787' : 'https://reference.test',OWNER_EMAIL:'owner@example.test',MAIL_PROVIDER:'resend',MAIL_FROM:'auth@example.test',MAIL_API_KEY:'synthetic-native-ai-mail-1',SESSION_SECRET:'synthetic-session-secret-for-native-ai-tests-0001',SETUP_TOKEN:'synthetic-setup-token-for-native-ai-tests-0001',INSTALLATION_KEY:'a'.repeat(64),RER_AI_REQUEST:JSON.stringify(request),RER_AI_AUTHORITY:JSON.stringify(policy),RER_AI_ACCOUNT_ID:'a'.repeat(32),RER_AI_BUCKET_NAME:'synthetic-ai-images',RER_AI_PRIVACY_TOKEN:'synthetic-privacy-token',...bindings};
  const init=()=>new Miniflare({...convertV4MiniflareOptions({modules:true,script:built.outputFiles[0].text,compatibilityDate:'2026-09-08',bindings:env,d1Databases:{DB:'ai-auth'},r2Buckets:{AI_IMAGES:'ai-images'},durableObjects:{AI_BUDGET:{className:'AiAuthority',useSQLite:true}},outboundService:async request=>{
   if(request.url==='https://api.resend.com/emails'){mails.push(await request.json());return Response.json({id:'synthetic-native-ai-mail-1'});}
-  if(request.url.startsWith('https://api.cloudflare.com/'))return Response.json({success:true,result:request.url.endsWith('/managed')?{enabled:publicBucket}:{domains:[]}});
+  if(request.url.startsWith('https://api.cloudflare.com/')){if(privacy)await privacy(request);return Response.json({success:true,result:request.url.endsWith('/managed')?{enabled:publicBucket}:{domains:[]}});}
   if(request.url==='https://provider.test/infer'){
    const body=await request.json();hits.push(body);
    if(provider)return provider(body,hits.length);

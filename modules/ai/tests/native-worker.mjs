@@ -5,7 +5,8 @@ import { operatorAuth } from '../../../default-seed/src/core/platform/auth/sessi
 import { createAuthHandler } from '../../operator-auth/index.mjs';
 export class AiAuthority extends Authority {
   constructor(ctx,env) {
-    super(ctx,{...env,AI:{async run(model,input) {
+    const bucket=env.AI_IMAGES;
+    super(ctx,{...env,AI_IMAGES:{get:(...args)=>bucket.get(...args),async put(...args){const result=await bucket.put(...args);if(env.TEST_R2_LOST_WRITE==='true')throw Error('synthetic lost R2 acknowledgement');return result;}},AI:{async run(model,input) {
       const response = await fetch('https://provider.test/infer',{method:'POST',body:JSON.stringify({model,input:input.multipart ? 'image' : input})});
       if (!response.ok) throw Error(await response.text());
       return response.json();
