@@ -18,7 +18,7 @@ account, epoch, bindings, tools, streaming, batches or reference images.
 
 ## Lamp declaration
 
-Put `ai` inside delivery `artifact.specInputs`. This is a capability request,
+Put `ai` inside delivery `artifact.specInputs` and the owner deploy declaration. This is a capability request,
 not spending approval. Emitted Wrangler must bind the matching AI, private R2,
 and SQLite authority class. Unknown fields, aliases and binding conflicts fail.
 The exact ids below were rechecked in primary Cloudflare docs on 23 October
@@ -61,6 +61,16 @@ entire documented 262144-token context per call and a proved output ceiling,
 including the system/template overhead. The actual output request uses
 `max_completion_tokens`, one choice, text, no thinking, no storage and no stream.
 No free-tier or cached-token discount reduces a reservation.
+
+For Free deployment, the owner declaration also names the SQLite DO and R2
+resources plus a required secret binding `RER_AI_PRIVACY_TOKEN` with an
+owner-supplied environment source. Supply `RER_AI_AUTHORITY` through the
+owner-only deployment environment or private `--env-file`. Its installation is
+the derived Worker name (for example `lamp-production`), environment is
+`production`, and tenant is the server-owned installation tenant. Do not put
+`RER_AI_*` variables in seed-controlled `vars`; the consumer derives them.
+The first declaration above requests zero spending until both the seed request
+and separate permitted policy explicitly authorize larger finite limits.
 
 For an approved, proven installation, bind `AiAuthority` as a SQLite DO and the
 named R2 bucket. The native transport calls the real binding's `run` method.
@@ -124,9 +134,15 @@ other apps and changing prices mean this is not an account-wide spending cap.
 
 ## Hosting and provider boundary
 
-Free owner-account and Assisted deployment explicitly refuse native AI pending
-installation approval plumbing and held-key qualification. Managed package
-production also explicitly refuses it; its service consumer lives outside Base
+The Free owner-account deployment consumer accepts native AI only with a
+separate `RER_AI_AUTHORITY` supplied by the deploying owner, bound to the derived
+Worker installation and environment. It derives the payer account and bucket
+name, requires the privacy-token secret, checks current prices/proof records,
+renders the native binding and verifies exact provider readback. A missing
+approval, conflicting built binding or cross-account plan fails closed. This
+path is tested with the Cloudflare network edge doubled; live provider/account
+qualification is still held. Assisted/Managed package
+production explicitly refuses it; its service consumer lives outside Base
 and mail support grants no AI authority. Native demos already refuse `ai`, and
 the consumer rejects local/dev/demo modes before dispatch. Container hosting is
 not a native Workers AI transport. `rer check` validates a matching first-party

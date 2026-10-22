@@ -27,3 +27,11 @@ export function validateAiPlan(plan) {
   for (const [k,v] of Object.entries(expected)) if (plan.vars[k] !== v) fail('ai_policy_conflict');
   if (!/^[a-f0-9]{32}$/.test(plan.vars.RER_AI_ACCOUNT_ID ?? '') || plan.vars.RER_AI_BUCKET_NAME !== plan.r2.find(d => d.binding === approved.imageBinding).name) fail('ai_policy_conflict');
 }
+/** A built raw binding cannot silently bypass the owner declaration. */
+export function validateBuiltAi(config,request) {
+  const present = config.ai !== undefined && (typeof config.ai !== 'object' || config.ai === null || Object.keys(config.ai).length > 0);
+  if (!present) { if (request !== undefined) fail('ai_binding_missing'); return; }
+  if (request === undefined) fail('ai_binding_undeclared');
+  validateRequest(request); exact(config.ai,['binding']);
+  if (config.ai.binding !== request.binding) fail('ai_policy_conflict');
+}

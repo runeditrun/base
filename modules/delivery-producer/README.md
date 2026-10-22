@@ -185,8 +185,9 @@ length and rejection checks without declaring synthetic GitHub repositories.
 AI/SQLite/R2 binding references, bounded operations and requested limits. The
 producer validates matching Wrangler bindings and rejects undeclared raw AI or
 namespace conflicts. `rer check` emits the matching `delivery.ai.*` clause.
-A request is not installation spending approval. Free/Assisted owner deployment
-and Managed package generation explicitly refuse native AI until their
-installation policy and held-key provider gates are completed. Existing mail
+A request is not installation spending approval. The Free owner-account consumer requires separate installation authority and
+verifies native binding readback; live provider qualification remains held.
+Assisted/Managed package generation explicitly refuses native AI until its
+external installation policy consumer is qualified. Existing mail
 support does not establish AI support. AI data is not portable with DO storage;
 restore must keep inference disabled until custody is reconciled.

@@ -111,3 +111,14 @@ test('an injected JSON upload module remains unsupported rather than becoming me
   artifact.modules.push({path:'.vite/manifest.json',base64:Buffer.from('{}').toString('base64'),sha256:hash('{}')});
   assert.throws(() => validateArtifact(artifact),/unsupported-module-type/);
 });
+
+test('built native AI requires its exact strict declaration before artifact preparation',async t=>{
+ const {server,args}=await buildFixture(t);
+ const ai={schema:1,provider:'cloudflare',transport:'native',binding:'AI',budgetBinding:'AI_BUDGET',imageBinding:'AI_IMAGES',textModels:['@cf/qwen/qwen3.8-27b'],imageModels:[],purposes:[{id:'site-read',kind:'text',model:'@cf/qwen/qwen3.8-27b'}],limits:{calls:0,units:0,microUsd:0},operations:{textCalls:2,maxInputBytes:10000,maxOutputTokens:1024,imageUnits:0,timeoutMs:1000}};
+ const config={...outputConfig(),ai:{binding:'AI'}};
+ const save=()=>writeFile(join(server,'wrangler.json'),JSON.stringify(config));await save();
+ await assert.rejects(packageBuild(args),e=>e.code==='ai_binding_undeclared');
+ assert.ok((await packageBuild({...args,ai})).modules.length>0);
+ config.ai.binding='OTHER';await save();await assert.rejects(packageBuild({...args,ai}),e=>e.code==='ai_policy_conflict');
+ config.ai={binding:'AI',remote:true};await save();await assert.rejects(packageBuild({...args,ai}),e=>e.code==='ai_policy_invalid');
+});
