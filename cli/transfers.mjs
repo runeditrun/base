@@ -1,3 +1,4 @@
+import { refuseAiRestore } from './ai-custody.mjs';
 import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import {localDependencyLinks} from './dependency-doctor.mjs';
@@ -8,6 +9,7 @@ export async function transfer(project, options, signal, custody) {
  if (options.verb === 'export' && options.target === 'remote' && project.adapter.portability?.hostedExport !== undefined) {
   return (await import('./hosted-export-command.mjs')).runHostedExport(project, options, custody.store, signal);
  }
+ if (options.verb === 'import') await refuseAiRestore(project.root,project.adapter?.deployDeclaration ?? project.adapter?.deploy?.declaration);
  const direction = options.verb, file = direction === 'export' ? options.output : options.input;
  if (!file) throw missing(`Provide --${direction === 'export' ? 'output' : 'input'} FILE.`);
  if (direction === 'import' && !options.yes) throw refuse('Import requires explicit --yes confirmation.');

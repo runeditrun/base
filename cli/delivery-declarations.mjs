@@ -9,11 +9,16 @@ export const deliveryDeclarationSources = [
  ['packaging.json', value => value?.artifact?.specInputs],
  ['scripts/delivery/base/packaging.json', value => value?.artifact?.specInputs],
  ['management/integration/deployment-spec.json', value => value],
+ ['deploy.json', value => value],
 ];
 
-export async function deliveryDeclarationClauses(root) {
+export function nativeDeclarationSources(ownerDeclaration) {
+ return typeof ownerDeclaration === 'string' && !deliveryDeclarationSources.some(([p]) => p === ownerDeclaration) ? [...deliveryDeclarationSources,[ownerDeclaration,value => value]] : deliveryDeclarationSources;
+}
+
+export async function deliveryDeclarationClauses(root, ownerDeclaration) {
  const clauses = [];
- for (const [path, select] of deliveryDeclarationSources) {
+ for (const [path, select] of nativeDeclarationSources(ownerDeclaration)) {
   let text;
   try { text = await readFile(await contained(root, path, { optional: true }), 'utf8'); }
   catch (error) {

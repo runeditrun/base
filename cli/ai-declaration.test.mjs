@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {writeFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {portabilityFixture} from './fixtures/portability.mjs';
 
@@ -13,12 +13,17 @@ test('rer check reports the native declaration and refuses seed-supplied price a
  await save({...ai,prices:{version:'synthetic-cli-sentinel'}});
  const refused=await seed.run(['check'],1);assert.ok(refused.at(-1).clauses.some(c=>c.id.startsWith('delivery.ai.')&&!c.ok));
  assert.ok(!JSON.stringify(refused).includes('synthetic-cli-sentinel'));
+ await save(ai);
+ const owner=JSON.parse(await readFile(join(seed.root,'deploy.json'),'utf8'));
+ await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...owner,ai}));
+ const owned=await seed.run(['check']);assert.ok(owned.at(-1).clauses.some(c=>c.id==='delivery.ai.deploy.json'&&c.ok));
 });
 
 test('native AI installation recovery is refused before archive or database mutation',async t=>{
  const seed=await portabilityFixture(t,{generated:false});
  await seed.run(['export','--output','exports/before-ai.rer']);
- await writeFile(join(seed.root,'rer-packaging.json'),JSON.stringify({artifact:{specInputs:{ai:{schema:1}}}}));
+ const owner=JSON.parse(await readFile(join(seed.root,'deploy.json'),'utf8'));
+ await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...owner,ai:{schema:1}}));
  const result=await seed.run(['import','--input','exports/before-ai.rer','--yes'],4);
  assert.ok(JSON.stringify(result).includes('ai_reconciliation_required'));
 });

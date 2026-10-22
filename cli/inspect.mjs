@@ -78,7 +78,7 @@ export async function check(project, explicitProfile) {
  const clauses = [], add = (id, ok, message) => clauses.push({ id, ok: Boolean(ok), ...(!ok ? { message } : {}) });
  // A warning, never a failing clause: live run sites redeploy while seeds keep Base's mark.
  let placeholderMarks = [];
- clauses.push(...await deliveryDeclarationClauses(project.root));
+ clauses.push(...await deliveryDeclarationClauses(project.root, project.adapter?.deployDeclaration ?? project.adapter?.deploy?.declaration));
  for (const command of project.commands) add('SC-10.inputs.' + command.name, command.available, `Restore the declared inputs for ${command.name}.`);
  for (const loop of project.descriptor.loops ?? []) add('SC-10.loop.' + loop.id, !loop.required || loop.enabled, `Enable the required ${loop.id} loop or correct its declaration.`);
  if (project.profile === 'first-party' || explicitProfile === 'first-party') {
