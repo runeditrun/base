@@ -5,11 +5,12 @@ import { posix } from 'node:path';
 import { listen } from './listen.mjs';
 import { loopback } from './parse.mjs';
 import { fontResponseHeaders } from './font-cache.mjs';
+import { UpstreamAgent } from './upstream-agent.mjs';
 
 // The public listener observes transport lifetime without buffering or replacing
 // application responses. Preserve Host, Origin, cookies, status and streaming.
-// Each request opens its own loopback connection: a pooled keep-alive socket
-// that the runtime has already dropped would otherwise fail a fresh request.
+// Share bounded upstream connections. A runtime closing an idle socket races
+// reuse; retry only a bodyless read, once, before any response bytes arrive.
 // In door mode (`door`: {host, header, secret}) it answers only requests whose
 // Host is its own `<name>.localhost:<port>` (or a subdomain) and that carry the
 // per-start secret the front door adds; cookies are not scoped by port, so
@@ -24,17 +25,25 @@ import { fontResponseHeaders } from './font-cache.mjs';
 // anyway, and an auth check that throws on it must not answer with a crash page.
 export async function trafficProxy({host,port,target,activity,door,devKey,origin}) {
  const probe=randomUUID(),sockets=new Set(),keyed=keyHolder(devKey),configured=origin?new URL(origin).host:null;
+ const agent=new UpstreamAgent();let closing=false;
  const server=http.createServer((req,res)=>{
   if(door&&!doorAdmits(req,door)){req.resume();res.writeHead(403,{'content-type':'text/plain; charset=utf-8'});res.end('This checkout answers only through its front door.');return;}
   if(!hostAdmits(req,configured)){req.resume();res.writeHead(421,{'content-type':'text/plain; charset=utf-8'});res.end('This local server answers only its own host.');return;}
   if(!publicPath(req.url)||fsPath(req.url)&&!keyed(req)){req.resume();notFound(res);return;}
   const internal=req.headers['x-rer-probe']===probe;delete req.headers['x-rer-probe'];
-  const finish=internal?()=>{}:activity.begin();
+  const endActivity=internal?()=>{}:activity.begin();let finished=false;
+  const finish=()=>{if(!finished){finished=true;endActivity();}};
   let requestEnded=req.complete,responseEnded=false;
   const completed=()=>{if(requestEnded&&responseEnded)finish();};
   req.once('end',()=>{requestEnded=true;completed();});req.once('aborted',finish);
   res.once('close',()=>{responseEnded=true;if(req.destroyed)finish();else completed();});res.once('finish',()=>{responseEnded=true;completed();});
-  const upstream=http.request({host:'127.0.0.1',port:target,path:req.url,method:req.method,headers:req.headers,agent:false},reply=>{
+  let upstream,bodyStarted=false;
+  req.on('data',()=>{bodyStarted=true;});
+  const bodyless=['GET','HEAD','OPTIONS'].includes(req.method)&&!req.headers['transfer-encoding']&&(!req.headers['content-length']||req.headers['content-length']==='0');
+  function send(retried=false){
+   let responseStarted=false,readAtStart;
+   const attempt=http.request({host:'127.0.0.1',port:target,path:req.url,method:req.method,headers:req.headers,agent:retried?false:agent},reply=>{
+   responseStarted=true;
    // Vite answers a path outside its serving allow list with a 403 page that lists the
    // allow list (checkout and home paths); a request without the dev key gets 404 instead.
    // Any other 403 is the application's own and passes through.
@@ -51,8 +60,21 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
    }
    res.writeHead(reply.statusCode,fontResponseHeaders(req.url,reply.statusCode,reply.rawHeaders,req.headers));reply.pipe(res);
   });
-  req.once('aborted',()=>upstream.destroy());res.once('close',()=>upstream.destroy());
-  upstream.on('error',()=>{if(!res.headersSent)notFound(res);else res.destroy();});req.pipe(upstream);
+   upstream=attempt;
+   attempt.once('socket',socket=>{readAtStart=socket.bytesRead;});
+   attempt.on('error',error=>{
+    if(closing||req.aborted||res.destroyed)return;
+    const dropped=['ECONNRESET','EPIPE'].includes(error.code)||error.message==='socket hang up';
+    if(!retried&&dropped&&attempt.reusedSocket&&!responseStarted&&attempt.socket?.bytesRead===readAtStart&&bodyless&&!bodyStarted&&req.readableEnded){
+     req.unpipe(attempt);send(true);return;
+    }
+    if(!res.headersSent)notFound(res);else res.destroy();
+   });
+   if(retried)attempt.end();else req.pipe(attempt);
+  }
+  req.once('aborted',()=>upstream.destroy());
+  res.once('close',()=>{if(!res.writableFinished)upstream.destroy();});
+  send();
  });
  server.on('connection',socket=>{sockets.add(socket);socket.on('close',()=>sockets.delete(socket));});
  server.on('upgrade',(req,socket,head)=>{
@@ -79,8 +101,8 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
   }
   upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());socket.on('close',()=>upstream.destroy());upstream.on('close',()=>socket.destroy());
  });
- await listen(server,host,port);
- return {probe,port:server.address().port,async close(){for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
+ try{await listen(server,host,port);}catch(error){agent.destroy();throw error;}
+ return {probe,port:server.address().port,async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
 }
 function doorAdmits(req,door){
  const host=String(req.headers.host??'').toLowerCase(),given=Buffer.from(String(req.headers[door.header]??'')),secret=Buffer.from(door.secret);
