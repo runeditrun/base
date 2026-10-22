@@ -24,6 +24,7 @@ test('public proxy reuses connections, recovers a stale read once, and never rep
   // The runtime closes the formerly idle connection just as its next request
   // arrives: a deterministic version of the FIN/reuse race, before any reply.
   if(drop||alwaysDrop){drop=false;req.socket.destroy();return;}
+  if(req.url==='/partial'){req.socket.end('HTTP/1.1 200 OK\r\nX-Partial: yes');return;}
   if(req.url==='/stream'){res.writeHead(200);res.write('first');release=()=>res.end('last');return;}
   if(req.url==='/restricted'){res.writeHead(403);res.end('<h1>403 Restricted</h1>private allow list');return;}
   if(req.url==='/forbidden'){res.writeHead(403);res.end('application denial');return;}
@@ -56,6 +57,9 @@ test('public proxy reuses connections, recovers a stale read once, and never rep
  assert.equal((await request(proxy.port,'/read-body',{body:'x',headers:{'content-length':'1'}})).status,404);
  assert.equal(seen.filter(row=>row.url==='/read-body').length,1,'a streamed GET body is not replayed either');
  assert.equal((await request(proxy.port,'/echo',{method:'POST',body:'streamed bytes'})).body,'streamed bytes');
+ await request(proxy.port,'/warm');
+ assert.equal((await request(proxy.port,'/partial')).status,404);
+ assert.equal(seen.filter(row=>row.url==='/partial').length,1,'partial response bytes prevent replay even before complete headers');
  assert.equal((await request(proxy.port,'/restricted')).status,404);
  assert.equal((await request(proxy.port,'/forbidden')).body,'application denial');
  assert.equal((await request(proxy.port,'/@fs/private')).status,404);
