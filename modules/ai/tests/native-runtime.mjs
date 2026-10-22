@@ -11,10 +11,10 @@ export const authority = {schema:1,enabled:true,installation:'synthetic-installa
   proofs:{[text]:{reference:'synthetic-text-edge',kind:'text',maxInputTokens:262144,maxOutputTokens:1024,maxImageUnits:0,mime:''},[image]:{reference:'synthetic-image-edge',kind:'image',maxInputTokens:0,maxOutputTokens:0,maxImageUnits:100,mime:'image/png'}}};
 const built = await build({entryPoints:[new URL('./native-worker.mjs',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'browser',target:'es2022'});
 const schema = await readFile(new URL('../../operator-auth/accounts/schema/operator-auth.sql',import.meta.url),'utf8');
-export function samplePng() {
+export function samplePng(width = 1, height = 1) {
  const crc = bytes => {let n=0xffffffff;for(const b of bytes){n^=b;for(let i=0;i<8;i++)n=(n>>>1)^((n&1)?0xedb88320:0);}return(n^0xffffffff)>>>0;};
  const chunk=(name,bytes)=>{const type=Buffer.from(name),size=Buffer.alloc(4),sum=Buffer.alloc(4);size.writeUInt32BE(bytes.length);sum.writeUInt32BE(crc(Buffer.concat([type,bytes])));return Buffer.concat([size,type,bytes,sum]);};
- const header=Buffer.alloc(13);header.writeUInt32BE(1,0);header.writeUInt32BE(1,4);header[8]=8;header[9]=6;
+ const header=Buffer.alloc(13);header.writeUInt32BE(width,0);header.writeUInt32BE(height,4);header[8]=8;header[9]=6;
  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(Buffer.from([0,25,50,75,255]))),chunk('IEND',Buffer.alloc(0))]);
 }
 export async function nativeRuntime(t,{request=declaration,policy=authority,provider,bindings={}}={}) {

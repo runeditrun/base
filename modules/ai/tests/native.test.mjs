@@ -77,7 +77,7 @@ test('stable private image purpose dispatches once, reuses R2, and refuses chang
 });
 
 test('invalid images leave a durable purpose tombstone without overwrite or regeneration',async t=>{
- for(const invalid of [{image:'<svg/>'},{image:samplePng().subarray(0,60).toString('base64')},{url:'https://provider.test/secret'}])await t.test('invalid output',async t=>{
+ for(const invalid of [{image:'<svg/>'},{image:samplePng(4097,4097).toString('base64')},{image:samplePng().subarray(0,60).toString('base64')},{url:'https://provider.test/secret'}])await t.test('invalid output',async t=>{
   const r=await nativeRuntime(t,{provider:()=>Response.json(invalid)});
   assert.equal((await post(r,image('first'))).status,422);
   assert.equal((await r.bucket.list()).objects.length,0);
@@ -90,6 +90,7 @@ test('opt-out, expired prices, unproved models and unsupported dev/demo refuse b
  for(const change of [
   {policy:{...authority,enabled:false}},
   {policy:{...authority,prices:{}}},
+  {policy:{...authority,prices:Object.fromEntries(Object.entries(authority.prices).map(([k,v])=>[k,{...v,validUntil:0}]))}},
   {policy:{...authority,proofs:{}}},
   {bindings:{AUTH_LOCAL:'true'}},
   {bindings:{RER_DEMO:'true'}},
@@ -119,4 +120,18 @@ test('corrupt or replaced private objects cannot be read, overwritten or regener
  await r.restart();
  assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie})).status,409);
  assert.equal((await post(r,image('second'))).status,409);assert.equal(r.hits.length,1);
+});
+
+test('worker restart after image dispatch preserves uncertain purpose and never sends again',async t=>{
+ let dispatched,complete;
+ const started=new Promise(resolve=>{dispatched=resolve;});
+ const held=new Promise(resolve=>{complete=resolve;});
+ const r=await nativeRuntime(t,{provider:async()=>{dispatched();await held;return Response.json({image:samplePng().toString('base64')});}});
+ const pending=post(r,image('first')).catch(()=>null);
+ await started;
+ await r.restart();
+ complete();await pending;
+ assert.equal((await post(r,image('second'))).status,409);
+ assert.equal(r.hits.length,1);
+ const state=await r.status();assert.equal(state.totals.calls,1);assert.ok(['dispatching','uncertain'].includes(state.calls[0].status));
 });
