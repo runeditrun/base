@@ -12,10 +12,10 @@ test('reference app requires current owner, same origin and trusted declaration 
   const response=await post(r,options.body??text('unauthorized'),options);assert.ok(response.status>=400);assert.match(response.headers.get('cache-control'),/no-store/);
  }
  assert.equal(r.hits.length,0);
- await r.db.prepare("UPDATE oa_operators SET role='member'").run();
+ await (await r.db).prepare("UPDATE oa_operators SET role='member'").run();
  assert.equal((await post(r,text('member'))).status,403);
- await r.db.prepare("UPDATE oa_operators SET role='owner'").run();
- await r.db.prepare('UPDATE oa_sessions SET revoked_at=?').bind(Date.now()).run();
+ await (await r.db).prepare("UPDATE oa_operators SET role='owner'").run();
+ await (await r.db).prepare('UPDATE oa_sessions SET revoked_at=?').bind(Date.now()).run();
  assert.equal((await post(r,image('revoked'))).status,403);
  assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie})).status,403);
  assert.equal(r.hits.length,0);
@@ -63,7 +63,7 @@ test('uncertain, partial and excessive usage keep liability, never retry, and fe
 test('stable private image purpose dispatches once, reuses R2, and refuses changed input or public drift',async t=>{
  const r=await nativeRuntime(t);
  const results=await Promise.all([post(r,image('one')),post(r,image('two'))]);
- assert.ok(results.some(r=>r.status===200));assert.equal(r.hits.length,1);
+ assert.ok(results.some(r=>r.status===200),JSON.stringify(await Promise.all(results.map(r=>r.clone().json()))));assert.equal(r.hits.length,1);
  assert.equal((await post(r,image('three'))).status,200);assert.equal(r.hits.length,1);
  assert.equal((await post(r,{...image('four'),input:'different'})).status,409);
  await r.restart();
@@ -82,7 +82,7 @@ test('invalid images leave a durable purpose tombstone without overwrite or rege
  for(const invalid of [{image:'<svg/>'},{image:samplePng(4097,4097).toString('base64')},{image:samplePng().subarray(0,60).toString('base64')},{url:'https://provider.test/secret'}])await t.test('invalid output',async t=>{
   const r=await nativeRuntime(t,{provider:()=>Response.json(invalid)});
   assert.equal((await post(r,image('first'))).status,422);
-  assert.equal((await r.bucket.list()).objects.length,0);
+  assert.equal((await (await r.bucket).list()).objects.length,0);
   await r.restart();assert.equal((await post(r,image('second'))).status,409);assert.equal(r.hits.length,1);
   const state=await r.status();assert.equal(state.calls[0].status,'uncertain');assert.equal(state.totals.calls,1);
  });
@@ -117,8 +117,8 @@ test('changed installation policy freezes dispatch until owner reconciliation pr
 
 test('corrupt or replaced private objects cannot be read, overwritten or regenerated',async t=>{
  const r=await nativeRuntime(t);assert.equal((await post(r,image('first'))).status,200);
- const listing=await r.bucket.list(),key=listing.objects[0].key;
- await r.bucket.put(key,samplePng(),{httpMetadata:{contentType:'image/png'},customMetadata:{operation:'other',scope:'other',digest:'0'.repeat(64)}});
+ const listing=await (await r.bucket).list(),key=listing.objects[0].key;
+ await (await r.bucket).put(key,samplePng(),{httpMetadata:{contentType:'image/png'},customMetadata:{operation:'other',scope:'other',digest:'0'.repeat(64)}});
  await r.restart();
  assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie})).status,409);
  assert.equal((await post(r,image('second'))).status,409);assert.equal(r.hits.length,1);

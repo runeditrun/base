@@ -20,7 +20,7 @@ export async function requirePrivateBucket({accountId,bucketName,token,fetch:sen
   if (!/^[a-f0-9]{32}$/.test(accountId ?? '') || !/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(bucketName ?? '') || typeof token !== 'string' || !token) fail('ai_privacy_unverified', 503);
   const read = async suffix => {
     let response;
-    try { response = await send(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/domains/${suffix}`, {headers:{authorization:`Bearer ${token}`},redirect:'error'}); } catch { fail('ai_privacy_unverified', 503); }
+    try { response = await send(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/domains/${suffix}`, {headers:{authorization:`Bearer ${token}`},redirect:'manual'}); } catch { fail('ai_privacy_unverified', 503); }
     if (!response.ok || Number(response.headers.get('content-length')) > 65536) fail('ai_privacy_unverified', 503);
     const reader = response.body.getReader(); let size = 0, chunks = [];
     for (;;) { const {done,value} = await reader.read(); if (done) break; size += value.length; if (size > 65536) { await reader.cancel(); fail('ai_privacy_unverified', 503); } chunks.push(value); }
