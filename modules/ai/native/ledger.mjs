@@ -12,7 +12,7 @@ export class Ledger {
   rows(sql, ...args) { return [...this.storage.sql.exec(sql, ...args)]; }
   one(sql, ...args) { return this.rows(sql, ...args)[0]; }
   transaction(fn) { return this.storage.transactionSync(fn); }
-  bind(policy) {
+  bind(policy, inspect = false) {
     const current = canonical({ installation:policy.installation,environment:policy.environment,custody:policy.custody,revision:policy.revision, policy });
     const frozen = this.transaction(() => {
       const row = this.one('SELECT * FROM ai_state WHERE id=1');
@@ -20,7 +20,7 @@ export class Ledger {
       else if (row.policy !== current) { this.storage.sql.exec('UPDATE ai_state SET frozen=1 WHERE id=1'); return true; }
       return !!row?.frozen;
     });
-    if (frozen) fail('ai_reconciliation_required');
+    if (frozen && !inspect) fail('ai_reconciliation_required');
   }
   totals() { return this.one('SELECT coalesce(sum(calls),0) calls,coalesce(sum(units),0) units,coalesce(sum(microUsd),0) microUsd FROM ai_calls'); }
   operation(id) { return this.one('SELECT * FROM ai_operations WHERE id=?', id); }

@@ -35,7 +35,7 @@ export function validateWranglerShape(config, ai) {
   keys(config, [...metadata,...unsupported,'vars','d1_databases','r2_buckets','kv_namespaces','analytics_engine_datasets','queues','durable_objects','migrations','triggers','send_email','assets','unsafe','logfwdr','ai'], 'Wrangler');
   if (!empty(config.ai)) {
     keys(config.ai, ['binding'], 'AI binding');
-    if (!ai || config.ai.binding !== ai.binding) throw Error('Undeclared native AI binding');
+    if (!ai || config.ai.binding !== ai.binding) throw Error('Unsupported undeclared native AI binding');
   } else if (ai) throw Error('Declared native AI binding missing');
   for (const key of unsupported) if (!empty(config[key])) throw Error(`Unsupported deployment binding: ${key}; an explicit consumer contract is required`);
   for (const key of ['tail_consumers','site','legacy_assets','env']) if (!empty(config[key])) throw Error(`Unsupported deployment configuration: ${key}`);

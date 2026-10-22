@@ -19,7 +19,6 @@ export class AiAuthority {
     let request, authority;
     try { request = JSON.parse(this.env.RER_AI_REQUEST); authority = JSON.parse(this.env.RER_AI_AUTHORITY); } catch { fail('ai_disabled', 503); }
     const policy = approve(request,authority);
-    this.ledger.bind(policy);
     return policy;
   }
   async privacy() {
@@ -31,7 +30,8 @@ export class AiAuthority {
       const policy = this.policy(), input = await boundedJson(request);
       exact(input, ['action','tenant','purpose','command','input','second']);
       if (input.tenant !== policy.tenant) fail('ai_tenant_refused', 403);
-      if (input.action === 'status') return Response.json(this.ledger.snapshot(), {headers:privateHeaders});
+      if (input.action === 'status') { this.ledger.bind(policy,true); return Response.json(this.ledger.snapshot(), {headers:privateHeaders}); }
+      this.ledger.bind(policy);
       const purpose = policy.purposes.find(p => p.id === input.purpose);
       if (!purpose) fail('ai_purpose_refused', 403);
       if (input.action === 'read') {
@@ -63,7 +63,7 @@ export class AiAuthority {
       }
       if (purpose.kind === 'text' && input.action !== 'start' || purpose.kind === 'image' && input.action !== 'generate') fail('ai_invalid_request',400);
       const claimed = this.ledger.reserve({id,tenant:policy.tenant,purpose:purpose.id,kind:purpose.kind,digest:hash}, Array.from({length:purpose.kind === 'text' ? 2 : 1}, () => maximum), policy.limits);
-      if (purpose.kind === 'image') return await this.image(policy,purpose,claimed,maximum,input.input);
+      if (purpose.kind === 'image') return await this.image(policy,purpose,claimed,input.input);
       if (!claimed.fresh) fail('ai_operation_uncertain');
       return await this.text(policy,purpose,id,maximum,input.input,0);
     } catch (error) { return errorResponse(error); }
@@ -93,7 +93,7 @@ export class AiAuthority {
       return Response.json({result}, {headers:privateHeaders});
     } catch (error) { this.ledger.releaseUnsent(id); throw error; }
   }
-  async image(policy,purpose,claimed,maximum,prompt) {
+  async image(policy,purpose,claimed,prompt) {
     const operation = claimed.operation, key = await imageKey(policy,purpose.id);
     const scope = await digest(canonical([policy.installation,policy.environment,policy.tenant,purpose.id]));
     const stored = await adopt(this.env[policy.imageBinding],key,operation,scope);
@@ -101,7 +101,7 @@ export class AiAuthority {
       // Recovery is possible only when this operation durably recorded validated output before put.
       if (!operation.object_digest) fail('ai_image_collision');
       const call = this.ledger.calls(operation.id)[0];
-      this.ledger.settle(operation.id,0,call.fence,{calls:1,units:maximum.units,microUsd:maximum.microUsd});
+      this.ledger.uncertain(operation.id,0,call.fence);
       return Response.json({stored:true}, {headers:privateHeaders});
     }
     if (!claimed.fresh) fail('ai_operation_uncertain');
@@ -116,7 +116,7 @@ export class AiAuthority {
       await this.privacy();
       const written = await this.env[policy.imageBinding].put(key,valid.bytes,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:valid.mime},customMetadata:{scope,operation:operation.id,digest:valid.digest}});
       if (!written) fail('ai_image_collision');
-      this.ledger.settle(operation.id,0,fence,{calls:1,units:maximum.units,microUsd:maximum.microUsd});
+      this.ledger.uncertain(operation.id,0,fence);
       return Response.json({stored:true}, {headers:privateHeaders});
     });
   }

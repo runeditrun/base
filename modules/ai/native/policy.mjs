@@ -44,6 +44,7 @@ export function validateRequest(value) {
 }
 /** This input is installation authority, never a seed declaration or browser body. */
 export function approve(request, authority) {
+  if (!request || !authority) fail('ai_disabled',503);
   validateRequest(request);
   exact(authority, ['schema','enabled','installation','environment','tenant','revision','custody','permitted','prices','proofs']);
   if (authority.schema !== 1 || authority.enabled !== true) fail('ai_disabled', 503);
