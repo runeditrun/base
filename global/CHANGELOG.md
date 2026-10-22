@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.78
+
+- Add signed seed test delivery to the optional mail relay, with public Worker routing, bounded target checks and invocation logs.
+- Restore transient migration tables when replaying installation archives.
+- Expose native migration preflight and refuse replay through relocated ledger identities.
+- Convert reviewed completed D1 import jobs to preserve-conflicts reversal with a durable journal; ordinary previews stay SELECT-only.
+- Package the D1 import kit at `@runeditrun/rer/modules/import-kit/d1` for adopting Workers.
+
 ## 0.2.77
 
 - **Dependency signing keys are sealed at rest with a rotatable installation key (#367, #382).** Each interface's private signing key is stored as an AES-256-GCM envelope under a key derived from the generated `INSTALLATION_KEY` setting, which setup and hosted deploys keep beside `SESSION_SECRET` and archives never carry. Legacy plaintext keys upgrade once. `rer deploy --rotate-secret INSTALLATION_KEY` re-seals every row and retires the previous binding; `rer deploy --reopen-installation-key KID` reopens a D1 restore from before a rotation with retained private custody, reporting the D1 key history first. Missing or wrong keys fail closed with `installation_key_missing` or `installation_key_unavailable`.
