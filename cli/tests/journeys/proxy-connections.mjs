@@ -35,6 +35,7 @@ try {
  const rows=async()=> (await readFile(accepts,'utf8').catch(()=>'' )).trim().split('\n').filter(Boolean).map(JSON.parse);
  async function timeWait(port){
   const {stdout}=await promisify(execFile)('/usr/sbin/netstat',['-an','-p','tcp'],{maxBuffer:16*1024*1024});
+  if(!/^tcp[46]?\s/m.test(stdout))return null;
   return stdout.split('\n').filter(line=>line.includes('TIME_WAIT')&&line.trim().split(/\s+/).slice(3,5).some(address=>address===`127.0.0.1.${port}`)).length;
  }
  for(const mode of ['before','after']){
