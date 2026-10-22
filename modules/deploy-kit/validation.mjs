@@ -1,3 +1,4 @@
+import { validateAiPlan } from './ai.mjs';
 import { createHash } from 'node:crypto';
 export const hash = value => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : stable(value)).digest('hex');
 export function stable(value) {
@@ -23,6 +24,11 @@ export function validatePlan(plan) {
   // Service bindings and the workers.dev opt-out are optional so earlier plans keep their exact shape.
   assert(plan.services === undefined || Array.isArray(plan.services) && plan.services.length, 'invalid-plan-resources');
   assert(plan.workersDev === undefined || plan.workersDev === false, 'invalid-plan');
+  if (plan.ai !== undefined) {
+    validateAiPlan(plan);
+    assert(identifier(plan.ai.request.binding) && !bindings.has(plan.ai.request.binding),'duplicate-or-invalid-binding');
+    bindings.add(plan.ai.request.binding);
+  }
   for (const entry of [...plan.d1,...plan.r2,...kv,...plan.queues,...plan.durableObjects,...plan.secrets,...(plan.services ?? [])]) {
     assert(identifier(entry.binding) && !bindings.has(entry.binding), 'duplicate-or-invalid-binding'); bindings.add(entry.binding);
   }

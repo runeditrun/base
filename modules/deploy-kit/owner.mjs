@@ -1,4 +1,4 @@
-import { refuseAiHosting } from '../delivery-producer/ai.mjs';
+import { ownerAi } from './ai.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
@@ -116,7 +116,6 @@ export function localOnlyBinding(declaration, localOnlyKeys = []) {
 /** A seed declares bindings, never names. Migrations come from the packaged artifact. */
 export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], env = {} } = {}) {
   assert(declaration?.version === 1 && typeof declaration === 'object' && Object.keys(declaration).every(key => DECLARATION_KEYS.includes(key)), 'invalid-owner-declaration');
-  refuseAiHosting(declaration, 'owner-account');
   assert(declaration.publicSettings === undefined || Array.isArray(declaration.publicSettings) && new Set(declaration.publicSettings).size === declaration.publicSettings.length && declaration.publicSettings.every(name => typeof name === 'string' && /^[A-Z][A-Z0-9_]*$/.test(name)), 'invalid-public-settings');
   if (declaration.platforms !== undefined) assert(Array.isArray(declaration.platforms) && declaration.platforms.length > 0 && new Set(declaration.platforms).size === declaration.platforms.length && declaration.platforms.every(item => ['workers','container'].includes(item)), 'invalid-platforms');
   if (declaration.container !== undefined) {
@@ -135,7 +134,8 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   assert(artifact.migrations.every(migration => d1.some(item => item.binding === migration.binding)), 'undeclared-migration-binding');
   const queues = entries(declaration,'queues');
   for (const item of queues) assert(item.deadLetterQueue === undefined || queues.some(other => other.binding === item.deadLetterQueue), 'invalid-dead-letter-queue');
-  const vars = {...(declaration.vars ?? {})};
+  const native = ownerAi(target,declaration,env,name);
+  const vars = {...(declaration.vars ?? {}),...(native.vars ?? {})};
   const origin = publicOrigin(declaration, env);
   if (declaration.originVar !== undefined) {
     assert(identifier(declaration.originVar) && !Object.hasOwn(vars,declaration.originVar), 'invalid-owner-origin-variable');
@@ -146,7 +146,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   const services = entries(declaration,'services').map(({binding,project,entrypoint,allowedHosts,grant}) => ({binding,service:ownerWorkerName(project,target.environment),
     ...(grant === undefined ? {} : {grant}),...(entrypoint === undefined ? {} : {entrypoint}),...(allowedHosts === undefined ? {} : {props:{allowedHosts}})}));
   assert(declaration.workersDev === undefined || declaration.workersDev === false, 'invalid-owner-declaration');
-  return validatePlan({version:1,worker:target.worker,compatibilityDate:declaration.compatibilityDate,compatibilityFlags:declaration.compatibilityFlags ?? [],
+  return validatePlan({...(native.ai ? {ai:native.ai} : {}),version:1,worker:target.worker,compatibilityDate:declaration.compatibilityDate,compatibilityFlags:declaration.compatibilityFlags ?? [],
     d1:d1.map(({binding}) => ({binding,name:name(binding),migrations:artifact.migrations.filter(x => x.binding === binding).map(({binding:_,...rest}) => rest)})),
     r2:entries(declaration,'r2').map(item => ({...item,name:name(item.binding)})),
     ...(kv.length ? {kv} : {}),

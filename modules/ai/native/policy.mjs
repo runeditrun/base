@@ -1,4 +1,5 @@
 import { AiError } from '../errors.mjs';
+export const NATIVE_MODELS = {text:'@cf/qwen/qwen3.8-27b',image:'@cf/black-forest-labs/flux-2-dev'};
 export const fail = (code, status = 409) => { throw new AiError(code, status); };
 export function exact(value, fields) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !fields.includes(key))) fail('ai_policy_invalid', 400);

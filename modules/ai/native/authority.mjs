@@ -1,5 +1,5 @@
 import { AiError } from '../errors.mjs';
-import { approve, canonical, digest, exact, fail, name, reservation } from './policy.mjs';
+import { NATIVE_MODELS, approve, canonical, digest, exact, fail, name, reservation } from './policy.mjs';
 import { Ledger } from './ledger.mjs';
 import { nativeTransport, requirePrivateBucket, textInput, textResult } from './provider.mjs';
 import { adopt, imageEnvelope, imageKey } from './image.mjs';
@@ -48,8 +48,7 @@ export class AiAuthority {
       if (!['generate','start','finish','cancel'].includes(input.action) || !name(input.command)) fail('ai_invalid_request',400);
       if (purpose.kind === 'image') await this.privacy();
       // Only currently specified native contracts can be selected. Unknown ids never inherit an adapter.
-      if (purpose.kind === 'text' && purpose.model !== '@cf/qwen/qwen3.8-27b') fail('ai_provider_unproven',503);
-      if (purpose.kind === 'image' && purpose.model !== '@cf/black-forest-labs/flux-2-dev') fail('ai_provider_unproven',503);
+      if (purpose.model !== NATIVE_MODELS[purpose.kind]) fail('ai_provider_unproven',503);
       if (typeof input.input !== 'string' || new TextEncoder().encode(input.input).length > policy.operations.maxInputBytes) fail('ai_invalid_request',400);
       if (input.second !== undefined) fail('ai_invalid_request',400);
       const hash = await digest(canonical([purpose,input.input]));

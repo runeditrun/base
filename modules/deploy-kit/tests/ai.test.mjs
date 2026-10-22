@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {cloudflare,ownerTarget,ownerPlan,ownerDeploy} from '../index.mjs';
+import {hash} from '../validation.mjs';
+import {renderConfig,verifyBindings} from '../render.mjs';
+import {ownerProvider} from './owner-provider.mjs';
+const model='@cf/qwen/qwen3.8-27b';
+const request={schema:1,provider:'cloudflare',transport:'native',binding:'AI',budgetBinding:'AI_BUDGET',imageBinding:'AI_IMAGES',textModels:[model],imageModels:[],purposes:[{id:'site-read',kind:'text',model}],limits:{calls:10,units:10000000,microUsd:10000000},operations:{textCalls:2,maxInputBytes:10000,maxOutputTokens:1024,imageUnits:0,timeoutMs:1000}};
+
+test('owner-account deployment requires separate installation approval and reads back the native binding in the payer account',async t=>{
+ const provider=ownerProvider();t.after(()=>provider.close());const api=cloudflare(provider);
+ const target=await ownerTarget(api,{project:'synthetic',environment:'production'});
+ const folder=await mkdtemp(join(tmpdir(),'native-ai-owner-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const source='export default { fetch(){ return new Response("ok") } }';
+ const artifact={version:1,source:{sha:'5'.repeat(40),tree:'6'.repeat(40)},run:{id:'0',attempt:'1'},main:'index.js',modules:[{path:'index.js',base64:Buffer.from(source).toString('base64'),sha256:hash(source)}],assets:[],migrations:[]};
+ const declaration={version:1,project:'synthetic',compatibilityDate:'2026-09-08',d1:[],r2:[{binding:'AI_IMAGES'}],queues:[],durableObjects:[{binding:'AI_BUDGET',className:'AiAuthority',storage:'sqlite'}],secrets:[{binding:'RER_AI_PRIVACY_TOKEN',environment:'AI_PRIVACY_TOKEN'}],crons:[],vars:{},ai:request};
+ assert.throws(()=>ownerPlan(target,declaration,artifact),e=>e.code==='ai_hosting_unproven');assert.equal(provider.state.writes.length,0);
+ const authority={schema:1,enabled:true,installation:target.worker,environment:target.environment,tenant:'synthetic-tenant',revision:'initial',custody:'original',permitted:{...request,limits:{...request.limits,calls:2}},prices:{[model]:{version:'synthetic-prices',validUntil:Date.now()+86400000,inputMicroUsdPerMillion:450000,outputMicroUsdPerMillion:3200000,imageMicroUsdPerUnit:410}},proofs:{[model]:{reference:'synthetic-provider-edge',kind:'text',maxInputTokens:262144,maxOutputTokens:1024,maxImageUnits:0,mime:''}}};
+ const env={RER_AI_AUTHORITY:JSON.stringify(authority),AI_PRIVACY_TOKEN:'synthetic-private-custody-token-1'};
+ const plan=ownerPlan(target,declaration,artifact,{env});
+ assert.throws(()=>ownerPlan(target,{...declaration,vars:{RER_AI_ACCOUNT_ID:'untrusted'}},artifact,{env}),e=>e.code==='ai_policy_conflict');
+ assert.throws(()=>ownerPlan(target,declaration,artifact,{env:{...env,RER_AI_AUTHORITY:JSON.stringify({...authority,installation:'other-installation'})}}),e=>e.code==='ai_policy_conflict');
+ assert.throws(()=>renderConfig(plan,{d1:[],r2:[],queues:[]},'b'.repeat(32),'5'.repeat(40),'','index.js'),/ai-installation-account-mismatch/);
+ const statePath=join(folder,'owner.json');
+ const result=await ownerDeploy({api,target,plan,artifact,statePath,env,fetch:provider.fetch});assert.equal(result.receipt.changed,true);
+ assert.ok(provider.state.settings.bindings.some(b=>b.type==='ai'&&b.name==='AI'));
+ assert.equal(JSON.parse(provider.state.settings.bindings.find(b=>b.name==='RER_AI_AUTHORITY').text).permitted.limits.calls,2);
+ assert.equal(provider.state.settings.bindings.find(b=>b.name==='RER_AI_ACCOUNT_ID').text,provider.accountId);
+ assert.equal(provider.state.settings.bindings.find(b=>b.name==='RER_AI_BUCKET_NAME').text,'synthetic-production-ai-images');
+ assert.ok(!String(await readFile(statePath)).includes(env.AI_PRIVACY_TOKEN));
+ assert.throws(()=>verifyBindings([{type:'ai',name:'OTHER'}],[{type:'ai',name:'AI'}]),/undeclared-native-ai-binding/);
+ assert.throws(()=>verifyBindings([{type:'ai',name:'AI',account_id:'untrusted'}],[{type:'ai',name:'AI'}]),/binding-readback-mismatch/);
+});
