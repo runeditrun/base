@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.79
+
+- Reuse bounded keep-alive connections in the local dev proxy and retry stale connections for bodyless reads.
+- Give each native demo visitor a separate 64-hex installation key so dependency signing works.
+
 ## 0.2.78
 
 - Add signed seed test delivery to the optional mail relay, with public Worker routing, bounded target checks and invocation logs.
