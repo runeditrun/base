@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.78-dev.ga962e36a",
+  "cliVersion": "0.2.78-dev.g0893d69d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1703,7 +1703,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "31f1f0260eca7406859cb5dc7e7fc7003bb0994158ba60e97c2451736f0211d0"
+      "sha256": "5bd7d13b5121932e8b91c774ac978705d862f776d69372e4872e0e0c222623bb"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",
@@ -1747,7 +1747,7 @@
     },
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",
-      "sha256": "5e4c2f1502f1a36e3b6b00e8f5a7c14db8cb3692566fe38e1d017776f24016a7"
+      "sha256": "8914175737dcc7efa9f722a470cd9967c4487d271eedc0b4d7653cf93f380ea4"
     },
     "modules/deploy-kit/public-origin.mjs": {
       "source": "modules/deploy-kit/public-origin.mjs",
