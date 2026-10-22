@@ -53,8 +53,9 @@ export function validateRequest(value) {
 export function approve(request, authority) {
   if (!request || !authority) fail('ai_disabled',503);
   validateRequest(request);
-  exact(authority, ['schema','enabled','installation','environment','tenant','revision','custody','permitted','prices','proofs']);
+  exact(authority, ['schema','enabled','accountId','installation','environment','tenant','revision','custody','permitted','prices','proofs']);
   if (authority.schema !== 1 || authority.enabled !== true) fail('ai_disabled', 503);
+  if (!/^[a-f0-9]{32}$/.test(authority.accountId ?? '')) fail('ai_policy_invalid');
   if (![authority.installation,authority.environment,authority.tenant].every(name) || !name(authority.revision) || !name(authority.custody)) fail('ai_policy_invalid');
   validateRequest(authority.permitted);
   for (const key of ['provider','transport','binding','budgetBinding','imageBinding']) if (request[key] !== authority.permitted[key]) fail('ai_policy_conflict');
@@ -65,7 +66,7 @@ export function approve(request, authority) {
   for (const key of ['textModels','imageModels']) approved[key] = request[key].filter(m => permitted[key].includes(m));
   approved.limits = Object.fromEntries(limits.map(k => [k, Math.min(request.limits[k], permitted.limits[k])]));
   for (const key of Object.keys(approved.operations)) approved.operations[key] = Math.min(request.operations[key], permitted.operations[key]);
-  return { ...approved, installation:authority.installation,environment:authority.environment,tenant:authority.tenant,revision:authority.revision,custody:authority.custody,prices:authority.prices,proofs:authority.proofs };
+  return { ...approved, accountId:authority.accountId, installation:authority.installation,environment:authority.environment,tenant:authority.tenant,revision:authority.revision,custody:authority.custody,prices:authority.prices,proofs:authority.proofs };
 }
 export function priceFor(policy, purpose, now = Date.now()) {
   const price = policy.prices?.[purpose.model];

@@ -19,6 +19,7 @@ export class AiAuthority {
     let request, authority;
     try { request = JSON.parse(this.env.RER_AI_REQUEST); authority = JSON.parse(this.env.RER_AI_AUTHORITY); } catch { fail('ai_disabled', 503); }
     const policy = approve(request,authority);
+    if (this.env.RER_AI_ACCOUNT_ID !== policy.accountId) fail('ai_policy_conflict');
     return policy;
   }
   async privacy() {

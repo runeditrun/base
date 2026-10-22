@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 const text = '@cf/qwen/qwen3.8-27b', image = '@cf/black-forest-labs/flux-2-dev';
 export const declaration = {schema:1,provider:'cloudflare',transport:'native',binding:'AI',budgetBinding:'AI_BUDGET',imageBinding:'AI_IMAGES',textModels:[text],imageModels:[image],purposes:[{id:'site-read',kind:'text',model:text},{id:'house-style',kind:'image',model:image}],limits:{calls:100,units:100000000,microUsd:100000000},operations:{textCalls:2,maxInputBytes:10000,maxOutputTokens:1024,imageUnits:100,timeoutMs:1000}};
-export const authority = {schema:1,enabled:true,installation:'synthetic-installation',environment:'test',tenant:'synthetic-tenant',revision:'initial',custody:'original',permitted:declaration,
+export const authority = {schema:1,enabled:true,accountId:'a'.repeat(32),installation:'synthetic-installation',environment:'test',tenant:'synthetic-tenant',revision:'initial',custody:'original',permitted:declaration,
   prices:Object.fromEntries([text,image].map(m => [m,{version:'synthetic-prices',validUntil:Date.now()+86400000,inputMicroUsdPerMillion:450000,outputMicroUsdPerMillion:3200000,imageMicroUsdPerUnit:410}])),
   proofs:{[text]:{reference:'synthetic-text-edge',kind:'text',maxInputTokens:262144,maxOutputTokens:1024,maxImageUnits:0,mime:''},[image]:{reference:'synthetic-image-edge',kind:'image',maxInputTokens:0,maxOutputTokens:0,maxImageUnits:100,mime:'image/png'}}};
 const built = await build({entryPoints:[new URL('./native-worker.mjs',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'browser',target:'es2022'});

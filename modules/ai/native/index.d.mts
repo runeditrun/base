@@ -5,7 +5,7 @@ export interface NativeAiRequest {
  operations: {textCalls:2;maxInputBytes:number;maxOutputTokens:number;imageUnits:number;timeoutMs:number};
 }
 export interface NativeAiAuthority {
- schema:1; enabled:boolean; installation:string; environment:string; tenant:string; revision:string; custody:string;
+ schema:1; enabled:boolean; accountId:string; installation:string; environment:string; tenant:string; revision:string; custody:string;
  permitted:NativeAiRequest;
  prices:Record<string,{version:string;validUntil:number;inputMicroUsdPerMillion:number;outputMicroUsdPerMillion:number;imageMicroUsdPerUnit:number}>;
  proofs:Record<string,{reference:string;kind:'text'|'image';maxInputTokens:number;maxOutputTokens:number;maxImageUnits:number;mime:string}>;

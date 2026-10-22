@@ -45,7 +45,8 @@ The exact ids below were rechecked in primary Cloudflare docs on 23 October
 
 Installation authority supplies `RER_AI_REQUEST` and `RER_AI_AUTHORITY` privately
 from trusted installation configuration, never setup/browser inputs. Authority
-has schema 1, `enabled` (default off), installation/environment/tenant ids,
+has schema 1, `enabled` (default off), the installation account `accountId`,
+installation/environment/tenant ids,
 `revision`, a custody generation, `permitted` (the same strict request schema),
 `prices` and `proofs`. `approve` computes the intersection and smaller limits;
 seed requests cannot expand authority. One authority instance is selected using
@@ -63,8 +64,8 @@ including the system/template overhead. The actual output request uses
 No free-tier or cached-token discount reduces a reservation.
 
 For Free deployment, the owner declaration also names the SQLite DO and R2
-resources plus a required secret binding `RER_AI_PRIVACY_TOKEN` with an
-owner-supplied environment source. Supply `RER_AI_AUTHORITY` through the
+resources plus class `AiAuthority` and a required secret binding
+`RER_AI_PRIVACY_TOKEN` sourced from the same owner-only environment name. Supply `RER_AI_AUTHORITY` through the
 owner-only deployment environment or private `--env-file`. Its installation is
 the derived Worker name (for example `lamp-production`), environment is
 `production`, and tenant is the server-owned installation tenant. Do not put
@@ -136,7 +137,7 @@ other apps and changing prices mean this is not an account-wide spending cap.
 
 The Free owner-account deployment consumer accepts native AI only with a
 separate `RER_AI_AUTHORITY` supplied by the deploying owner, bound to the derived
-Worker installation and environment. It derives the payer account and bucket
+Worker installation, environment and exact payer account. It derives the payer account and bucket
 name, requires the privacy-token secret, checks current prices/proof records,
 renders the native binding and verifies exact provider readback. A missing
 approval, conflicting built binding or cross-account plan fails closed. This

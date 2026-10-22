@@ -8,7 +8,7 @@ import {validateMailSpec} from './mail.mjs';
 import {validateNativeExport} from './native-export.mjs';
 import {validateAiSpec} from './ai.mjs';
 import {seedSignIn} from './sign-in.mjs';
-const reserved = new Set(['ASSETS','RER_RELEASE_DIGEST','RER_PREVIEW_TOKEN','RER_VERSION_METADATA','RER_INSTALLATION_ID','RER_MANAGEMENT_ORIGIN']);
+const reserved = new Set(['ASSETS','RER_RELEASE_DIGEST','RER_PREVIEW_TOKEN','RER_VERSION_METADATA','RER_INSTALLATION_ID','RER_MANAGEMENT_ORIGIN','RER_AI_REQUEST','RER_AI_AUTHORITY','RER_AI_ACCOUNT_ID','RER_AI_BUCKET_NAME']);
 const specKeys = ['schema','resources','migrations','compatibilityDate','compatibilityFlags','durableObjects','durableObjectMigrations','publicVariables','secretNames','optionalSecretNames','schedules','queueConsumers','healthPath','recovery','emailSending','providerEffects','surfaces','initialSetup','mail','nativeExport','ai'];
 /** Validate the exact producer contract without implying service acceptance or provider consent. */
 export function validateCandidateSpec(spec) {
