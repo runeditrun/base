@@ -71,6 +71,8 @@ test('stable private image purpose dispatches once, reuses R2, and refuses chang
  assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),samplePng());assert.match(response.headers.get('cache-control'),/private, no-store/);
  assert.equal((await r.call('/api/ai?purpose=house-style&key=arbitrary',{cookie:r.cookie})).status,400);
  assert.equal((await r.call('/api/ai?purpose=house-style')).status,403);
+ assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie,origin:'https://other.test'})).status,403);
+ assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie,headers:{'sec-fetch-site':'cross-site'}})).status,403);
  r.public(true);
  assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie})).status,503);
  assert.equal((await post(r,image('five'))).status,503);assert.equal(r.hits.length,1);

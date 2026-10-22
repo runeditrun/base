@@ -4,7 +4,10 @@ import { boundedJson, errorResponse, privateHeaders } from './authority.mjs';
 /** Pair with the adopting app's real auth service. Tenant comes from server authority. */
 export function createNativeAiConsumer({env,auth,origin,request:declaration,authority,mode = 'disabled',prepareSecond}) {
   async function call(request,input) {
-    if (input.action === 'read') requireOrigin(request,{origin});
+    if (input.action === 'read') {
+      requireOrigin(request,{origin});
+      if (request.headers.get('sec-fetch-site') === 'cross-site' || request.headers.has('origin') && request.headers.get('origin') !== origin) fail('ai_origin_refused',403);
+    }
     else requirePost(request,{origin});
     const session = await auth.getSession(request);
     if (!session || session.operator?.role !== 'owner' || session.operator?.status !== 'active') fail('ai_owner_required',403);

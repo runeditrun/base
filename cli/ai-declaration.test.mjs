@@ -17,7 +17,8 @@ test('rer check reports the native declaration and refuses seed-supplied price a
 
 test('native AI installation recovery is refused before archive or database mutation',async t=>{
  const seed=await portabilityFixture(t,{generated:false});
+ await seed.run(['export','--output','exports/before-ai.rer']);
  await writeFile(join(seed.root,'rer-packaging.json'),JSON.stringify({artifact:{specInputs:{ai:{schema:1}}}}));
- const result=await seed.run(['import','--input','missing.rer','--yes'],4);
+ const result=await seed.run(['import','--input','exports/before-ai.rer','--yes'],4);
  assert.ok(JSON.stringify(result).includes('ai_reconciliation_required'));
 });
