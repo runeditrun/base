@@ -170,3 +170,15 @@ test('image-unit prices reserve the full quoted image cost before dispatch',asyn
  assert.equal((await post(r,image('budgeted'))).status,402);assert.equal(r.hits.length,0);
  assert.equal((await r.status()).totals.microUsd,0);
 });
+
+test('an unapproved deployed source cannot dispatch, and reauthorization preserves prior liability',async t=>{
+ const r=await nativeRuntime(t,{provider:()=>output(null)});
+ assert.equal((await post(r,text('first'))).status,409);const before=await r.status();
+ await r.restart({RER_DEPLOY_SOURCE:'6'.repeat(40)});
+ assert.equal((await post(r,text('rollback'))).status,409);assert.equal(r.hits.length,1);
+ const policy={...authority,sourceSha:'6'.repeat(40),revision:'source-approved'};
+ await r.restart({RER_AI_AUTHORITY:JSON.stringify(policy)});
+ assert.equal((await post(r,text('rollback'))).status,409);
+ assert.equal((await post(r,{action:'reconcile'})).status,200);
+ assert.deepEqual((await r.status()).totals,before.totals);assert.equal(r.hits.length,1);
+});

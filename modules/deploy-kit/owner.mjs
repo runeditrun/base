@@ -134,7 +134,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   assert(artifact.migrations.every(migration => d1.some(item => item.binding === migration.binding)), 'undeclared-migration-binding');
   const queues = entries(declaration,'queues');
   for (const item of queues) assert(item.deadLetterQueue === undefined || queues.some(other => other.binding === item.deadLetterQueue), 'invalid-dead-letter-queue');
-  const native = ownerAi(target,declaration,env,name);
+  const native = ownerAi(target,declaration,env,name,artifact.source?.sha);
   const vars = {...(declaration.vars ?? {}),...(native.vars ?? {})};
   const origin = publicOrigin(declaration, env);
   if (declaration.originVar !== undefined) {

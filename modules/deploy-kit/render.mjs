@@ -4,7 +4,10 @@ import { assert, stable } from './validation.mjs';
  * `rer verify` serves the local build with this same setting (cli/hosted-output.mjs). */
 export const RUN_WORKER_FIRST = true;
 export function renderConfig(plan, resources, accountId, sourceSha, fingerprint, main, hasAssets = false) {
-  if (plan.ai) assert(plan.vars.RER_AI_ACCOUNT_ID === accountId,'ai-installation-account-mismatch');
+  if (plan.ai) {
+    assert(plan.vars.RER_AI_ACCOUNT_ID === accountId,'ai-installation-account-mismatch');
+    assert(plan.ai.authority.sourceSha === sourceSha,'ai-source-approval-mismatch');
+  }
   return { ...(plan.ai ? {ai:{binding:plan.ai.request.binding}} : {}),name:plan.worker, account_id:accountId, main, compatibility_date:plan.compatibilityDate, compatibility_flags:plan.compatibilityFlags ?? [], workers_dev:plan.workersDev !== false,
     ...(hasAssets ? {assets:{directory:'__static',binding:'ASSETS',run_worker_first:RUN_WORKER_FIRST}} : {}),
     vars:{...plan.vars,RER_DEPLOY_SOURCE:sourceSha,RER_DEPLOY_FINGERPRINT:fingerprint}, version_metadata:{binding:'RER_VERSION'},

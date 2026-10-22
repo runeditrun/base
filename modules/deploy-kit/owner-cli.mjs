@@ -50,7 +50,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   publicOrigin(declaration, env);
   let artifact;
   if (command === 'dry-run') {
-    artifact = await packageBuild({root,source:{sha:'0'.repeat(40),tree:'0'.repeat(40)},runIdentity:{id:'0',attempt:'1'},productDirectory:values.product,ai:declaration.ai});
+    artifact = declaration.ai ? await ownerArtifact(root,values.product,declaration.ai) : await packageBuild({root,source:{sha:'0'.repeat(40),tree:'0'.repeat(40)},runIdentity:{id:'0',attempt:'1'},productDirectory:values.product,ai:declaration.ai});
     const worker = ownerWorkerName(declaration.project,values.environment);
     ownerPlan({project:declaration.project,environment:values.environment,worker,origin:`https://${worker}.example.invalid`},declaration,artifact,{localOnlyKeys,env});
   }

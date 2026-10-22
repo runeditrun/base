@@ -45,7 +45,7 @@ The exact ids below were rechecked in primary Cloudflare docs on 23 October
 
 Installation authority supplies `RER_AI_REQUEST` and `RER_AI_AUTHORITY` privately
 from trusted installation configuration, never setup/browser inputs. Authority
-has schema 1, `enabled` (default off), the installation account `accountId`,
+has schema 1, `enabled` (default off), the installation account `accountId`, approved committed `sourceSha`,
 installation/environment/tenant ids,
 `revision`, a custody generation, `permitted` (the same strict request schema),
 `prices` and `proofs`. `approve` computes the intersection and smaller limits;
@@ -122,13 +122,17 @@ metadata/unknown chunks, malformed Base64 and bomb outputs are refused.
 Ledgers contain hashes, counters, finite purpose ids and states, never prompts,
 text outputs, cookies, tokens or raw provider exceptions.
 
-No epoch reset exists. Policy/custody/revision changes freeze the authority and
+No epoch reset exists. Runtime compares the approved source SHA with the
+deployment producer's source binding. A changed/rolled-back source is refused
+until installation authority approves it; a new policy then freezes existing
+custody until owner reconciliation. Native dry-run preparation also requires
+committed approved source. Policy/custody/revision changes freeze the authority and
 preserve all rows. Migration/restore must disable AI; declared native-AI archive
 restore is refused. Reconciliation requires a new installation-authorized revision and an active
 owner POST with `action:"reconcile"`; it checks the retained totals against
 the new limits and preserves every liability and purpose tombstone. It cannot
-refund uncertain work or erase debt. There is no wipe endpoint. Infrastructure
-rollback detection remains required before production qualification. Never erase
+refund uncertain work or erase debt. There is no wipe endpoint. Direct infrastructure rewinds outside the guarded restore/deploy doors remain
+unqualified; production recovery must disable AI and reconcile external custody. Never erase
 or replace the DO or purpose tombstones to recover capacity. Raw bindings,
 arbitrary Worker code and account owners can bypass the wrapper; infrastructure,
 other apps and changing prices mean this is not an account-wide spending cap.
@@ -137,7 +141,7 @@ other apps and changing prices mean this is not an account-wide spending cap.
 
 The Free owner-account deployment consumer accepts native AI only with a
 separate `RER_AI_AUTHORITY` supplied by the deploying owner, bound to the derived
-Worker installation, environment and exact payer account. It derives the payer account and bucket
+Worker installation, environment, exact payer account and artifact source SHA. It derives the payer account and bucket
 name, requires the privacy-token secret, checks current prices/proof records,
 renders the native binding and verifies exact provider readback. A missing
 approval, conflicting built binding or cross-account plan fails closed. This

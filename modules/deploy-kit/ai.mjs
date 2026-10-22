@@ -1,7 +1,7 @@
 import { NATIVE_MODELS, approve, canonical, exact, fail, reservation, validateRequest } from '../ai/native/policy.mjs';
 export const AI_VARIABLES = ['RER_AI_REQUEST','RER_AI_AUTHORITY','RER_AI_ACCOUNT_ID','RER_AI_BUCKET_NAME'];
 /** The deploying account owner supplies this authority separately from seed source. */
-export function ownerAi(target,declaration,env,bucketName) {
+export function ownerAi(target,declaration,env,bucketName,sourceSha) {
   if (declaration.ai === undefined) return {};
   validateRequest(declaration.ai);
   if (typeof env.RER_AI_AUTHORITY !== 'string') fail('ai_hosting_unproven',503);
@@ -9,7 +9,7 @@ export function ownerAi(target,declaration,env,bucketName) {
   try { authority = JSON.parse(env.RER_AI_AUTHORITY); } catch { fail('ai_policy_invalid',400); }
   const approved = approve(declaration.ai,authority);
   const accountId = target.accountId ?? env.CLOUDFLARE_ACCOUNT_ID;
-  if (authority.accountId !== accountId || authority.installation !== target.worker || authority.environment !== target.environment || !/^[a-f0-9]{32}$/.test(accountId ?? '')) fail('ai_policy_conflict');
+  if (authority.sourceSha !== sourceSha || authority.accountId !== accountId || authority.installation !== target.worker || authority.environment !== target.environment || !/^[a-f0-9]{32}$/.test(accountId ?? '')) fail('ai_policy_conflict');
   if (Object.keys(declaration.vars ?? {}).some(k => k.startsWith('RER_AI_'))) fail('ai_policy_conflict');
   if (!declaration.durableObjects?.some(d => d.binding === approved.budgetBinding && d.className === 'AiAuthority' && d.storage === 'sqlite') || !declaration.r2?.some(d => d.binding === approved.imageBinding)) fail('ai_binding_missing');
   if (!declaration.secrets?.some(s => s.binding === 'RER_AI_PRIVACY_TOKEN' && s.environment === 'RER_AI_PRIVACY_TOKEN' && !s.optional)) fail('ai_privacy_unverified',503);
