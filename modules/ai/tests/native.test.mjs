@@ -97,3 +97,26 @@ test('opt-out, expired prices, unproved models and unsupported dev/demo refuse b
   const r=await nativeRuntime(t,change);assert.ok((await post(r,text('blocked'))).status>=400);assert.equal(r.hits.length,0);
  });
 });
+
+test('changed installation policy freezes dispatch until owner reconciliation preserves every liability',async t=>{
+ const r=await nativeRuntime(t,{provider:()=>output(null)});
+ assert.equal((await post(r,text('first'))).status,409);
+ const before=await r.status();
+ const policy={...authority,revision:'reconciled',custody:'restored'};
+ await r.restart({RER_AI_AUTHORITY:JSON.stringify(policy)});
+ assert.equal((await post(r,text('new'))).status,409);assert.equal(r.hits.length,1);
+ const frozen=await r.status();assert.equal(frozen.frozen,true);assert.deepEqual(frozen.calls,before.calls);
+ assert.equal((await post(r,{action:'reconcile'},{cookie:undefined})).status,403);
+ assert.equal((await post(r,{action:'reconcile'})).status,200);
+ const after=await r.status();assert.deepEqual(after.totals,before.totals);assert.deepEqual(after.operations,before.operations);
+ assert.equal((await post(r,text('first'))).status,409);assert.equal(r.hits.length,1);
+});
+
+test('corrupt or replaced private objects cannot be read, overwritten or regenerated',async t=>{
+ const r=await nativeRuntime(t);assert.equal((await post(r,image('first'))).status,200);
+ const listing=await r.bucket.list(),key=listing.objects[0].key;
+ await r.bucket.put(key,samplePng(),{httpMetadata:{contentType:'image/png'},customMetadata:{operation:'other',scope:'other',digest:'0'.repeat(64)}});
+ await r.restart();
+ assert.equal((await r.call('/api/ai?purpose=house-style',{cookie:r.cookie})).status,409);
+ assert.equal((await post(r,image('second'))).status,409);assert.equal(r.hits.length,1);
+});

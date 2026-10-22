@@ -31,6 +31,7 @@ export class AiAuthority {
       exact(input, ['action','tenant','purpose','command','input','second']);
       if (input.tenant !== policy.tenant) fail('ai_tenant_refused', 403);
       if (input.action === 'status') { this.ledger.bind(policy,true); return Response.json(this.ledger.snapshot(), {headers:privateHeaders}); }
+      if (input.action === 'reconcile') { this.ledger.reconcile(policy); await this.ctx.storage.sync(); return Response.json({reconciled:true}, {headers:privateHeaders}); }
       this.ledger.bind(policy);
       const purpose = policy.purposes.find(p => p.id === input.purpose);
       if (!purpose) fail('ai_purpose_refused', 403);
@@ -44,7 +45,7 @@ export class AiAuthority {
         if (!object) fail('ai_operation_uncertain');
         return new Response(object.bytes, {headers:{...privateHeaders,'content-type':object.mime}});
       }
-      if (!['generate','start','finish'].includes(input.action) || !name(input.command)) fail('ai_invalid_request',400);
+      if (!['generate','start','finish','cancel'].includes(input.action) || !name(input.command)) fail('ai_invalid_request',400);
       if (purpose.kind === 'image') await this.privacy();
       const maximum = reservation(policy,purpose);
       // Only currently specified native contracts can be selected. Unknown ids never inherit an adapter.
@@ -54,6 +55,12 @@ export class AiAuthority {
       if (input.second !== undefined) fail('ai_invalid_request',400);
       const hash = await digest(canonical([purpose,input.input]));
       const id = await digest(canonical([policy.installation,policy.environment,policy.tenant,purpose.id,purpose.kind === 'image' ? 'stable' : input.command]));
+      if (input.action === 'cancel') {
+        const operation = this.ledger.operation(id);
+        if (!operation || operation.tenant !== policy.tenant || operation.purpose !== purpose.id || operation.kind !== 'text') fail('ai_operation_conflict');
+        this.ledger.releaseUnsent(id);
+        return Response.json({cancelled:true},{headers:privateHeaders});
+      }
       if (input.action === 'finish') {
         if (purpose.kind !== 'text') fail('ai_invalid_request',400);
         const operation = this.ledger.operation(id);

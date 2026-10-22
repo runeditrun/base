@@ -22,11 +22,11 @@ export function createNativeAiConsumer({env,auth,origin,request:declaration,auth
     if (!first.ok) return first;
     let second;
     try { second = await prepareSecond((await first.json()).result,input.input); }
-    catch { fail('ai_second_call_unavailable',503); }
+    catch { await send({...input,action:'cancel'}); fail('ai_second_call_unavailable',503); }
     // Reauthorize before the second effect as well. Reserved work is retained if auth was revoked.
     const current = await auth.getSession(request);
     if (!current || current.operator?.id !== session.operator.id || current.operator?.role !== 'owner' || current.operator?.status !== 'active') fail('ai_owner_required',403);
-    if (second === null) return Response.json({result:null}, {headers:privateHeaders});
+    if (second === null) { await send({...input,action:'cancel'}); return Response.json({result:null}, {headers:privateHeaders}); }
     return send({...input,action:'finish',input:second});
   }
   return { async handle(request) {
@@ -42,7 +42,7 @@ export function createNativeAiConsumer({env,auth,origin,request:declaration,auth
       if (session?.operator?.role !== 'owner' || session?.operator?.status !== 'active') fail('ai_owner_required',403);
       const input = await boundedJson(request);
       exact(input,['action','purpose','command','input']);
-      if (!['text','generate','status'].includes(input.action)) fail('ai_invalid_request',400);
+      if (!['text','generate','status','reconcile'].includes(input.action)) fail('ai_invalid_request',400);
       return await call(request,input);
     } catch (error) { return errorResponse(error); }
   } };

@@ -22,6 +22,18 @@ export class Ledger {
     });
     if (frozen && !inspect) fail('ai_reconciliation_required');
   }
+  reconcile(policy) {
+    this.transaction(() => {
+      const row = this.one('SELECT * FROM ai_state WHERE id=1');
+      if (!row) fail('ai_reconciliation_required');
+      const previous = JSON.parse(row.policy).policy;
+      if (previous.installation !== policy.installation || previous.environment !== policy.environment || previous.tenant !== policy.tenant || previous.revision === policy.revision) fail('ai_reconciliation_required');
+      const totals = this.totals();
+      if (counters.some(k => sum(totals[k]) > policy.limits[k])) fail('ai_budget_exhausted',402);
+      // New authority may acknowledge custody and raise limits, never erase paid effects.
+      this.storage.sql.exec('UPDATE ai_state SET policy=?,frozen=0 WHERE id=1',canonical({installation:policy.installation,environment:policy.environment,custody:policy.custody,revision:policy.revision,policy}));
+    });
+  }
   totals() { return this.one('SELECT coalesce(sum(calls),0) calls,coalesce(sum(units),0) units,coalesce(sum(microUsd),0) microUsd FROM ai_calls'); }
   operation(id) { return this.one('SELECT * FROM ai_operations WHERE id=?', id); }
   findImage(tenant, purpose) { return this.one("SELECT * FROM ai_operations WHERE tenant=? AND purpose=? AND kind='image'", tenant, purpose); }

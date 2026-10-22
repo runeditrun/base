@@ -113,9 +113,11 @@ text outputs, cookies, tokens or raw provider exceptions.
 
 No epoch reset exists. Policy/custody/revision changes freeze the authority and
 preserve all rows. Migration/restore must disable AI; declared native-AI archive
-restore is refused. There is no self-service reconciliation or wipe endpoint in
-this candidate. An installation-authority reconciliation protocol and proof of
-rollback detection remain required before production qualification. Never erase
+restore is refused. Reconciliation requires a new installation-authorized revision and an active
+owner POST with `action:"reconcile"`; it checks the retained totals against
+the new limits and preserves every liability and purpose tombstone. It cannot
+refund uncertain work or erase debt. There is no wipe endpoint. Infrastructure
+rollback detection remains required before production qualification. Never erase
 or replace the DO or purpose tombstones to recover capacity. Raw bindings,
 arbitrary Worker code and account owners can bypass the wrapper; infrastructure,
 other apps and changing prices mean this is not an account-wide spending cap.

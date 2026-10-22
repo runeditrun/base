@@ -20,9 +20,8 @@ export function samplePng() {
 export async function nativeRuntime(t,{request=declaration,policy=authority,provider,bindings={}}={}) {
  const folder=await mkdtemp(join(tmpdir(),'rer-ai-native-'));
  const hits=[];let publicBucket=false;
- const requestedLocal = bindings.AUTH_LOCAL;
- const env={AUTH_ORIGIN:'https://reference.test',OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-session-secret-for-native-ai-tests-0001',SETUP_TOKEN:'synthetic-setup-token-for-native-ai-tests-0001',INSTALLATION_KEY:'a'.repeat(64),RER_AI_REQUEST:JSON.stringify(request),RER_AI_AUTHORITY:JSON.stringify(policy),RER_AI_ACCOUNT_ID:'a'.repeat(32),RER_AI_BUCKET_NAME:'synthetic-ai-images',RER_AI_PRIVACY_TOKEN:'synthetic-privacy-token',...bindings};
- const init=()=>new Miniflare({...convertV4MiniflareOptions({modules:true,script:built.outputFiles[0].text,compatibilityDate:'2026-09-08',bindings:{...env,AUTH_LOCAL:undefined},d1Databases:{DB:'ai-auth'},r2Buckets:{AI_IMAGES:'ai-images'},durableObjects:{AI_BUDGET:{className:'AiAuthority',useSQLite:true}},outboundService:async request=>{
+ const env={AUTH_ORIGIN:bindings.AUTH_LOCAL === 'true' ? 'http://127.0.0.1:8787' : 'https://reference.test',OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-session-secret-for-native-ai-tests-0001',SETUP_TOKEN:'synthetic-setup-token-for-native-ai-tests-0001',INSTALLATION_KEY:'a'.repeat(64),RER_AI_REQUEST:JSON.stringify(request),RER_AI_AUTHORITY:JSON.stringify(policy),RER_AI_ACCOUNT_ID:'a'.repeat(32),RER_AI_BUCKET_NAME:'synthetic-ai-images',RER_AI_PRIVACY_TOKEN:'synthetic-privacy-token',...bindings};
+ const init=()=>new Miniflare({...convertV4MiniflareOptions({modules:true,script:built.outputFiles[0].text,compatibilityDate:'2026-09-08',bindings:env,d1Databases:{DB:'ai-auth'},r2Buckets:{AI_IMAGES:'ai-images'},durableObjects:{AI_BUDGET:{className:'AiAuthority',useSQLite:true}},outboundService:async request=>{
   if(request.url.startsWith('https://api.cloudflare.com/'))return Response.json({success:true,result:request.url.endsWith('/managed')?{enabled:publicBucket}:{domains:[]}});
   if(request.url==='https://provider.test/infer'){
    const body=await request.json();hits.push(body);
@@ -36,10 +35,9 @@ export async function nativeRuntime(t,{request=declaration,policy=authority,prov
  t.after(async()=>{await mf.dispose();await rm(folder,{recursive:true,force:true});});
  const db=await mf.getD1Database('DB');
  for(const sql of schema.replace(/^--.*$/gm,'').match(/CREATE TRIGGER[\s\S]*?END;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g))await db.prepare(sql).run();
- const call=async(path,{body,cookie,origin=env.AUTH_ORIGIN,method=body===undefined?'GET':'POST',headers={}}={})=>mf.dispatchFetch('http://localhost/',{method:'POST',body:JSON.stringify({url:env.AUTH_ORIGIN+path,method,headers:{host:'reference.test',origin,...(body===undefined?{}:{'content-type':'application/json'}),...(cookie?{cookie}:{}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})})});
+ const call=async(path,{body,cookie,origin=env.AUTH_ORIGIN,method=body===undefined?'GET':'POST',headers={}}={})=>mf.dispatchFetch('http://localhost/',{method:'POST',body:JSON.stringify({url:env.AUTH_ORIGIN+path,method,headers:{host:new URL(env.AUTH_ORIGIN).host,origin,...(body===undefined?{}:{'content-type':'application/json'}),...(cookie?{cookie}:{}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})})});
  const bootstrap=await call('/auth/bootstrap',{body:{token:env.SETUP_TOKEN,displayName:'Synthetic Owner'}});
  if(bootstrap.status!==303)throw Error(`Bootstrap failed ${bootstrap.status}: ${await bootstrap.text()}`);
  const cookie=bootstrap.headers.get('set-cookie').split(';')[0];
- if (requestedLocal) { env.RER_DEMO='true'; await mf.dispose(); mf=init(); await mf.ready; }
  return {call,cookie,hits,get db(){return mf.getD1Database('DB');},get bucket(){return mf.getR2Bucket('AI_IMAGES');},public(value){publicBucket=value;},async restart(change={}){await mf.dispose();Object.assign(env,change);mf=init();await mf.ready;},async status(){const r=await call('/api/ai',{cookie,body:{action:'status'}});return {status:r.status,...await r.json()};}};
 }
