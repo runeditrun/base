@@ -60,6 +60,16 @@ export function approve(request, authority) {
   validateRequest(authority.permitted);
   for (const key of ['provider','transport','binding','budgetBinding','imageBinding']) if (request[key] !== authority.permitted[key]) fail('ai_policy_conflict');
   const permitted = authority.permitted;
+  const models = [...new Set([...permitted.textModels,...permitted.imageModels])];
+  exact(authority.prices,models); exact(authority.proofs,models);
+  for (const price of Object.values(authority.prices)) {
+    exact(price,['version','validUntil','inputMicroUsdPerMillion','outputMicroUsdPerMillion','imageMicroUsdPerUnit']);
+    if (!name(price.version) || ![price.validUntil,price.inputMicroUsdPerMillion,price.outputMicroUsdPerMillion,price.imageMicroUsdPerUnit].every(integer)) fail('ai_policy_invalid');
+  }
+  for (const proof of Object.values(authority.proofs)) {
+    exact(proof,['reference','kind','maxInputTokens','maxOutputTokens','maxImageUnits','mime']);
+    if (!name(proof.reference) || !['text','image'].includes(proof.kind) || ![proof.maxInputTokens,proof.maxOutputTokens,proof.maxImageUnits].every(integer) || typeof proof.mime !== 'string' || !['','image/png'].includes(proof.mime)) fail('ai_policy_invalid');
+  }
   const purposes = request.purposes.filter(p => permitted.purposes.some(q => canonical(p) === canonical(q)));
   const approved = structuredClone(request);
   approved.purposes = purposes;

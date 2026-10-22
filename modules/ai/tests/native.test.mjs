@@ -94,9 +94,11 @@ test('opt-out, expired prices, unproved models and unsupported dev/demo refuse b
  for(const change of [
   {policy:{...authority,enabled:false}},
   {policy:{...authority,prices:{}}},
+  {policy:{...authority,prices:undefined}},
+  {policy:{...authority,prices:{...authority.prices,secret:'synthetic-policy-secret-sentinel'}}},
   {policy:{...authority,prices:Object.fromEntries(Object.entries(authority.prices).map(([k,v])=>[k,{...v,validUntil:0}]))}},
   {policy:{...authority,proofs:{}}},
-  {policy:{...authority,permitted:{...declaration,textModels:[],purposes:[declaration.purposes[1]]}}},
+  {policy:{...authority,permitted:{...declaration,textModels:[],purposes:[declaration.purposes[1]]},prices:{[declaration.imageModels[0]]:authority.prices[declaration.imageModels[0]]},proofs:{[declaration.imageModels[0]]:authority.proofs[declaration.imageModels[0]]}}},
   {bindings:{AUTH_LOCAL:'true'}},
   {bindings:{RER_DEMO:'true'}},
  ])await t.test('refusal',async t=>{
