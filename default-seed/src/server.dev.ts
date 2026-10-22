@@ -10,3 +10,5 @@ import { withDevAi } from '../../modules/ai/dev/index.mjs'
 
 const development = withDevAi<Bindings, typeof worker>(worker, { bindings: requireBindings })
 export default withDevIdentity<Bindings, typeof worker>(development, { bindings: requireBindings, config: authConfig, personas: devPersonas })
+
+export { AiAuthority } from './server'

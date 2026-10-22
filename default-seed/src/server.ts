@@ -1,3 +1,5 @@
+export { AiAuthority } from '../../modules/ai/index.mjs'
+import { nativeAiResponse } from './core/platform/ai.server'
 import { withDemo } from '../../modules/demo/index.mjs'
 import { dependenciesResponse } from './core/platform/auth/dependencies.server'
 import { firstRunResponse } from '../../foundation/runtime/setup'
@@ -30,6 +32,8 @@ export default withDemo({
     const asset = await staticAssetResponse(request, bindings)
     if (asset) return asset
     bindings = requireBindings(bindings)
+    const ai = await nativeAiResponse(request, bindings)
+    if (ai) return rejectedResponse(request, ai)
     const imported = await importDoorResponse(request, bindings)
     // Admission runs before dispatch, so finish refused uploads with the same
     // bounded drain as the normal router. Otherwise workerd can replace 4xx

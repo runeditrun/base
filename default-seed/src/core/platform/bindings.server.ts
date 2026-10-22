@@ -1,6 +1,11 @@
 import { env } from 'cloudflare:workers'
 
 export interface Bindings {
+  RER_AI_REQUEST?: string
+  RER_AI_AUTHORITY?: string
+  RER_AI_ACCOUNT_ID?: string
+  RER_AI_BUCKET_NAME?: string
+  RER_AI_PRIVACY_TOKEN?: string
   DB: D1Database
   JOBS: Queue
   /** Built browser files; hosted deploys run the Worker first (staticAssetResponse). */

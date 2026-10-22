@@ -36,6 +36,7 @@ export function verifyBindings(actual, expected) {
     // Provider-added secrets and ordinary bindings can be legitimate, but every service
     // binding grants authority and must be explicitly declared by the caller.
     assert(binding.type !== 'service' || services.has(binding.name), 'binding-readback-mismatch');
+    assert(binding.type !== 'ai', 'undeclared-native-ai-binding');
   }
   for (const desired of expected) {
     const rows = actual.filter(x => x.name === desired.name); assert(rows.length === 1,'binding-readback-mismatch');

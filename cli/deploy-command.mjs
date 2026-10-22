@@ -1,3 +1,4 @@
+import { refuseAiHosting } from '../modules/delivery-producer/ai.mjs';
 import { requireProductionAuth } from './production-auth.mjs';
 import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { readFile, readdir } from 'node:fs/promises';
@@ -64,6 +65,7 @@ export async function deployCommand(context) {
  validateDeployOptions(options);
  try { await refuseLocalModels(root); } catch { throw refuse('Deploy refuses the local-only key file .rer/local/models.json. Remove live-dev credentials before deployment.'); }
  const { path, value: declaration } = await declarationFor(root, adapter);
+ refuseAiHosting(declaration, 'Free/Assisted');
  try { ownerWorkerName(declaration.project, options.environment ?? 'production'); }
  catch (error) {
   const message = {

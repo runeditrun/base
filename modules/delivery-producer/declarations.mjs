@@ -1,3 +1,4 @@
+import { validateAiDeclaration } from './ai.mjs';
 import {array, bindingPattern, keys, string, strings} from './bindings.mjs';
 
 const pathPattern = /^\/[A-Za-z0-9/_.~-]*$/;
@@ -13,6 +14,7 @@ const status = (value, label) => {
 
 /** Preserve source-owned preview and setup declarations, without authorizing effects. */
 export function validateDeclarations(spec) {
+  if (spec.ai !== undefined) validateAiDeclaration(spec.ai);
   if (spec.providerEffects !== undefined) {
     if (strings(spec.providerEffects, 'providerEffects', /^[a-z][a-z0-9-]{0,63}$/).length > 32) throw Error('Too many provider effects');
   }

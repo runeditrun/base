@@ -8,3 +8,4 @@ export interface AiTransport { request(input: { operation: 'chat' | 'responses' 
 export function createAiClient(config?: AiConfig, dependencies?: { fetch?: typeof fetch; transport?: AiTransport }): AiClient;
 export function aiConfig(env?: Record<string, unknown>, features?: AiConfig['features']): AiConfig;
 export function aiDiagnostics(config?: AiConfig): Array<{ feature: string; code: AiErrorCode; message: string }>;
+export { createNativeAiConsumer, AiAuthority, type NativeAiRequest, type NativeAiAuthority } from './native/index.mjs';

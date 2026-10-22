@@ -27,8 +27,11 @@ export async function deliveryDeclarationClauses(root) {
   catch { clause.ok = false; clause.message = `${path}: invalid JSON declaration.`; }
   if (clause.ok) {
    const spec = select(value);
-   if (spec !== undefined) try { validateDeclarations(spec); }
-   catch (error) { clause.ok = false; clause.message = `${path}: ${error.message}`; }
+   if (spec !== undefined) try {
+    validateDeclarations(spec);
+    if (spec.ai !== undefined) clauses.push({id:`delivery.ai.${path}`,ok:true});
+   }
+   catch (error) { clause.ok = false; clause.message = `${path}: ${error.message}`; if (spec?.ai !== undefined) clauses.push({id:`delivery.ai.${path}`,ok:false,message:'Restore the strict native AI declaration; installation approval is separate.'}); }
   }
   clauses.push(clause);
  }
