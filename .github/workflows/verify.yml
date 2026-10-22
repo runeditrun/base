@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       clean_bootstrap:
-        description: Run without restoring dependency or browser caches
+        description: Run without restoring dependency, browser or apt caches
         type: boolean
         default: false
       journeys:
@@ -138,6 +138,7 @@ jobs:
           test -n "$version"
           printf 'playwright=%s\n' "$version" >> "$GITHUB_OUTPUT"
       - name: Cache apt package archives
+        id: apt-cache
         if: ${{ !inputs.clean_bootstrap }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
         with:
@@ -152,7 +153,10 @@ jobs:
             ~/.cache/ms-playwright
           key: base-ubuntu24-${{ runner.arch }}-${{ hashFiles('scripts/agent-bootstrap.sh', 'scripts/install-gitleaks.sh', 'pnpm-lock.yaml', 'modules/mail/pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'default-seed/package.json', 'foundation/template/package.json', 'foundation/template/pnpm-lock.yaml') }}
       - name: Bootstrap pinned Linux toolchain
+        env:
+          APT_CACHE_HIT: ${{ steps.apt-cache.outputs.cache-hit || 'false' }}
         run: |
+          printf 'Apt archive cache hit: %s\n' "$APT_CACHE_HIT"
           # Checkout configures a temporary HOME; the root container's test
           # shell needs this exact reviewed workspace trusted in its own HOME.
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
