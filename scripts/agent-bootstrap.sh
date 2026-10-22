@@ -66,7 +66,7 @@ apt_mirror_label=
 apt_select_mirror() {
   local attempt=$1 mirror src dest changed=0
   cp "$apt_base_config" "$apt_config"
-  apt_mirror_label=$(grep -hoEm1 'https?://[^/[:space:]]+' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null | head -n 1 || true)
+  apt_mirror_label=$(sed -nE 's@^(URIs:[[:space:]]*|deb (\[[^]]*\][[:space:]]*)?)(https?://[^/[:space:]]+).*@\3@p' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null | head -n 1 || true)
   apt_mirror_label=${apt_mirror_label:-configured-sources}
   (( attempt > 1 )) || return 0
   mirror=${apt_fallback_mirrors[attempt - 2]}
