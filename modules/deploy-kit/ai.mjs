@@ -33,8 +33,8 @@ export function validateAiPlan(plan) {
 /** Bind the approval to this deployment before state settlement or provider effects. */
 export function validateAiDeployment(plan,accountId,sourceSha) {
   if (plan.ai === undefined) return;
-  if (plan.vars.RER_AI_ACCOUNT_ID !== accountId) fail('ai-installation-account-mismatch');
-  if (plan.ai.authority.sourceSha !== sourceSha) fail('ai-source-approval-mismatch');
+  if (plan.vars.RER_AI_ACCOUNT_ID !== accountId) throw Object.assign(new Error('ai-installation-account-mismatch'),{code:'ai-installation-account-mismatch'});
+  if (plan.ai.authority.sourceSha !== sourceSha) throw Object.assign(new Error('ai-source-approval-mismatch'),{code:'ai-source-approval-mismatch'});
 }
 /** A built raw binding cannot silently bypass the owner declaration. */
 export function validateBuiltAi(config,request) {
