@@ -1,3 +1,4 @@
+import { ownerAi, validateAiPlan } from './ai.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
@@ -23,7 +24,7 @@ import { publicOrigin } from './public-origin.mjs';
 const segment = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const STATE_KIND = 'rer-deploy-owner-state';
 export const KINDS = ['d1','r2','kv','queues'];
-const DECLARATION_KEYS = ['version','project','compatibilityDate','compatibilityFlags','d1','r2','kv','queues','durableObjects','secrets','crons','vars','originVar','publicOriginSetting','publicSettings','services','workersDev','platforms','container','deployGuide','productDirectory'];
+const DECLARATION_KEYS = ['version','project','compatibilityDate','compatibilityFlags','d1','r2','kv','queues','durableObjects','secrets','crons','vars','originVar','publicOriginSetting','publicSettings','services','workersDev','platforms','container','deployGuide','productDirectory','ai'];
 const ENTRY_KEYS = {d1:['binding'],r2:['binding','locationHint'],kv:['binding'],queues:['binding','consumer','deadLetterQueue'],durableObjects:['binding','className','storage'],secrets:['binding','environment','verifyStandIn','optional'],services:['binding','project','entrypoint','allowedHosts','grant']};
 
 export function refuse(code, kind, name) { const error = new Error(code); error.resource = `${kind}:${name}`; return error; }
@@ -133,7 +134,8 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   assert(artifact.migrations.every(migration => d1.some(item => item.binding === migration.binding)), 'undeclared-migration-binding');
   const queues = entries(declaration,'queues');
   for (const item of queues) assert(item.deadLetterQueue === undefined || queues.some(other => other.binding === item.deadLetterQueue), 'invalid-dead-letter-queue');
-  const vars = {...(declaration.vars ?? {})};
+  const native = ownerAi(target,declaration,env,name,artifact.source?.sha);
+  const vars = {...(declaration.vars ?? {}),...(native.vars ?? {})};
   const origin = publicOrigin(declaration, env);
   if (declaration.originVar !== undefined) {
     assert(identifier(declaration.originVar) && !Object.hasOwn(vars,declaration.originVar), 'invalid-owner-origin-variable');
@@ -144,7 +146,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   const services = entries(declaration,'services').map(({binding,project,entrypoint,allowedHosts,grant}) => ({binding,service:ownerWorkerName(project,target.environment),
     ...(grant === undefined ? {} : {grant}),...(entrypoint === undefined ? {} : {entrypoint}),...(allowedHosts === undefined ? {} : {props:{allowedHosts}})}));
   assert(declaration.workersDev === undefined || declaration.workersDev === false, 'invalid-owner-declaration');
-  return validatePlan({version:1,worker:target.worker,compatibilityDate:declaration.compatibilityDate,compatibilityFlags:declaration.compatibilityFlags ?? [],
+  const plan = validatePlan({...(native.ai ? {ai:native.ai} : {}),version:1,worker:target.worker,compatibilityDate:declaration.compatibilityDate,compatibilityFlags:declaration.compatibilityFlags ?? [],
     d1:d1.map(({binding}) => ({binding,name:name(binding),migrations:artifact.migrations.filter(x => x.binding === binding).map(({binding:_,...rest}) => rest)})),
     r2:entries(declaration,'r2').map(item => ({...item,name:name(item.binding)})),
     ...(kv.length ? {kv} : {}),
@@ -156,6 +158,8 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
     crons:[...(declaration.crons ?? [])],vars,
     // Only declarations using these add the keys, so earlier plans and fingerprints are unchanged.
     ...(services.length ? {services} : {}),...(declaration.workersDev === false ? {workersDev:false} : {})});
+  validateAiPlan(plan);
+  return plan;
 }
 function assertOwnerNames(target, plan) {
   assert(plan.worker === target.worker, 'owner-plan-name-mismatch');
@@ -361,7 +365,7 @@ export async function ownerDeploy({api: provider, target, plan, artifact, stateP
   assert(typeof statePath === 'string' && statePath.length, 'missing-owner-state-path');
   const api = withSettledLists(withScopeHints(provider),settle);
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
-  validatePlan(plan); assertOwnerNames(target, plan);
+  validatePlan(plan); validateAiPlan(plan); assertOwnerNames(target, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
   return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets}));
 }
@@ -426,7 +430,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
 /** Independent read-only health of the last owner deployment recorded in the state file. */
 export async function ownerHealth({api: provider, target, plan, statePath, fetch = globalThis.fetch, healthOptions = {}}) {
   const api = withSettledLists(withScopeHints(provider));
-  validatePlan(plan); assertOwnerNames(target, plan);
+  validatePlan(plan); validateAiPlan(plan); assertOwnerNames(target, plan);
   const state = await readOwnerState(statePath, target);
   assert(state.receipt, 'missing-owner-receipt');
   return verifyHealth({...healthOptions, api, plan, receipt:state.receipt, fetch});

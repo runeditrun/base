@@ -509,3 +509,12 @@ tokens should be left unset so rer issues a fresh one. The existing owner is
 kept, and a successful claim retires the one-time token. A hook that fails
 without an HTTP exchange can only supply its own cause. Seeds copy this guide
 and `RUN-LOCALLY.md` for these recovery instructions.
+
+Native Workers AI declarations require a separate owner-supplied
+`RER_AI_AUTHORITY` for this derived installation/environment, current trusted
+prices and held-proof records. Missing approval returns `ai_hosting_unproven`.
+The consumer derives the payer account/private-bucket name, requires the privacy
+secret, renders `type:ai`, and checks exact readback. A built undeclared raw AI
+binding, binding conflict, account mismatch or undeclared readback fails closed.
+Provider/account qualification remains held; no inference runs during deployment. See the [AI consumer candidate](../ai/native/README.md)
+for the policy/budget contract and separate provider/hosting qualification gates.

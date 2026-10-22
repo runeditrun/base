@@ -1,6 +1,6 @@
 # Native Workers AI consumer candidate
 
-This opt-in extension uses the existing `modules/ai` and delivery declarations.
+This opt-in extension uses the existing AI module and delivery declarations.
 It is disabled without an explicit installation authority, a nonzero approved
 budget, fresh versioned prices and an installation-held adapter proof. No native
 provider or hosting mode is qualified by this candidate. No credentials are

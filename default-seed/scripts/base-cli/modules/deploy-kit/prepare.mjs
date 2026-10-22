@@ -1,3 +1,4 @@
+import { validateBuiltAi } from './ai.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile, readdir, rm } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
@@ -16,7 +17,7 @@ function run(argv, cwd, env) {
   try { return execFileSync(argv[0],argv.slice(1),{cwd,env,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:15*60*1000,maxBuffer:1024*1024}); }
   catch { throw new Error('prepare-command-failed'); }
 }
-export async function packageBuild({root,source,runIdentity,productDirectory = 'default-seed'}) {
+export async function packageBuild({root,source,runIdentity,productDirectory = 'default-seed', ai}) {
   assert(productDirectory === '' || localPath(productDirectory), 'invalid-product-directory');
   const product = join(root,productDirectory);
   await refuseLocalModels(root);
@@ -24,6 +25,7 @@ export async function packageBuild({root,source,runIdentity,productDirectory = '
   await refuseLocalEnvFiles(root, [join(productDirectory,'dist/server'), join(productDirectory,'dist/client')]);
   const build = join(product,'dist/server');
   const config = JSON.parse(await regularBytes(join(build,'wrangler.json'),1024*1024));
+  validateBuiltAi(config,ai);
   const main = localPath(relative(build,resolve(build,config.main)));
   const modules = await collectBuildModules(build,config,main);
   const ignored = assetsIgnore(await regularBytes(join(product,'dist/client/.assetsignore'),65536).then(String,error => { if (error.code === 'ENOENT') return ''; throw error; }));

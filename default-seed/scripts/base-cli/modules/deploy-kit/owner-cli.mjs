@@ -21,11 +21,11 @@ export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take u
 const usage = 'usage: owner-cli.mjs deploy|dry-run|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
 
 /** The owner's committed source and existing local build. Run the seed's build first. */
-async function ownerArtifact(root, product) {
+async function ownerArtifact(root, product, ai) {
   const git = (...args) => { try { return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim(); } catch { throw new Error('owner-source-not-a-git-checkout'); } };
   const source = {sha:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}')};
   assert(!git('status','--porcelain','--untracked-files=no'),'owner-source-not-committed');
-  return packageBuild({root,source,runIdentity:{id:'0',attempt:'1'},productDirectory:product});
+  return packageBuild({root,source,runIdentity:{id:'0',attempt:'1'},productDirectory:product,ai});
 }
 
 /** Inputs: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, plus the secrets the declaration names on first deploy. */
@@ -50,7 +50,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   publicOrigin(declaration, env);
   let artifact;
   if (command === 'dry-run') {
-    artifact = await packageBuild({root,source:{sha:'0'.repeat(40),tree:'0'.repeat(40)},runIdentity:{id:'0',attempt:'1'},productDirectory:values.product});
+    artifact = declaration.ai ? await ownerArtifact(root,values.product,declaration.ai) : await packageBuild({root,source:{sha:'0'.repeat(40),tree:'0'.repeat(40)},runIdentity:{id:'0',attempt:'1'},productDirectory:values.product,ai:declaration.ai});
     const worker = ownerWorkerName(declaration.project,values.environment);
     ownerPlan({project:declaration.project,environment:values.environment,worker,origin:`https://${worker}.example.invalid`},declaration,artifact,{localOnlyKeys,env});
   }
@@ -118,7 +118,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return {ok:true, origin:state.receipt.origin ?? target.origin, versionId:live.versionId, retiredSecrets, ownerClaim:state.ownerClaim, liveSecrets:rows.map(row => row.name)};
   }
   const current = retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
-  artifact ??= await ownerArtifact(root,values.product);
+  artifact ??= await ownerArtifact(root,values.product,declaration.ai);
   const plan = ownerPlan(target,current,artifact,{localOnlyKeys,env});
   if (command === 'dry-run') {
     const checked = withScopeHints(api);

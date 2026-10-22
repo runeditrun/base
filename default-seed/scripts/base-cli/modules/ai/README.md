@@ -88,3 +88,10 @@ refused in deploy declarations too. Remove it explicitly before deployment.
 Models routing, billing and app administration, Worker probes and Pencil's first
 analytics journey belong to their separate tasks. No provider account is needed
 to run this module's tests.
+
+## Opt-in native Workers AI candidate
+
+[The native consumer](native/README.md) adds strict installation policy, a SQLite
+budget authority and private purpose-based image custody. It has no qualified
+provider/hosting mode yet; the direct and Models APIs above keep their existing
+contracts. Native requests do not pass through their raw Responses/SSE paths.

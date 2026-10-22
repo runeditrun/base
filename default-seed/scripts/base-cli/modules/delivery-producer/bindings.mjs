@@ -24,15 +24,19 @@ export function strings(value, label, pattern) {
   return [...value];
 }
 const list = (config, key) => config[key] === undefined ? [] : array(config[key], key);
-const unsupported = ['services','vectorize','hyperdrive','dispatch_namespaces','mtls_certificates','workflows','pipelines','secrets_store_secrets','artifacts','ratelimits','ai','browser','images','ai_search','ai_search_namespaces','agent_memory','vpc_services','vpc_networks','worker_loaders','version_metadata','text_blobs','data_blobs','wasm_modules','containers','exports','cloudchamber','connect','unsafe_hello_world','flagship'];
+const unsupported = ['services','vectorize','hyperdrive','dispatch_namespaces','mtls_certificates','workflows','pipelines','secrets_store_secrets','artifacts','ratelimits','browser','images','ai_search','ai_search_namespaces','agent_memory','vpc_services','vpc_networks','worker_loaders','version_metadata','text_blobs','data_blobs','wasm_modules','containers','exports','cloudchamber','connect','unsafe_hello_world','flagship'];
 // These fields configure builds, local development, or broker-owned deployment identity.
 // Unknown top-level fields fail closed, including future native binding families.
 const metadata = ['$schema','name','main','account_id','compatibility_date','compatibility_flags','workers_dev','preview_urls','route','routes','zone_id','usage_model','placement','limits','observability','tail_consumers','build','no_bundle','find_additional_modules','rules','base_dir','tsconfig','minify','define','alias','jsx_factory','jsx_fragment','keep_vars','send_metrics','dev','legacy_env','env','upload_source_maps','site','legacy_assets','configPath','userConfigPath','topLevelName','pages_build_output_dir','preserve_file_names','definedEnvironments','python_modules'];
 function empty(value) {
   return value === undefined || (Array.isArray(value) ? value.length === 0 : value && typeof value === 'object' && Object.keys(value).length === 0);
 }
-export function validateWranglerShape(config) {
-  keys(config, [...metadata,...unsupported,'vars','d1_databases','r2_buckets','kv_namespaces','analytics_engine_datasets','queues','durable_objects','migrations','triggers','send_email','assets','unsafe','logfwdr'], 'Wrangler');
+export function validateWranglerShape(config, ai) {
+  keys(config, [...metadata,...unsupported,'vars','d1_databases','r2_buckets','kv_namespaces','analytics_engine_datasets','queues','durable_objects','migrations','triggers','send_email','assets','unsafe','logfwdr','ai'], 'Wrangler');
+  if (!empty(config.ai)) {
+    keys(config.ai, ['binding'], 'AI binding');
+    if (!ai || config.ai.binding !== ai.binding) throw Error('Unsupported undeclared native AI binding');
+  } else if (ai) throw Error('Declared native AI binding missing');
   for (const key of unsupported) if (!empty(config[key])) throw Error(`Unsupported deployment binding: ${key}; an explicit consumer contract is required`);
   for (const key of ['tail_consumers','site','legacy_assets','env']) if (!empty(config[key])) throw Error(`Unsupported deployment configuration: ${key}`);
   for (const key of ['unsafe','logfwdr']) {
@@ -66,8 +70,8 @@ export function validateEmailSending(value) {
     return result;
   });
 }
-export function wranglerBindings(config) {
-  validateWranglerShape(config);
+export function wranglerBindings(config, ai) {
+  validateWranglerShape(config, ai);
   const resources = [];
   for (const [field,kind,allowed] of [
     ['d1_databases','d1',['binding','database_name','database_id','preview_database_id','migrations_dir','migrations_table','remote']],
