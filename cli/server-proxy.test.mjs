@@ -18,9 +18,8 @@ function request(port,path='/',{method='GET',body,headers={}}={}){
 // streaming requests/responses and lifecycle accounting run unchanged.
 test('public proxy reuses connections, recovers a stale read once, and never replays a streamed write', {timeout:15000}, async t=>{
  let accepts=0,drop=false,alwaysDrop=false,begins=0,finishes=0,release;
- const sockets=new Set(),seen=[],counts=new Map();
+ const sockets=new Set(),seen=[];
  const runtime=http.createServer((req,res)=>{
-  counts.set(req.socket,(counts.get(req.socket)??0)+1);
   seen.push({method:req.method,url:req.url,socket:req.socket,headers:req.headers});
   // The runtime closes the formerly idle connection just as its next request
   // arrives: a deterministic version of the FIN/reuse race, before any reply.
