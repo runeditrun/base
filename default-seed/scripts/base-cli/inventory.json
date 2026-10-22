@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.78-dev.g0893d69d",
+  "cliVersion": "0.2.78-dev.gc60b6612",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1703,7 +1703,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "5bd7d13b5121932e8b91c774ac978705d862f776d69372e4872e0e0c222623bb"
+      "sha256": "0870ac7f170715bc39bb3399f9874b23cfdb3816faf51c9a6eddf6d174024502"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",
