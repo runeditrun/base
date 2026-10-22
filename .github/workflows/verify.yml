@@ -112,6 +112,9 @@ jobs:
           df -Pk "$GITHUB_WORKSPACE"
       - name: Install checkout prerequisites
         run: |
+          # The same Ubuntu-signed archive on Azure avoids the public mirror's
+          # runner-dependent ~80 kB/s transfers, including uncached apt metadata.
+          sed -i -E 's@http://(archive|security)\.ubuntu\.com/ubuntu/?@http://azure.archive.ubuntu.com/ubuntu/@g' /etc/apt/sources.list.d/ubuntu.sources
           # This apt phase runs before checkout/cache restore; bound it too.
           timeout --kill-after=10s 300s bash -ec '
             apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update
