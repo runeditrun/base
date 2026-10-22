@@ -58,7 +58,7 @@ export class AiAuthority {
         const existing = this.ledger.findImage(policy.tenant,purpose.id);
         if (existing) {
           if (existing.digest !== hash) fail('ai_operation_conflict');
-          return this.image(policy,purpose,{operation:existing,fresh:false},input.input);
+          return await this.image(policy,purpose,{operation:existing,fresh:false},input.input);
         }
       }
       const maximum = reservation(policy,purpose);
@@ -73,7 +73,7 @@ export class AiAuthority {
         const operation = this.ledger.operation(id);
         if (!operation || operation.tenant !== policy.tenant || operation.purpose !== purpose.id || this.ledger.calls(id)[0]?.status !== 'settled') fail('ai_operation_uncertain');
         this.ledger.second(id,hash);
-        return this.text(policy,purpose,id,maximum,input.input,1);
+        return await this.text(policy,purpose,id,maximum,input.input,1);
       }
       if (purpose.kind === 'text' && input.action !== 'start' || purpose.kind === 'image' && input.action !== 'generate') fail('ai_invalid_request',400);
       const claimed = this.ledger.reserve({id,tenant:policy.tenant,purpose:purpose.id,kind:purpose.kind,digest:hash}, Array.from({length:purpose.kind === 'text' ? 2 : 1}, () => maximum), policy.limits);
