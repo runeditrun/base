@@ -163,3 +163,10 @@ test('restart after validated provider output before R2 create retains liability
  assert.equal((await post(r,image('second'))).status,409);assert.equal(r.hits.length,1);
  const state=await r.status();assert.equal(state.totals.calls,1);assert.ok(state.operations[0].object_digest);assert.equal(state.calls[0].status,'dispatching');
 });
+
+test('image-unit prices reserve the full quoted image cost before dispatch',async t=>{
+ const policy={...authority,permitted:{...declaration,limits:{...declaration.limits,microUsd:5000}}};
+ const r=await nativeRuntime(t,{policy});
+ assert.equal((await post(r,image('budgeted'))).status,402);assert.equal(r.hits.length,0);
+ assert.equal((await r.status()).totals.microUsd,0);
+});
