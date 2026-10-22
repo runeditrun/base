@@ -1,4 +1,4 @@
-import { ownerAi, validateAiPlan } from './ai.mjs';
+import { ownerAi, validateAiPlan, validateAiDeployment } from './ai.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
@@ -366,6 +366,7 @@ export async function ownerDeploy({api: provider, target, plan, artifact, stateP
   const api = withSettledLists(withScopeHints(provider),settle);
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   validatePlan(plan); validateAiPlan(plan); assertOwnerNames(target, plan);
+  validateAiDeployment(plan,api.accountId,artifact.source?.sha);
   for (const item of plan.d1) validateMigrations(item.migrations);
   return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets}));
 }

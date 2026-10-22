@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {cloudflare,ownerTarget,ownerPlan,ownerDeploy} from '../index.mjs';
+import {cloudflare,ownerTarget,ownerPlan,ownerDeploy,deploy} from '../index.mjs';
 import {hash} from '../validation.mjs';
 import {renderConfig,verifyBindings} from '../render.mjs';
 import {ownerProvider} from './owner-provider.mjs';
@@ -33,4 +33,52 @@ test('owner-account deployment requires separate installation approval and reads
  assert.ok(!String(await readFile(statePath)).includes(env.RER_AI_PRIVACY_TOKEN));
  assert.throws(()=>verifyBindings([{type:'ai',name:'OTHER'}],[{type:'ai',name:'AI'}]),/undeclared-native-ai-binding/);
  assert.throws(()=>verifyBindings([{type:'ai',name:'AI',account_id:'untrusted'}],[{type:'ai',name:'AI'}]),/binding-readback-mismatch/);
+});
+
+function deploymentInputs(target) {
+ const source='export default { fetch(){ return new Response("ok") } }';
+ const artifact={version:1,source:{sha:'5'.repeat(40),tree:'6'.repeat(40)},run:{id:'0',attempt:'1'},main:'index.js',modules:[{path:'index.js',base64:Buffer.from(source).toString('base64'),sha256:hash(source)}],assets:[],migrations:[]};
+ const declaration={version:1,project:target.project,compatibilityDate:'2026-09-08',d1:[],r2:[{binding:'AI_IMAGES'}],queues:[],durableObjects:[{binding:'AI_BUDGET',className:'AiAuthority',storage:'sqlite'}],secrets:[{binding:'RER_AI_PRIVACY_TOKEN',environment:'RER_AI_PRIVACY_TOKEN'}],crons:[],vars:{},ai:request};
+ const authority={schema:1,enabled:true,accountId:target.accountId,sourceSha:artifact.source.sha,installation:target.worker,environment:target.environment,tenant:'synthetic-tenant',revision:'initial',custody:'original',permitted:request,prices:{[model]:{version:'synthetic-prices',validUntil:Date.now()+86400000,inputMicroUsdPerMillion:450000,outputMicroUsdPerMillion:3200000,imageMicroUsdPerUnit:410}},proofs:{[model]:{reference:'synthetic-provider-edge',kind:'text',maxInputTokens:262144,maxOutputTokens:1024,maxImageUnits:0,mime:''}}};
+ return {artifact,declaration,env:{RER_AI_AUTHORITY:JSON.stringify(authority),RER_AI_PRIVACY_TOKEN:'synthetic-private-custody-token-1'}};
+}
+
+test('seed AI policy variables refuse without an AI declaration at planning and both deployment doors',async t=>{
+ const provider=ownerProvider();t.after(()=>provider.close());const api=cloudflare(provider);
+ const target=await ownerTarget(api,{project:'synthetic',environment:'production'});
+ const {artifact,declaration,env}=deploymentInputs(target);
+ const {ai:_,...disabled}=declaration;
+ disabled.secrets=[];
+ const folder=await mkdtemp(join(tmpdir(),'native-ai-disabled-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const plan=ownerPlan(target,disabled,artifact);
+ for(const name of ['RER_AI_REQUEST','RER_AI_AUTHORITY','RER_AI_ACCOUNT_ID','RER_AI_BUCKET_NAME','RER_AI_PRIVACY_TOKEN','RER_AI_FUTURE_POLICY']) {
+  const vars={[name]:'synthetic-seed-policy'};
+  for(const source of [disabled,declaration]) assert.throws(()=>ownerPlan(target,{...source,vars},artifact,{env}),e=>e.code==='ai_policy_conflict');
+  const supplied={...plan,vars};
+  for(const run of [()=>ownerDeploy({api,target,plan:supplied,artifact,statePath:join(folder,'owner.json'),env}),()=>deploy({api,plan:supplied,artifact,env})]) {
+   await assert.rejects(run,e=>e.code==='ai_policy_conflict');
+   assert.equal(provider.state.writes.length,0);
+  }
+ }
+ await assert.rejects(readFile(join(folder,'owner.json')),e=>e.code==='ENOENT');
+});
+
+test('both deployment doors bind approved payer and source before any provider or state mutation',async t=>{
+ const provider=ownerProvider();t.after(()=>provider.close());const api=cloudflare(provider);
+ const target=await ownerTarget(api,{project:'synthetic',environment:'production'});
+ const folder=await mkdtemp(join(tmpdir(),'native-ai-preflight-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ for(const boundary of ['payer','source']) {
+  const plannedTarget=boundary==='payer'?{...target,accountId:'b'.repeat(32)}:target;
+  const {artifact,declaration,env}=deploymentInputs(plannedTarget);
+  const plan=ownerPlan(plannedTarget,declaration,artifact,{env});
+  const paired=boundary==='source'?{...artifact,source:{...artifact.source,sha:'7'.repeat(40)}}:artifact;
+  const code=boundary==='payer'?'ai-installation-account-mismatch':'ai-source-approval-mismatch';
+  const calls=provider.state.calls.length;
+  for(const run of [()=>ownerDeploy({api,target,plan,artifact:paired,statePath:join(folder,'owner.json'),env}),()=>deploy({api,plan,artifact:paired,env})]) {
+   await assert.rejects(run,e=>e.code===code);
+   assert.equal(provider.state.writes.length,0);
+   assert.equal(provider.state.calls.length,calls);
+  }
+ }
+ await assert.rejects(readFile(join(folder,'owner.json')),e=>e.code==='ENOENT');
 });

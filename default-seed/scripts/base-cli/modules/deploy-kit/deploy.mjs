@@ -1,4 +1,4 @@
-import { validateAiPlan } from './ai.mjs';
+import { validateAiPlan, validateAiDeployment } from './ai.mjs';
 import { readinessWindow, readinessAPI } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
@@ -21,6 +21,7 @@ import { verifyHealth } from './health.mjs';
  * claim on bytes a reviewed rewrite replaced. */
 export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,repeatOnly=false,createResources=!previousReceipt,uploadWithoutReceipt=false,onReceipt,onHealth,readiness={},env={},fetch=globalThis.fetch,healthOptions={},declaredSecrets=plan.secrets,locked=false}) {
   validatePlan(plan); validateAiPlan(plan); validateArtifact(artifact);
+  validateAiDeployment(plan,api.accountId,artifact.source.sha);
   await verifyServiceGrants(api, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
   const existing = await activeWorker(api,plan.worker);
