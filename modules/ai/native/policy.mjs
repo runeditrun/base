@@ -12,6 +12,12 @@ export function sum(...values) {
   if (result > BigInt(Number.MAX_SAFE_INTEGER)) fail('ai_accounting_invalid');
   return Number(result);
 }
+export function product(left, right) {
+  if (!integer(left) || !integer(right)) fail('ai_accounting_invalid');
+  const result = BigInt(left) * BigInt(right);
+  if (result > BigInt(Number.MAX_SAFE_INTEGER)) fail('ai_accounting_invalid');
+  return Number(result);
+}
 export function estimate(units, rate) {
   if (!integer(units) || !integer(rate)) fail('ai_accounting_invalid');
   const cost = (BigInt(units) * BigInt(rate) + 999999n) / 1000000n;
@@ -75,6 +81,6 @@ export function reservation(policy, purpose) {
   if (purpose.kind === 'text' && (proof.maxInputTokens < 262144 || proof.maxOutputTokens < o.maxOutputTokens)) fail('ai_provider_unproven', 503);
   if (purpose.kind === 'image' && (proof.maxImageUnits < 1 || proof.maxImageUnits > o.imageUnits || proof.mime !== 'image/png')) fail('ai_provider_unproven', 503);
   const units = purpose.kind === 'text' ? sum(proof.maxInputTokens, proof.maxOutputTokens) : proof.maxImageUnits;
-  const microUsd = purpose.kind === 'text' ? sum(estimate(proof.maxInputTokens,price.inputMicroUsdPerMillion), estimate(proof.maxOutputTokens,price.outputMicroUsdPerMillion)) : estimate(units, price.imageMicroUsdPerUnit);
+  const microUsd = purpose.kind === 'text' ? sum(estimate(proof.maxInputTokens,price.inputMicroUsdPerMillion), estimate(proof.maxOutputTokens,price.outputMicroUsdPerMillion)) : product(units, price.imageMicroUsdPerUnit);
   return { calls:1,units,microUsd,price,proof };
 }

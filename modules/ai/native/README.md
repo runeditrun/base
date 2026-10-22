@@ -52,7 +52,7 @@ seed requests cannot expand authority. One authority instance is selected using
 only installation/environment, with tenant-scoped durable operations.
 
 Prices are model-indexed records with a version, expiry timestamp and integer
-micro-USD rates per million input/output tokens and per million image units.
+micro-USD rates per million input/output tokens and per image unit.
 Proofs are model-indexed records with a held-proof reference, kind, hard input,
 output and image-unit ceilings and image MIME. These are installation-trusted
 attestations, not a client boolean. The held-key gate must establish them; do
