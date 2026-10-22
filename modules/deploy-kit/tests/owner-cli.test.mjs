@@ -186,6 +186,24 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
  finally { clearTimeout(hold); }
  assert.ok(aborted); assert.equal(reads, 1, 'an expired provider read is not retried');
 
+ // A transient failure can land after clock expiry while the abort timer is pending.
+ const boundary = ownerProvider(); t.after(() => boundary.close());
+ const boundaryRoot = await seed(t); let clock = 0, boundaryUploaded = false, boundaryReads = 0;
+ const boundaryFetch = async (input, init = {}) => {
+  const url = new URL(input);
+  if (boundaryUploaded && (init.method ?? 'GET') === 'GET' && url.pathname.endsWith('/settings')) {
+   boundaryReads++;
+   assert.equal(init.signal.aborted, false, 'the deadline timer has not fired');
+   clock = 100000;
+   throw Object.assign(new Error('reset'), {code:'ECONNRESET'});
+  }
+  const result = await boundary.fetch(input, init);
+  if (init.method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') boundaryUploaded = true;
+  return result;
+ };
+ await assert.rejects(main(['deploy',...args], inputs(boundary), {cwd:boundaryRoot,fetch:boundaryFetch,notice:()=>{},healthOptions:{readiness:{totalMs:50,clock:() => clock}}}), /provider-transport-failed/);
+ assert.equal(boundaryReads, 1, 'clock expiry blocks another provider read before the abort timer fires');
+
  // A changed-source upload can briefly lose its established route too.
  await writeFile(join(root,'source.mjs'),'export const edition = "updated";');
  await writeFile(join(root,'dist/server/index.js'),'export default {scheduled() {},fetch(){return new Response("updated vector")}};');

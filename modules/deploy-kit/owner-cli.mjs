@@ -58,6 +58,12 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   // Bound each response, not the owner's bucket size; failures retain ownership.
   let requestWindow = propagation?.uploaded ? propagation.window : undefined;
   const request = fetch;
+  const guardedRequest = (input, init = {}) => {
+    init.signal?.throwIfAborted();
+    // The window clock can expire before its shared abort timer fires.
+    assert(!requestWindow?.active || requestWindow.remaining() > 0, 'deployment-readiness-timeout');
+    return request(input, init);
+  };
   const requestSignal = () => {
     if (!requestWindow?.active) return undefined;
     const remaining = requestWindow.remaining();
@@ -69,7 +75,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return request(input, {...init,...(deadline ? {signal:init.signal ? AbortSignal.any([init.signal,deadline]) : deadline} : {})});
   };
   // Transport must see the same outer signal when deciding whether to retry.
-  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch:request,requestSignal,budgetMigrations:command === 'deploy',...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
+  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch:guardedRequest,requestSignal,budgetMigrations:command === 'deploy',...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
   // Removal needs the recorded account/name identity, not a workers.dev route.
   const target = command === 'remove'
     ? {accountId:api.accountId,project:declaration.project,environment:values.environment,worker:ownerWorkerName(declaration.project,values.environment)}
