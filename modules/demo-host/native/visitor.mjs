@@ -34,7 +34,7 @@ export class NativeDemo extends DurableObject {
     // Short TTLs are usable only on the guarded testing host.
     if (/^[123]x0{31}AA$/.test(this.env.TURNSTILE_SECRET_KEY ?? '') && this.env.NATIVE_TEST_TTL_MS) ends = Math.min(ends, started + Number(this.env.NATIVE_TEST_TTL_MS));
     const runtime = { ...bundle.vars, ...settings, RER_DEMO: '1', [originVar]: origin,
-      RER_NATIVE_KEY: random(), SESSION_SECRET: random(), SETUP_TOKEN: random(), OWNER_EMAIL: this.env.DEMO_OWNER_EMAIL || 'owner@demo.invalid',
+      RER_NATIVE_KEY: random(), SESSION_SECRET: random(), INSTALLATION_KEY: random(), SETUP_TOKEN: random(), OWNER_EMAIL: this.env.DEMO_OWNER_EMAIL || 'owner@demo.invalid',
       RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
       RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal };
     this.state = { phase: 'starting', runtime, ends, seen: started, savedSeen: started, lastCron: Math.floor(started / 60_000), correlation };

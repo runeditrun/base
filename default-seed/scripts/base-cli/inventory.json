@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.78",
+  "cliVersion": "0.2.78-dev.gcd8787e7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1471,7 +1471,7 @@
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",
-      "sha256": "292ad76af788309a3e9ccb66e29b98a04d9780685cce941d8cf26043352ca339"
+      "sha256": "055e375e281679c486099888c15f2fd39afcbda290f0f6a07444827801c4e548"
     },
     "modules/demo-host/native/warm.mjs": {
       "source": "modules/demo-host/native/warm.mjs",
