@@ -8,7 +8,7 @@ const output = (usage={prompt_tokens:12,completion_tokens:8})=>Response.json({ch
 
 test('reference app requires current owner, same origin and trusted declaration before native effects',async t=>{
  const r=await nativeRuntime(t);
- for(const options of [{cookie:undefined},{origin:'https://other.test'},{body:{...text('override'),tenant:'other'}},{body:{...text('override'),model:'arbitrary'}},{body:{...text('override'),prices:{}}}]){
+ for(const options of [{cookie:undefined},{origin:'https://other.test'},{body:{...text('override'),tenant:'other'}},{body:{...text('override'),model:'arbitrary'}},{body:{...text('override'),prices:{}}},{body:{...text('purpose'),purpose:'arbitrary'}}]){
   const response=await post(r,options.body??text('unauthorized'),options);assert.ok(response.status>=400);assert.match(response.headers.get('cache-control'),/no-store/);
  }
  assert.equal(r.hits.length,0);
@@ -24,8 +24,8 @@ test('reference app requires current owner, same origin and trusted declaration 
 });
 
 test('two dependent text calls reserve atomically, settle usage and deduplicate through restart',async t=>{
- const request={...declaration,limits:{...declaration.limits,calls:2}};
- const r=await nativeRuntime(t,{request});
+ const policy={...authority,permitted:{...declaration,limits:{...declaration.limits,calls:2}}};
+ const r=await nativeRuntime(t,{policy});
  const responses=await Promise.all([post(r,text('first')),post(r,text('second'))]);
  assert.deepEqual(responses.map(x=>x.status).sort(),[200,402]);
  assert.equal(r.hits.length,2);
@@ -96,6 +96,7 @@ test('opt-out, expired prices, unproved models and unsupported dev/demo refuse b
   {policy:{...authority,prices:{}}},
   {policy:{...authority,prices:Object.fromEntries(Object.entries(authority.prices).map(([k,v])=>[k,{...v,validUntil:0}]))}},
   {policy:{...authority,proofs:{}}},
+  {policy:{...authority,permitted:{...declaration,textModels:[],purposes:[declaration.purposes[1]]}}},
   {bindings:{AUTH_LOCAL:'true'}},
   {bindings:{RER_DEMO:'true'}},
  ])await t.test('refusal',async t=>{
