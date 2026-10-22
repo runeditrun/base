@@ -112,9 +112,13 @@ jobs:
           df -Pk "$GITHUB_WORKSPACE"
       - name: Install checkout prerequisites
         run: |
-          # The same Ubuntu-signed archive on Azure avoids the public mirror's
-          # runner-dependent ~80 kB/s transfers, including uncached apt metadata.
-          sed -i -E 's@http://(archive|security)\.ubuntu\.com/ubuntu/?@http://azure.archive.ubuntu.com/ubuntu/@g' /etc/apt/sources.list.d/ubuntu.sources
+          # Attempt 1 uses the runner's Azure mirror, which avoids the public
+          # archive's runner-dependent ~80 kB/s transfers. A fresh runner can
+          # have a dead Azure package path (index fetches work, package GETs
+          # hang), so retrying the same host does not help: attempts 2 and 3
+          # use other mirrors serving the same Ubuntu-signed archive. Keep this
+          # list in step with apt_fallback_mirrors in scripts/agent-bootstrap.sh.
+          mirrors=(http://azure.archive.ubuntu.com/ubuntu http://mirrors.edge.kernel.org/ubuntu http://us-east-1.ec2.archive.ubuntu.com/ubuntu)
           # Checkout cannot source a repository helper or restore an Actions
           # cache yet. Retain apt archives/partials locally across fresh attempts.
           mkdir -p /var/tmp/rer-checkout-apt/archives
@@ -129,17 +133,19 @@ jobs:
           APT
           started=$SECONDS
           for attempt in 1 2 3; do
-            printf 'Checkout apt: prerequisites attempt %s/3 (90s deadline)\n' "$attempt"
+            mirror=${mirrors[attempt - 1]}
+            sed -i -E "s@^(URIs:[[:space:]]*)https?://(([a-z0-9.-]+\.)?archive\.ubuntu\.com|security\.ubuntu\.com|mirrors\.edge\.kernel\.org)/ubuntu/?@\1${mirror}/@" /etc/apt/sources.list.d/ubuntu.sources
+            printf 'Checkout apt: prerequisites attempt %s/3 (90s deadline; mirror %s)\n' "$attempt" "$mirror"
             if timeout --kill-after=5s 90s bash -ec '
               dpkg --configure -a
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git
             '; then
-              printf 'Checkout apt: prerequisites complete (attempts=%s seconds=%s)\n' "$attempt" "$((SECONDS - started))"
+              printf 'Checkout apt: prerequisites complete (attempts=%s mirror=%s seconds=%s)\n' "$attempt" "$mirror" "$((SECONDS - started))"
               exit 0
             else
               status=$?
-              printf 'Checkout apt: prerequisites attempt %s/3 failed (exit %s seconds=%s)\n' "$attempt" "$status" "$((SECONDS - started))" >&2
+              printf 'Checkout apt: prerequisites attempt %s/3 failed (mirror %s, exit %s, seconds=%s)\n' "$attempt" "$mirror" "$status" "$((SECONDS - started))" >&2
             fi
             if (( attempt < 3 )); then sleep "$((attempt * 2))"; fi
           done
