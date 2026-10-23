@@ -220,6 +220,12 @@ writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out files the copy had left out, and re-records each copy.
+An absent unadapted singleton is retired from the record entirely and named in
+the `retired` output. As with absent files in directory copies, local absence is
+the removal signal; refresh does not distinguish accidental deletion from an
+intentional removal. Verify before refreshing to inspect missing copies. Deleted
+adaptations still block refresh, and a singleton still present locally whose
+Base source disappeared still reports an error.
 It refuses undeclared local edits that differ from both the recorded and incoming
 Base bytes; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
