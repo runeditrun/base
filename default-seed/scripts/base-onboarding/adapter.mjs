@@ -15,6 +15,7 @@ import { appFetch } from './app-fetch.mjs';
 import { owner, signIn } from './adapter-auth.mjs';
 import { installerDevKey } from './dev-identity.mjs';
 import { assertArchiveFree } from './archive-output.mjs';
+import { startOriginDiagnostic } from './start-origin-diagnostic.mjs';
 export { ownerAccountHosting } from './adapter-hosting.mjs';
 
 // The adapter kit for an existing seed. A seed's scripts/installer/local.mjs
@@ -229,7 +230,10 @@ async function start(context, hooks) {
   if (signal?.aborted) throw error;
   const ports=await ownedPorts();
   if(ports.length){
-   const message=store.redact(`Application listened on port ${ports.join(', ')}; readiness failed for expected internal port ${expectedPort}. Check application health and the runtime target's port binding.`);
+   let diagnosis;
+   try { diagnosis=await startOriginDiagnostic(context,hooks,child,health,ready); }
+   catch (diagnosticError) { if(signal?.aborted)throw diagnosticError; }
+   const message=store.redact(diagnosis??`Application listened on port ${ports.join(', ')}; readiness failed for GET ${url} through expected internal port ${expectedPort}. Check application health and the runtime target's port binding.`);
    store.report(message);const prior=approvedFailure(error);error=commandFailure(`${prior?.message??readinessLabel}\n${message}`,prior??{});
   }
   throw installationFailure('command_failed', { step: 'start', diagnostic: error });
