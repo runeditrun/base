@@ -26,11 +26,22 @@ const events = result => result.stdout.trim().split('\n').map(line => JSON.parse
 
 test('every command help is effect-free outside a checkout, before adapters and tools', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-help-')); t.after(() => rm(root, { recursive: true, force: true }));
- for (const verb of Object.keys(verbs)) {
-  const result = run(root, [verb, '--help']);
-  assert.equal(result.status, 0, `${verb}: ${result.stderr}`); assert.match(result.stdout, /Usage:/);
+ for (const verb of [...Object.keys(verbs), 'demo', 'signin']) {
   const json = run(root, [verb, '--help', '--json']); assert.equal(json.status, 0); assert.equal(events(json).at(-1).event, 'result');
  }
+ // The complete public command tree, through the checkout dispatcher and the installed rer.
+ const checkout = [...Object.keys(verbs), 'demo', 'signin', 'release', 'release sign', 'release receipt', 'release keygen', 'listing', 'archive', 'archive diff', 'business', 'companion'];
+ const installed = [...checkout, 'update', 'list', 'cli', 'cli status', 'cli install', 'cli uninstall', 'queue', 'queue NAME', 'door', 'door enable', 'run'];
+ for (const [entry, commands] of [[cli, checkout], [join(base, 'global/rer.mjs'), installed]]) for (const command of commands) {
+  const result = run(root, [...command.split(' '), '--help'], entry, { ...environment(), RER_NO_UPDATE_CHECK: '1' });
+  assert.equal(result.status, 0, `${entry} ${command}: ${result.stdout}${result.stderr}`);
+  assert.ok(result.stdout.includes(`rer ${command.split(' ')[0]}`), `${command} --help prints its own usage: ${result.stdout}`);
+ }
+ // A demo advertises exactly the flags it accepts.
+ const advertised = /^Flags: (.*)$/m.exec(run(root, ['demo', '--help']).stdout)[1].split(', ');
+ const value = { '--cwd': '.', '--port': '4000', '--host': '127.0.0.1', '--idle-timeout': '60' };
+ for (const flag of advertised) assert.doesNotThrow(() => parse(['demo', flag, ...(value[flag] ? [value[flag]] : [])]), flag);
+ for (const flag of verbs.dev.flags.filter(flag => flag !== '--demo' && !advertised.includes(flag))) assert.throws(() => parse(['demo', flag, '1']), error => error.exitCode === 2 && error.message.includes('rer demo --help'), flag);
  for (const argv of [['dev','--foreground','--help'], ['preview','--detach','--help']]) assert.equal(run(root,argv).status,0);
  assert.deepEqual(await readdir(root), []);
  await writeFile(join(root,'OPERATIONS.json'),'{invalid configuration');
@@ -40,10 +51,30 @@ test('every command help is effect-free outside a checkout, before adapters and 
 
 test('parsing rejects every unsupported flag, missing value, invalid host/port and duplicate before effects', () => {
  for (const verb of Object.keys(verbs)) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
+ // A refusal suggests a flag only for a near miss; otherwise it names just the verb's help.
+ const refusal = argv => { try { parse(argv); } catch (error) { return error.message; } assert.fail(`${argv.join(' ')} was accepted`); };
+ for (const [verb, typed, meant] of [['dev', '--prot', '--port'], ['check', '--jsn', '--json'], ['deploy', '--dryrun', '--dry-run'], ['setup', '--email', '--owner-email'], ['export', '--out', '--output']]) assert.ok(refusal([verb, typed]).includes(meant), `${verb} ${typed}`);
+ for (const [verb, typed] of [['check', '--frobnicate'], ['export', '--xyz'], ['install', '--verbose'], ['deploy', '--port'], ['check', 'positional'], ['dev', '3000']]) {
+  const message = refusal([verb, typed]);
+  assert.ok(message.includes(`rer ${verb} --help`), message);
+  assert.deepEqual(verbs[verb].flags.filter(flag => flag !== '--help' && message.includes(flag)), [], message);
+ }
  for (const argv of [['dev', '--port'], ['dev', '--port', '0'], ['dev', '--port', '65536'], ['dev', '--port', '1.5'], ['setup', '--owner-email', 'owner name <a@b.test>'], ['check', '--profile', 'independent'], ['dev', '--json', '--json']]) assert.throws(() => parse(argv), error => error.exitCode === 2);
  for (const host of ['0.0.0.0', '::', 'example.test', '[::1]']) assert.throws(() => parse(['dev', '--host', host]), error => error.exitCode === 4);
  assert.equal(parse(['dev', '--', '--port', '08787']).port, 8787);
  assert.equal(parse(['dev', '--host', '::1']).host, '::1');
+});
+
+test('a missing or mistyped project folder names the folder and --cwd, without retry advice', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'rer-cwd-')); t.after(() => rm(root, { recursive: true, force: true }));
+ await writeFile(join(root, 'notes.txt'), '');
+ for (const [args, status] of [[['check', '--cwd', 'absent-folder'], 3], [['dev', '--cwd', 'absent-folder', '--json'], 3], [['check', '--cwd', 'notes.txt'], 2]]) {
+  const result = run(root, args);
+  assert.equal(result.status, status, result.stdout + result.stderr);
+  const message = args.includes('--json') ? events(result).find(row => row.event === 'error').message : result.stderr;
+  assert.ok(message.includes(args[2]) && message.includes('--cwd'), message);
+  assert.doesNotMatch(message, /again/);
+ }
 });
 
 test('independent execution needs no package, edition, pnpm, installer or Base runtime and preserves raw argv', async t => {

@@ -13,7 +13,9 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  const home = join(root, 'home'), emptyPath = join(root, 'empty-bin');
  await Promise.all([mkdir(home), mkdir(emptyPath)]);
  await writeFile(join(root, 'adapter.mjs'), "export const commandAdapter = { version: 1, state: 'dist/state', hooks: { secrets: { file: '.dev.vars' } } };\n");
- await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node } }));
+ // The project pins a Node this shell does not run.
+ const pinnedNode = process.versions.node === '20.0.0' ? '20.0.1' : '20.0.0';
+ await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: pinnedNode } }));
  await writeFile(join(root, 'configuration.mjs'), 'export function validateConfiguration(env) { throw Error(`Invalid private input: ${env.SESSION_SECRET}`); }\n');
  // A real project with many unavailable targets makes the report larger than
  // a pipe buffer. Nothing executes those targets or substitutes a tool binary.
@@ -50,10 +52,9 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  assert.equal(diagnostics.operations.configuration, 'invalid');
  assert.deepEqual(diagnostics.operations.commands, Object.keys(commands).map(name => ({ name, available: false })));
  assert.equal(diagnostics.state.safe, false);
- assert.match(diagnostics.state.issue, /persistence overlaps generated dist/);
- assert.match(diagnostics.pnpm.issue, /declare an exact pnpm version/);
- assert.match(diagnostics.pnpm.issue, /pnpm could not start \(ENOENT\)/);
- assert.match(diagnostics.pnpm.issue, /Command: pnpm --version/);
+ assert.ok(diagnostics.state.issue.includes('dist'), 'the state issue names the overlapping location');
+ assert.ok(diagnostics.pnpm.issue.includes('packageManager') && diagnostics.pnpm.issue.includes('pnpm --version'), 'the pnpm issue names the declaration to correct and the command that failed');
+ assert.deepEqual([diagnostics.node.expected, diagnostics.node.actual], [pinnedNode, process.versions.node]);
  const human = await run([]);
  if (process.env.RER_TEST_EVIDENCE_DIRECTORY) await writeFile(join(process.env.RER_TEST_EVIDENCE_DIRECTORY, 'doctor-human.txt'), human);
  const summaryAt = human.lastIndexOf('\ndoctor:');
@@ -65,6 +66,9 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  assert.deepEqual(reportedCommands, diagnostics.operations.commands.filter(command => !command.available).map(command => command.name));
  assert.ok(human.includes(diagnostics.state.issue));
  assert.ok(human.includes(diagnostics.pnpm.issue));
+ // The failed Node check comes with its next action: here automatic selection is off.
+ const nodeCheck = human.split('\n').findIndex(line => line.startsWith('Node:'));
+ assert.ok(human.split('\n').slice(nodeCheck, nodeCheck + 2).join('\n').includes('RER_NODE_AUTO'), human);
 });
 
 test('local doctor succeeds without deployment credentials and still refuses missing local settings', async t => {
@@ -77,8 +81,8 @@ test('local doctor succeeds without deployment credentials and still refuses mis
  await writeFile(join(root, 'adapter.mjs'), "export const commandAdapter={version:1,state:'.wrangler/state',hooks:{secrets:{file:'.dev.vars'}}};\n");
  const deploymentInputs = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-doctor-1', runtime: { requirements: [] }, requiredEnvironment: deploymentInputs, seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { dev: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Run this checkout locally.' } } }));
- const invoke = async json => {
-  const child = spawn(process.execPath, [cli, 'doctor', ...(json ? ['--json'] : [])], { cwd: root, env: { PATH: process.env.PATH, HOME: join(root, 'home'), TZ: 'UTC' }, stdio: ['ignore', 'pipe', 'pipe'] });
+ const invoke = async (json, PATH = process.env.PATH) => {
+  const child = spawn(process.execPath, [cli, 'doctor', ...(json ? ['--json'] : [])], { cwd: root, env: { PATH, HOME: join(root, 'home'), TZ: 'UTC' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '', stderr = '';
   child.stdout.on('data', chunk => stdout += chunk); child.stderr.on('data', chunk => stderr += chunk);
   const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
@@ -94,6 +98,11 @@ test('local doctor succeeds without deployment credentials and still refuses mis
  assert.equal(human.code, 0, human.stdout + human.stderr);
  assert.throws(() => JSON.parse(human.stdout));
  for (const name of deploymentInputs) assert.ok(human.stdout.includes(name));
+ // Without the pinned pnpm on PATH or in rer's cache, the failed check names the command that fetches it.
+ await mkdir(join(root, 'empty-bin'));
+ const noPnpm = await invoke(false, join(root, 'empty-bin'));
+ assert.equal(noPnpm.code, 3, noPnpm.stdout + noPnpm.stderr);
+ assert.ok(noPnpm.stdout.includes('rer install'), noPnpm.stdout);
  await writeFile(join(root, '.dev.vars'), 'AUTH_ORIGIN=http://localhost:8787\n');
  const missing = await invoke(true);
  assert.equal(missing.code, 3, missing.stdout + missing.stderr);

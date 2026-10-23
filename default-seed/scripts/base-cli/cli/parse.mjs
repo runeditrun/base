@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { commonFlags, serverDefaults, signinVerb, verbs } from './contract.mjs';
+import { commonFlags, demoVerb, serverDefaults, signinVerb, verbs } from './contract.mjs';
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
@@ -14,19 +14,24 @@ export const loopback = host => host === '::1' || isLoopbackHost(host);
 export const listenHost = host => ['127.0.0.1', 'localhost', '::1'].includes(host);
 export const origin = (host, port) => `http://${host === '::1' ? '[::1]' : host}:${port}`;
 
-export function parse(argv, cwd = process.cwd(), { independent = false, deferTail = false } = {}) {
+export function parse(argv, cwd = process.cwd(), { independent = false, deferTail = false, demo = false } = {}) {
  const [verb, ...args] = argv;
  if (!verb || verb === '--help') return { help: true };
  if (verb === 'listing') return { verb, listingArgs: args };
  // Release validates its own flags, including its integer publication scan timeout.
  if (verb === 'release') return { verb, releaseArgs: args };
  if (verb === 'archive') return { verb, archiveArgs: args };
- // rer demo is rer dev --demo.
- if (verb === 'demo' && !independent) return parse(['dev', '--demo', ...args], cwd, { independent, deferTail });
+ // rer demo is rer dev --demo, taking only the flags a demo accepts; its help
+ // and refusals name demo.
+ if (verb === 'demo' && !independent) {
+  const options = parse(['dev', '--demo', ...args], cwd, { independent, deferTail, demo: true });
+  return options.help ? { ...options, verb: 'demo' } : options;
+ }
  // Independent projects own verb names; only the common wrapper flags apply
  // to unknown names. Profile resolution rejects undeclared commands later.
  if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run rer --help.');
- const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
+ const name = demo ? 'demo' : verb;
+ const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : demo ? ['--demo', ...demoVerb.flags] : (verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
  let separator = false;
  for (let i = 0; i < args.length; i++) {
   const flag = args[i];
@@ -36,12 +41,14 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   if (separator && !allowed.has(flag) && !flag.startsWith('--')) { options.forwarded.push(...args.slice(i)); break; }
   if (!allowed.has(flag)) {
    if(flag==='--strictPort')throw invalid('Unsupported --strictPort. Use --port PORT; strict port binding is automatic.');
-   const suggestion=[...allowed].sort((a,b)=>distance(flag,a)-distance(flag,b))[0];
-   throw invalid(`Unsupported flag ${/^--[a-zA-Z-]{1,40}$/.test(flag)?flag:'(invalid)'} for ${verb}.${suggestion?` Did you mean ${suggestion}?`:''} Run rer ${verb} --help.`);
+   // Only a well-formed flag is echoed: anything else may be a value typed in the wrong place.
+   if(!/^--[a-zA-Z-]{1,40}$/.test(flag))throw invalid(`Unsupported argument for ${name}: rer ${name} takes only the flags its help lists. Run rer ${name} --help.`);
+   const suggestion=nearMiss(flag,allowed);
+   throw invalid(`Unsupported flag ${flag} for ${name}.${suggestion?` Did you mean ${suggestion}?`:''} Run rer ${name} --help.`);
   }
   // Several secrets change in one deploy: --set-secret A --set-secret B is --set-secret A,B.
   const listed = ['--set-secret', '--unset-secret'].includes(flag);
-  if (options.supplied.has(flag) && !listed) throw invalid(`Repeated flag ${flag} for ${verb}. Run rer ${verb} --help.`);
+  if (options.supplied.has(flag) && !listed) throw invalid(`Repeated flag ${flag} for ${name}. Run rer ${name} --help.`);
   options.supplied.add(flag);
   const key = flag.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
   if (booleans.has(flag)) options[key] = true;
@@ -107,10 +114,21 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys(verbs).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n`;
- const known = verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys(verbs).join(', ')}, demo, signin, release, listing, archive\nRun rer VERB --help for flags.\n`;
+ const known = verb === 'demo' ? demoVerb : verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
  return `${door}Usage: rer ${verb} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
 }
 
-function distance(a,b){let row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(next[j-1]+1,row[j]+1,row[j-1]+(a[i-1]===b[j-1]?0:1));row=next;}return row[b.length];}
+// A flag to suggest only for a near miss: a typo of an allowed flag (a few
+// letters changed, swapped, added or dropped, keeping its first letter), or a
+// start or word that exactly one allowed flag has (--out, --email).
+function nearMiss(flag,allowed){
+ const name=flag.slice(2),names=[...allowed].map(candidate=>candidate.slice(2));
+ const [best]=names.filter(candidate=>candidate[0]===name[0]).map(candidate=>[candidate,distance(name,candidate)]).sort((a,b)=>a[1]-b[1]);
+ if(best&&best[1]<=(name.length<=4?1:name.length<=8?2:3))return '--'+best[0];
+ const containing=name.length>=3?names.filter(candidate=>candidate.startsWith(name)||candidate.split('-').includes(name)):[];
+ return containing.length===1?'--'+containing[0]:undefined;
+}
+// Optimal string alignment distance: an adjacent swap counts as one edit.
+function distance(a,b){const d=Array.from({length:a.length+1},(_,i)=>Array.from({length:b.length+1},(_,j)=>i||j));for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++){d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1);}return d[a.length][b.length];}

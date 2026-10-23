@@ -3,7 +3,7 @@ const usage = 'Usage: rer cli status [--json] | rer cli install | rer cli uninst
 
 export async function cliCommand(args) {
  const [action, ...flags] = args;
- if (!action || ['--help', '-h'].includes(action)) { process.stdout.write(usage); return 0; }
+ if (!action || args.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
  const allowed = action === 'status' ? ['--json'] : [];
  const unknown = flags.find(flag => !allowed.includes(flag));
  if (!['status', 'install', 'uninstall'].includes(action) || unknown !== undefined) { process.stderr.write(`Unsupported: rer cli ${args.join(' ')}\n${usage}`); return 2; }

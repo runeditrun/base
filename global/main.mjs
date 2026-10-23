@@ -56,7 +56,8 @@ export async function main(argv) {
  handleBrokenPipes();
  const [verb] = argv;
  if (verb === '--version' || verb === '-v') return (await import('./version.mjs')).versionCommand(argv);
- if (verb === 'queue' && argv.length === 2 && argv[1] === '--help') {
+ // A --help after the -- separator belongs to COMMAND.
+ if (verb === 'queue' && argv.slice(1, argv.includes('--') ? argv.indexOf('--') : undefined).includes('--help')) {
   process.stdout.write('Usage: rer queue NAME -- COMMAND [ARGS]\nRun COMMAND once this computer\'s job queue admits it.\n');
   return 0;
  }
