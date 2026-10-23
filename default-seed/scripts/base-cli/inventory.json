@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5871fafc",
+  "cliVersion": "0.2.79-dev.g537b088b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -951,11 +951,11 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "72a429474ad980b840fb6729590eb6cb263abca022bdaebd7d2a4a09bccf33f4"
+      "sha256": "385a4bd7bd9b0b0971132e85d0f923398ce5daefe5a34718178d58d80cf6163e"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "36c016fca40785a944d442b2d5c3a758367d27f1dd0085710ebbe72b1c7c16fd"
+      "sha256": "a6d0a905f7821b9b3370bed127d86a1e6f582dba85ed84d0584bbe7658e86f3e"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -3351,7 +3351,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "83759bdc519ebb14fe30a6fd3d7ffcaa63b2fa489c9359ccc06409b50adec2c9"
+      "sha256": "094f48be32498bc0c203fc4216768e21938e6a491cfa10c7474affbaf4a1d5c7"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -3359,15 +3359,15 @@
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
-      "sha256": "247d0a9b0a8141c171dbed6a5f43f4ea42cddf3a69f561ec0db415a7d4569021"
+      "sha256": "463159369ea8d6a03ebe4308bf7282f0a003d6d32764873456a74001bec7a27d"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "e8fc66768dfd3fec0f1d19297dd7cc1045bc309375f001cd021ca62cb05db22b"
+      "sha256": "dda545e304946606c71e39501c769281cc07d2f2852986c66c9bcd43ba793442"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
-      "sha256": "22660ddff18abe46b7e9e49d0b4400a7b4d77fe4f2e2ea337ee4be4be122fa26"
+      "sha256": "3ced7f119e18788a24905ca1e8b9ecd274620807e884e785011ad4091ba3ff62"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
@@ -3391,7 +3391,7 @@
     },
     "modules/portability/export.mjs": {
       "source": "modules/portability/export.mjs",
-      "sha256": "bf8cc53dc49867ff1b12626d3b70ea29bbc8d0e80038248654b346abd1c22def"
+      "sha256": "f60827ebaa4756432d73bbfce0deb64a336c28b1a5794752af46fe07be98da05"
     },
     "modules/portability/files.mjs": {
       "source": "modules/portability/files.mjs",
@@ -3399,7 +3399,7 @@
     },
     "modules/portability/format.mjs": {
       "source": "modules/portability/format.mjs",
-      "sha256": "d67feb6dde3a1a440c76e8c52a4e840b14bb1eeea60a450565d273677f915381"
+      "sha256": "a0d23baa1f7f45f429d197f481511fa7a9d481cb8f9654ae8bfe014780a94d4c"
     },
     "modules/portability/generated.mjs": {
       "source": "modules/portability/generated.mjs",
@@ -3415,7 +3415,7 @@
     },
     "modules/portability/http-errors.mjs": {
       "source": "modules/portability/http-errors.mjs",
-      "sha256": "d685c77c43699ccdb7d607003c80bf63bc6dc1e498e61c049daf7fca4ad729b0"
+      "sha256": "22ddbdaf75fcf6dfb53b8d450ff360552399eb649fd6d7783af677340604c98a"
     },
     "modules/portability/http.mjs": {
       "source": "modules/portability/http.mjs",
@@ -3435,11 +3435,11 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "2d5450cbed26051795ee3e4d79d019c5115c49c0d568f355d6f9045df43223a3"
+      "sha256": "97f32e43387ae5c6c70b1592fa3c4a7ee17a19d41c3a7bd7b11b0b3d1655dbc1"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
-      "sha256": "78e5914e2cc6f1890db8f3eef02527fc09ed28e0b4877efc6f52332d70298184"
+      "sha256": "8450097d38ce60472b62a16703a4295a3c7b1b56e43887ddcc2ef2c7f066aee5"
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
@@ -3507,7 +3507,7 @@
     },
     "modules/portability/schema-identity.mjs": {
       "source": "modules/portability/schema-identity.mjs",
-      "sha256": "ab6b1b3295f812d2995bacc7abc593a8a72b571e42eda5cb24cf0130e4a96fa8"
+      "sha256": "2c6b6cc2d3cef58cdcbf5fc3139a5a944d445f54d395345fda4c0f613064b2eb"
     },
     "modules/portability/schema/portability.sql": {
       "source": "modules/portability/schema/portability.sql",

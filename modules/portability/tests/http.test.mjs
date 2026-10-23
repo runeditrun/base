@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPortabilityHandler } from '../index.mjs';
+import { createPortabilityHandler, PortabilityError } from '../index.mjs';
 import { runtime,seed,archive } from './helpers.mjs';
 import { fixturePolicy } from './fixture-policy.mjs';
+import { AuthError } from '../../operator-auth/errors.mjs';
 async function setup(t,{maxBodyBytes,authorize}={}) {
   const f=await runtime(t);let actor='owner',calls=[];
   const handler=await createPortabilityHandler({db:f.db,buckets:{FILES:f.bucket},policy:fixturePolicy,appOrigin:'https://app.test',maxBodyBytes,
@@ -17,6 +18,27 @@ test('HTTP checks authorization on every route; null actors receive 401 and no-s
   const routes=[['exports','POST',{}],['exports/'+exportId,'GET'],['exports/'+exportId+'/advance','POST',{}],['exports/'+exportId+'/download','GET'],['exports/'+exportId+'/abort','POST',{}],
     ['imports','POST',{confirmed:true,manifest:bundle.manifest}],['imports/'+importId,'GET'],['imports/'+importId+'/parts/0','PUT',bundle.parts[0]],['imports/'+importId+'/finalize','POST',{}],['imports/'+importId+'/abort','POST',{}]];
   setActor(null);for(const route of routes){const before=calls.length,response=await call(...route);assert.equal(response.status,401);assert.equal(calls.length,before+1);assert.equal(response.headers.get('Cache-Control'),'no-store');assert.deepEqual(await response.json(),{error:'unauthorized'});}
+});
+
+test('HTTP redacts arbitrary typed codes and unwraps authority causes', async t => {
+ let failure;
+ const {call} = await setup(t, {authorize: () => { throw failure; }});
+ const typed = Object.assign(new Error('private authority context'), {status: 403, code: 'private_token_abc123'});
+ const wrappers = [
+  ['direct', error => error],
+  ['Error cause', error => new Error('private wrapper', {cause: error})],
+  ['structural cause', error => ({cause: error})],
+  ['nested cause', error => new Error('private outer', {cause: new Error('private inner', {cause: error})})],
+ ];
+ for (const [label, wrap] of wrappers) await t.test(label, async t => {
+  for (const [error, status, code] of [[typed, 403, 'operation_failed'], [new PortabilityError('private_token_abc123', 403), 403, 'operation_failed'], [new AuthError('forbidden', 403), 403, 'forbidden'], [new AuthError('unauthenticated', 401), 401, 'unauthenticated']]) await t.test(error.constructor.name + ': ' + code, async () => {
+   failure = wrap(error);
+   const response = await call('exports', 'POST', {}), text = await response.text();
+   console.log(label, status, '=>', response.status, text);
+   assert.equal(response.status, status); assert.deepEqual(JSON.parse(text), {error: code});
+   assert.doesNotMatch(text + JSON.stringify([...response.headers]), /private|abc123/);
+  });
+ });
 });
 test('HTTP hides another actors jobs with 404',async t=>{const {call,setActor}=await setup(t);const id=(await (await call('exports','POST',{})).json()).id;setActor('other');for(const route of [[`exports/${id}`,'GET'],[`exports/${id}/advance`,'POST',{}]]){const r=await call(...route);assert.equal(r.status,404);assert.deepEqual(await r.json(),{error:'job_not_found'});}});
 test('HTTP rejects wrong and missing Origin on unsafe methods',async t=>{const {call}=await setup(t);for(const origin of ['https://wrong.test',null]){const r=await call('exports','POST',{},origin);assert.equal(r.status,403);assert.deepEqual(await r.json(),{error:'origin_refused'});}});

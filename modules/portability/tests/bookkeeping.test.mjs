@@ -4,6 +4,10 @@ import { database,bundle,stage } from './regression-helpers.mjs';
 import { createPortability,excludedTable } from '../index.mjs';
 import { importArchive } from '../files.mjs';
 import { migrate } from '../../container/migrations.mjs';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ArchiveVerifier } from '../format.mjs';
 
 const policy={product:'ledger-portability'};
 const ddl=['CREATE TABLE items(id TEXT PRIMARY KEY,value TEXT)',
@@ -38,10 +42,20 @@ test('includeTables cannot reintroduce platform tables, including SQLite case al
     await assert.rejects(createPortability({db:source.db,policy:input}),error=>error.code==='platform_table:'+name && error.message.includes('includeTables'));
   }
 });
-test('an old archive skips platform rows, reports them once, and restores only seed data',async t=>{
+test('an old schema identity needs complete definitions, then skips platform rows and restores only seed data',async t=>{
   const target=await migrated(t),events=[];
   await target.db.prepare("INSERT INTO rer_command_receipts VALUES('destination-request','keep')").run();
-  const result=await importArchive(target.service,new URL('./fixtures/bookkeeping-v2.jsonl',import.meta.url),[],undefined,event=>events.push(event));
+  const fixture=new URL('./fixtures/bookkeeping-v2.jsonl',import.meta.url);
+  await assert.rejects(importArchive(target.service,fixture,[]),error=>error.code==='schema_mismatch:legacy_schema');
+  // Retain the original table-only checksum and all row/content checks. Bind
+  // a complete empty object inventory to exercise the compatible old identity.
+  const records=(await readFile(fixture,'utf8')).trim().split('\n').map(JSON.parse);
+  records[0].schemaObjects=[];
+  const integrity=new ArchiveVerifier(records[0]);records.slice(1,-1).forEach(part=>integrity.add(part));
+  records.at(-1).archiveHash=integrity.digest();
+  const directory=await mkdtemp(join(tmpdir(),'bookkeeping-archive-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+  const path=join(directory,'archive.rer');await writeFile(path,records.map(JSON.stringify).join('\n')+'\n',{mode:0o600});
+  const result=await importArchive(target.service,path,[],undefined,event=>events.push(event));
   assert.deepEqual(result.skippedTables,['rer_command_receipts','rer_migrations']);
   assert.deepEqual(events.filter(event=>event.phase==='skipped').map(event=>event.tables),[result.skippedTables]);
   assert.deepEqual((await target.db.prepare('SELECT * FROM items').all()).results,[{id:'person-1',value:'Asha Chen'}]);

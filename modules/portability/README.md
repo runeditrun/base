@@ -331,12 +331,28 @@ parts also preserve the original rowid, including gaps, for restoration and
 erasure matching. Export time,
 source identity, job ids and boundaries do not affect equivalence.
 
-Schema compatibility ignores SQL comments and whitespace between tokens, so
-hosted D1 and local migrations agree. Quoted identifiers, string contents,
-constraints and generated expressions remain significant. The original DDL
-still travels and is authenticated by `archiveHash`. Archives made with the
-earlier raw-DDL schema hash are verified under that hash before compatibility
-normalization; their authenticated manifest and parts are never rewritten.
+Schema identity covers table definitions (including constraints and generated
+expressions), explicit indexes (including uniqueness and partial predicates),
+views and triggers. Indexes and triggers on excluded tables are excluded with
+their tables, including platform bookkeeping tables. The complete additional
+definitions travel in `schemaObjects`. Compatibility ignores SQL comments and
+whitespace between tokens in every definition, so hosted D1 and local migrations
+agree. Quoted identifiers, string contents and operator boundaries remain
+significant. The original DDL is authenticated by `archiveHash`.
+
+Older version 2 archives first verify their original raw-DDL or tokenized,
+table-only schema checksum and complete archive proof. Compatibility then uses
+any complete `schemaObjects` inventory the archive carries, without rewriting
+its authenticated manifest or parts. Without that inventory, the original
+presence or absence of indexes, views and triggers cannot be established from
+table SQL or migration names alone, even when the destination has no such
+objects. Normal restore refuses `schema_mismatch` and the CLI gives the existing
+re-export recovery instructions. This also catches removal of an old object's
+definition rather than assuming missing evidence means the objects match.
+Re-export from the original installation to carry the complete definitions.
+A new archive explicitly records even an empty object inventory, so later
+additive migrations can still be placed normally. The separate acknowledged
+v1 recovery path remains an explicitly unverified recovery, as documented below.
 
 New exports use archive version 2. The closing `archiveHash` is SHA-256 of
 canonical JSON `{manifest,parts}`, where `manifest` is the complete manifest
@@ -679,8 +695,12 @@ returns an async dispatcher, or null for foreign paths. Default base path is
 an actor id or null. Jobs belong to their creating actor. Unsafe methods require
 the exact configured Origin. Responses have `Cache-Control: no-store` and errors
 are `{error:code}`. Request bodies are bounded; `maxBodyBytes` can lower the bound.
-Typed authorization errors retain their HTTP status and bounded symbolic code
-(for example `403 step_up_required`). Native diagnostics remain private:
+Typed authorization errors retain their HTTP status, directly or through a
+bounded, cycle-safe `cause` chain. Codes come from the existing fixed public
+vocabulary (for example `403 step_up_required`); unknown codes become
+`operation_failed`. Portability diagnostics expose the known code prefix only,
+never caller-supplied suffixes. Aggregate error collections are not authority
+wrappers. Native diagnostics remain private:
 transient D1 availability failures use `503 operation_failed`, transport timeouts
 use `504 operation_failed`, and unexpected faults remain `500 operation_failed`.
 The hosted CLI aborts a completed export after saving and verifying the local
