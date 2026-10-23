@@ -8,7 +8,7 @@ import { applySql } from './apply-sql.mjs';
 const post = (input, cookie) => ({ method: 'POST', input, cookie });
 
 test('D1 auth writes survive audit triggers and storage failures without partial authority', async () => {
-  const r = await runtime();
+  const r = await runtime({ externalIssuers: ['https://idp.example.com'] });
   try {
     const db = await r.db;
     await applySql(db, await readFile(new URL('./fixtures/trigger-writes.sql', import.meta.url), 'utf8'));

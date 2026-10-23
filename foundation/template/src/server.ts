@@ -7,7 +7,7 @@ import { staticAssetResponse } from './base/static-assets'
 import { deploymentHealth } from './base/deployment-health'
 import { lobbyResponse } from './base/lobby'
 import { setupStateResponse } from './base/setup-state'
-import { authResponse, runtimeBindings, type Bindings } from './auth.server'
+import { authResponse, operatorAuth, runtimeBindings, type Bindings } from './auth.server'
 import { identity } from './identity'
 
 const api = new Hono<{ Bindings: Bindings }>()
@@ -32,7 +32,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     // Local dev serves the saved origin's data at its own port (RER_DEV_ORIGIN).
     const state = await setupStateResponse(request, runtimeBindings(env))
     if (state) return state
-    const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
+    const lobby = await lobbyResponse(request, runtimeBindings(env), identity, undefined, operatorAuth(runtimeBindings(env)).getSession)
     if (lobby) return lobby
     return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
   },

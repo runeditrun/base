@@ -184,11 +184,11 @@ test('only the originating first setup can enable provider sign-in; settings and
  // Both unchanged off and unchanged on finish setup without generation/audit churn.
  for(const enabled of [false,true]) {
   const r=await runtime(t),owner=await r.bootstrap();
-  if(enabled)assert.equal((await r.call('/auth/settings/identity',{cookie:owner,body:{idpSignIn:true}})).status,200);
+  if(enabled)assert.equal((await r.rawLink()).status,200);
   const before=setting(r),beforeAudit=audit(r);
   assert.equal((await r.call('/auth/settings/identity',{cookie:owner,body:{idpSignIn:enabled}})).status,200);
   assert.deepEqual(setting(r),{...before,first_setup:0});assert.deepEqual(audit(r),beforeAudit);
-  assert.equal((await r.rawLink()).status,200);assert.equal(setting(r).idp_sign_in,Number(enabled));assert.deepEqual(audit(r),beforeAudit);
+  assert.equal((await r.link()).status,200);assert.equal(setting(r).idp_sign_in,Number(enabled));assert.deepEqual(audit(r),beforeAudit);
  }
  const paused=await runtime(t),owner=await paused.bootstrap(),gate=paused.pauseLink(),callback=paused.rawLink();await gate.ready;
  try{assert.equal((await paused.call('/auth/settings/identity',{cookie:owner,body:{idpSignIn:false}})).status,200);}finally{gate.release();}

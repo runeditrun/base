@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { emittedRuntime, setupToken, owner } from './emitted-runtime.mjs'
 
-test('the claimed Lobby offers project-folder recovery only on this computer', async () => {
-  for (const [options, local] of [[{ hostname: 'localhost', noMail: true }, true], [{ demoHost: true }, false]]) {
+test('the claimed Lobby opens the local sign-in flow without deployment credentials', async () => {
+  for (const options of [{ hostname: 'localhost', noMail: true }, { demoHost: true }]) {
     const runtime = await emittedRuntime(options)
     try {
       const claim = await runtime.call('/auth/bootstrap', {
@@ -14,10 +14,30 @@ test('the claimed Lobby offers project-folder recovery only on this computer', a
       assert.equal(response.status, 200)
       const html = await response.text()
       assert.match(html, /data-state="claimed"/)
-      if (local) assert.match(html, /<code>rer signin<\/code>/)
-      else assert.doesNotMatch(html, /rer signin/)
+      const href = html.match(/class="btn" href="([^"]+)"/)[1]
+      assert.equal(new URL(href, runtime.origin).pathname, '/signin')
+      assert.equal((await runtime.call(href)).status, 200)
+      assert.equal(runtime.mails.length, 0, 'opening sign-in needs no deployed credentials or email delivery')
     } finally { await runtime.close() }
   }
+})
+
+test('a current session opens the app from the Lobby and signout restores the sign-in action', async () => {
+  const runtime = await emittedRuntime({ noMail: true })
+  try {
+    const claim = await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Morgan' } })
+    const cookie = claim.headers.get('set-cookie').split(';')[0]
+    const signedIn = await runtime.call('/', { cookie })
+    assert.equal(signedIn.status, 200)
+    const html = await signedIn.text()
+    assert.match(html, /class="btn" href="\/app"/)
+    assert.doesNotMatch(html, /href="\/signin/)
+    assert.equal((await runtime.call('/app', { cookie })).headers.get('location'), '/setup')
+    assert.equal((await runtime.call('/setup', { cookie })).status, 200)
+    assert.equal((await runtime.call('/auth/signout', { method: 'POST', input: {}, cookie })).status, 204)
+    const signedOut = await runtime.call('/', { cookie })
+    assert.match(await signedOut.text(), /class="btn" href="\/signin/)
+  } finally { await runtime.close() }
 })
 
 test('the installed Lobby offers sign-in as soon as the owner is claimed, before first-run confirmation', async () => {

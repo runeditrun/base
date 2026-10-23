@@ -66,8 +66,8 @@ export async function resolvePersona(url, key, as, signal) {
  // The people rer can sign in as: each persona with its email, then every
  // invited or active person in this checkout's local database by email.
  const valid = personas.map(entry => entry.as === entry.email || !entry.email ? entry.as : `${entry.as} (${entry.email})`).join(', ');
- if (!as.includes('@')) throw invalid(`Unknown dev persona ${as}. rer dev --as takes one of: ${valid}.`);
- throw invalid(`No one with the email ${as} can sign in to this app locally. rer dev --as takes one of: ${valid}. Someone added only to the app's own records can sign in once the app invites them (its Invite action, which sends no mail locally); then run rer dev --as ${as} again.`);
+ if (!as.includes('@')) throw invalid(`Dev persona ${as} is unavailable for sign-in. Run rer dev --as with one of: ${valid}. If this account is inactive, ask an owner or administrator to reactivate it first.`);
+ throw invalid(`No one with the email ${as} can sign in to this app locally. rer dev --as takes one of: ${valid}. If this account is inactive, ask an owner or administrator to reactivate it. Someone added only to the app's own records can sign in once the app invites them (its Invite action, which sends no mail locally); then run rer dev --as ${as} again.`);
 }
 
 // rer build refuses output that bundles the dev layer, naming the file.
