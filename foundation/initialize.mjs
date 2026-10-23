@@ -32,6 +32,8 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
       const workflow = select(baseRepo, revision, `export/${name}`)[0]
       await put(`editions/${edition}/.github/workflows/${name}`, workflow.bytes, workflow.path)
     }
+    const helper = select(baseRepo, revision, 'export/install-chromium-deps.py')[0]
+    await put(`editions/${edition}/scripts/install-chromium-deps.py`, helper.bytes, helper.path)
     await json('family.json', { schemaVersion: 1, id: family, repository, base: { repository: 'runeditrun/base', commit: revision } })
     await put('core/README.md', '# Headless family core\n\nAdd domain source only when every edition needs it. No domain is preselected.\n')
     await put('modules/README.md', '# Optional family capabilities\n\nAdd modules when an edition needs them. Promote to Base only for actual cross-family reuse.\n')
