@@ -237,10 +237,23 @@ node scripts/edition-authoring/cli.mjs refresh-base FULL_40_HEX_COMMIT --base /a
 
 `adapt-base <file> [--record <file>]` only accepts an existing regular recorded
 file. It keeps local bytes and mode unchanged, and adds `adapted: {"local/path":
-"ORIGINAL_FULL_BASE_COMMIT"}` to that copy. The existing `files` digest and
+"ORIGINAL_FULL_BASE_COMMIT"}` and `acknowledged: {"local/path":
+{"sha256": "SHA256_OF_LOCAL_BYTES", "mode": "100644"}}` to that copy (`100755`
+for an executable file). The existing `files` digest and
 `modes` entry remain the Base baseline at this per-file commit, even when the
 copy's other files move to a newer revision. Repeating the declaration does not
 advance that baseline. Commit the record alongside the adaptation.
+
+The acknowledgement covers exactly those local bytes and mode. After a later
+local change, `refresh-base` refuses the entire refresh before writing any file
+or record, just as it does for undeclared edits. `verify-base` exits nonzero and
+reports `adaptation-modified` or `adaptation-mode` with the file and a runnable
+`acknowledge` command, including `--record` when needed. Review the change, then
+run `adapt-base <file>` again to update the local snapshot. This keeps the original
+Base baseline and upstream conflict notes. Older declarations without an
+`acknowledged` snapshot remain readable, but report `adaptation-unacknowledged`
+and block refresh until the same explicit re-acknowledgement; neither command
+automatically accepts the current bytes.
 
 Refresh never writes or removes declared adaptations, including when Base deletes
 the source. It still refreshes every untouched copy. Its `adapted` report lists
@@ -252,9 +265,9 @@ A second refresh to the same commit leaves the record and local file bytes
 unchanged. Undeclared local edits still block before any file is written, with
 an instruction naming `adapt-base`.
 
-`verify-base` reports declarations separately: it checks their existence and
-regular-file status and verifies their retained Base baselines, but does not
-claim local byte or mode equality for seed-owned files. `--offline` cannot
+`verify-base` reports declarations separately: it checks their existence,
+regular-file status, acknowledged local bytes and mode, and retained Base
+baselines. `--offline` checks the local acknowledgement but cannot
 validate the upstream baseline. Run the edition's product tests for adaptations.
 For richer source comparisons, use `edition.json` origins and mappings with
 `compare` instead.
