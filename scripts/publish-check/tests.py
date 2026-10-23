@@ -183,6 +183,50 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
         self.write('tests/baseline.mjs', f"const apiKey = '{wrong}';\n")
         self.assertEqual(cli()[0]['status'], 'FAIL')
 
+    def test_home_route_parameters_pass_through_cli(self):
+        with tempfile.TemporaryDirectory() as directory:
+            public = os.path.join(directory, 'public.git')
+            subprocess.run(['git', 'clone', '-q', '--bare', str(self.repo), public], check=True)
+            routes = [('Users', ':id'), ('Users', '${id}'), ('home', ':name'),
+                      ('home', '${name}'), ('Users', '${user.id ?? defaultId}/Library/cache')]
+            for index, (root, segment) in enumerate(routes):
+                self.write(f'src/routes/{index}.ts', f'export const route = `/{root}/{segment}`;\n')
+            self.commit()
+            self.commit()  # Keep the route blobs in newly-public history too.
+            result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo),
+                                     '--public-base', public + '#main', '--project', 'runeditrun/base',
+                                     '--repository', 'https://github.com/runeditrun/base'],
+                                    capture_output=True, text=True, timeout=120)
+            report = json.loads(result.stdout)
+            self.assertEqual(result.returncode, 0, report)
+            self.assertEqual(report['status'], 'PASS')
+            self.assertTrue(report['complete'])
+
+    def test_real_home_segments_still_fail_through_cli(self):
+        with tempfile.TemporaryDirectory() as directory:
+            public = os.path.join(directory, 'public.git')
+            subprocess.run(['git', 'clone', '-q', '--bare', str(self.repo), public], check=True)
+            homes = [('Users', 'alice/'), ('Users', 'alice'), ('home', 'alice/.ssh'),
+                     ('Users', 'alice/:id'), ('Users', 'alice/${id}'), ('Users', 'alice-${id}'),
+                     ('Users', '${id}-alice'), ('Users', ':id.json'), ('Users', '{name}')]
+            for index, (root, segment) in enumerate(homes):
+                # An exempt route in the same file cannot mask a real home.
+                self.write(f'src/paths/{index}.ts', f'export const route = `/{root}/:id`;\n'
+                           f'export const home = `/{root}/{segment}`;\n')
+            self.commit()
+            self.commit()
+            result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo),
+                                     '--public-base', public + '#main', '--project', 'runeditrun/base',
+                                     '--repository', 'https://github.com/runeditrun/base'],
+                                    capture_output=True, text=True, timeout=120)
+            report = json.loads(result.stdout)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(report['status'], 'FAIL')
+            self.assertTrue(report['complete'])
+            for index in range(len(homes)):
+                self.assertTrue(any(f['rule'] == 'hygiene.local-path' and f['path'] == f'src/paths/{index}.ts'
+                                    and 'newly-public' in f['scopes'] for f in report['findings']))
+
     def test_ordinary_text_is_classified_by_shape_and_real_leaks_still_fail(self):
         def png(*chunks):
             body = b'\x89PNG\r\n\x1a\n'
