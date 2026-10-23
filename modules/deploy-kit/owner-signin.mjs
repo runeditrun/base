@@ -2,19 +2,23 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { assert } from './validation.mjs';
 import { query } from './migrations.mjs';
 import { literal } from './migration-ledger.mjs';
-import { readOwnerState, sameDeployment } from './owner.mjs';
+import { readOwnerState, sameDeployment, servedBindings } from './owner.mjs';
+import { recordedNames } from './ai.mjs';
+import { admit } from '../ai/native/names.mjs';
 import { activeWorker } from './worker.mjs';
 import { OWNER_SIGNIN_PATH, OWNER_SIGNIN_SECONDS, ownerSigninDigest } from '../operator-auth/owner-signin-grant.mjs';
 
 /** `rer signin`: with the same Cloudflare credentials that deployed this Worker, write a
  * one-time grant for the claimed owner into the deployment's own auth D1 and return the
  * link. Only the token's SHA-256 reaches the database; the token itself exists only in
- * the returned link. Refuses unless the live Worker is the one this record deployed. */
-export async function ownerSignin({ api, target, statePath, clock = Date.now }) {
+ * the returned link. Refuses unless the live Worker is the one this record deployed, read
+ * back through the recorded deployment's runtime names (`runtime`). */
+export async function ownerSignin({ api, target, statePath, runtime, clock = Date.now }) {
   const state = await readOwnerState(statePath, target);
   assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
   const live = await activeWorker(api, target.worker);
   assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');
+  admit(runtime ?? recordedNames(state.receipt, target), servedBindings(live));
   const ids = Object.values(state.owned.d1).filter(entry => entry.status === 'created' && entry.id).map(entry => entry.id);
   const holding = [];
   for (const id of ids) if ((await query(api, id, "SELECT name FROM sqlite_master WHERE type='table' AND name='oa_owner_signins'"))[0].results.length) holding.push(id);

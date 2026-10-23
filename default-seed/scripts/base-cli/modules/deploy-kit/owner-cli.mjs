@@ -8,7 +8,7 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
-import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, pendingSecrets } from './owner.mjs';
+import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, pendingSecrets, servedBindings } from './owner.mjs';
 import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
@@ -118,7 +118,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   else runtime = recordedNames(recorded.receipt,target);
   // What an interrupted secret change would leave on the Worker passes those names before any lock or settlement.
   admit(runtime,pendingSecrets(recorded));
-  if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice});
+  if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice,runtime});
   if (command === 'deploy') await beforeWrite();
   // A dry run only reads state: settling an interrupted change may write it.
   const state = command === 'dry-run' ? recorded : await settleOwnerState({api,target,statePath,runtime,secretsOnly:command === 'deploy'});
@@ -131,12 +131,14 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     assert(current.receipt && !current.pendingUpload && !current.pendingSecret, 'missing-owner-receipt');
     const live = await activeWorker(api, target.worker);
     assert(live && sameDeployment(live, current.receipt.provider), 'owned-resource-replaced');
+    // The claimed Worker is read back through the recorded deployment's names.
+    admit(runtime, servedBindings(live));
     current.ownerClaim = { outcome: values.outcome };
     await writeOwnerState(statePath, current);
     return {ok:true, owner:values.outcome};
   });
   // The link is a credential: returned to the caller once, never written to the state file.
-  if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'signin'); })};
+  if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath,runtime}).catch(error => { throw api.annotateFailure(error,'signin'); })};
   if (command === 'inspect') {
     assert(!localOnlyBinding(declaration, localOnlyKeys), 'local-only-binding');
     assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
@@ -144,6 +146,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');
     const rows = await api.request(`/workers/scripts/${target.worker}/secrets`);
     assert(Array.isArray(rows), 'invalid-secret-list');
+    admit(runtime, [...servedBindings(live), ...rows]);
     // Native uploaders record their configured app origin with the deployment identity.
     return {ok:true, origin:state.receipt.origin ?? target.origin, versionId:live.versionId, retiredSecrets, ownerClaim:state.ownerClaim, liveSecrets:rows.map(row => row.name)};
   }

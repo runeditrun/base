@@ -1,6 +1,8 @@
 import { assert, uuid } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
-import { checkResourceIdentity, readOwnerState, sameDeployment, withStateLock, ownerResourceName } from './owner.mjs';
+import { checkResourceIdentity, readOwnerState, sameDeployment, withStateLock, ownerResourceName, servedBindings } from './owner.mjs';
+import { recordedNames } from './ai.mjs';
+import { admit } from '../ai/native/names.mjs';
 import { retiredInstallationKeys } from '../dependencies/custody.mjs';
 
 /** The D1 REST batch is one transaction, matching the Worker's db.batch contract.
@@ -24,14 +26,17 @@ function database(api, id) {
 }
 
 /** Reseal the dependency rows in the declared DB only while the receipt still
- * proves both the Worker and its recorded D1 resource belong to this deployment. */
-export async function ownerRekey({ api, target, statePath, declaration, env, notice = line => console.error(line) }) {
+ * proves both the Worker and its recorded D1 resource belong to this deployment,
+ * read back through the recorded deployment's runtime names (`runtime`). */
+export async function ownerRekey({ api, target, statePath, declaration, env, runtime, notice = line => console.error(line) }) {
  return withStateLock(statePath, async () => {
   const state = await readOwnerState(statePath, target);
   assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
+  const names = runtime ?? recordedNames(state.receipt, target);
   const owned = async () => {
    const live = await activeWorker(api, target.worker);
    assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');
+   admit(names, servedBindings(live));
    return live;
   };
   const live = await owned();

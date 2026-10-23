@@ -217,15 +217,17 @@ test('every owner command, Worker write and configuration family passes the one 
  assert.ok(reserved.length&&reserved.every(binding=>binding.type==='inherit'?[...AI_VARIABLES,AI_PRIVACY_TOKEN].includes(binding.name)
   :binding.type==='plain_text'?binding.text===derived[binding.name]:binding.type==='secret_text'&&binding.name===AI_PRIVACY_TOKEN),JSON.stringify(reserved));
  const statePath=join(root,'.rer/deploy/production.json'),saved=JSON.parse(await readFile(statePath)),held=provider.state.secrets.map(item=>item.name);
- // A reserved name the live Worker serves outside the approval: a secret change would inherit it, health would read it back.
- const extra={type:'plain_text',name:'RER_AI_LIVE',text:'synthetic-live'},live=[provider.state.settings.bindings,provider.state.version.resources.bindings];
- for(const bindings of live)bindings.push(extra);
- for(const change of [['--set','A_SECRET'],['--set','A_SECRET','--set','B_SECRET']])for(const command of ['secret','health']){
+ // A reserved name the live Worker serves outside the approval: a secret change would inherit it, every other
+ // command reads it back. Removal deletes it; a dry run reads only the secrets a fresh upload would keep.
+ const foreign={type:'plain_text',name:'RER_AI_LIVE',text:'synthetic-live'},live=[provider.state.settings.bindings,provider.state.version.resources.bindings];
+ for(const bindings of live)bindings.push(foreign);
+ const extras={secret:[['--set','A_SECRET'],['--set','A_SECRET','--set','B_SECRET']],'record-owner':[['--outcome','claimed']]};
+ for(const command of COMMANDS.filter(command=>!['remove','dry-run'].includes(command)))for(const extra of extras[command]??[[]]){
   const bytes=await readFile(statePath),writes=provider.state.writes.length;
-  await assert.rejects(cli(command,command==='secret'?change:[]),e=>e.code==='ai_policy_conflict',`live x ${command}`);
+  await assert.rejects(cli(command,extra),e=>e.code==='ai_policy_conflict',`live x ${command} ${extra.join(' ')}`);
   assert.equal(provider.state.writes.length,writes);assert.deepEqual(await readFile(statePath),bytes);
  }
- for(const bindings of live)bindings.splice(bindings.indexOf(extra),1);
+ for(const bindings of live)bindings.splice(bindings.indexOf(foreign),1);
  // An interrupted change that would leave a reserved name: applied at the edge, then staged as a several-secret copy.
  for(const mode of ['applied','staged']){
   const state=structuredClone(saved),bindings=['RER_AI_PENDING',...(mode==='staged'?['B_SECRET']:[])];
@@ -238,7 +240,7 @@ test('every owner command, Worker write and configuration family passes the one 
   // Removal deletes the Worker and keeps serving nothing, so it alone settles without runtime names.
   for(const command of COMMANDS.filter(command=>command!=='remove')){
    await writeFile(statePath+'.lock','other-run\n');
-   let error;try{await cli(command,{secret:['--set','A_SECRET'],'record-owner':['--outcome','claimed']}[command]);}catch(e){error=e;}finally{await rm(statePath+'.lock');}
+   let error;try{await cli(command,extras[command]?.[0]);}catch(e){error=e;}finally{await rm(statePath+'.lock');}
    assert.equal(error?.code,'ai_policy_conflict',`${mode} x ${command}: ${error?.code??error?.message}`);
    assert.equal(provider.state.writes.length,writes,`${mode} x ${command}`);assert.deepEqual(await readFile(statePath),bytes,`${mode} x ${command}`);
   }
