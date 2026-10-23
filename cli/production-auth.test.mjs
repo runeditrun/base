@@ -150,7 +150,11 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
  assert.match(await error('SENDGRID_API_KEY=test-only-provider-credential\n'), /MAIL_FROM/);
  // The documented display-name sender passes like a bare address, quoted or not; an invalid one names the accepted forms.
  for (const from of [`Your Business <${productionSender}>`, `"Your Business <${productionSender}>"`]) assert.match(await error(`MAIL_FROM=${from}\nRESEND_API_KEY=test-only-provider-credential\n`), /not committed/, from);
- assert.match(await error(`MAIL_FROM=Your Business ${productionSender}\nRESEND_API_KEY=test-only-provider-credential\n`), /MAIL_FROM/);
+ const invalidSender = await error(`MAIL_FROM=Your Business ${productionSender}\nRESEND_API_KEY=test-only-provider-credential\n`);
+ const guidance = /\((?<forms>[^)]+)\)\.\s+(?<correction>[^.]+),\s+then\b/.exec(invalidSender)?.groups;
+ assert.ok(guidance, invalidSender);
+ assert.deepEqual(guidance.forms.split(/\s+or\s+/).map(form => form.replace(/^a\s+/, '')), ['bare address', 'Display Name <address>'], invalidSender);
+ assert.match(guidance.correction, /\bMAIL_FROM\b.*\benvironment\b.*--env-file\b/, invalidSender);
  assert.match(await error(`MAIL_FROM=${productionSender}\nMAIL_PROVIDER=resend\nSENDGRID_API_KEY=test-only-provider-credential\n`), /RESEND_API_KEY/, 'explicit provider cannot borrow another provider key');
  assert.match(await error(`MAIL_FROM=${productionSender}\nMAIL_API_KEY=test-only-provider-credential\n`), /SENDGRID_API_KEY.*RESEND_API_KEY/, 'an ambiguous shared key does not resolve a deferred native provider');
  spec.optionalSecretNames = ['RESEND_API_KEY'];
