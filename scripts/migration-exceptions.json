@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "baseline": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+    "path": "modules/import-kit/src/d1/database.ts",
+    "before": "7e599f922d698b20b9d60ed4ddb32e034bc3f7d5721b215324765732e39eedfa",
+    "after": "b082fc258c00f02913787363da88b996b8e47a6fd2af094d2121673c2bb9d4e0",
+    "reason": "Owner-authorized 23 October 2026: retain the already-landed runtime-only exports from 8fe7936f564fdbcbb6f20745497261d58558212c (postConditions and atomicPrefix). Released schema SQL and existing product migration bytes are unchanged; consumers need no database recovery. This exception binds only these exact bytes at rer-v0.2.79."
+  }
+]

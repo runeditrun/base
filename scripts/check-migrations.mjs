@@ -6,6 +6,8 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {migrationMappings} from '../edition-authoring/migration-origins.mjs';
+import {migrationInputs} from './migration-inputs.mjs';
+import {gitBlobs} from './git-blobs.mjs';
 
 const roots = ['default-seed/migrations/', 'foundation/template/migrations/'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -13,10 +15,6 @@ const commit = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const safePath = value => typeof value === 'string' && !value.includes('\\') && !value.split('/').some(part => !part || part === '..' || part === '.');
 const numberedPath = value => roots.some(root => value.startsWith(root));
-// These source classes are documented migration inputs, including aggregate SQL
-// still consumed by older families. Freeze whole files, including TS helpers.
-const sqlOrigin = name => /^(?:modules\/.*(?:\/schema\/.*|\/schema)\.sql|foundation\/runtime\/.*\.sql)$/.test(name);
-const migrationArray = bytes => /export\s+const\s+\w*(?:Migration|Schema)\s*(?::[^=;]+)?=\s*\[/.test(bytes);
 function localBytes(repo, name) {
   let target = repo;
   for (const part of name.split('/')) {
@@ -81,8 +79,10 @@ function check(repo, extraBase) {
     if (!safePath(copy.source) || !releasedEntries.some(entry => entry.name === copy.source && entry.type === 'blob' && ['100644', '100755'].includes(entry.mode))) throw Error(`Released mapped migration origin not found: ${copy.source}`);
     origins.add(copy.source);
   }
-  const releasedOrigins = new Set(releasedEntries.filter(({name, type, object}) => origins.has(name) || sqlOrigin(name) ||
-    (name.startsWith('modules/') && /(?:^|\/)schema\.(?:ts|mjs|js)$/.test(name) && type === 'blob' && migrationArray(git('cat-file', 'blob', object).toString('utf8')))).map(({name}) => name));
+  const releasedFiles = gitBlobs(repo, releasedEntries.filter(({name, type}) => type === 'blob' &&
+    (name.startsWith('modules/') || name.startsWith('foundation/runtime/'))));
+  const discovered = migrationInputs(releasedFiles);
+  const releasedOrigins = new Set(releasedEntries.filter(({name}) => origins.has(name) || discovered.has(name)).map(({name}) => name));
   const protectedPath = value => safePath(value) && (numberedPath(value) || releasedOrigins.has(value));
 
   const exceptionPath = path.join(repo, 'scripts/migration-exceptions.json');
@@ -98,7 +98,7 @@ function check(repo, extraBase) {
       .filter(({name}) => numberedPath(name) || (baseline === released && releasedOrigins.has(name)));
     for (const {name, type, mode, object} of entries) {
       if (type !== 'blob' || !['100644', '100755'].includes(mode)) throw Error(`Migration baseline contains a non-file: ${name}`);
-      const before = hash(git('cat-file', 'blob', object));
+      const before = hash(releasedFiles.get(name) ?? git('cat-file', 'blob', object));
       let after = null;
       try { after = hash(localBytes(repo, name)); }
       catch (error) { if (error.code !== 'ENOENT') throw error; }

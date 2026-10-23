@@ -223,18 +223,27 @@ and `foundation/template/migrations/` byte for byte against the highest stable
 the GitHub push event's `before` commit or pull request base, so a multi-commit
 push cannot rewrite numbered migrations published on plain main between releases.
 
-The release comparison also freezes the initializer's actual migration
-origins from both the released inline mapping and today's shared `migrationCopies`
-array (removing a mapping cannot unprotect a released origin), module `schema/*.sql` and `schema.sql` sources, foundation runtime SQL,
-and module `schema.ts`/`schema.mjs`/`schema.js` files exporting `*Migration` or
-`*Schema` arrays (including import-kit). The entire source file is compared,
-including helpers used to construct arrays. This includes the operator-auth
-draft still consumed by older families. A changed schema needs a new source
-file and a new numbered migration. These classes are discovered from committed
-release source, rather than a separate list of paths. A source added after the
-latest release stays editable until its first release; numbered migrations are
-protected by the plain-main comparisons as well. Every initializer mapping must
-resolve to a regular origin file; a missing mapped origin fails closed.
+The release comparison also freezes the initializer's actual migration origins
+from both released and current mappings, every module SQL file, and
+foundation runtime SQL. After a frozen install (`pnpm install --frozen-lockfile`),
+the check uses the existing TypeScript parser to discover released JS/TS SQL
+values without executing them. Exported non-function values containing SQL, or
+derived from SQL through references, spreads and helper calls, are migration
+inputs. Exported migration/schema arrays remain inputs too. Discovery follows
+value bindings to their declarations across imports and re-exports, including
+barrels and helpers without SQL literals or schema filenames. Type-only imports
+and unrelated runtime functions are not dependencies of a schema value.
+
+The entire containing file is frozen, including comments, whitespace and runtime
+exports sharing that file. A comment-only edit outside this SQL dependency graph
+is allowed. This includes the operator-auth draft still consumed by older
+families. A changed schema needs a new source file and a new numbered migration.
+Discovery uses committed release source, so removing today's import or export
+cannot unprotect an input. A source added after the latest release stays editable
+until its first release; numbered migrations are protected by plain-main
+comparisons as well. Every initializer mapping must resolve to a regular origin
+file; missing mappings, unparseable released sources and unresolved schema value
+imports fail closed.
 
 New files pass; changed or removed files fail. It reads the working tree, so
 uncommitted edits are checked too. Shallow clones acquire missing baseline
@@ -252,7 +261,9 @@ SHA-256), `after` (the replacement bytes' SHA-256, or null for deletion), and
 skip flag. An exception accepts only those exact bytes at that path and
 baseline, remains visible in the check output, and must cover each reported
 baseline explicitly. Remove obsolete exceptions after the released baseline
-advances. The list starts empty.
+advances. The current exception retains only the exact already-landed runtime
+exports in import-kit `database.ts` authorized on 23 October 2026; no schema SQL
+changed and no consumer recovery is needed.
 
 ### Existing families with the old owner draft mapping
 

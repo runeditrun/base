@@ -3,18 +3,14 @@
 import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {commit, familyManifest, json, select} from '../composition/git-source.mjs';
+import {parseCompositionArgs} from '../composition/arguments.mjs';
 
 const args = process.argv.slice(2);
 try {
-  const [edition] = args;
-  if (edition && edition !== '--help') {
-    const option = name => {
-      const at = args.indexOf(`--${name}`);
-      return at < 0 ? undefined : args[at + 1];
-    };
-    const family = option('family-repo'), base = option('base-repo');
-    if (!family || !base) throw Error('Use pnpm edition <edition> --family-repo <checkout> --base-repo <checkout> --output <new-directory>');
-    const revision = commit(family, option('ref') ?? 'HEAD');
+  const options = parseCompositionArgs(args);
+  if (options) {
+    const {edition, 'family-repo': family, 'base-repo': base} = options;
+    const revision = commit(family, options.ref ?? 'HEAD');
     const manifest = familyManifest(family, revision);
     const baseRevision = commit(base, manifest.base.commit);
     const descriptor = json(family, revision, `compositions/${edition}.json`);
