@@ -188,7 +188,10 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             public = os.path.join(directory, 'public.git')
             subprocess.run(['git', 'clone', '-q', '--bare', str(self.repo), public], check=True)
             routes = [('Users', ':id'), ('Users', '${id}'), ('home', ':name'),
-                      ('home', '${name}'), ('Users', '${user.id ?? defaultId}/Library/cache')]
+                      ('home', '${name}'), ('Users', '${user.id}/Library/cache'),
+                      ('Users', ':id/Library'), ('Users', ':id/groups'),
+                      ('Users', '${a.b}'), ('Users', '${ a . b }'), ('Users', '${a}/${b}'),
+                      ('Users', ':id/home/:name')]
             for index, (root, segment) in enumerate(routes):
                 self.write(f'src/routes/{index}.ts', f'export const route = `/{root}/{segment}`;\n')
             self.commit()
@@ -208,7 +211,16 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             subprocess.run(['git', 'clone', '-q', '--bare', str(self.repo), public], check=True)
             homes = [('Users', 'alice/'), ('Users', 'alice'), ('home', 'alice/.ssh'),
                      ('Users', 'alice/:id'), ('Users', 'alice/${id}'), ('Users', 'alice-${id}'),
-                     ('Users', '${id}-alice'), ('Users', ':id.json'), ('Users', '{name}')]
+                     ('Users', '${id}-alice'), ('Users', ':id.json'), ('Users', '{name}'),
+                     ('Users', "${'alice'}"), ('Users', ':id/../alice/.ssh'),
+                     ('home', ':name/../alice/.ssh'), ('Users', '${a}${b}'),
+                     ('Users', "${a['x']}"), ('Users', '${lookup()}'), ('Users', '${123}'),
+                     ('Users', '${a || b}'), ('Users', '${user.id ?? defaultId}/Library/cache'),
+                     ('Users', '${`alice`}'), ('Users', '${true}'), ('Users', '${null}'),
+                     ('Users', ':id/%2e%2e/alice/.ssh'), ('Users', ':id/.%2e/alice/.ssh'),
+                     ('Users', ':id/%2E%2e%2Falice/.ssh'), ('Users', r':id\..\alice\.ssh'),
+                     ('Users', ':id/groups/../../alice/.ssh'), ('Users', ':id/Users/alice'),
+                     ('Users', ':id/home/alice'), ('Users', r':id/C:\Users\alice')]
             for index, (root, segment) in enumerate(homes):
                 # An exempt route in the same file cannot mask a real home.
                 self.write(f'src/paths/{index}.ts', f'export const route = `/{root}/:id`;\n'

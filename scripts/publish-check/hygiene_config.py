@@ -5,13 +5,29 @@ from publication_config import intended_public_repositories
 
 # A home segment within a relative path is not an absolute home directory.
 # Match the username itself so a bare home, including one with spaces, counts.
-LOCAL_PATH = re.compile(r'''(?x)
-    (?<![^\s("'`=:\[<>{|])(?:[*_]|~~)*
+_IDENTIFIER = r'[A-Za-z_$][A-Za-z0-9_$]*'
+_VARIABLE = rf'(?!(?:true|false|null|this|super)(?![A-Za-z0-9_$])){_IDENTIFIER}'
+_INTERPOLATION = rf'\$\{{[ \t]*{_VARIABLE}(?:[ \t]*\.[ \t]*{_IDENTIFIER})*[ \t]*\}}'
+_HOME_PARAMETER = rf'(?::[A-Za-z_][A-Za-z0-9_]*|{_INTERPOLATION})'
+_PATH_END = r'''(?=[\s"'<>`]|$)'''
+_SEGMENT_END = rf'(?:[/\\]|{_PATH_END})'
+# Inspect the entire token after a parameter. A suffix may have ordinary path
+# components or plain interpolations, but cannot traverse or introduce another
+# literal home. Unknown interpolation syntax cannot conceal the remaining path.
+_SAFE_SUFFIX = rf'''
+    (?:[/\\]
+        (?!\.\.(?={_SEGMENT_END}|[?\#]))
+        (?!(?:Users|home)[/\\]+(?!{_HOME_PARAMETER}(?={_SEGMENT_END}))[^/\\\s"'<>`]+)
+        (?!(?i:[A-Z]:[/\\]+Users[/\\]+))
+        (?:{_INTERPOLATION}|(?!\$\{{)[^/\\\s"'<>`])*
+    )*{_PATH_END}'''
+LOCAL_PATH = re.compile(rf'''(?x)
+    (?<![^\s("'`=:\[<>{{|])(?:[*_]|~~)*
     (?:
         (?:(?i:(?a:file://)))?(?<!/[A-Z]:)/(?:Users|home)/
-        # Only a whole first segment can stand for a route's home name.
-        # Later parameters cannot hide a literal name; Windows is unchanged.
-        (?!(?::[A-Za-z_][A-Za-z0-9_]*|\$\{[^/\\{}\r\n]+\})(?=[/\\\s"'<>`]|$))
+        # Exempt only a whole parameter with a suffix that cannot re-aim it.
+        # Literal expressions, mixed segments and Windows homes still match.
+        (?!{_HOME_PARAMETER}{_SAFE_SUFFIX})
         |(?i:(?:(?a:file:///))?[A-Z]:[\\/]+Users[\\/]+)
     )[^/\\\s"'<>`]+''')
 CONFIG = '.publish-check/config.json'
