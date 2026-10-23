@@ -47,7 +47,7 @@ schema at construction. Apply the bookkeeping migration first. Policy fields:
 | `requiredConfiguration` | Setting names returned after restore for the owner to re-enter. |
 | `validateStaged({db,tables,read,manifest})` | Read-only product validation before any object write; false or a thrown error refuses restore. `tables` names the staging tables for bounded SQL queries; `read` is a convenience for small tables. |
 | `acceptedSchemas` | Map from an earlier full schema hash to `{upgradeRow(table,row)}`. Upgrade functions are pure and synchronous. No older schema is accepted by default. |
-| `buckets` | Binding names mapped to `{prefix?,objectReferences?:{table,keyColumn}}`. Prefixes isolate an object namespace. References require exactly the distinct referenced keys. |
+| `buckets` | Binding names mapped to `{prefix?,objectReferences?:{table,keyColumn}}`. Prefixes isolate an object namespace. References require exactly the distinct referenced keys: export checks its snapshot, and restore its staged rows (after `importRow`, before any object write), that each key is nonempty, under the prefix, not absolute and without `.` or `..` segments, and that the keys are exactly the bucket's archived objects, none missing and none extra; otherwise `object_references:<binding>`. |
 | `extraPayloads` | Named `{produce,consume}` pairs. Producers return bytes or a byte stream. Consumers receive a verified byte stream and descriptor before D1 commit. |
 | `partBytes` | Maximum part size, default 16 MiB, configurable from 1 KiB to 16 MiB. |
 
@@ -468,7 +468,9 @@ a view resolved from applied migration history), selects `*` or
 a secret column, when a trigger on it or a foreign key action from it reaches a
 catalogue table, when any other later statement writes it (directly or through
 a trigger) or changes its columns other than by `ADD COLUMN` (allowed only when
-every replay names its columns), or when the statement cannot be bounded.
+every replay names its columns), when the statement cannot be bounded, or when
+it writes a table that a bucket's `objectReferences` names: references are
+checked on the staged rows, before any object write.
 A failed or interrupted apply leaves no replayed row; finalizing again replays
 from the start.
 Read-only trigger bodies, including RAISE-only guards, add no write dependency.
@@ -612,8 +614,8 @@ part; different content returns 409. Reassembled bytes pass the part checksum
 before completion advances. Staged data stays private until finalization.
 Finalize requires the closing `archiveHash` and verifies all
 parts, semantic contents, destination
-emptiness, erasure and product invariants. R2 ownership is recorded after the
-empty-namespace check. Verified object writes precede one atomic D1 batch, with
+emptiness, erasure, object references and product invariants. R2 ownership
+is recorded after the empty-namespace check. Verified object writes precede one atomic D1 batch, with
 deferred FKs, trigger suppression/recreation, replaceable rows, staged inserts,
 journal adoption and completion. FK cycles and self-references restore together.
 An unsuccessful commit removes only owned objects. A lost commit acknowledgement
