@@ -3,9 +3,6 @@ import json
 import re
 from publication_config import intended_public_repositories
 
-# A home segment within a relative path is not an absolute home directory.
-# Match the username itself so a bare home, including one with spaces, counts.
-LOCAL_PATH = re.compile(r'''(?x)(?<![^\s("'`=:\[<>{|])(?:[*_]|~~)*(?:(?:(?i:(?a:file://)))?(?<!/[A-Z]:)/(?:Users|home)/|(?i:(?:(?a:file:///))?[A-Z]:[\\/]+Users[\\/]+))[^/\\\s"'<>`]+''')
 CONFIG = '.publish-check/config.json'
 # An alphabetic top-level label ends before a following digit, such as the DER
 # tag after a certificate's email value; other labels keep the full extent.

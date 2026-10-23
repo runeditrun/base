@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5d1673c1",
+  "cliVersion": "0.2.79-dev.gbae4a227",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3817,9 +3817,13 @@
       "source": "scripts/publish-check/hit_location.py",
       "sha256": "adcd3403de1f3a3abaf57518acb14273ae06ace5a17d5136192fadfc2d5f194d"
     },
+    "scripts/publish-check/home_paths.py": {
+      "source": "scripts/publish-check/home_paths.py",
+      "sha256": "28ba6228b7069f8e80694d5eab086bd9d8269283c7b4083113ca900896b7e8e8"
+    },
     "scripts/publish-check/hygiene_config.py": {
       "source": "scripts/publish-check/hygiene_config.py",
-      "sha256": "a8183399e0f011ce59b4db09dc7af63b5f40d476ebd917e3ccd9826f6b610c5a"
+      "sha256": "1cc101dcb5e7044cdd78b6e4508ec440ab05137809bbdb4b2f8377e3efaed6ad"
     },
     "scripts/publish-check/hygiene_text.py": {
       "source": "scripts/publish-check/hygiene_text.py",
@@ -3851,7 +3855,7 @@
     },
     "scripts/publish-check/policy.py": {
       "source": "scripts/publish-check/policy.py",
-      "sha256": "02166aca1594dcd590cdfdfc402c46af9792d38298eda3d224ca19cd162457bb"
+      "sha256": "3236c4d863e358125363342335fed315d583987eff17a71d7a8797a60a93d985"
     },
     "scripts/publish-check/project_identity.py": {
       "source": "scripts/publish-check/project_identity.py",
@@ -3871,7 +3875,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "985cbf70e00667c744fce9b75496d8fda95d59f29f33e774332ad579d7826347"
+      "sha256": "7b0810ec6800657a38b8287082521e636449c414dc01ad562c9795edd7e021cd"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",

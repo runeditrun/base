@@ -5,7 +5,8 @@ from github_refs import REPOSITORY_HOSTS, reference_sets
 from destination import RULE as PENDING_DESTINATION
 from hygiene_text import decoded_text
 from provenance import provenance_text
-from hygiene_config import EMAIL, LOCAL_PATH, public_email
+from hygiene_config import EMAIL, public_email
+from home_paths import local_path
 from font_licence import without_required_notices
 from trust_bundle import anchor_values
 from png_text import text_chunks
@@ -183,7 +184,7 @@ def inspect_text(data, path, config, *, commit_message=False, binary_content=Non
     # NUL removal covers UTF-16/32 ASCII content, matching the secret scanner.
     text = decoded_text(data)
     rules = set()
-    if LOCAL_PATH.search(text):
+    if local_path(text):
         rules.add('hygiene.local-path')
     if any(pattern.search(text) for pattern in config['internalReferencePatterns']):
         rules.add('hygiene.internal-reference')
