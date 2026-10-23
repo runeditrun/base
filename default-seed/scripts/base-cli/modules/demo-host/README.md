@@ -1,7 +1,7 @@
 # Native hosted demos
 
 `rer deploy --demo` builds the seed's production Worker for a Worker Loader
-host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
+host. See [adoption and deployment](https://github.com/runeditrun/base/blob/main/export/DEMO.md#hosting-the-demo).
 
 - `build.mjs`: ordinary Vite output, declared SQL and public configuration,
   using the shared container migration-inventory and image-variable checks.

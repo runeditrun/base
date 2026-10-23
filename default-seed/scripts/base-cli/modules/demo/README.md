@@ -35,4 +35,4 @@ Public sockets, WebSockets and event streams remain usable for checks. The
 local sockets guard and hosted egress retain a small direct mail/SMS denylist;
 use the effect helper for such sends. Hosted demos keep their isolated
 container, Turnstile, per-IP start limit, TTL/idle end and maximum instances.
-See [adoption and hosting](../../export/DEMO.md).
+See [adoption and hosting](https://github.com/runeditrun/base/blob/main/export/DEMO.md).

@@ -514,7 +514,7 @@ The current MCP `next_question` filters out owner items. When an owner summary
 is supplied, the CLI displays its browser link and refuses to answer it.
 
 The four deterministic adapter implementations and their native output formats
-are described in [the adapter guide](cli/business/vendors/README.md). Their
+are described in [the adapter guide](https://github.com/runeditrun/base/blob/main/cli/business/vendors/README.md). Their
 presence does not enable export until the seed import authority and remaining
 transport contracts are connected.
 

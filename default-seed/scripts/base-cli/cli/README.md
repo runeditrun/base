@@ -100,8 +100,9 @@ preview before either operation. `import --journal LATER_ARCHIVE` also applies
 the erasure journal of a later archive from the same installation, so a fresh
 destination refuses rows erased since. Erasure-fence refusals (`erased_row`,
 `erasure_epoch`, `later_journal`) exit 4. Reset preserves exports. Remote transfer is
-available only when the adapter declares complete resource coverage; an
-unsupported target exits 4.
+available only when the adapter declares complete resource coverage. Unsupported
+hosted export exits 2 before effects; unsupported import or transfer capability
+can refuse with exit 4.
 
 A first-party adapter may also declare `portability.hostedExport` as an argv
 array, for example `['node', 'scripts/export.mjs']`. With that declaration,
@@ -135,20 +136,23 @@ base rows across a fresh installation. Ordinary-table archives from before this
 support remain compatible with the same schema.
 
 Every first-party seed verifies local export/import/export equivalence for its
-supported domain and resource data. In default-seed, each export advances the
-included authority generation, so archive hashes may differ even when retained
-domain and identity rows are equal. The technical foundation currently has no
-product domain or background jobs; default-seed retains its durable jobs and
+supported domain and resource data. With foundation's included auth settings,
+each export advances the authority generation, so archive hashes may differ even
+when retained domain and identity rows are equal. The technical foundation
+currently has no product domain or background jobs; default-seed retains its durable jobs and
 schedule records while omitting transient queue delivery state, local runtime
 caches and logs, transfer bookkeeping, provider credentials,
-provider link keys and transient provider sessions. People, external identity
-bindings, the installation sector and the original owner claim are retained.
+provider link keys and transient provider sessions. Default-seed excludes
+authentication identities and the owner claim; setup claims a fresh owner after
+restore. Foundation explicitly retains selected identity tables and the original
+owner claim. Both retain the installation sector.
 Retained dependency links are marked as needing re-link, and provider sign-in
 and first-setup enablement are off after import. Restore does not re-dispatch
 jobs. Run setup after restore to create local configuration and initiate the
-owner-approved provider re-link. The original owner recovers access through
-ordinary native sign-in; setup does not grant a new owner. A new binding or
-product effect needs an explicit policy and integrated proof.
+owner-approved provider re-link. With foundation's retained owner claim, the
+original owner recovers access through ordinary native sign-in; setup does not
+grant a new owner. A new binding or product effect needs an explicit policy and
+integrated proof.
 
 Setup reads the declared `rer-setup.json` with the shared reader and validates
 answers against the shared manifest model. The manifest owns fields and managed
@@ -162,6 +166,12 @@ manifest default and receives `--owner-name`; it replaces the generated
 
 Run `node --test --test-concurrency=2 cli/*.test.mjs` from Base. Base's shared tests
 stay in Base; exported seeds carry runtime source and their own adopting tests.
+CI uses `CLI_SHARD=1` through `5` for the five CLI push shards,
+`MODULE_SHARD=1` through `6` for the module shards, and `REFERENCE_SHARD=1`,
+`2` or `nightly` for reference checks. `CI_INCLUDE_JOURNEYS=true` adds the slower
+CLI `reference-journey.test.mjs` and reference `journey-installer-browser`,
+`journey-installer` and `journey-journey` checks to the CI plan; scheduled and tag
+runs select them, and manual dispatch can opt in.
 
 ## Managed local serving
 
@@ -303,8 +313,10 @@ deploy's local build/validation, release's expensive phases and local transfer
 resource work. Serving uses the registry, with finite preparation queued.
 Labels include project, initiating verb/phase and a safe checkout digest. Use
 `node scripts/base-cli/modules/job-queue/cli.mjs status` to inspect admission.
-Waits go to redacted progress/stderr. Nested commands validate live lease
-membership and actual process ancestry before sharing the admitted slot.
+The CLI wrapper defaults `RER_JOBS_MAX_WAIT_SECONDS` to 1200 seconds; admission
+timeout exits 75 without starting work, while the bare queue defaults to an
+indefinite wait. Waits go to redacted progress/stderr. Nested commands validate
+live lease membership and actual process ancestry before sharing the admitted slot.
 Direct documented browser/runtime entrypoints and indirect package scripts join
 the same executor. Original-caller `CI=true` skips admission; `CI=false` and unset CI queue.
 Heavy verbs alone accept `--no-queue`, only with `CI=true`. Synthesized install
