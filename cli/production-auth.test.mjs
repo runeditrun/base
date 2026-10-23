@@ -8,10 +8,12 @@ import { portabilityFixture } from './fixtures/portability.mjs';
 import { deployProviderFixture } from './fixtures/deploy-provider.mjs';
 
 test('credentials-only deploy update uses declared live mail secrets with a valid declared sender', async t => {
- const f=await deployProviderFixture(t,{vars:{MAIL_PROVIDER:'sendgrid',MAIL_FROM:productionSender},r2:[],secrets:[
+ const f=await deployProviderFixture(t,{vars:{MAIL_PROVIDER:'sendgrid'},r2:[],secrets:[
   {binding:'MAIL_FROM',environment:'PRODUCT_MAIL_FROM',optional:true},
   {binding:'SENDGRID_API_KEY',environment:'PRODUCT_MAIL_KEY',optional:true},
  ]});
+ const packagingPath=join(f.root,'rer-packaging.json');
+ await writeFile(packagingPath,JSON.stringify({artifact:{specInputs:{publicVariables:{MAIL_FROM:productionSender}}}}));
  for(const name of ['PRODUCT_MAIL_FROM','PRODUCT_MAIL_KEY','MAIL_FROM','SENDGRID_API_KEY'])delete process.env[name];
  const output=[];
  t.mock.method(process.stdout,'write',chunk=>{output.push(String(chunk));return true;});
@@ -33,7 +35,7 @@ test('credentials-only deploy update uses declared live mail secrets with a vali
  assert.equal((await run()).code,4);assert.equal(f.provider.state.writes.length,writes);
  await writeFile(join(f.root,'deploy.env'),'');
  const declarationPath=join(f.root,'deploy.json'),declaration=JSON.parse(await readFile(declarationPath,'utf8'));
- delete declaration.vars.MAIL_FROM;
+ await rm(packagingPath);
  declaration.secrets=declaration.secrets.filter(secret=>secret.binding!=='MAIL_FROM');
  await writeFile(declarationPath,JSON.stringify(declaration));
  assert.equal((await run()).code,4,'an undeclared live sender cannot satisfy the deployment contract');
