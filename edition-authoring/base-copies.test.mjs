@@ -470,3 +470,57 @@ test('Git copy modes use the owner executable bit', () => {
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
+
+test('declared Purse-shaped adaptations survive refresh while untouched copies advance', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-adapted-'));
+  try {
+    const {base, seed, revision} = fixture(temp);
+    const adapted = ['.github/workflows/run-demo.yml', 'public/fonts/fonts.css', 'src/base/dispatch.ts', 'src/base/font-head.ts'];
+    for (const name of adapted) write(base, name, `Base original ${name}\n`);
+    write(base, 'src/base/untouched.ts', 'original untouched sibling\n');
+    const pinned = commit(base);
+    write(seed, 'src/base/untouched.ts', 'original untouched sibling\n');
+    for (const name of adapted) {
+      write(seed, name, fs.readFileSync(path.join(base, name)));
+    }
+    for (const name of [adapted[0], adapted[1], 'src/base']) ok(seed, 'record-base', name, name, pinned, '--base', base);
+    for (const name of adapted) write(seed, name, `Seed adaptation ${name}\n`);
+    ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+    ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+    write(base, 'modules/sample/index.mjs', 'updated untouched copy\n');
+    write(base, adapted[0], 'changed upstream workflow\n');
+    write(base, 'src/base/untouched.ts', 'updated untouched sibling\n');
+    fs.rmSync(path.join(base, adapted[1]));
+    fs.chmodSync(path.join(base, adapted[2]), 0o755);
+    const next = commit(base);
+    const before = fs.readFileSync(path.join(seed, 'base-copies.json'));
+    const refused = run(seed, 'refresh-base', next, '--base', base);
+    assert.equal(refused.status, 1);
+    console.log('Before declaration:', refused.error.trim());
+    assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), before);
+    for (const name of adapted) ok(seed, 'adapt-base', name);
+    ok(seed, 'adapt-base', adapted[0]);
+    const report = ok(seed, 'refresh-base', next, '--base', base);
+    console.log('After declaration:', JSON.stringify(report.adapted));
+    assert.equal(report.adapted.length, 4);
+    assert.deepEqual(report.adapted.filter(item => item.conflict).map(item => item.path).sort(), adapted.slice(0, 3).sort());
+    assert.ok(report.adapted.filter(item => item.conflict).every(item => item.diffHint.includes(next)));
+    for (const name of adapted) assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), `Seed adaptation ${name}\n`);
+    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), 'updated untouched copy\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'src/base/untouched.ts'), 'utf8'), 'updated untouched sibling\n');
+    assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+    assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
+    const refreshed = fs.readFileSync(path.join(seed, 'base-copies.json'));
+    ok(seed, 'refresh-base', next, '--base', base);
+    assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), refreshed);
+    for (const name of adapted) assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), `Seed adaptation ${name}\n`);
+    // Re-recording after explicitly restoring current Base bytes returns to managed copies.
+    const restored = adapted[3];
+    fs.copyFileSync(path.join(base, restored), path.join(seed, restored));
+    ok(seed, 'record-base', 'src/base', 'src/base', next, '--base', base);
+    ok(seed, 'adapt-base', adapted[2]);
+    write(seed, restored, 'undeclared again\n');
+    assert.equal(run(seed, 'refresh-base', next, '--base', base).status, 1);
+    assert.match(run(seed, 'adapt-base', 'src/app.mjs').error, /not a recorded/);
+  } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+});

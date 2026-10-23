@@ -61,7 +61,7 @@ export function options(args, count) {
     } else if (arg.startsWith('--')) throw Error(`Unknown option: ${arg}`);
     else result.positional.push(arg);
   }
-  if (result.positional.length !== count) throw Error('Usage: verify-base [--record <file>] [--base <checkout>] [--offline] | record-base <path> <origin-path> <revision> [--record <file>] [--base <checkout>] | refresh-base <revision> [--record <file>] [--base <checkout>]');
+  if (result.positional.length !== count) throw Error('Usage: verify-base [--record <file>] [--base <checkout>] [--offline] | record-base <path> <origin-path> <revision> [--record <file>] [--base <checkout>] | adapt-base <file> [--record <file>] | refresh-base <revision> [--record <file>] [--base <checkout>]');
   safe(result.record);
   return result;
 }
@@ -80,6 +80,12 @@ export function validate(record) {
     for (const [name, digest] of Object.entries(copy.files)) {
       safe(name);
       if (!within(name, copy.path) || !sha256.test(digest)) throw Error(`Invalid recorded copy file: ${name}`);
+    }
+    if (copy.adapted !== undefined) {
+      if (!copy.adapted || typeof copy.adapted !== 'object' || Array.isArray(copy.adapted)) throw Error(`Invalid adaptations: ${copy.path}`);
+      for (const [name, revision] of Object.entries(copy.adapted)) {
+        if (!Object.hasOwn(copy.files, name) || !commit.test(revision)) throw Error(`Invalid adaptation: ${name}`);
+      }
     }
     // Older records have no modes, and a file without a recorded mode is not mode-checked; record-base writes every one.
     if (copy.modes !== undefined) {
@@ -179,7 +185,7 @@ export function verifyCopies(root, {record: recordPath, base, offline}) {
       if (!within(name, copy.path)) continue;
       if (!file.regular) drift.push({kind: 'not-a-file', path: name, copy: copy.path});
       else if (!Object.hasOwn(copy.files, name)) drift.push({kind: 'unrecorded', path: name, copy: copy.path});
-      else {
+      else if (!Object.hasOwn(copy.adapted || {}, name)) {
         const actual = hash(file.read());
         if (actual !== copy.files[name]) drift.push({kind: 'modified', path: name, copy: copy.path, expected: copy.files[name], actual});
         if (copy.modes?.[name] && modeOf(file.executable) !== copy.modes[name]) drift.push({kind: 'mode', path: name, copy: copy.path, expected: copy.modes[name], actual: modeOf(file.executable)});
@@ -196,17 +202,19 @@ export function verifyCopies(root, {record: recordPath, base, offline}) {
         const present = [];
         for (const [name, expected] of Object.entries(copy.files)) {
           const originPath = mapped(name, copy.path, copy.originPath);
-          if (!tree.has(originPath)) drift.push({kind: 'origin-missing', path: name, originPath, revision: copy.revision});
+          const baseline = copy.adapted?.[name] || copy.revision;
+          const tree = read.tree(baseline);
+          if (!tree.has(originPath)) drift.push({kind: 'origin-missing', path: name, originPath, revision: baseline});
           else {
             const {object, mode} = tree.get(originPath);
-            present.push({name, originPath, expected, object});
-            if (copy.modes?.[name] && mode !== copy.modes[name]) drift.push({kind: 'origin-mode', path: name, originPath, revision: copy.revision, expected: copy.modes[name], actual: mode});
+            present.push({name, originPath, expected, object, revision: baseline});
+            if (copy.modes?.[name] && mode !== copy.modes[name]) drift.push({kind: 'origin-mode', path: name, originPath, revision: baseline, expected: copy.modes[name], actual: mode});
           }
         }
         const digests = read.digests(present.map(item => item.object));
         for (const item of present) {
           const actual = digests.get(item.object);
-          if (actual !== item.expected) drift.push({kind: 'origin-mismatch', path: item.name, originPath: item.originPath, revision: copy.revision, expected: item.expected, actual});
+          if (actual !== item.expected) drift.push({kind: 'origin-mismatch', path: item.name, originPath: item.originPath, revision: item.revision, expected: item.expected, actual});
         }
         // Base files under the origin path that this copy deliberately leaves out.
         copies[index].notCopied = [...tree.keys()].filter(name => within(name, copy.originPath) &&
@@ -228,7 +236,8 @@ export function verifyCopies(root, {record: recordPath, base, offline}) {
     ok: !drift.length && !unrecordedCopies.length, record: recordPath, repository: record.repository,
     origin: offline ? 'not checked (--offline): local bytes against recorded SHA-256 only' : base ? 'local Base checkout' : 'fresh clone of the recorded repository',
     copies, drift, unrecordedCopies,
-    meaning: 'A recorded copy claims byte equality with Base at its commit. Adapted source belongs in edition.json origins and mappings, compared with compare, not in this record.',
+    adapted: record.copies.flatMap(copy => Object.entries(copy.adapted || {}).map(([path, revision]) => ({path, revision}))),
+    meaning: 'Undeclared copies claim byte equality. Declared adaptations are seed-owned; their recorded Base bytes and revision are comparison baselines, not local integrity checks.',
   };
 }
 
@@ -264,6 +273,24 @@ export function recordCopy(root, {positional: [localPath, originPath, revision],
   } finally { origin.close(); }
 }
 
+// Explicitly transfer one recorded file to seed ownership without changing its bytes
+// or its Base digest/mode. The per-file revision survives later whole-copy refreshes.
+export function adaptCopy(root, {positional: [name], record: recordPath}) {
+  safe(name);
+  const filename = recordFile(root, recordPath);
+  if (!filename) throw Error(`No ${recordPath} found; run record-base first`);
+  const record = validate(JSON.parse(fs.readFileSync(filename, 'utf8')));
+  const copy = record.copies.find(copy => Object.hasOwn(copy.files, name));
+  if (!copy) throw Error(`${name} is not a recorded Base copy file`);
+  noLinks(root, name);
+  if (!seedFiles(root).get(name)?.regular) throw Error(`Adaptation must be a regular file: ${name}`);
+  copy.adapted ||= {};
+  copy.adapted[name] ||= copy.revision;
+  delete record.repository;
+  fs.writeFileSync(filename, json(record));
+  return {adapted: name, revision: copy.adapted[name], sha256: copy.files[name], record: recordPath};
+}
+
 // Move every recorded copy to one Base commit, after any export tool has written
 // its files. Recorded files and files already equal to Base at that commit are
 // kept current; files Base added under a copied path since the copy's pin are
@@ -286,24 +313,38 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     // Check every recorded path before planning removals too. A path absent
     // upstream still belongs to the owner when its local bytes have changed.
     for (const copy of record.copies) for (const [name, digest] of Object.entries(copy.files)) {
+      if (Object.hasOwn(copy.adapted || {}, name)) {
+        noLinks(root, name);
+        if (!files.get(name)?.regular) throw Error(`Adaptation must be a regular file: ${name}`);
+        continue;
+      }
       const actual = local(name), source = next.get(mapped(name, copy.path, copy.originPath));
       if (actual && actual !== digest && actual !== (source && upstream.get(source.object))) edited.push(name);
     }
-    if (edited.length) throw Error(`Recorded copies have local edits; move adapted source out of the record first: ${edited.join(', ')}`);
+    if (edited.length) throw Error(`Recorded copies have local edits; move adapted source out of the record first: ${edited.join(', ')}. To keep each intentional adaptation, run adapt-base <file> first.`);
+    const adapted = record.copies.flatMap(copy => Object.entries(copy.adapted || {}).map(([name, baseline]) => {
+      const originPath = mapped(name, copy.path, copy.originPath);
+      const source = next.get(originPath);
+      const conflict = !source || upstream.get(source.object) !== copy.files[name] || Boolean(copy.modes?.[name] && source.mode !== copy.modes[name]);
+      return {path: name, originPath, revision: baseline, conflict,
+        ...(conflict ? {note: 'Upstream changed or removed this seed-owned adaptation; review and reconcile explicitly.',
+          diffHint: `git -C <base> diff ${baseline} ${revision} -- ${JSON.stringify(originPath)}`} : {})};
+    }));
     const plans = record.copies.map(copy => {
       const pinned = read.tree(copy.revision);
       const tests = Object.keys(copy.files).some(name => testSource(mapped(name, copy.path, copy.originPath)));
       const sources = [...next].filter(([name, {object}]) => {
         if (!within(name, copy.originPath)) return false;
         const target = mapped(name, copy.originPath, copy.path), actual = local(target);
+        if (Object.hasOwn(copy.adapted || {}, target)) return false;
         if (Object.hasOwn(copy.files, target)) {
           return Boolean(actual);
         }
         if (actual) return actual === upstream.get(object);
         return !pinned.has(name) && (tests || !testSource(name));
       });
-      if (!sources.length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
-      return {copy, sources, removed: Object.keys(copy.files).filter(name => !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
+      if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
+      return {copy, sources, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
     // A migration a database may already have applied is never rewritten in place:
     // the schema change it brings belongs in a new migration of the seed's own.
@@ -315,6 +356,10 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     for (const {copy, sources, removed} of plans) {
       for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }
       const recorded = {}, modes = {}, added = [];
+      for (const name of Object.keys(copy.adapted || {})) {
+        recorded[name] = copy.files[name];
+        if (copy.modes?.[name]) modes[name] = copy.modes[name];
+      }
       for (const [source, {object, mode}] of sources.sort(([a], [b]) => a.localeCompare(b))) {
         const name = safe(mapped(source, copy.originPath, copy.path));
         noLinks(root, name);
@@ -331,6 +376,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     delete record.repository;
     validate(record);
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }
 }

@@ -219,17 +219,58 @@ writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out files the copy had left out, and re-records each copy.
-It refuses recorded files with local edits. To move one copy,
+It refuses recorded files with undeclared local edits; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
 Base removed, and run `record-base` with the new commit. Then run `verify-base`
 and the edition's own tests, and commit the copies with the record. To review
 what changed upstream first, read `git -C BASE diff OLD NEW -- modules/mail`.
 
-A copy record claims byte equality. When an edition adapts copied source, move
-it out of the record: describe it in `edition.json` with an `origin` and
-`mappings`, and use `compare` to see upstream and local changes. Penny's
-`base/PROVENANCE.json` and `verify-base-source.mjs` were the model for this
-record and command.
+**Keep seed adaptations.** Before refreshing, explicitly declare each adapted file:
+
+```sh
+node scripts/edition-authoring/cli.mjs adapt-base .github/workflows/run-demo.yml
+node scripts/edition-authoring/cli.mjs adapt-base public/fonts/fonts.css
+node scripts/edition-authoring/cli.mjs adapt-base src/base/dispatch.ts
+node scripts/edition-authoring/cli.mjs adapt-base src/base/font-head.ts
+node scripts/edition-authoring/cli.mjs refresh-base FULL_40_HEX_COMMIT --base /absolute/base-checkout
+```
+
+`adapt-base <file> [--record <file>]` only accepts an existing regular recorded
+file. It keeps local bytes and mode unchanged, and adds `adapted: {"local/path":
+"ORIGINAL_FULL_BASE_COMMIT"}` to that copy. The existing `files` digest and
+`modes` entry remain the Base baseline at this per-file commit, even when the
+copy's other files move to a newer revision. Repeating the declaration does not
+advance that baseline. Commit the record alongside the adaptation.
+
+Refresh never writes or removes declared adaptations, including when Base deletes
+the source. It still refreshes every untouched copy. Its `adapted` report lists
+each seed-owned file; `conflict: true` means upstream bytes, mode or existence
+changed against the original baseline. A conflict note supplies a Git diff hint
+for explicit reconciliation. The note remains visible on repeated refreshes until
+you reconcile the baseline; it does not prevent other copies from refreshing.
+A second refresh to the same commit leaves the record and local file bytes
+unchanged. Undeclared local edits still block before any file is written, with
+an instruction naming `adapt-base`.
+
+`verify-base` reports declarations separately: it checks their existence and
+regular-file status and verifies their retained Base baselines, but does not
+claim local byte or mode equality for seed-owned files. `--offline` cannot
+validate the upstream baseline. Run the edition's product tests for adaptations.
+For richer source comparisons, use `edition.json` origins and mappings with
+`compare` instead.
+
+To return a copy to verbatim management, save the seed adaptation somewhere safe,
+restore its files and modes from the desired Base commit (including deletions),
+then run `record-base <copy-path> <origin-path> <commit> --base <checkout>`.
+This explicitly replaces that copy's declarations with a fresh verbatim record;
+redeclare any other adaptations in the same copy before refreshing. Verify and
+run edition tests before committing. To retain a reconciled adaptation against a
+new baseline, record that Base baseline first, restore the saved adaptation, and
+run `adapt-base <file>` again. Never update a previously applied migration in
+place: keep it and add a new seed migration for schema changes.
+
+Penny's `base/PROVENANCE.json` and `verify-base-source.mjs` were the model for
+this record and command.
 
 ## Public projections
 

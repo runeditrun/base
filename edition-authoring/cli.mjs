@@ -6,7 +6,7 @@ import {release, verifyReceipt} from './release.mjs';
 import {changes, extract, compare} from './updates.mjs';
 import {manifest, VERSION} from './manifest.mjs';
 import {snapshot, source, merge} from './sources.mjs';
-import {options, recordCopy, refreshCopies, verifyCopies} from './base-copies.mjs';
+import {options, adaptCopy, recordCopy, refreshCopies, verifyCopies} from './base-copies.mjs';
 import {hash, json, git, tracked, writeTree, fresh} from './files.mjs';
 
 const root = process.cwd();
@@ -110,8 +110,9 @@ try {
     result = verifyCopies(root, options(args.slice(1), 0));
     if (!result.ok) process.exitCode = 1;
   } else if (command === 'record-base') result = recordCopy(root, options(args.slice(1), 3));
+  else if (command === 'adapt-base') result = adaptCopy(root, options(args.slice(1), 1));
   else if (command === 'refresh-base') result = refreshCopies(root, options(args.slice(1), 1));
-  else throw Error('Usage: cli.mjs inspect|lock|check|receipt <sidecar-json>|changes|extract <id|parent> <new-output>|compare <id|parent> <candidate-checkout> [current-parent-checkout]|materialize <new-output>|promote <id>|release <new-local-git-repository>|verify-base [--record <file>] [--base <checkout>] [--offline]|record-base <path> <origin-path> <revision> [--record <file>] [--base <checkout>]|refresh-base <revision> [--record <file>] [--base <checkout>]');
+  else throw Error('Usage: cli.mjs inspect|lock|check|receipt <sidecar-json>|changes|extract <id|parent> <new-output>|compare <id|parent> <candidate-checkout> [current-parent-checkout]|materialize <new-output>|promote <id>|release <new-local-git-repository>|verify-base [--record <file>] [--base <checkout>] [--offline]|record-base <path> <origin-path> <revision> [--record <file>] [--base <checkout>]|adapt-base <file> [--record <file>]|refresh-base <revision> [--record <file>] [--base <checkout>]');
   console.log(json(result));
 } catch (error) {
   console.error(error.message);
