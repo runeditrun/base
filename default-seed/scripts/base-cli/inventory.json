@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5d1673c1",
+  "cliVersion": "0.2.79-dev.g62def0d8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "adc231db5785a69624ee5de90b8227d83e4825133e9f3eb16bf0077e221dcb84"
+      "sha256": "4a527623a99b8d50a6145d58f0ba4ac74e7d2ab6a8762512e0e63dfe642a927b"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -294,6 +294,10 @@
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
       "sha256": "ef2c2e358e3913ba4fc176051496d01d544ba17febc143b1a94089f2e9c7de0c"
+    },
+    "start-origin-diagnostic.mjs": {
+      "source": "onboarding/start-origin-diagnostic.mjs",
+      "sha256": "017e0f280b5da6190313b475a627e230ecb96fc6d0e229869aeab05ff7a4b26f"
     },
     "state.mjs": {
       "source": "onboarding/state.mjs",
