@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5d1673c1",
+  "cliVersion": "0.2.79-dev.g3cfc85a4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3819,7 +3819,7 @@
     },
     "scripts/publish-check/hygiene_config.py": {
       "source": "scripts/publish-check/hygiene_config.py",
-      "sha256": "a8183399e0f011ce59b4db09dc7af63b5f40d476ebd917e3ccd9826f6b610c5a"
+      "sha256": "5962e3d8e59172e79a4b5b071e2325532bd18f6e9757814d2403e4f12bf8f843"
     },
     "scripts/publish-check/hygiene_text.py": {
       "source": "scripts/publish-check/hygiene_text.py",
