@@ -156,13 +156,20 @@ origin path, Base commit, and the SHA-256 of every copied file:
     {"path": "src/base/modules/mail", "originPath": "modules/mail", "revision": "FULL_40_HEX_COMMIT",
      "files": {"src/base/modules/mail/index.mjs": "SHA256_OF_BASE_BYTES"},
      "modes": {"src/base/modules/mail/index.mjs": "100644"}},
-    {"path": "migrations/0005_operator_auth.sql", "originPath": "modules/operator-auth/accounts/schema/operator-auth.sql",
+    {"path": "migrations/0005_operator_auth.sql", "originPath": "default-seed/migrations/core/0002_operator_auth.sql",
      "revision": "FULL_40_HEX_COMMIT", "files": {"migrations/0005_operator_auth.sql": "SHA256_OF_BASE_BYTES"},
      "modes": {"migrations/0005_operator_auth.sql": "100644"}}
   ],
   "ignore": ["docs/coincidental-example.txt"]
 }
 ```
+
+Migration copies must come from append-only numbered sources such as
+`default-seed/migrations/core/NNNN_*.sql` or a per-change `schema/<change>.sql`.
+Do not record an evolving aggregate schema draft as a verbatim migration. If
+a seed starts from a draft, run `adapt-base <migration>` at creation to record
+seed ownership and its acknowledged bytes. Once published or applied, preserve
+that migration and carry every later schema delta in a NEW numbered migration.
 
 Each copy has its own commit, so modules can move to new pins independently. A
 copy may omit Base files, such as upstream tests. Copies must not overlap.
@@ -220,6 +227,12 @@ writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out files the copy had left out, and re-records each copy.
+Numbered migrations are never rewritten or removed: run `adapt-base <file>`
+first to retain the historical file, then add a new seed migration carrying the
+upstream change. Refresh reports the retained adaptation with a `diffHint`.
+Its `schemaDeltas` list flags newly adopted or changed `*/schema/*.sql` files
+as potentially needing a new seed migration, with a diff hint for each. Review
+these alongside the runtime changes before using the refreshed code.
 It refuses undeclared local edits that differ from both the recorded and incoming
 Base bytes; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
@@ -271,6 +284,11 @@ each seed-owned file; `conflict: true` means upstream bytes, mode or existence
 changed against the original baseline. A conflict note supplies a Git diff hint
 for explicit reconciliation. The note remains visible on repeated refreshes until
 you reconcile the baseline; it does not prevent other copies from refreshing.
+For migration copies, retain the original baseline permanently: never reconcile
+it by changing an applied migration or re-recording it at a newer commit. Put
+the change in a new numbered seed migration. `rer check` SC-05 uses the retained
+per-file revision and acknowledged bytes/mode for declared adaptations, and
+continues to reject drift that has not been explicitly acknowledged.
 A second refresh to the same commit leaves the record and local file bytes
 unchanged. Undeclared local edits that differ from both the recorded and incoming
 Base bytes still block before any file is written, with an instruction naming

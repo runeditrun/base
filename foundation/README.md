@@ -207,3 +207,35 @@ Read [the exported local operations guide](../export/RUN-LOCALLY.md),
 [the command contract](../export/SEED-COMMAND-CONTRACT.md),
 [the first-release acceptance guide](../export/FIRST-RELEASE-ACCEPTANCE.md),
 and the composition and edition-authoring guides before changing their paths.
+
+## Published migrations
+
+The initial owner schema is a frozen numbered file in
+`foundation/template/migrations/core/0001_owner.sql`. The initializer copies this
+template into the family; it does not map the evolving operator-auth schema
+draft onto an immutable migration. Keep that file after publishing or applying
+it. Add each later schema delta as a NEW numbered migration.
+
+`pnpm verify:foundation` starts with `node scripts/check-migrations.mjs`. This
+Base-only check compares every existing file under `default-seed/migrations/`
+and `foundation/template/migrations/` byte for byte against the highest stable
+`rer-v*` release advertised by `origin` and HEAD's first parent. CI also compares
+the GitHub push event's `before` commit or pull request base, so a multi-commit
+push cannot rewrite migrations published on plain main between releases.
+New files pass; changed or removed files fail. It reads the working tree, so
+uncommitted edits are checked too. Shallow clones acquire missing baseline
+commits from `origin`; inaccessible history fails explicitly. Offline runs are
+not a substitute. For another known main baseline, also pass
+`--base-ref FULL_COMMIT` (this adds a comparison; it cannot replace release or
+CI baselines).
+
+An exceptional correction to published history requires a reviewed entry in
+`scripts/migration-exceptions.json`, with an explanation of why a new migration
+cannot serve and the affected consumers' recovery plan. Each entry binds exactly
+one comparison: `baseline` (the full commit ID), `path`, `before` (the old bytes'
+SHA-256), `after` (the replacement bytes' SHA-256, or null for deletion), and
+`reason`. The failure report supplies those identities. There is no blanket
+skip flag. An exception accepts only those exact bytes at that path and
+baseline, remains visible in the check output, and must cover each reported
+baseline explicitly. Remove obsolete exceptions after the released baseline
+advances. The list starts empty.

@@ -57,7 +57,6 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
         ['dependencies','schema/keys-sealed.sql','0016_sealing'],
         ['operator-auth','accounts/schema/owner-signin.sql','0014_owner_signin'],
       ].map(([component,file,name])=>({component,repository:'base',source:`modules/${component}/${file}`,target:`migrations/core/${name}.sql`})),
-      { component: 'operator-auth', repository: 'base', source: 'modules/operator-auth/accounts/schema/operator-auth.sql', target: 'migrations/core/0001_owner.sql' },
       { component: 'operator-auth', repository: 'base', source: 'modules/operator-auth/identity/oidc/schema/oidc.sql', target: 'migrations/core/0005_identity_providers.sql' },
       { component: 'mail', repository: 'base', source: 'modules/mail/src/development/schema.sql', target: 'migrations/core/0002_outbox.sql' },
       { component: 'portability', repository: 'base', source: 'modules/portability/schema/portability.sql', target: 'migrations/core/0003_portability.sql' },
