@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFileSync, spawnSync} from 'node:child_process';
 
-test('released SQL values and their imported helpers stay immutable while unreleased inputs evolve', t => {
+function fixture(t) {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-inputs-'));
   t.after(() => fs.rmSync(repo, {recursive: true, force: true}));
   const git = (...args) => execFileSync('git', ['-C', repo, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -30,6 +30,11 @@ test('released SQL values and their imported helpers stay immutable while unrele
     return {status: result.status, report: JSON.parse(result.stdout)};
   };
   git('init', '-q'); git('remote', 'add', 'origin', repo);
+  return {repo, git, put, checkpoint, check};
+}
+
+test('released SQL values and their imported helpers stay immutable while unreleased inputs evolve', t => {
+  const {repo, git, put, checkpoint, check} = fixture(t);
   const module = `modules/held-${path.basename(repo)}/src/d1`;
   const helper = `${module}/${path.basename(repo)}-schema.ts`;
   const scalar = 'modules/example/storage/definition.ts';
@@ -60,5 +65,37 @@ test('released SQL values and their imported helpers stay immutable while unrele
   put('default-seed/migrations/core/0002_next.sql', 'CREATE TABLE next (id TEXT);\n');
   checkpoint();
   put(`${module}/new-schema.ts`, 'export const next = ["CREATE TABLE next (id TEXT, value TEXT)"];\n');
+  assert.equal(check().status, 0);
+});
+
+test('released function installers protect unseen DDL helpers while query handlers remain editable', t => {
+  const {repo, git, put, checkpoint, check} = fixture(t);
+  const module = `modules/${path.basename(repo)}`;
+  const helper = `${module}/nested/${path.basename(repo)}.mjs`;
+  const name = `${module}/nested/name.mjs`;
+  const outbox = `${module}/outbox.mjs`;
+  const handler = `${module}/handler.mjs`;
+  put('foundation/initialize.mjs', "export const migrationCopies = [{repository:'base',source:'modules/example/schema.sql',target:'migrations/core/0001.sql'}];");
+  put('modules/example/schema.sql', 'CREATE TABLE example (id TEXT);\n');
+  put('scripts/migration-exceptions.json', '[]');
+  put(name, 'export const table = "installer_rows";\n');
+  put(helper, `import {table} from './name.mjs';\nexport async function install(db) { await db.prepare(\`CREATE TABLE \${table} (id TEXT)\`).run(); }\n`);
+  put(`${module}/index.mjs`, `import {install} from './nested/${path.basename(helper)}';\nimport {handle} from './handler.mjs';\nexport async function create(db) { await install(db); return handle(db); }\n`);
+  put(outbox, 'const schema = "CREATE TABLE outbox (id TEXT)";\nexport const create = db => ({ready: () => db.prepare(schema).run()});\n');
+  const queries = 'export async function handle(db) { await db.prepare("INSERT INTO requests VALUES (?)").bind("value").run(); return db.prepare("SELECT id FROM requests").all(); }\n';
+  put(handler, queries);
+  checkpoint(); git('tag', 'rer-v0.0.1');
+  assert.equal(check().status, 0);
+  for (const [file, before, after] of [[helper, '(id TEXT)', '(ix TEXT)'], [name, 'installer_rows', 'installer_rowz'], [outbox, 'outbox (', 'outbow (']]) {
+    const original = fs.readFileSync(path.join(repo, file), 'utf8');
+    put(file, original.replace(before, after));
+    const changed = check();
+    assert.notEqual(changed.status, 0);
+    assert.ok(changed.report.changes.some(item => item.path === file));
+    put(file, original);
+  }
+  put(handler, '// Handler comments and whitespace can evolve.\n\n' + queries + '\n');
+  assert.equal(check().status, 0);
+  put(handler, queries.replace('SELECT id', 'SELECT 1').replace('INSERT INTO requests', 'INSERT INTO request_log'));
   assert.equal(check().status, 0);
 });

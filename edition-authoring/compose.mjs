@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // Check committed family migration mappings before dispatching pinned tooling.
-import {spawnSync} from 'node:child_process';
-import {resolve} from 'node:path';
 import {commit, familyManifest, json, select} from '../composition/git-source.mjs';
-import {parseCompositionArgs} from '../composition/arguments.mjs';
+import {parseCompositionArgs, usage} from '../composition/arguments.mjs';
+import {dispatchComposition} from '../composition/cli.mjs';
 
 const args = process.argv.slice(2);
 try {
@@ -21,10 +20,10 @@ try {
         throw Error(`Refusing aggregate draft mapping ${file.path} -> ${copy.target} in compositions/${edition}.json before composition. In the existing edition, run adapt-base ${copy.target} so its recorded bytes are frozen. Retain those historical bytes in ${descriptor.source}/${copy.target}, remove the draft mapping, and commit the family. Add new schema as a NEW numbered migration, then refresh-base; see foundation/README.md (existing families).`);
       }
     }
-  }
-  const child = spawnSync(process.execPath, [resolve(import.meta.dirname, '../composition/cli.mjs'), ...args], {stdio: 'inherit'});
-  if (child.error) throw child.error;
-  process.exitCode = child.status ?? 1;
+    // Keep the checked commit and original ref intent together: implicit HEAD
+    // must still require a clean checkout when the dispatcher starts.
+    process.exitCode = await dispatchComposition(options, revision);
+  } else console.log(usage);
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

@@ -234,9 +234,17 @@ value bindings to their declarations across imports and re-exports, including
 barrels and helpers without SQL literals or schema filenames. Type-only imports
 and unrelated runtime functions are not dependencies of a schema value.
 
+Exported functions and their reachable declarations also expose runtime schema
+installers, including private functions and imported helpers. Any reached file
+containing DDL (CREATE, ALTER or DROP of a table, index, trigger or view) is an
+input, as are the value bindings that construct that DDL, such as interpolated
+table names. Discovery follows the released binding graph; no installer filename
+list is maintained. It does not freeze an installer's unrelated runtime
+dependencies or SELECT/INSERT-only request handlers.
+
 The entire containing file is frozen, including comments, whitespace and runtime
 exports sharing that file. A comment-only edit outside this SQL dependency graph
-is allowed. This includes the operator-auth draft still consumed by older
+or whitespace-only edit outside this SQL dependency graph is allowed. This includes the operator-auth draft still consumed by older
 families. A changed schema needs a new source file and a new numbered migration.
 Discovery uses committed release source, so removing today's import or export
 cannot unprotect an input. A source added after the latest release stays editable
