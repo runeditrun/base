@@ -11,6 +11,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, batch, safe, noLinks, testSource} from './files.mjs';
+import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
 
 export const RECORD = 'base-copies.json';
 const commit = /^[a-f0-9]{40}$/, sha256 = /^[a-f0-9]{64}$/;
@@ -85,6 +86,12 @@ export function validate(record) {
       if (!copy.adapted || typeof copy.adapted !== 'object' || Array.isArray(copy.adapted)) throw Error(`Invalid adaptations: ${copy.path}`);
       for (const [name, revision] of Object.entries(copy.adapted)) {
         if (!Object.hasOwn(copy.files, name) || !commit.test(revision)) throw Error(`Invalid adaptation: ${name}`);
+      }
+    }
+    if (copy.acknowledged !== undefined) {
+      if (!copy.acknowledged || typeof copy.acknowledged !== 'object' || Array.isArray(copy.acknowledged)) throw Error(`Invalid acknowledgements: ${copy.path}`);
+      for (const [name, local] of Object.entries(copy.acknowledged)) {
+        if (!Object.hasOwn(copy.adapted || {}, name) || !local || !sha256.test(local.sha256) || !FILE_MODES.includes(local.mode)) throw Error(`Invalid acknowledgement: ${name}`);
       }
     }
     // Older records have no modes, and a file without a recorded mode is not mode-checked; record-base writes every one.
@@ -185,7 +192,10 @@ export function verifyCopies(root, {record: recordPath, base, offline}) {
       if (!within(name, copy.path)) continue;
       if (!file.regular) drift.push({kind: 'not-a-file', path: name, copy: copy.path});
       else if (!Object.hasOwn(copy.files, name)) drift.push({kind: 'unrecorded', path: name, copy: copy.path});
-      else if (!Object.hasOwn(copy.adapted || {}, name)) {
+      else if (Object.hasOwn(copy.adapted || {}, name)) {
+        noLinks(root, name);
+        drift.push(...acknowledgementDrift(root, copy, name, file, recordPath));
+      } else {
         const actual = hash(file.read());
         if (actual !== copy.files[name]) drift.push({kind: 'modified', path: name, copy: copy.path, expected: copy.files[name], actual});
         if (copy.modes?.[name] && modeOf(file.executable) !== copy.modes[name]) drift.push({kind: 'mode', path: name, copy: copy.path, expected: copy.modes[name], actual: modeOf(file.executable)});
@@ -237,7 +247,7 @@ export function verifyCopies(root, {record: recordPath, base, offline}) {
     origin: offline ? 'not checked (--offline): local bytes against recorded SHA-256 only' : base ? 'local Base checkout' : 'fresh clone of the recorded repository',
     copies, drift, unrecordedCopies,
     adapted: record.copies.flatMap(copy => Object.entries(copy.adapted || {}).map(([path, revision]) => ({path, revision}))),
-    meaning: 'Undeclared copies claim byte equality. Declared adaptations are seed-owned; their recorded Base bytes and revision are comparison baselines, not local integrity checks.',
+    meaning: 'Undeclared copies claim Base byte equality. Declared adaptations must match their acknowledged local bytes and mode; their recorded Base bytes and revision remain comparison baselines.',
   };
 }
 
@@ -283,12 +293,15 @@ export function adaptCopy(root, {positional: [name], record: recordPath}) {
   const copy = record.copies.find(copy => Object.hasOwn(copy.files, name));
   if (!copy) throw Error(`${name} is not a recorded Base copy file`);
   noLinks(root, name);
-  if (!seedFiles(root).get(name)?.regular) throw Error(`Adaptation must be a regular file: ${name}`);
+  const file = seedFiles(root).get(name);
+  if (!file?.regular) throw Error(`Adaptation must be a regular file: ${name}`);
   copy.adapted ||= {};
   copy.adapted[name] ||= copy.revision;
+  copy.acknowledged ||= {};
+  copy.acknowledged[name] = snapshot(file);
   delete record.repository;
   fs.writeFileSync(filename, json(record));
-  return {adapted: name, revision: copy.adapted[name], sha256: copy.files[name], record: recordPath};
+  return {adapted: name, revision: copy.adapted[name], sha256: copy.files[name], acknowledged: copy.acknowledged[name], record: recordPath};
 }
 
 // Move every recorded copy to one Base commit, after any export tool has written
@@ -309,18 +322,20 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     const next = read.tree(revision);
     const upstream = read.digests([...next.values()].map(({object}) => object));
     const local = name => files.get(name)?.regular ? hash(files.get(name).read()) : null;
-    const edited = [];
+    const edited = [], unacknowledged = [];
     // Check every recorded path before planning removals too. A path absent
     // upstream still belongs to the owner when its local bytes have changed.
     for (const copy of record.copies) for (const [name, digest] of Object.entries(copy.files)) {
       if (Object.hasOwn(copy.adapted || {}, name)) {
         noLinks(root, name);
         if (!files.get(name)?.regular) throw Error(`Adaptation must be a regular file: ${name}`);
+        unacknowledged.push(...acknowledgementDrift(root, copy, name, files.get(name), recordPath));
         continue;
       }
       const actual = local(name), source = next.get(mapped(name, copy.path, copy.originPath));
       if (actual && actual !== digest && actual !== (source && upstream.get(source.object))) edited.push(name);
     }
+    if (unacknowledged.length) throw Error(`Adapted files need acknowledgement: ${[...new Set(unacknowledged.map(item => item.path))].join(', ')}. Review local bytes and mode, then run:\n${[...new Set(unacknowledged.map(item => item.acknowledge))].join('\n')}`);
     if (edited.length) throw Error(`Recorded copies have local edits; move adapted source out of the record first: ${edited.join(', ')}. To keep each intentional adaptation, run adapt-base <file> first.`);
     const adapted = record.copies.flatMap(copy => Object.entries(copy.adapted || {}).map(([name, baseline]) => {
       const originPath = mapped(name, copy.path, copy.originPath);

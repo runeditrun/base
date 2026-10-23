@@ -524,3 +524,71 @@ test('declared Purse-shaped adaptations survive refresh while untouched copies a
     assert.match(run(seed, 'adapt-base', 'src/app.mjs').error, /not a recorded/);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
+
+test('adaptations require renewed acknowledgement when local bytes or mode change', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-acknowledged-'));
+  try {
+    const {base, seed, revision} = fixture(temp);
+    const recordPath = 'records/base copies.json', name = 'vendor/sample/index.mjs';
+    fs.mkdirSync(path.join(seed, 'records'));
+    const recordFile = path.join(seed, recordPath);
+    const record = ['--record', recordPath];
+    ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base, ...record);
+    ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base, ...record);
+    write(seed, name, 'acknowledged seed implementation\n');
+    ok(seed, 'adapt-base', name, ...record);
+    write(seed, name, 'later seed implementation\n');
+    write(base, 'modules/sample/index.mjs', 'upstream implementation changed\n');
+    write(base, 'modules/sample/lib/util.mjs', 'updated untouched sibling\n');
+    write(base, 'tools/helper.mjs', 'updated untouched copy\n');
+    const next = commit(base);
+    const before = fs.readFileSync(recordFile);
+    const refused = run(seed, 'refresh-base', next, '--base', base, ...record);
+    assert.equal(refused.status, 1);
+    assert.ok(refused.error.includes(name));
+    assert.deepEqual(fs.readFileSync(recordFile), before);
+    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/lib/util.mjs'), 'utf8'), 'export const util = 1;\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'export const helper = true;\n');
+    const failed = run(seed, 'verify-base', '--base', base, ...record);
+    assert.equal(failed.status, 1);
+    const drift = failed.report.drift.find(item => item.path === name);
+    assert.equal(drift.kind, 'adaptation-modified');
+    assert.ok(refused.error.includes(drift.acknowledge));
+    // Execute the supplied command, including the custom record path with spaces.
+    const acknowledge = () => {
+      const result = spawnSync('sh', ['-c', drift.acknowledge], {cwd: seed, encoding: 'utf8'});
+      assert.equal(result.status, 0, result.stderr);
+    };
+    acknowledge();
+    const refreshed = ok(seed, 'refresh-base', next, '--base', base, ...record);
+    assert.equal(refreshed.adapted.find(item => item.path === name).conflict, true);
+    assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), 'later seed implementation\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/lib/util.mjs'), 'utf8'), 'updated untouched sibling\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'updated untouched copy\n');
+    assert.equal(ok(seed, 'verify-base', '--base', base, ...record).ok, true);
+    const unchanged = fs.readFileSync(recordFile);
+    ok(seed, 'refresh-base', next, '--base', base, ...record);
+    assert.deepEqual(fs.readFileSync(recordFile), unchanged);
+    fs.chmodSync(path.join(seed, name), 0o755);
+    assert.equal(run(seed, 'refresh-base', next, '--base', base, ...record).status, 1);
+    const mode = run(seed, 'verify-base', '--offline', ...record);
+    assert.equal(mode.status, 1);
+    assert.deepEqual(kinds(mode.report), [`adaptation-mode ${name}`]);
+    acknowledge();
+    ok(seed, 'refresh-base', next, '--base', base, ...record);
+    assert.equal(ok(seed, 'verify-base', '--offline', ...record).ok, true);
+    // Records from before snapshots remain readable and require explicit acceptance.
+    const legacy = JSON.parse(fs.readFileSync(recordFile));
+    for (const copy of legacy.copies) delete copy.acknowledged;
+    fs.writeFileSync(recordFile, JSON.stringify(legacy));
+    const legacyBytes = fs.readFileSync(recordFile);
+    const missing = run(seed, 'verify-base', '--offline', ...record);
+    assert.equal(missing.status, 1);
+    assert.deepEqual(kinds(missing.report), [`adaptation-unacknowledged ${name}`]);
+    assert.equal(run(seed, 'refresh-base', next, '--base', base, ...record).status, 1);
+    assert.deepEqual(fs.readFileSync(recordFile), legacyBytes);
+    acknowledge();
+    ok(seed, 'refresh-base', next, '--base', base, ...record);
+    assert.equal(ok(seed, 'verify-base', '--base', base, ...record).ok, true);
+  } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+});
