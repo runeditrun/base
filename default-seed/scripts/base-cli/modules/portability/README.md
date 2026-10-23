@@ -107,7 +107,8 @@ and declaring both `policy` and `policyModule` fail closed. Serializable object
 schema-upgrade and payload callbacks) are refused instead of being dropped by
 JSON transport. Container transfer currently refuses `policyModule` explicitly;
 it continues to accept serializable object policies. Malformed primary or later
-journal JSON is reported once as `archive_json` with exit 2, before local data
+journal JSON is reported once as `invalid_archive` with exit 2 and a re-export
+recovery command, before local data
 migrations, without echoing archive content or parser diagnostics.
 
 An installation migrated by Platform has `rer_migrations(name, sha256,
@@ -329,6 +330,13 @@ object metadata/hashes, payload hashes and required configuration. Keyless row
 parts also preserve the original rowid, including gaps, for restoration and
 erasure matching. Export time,
 source identity, job ids and boundaries do not affect equivalence.
+
+Schema compatibility ignores SQL comments and whitespace between tokens, so
+hosted D1 and local migrations agree. Quoted identifiers, string contents,
+constraints and generated expressions remain significant. The original DDL
+still travels and is authenticated by `archiveHash`. Archives made with the
+earlier raw-DDL schema hash are verified under that hash before compatibility
+normalization; their authenticated manifest and parts are never rewritten.
 
 New exports use archive version 2. The closing `archiveHash` is SHA-256 of
 canonical JSON `{manifest,parts}`, where `manifest` is the complete manifest
@@ -671,6 +679,13 @@ returns an async dispatcher, or null for foreign paths. Default base path is
 an actor id or null. Jobs belong to their creating actor. Unsafe methods require
 the exact configured Origin. Responses have `Cache-Control: no-store` and errors
 are `{error:code}`. Request bodies are bounded; `maxBodyBytes` can lower the bound.
+Typed authorization errors retain their HTTP status and bounded symbolic code
+(for example `403 step_up_required`). Native diagnostics remain private:
+transient D1 availability failures use `503 operation_failed`, transport timeouts
+use `504 operation_failed`, and unexpected faults remain `500 operation_failed`.
+The hosted CLI aborts a completed export after saving and verifying the local
+archive, releasing its snapshots and parts. Interrupted downloads retain their
+job for resume.
 
 | Method / relative path | Action |
 | --- | --- |

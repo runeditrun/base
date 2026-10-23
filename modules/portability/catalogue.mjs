@@ -1,5 +1,6 @@
 import { all, insist, quote, PortabilityError } from './storage.mjs';
-import { canonicalJson, sha256, base64, unbase64, utf8 } from './hash.mjs';
+import { canonicalJson, base64, unbase64, utf8 } from './hash.mjs';
+import { schemaIdentityOf } from './schema-identity.mjs';
 import { platformTables, platformTable, identifier, matches } from './bookkeeping.mjs';
 /** Platform bookkeeping is mandatory; operator identity remains a seed choice. */
 export const excludedTables=Object.freeze([...platformTables,'oa_%','oc_%']);
@@ -60,9 +61,8 @@ async function archived(db,config) {
   objects.sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0);
   return {objects,kinds,excluded,entries:objects.filter(x=>x.type==='table' && !excluded.some(y=>y.name===x.name))};
 }
-const identityOf=tables=>sha256(canonicalJson(tables.map(({name,sql})=>({name,sql}))));
 // The archive schema identity alone, for databases that need not satisfy the policy.
-export async function schemaIdentity(db,config) { return identityOf((await archived(db,config)).entries); }
+export async function schemaIdentity(db,config) { return schemaIdentityOf((await archived(db,config)).entries); }
 export async function catalogue(db,config) {
   const {objects,kinds,excluded,entries}=await archived(db,config);
   const tables=[];
@@ -99,7 +99,7 @@ export async function catalogue(db,config) {
     insist(tables.find(x=>x.name===table)?.columns.some(c=>c.name===keyColumn),'reference_column_missing');
     insist(!config.secretColumns[table]?.includes(keyColumn),'reference_column_excluded');
   }
-  const identity=await identityOf(tables);
+  const identity=await schemaIdentityOf(tables);
   return {identity,tables,excludedTables:excluded.map(x=>x.name).sort(),triggers:objects.filter(x=>x.type==='trigger' && tables.some(t=>t.name===x.tbl_name))};
 }
 export function affinity(type) {

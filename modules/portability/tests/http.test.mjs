@@ -27,3 +27,25 @@ test('HTTP success, download and error responses all prevent caching',async t=>{
   let r;do{r=await call(`exports/${id}/advance`,'POST',{maxParts:100});}while((await r.clone().json()).phase==='building');
   for(const route of [[`exports/${id}`,'GET'],[`exports/${id}/download`,'GET'],['unknown','GET'],['exports','POST','invalid JSON']]){const response=await call(...route);assert.equal(response.headers.get('Cache-Control'),'no-store');await response.text();}
 });
+
+test('HTTP preserves typed authority refusals and distinguishes transient storage failures without leaking diagnostics',async t=>{
+ let failure;
+ const {call}=await setup(t,{authorize:()=>{throw failure;}});
+ const cases=[
+  [Object.assign(new Error('private authority context'),{status:401,code:'unauthorized'}),401,'unauthorized'],
+  [Object.assign(new Error('private authority context'),{status:403,code:'step_up_required'}),403,'step_up_required'],
+  [Object.assign(new Error('private authority context'),{status:429,code:'rate_limited'}),429,'rate_limited'],
+  [new Error('private database context',{cause:new Error('D1_ERROR: database is overloaded')}),503,'operation_failed'],
+  [Object.assign(new Error('private timeout context'),{name:'TimeoutError'}),504,'operation_failed'],
+  [new Error('D1_ERROR: no such table: private_table'),500,'operation_failed'],
+  [new TypeError('private programming context'),500,'operation_failed'],
+ ];
+ for(const [error,status,code] of cases){
+  failure=error;
+  const response=await call('exports','POST',{}),body=await response.json();
+  console.log('export failure:',error.name,error.code??'native','=>',response.status,body.error);
+  assert.equal(response.status,status);assert.deepEqual(body,{error:code});
+  assert.equal(response.headers.get('Cache-Control'),'no-store');
+  assert.doesNotMatch(JSON.stringify(body),/private/);
+ }
+});
