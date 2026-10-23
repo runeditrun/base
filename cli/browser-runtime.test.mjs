@@ -24,6 +24,7 @@ test('doctor lists Chromium and headless shell as not downloaded yet, without fa
  await writeFile(join(root, 'adapter.mjs'), "export const commandAdapter = { version: 1, state: '.local/state', hooks: { secrets: { file: '.dev.vars' } } };\n");
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/browser-doctor', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { doctor: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Read-only diagnostics.' } } }));
  for (const entry of ['../bin/rer.mjs', '../global/rer.mjs']) {
+  let browser;
   for (const json of [true, false]) {
    const child = spawn(process.execPath, [resolve(import.meta.dirname, entry), 'doctor', ...(json ? ['--json'] : [])], { cwd: root, env: { HOME: home, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: browsers, RER_NODE_AUTO: '0' }, stdio: ['ignore', 'pipe', 'pipe'], signal: t.signal });
    let stdout = '', stderr = '';
@@ -31,13 +32,19 @@ test('doctor lists Chromium and headless shell as not downloaded yet, without fa
    child.stderr.setEncoding('utf8').on('data', text => { stderr += text; });
    const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
    assert.ok(code !== null, stderr + stdout);
-   const report = json ? JSON.parse(stdout.trim()).diagnostics : JSON.parse(stdout.slice(0, stdout.lastIndexOf('\ndoctor:')));
-   // Not downloaded yet is the normal state until a command needs the browser.
-   assert.equal(report.browser.ok, true);
-   assert.ok(report.browser.note, 'doctor says the browsers are not downloaded yet');
-   assert.equal(report.browser.fix, undefined);
-   assert.deepEqual(report.browser.executables.map(({ name, ok }) => ({ name, ok })), [{ name: 'chromium', ok: false }, { name: 'chromium-headless-shell', ok: false }]);
-   assert.ok(report.browser.executables.every(({ path }) => path.startsWith(browsers)), 'the checkout Playwright resolves the requested browser cache');
+   if (json) {
+    const report = JSON.parse(stdout.trim()).diagnostics;
+    browser = report.browser;
+    // Not downloaded yet is the normal state until a command needs the browser.
+    assert.equal(report.browser.ok, true);
+    assert.ok(report.browser.note, 'doctor says the browsers are not downloaded yet');
+    assert.equal(report.browser.fix, undefined);
+    assert.deepEqual(report.browser.executables.map(({ name, ok }) => ({ name, ok })), [{ name: 'chromium', ok: false }, { name: 'chromium-headless-shell', ok: false }]);
+    assert.ok(report.browser.executables.every(({ path }) => path.startsWith(browsers)), 'the checkout Playwright resolves the requested browser cache');
+   } else {
+    assert.throws(() => JSON.parse(stdout), 'default diagnostics are human text');
+    assert.ok(stdout.includes(browser.note), 'human output retains the browser prerequisite guidance');
+   }
    assert.deepEqual(await readdir(browsers), [], 'doctor leaves the browser cache empty');
    assert.deepEqual(await readdir(home), [], 'doctor acquires no runtime or package manager');
   }

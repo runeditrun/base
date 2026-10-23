@@ -8,6 +8,7 @@ import {fixture,freePort} from './reference.mjs';
 import {testProvider} from '../../default-seed/tests/operator-auth/oidc-provider.mjs';
 import {labels} from '../../onboarding/adapter-labels.mjs';
 import {useWorkspaceDependencies} from './workspace-dependencies.mjs';
+import {productionSender} from './production-sender.mjs';
 
 export function setupDiagnostic(child) {
  // Emit fixed classifications only; child messages and private values stay local.
@@ -32,6 +33,9 @@ export function setupDiagnostic(child) {
 // and `state`, which the controlled provider edge reads on every request.
 export async function linkedSetup(kind,t) {
  const f=await fixture(kind,t),origin='http://127.0.0.1:'+await freePort(),provider=await testProvider(origin,'cli-owner@example.test');
+ const deployPath=join(f.root,'deploy.json'),declaration=JSON.parse(await readFile(deployPath,'utf8'));
+ declaration.vars={...declaration.vars,MAIL_FROM:productionSender};
+ await writeFile(deployPath,JSON.stringify(declaration));
  await adoptEditor(f.root,kind);
  if(kind==='foundation') {const path=join(f.root,'rer-setup.json'),manifest=JSON.parse(await readFile(path,'utf8'));manifest.steps=manifest.steps.map(step=>step.type==='owner-claim'?{type:'owner-claim',mode:'idp',emailField:'OWNER_EMAIL',dependency:'oidc-provider@1',path:'/auth/owner-claim'}:step);await writeFile(path,JSON.stringify(manifest));}
  await useWorkspaceDependencies(f.root);
