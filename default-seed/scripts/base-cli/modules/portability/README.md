@@ -31,7 +31,8 @@ payload consumers, and prove the integrated round trip.
 ## Policy
 
 `await createPortability({db, buckets, policy})` validates policy and the current
-schema at construction. Apply the bookkeeping migration first. Policy fields:
+schema at construction. Apply the bookkeeping migration first. Export refuses
+with HTTP 409 `import_applying` while an import is applying. Policy fields:
 
 | Field | Meaning |
 | --- | --- |
@@ -207,7 +208,7 @@ RER's native `localPortability` invokes this same entry point in its
 history again for transfer.
 
 The implementation ships in the RER CLI, not the Worker portability module.
-Package-mode seeds need a future `@runeditrun/rer` release containing this
+Package-mode seeds need a pinned `@runeditrun/rer` release containing this
 export and an exact pin/lock update; version 0.2.77 does not expose it.
 Vendored seeds need a reviewed Base CLI-copy refresh with
 `node scripts/export-cli.mjs SEED_ROOT` from the selected Base source and their
@@ -256,7 +257,7 @@ secret base cells become NULL before generated snapshots are normalized. A
 generated column cannot itself be redacted: exclude the table or change the
 product schema/policy if its computed value must be secret. Ordinary-column
 metadata and row encoding are unchanged. Ordinary-table archives using the
-authenticated format continue to import into the same schema; see the version
+v2 integrity-checked format continue to import into the same schema; see the version
 1 refusal below.
 
 An archived INTEGER-affinity base cell outside JavaScript's safe integer range fails before
@@ -749,13 +750,14 @@ product erasure or remove product objects; the product handles attachments and
 any extra state. Do not retain a previously downloaded archive as erasure proof;
 supply the owner's later journal when restoring old offline data.
 
-## Measured capacity
+## Historical measured capacity
 
-One local Miniflare D1/R2 run exported, restored and exported 20,000 rows across
-five tables in 171.169 seconds, with 625 parts at a configured 4 KiB bound and a
+An unverified historical local Miniflare D1/R2 report recorded export, restore
+and export of 20,000 rows across five tables in 171.169 seconds, with 625 parts at a configured 4 KiB bound and a
 1,979,471-byte archive. Restore used one atomic D1 commit. The verification run
-reports the measurements again. These measurements are test evidence, not a production
-capacity claim. Real D1 CPU, query, statement and storage limits, object mutation,
+can produce fresh measurements; no corresponding historical benchmark receipt
+is retained in this repository. These figures do not establish current production
+capacity. Real D1 CPU, query, statement and storage limits, object mutation,
 destination writers and extra-payload recovery need product-level verification.
 
 ## Adopting

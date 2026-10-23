@@ -175,6 +175,12 @@ their native look.
   appearance, at least 36px of right padding and its chevron 10-16px from the
   right edge.
 
+`KEEP_BROWSER_CHECK=1` retains successful onboarding screenshots and axe reports;
+failed checks retain them automatically.
+
+The CLI wrapper's `RER_JOBS_MAX_WAIT_SECONDS` defaults to 1200 seconds, unlike the
+bare queue's indefinite wait; admission timeout exits 75 without starting work.
+
 ## Setup behavior and custody
 
 Setup validates answers before effects, then uses the declared lifecycle to
@@ -213,14 +219,20 @@ is separate from bringing records in through the reviewed import door. Each
 first-party adapter declares which resources that archive export/restore supports.
 Every first-party seed verifies a complete local export/import/export round
 trip across those resources. Archives are private and integrity-checked;
-owner/auth, historical development mail, private settings and transient runtime state remain
-excluded. Archive restore validates and restores atomically into an empty destination.
+historical development mail, private settings and transient runtime state remain
+excluded. Identity retention depends on the seed's archive policy: default-seed
+excludes authentication identities and the owner claim, while foundation retains
+selected identity tables and the original claim. A restored job remains bound to
+its recorded principal; verify whether that principal survives the selected policy.
+Archive restore validates and restores atomically into an empty destination.
 Remote transfer is supported only when every required resource has a complete
 adapter implementation; unsupported targets fail visibly.
 
 Deployment uses each seed's actual owner-account declaration, resource policy,
-migrations and health check. Dry run validates and builds locally without
-provider requests. Local tests and structural checks do not establish hosted
+migrations and health check. Application dry run builds and validates locally,
+then uses Cloudflare credentials to read target secret bindings; it makes no
+provider writes. Site and demo dry runs have their separately documented offline
+behavior. Local tests and structural checks do not establish hosted
 acceptance or external mail delivery.
 
 Keep server authorization in every private handler, including direct server
