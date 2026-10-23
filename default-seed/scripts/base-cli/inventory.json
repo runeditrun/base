@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5d1673c1",
+  "cliVersion": "0.2.79-dev.g62def0d8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1707,7 +1707,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "0870ac7f170715bc39bb3399f9874b23cfdb3816faf51c9a6eddf6d174024502"
+      "sha256": "fb6c421b35bd4e8227a8d1debb734661305a0433f9266f9c9f9c6f538bb619be"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",
@@ -1771,7 +1771,7 @@
     },
     "modules/deploy-kit/readiness-window.mjs": {
       "source": "modules/deploy-kit/readiness-window.mjs",
-      "sha256": "05f2bd81dcb2f66e7f715a67665e6b7cc7f0dae810b5e36cde30b14007740cff"
+      "sha256": "237cc1de1793d054d4932b223faf4f10c9c32413f2c1d7f5c14ea58e36c4afe2"
     },
     "modules/deploy-kit/receipt.mjs": {
       "source": "modules/deploy-kit/receipt.mjs",
