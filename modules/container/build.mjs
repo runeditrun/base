@@ -9,7 +9,8 @@ import { checkBoundary } from './boundary.mjs';
 import { localDurableObjects } from './durable-objects.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 import { containerMigrationInventory } from './migration-inventory.mjs';
-import { checkImageBindings, checkImageVariables } from './image-variables.mjs';
+import { checkImageBindings, checkImageVariables, checkSeedBindings } from './image-variables.mjs';
+import { refuseAi } from '../ai/native/names.mjs';
 import { refuseLocalEnvFiles } from '../deploy-kit/local-only.mjs';
 export async function buildContainer(root, options={}) {
  const previous=process.cwd();process.chdir(root);
@@ -18,6 +19,8 @@ export async function buildContainer(root, options={}) {
 async function buildImage(root, { output = join(root,'.rer/container/image'), engine, cacheContract, runner, declaration } = {}) {
  const require = createRequire(join(root,'package.json'));
  declaration ??= JSON.parse(await readFile(join(root,'deploy.json'),'utf8'));
+ // Containers have no approved AI route: refused before anything is built.
+ refuseAi(declaration,'container-image');
  engine ??= declaration.container?.engine ?? 'workerd'; cacheContract ??= declaration.container?.cacheContract; runner ??= declaration.container?.runner;
  if (!['workerd','node'].includes(engine)) throw new Error('Unsupported container engine');
  const vite = await import(pathToFileURL(require.resolve('vite'))), loaded = await vite.loadConfigFromFile({ command:'build',mode:'production' },undefined,root);
@@ -25,6 +28,7 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  // Config loading may prepare the seed's root Wrangler configuration. Inspect
  // its declared entry after that preparation, still before compiling the app.
  await checkBoundary(root,{engine,cacheContract});
+ checkSeedBindings(root,require('wrangler').experimental_readRawConfig);
  const config = loaded.config;
  const outputExports = new Map();
  const freshServerFiles = new Set(), serverOutput = resolve(root,'dist/server');

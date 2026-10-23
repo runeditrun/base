@@ -1,4 +1,3 @@
-import {refuseAiHosting} from './ai.mjs';
 import {mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {produceArtifact} from './artifact.mjs';
@@ -39,7 +38,6 @@ export async function checkEdition(root, selection) {
 export async function producePackage({root = process.cwd(), config, output = 'rer-package'} = {}) {
   root = await candidateRoot(root);
   const {project, workflow, setup} = packagingConfig(config);
-  refuseAiHosting(config.artifact.specInputs, 'Managed');
   await checkEdition(root, config.edition);
   const selectedSetup = await loadSetupManifest(root, setup, config.artifact.specInputs?.mail);
   const descriptor = selectedSetup

@@ -178,16 +178,13 @@ Repository syntax fixtures use host templates expanded by their test consumers.
 The shared producer and publisher cases retain their exact URL spelling, case,
 length and rejection checks without declaring synthetic GitHub repositories.
 
-## Native AI capability requests
+## Native AI
 
-`artifact.specInputs.ai` uses the strict schema in the
-[consumer guide](../ai/native/README.md), including exact models, finite purposes,
-AI/SQLite/R2 binding references, bounded operations and requested limits. The
-producer validates matching Wrangler bindings and rejects undeclared raw AI or
-namespace conflicts. `rer check` emits the matching `delivery.ai.*` clause.
-A request is not installation spending approval. The Free owner-account consumer requires separate installation authority and
-verifies native binding readback; live provider qualification remains held.
-Assisted/Managed package generation explicitly refuses native AI until its
-external installation policy consumer is qualified. Existing mail
-support does not establish AI support. AI data is not portable with DO storage;
-restore must keep inference disabled until custody is reconciled.
+A delivery package has no approved native AI route. An `ai` field in
+`artifact.specInputs`, in the deployment-spec options or in a candidate
+specification is refused with `ai_hosting_unproven` before anything is packaged,
+exported or passed by `rer check`. A raw Wrangler `ai` binding stays an
+unsupported binding, and no name a package declares may use the reserved
+`RER_AI_` namespace (`ai_policy_conflict`). Native AI is served only by
+`rer deploy` to the owner's own Cloudflare account; see the
+[consumer guide](../ai/native/README.md).

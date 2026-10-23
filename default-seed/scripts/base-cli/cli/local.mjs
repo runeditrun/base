@@ -9,10 +9,13 @@ import { defaultPort, firstFreePort, busyPortMessage } from './port.mjs';
 import { localSettingKeys } from './settings.mjs';
 import { doorSite } from './door.mjs';
 import { selectDoor } from './door-mode.mjs';
+import { refuseNativeAi } from './ai-custody.mjs';
 
 export async function selectedOrigin(project, options, { setup = false } = {}) {
  const { readSettings } = await shared('adapter-settings.mjs');
  const vars = project.adapter?.hooks?.secrets ? (await readSettings(project.root, project.adapter.hooks.secrets)).values : {};
+ // Every local runtime reads these settings by name: none may be a reserved AI name.
+ refuseNativeAi('This checkout\'s local settings', undefined, Object.keys(vars).map(name => ({ type: 'var', name })));
  const { origin: originKey } = localSettingKeys(project);
  let previous;
  if (vars[originKey]) {

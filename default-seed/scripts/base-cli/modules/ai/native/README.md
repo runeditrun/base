@@ -18,8 +18,9 @@ account, epoch, bindings, tools, streaming, batches or reference images.
 
 ## Lamp declaration
 
-Put `ai` inside delivery `artifact.specInputs` and the owner deploy declaration. This is a capability request,
-not spending approval. Emitted Wrangler must bind the matching AI, private R2,
+Put `ai` in the owner deploy declaration: `rer deploy` to the owner's own
+Cloudflare account is the only route that serves it. This is a capability
+request, not spending approval. Emitted Wrangler must bind the matching AI, private R2,
 and SQLite authority class. Unknown fields, aliases and binding conflicts fail.
 The exact ids below were rechecked in primary Cloudflare docs on 23 October
 2026; they name contracts under investigation, not supported-provider claims.
@@ -82,47 +83,79 @@ such as `AI_ENABLED`, `rer_ai_authority` and `APP_RER_AI_AUTHORITY`; the
 kit-owned `RER_DEPLOY_SOURCE`, `RER_DEPLOY_FINGERPRINT`, `RER_VERSION` and
 `ASSETS` are unchanged. A refusal is `ai_policy_conflict`, naming the channel.
 
-Every route that turns a name into a runtime binding goes through that
-projection, and a list that did not come through one admits no reserved name:
-the owner declaration and supplied plans (variables, the origin variable and its
-public setting, secret bindings and the environment names they are read from,
-resource, service and native bindings), the rendered configuration and upload
-metadata, the secrets an upload keeps, secret changes (the secrets a set adds,
-what a pending change would leave, and everything the live Worker serves, since
-a new version inherits it), the deployment of an uploaded several-secret copy,
-container and hosted-demo builds (the configuration each build emitted and the
-seed's own Wrangler configuration in every environment, assets included),
-container settings, the demo origin variable and delivery packages. Readback
-uses the same projection: deploy and health refuse a live binding or secret
-outside it, and a secret change or recovery refuses one before it records or
-deploys anything.
+Only the owner-account deploy derives an approval. Every other path has the
+projection without one, `DENY`, and refuses an `ai` declaration outright with
+`ai_hosting_unproven` before it builds, packages, serves or calls the provider: container
+builds, deploys and local runs; the hosted demo (`rer deploy --demo`: its build,
+upgrade and deploy); delivery packages, their declarations, `rer check` and the
+portable export; `rer verify`; and the run site's declaration. Those paths, the site, egress and docs-search
+builds, and the checkout's local settings that `rer setup`, `rer dev`,
+`rer preview`, local `rer demo` and the local container start from, refuse a
+reserved name (`ai_policy_conflict`) the same way. Container and hosted-demo builds check the
+seed's own Wrangler configuration, every environment included, before they
+compile, and the configuration the build emitted before they write a package. A
+hosted demo's upgrade admits what the live demo Worker passes on before it
+deletes the retired container applications or bucket. Removing a hosted demo
+deletes it and binds nothing, so it is not refused.
 
-Order: each owner command (deploy, dry run, health, secret changes including
-rotation, reopening and the setup token's retirement, owner claim, sign-in,
-inspection and rekey) computes its names, pairs any approval with the payer and
-the source it deploys or reads, and admits what an interrupted secret change
-would leave before it takes the state lock, settles anything or writes; a
-refusal leaves the pending intent and the receipt untouched. Rotation and
-reopening save their keys, and a first deploy its generated installation key,
-only after those refusals have passed. Removal is the one command that admits
-nothing: it deletes the Worker. Every command that reads the live Worker back
-admits what it serves before any state or provider write: a deploy or dry run
-the secrets a fresh upload keeps (a deploy then reads every binding back), a
-secret change everything the new version inherits, and health, inspection,
-owner claim, sign-in and rekey every live binding.
-Boundaries this does not cover:
-a custom deploy hook runs the author's own upload code before any kit check (the
-owner kit calls it makes are projected); local runtimes on the owner's machine
-(`rer dev`, `rer verify`, local `rer demo`, local container dev and preview)
-serve the checkout's own settings and are not deployments; and an interrupted
-several-secret copy that staged an unapproved reserved name is never deployed,
-so its change cannot complete: every other command refuses it, and only
-`rer deploy --remove --yes`, which deletes the environment's Worker and
-resources, clears it (the copy is one of the Worker's versions and goes with it).
-An interrupted single reserved secret is removed with
-`rer deploy --unset-secret NAME`. To turn native AI off, first remove the token
-with `rer deploy --unset-secret RER_AI_PRIVACY_TOKEN` while it is still
-declared, then remove `ai` and that secret from the declaration and deploy.
+On the owner path, every route that turns a name into a runtime binding goes
+through the projection, and a list that did not come through one admits no
+reserved name: the owner declaration and supplied plans (variables, the origin
+variable and its public setting, secret bindings and the environment names they
+are read from, resource, service and native bindings), the rendered
+configuration and upload metadata, the secrets an upload keeps, secret changes
+(the secrets a set adds, what a pending change would leave, and everything the
+live Worker serves, since a new version inherits it) and the deployment of an
+uploaded several-secret copy. Readback uses the same projection: deploy and
+health refuse a live binding or secret outside it, and a secret change or
+recovery refuses one before it records or deploys anything. A recorded
+deployment's names are re-derived from its receipt only while the receipt, the
+target and the recorded approval's payer are one account.
+
+Order: deploy, dry run and health plan the whole declaration, secrets retired
+with `--unset-secret` included, and the declaration each retired list a pending
+secret change could leave once settled, then pair the approval with the payer
+and the artifact source (health also with the recorded deployment's source).
+They do it before a deploy saves a first installation key, before the state
+lock and before settlement, so a refusal leaves the lock, the pending intent,
+the receipt and key custody untouched. Secret changes (including rotation,
+reopening and the setup token's retirement) admit, through the recorded
+deployment's names, what this change and a pending one would leave before they
+lock; rotation and reopening save their keys only after those refusals have
+passed. Owner claim, sign-in, inspection and rekey admit a pending change and
+read the live Worker back through the recorded names before they lock, so a
+refusal never waits on another run's lock, and read it again before any state
+or database write. Removal is the one command that admits nothing: it deletes
+the Worker. A deploy or secret change admits, under the lock and before any
+state or provider write, what the live Worker keeps: the secrets a fresh upload
+keeps, or everything the new secret version inherits; a dry run reads the same
+secrets without locking. That readback needs the provider, so a deploy that
+saves a first installation key has saved it by then.
+
+Boundaries this does not cover: a custom deploy hook runs the author's own
+upload code before any kit check (the owner kit calls it makes are projected);
+a live proof (`live-proofs/`) runs a seed's own deploy script, whose
+`pnpm exec wrangler deploy` uploads the seed's own Wrangler configuration; and
+`rer container deploy --image` runs an image this run did not build, so only its
+deploy declaration and the settings it delivers are checked (an image
+`rer container build` made had its configuration checked when it was built).
+Local runtimes serve no native AI: with the Base operator installer, `rer dev`
+and `rer preview` start only once the local settings hold `AUTH_LOCAL=true`,
+local `rer demo` runs in demo mode, and the consumer refuses both modes before
+it reads any authority; the seed's own Wrangler configuration reaches those
+runtimes as written. An interrupted several-secret copy that staged an
+unapproved reserved name is never deployed, so its change cannot complete:
+every other command refuses it, and only `rer deploy --remove --yes`, which
+deletes the environment's Worker and resources, clears it (the copy is one of
+the Worker's versions and goes with it). Remove an interrupted single reserved
+secret with `rer deploy --unset-secret NAME` while the declaration still names
+it, then delete that entry from the declaration: until it is gone, every deploy
+refuses the retired name with `ai_policy_conflict` before it locks or writes. To
+turn native AI off, first remove the token with
+`rer deploy --unset-secret RER_AI_PRIVACY_TOKEN` while it is still declared, then
+remove `ai` and that secret from the declaration and deploy; a deploy in between
+refuses the declared `ai` without its token (`ai_privacy_unverified`) before it
+locks or writes.
 The first declaration above requests zero spending until both the seed request
 and separate permitted policy explicitly authorize larger finite limits.
 
@@ -199,12 +232,11 @@ name, requires the privacy-token secret, checks current prices/proof records,
 renders the native binding and verifies exact provider readback. A missing
 approval, conflicting built binding or cross-account plan fails closed. This
 path is tested with the Cloudflare network edge doubled; live provider/account
-qualification is still held. Assisted/Managed package
-production explicitly refuses it; its service consumer lives outside Base
-and mail support grants no AI authority. Native demos already refuse `ai`, and
-the consumer rejects local/dev/demo modes before dispatch. Container hosting is
-not a native Workers AI transport. `rer check` validates a matching first-party
-`delivery.ai.*` declaration clause; that is not hosting or provider acceptance.
+qualification is still held. Every other hosting mode refuses `ai`: delivery
+packages (Assisted/Managed; their service consumer lives outside Base, and mail
+support grants no AI authority), hosted demos and containers, which are not a
+native Workers AI transport. The consumer rejects local/dev/demo modes before
+dispatch.
 
 Network-edge doubles exercise real reference-app auth, SQLite DO and R2 in
 `tests/native.test.mjs`. They do not establish Cloudflare billing, parameter

@@ -257,13 +257,18 @@ async function uploadFingerprint(body) {
   assert(typeof fingerprint === 'string' && fingerprint, 'invalid-upload-metadata');
   return fingerprint;
 }
-/** Record a secret change's outcome on the receipt: the Worker version it made, and whether
- * its secrets are now retired (a removed declared secret stays out of later plans). */
-export function recordSecretChange(state, current, {bindings, present}) {
-  state.receipt.provider = {versionId:current.versionId, deploymentId:current.deploymentId, etag:current.etag};
+/** The declared secrets retired once a secret change settles: removing one retires it, setting it restores it. */
+export function retiredAfter(state, {bindings, present}) {
   const retired = new Set(state.retiredSecrets ?? []);
   for (const binding of bindings) if (present) retired.delete(binding); else retired.add(binding);
-  if (retired.size) state.retiredSecrets = [...retired].sort(); else delete state.retiredSecrets;
+  return [...retired].sort();
+}
+/** Record a secret change's outcome on the receipt: the Worker version it made, and whether
+ * its secrets are now retired (a removed declared secret stays out of later plans). */
+export function recordSecretChange(state, current, change) {
+  state.receipt.provider = {versionId:current.versionId, deploymentId:current.deploymentId, etag:current.etag};
+  const retired = retiredAfter(state, change);
+  if (retired.length) state.retiredSecrets = retired; else delete state.retiredSecrets;
   delete state.pendingSecret;
 }
 /** A secret change rer recorded as pending but never confirmed (a lost response, or a run that

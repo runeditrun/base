@@ -9,6 +9,8 @@ import { migrate } from '../modules/container/migrations.mjs';
 import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migrations.mjs';
 import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';
+import { refuseNativeAi } from './ai-custody.mjs';
+import { configBindings } from '../modules/ai/native/names.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -41,6 +43,15 @@ async function miniflareFor(root) {
 const standIn = (item, field) => typeof item.verifyStandIn === 'string' && item.verifyStandIn ? item.verifyStandIn : field?.kind === 'email' ? 'owner@example.com' : typeof field?.default === 'string' && field.default ? field.default : randomBytes(24).toString('hex');
 const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map(match => match[1].slice(1)).filter(path => !path.startsWith('/') && /\.[A-Za-z0-9]+$/.test(path));
 
+// The names rer verify binds from the deploy declaration: its variables, its origin variable and a stand-in per secret.
+const declaredNames = (declaration, secrets) => [...[...Object.keys(declaration.vars ?? {}), declaration.originVar].map(name => ({ type: 'var', name })), ...secrets.map(name => ({ type: 'secret_text', name }))];
+/** Before the seed's own verification runs: the deploy declaration rer verify serves afterwards (a missing one is reported then). */
+export async function refuseVerifyAi(root, declarationPath = 'deploy.json') {
+ let declaration;
+ try { declaration = await read(join(root, declarationPath)); } catch { return; }
+ refuseNativeAi('rer verify', declaration, declaredNames(declaration, (declaration.secrets ?? []).map(item => item?.binding)));
+}
+
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
 export async function serveHosted(root, { declaration: declarationPath = 'deploy.json' } = {}) {
@@ -52,7 +63,6 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  try { declaration = await read(join(root, declarationPath)); }
  catch { throw new RerError('hosted_output_missing', `No readable deploy declaration at ${declarationPath}. A seed whose deploy reads another file names it with the commandAdapter option deployDeclaration.`, 1); }
  const manifest = await optional(join(root, 'rer-setup.json'));
- const { Miniflare, convertV4MiniflareOptions = options => options } = await miniflareFor(root);
  const entry = join(build, config.main);
  const modules = [entry, ...(await files(build)).map(path => join(build, path)).filter(path => path !== entry && moduleTypes[extname(path)])].map(path => ({ type: moduleTypes[extname(path)], path }));
  const identity = { sourceSha: createHash('sha1').update(randomBytes(16)).digest('hex'), fingerprint: createHash('sha256').update(randomBytes(16)).digest('hex'), versionId: crypto.randomUUID() };
@@ -60,6 +70,9 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  for (const binding of await hostedMailCredentials(root)) {
   if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
  }
+ // A local runtime with no approved AI route: an ai declaration, or a reserved name in anything it binds, is refused before it serves.
+ refuseNativeAi('rer verify', declaration, [...configBindings(config), ...declaredNames(declaration, Object.keys(secrets))]);
+ const { Miniflare, convertV4MiniflareOptions = options => options } = await miniflareFor(root);
  const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app' } }, {
   name: 'app', modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
   bindings: { ...config.vars, ...declaration.vars, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: ORIGIN } : {}),

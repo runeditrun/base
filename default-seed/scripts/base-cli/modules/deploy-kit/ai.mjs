@@ -56,14 +56,15 @@ export function planNames(plan,pairing) {
   return names;
 }
 /** The runtime names of a recorded deployment: its approval re-derived from the receipt's own
- * configuration, still this account's and installation's and paired with the source it deployed. */
+ * configuration, still this account's (the receipt's, the target's and the approval's payer are one
+ * account) and installation's, and paired with the source it deployed. */
 export function recordedNames(receipt,target) {
   if (receipt?.config?.ai === undefined) return DENY;
   const vars = receipt.config.vars ?? {};
   let request, authority;
   try { request = JSON.parse(vars.RER_AI_REQUEST); authority = JSON.parse(vars.RER_AI_AUTHORITY); } catch { fail('ai_policy_conflict'); }
   const names = runtimeNames({request,authority,accountId:vars.RER_AI_ACCOUNT_ID,bucket:vars.RER_AI_BUCKET_NAME});
-  if (receipt.accountId !== target.accountId || authority.sourceSha !== receipt.source?.sha || authority.installation !== target.worker || authority.environment !== target.environment || receipt.config.ai.binding !== request.binding) fail('ai_policy_conflict');
+  if (receipt.accountId !== target.accountId || authority.accountId !== receipt.accountId || authority.sourceSha !== receipt.source?.sha || authority.installation !== target.worker || authority.environment !== target.environment || receipt.config.ai.binding !== request.binding) fail('ai_policy_conflict');
   return names;
 }
 /** A built raw binding cannot silently bypass the owner declaration. */

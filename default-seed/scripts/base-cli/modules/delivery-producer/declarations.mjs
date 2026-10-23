@@ -1,6 +1,5 @@
-import { validateAiDeclaration } from './ai.mjs';
 import {array, bindingPattern, keys, string, strings} from './bindings.mjs';
-import {DENY,admit} from '../ai/native/names.mjs';
+import {DENY,admit,refuseAi} from '../ai/native/names.mjs';
 
 const pathPattern = /^\/[A-Za-z0-9/_.~-]*$/;
 const signInPath = value => typeof value === 'string' && /^\/(?!\/)[a-zA-Z0-9/_-]*$/.test(value);
@@ -15,7 +14,7 @@ const status = (value, label) => {
 
 /** Preserve source-owned preview and setup declarations, without authorizing effects. */
 export function validateDeclarations(spec) {
-  if (spec.ai !== undefined) validateAiDeclaration(spec.ai);
+  refuseAi(spec, 'delivery-declaration');
   if (spec.providerEffects !== undefined) {
     if (strings(spec.providerEffects, 'providerEffects', /^[a-z][a-z0-9-]{0,63}$/).length > 32) throw Error('Too many provider effects');
   }

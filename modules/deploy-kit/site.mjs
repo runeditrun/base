@@ -7,7 +7,7 @@ import { readinessWindow, readinessAPI } from './readiness-window.mjs';
 import { uploadVersionId } from './uploaded-worker.mjs';
 import { ownedSiteVersion, waitForSiteDomains, waitForSiteUpload } from './site-readback.mjs';
 import { siteRuntime, siteRuntimeBindings } from './site-runtime.mjs';
-import { DENY, emit } from '../ai/native/names.mjs';
+import { DENY, emit, refuseAi } from '../ai/native/names.mjs';
 export { servedVersion, siteReadbackSummary } from './site-readback.mjs';
 
 /* A seed's run site (run-<seed>.com): the folder `rer build --site` writes,
@@ -48,6 +48,8 @@ function refuse(code, kind, name) { const error = new Error(code); error.resourc
 
 /** deploy-site.json: `{ "version": 1, "domain": "run-cradle.com" }`, the apex hostname only. */
 export function siteDeclaration(value) {
+  // The run site serves fixed bindings and has no approved AI route.
+  refuseAi(value, 'site');
   assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).sort().join() === 'domain,version', 'invalid-site-declaration');
   assert(typeof value.domain === 'string' && value.domain.length <= 253 && APEX.test(value.domain), 'invalid-site-domain');
   return value;

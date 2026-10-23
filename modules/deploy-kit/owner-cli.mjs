@@ -8,7 +8,7 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
-import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, pendingSecrets, servedBindings } from './owner.mjs';
+import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, pendingSecrets, servedBindings, retiredAfter } from './owner.mjs';
 import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
@@ -104,13 +104,17 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,beforeWrite}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
-  const unretired = ({retiredSecrets = []}) => retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
-  let plan, runtime;
+  const unretired = retired => retired.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retired.includes(item?.binding))} : declaration;
+  let plan, plans, declaredSecrets, runtime;
   if (['deploy','dry-run','health'].includes(command)) {
-    // The current build's plan and approval are checked before settlement, which locks and may write state.
+    // Before key custody, the lock or settlement, which may write state: the full declaration, retired
+    // secrets included (they name the fingerprint), and the plan for each retired list settlement can leave.
     artifact ??= await ownerArtifact(root,values.product,declaration.ai);
-    plan = ownerPlan(target,unretired(recorded),artifact,{localOnlyKeys,env});
-    runtime = planNames(plan,{accountId:api.accountId,sourceSha:artifact.source.sha});
+    declaredSecrets = ownerPlan(target,declaration,artifact,{localOnlyKeys,env}).secrets;
+    const settled = [recorded.retiredSecrets ?? [],...(recorded.receipt && recorded.pendingSecret ? [retiredAfter(recorded,recorded.pendingSecret)] : [])];
+    plans = new Map(settled.map(retired => [String(retired),ownerPlan(target,unretired(retired),artifact,{localOnlyKeys,env})]));
+    [runtime] = [...plans.values()].map(each => planNames(each,{accountId:api.accountId,sourceSha:artifact.source.sha}));
+    plan = plans.get(String(recorded.retiredSecrets ?? []));
     // Health reads the recorded deployment, so the approval must pair with its source too.
     if (command === 'health' && recorded.receipt) planNames(plan,{accountId:api.accountId,sourceSha:recorded.receipt.source?.sha});
   }
@@ -118,14 +122,16 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   else runtime = recordedNames(recorded.receipt,target);
   // What an interrupted secret change would leave on the Worker passes those names before any lock or settlement.
   admit(runtime,pendingSecrets(recorded));
+  // So does what the live Worker serves, for each command that reads it back whole: one read-only request, so a refusal never waits on another run's lock.
+  if (['inspect','record-owner','signin','rekey'].includes(command)) admit(runtime,servedBindings(await activeWorker(api,target.worker)));
   if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice,runtime});
   if (command === 'deploy') await beforeWrite();
   // A dry run only reads state: settling an interrupted change may write it.
   const state = command === 'dry-run' ? recorded : await settleOwnerState({api,target,statePath,runtime,secretsOnly:command === 'deploy'});
   if (command === 'dry-run') assert(!state.pendingSecret, 'secret-change-unsettled');
   const {retiredSecrets = []} = state;
-  // Settlement can retire or restore a declared secret; the plan follows the settled list.
-  if (plan && String(retiredSecrets) !== String(recorded.retiredSecrets ?? [])) plan = ownerPlan(target,unretired(state),artifact,{localOnlyKeys,env});
+  // Settlement leaves one of the retired lists planned above: any other was written by another run while this one waited.
+  if (plans) { plan = plans.get(String(retiredSecrets)); assert(plan, 'owner-state-changed'); }
   if (command === 'record-owner') return withStateLock(statePath, async () => {
     const current = await readOwnerState(statePath, target);
     assert(current.receipt && !current.pendingUpload && !current.pendingSecret, 'missing-owner-receipt');
@@ -165,8 +171,6 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   }
   // Dispatch is the provider's: on some accounts a new Cron starts only at the account scheduler's next refresh.
   if (plan.crons.length) notice(cronNotice);
-  // The fingerprint names every declared secret, retired ones too: an untouched repeat after the claim is a no-op.
-  const declaredSecrets = unretired(state) === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env}).secrets;
   const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness});
   requestWindow = window;
   const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {

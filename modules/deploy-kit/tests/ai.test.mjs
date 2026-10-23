@@ -217,6 +217,14 @@ test('every owner command, Worker write and configuration family passes the one 
  assert.ok(reserved.length&&reserved.every(binding=>binding.type==='inherit'?[...AI_VARIABLES,AI_PRIVACY_TOKEN].includes(binding.name)
   :binding.type==='plain_text'?binding.text===derived[binding.name]:binding.type==='secret_text'&&binding.name===AI_PRIVACY_TOKEN),JSON.stringify(reserved));
  const statePath=join(root,'.rer/deploy/production.json'),saved=JSON.parse(await readFile(statePath)),held=provider.state.secrets.map(item=>item.name);
+ // Refused while another run holds the lock: a command that locked, settled or saved key custody first would not report this code.
+ const locked=async(cell,code,run)=>{
+  const bytes=await readFile(statePath),writes=provider.state.writes.length;
+  await writeFile(statePath+'.lock','other-run\n');
+  let error;try{await run();}catch(e){error=e;}finally{await rm(statePath+'.lock');}
+  assert.equal(error?.code??error?.message,code,`${cell}: ${error?.code??error?.message}`);
+  assert.equal(provider.state.writes.length,writes,cell);assert.deepEqual(await readFile(statePath),bytes,cell);
+ };
  // A reserved name the live Worker serves outside the approval: a secret change would inherit it, every other
  // command reads it back. Removal deletes it; a dry run reads only the secrets a fresh upload would keep.
  const foreign={type:'plain_text',name:'RER_AI_LIVE',text:'synthetic-live'},live=[provider.state.settings.bindings,provider.state.version.resources.bindings];
@@ -227,7 +235,26 @@ test('every owner command, Worker write and configuration family passes the one 
   await assert.rejects(cli(command,extra),e=>e.code==='ai_policy_conflict',`live x ${command} ${extra.join(' ')}`);
   assert.equal(provider.state.writes.length,writes);assert.deepEqual(await readFile(statePath),bytes);
  }
+ // The maintenance commands read it back before they lock: their refusal never waits on another run's lock.
+ for(const command of ['inspect','record-owner','signin','rekey'])await locked(`live x ${command} while another run holds the lock`,'ai_policy_conflict',()=>cli(command,extras[command]?.[0]));
  for(const bindings of live)bindings.splice(bindings.indexOf(foreign),1);
+ let custody=0;
+ const planned=(command,file,extra=[],beforeWrite=async()=>{custody++;})=>main([command,'--declaration',file,'--environment','production',...extra],env,{fetch,cwd:root,notice:()=>{},beforeWrite});
+ // A secret retired with --unset-secret stays declared: deploy, dry run and health plan the whole declaration, its binding and its source alike.
+ for(const entry of [{binding:'RER_AI_RETIRED',environment:'A_SECRET',optional:true},{binding:'C_SECRET',environment:'RER_AI_RETIRED',optional:true}]){
+  await writeFile(join(root,'retired.json'),JSON.stringify({...declaration,secrets:[...declaration.secrets,entry]}));
+  assert.equal((await planned('secret','retired.json',['--unset',entry.binding],async()=>{})).ok,true);
+  for(const command of ['deploy','dry-run','health'])await locked(`retired ${entry.binding} x ${command}`,'ai_policy_conflict',()=>planned(command,'retired.json'));
+ }
+ // So is the list a pending change leaves once settled: an interrupted removal of the private token would retire it.
+ await writeFile(statePath,JSON.stringify({...saved,pendingSecret:{bindings:[AI_PRIVACY_TOKEN],present:false,versionId:saved.receipt.provider.versionId,names:held.filter(name=>name!==AI_PRIVACY_TOKEN)}}));
+ for(const command of ['deploy','dry-run','health'])await locked(`pending token removal x ${command}`,'ai_privacy_unverified',()=>planned(command,'deploy.json'));
+ assert.equal(custody,0);
+ // A receipt whose recorded approval names another payer derives no runtime names for this account.
+ const recorded=saved.receipt.config.vars,payer='b'.repeat(32);
+ await writeFile(statePath,JSON.stringify({...saved,receipt:{...saved.receipt,config:{...saved.receipt.config,vars:{...recorded,RER_AI_ACCOUNT_ID:payer,RER_AI_AUTHORITY:canonical({...JSON.parse(recorded.RER_AI_AUTHORITY),accountId:payer})}}}}));
+ for(const command of COMMANDS.filter(command=>!['deploy','dry-run','health','remove'].includes(command)))await locked(`recorded payer x ${command}`,'ai_policy_conflict',()=>cli(command,extras[command]?.[0]));
+ await writeFile(statePath,JSON.stringify(saved));
  // An interrupted change that would leave a reserved name: applied at the edge, then staged as a several-secret copy.
  for(const mode of ['applied','staged']){
   const state=structuredClone(saved),bindings=['RER_AI_PENDING',...(mode==='staged'?['B_SECRET']:[])];

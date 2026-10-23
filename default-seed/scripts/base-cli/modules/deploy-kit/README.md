@@ -521,12 +521,17 @@ renderers emit through it, a Worker upload accepts only what it emitted (any
 other list admits no `RER_AI_*` name), a staged several-secret copy reaches
 traffic only once the bindings it carries are admitted, and readback admits
 through it. No declaration,
-supplied plan, rendered or kept binding, secret change, live binding a copy
-inherits, or container, demo or package build may bind another `RER_AI_*` name
-(`ai_policy_conflict`). Every owner command but removal pairs its approval with
-the payer and source and admits what a pending secret change would leave before
-it takes the state lock, settles or writes; exported `verifyHealth` pairs the
-plan with the recorded deployment before its first provider read. Custom deploy
-hooks and local runtimes are outside this boundary (see the AI consumer guide).
+supplied plan, rendered or kept binding, secret change or live binding a copy
+inherits may bind another `RER_AI_*` name (`ai_policy_conflict`). Only this
+owner-account deploy serves native AI: container, hosted-demo and delivery
+builds and `rer verify` refuse an `ai` declaration (`ai_hosting_unproven`), and
+they and the local settings rer's local runtimes start from refuse every
+reserved name, before they build or start anything. Deploy, dry run and health plan the whole
+declaration, retired secrets included, before a first key is saved, the state
+lock or settlement; every other owner command but removal pairs its approval
+with the payer and source and admits what a pending secret change would leave
+before it takes the state lock, settles or writes; exported `verifyHealth` pairs
+the plan with the recorded deployment before its first provider read. Custom
+deploy hooks are outside this boundary (see the AI consumer guide).
 Provider/account qualification remains held; no inference runs during deployment. See the [AI consumer candidate](../ai/native/README.md)
 for the policy/budget contract and separate provider/hosting qualification gates.

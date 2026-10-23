@@ -3,17 +3,21 @@ import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { containerMigrationInventory as demoMigrationInventory } from '../container/migration-inventory.mjs';
-import { checkImageBindings, checkImageVariables as checkBuildVariables } from '../container/image-variables.mjs';
+import { checkImageBindings, checkImageVariables as checkBuildVariables, checkSeedBindings } from '../container/image-variables.mjs';
+import { refuseAi } from '../ai/native/names.mjs';
 import { nativeBindings } from './native/config.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 
 // The seed's ordinary production Worker output, with the declared SQL inventory.
 // No image, runtime emulator or dependency installation belongs in this bundle.
 export async function buildDemo(root, output, declaration) {
+  // Hosted demos have no approved AI route: refused before anything is built.
+  refuseAi(declaration, 'hosted-demo-build');
   const require = createRequire(join(root, 'package.json'));
   const vite = await import(pathToFileURL(require.resolve('vite')));
   const loaded = await vite.loadConfigFromFile({ command: 'build', mode: 'production' }, undefined, root);
   if (!loaded) throw new Error('Vite configuration missing');
+  checkSeedBindings(root, require('wrangler').experimental_readRawConfig);
   const emitted = new Set(), entryExports = new Map();
   const config = { ...loaded.config, root, configFile: false, plugins: [...(loaded.config.plugins ?? []), {
     name: 'rer-demo-output',

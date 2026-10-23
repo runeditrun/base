@@ -62,6 +62,12 @@ export function emit(names, bindings) {
 }
 /** The projection an emitted list passed; DENY for any other list. */
 export const projectionOf = list => lists.get(list) ?? DENY;
+/** Only the owner-account deploy derives an approval. Every other path has DENY alone (container
+ * builds and deploys, hosted demos, delivery packages, rer's local runtimes): it refuses an `ai`
+ * declaration outright, before it builds, packages, serves or calls the provider. */
+export function refuseAi(declaration, path) {
+  if (declaration?.ai !== undefined) throw Object.assign(new Error('ai_hosting_unproven'), {code:'ai_hosting_unproven', status:503, resource:`ai:${path}`});
+}
 
 // Wrangler configuration families that bind a runtime name: each family's binding type and where
 // its names sit (`field`: absent for a top-level list, a nested list's key, or null for one object).

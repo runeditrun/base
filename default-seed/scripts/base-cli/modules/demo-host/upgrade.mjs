@@ -10,6 +10,9 @@ export async function upgradeDemo({ api, plan, report = () => {} }) {
   const classes = found.namespaces.map(row => row.class);
   const unknown = classes.filter(name => !['DemoContainer', 'NativeDemo', 'DemoCapacity'].includes(name));
   if (unknown.length) throw new Error('demo-upgrade-unknown-class');
+  // The API checks the currently deployed bindings before class deletion: the upgrade detaches the
+  // retired binding and inherits every other one, so those pass the runtime names before anything is deleted.
+  const kept = classes.includes('DemoContainer') ? admit(DENY, found.settings.bindings.filter(binding => !(binding.type === 'durable_object_namespace' && binding.class_name === 'DemoContainer'))) : [];
   const service = found.worker ? await api.request(`/workers/services/${plan.worker}`) : null;
   const tag = service?.default_environment?.script?.migration_tag;
   if (found.worker && classes.length && !tag) throw new Error('demo-upgrade-missing-migration-tag');
@@ -30,10 +33,9 @@ export async function upgradeDemo({ api, plan, report = () => {} }) {
     report(`Removed the retired shared demo R2 bucket ${found.bucket.name}; R2 now lives in each visitor's storage.`);
   }
   if (classes.includes('DemoContainer')) {
-    // The API checks the currently deployed bindings before class deletion.
     // Detach the retired binding first; inherit every other value by name,
     // including secrets, and retain the ownership annotation for a rerun.
-    const body = new FormData(), kept = admit(DENY, found.settings.bindings.filter(binding => !(binding.type === 'durable_object_namespace' && binding.class_name === 'DemoContainer')));
+    const body = new FormData();
     body.set('settings', new Blob([JSON.stringify({
       annotations: { 'workers/message': plan.record },
       bindings: emit(DENY, kept.map(binding => ({ name: binding.name, type: 'inherit' }))),

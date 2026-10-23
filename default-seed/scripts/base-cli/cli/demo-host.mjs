@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { contained } from './project.mjs';
 import { invalid, missing, RerError } from './errors.mjs';
 import { demoPlan } from '../modules/demo-host/plan.mjs';
+import { refuseNativeAi } from './ai-custody.mjs';
 
 export async function demoHostCommand(project, options, store, signal, out, operation) {
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Missing or malformed ${path}.`); } };
@@ -14,6 +15,8 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, hostVariables: app.container?.hostVariables, declaration: nativeDeclaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }
  catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds version, domain, name, and optionally maxInstances, ownerEmail and plain settings.`); }
  if (options.remove) return removeDemo(plan, store, signal);
+ // Hosted demos have no approved AI route: refused before the build, the upgrade and the deploy.
+ refuseNativeAi('rer deploy --demo', app);
  if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const supplied = process.env.RER_DEMO_MEASUREMENT_TOKEN?.trim();
  if (supplied && (supplied.length < 32 || supplied.length > 512 || /[\s;,]/.test(supplied))) throw invalid('RER_DEMO_MEASUREMENT_TOKEN must contain 32 to 512 characters, with no spaces, semicolons or commas.');

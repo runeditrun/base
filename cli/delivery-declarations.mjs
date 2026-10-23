@@ -9,16 +9,11 @@ export const deliveryDeclarationSources = [
  ['packaging.json', value => value?.artifact?.specInputs],
  ['scripts/delivery/base/packaging.json', value => value?.artifact?.specInputs],
  ['management/integration/deployment-spec.json', value => value],
- ['deploy.json', value => value],
 ];
 
-export function nativeDeclarationSources(ownerDeclaration) {
- return typeof ownerDeclaration === 'string' && !deliveryDeclarationSources.some(([p]) => p === ownerDeclaration) ? [...deliveryDeclarationSources,[ownerDeclaration,value => value]] : deliveryDeclarationSources;
-}
-
-export async function deliveryDeclarationClauses(root, ownerDeclaration) {
+export async function deliveryDeclarationClauses(root) {
  const clauses = [];
- for (const [path, select] of nativeDeclarationSources(ownerDeclaration)) {
+ for (const [path, select] of deliveryDeclarationSources) {
   let text;
   try { text = await readFile(await contained(root, path, { optional: true }), 'utf8'); }
   catch (error) {
@@ -32,11 +27,8 @@ export async function deliveryDeclarationClauses(root, ownerDeclaration) {
   catch { clause.ok = false; clause.message = `${path}: invalid JSON declaration.`; }
   if (clause.ok) {
    const spec = select(value);
-   if (spec !== undefined) try {
-    validateDeclarations(spec);
-    if (spec.ai !== undefined) clauses.push({id:`delivery.ai.${path}`,ok:true});
-   }
-   catch (error) { clause.ok = false; clause.message = `${path}: ${error.message}`; if (spec?.ai !== undefined) clauses.push({id:`delivery.ai.${path}`,ok:false,message:'Restore the strict native AI declaration; installation approval is separate.'}); }
+   if (spec !== undefined) try { validateDeclarations(spec); }
+   catch (error) { clause.ok = false; clause.message = `${path}: ${error.message}`; }
   }
   clauses.push(clause);
  }

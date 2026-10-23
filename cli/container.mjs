@@ -11,6 +11,7 @@ import { refuse, missing } from './errors.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployInputs } from '../modules/container/deploy-input.mjs';
 import { ingressBindings } from '../modules/container/ssh-plan.mjs';
+import { refuseNativeAi } from './ai-custody.mjs';
 import { deploySSH, sshTarget } from '../modules/container/ssh.mjs';
 const execute=promisify(execFile);
 async function run(command,args,options={}) {
@@ -31,6 +32,8 @@ export async function imageFolder(project,operation,config,{output,engine}={}) {
 }
 export async function containerCommand(project,options,out) {
  if(options.stop)return runContainer(project,options,out);
+ // Containers have no approved AI route: refused before the checkout lock and any build, deploy or local run.
+ refuseNativeAi('rer container',JSON.parse(await readFile(join(project.root,'deploy.json'),'utf8')));
  const {localOperation}=await shared('local/operation.mjs'),{recoverInterrupted}=await shared('local/recovery.mjs');
  const operation=await localOperation(project.root,process.env.RER_LOCAL_OPERATION);
  try{await recoverInterrupted(project.root,operation);return await runContainer(project,options,out,operation);}catch(error){if(error.code==='SSH_HOST_REFUSAL')throw refuse(error.message);throw error;}finally{await operation.release();}
@@ -57,8 +60,11 @@ async function runContainer(project,options,out,operation) {
  }
  if(['dev','preview'].includes(options.verb)){
   const selected=await selectedOrigin(project,options),env=join(root,'.rer/container/local.env');
+  const local={...selected.vars,[config.originVar]:selected.url,PORT:'8080',RER_CONTAINER_IDLE_SECONDS:String(options.idleTimeout)};
+  // The local container runs with these names: none may be a reserved AI name.
+  refuseNativeAi('rer container',undefined,Object.keys(local).map(name=>({type:'var',name})));
   await mkdir(join(root,'.rer/container'),{recursive:true,mode:0o700});
-  const local={...selected.vars,[config.originVar]:selected.url,PORT:'8080',RER_CONTAINER_IDLE_SECONDS:String(options.idleTimeout)};const {stdout}=await execute('docker',['image','inspect','--format','{{.Id}}',image]);local.RER_IMAGE_DIGEST=stdout.trim();
+  const {stdout}=await execute('docker',['image','inspect','--format','{{.Id}}',image]);local.RER_IMAGE_DIGEST=stdout.trim();
   await writeFile(env,Object.entries(local).map(([key,value])=>`${key}=${String(value).replaceAll('\n','\\n')}`).join('\n')+'\n',{mode:0o600});
   out.human('RER_OPEN '+selected.url);
   await run('docker',['run','--rm','--name',name,'--env-file',env,'-p',`${selected.host}:${selected.port}:8080`,'-v',name+'-data:/data',image],{cwd:root});

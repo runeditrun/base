@@ -1,4 +1,5 @@
 import {readFile} from 'node:fs/promises';
+import {join} from 'node:path';
 import {deliveryDeclarationSources} from '../../cli/delivery-declarations.mjs';
 import {sourcePath} from '../delivery-producer/migrations.mjs';
 import {usesManagedMail,validateMailSpec} from '../delivery-producer/mail.mjs';
@@ -12,6 +13,12 @@ import {DENY,admit,configBindings} from '../ai/native/names.mjs';
 export function checkImageBindings(config,readRaw) {
  const source=config.userConfigPath??config.configPath,raw=readRaw&&typeof source==='string'?readRaw({config:source}).rawConfig:{};
  admit(DENY,[config,...Object.values(config.env??{}),raw,...Object.values(raw.env??{})].flatMap(configBindings));
+}
+/** Before either build compiles: the seed's own Wrangler configuration as Wrangler finds it from the
+ * seed root, every environment included. A name only the build adds is refused once it exists. */
+export function checkSeedBindings(root,readRaw) {
+ const raw=readRaw({script:join(root,'package.json')}).rawConfig??{};
+ admit(DENY,[raw,...Object.values(raw.env??{})].flatMap(configBindings));
 }
 /** Built variables reach those runtimes by name: none may be a reserved AI name. Admit only the
  * managed-mail contract's public config through legacy secret declarations. */
