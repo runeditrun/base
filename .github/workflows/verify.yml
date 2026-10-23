@@ -21,7 +21,7 @@ on:
 permissions:
   contents: read
 
-# Keep each main run; successful exact-SHA branch verification can satisfy it.
+# Keep each main run; a green push of the same SHA to a branch or tag can satisfy it.
 # A distinct run key also avoids GitHub replacing a pending main run.
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
