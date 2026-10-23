@@ -1,15 +1,16 @@
-// rer run through the installed command's door: a project's documented
+// rer run, queue and list through the installed command's door: a project's documented
 // `pnpm run X -- ARGS` works as `rer run X -- ARGS` with no pnpm on PATH.
 // Only the npm registry is a fixture, serving a pnpm release.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { exportReference } from '../../scripts/export-reference.mjs';
 import { run } from './harness.mjs';
 
 const rer = resolve(import.meta.dirname, '../rer.mjs'), execute = promisify(execFile);
@@ -67,4 +68,56 @@ globalThis.fetch = async url => new Response(String(url).endsWith('.tgz') ? read
  assert.equal(callerPath.code, 0, callerPath.stderr);
  assert.match(callerPath.stdout, /caller-tool-ran/);
 
+});
+
+test('rer queue runs the command with its literal arguments, keeps its exit status and leaves no admitted job behind', { timeout: 60000 }, async t => {
+ const directory = await realpath(await mkdtemp(join(tmpdir(), 'rer-queue-')));
+ t.after(() => rm(directory, { recursive: true, force: true }));
+ const jobs = join(directory, 'jobs'), env = { HOME: join(directory, 'home'), PATH: process.env.PATH, RER_NO_UPDATE_CHECK: '1', RER_JOBS_DIR: jobs, RER_JOBS_LOAD_THRESHOLD: '100000', RER_JOBS_MIN_FREE_MEMORY_BYTES: '0' };
+ const queue = (...args) => run(process.execPath, [rer, 'queue', 'heavy', '--', ...args], { cwd: directory, env });
+ const idle = async () => { const { queued, running } = JSON.parse(await readFile(join(jobs, 'state.json'), 'utf8')); return { queued, running }; };
+
+ const echoed = await queue(process.execPath, '-e', 'console.log(JSON.stringify(process.argv.slice(1))); process.exit(5)', 'two words', '$HOME', '--', '--flag');
+ assert.equal(echoed.code, 5, 'the command keeps its own exit status');
+ assert.deepEqual(JSON.parse(echoed.stdout.trim().split('\n').at(-1)), ['two words', '$HOME', '--', '--flag'], 'arguments arrive literally');
+ assert.deepEqual(await idle(), { queued: [], running: [] });
+
+ assert.equal((await queue(process.execPath, '-e', '')).code, 0);
+ assert.equal((await queue('/nonexistent/rer-queue-command')).code, 127, 'a command that cannot start fails visibly');
+ assert.deepEqual(await idle(), { queued: [], running: [] }, 'neither a success nor a failed start strands an admitted job');
+
+ const usage = await run(process.execPath, [rer, 'queue', 'heavy'], { cwd: directory, env });
+ assert.equal(usage.code, 2);
+ assert.match(usage.stderr, /Usage: rer queue NAME -- COMMAND/);
+});
+
+test('rer list reports each checkout\'s kind and readiness without changing any of them', { timeout: 60000 }, async t => {
+ const directory = await realpath(await mkdtemp(join(tmpdir(), 'rer-list-'))), parent = join(directory, 'projects');
+ t.after(() => rm(directory, { recursive: true, force: true }));
+ const env = { HOME: join(directory, 'home'), PATH: process.env.PATH, RER_NO_UPDATE_CHECK: '1', RER_SERVERS_DIR: join(directory, 'servers') };
+ const list = (...args) => run(process.execPath, [rer, 'list', ...args], { cwd: directory, env });
+ const descriptors = { independent: { version: 2, project: 'example/independent' }, legacy: { version: 1 } };
+ for (const [name, descriptor] of Object.entries(descriptors)) { await mkdir(join(parent, name), { recursive: true }); await writeFile(join(parent, name, 'OPERATIONS.json'), JSON.stringify(descriptor)); }
+ await mkdir(join(parent, 'malformed'), { recursive: true }); await writeFile(join(parent, 'malformed/OPERATIONS.json'), '{not json');
+ await mkdir(join(parent, 'notes')); await writeFile(join(parent, 'notes/README.md'), 'no descriptor here');
+ await exportReference(resolve(import.meta.dirname, '../..'), join(parent, 'seed'));
+ const tree = async folder => (await readdir(folder, { withFileTypes: true, recursive: true })).filter(entry => !entry.isSymbolicLink()).map(entry => join(entry.parentPath, entry.name)).sort();
+ const before = await tree(parent);
+
+ const listed = await list(parent, '--json');
+ assert.equal(listed.code, 0, listed.stderr);
+ const { checkouts } = JSON.parse(listed.stdout);
+ const byName = Object.fromEntries(checkouts.map(entry => [entry.name, entry])), seed = byName.seed;
+ assert.deepEqual(Object.keys(byName).sort(), ['independent', 'legacy', 'malformed', 'seed'], 'only folders with an OPERATIONS.json are listed');
+ assert.deepEqual([seed.profile, seed.launchable, seed.prepared, seed.url], ['first-party', true, false, null], 'an unprepared seed is launchable and says it has no setup yet');
+ assert.deepEqual([byName.independent.profile, byName.independent.launchable], ['independent', false]);
+ assert.deepEqual([byName.legacy.profile, byName.legacy.launchable, byName.malformed.launchable], ['unsupported', false, false]);
+ for (const name of ['independent', 'legacy', 'malformed']) assert.ok(byName[name].reason, `${name} says why it cannot launch`);
+ assert.deepEqual(await tree(parent), before, 'listing creates and removes nothing');
+
+ const human = await list(parent);
+ assert.equal(human.code, 0);
+ for (const name of Object.keys(byName)) assert.ok(human.stdout.includes(name));
+ assert.equal((await list(join(directory, 'missing'))).code, 3, 'a folder that does not exist is refused');
+ assert.equal((await list('--wat')).code, 2);
 });

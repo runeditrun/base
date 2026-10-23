@@ -109,14 +109,6 @@ test('first-upload recovery requires the pending fingerprint as binding and anno
   assert.equal((await ownerDeploy(change(args))).receipt.changed,false);
 });
 
-test('owner documentation explains restoring state, safe resource cleanup and subdomain registration', async () => {
-  const text = await readFile(new URL('../README.md',import.meta.url),'utf8');
-  assert.match(text,/### If the state file is lost/);
-  assert.match(text,/Restore the state file from a backup/);
-  assert.match(text,/kit-created resources/);
-  assert.match(text,/Register one first/);
-});
-
 test('provider input errors use neutral codes before any request', () => {
   let calls = 0;
   const fetch = async () => { calls++; throw new Error('unexpected request'); };

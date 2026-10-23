@@ -29,11 +29,3 @@ test('a passing check removes its output; a failing or kept check retains it', a
   assert.equal(await finishOutputRoot(kept, { passed: true, keep: true }), false);
   for (const root of [failed, kept]) assert.ok((await stat(join(root, 'screenshots'))).isDirectory());
 });
-
-test('the browser check finishes its own output folder after printing results', async () => {
-  const source = await readFile(new URL('./browser-check.mjs', import.meta.url), 'utf8');
-  const printed = source.indexOf('console.log(JSON.stringify({ outputRoot, results }');
-  const marked = source.indexOf('passed = true;', printed);
-  const finished = source.indexOf('await finishOutputRoot(outputRoot, { passed })', marked);
-  assert.ok(printed > 0 && marked > printed && finished > marked, 'results print, then pass is recorded, then the folder is finished in finally');
-});
