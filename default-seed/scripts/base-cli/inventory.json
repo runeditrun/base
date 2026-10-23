@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g39fc89a9",
+  "cliVersion": "0.2.79-dev.gbf3e5cdd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1791,7 +1791,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "ecf780ef5480aac376f96b13cd41adaec815548bb5ada44abe13fce2bd89fc76"
+      "sha256": "2adc62cd294dcb6b3ef5084dac82a0aed76b33e66f9c0aaa7ebf488f9e7e8fda"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",

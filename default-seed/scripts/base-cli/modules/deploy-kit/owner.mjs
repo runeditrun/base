@@ -455,12 +455,14 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
 }
 
 /** Independent read-only health of the last owner deployment recorded in the state file.
- * verifyHealth pairs the plan's runtime names with this account and that deployment's source. */
+ * verifyHealth pairs the plan's runtime names with this account and that deployment's source;
+ * what a pending secret change would leave passes them before any provider read. */
 export async function ownerHealth({api: provider, target, plan, statePath, fetch = globalThis.fetch, healthOptions = {}}) {
   const api = withSettledLists(withScopeHints(provider));
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
-  validatePlan(plan); planNames(plan); assertOwnerNames(target, plan);
+  validatePlan(plan); const runtime = planNames(plan); assertOwnerNames(target, plan);
   const state = await readOwnerState(statePath, target);
   assert(state.receipt, 'missing-owner-receipt');
+  admit(runtime, pendingSecrets(state));
   return verifyHealth({...healthOptions, api, plan, receipt:state.receipt, fetch});
 }
