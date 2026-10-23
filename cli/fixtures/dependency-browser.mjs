@@ -34,7 +34,7 @@ export async function linkedBrowser(f,origin,provider,env,kind,network) {
  try {
   const deadline=Date.now()+120000;while(!preview.stdoutText.includes('"event":"ready"')&&preview.exitCode===null&&Date.now()<deadline)await pause(100);
   assert.ok(preview.stdoutText.includes('"event":"ready"'),'dev reaches readiness');
-  browser=await chromium.launch();
+  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
   const evidence=resolve('evidence/auth-6');await mkdir(evidence,{recursive:true});
   for(const width of [1440,390]) {
    const viewport={width,height:900};
