@@ -1,10 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMailSender, MailValidationError } from '../../index.mjs';
+import { createMailSender, MailValidationError, serializeSendGridMessage as serializeMailMessage } from '../../index.mjs';
 import { sendSendGrid, serializeSendGridMessage, SendGridSendError } from '../../src/sendgrid-email/index.mjs';
 
 const message = () => ({ from: 'Support <support@example.com>', to: ['person@example.com'], subject: 'Your request', text: 'Reply', html: '<p>Reply</p>', deliveryId: 'durable-1' });
 const accept = async () => new Response(null, { status: 202, headers: { 'x-message-id': 'receipt-1' } });
+
+test('the former message shape preserves explicit attachment MIME and disabled subscription tracking', () => {
+  const input = { ...message(), subscriptionTracking: false, attachments: [{ content: 'aGk=', filename: 'proof.txt', type: 'text/plain' }] };
+  assert.equal(serializeSendGridMessage(input), serializeMailMessage({
+    ...input, attachments: [{ content: Uint8Array.of(104, 105), filename: 'proof.txt', contentType: 'text/plain' }],
+  }));
+});
+
+test('messages without attachments retain the historical claim fingerprint bytes', () => {
+  const wire = serializeSendGridMessage({
+    from: 'Support <support@example.com>', to: ['Ada <ada@example.net>', 'grace@example.net'], subject: 'S ✓', text: 'T', html: '<p>x</p>',
+    replyTo: '"Re" <r@example.com>', headers: { 'X-A': 'b' }, asmGroupId: 5, subscriptionTracking: false, customArgs: { b: '1', a: '2' }, deliveryId: 'd1',
+  });
+  // Both API paths share a serializer; an independent historical envelope guards durable fingerprints.
+  assert.equal(wire, '{"personalizations":[{"to":[{"email":"ada@example.net","name":"Ada"},{"email":"grace@example.net"}]}],"from":{"email":"support@example.com","name":"Support"},"subject":"S ✓","content":[{"type":"text/plain","value":"T"},{"type":"text/html","value":"<p>x</p>"}],"reply_to":{"email":"r@example.com","name":"Re"},"headers":{"X-A":"b"},"custom_args":{"b":"1","a":"2","rer_delivery_id":"d1"},"asm":{"group_id":5},"tracking_settings":{"click_tracking":{"enable":false,"enable_text":false},"open_tracking":{"enable":false},"ganalytics":{"enable":false},"subscription_tracking":{"enable":false}}}');
+});
 
 test('base64 attachments become bytes and a missing type is a generic binary type', () => {
   const wire = JSON.parse(serializeSendGridMessage({ ...message(), attachments: [{ content: 'AP+ACg==', filename: 'bytes.bin' }] }));
