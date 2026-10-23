@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gde31036a",
+  "cliVersion": "0.2.79-dev.g5d1673c1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3283,7 +3283,7 @@
     },
     "modules/operator-auth/routes.mjs": {
       "source": "modules/operator-auth/routes.mjs",
-      "sha256": "c3b8780cb96df150ff52ef8e6c20f801ee5fe6fba106b551e257d6da99a732a3"
+      "sha256": "e7544cc70c2f6e933630d6848af102b957002bdec9cf112227f2c163b96e10fd"
     },
     "modules/operator-auth/scheduled/definition.mjs": {
       "source": "modules/operator-auth/scheduled/definition.mjs",
