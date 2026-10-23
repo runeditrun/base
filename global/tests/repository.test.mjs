@@ -1,5 +1,5 @@
-// rer dev <repo> through the installed command's door: the clone it makes
-// can check out an older release tag with no further fetch.
+// The installed rer dev <repo> command preserves release tags in its clone, so
+// a person can check out an older release without another fetch.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';

@@ -166,4 +166,54 @@ test('the front door serves two checkouts by name, starting them on a visit and 
  assert.equal((await request(port, door('alpha'), '/', navigation)).status, 503);
  await until(async () => await state('alpha') === 'running', 'alpha to start again');
  assert.match((await request(port, door('alpha'), '/records', navigation)).body, /Edited behind the door/);
+
+ // Managing the door itself: stop, start, restart, remove, add and disable each change
+ // what is routed, what is registered and what is listening, and repeat safely.
+ const status = async () => JSON.parse((await run(['door', 'status', '--json'], { cwd: directory, env })).stdout);
+ const manage = (...args) => run(['door', ...args], { cwd: directory, env });
+ const registered = async () => (await status()).sites.map(site => site.name).sort();
+ const first = await status();
+ assert.deepEqual([first.running, first.enabled, first.port], [true, true, port]);
+
+ assert.equal((await manage('stop')).code, 0);
+ const stopped = await status();
+ assert.deepEqual([stopped.running, stopped.enabled], [false, true], 'stopped, still enabled');
+ await assert.rejects(request(port, door('alpha'), '/health'), { code: 'ECONNREFUSED' }, 'nothing answers while the door is stopped');
+ assert.equal((await manage('stop')).code, 0, 'stopping a stopped door is not an error');
+ assert.deepEqual(await registered(), ['alpha', 'beta'], 'stopping keeps every checkout registered');
+
+ const started = await manage('start');
+ assert.equal(started.code, 0, started.stderr + started.stdout);
+ const running = await status();
+ assert.equal(running.running, true);
+ assert.equal((await request(port, door('nobody'), '/')).status, 404, 'the door answers again');
+ assert.match((await manage('start')).stdout, /already running/);
+ assert.equal((await status()).pid, running.pid, 'starting a running door starts no second one');
+
+ const restarted = await manage('restart');
+ assert.equal(restarted.code, 0, restarted.stderr + restarted.stdout);
+ const replaced = await status();
+ assert.equal(replaced.running, true);
+ assert.notEqual(replaced.pid, running.pid, 'restart replaces the door process');
+ assert.equal((await request(port, door('nobody'), '/')).status, 404);
+ assert.deepEqual(await registered(), ['alpha', 'beta']);
+
+ const removed = await manage('remove', 'beta');
+ assert.equal(removed.code, 0, removed.stderr + removed.stdout);
+ assert.deepEqual(await registered(), ['alpha'], 'a removed checkout is no longer registered');
+ // An image request never starts a site, so polling cannot register the name again.
+ await until(async () => (await request(port, door('beta'), '/favicon.ico', image)).status === 404, 'the removed name to stop being served (the door re-reads its registry every second)', 15_000);
+ assert.equal((await manage('remove', 'beta')).code, 3, 'removing it again names nothing to remove');
+ const readded = await manage('add', beta);
+ assert.equal(readded.code, 0, readded.stderr + readded.stdout);
+ assert.deepEqual(await registered(), ['alpha', 'beta'], 'adding it registers the same name again');
+ assert.equal((await manage('add', join(directory, 'missing'))).code, 3, 'a folder that is not a checkout is skipped and reported');
+
+ const disabled = await manage('disable');
+ assert.equal(disabled.code, 0, disabled.stderr + disabled.stdout);
+ const off = await status();
+ assert.deepEqual([off.running, off.enabled], [false, false]);
+ await assert.rejects(request(port, door('alpha'), '/health'), { code: 'ECONNREFUSED' }, 'nothing answers once the door is disabled');
+ assert.equal((await manage('start')).code, 3, 'a disabled door does not start until it is enabled again');
+ assert.deepEqual(await registered(), ['alpha', 'beta'], 'disabling keeps the registered checkouts');
 });

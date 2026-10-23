@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createOutputRoot, finishOutputRoot } from './browser-output.mjs';
+
+const execute = promisify(execFile);
 
 test('concurrent browser checks get separate output directories and keep each other\'s files', async t => {
   const taskTemp = await mkdtemp(join(tmpdir(), 'browser-output-'));
@@ -30,10 +34,20 @@ test('a passing check removes its output; a failing or kept check retains it', a
   for (const root of [failed, kept]) assert.ok((await stat(join(root, 'screenshots'))).isDirectory());
 });
 
-test('the browser check finishes its own output folder after printing results', async () => {
-  const source = await readFile(new URL('./browser-check.mjs', import.meta.url), 'utf8');
-  const printed = source.indexOf('console.log(JSON.stringify({ outputRoot, results }');
-  const marked = source.indexOf('passed = true;', printed);
-  const finished = source.indexOf('await finishOutputRoot(outputRoot, { passed })', marked);
-  assert.ok(printed > 0 && marked > printed && finished > marked, 'results print, then pass is recorded, then the folder is finished in finally');
+test('the browser-check command removes successful output and preserves failed output', { timeout: 120000 }, async t => {
+  const taskTemp = await mkdtemp(join(tmpdir(), 'browser-caller-'));
+  t.after(() => rm(taskTemp, { recursive: true, force: true }));
+  const env = { ...process.env, TMPDIR: taskTemp, KEEP_BROWSER_CHECK: '0', RER_JOBS_DIR: join(taskTemp, 'jobs') };
+  const command = join(import.meta.dirname, 'browser-check.mjs');
+  const outputs = async () => (await readdir(taskTemp)).filter(name => name.startsWith('onboarding-ui-browser-check-'));
+  await execute(process.execPath, [command], { env });
+  assert.deepEqual(await outputs(), [], 'a successful command removes its own reports');
+
+  // An empty audit script exercises the real browser's missing-engine failure.
+  const missingAudit = join(taskTemp, 'empty-axe.js');
+  await writeFile(missingAudit, '');
+  await assert.rejects(execute(process.execPath, [command], { env: { ...env, AXE_CORE_PATH: missingAudit } }), { code: 1 });
+  const retained = await outputs();
+  assert.equal(retained.length, 1, 'a failed command retains its own reports');
+  assert.ok((await readdir(join(taskTemp, retained[0], 'screenshots'))).length > 0, 'the failed run retains its captured screen');
 });
