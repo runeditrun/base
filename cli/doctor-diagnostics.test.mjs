@@ -59,7 +59,10 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  const summaryAt = human.lastIndexOf('\ndoctor:');
  assert.ok(summaryAt > 0, 'human mode puts its summary on a separate line after the report');
  assert.throws(() => JSON.parse(human.slice(0, summaryAt)), 'human mode is readable text');
- for (const name of Object.keys(commands)) assert.ok(human.includes(name), `human report includes ${name}`);
+ const unavailable = /^Unavailable command inputs:\n((?: {2}[^\n]+\n)+)/m.exec(human)?.[1];
+ assert.ok(unavailable, 'human report identifies unavailable command inputs');
+ const reportedCommands = unavailable.trimEnd().split('\n').map(line => /^ {2}([^:]+):/.exec(line)?.[1]);
+ assert.deepEqual(reportedCommands, diagnostics.operations.commands.filter(command => !command.available).map(command => command.name));
  assert.ok(human.includes(diagnostics.state.issue));
  assert.ok(human.includes(diagnostics.pnpm.issue));
 });
