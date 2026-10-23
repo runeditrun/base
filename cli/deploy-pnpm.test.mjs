@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, symlink, readdir } from 'node:
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { exportReference } from '../scripts/export-reference.mjs';
+import { productionSender } from './fixtures/production-sender.mjs';
 
 const execute = promisify(execFile);
 const base = resolve(import.meta.dirname, '..');
@@ -17,6 +18,9 @@ test('deploy accepts the real pinned pnpm in a minimal environment and reports t
  t.after(() => rm(directory, { recursive: true, force: true }));
  const root = join(directory, 'seed'), home = join(directory, 'home');
  await exportReference(base, root);
+ const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
+ declaration.vars.MAIL_FROM = productionSender;
+ await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
  for (const path of ['npm/bin', 'bin', 'tmp', 'xdg/config', 'xdg/cache', 'xdg/data', 'xdg/state']) await mkdir(join(home, path), { recursive: true });
  const { stdout } = await execute('/bin/sh', ['-c', 'command -v pnpm']);
  await symlink(stdout.trim(), join(home, 'npm/bin/pnpm'));
