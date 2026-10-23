@@ -1,6 +1,7 @@
 import { createPortability } from './index.mjs';
 import { insist, PortabilityError } from './storage.mjs';
 import { MAX_LINE_BYTES } from './format.mjs';
+import { httpFailure } from './http-errors.mjs';
 export async function boundedJson(request,limit) {
   const reader=request.body?.getReader();if(!reader)return {};
   const chunks=[];let size=0;
@@ -38,6 +39,6 @@ export async function createPortabilityHandler({db,buckets,policy,appOrigin,base
       if(collection==='imports' && request.method==='PUT' && id && action==='parts' && /^(0|[1-9]\d*)$/.test(index??''))return json(await api.uploadPart(id,Number(index),await boundedJson(request,maxBodyBytes)));
       if(collection==='imports' && request.method==='POST' && id && action==='finalize' && !index)return json(await api.finalize(id,await boundedJson(request,maxBodyBytes)));
       throw new PortabilityError('route_not_found',404);
-    }catch(e){return json({error:e instanceof PortabilityError?e.code:'operation_failed',...(e instanceof PortabilityError && e.code==='import_running'?{jobId:e.jobId,abortableAt:e.abortableAt}:{})},e instanceof PortabilityError?e.status:500);}
+    }catch(e){const failure=httpFailure(e);return json(failure.body,failure.status);}
   };
 }

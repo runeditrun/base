@@ -4,6 +4,7 @@ import { tokens, identifier, folded } from './generated.mjs';
 import { laterData } from './backfills.mjs';
 import { destinationLedger, matchMigrationLedger } from './ledgers.mjs';
 import { checkRebuild } from './rebuilds.mjs';
+import { schemaSQL } from './schema-identity.mjs';
 
 // Applied product migrations in the ledger's own order (ledgers.mjs). A
 // state-bearing ledger may hold an unacknowledged migration whose effects are
@@ -95,7 +96,7 @@ export async function additiveBridge(db,manifest,cat,migrations,history) {
     const kept=target.columns.slice(0,table.columns.length),added=target.columns.slice(table.columns.length);
     insist(canonicalJson(kept)===canonicalJson(table.columns) && table.rowidAlias===target.rowidAlias && table.dependencies.every(d=>target.dependencies.includes(d)),'schema_mismatch:columns'+label);
     const rebuiltChecks=rebuilt.has(folded(table.name)) && checkRebuild(table.sql,target.sql);
-    if(!added.length){insist(table.sql===target.sql || rebuiltChecks,'schema_mismatch:definition'+label);continue;}
+    if(!added.length){insist(schemaSQL(table.sql)===schemaSQL(target.sql) || rebuiltChecks,'schema_mismatch:definition'+label);continue;}
     const declared=await all(db,`PRAGMA table_xinfo(${quote(table.name)})`);
     insist(added.every(c=>!c.pk && !c.generated && (!c.notnull || declared.find(d=>d.name===c.name)?.dflt_value!=null)),'schema_mismatch:column_default'+label);
     insist(appended(table.sql,target.sql,added.map(c=>c.name)),'schema_mismatch:definition'+label);
