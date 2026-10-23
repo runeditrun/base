@@ -184,6 +184,7 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
         self.assertEqual(cli()[0]['status'], 'FAIL')
 
     def test_home_route_parameters_pass_through_cli(self):
+        users = '/' + 'Users/'
         with tempfile.TemporaryDirectory() as directory:
             public = os.path.join(directory, 'public.git')
             subprocess.run(['git', 'clone', '-q', '--bare', str(self.repo), public], check=True)
@@ -191,9 +192,14 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
                       ('home', '${name}'), ('Users', '${user.id}/Library/cache'),
                       ('Users', ':id/Library'), ('Users', ':id/groups'),
                       ('Users', '${a.b}'), ('Users', '${ a . b }'), ('Users', '${a}/${b}'),
-                      ('Users', ':id/home/:name')]
+                      ('Users', ':id/home/:name'), ('Users', ':id?attributes=userName'),
+                      ('Users', '${user.id}?attributes=userName')]
             for index, (root, segment) in enumerate(routes):
                 self.write(f'src/routes/{index}.ts', f'export const route = `/{root}/{segment}`;\n')
+            self.write('src/routes/next-statement.ts', f"const route = '{users}:id'; const count = 2;\n")
+            self.write('src/routes/prose.md', f"Use '{users}:id' for the account route.\n")
+            self.write('src/routes/consecutive.ts', f"const route = '{users}:id'\n"
+                       f"const other = '{users}:name'\n")
             self.commit()
             self.commit()  # Keep the route blobs in newly-public history too.
             result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo),
@@ -206,6 +212,7 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             self.assertTrue(report['complete'])
 
     def test_real_home_segments_still_fail_through_cli(self):
+        users, linux = '/' + 'Users/', '/' + 'home/'
         with tempfile.TemporaryDirectory() as directory:
             public = os.path.join(directory, 'public.git')
             subprocess.run(['git', 'clone', '-q', '--bare', str(self.repo), public], check=True)
@@ -221,10 +228,27 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
                      ('Users', ':id/%2E%2e%2Falice/.ssh'), ('Users', r':id\..\alice\.ssh'),
                      ('Users', ':id/groups/../../alice/.ssh'), ('Users', ':id/Users/alice'),
                      ('Users', ':id/home/alice'), ('Users', r':id/C:\Users\alice')]
-            for index, (root, segment) in enumerate(homes):
+            expressions = [f'`/{root}/{segment}`' for root, segment in homes]
+            expressions.extend([
+                f"'{users}:id' + '/../alice/.ssh'",
+                f'`{users}${{id}} /../alice/.ssh`',
+                f'`{linux}${{name}}\t/../alice/.ssh`',
+                f"'{users}:id%20/../alice/.ssh'",
+                f'"{users}:id/.' + '\\\n' + './alice/.ssh"',
+                f'`{users}${{id}}/` + "../alice/.ssh"',
+                f"'{linux}:name/' + '..' + '/alice/.ssh'",
+                f"('{users}:id') + '/../alice/.ssh'",
+                f"'{users}:id' /* join */ + '/../alice/.ssh'",
+                f"'{users}:id'\n + '/../alice/.ssh'",
+                f'`{users}${{id}}\n/../alice/.ssh`',
+                f"'{linux}:n%20/%2e%2e/alice/.ssh'",
+                f"join('{users}:id', '/../alice/.ssh')",
+                f"join('{linux}:name',\n '../alice/.ssh')",
+            ])
+            for index, expression in enumerate(expressions):
                 # An exempt route in the same file cannot mask a real home.
-                self.write(f'src/paths/{index}.ts', f'export const route = `/{root}/:id`;\n'
-                           f'export const home = `/{root}/{segment}`;\n')
+                self.write(f'src/paths/{index}.ts', f'export const route = `{users}:id`;\n'
+                           f'export const home = {expression};\n')
             self.commit()
             self.commit()
             result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo),
@@ -235,7 +259,7 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertEqual(report['status'], 'FAIL')
             self.assertTrue(report['complete'])
-            for index in range(len(homes)):
+            for index in range(len(expressions)):
                 self.assertTrue(any(f['rule'] == 'hygiene.local-path' and f['path'] == f'src/paths/{index}.ts'
                                     and 'newly-public' in f['scopes'] for f in report['findings']))
 
