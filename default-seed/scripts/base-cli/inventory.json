@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g144aa3ff",
+  "cliVersion": "0.2.79",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1351,7 +1351,7 @@
     },
     "modules/d1-transport/index.mjs": {
       "source": "modules/d1-transport/index.mjs",
-      "sha256": "a8a79a0c2673536e221facd892e688000bfae71485d864b4fff9801eb7aaf4a9"
+      "sha256": "f3de81d8dc2726fca11d401a73edfad6a5f9efc42aa6cd3d63bd3b25be26d2a6"
     },
     "modules/delivery-producer/bindings.mjs": {
       "source": "modules/delivery-producer/bindings.mjs",
@@ -1919,15 +1919,19 @@
     },
     "modules/import-kit/src/d1/apply.ts": {
       "source": "modules/import-kit/src/d1/apply.ts",
-      "sha256": "68ef23214fa11ca8fed729e4ef38661be5a7d3d14415c04cd6ab7d271839ce52"
+      "sha256": "a5c73e9fc45d03d1fabb02796e7154dc3e0f903d04578ddc7babad4aad66d76a"
+    },
+    "modules/import-kit/src/d1/atomic-prefix.ts": {
+      "source": "modules/import-kit/src/d1/atomic-prefix.ts",
+      "sha256": "eb558b7887fd51cf9d84d0f6984e93646ac5c04b67417f9a2002da7737a66b10"
     },
     "modules/import-kit/src/d1/budget.ts": {
       "source": "modules/import-kit/src/d1/budget.ts",
-      "sha256": "b555798bf820bafbbe1e1162f8fb4432dcd9f7037304f0fe63aa5cd12443410b"
+      "sha256": "1c9b901688227f2dddfd341e959f324ad0762c5e9df2154c0a5334bf86b4fab4"
     },
     "modules/import-kit/src/d1/compressed-plan.ts": {
       "source": "modules/import-kit/src/d1/compressed-plan.ts",
-      "sha256": "b96a798a51902178361933ac2509a7ccb549c932a778a7c3662b604f3b7a1430"
+      "sha256": "c99ab903f40fd0a8b1ed722adfa9a072610ca369f21007d86e372fddd15c2812"
     },
     "modules/import-kit/src/d1/creation.ts": {
       "source": "modules/import-kit/src/d1/creation.ts",
@@ -1943,7 +1947,7 @@
     },
     "modules/import-kit/src/d1/database.ts": {
       "source": "modules/import-kit/src/d1/database.ts",
-      "sha256": "7e599f922d698b20b9d60ed4ddb32e034bc3f7d5721b215324765732e39eedfa"
+      "sha256": "b082fc258c00f02913787363da88b996b8e47a6fd2af094d2121673c2bb9d4e0"
     },
     "modules/import-kit/src/d1/entry-locator.ts": {
       "source": "modules/import-kit/src/d1/entry-locator.ts",
@@ -2079,7 +2083,7 @@
     },
     "modules/import-kit/src/d1/jobs.ts": {
       "source": "modules/import-kit/src/d1/jobs.ts",
-      "sha256": "854eb6c1f81bd86e6bbb2d494ca4b2cf3d7944740360fb9d31b40c9c2bc34dd1"
+      "sha256": "16829dafad31d6a6efcc538ceeb3f2f75f18f9b8f6d6bf7206ca9447cd1dd14f"
     },
     "modules/import-kit/src/d1/native-set.ts": {
       "source": "modules/import-kit/src/d1/native-set.ts",
@@ -2139,7 +2143,7 @@
     },
     "modules/import-kit/src/d1/plans.ts": {
       "source": "modules/import-kit/src/d1/plans.ts",
-      "sha256": "8ec95804aae78302dab61ee474c019ffc12c2b4c717cc0edb94bb635f482c267"
+      "sha256": "3338241f200ebf1921e133030c61372e397b37f38322b13880b7bfa7d0363312"
     },
     "modules/import-kit/src/d1/preparation-fingerprint.ts": {
       "source": "modules/import-kit/src/d1/preparation-fingerprint.ts",
@@ -2444,6 +2448,10 @@
     "modules/import-kit/src/d1/undo-types.ts": {
       "source": "modules/import-kit/src/d1/undo-types.ts",
       "sha256": "7fca5fc80bd8d73e04009a8237e5e6e02c5c1edf074aa3e38447bd78200bba6e"
+    },
+    "modules/import-kit/src/d1/verified-plan.ts": {
+      "source": "modules/import-kit/src/d1/verified-plan.ts",
+      "sha256": "182e14d710ad7aeb869d7c437023c5481d665165b4f632570f364646f7e52e9c"
     },
     "modules/import-kit/src/journal/authority.ts": {
       "source": "modules/import-kit/src/journal/authority.ts",
