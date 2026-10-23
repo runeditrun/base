@@ -1,4 +1,4 @@
-import { validateAiPlan, validateAiDeployment } from './ai.mjs';
+import { planNames } from './ai.mjs';
 import { readinessWindow, readinessAPI } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
@@ -20,8 +20,8 @@ import { verifyHealth } from './health.mjs';
  * `locked`: the caller holds the install's deploy lock (owner mode), so migrate may retry a
  * claim on bytes a reviewed rewrite replaced. */
 export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,repeatOnly=false,createResources=!previousReceipt,uploadWithoutReceipt=false,onReceipt,onHealth,readiness={},env={},fetch=globalThis.fetch,healthOptions={},declaredSecrets=plan.secrets,locked=false}) {
-  validatePlan(plan); validateAiPlan(plan); validateArtifact(artifact);
-  validateAiDeployment(plan,api.accountId,artifact.source.sha);
+  // The plan's runtime names, paired with this account and artifact, before any provider call.
+  validatePlan(plan); const runtime = planNames(plan,{accountId:api.accountId,sourceSha:artifact.source?.sha}); validateArtifact(artifact);
   await verifyServiceGrants(api, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
   const existing = await activeWorker(api,plan.worker);
@@ -29,12 +29,12 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,r
   // detecting schedules outside this plan. Check again at trigger reconciliation.
   if (existing) await checkCronOwnership(api,plan);
   // Resolve missing secrets before resource writes. Existing opaque values are retained unchanged.
-  const secrets = await secretBindings(api,plan.worker,plan,env,Boolean(existing));
+  const secrets = await secretBindings(api,plan.worker,plan,env,Boolean(existing),runtime);
   const resources = await reconcileResources(api,plan,{create:createResources});
   const baseConfig = renderConfig(plan,resources,api.accountId,artifact.source.sha,'',artifact.main,artifact.assets.length > 0);
   const fingerprint = hash({plan:{...plan,secrets:declaredSecrets},config:baseConfig,source:artifact.source,modules:artifact.modules.map(({path,sha256}) => ({path,sha256})),assets:artifact.assets.map(({path,sha256}) => ({path,sha256}))});
   const config = renderConfig(plan,resources,api.accountId,artifact.source.sha,fingerprint,artifact.main,artifact.assets.length > 0);
-  const bindings = bindingsFor(config,resources,plan);
+  const bindings = bindingsFor(config,resources,plan,runtime);
   const namespaces = await durableNamespaces(api,plan);
   const migration = durableMigration(namespaces,existing);
   const priorFingerprint = existing?.settings.bindings.find(x => x.type === 'plain_text' && x.name === 'RER_DEPLOY_FINGERPRINT')?.text;

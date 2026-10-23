@@ -109,8 +109,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
     return { bindings, present: Boolean(options.setSecret), deployed: false };
    }
    store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
-   await keepInstallationKey({ root, environment, declaration, env, generated });
-   deployed = await owner('deploy', [], env, { notice: line => store.report(line), onCreated: resource => created.push(redaction.redact(resource)) });
+   // The first key is saved once the deploy's own refusals have passed, before anything reaches the provider.
+   deployed = await owner('deploy', [], env, { notice: line => store.report(line), onCreated: resource => created.push(redaction.redact(resource)), beforeWrite: () => keepInstallationKey({ root, environment, declaration, env, generated }) });
    // A generated value the kit did not send stays unknown: the Worker kept its own.
    const sent = supplied.filter(name => deployed.sentSecrets.includes(name)), keptSent = [...generated, ...reused].filter(name => sent.includes(name));
    await keepSecrets({ root, environment, kept, env, generated: generated.filter(name => sent.includes(name)), reused: reused.filter(name => sent.includes(name)), report: line => store.report(line) });

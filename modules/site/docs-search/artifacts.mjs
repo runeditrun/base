@@ -3,6 +3,7 @@ import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { buildSearchIndex } from './index-build.mjs';
+import { DENY, admit, configBindings } from '../../ai/native/names.mjs';
 
 // The seed owns its build toolchain; rer remains dependency-free for offline launch.
 const { build } = createRequire(resolve('package.json'))('esbuild');
@@ -48,6 +49,8 @@ export async function buildSearchArtifacts({ corpus, assets, output, previousUrl
     ...(accountId ? { account_id: accountId } : {}), workers_dev: false,
     assets: { directory: relative(resolve(output), resolve(assets)), binding: 'ASSETS', run_worker_first: true, html_handling: 'auto-trailing-slash', not_found_handling: '404-page' },
     ai: { binding: 'AI', remote: true } };
+  // Its fixed bindings pass the runtime names like every other configuration.
+  admit(DENY, configBindings(configuration));
   await writeFile(resolve(output, 'wrangler.json'), `${JSON.stringify(configuration, null, 2)}\n`);
   console.log(`Docs search: total=${counts.total} reused=${counts.reused} embedded=${counts.embedded} bytes=${Buffer.byteLength(bytes)}`);
   return { index, counts };

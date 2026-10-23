@@ -3,7 +3,7 @@ import { extname } from 'node:path';
 import { assert, hash, hexId, uuid } from './validation.mjs';
 import { moduleType, assetType } from './artifact.mjs';
 import { RUN_WORKER_FIRST } from './render.mjs';
-import { refuseAiNames } from '../ai/native/names.mjs';
+import { admit, emit, projectionOf } from '../ai/native/names.mjs';
 
 export async function activeWorker(api, worker) {
   let settings;
@@ -43,12 +43,13 @@ export function durableMigration(namespaces, current) {
   const old = current?.settings.migration_tag ?? '';
   return {old_tag:old,new_tag:`rer-${hash({old,classes:missing.map(x => x.className)}).slice(0,24)}`,new_sqlite_classes:missing.map(x => x.className)};
 }
-export async function secretBindings(api, worker, plan, env, exists) {
+/** The upload's secret bindings, emitted through the plan's runtime names (`runtime`). */
+export async function secretBindings(api, worker, plan, env, exists, runtime) {
   const present = exists ? await api.request(`/workers/scripts/${worker}/secrets`) : [];
   assert(Array.isArray(present) && present.every(x => typeof x.name === 'string' && x.type === 'secret_text'),'invalid-secret-list');
   const bindings = []; const names = present.map(x => x.name);
-  // The upload inherits declared secrets and keeps every other one the Worker holds.
-  refuseAiNames({ai:plan.ai !== undefined,held:names});
+  // The upload inherits declared secrets and keeps every other one the Worker holds: all pass the projection.
+  admit(runtime,present);
   const supplied = item => typeof env[item.environment] === 'string' && env[item.environment].trim();
   // An optional secret neither held nor supplied stays unbound; the app treats it as not connected.
   const unset = plan.secrets.filter(item => item.optional && !names.includes(item.binding) && !supplied(item)).map(item => item.binding);
@@ -65,7 +66,7 @@ export async function secretBindings(api, worker, plan, env, exists) {
       bindings.push({type:'secret_text',name:item.binding,text:env[item.environment]});
     }
   }
-  return {bindings,names,unset,missing:plan.secrets.filter(x => !names.includes(x.binding) && !unset.includes(x.binding)).map(x => x.binding)};
+  return {bindings:emit(runtime,bindings),names,unset,missing:plan.secrets.filter(x => !names.includes(x.binding) && !unset.includes(x.binding)).map(x => x.binding)};
 }
 export async function uploadAssets(api, worker, files) {
   const manifest = {}; const byHash = new Map();
@@ -93,9 +94,12 @@ export async function uploadAssets(api, worker, files) {
   assert(typeof completion === 'string' && completion,'incomplete-asset-upload');
   return completion;
 }
+/** Upload and deploy the Worker. Its metadata bindings are emitted through the runtime names the
+ * rendered `bindings` came through; any other list admits no reserved name. Kept secrets were
+ * admitted when `secretBindings` read them. */
 export async function uploadWorker(api, {plan,artifact,bindings,secrets,migration,fingerprint}) {
   const data = new FormData();
-  const metadata = {main_module:artifact.main,compatibility_date:plan.compatibilityDate,compatibility_flags:plan.compatibilityFlags ?? [],bindings:[...bindings,...secrets.bindings],keep_bindings:['secret_text'],annotations:{'workers/message':`rer-deploy:${fingerprint}`}};
+  const metadata = {main_module:artifact.main,compatibility_date:plan.compatibilityDate,compatibility_flags:plan.compatibilityFlags ?? [],bindings:emit(projectionOf(bindings),[...bindings,...secrets.bindings]),keep_bindings:['secret_text'],annotations:{'workers/message':`rer-deploy:${fingerprint}`}};
   if (migration) metadata.migrations = migration;
   if (artifact.assets.length) { metadata.assets = {jwt:await uploadAssets(api,plan.worker,artifact.assets),config:{run_worker_first:RUN_WORKER_FIRST}}; }
   data.set('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));

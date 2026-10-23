@@ -1,11 +1,15 @@
 import { parseCron } from './cron.mjs';
+import { objectClass } from './runtime.mjs';
+import { DENY, admit, configBindings } from '../../ai/native/names.mjs';
+export { hashedAsset, HASHED_ASSET, objectClass } from './runtime.mjs';
 
-export const RUNTIME_FILES = ['config', 'worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'r2-store', 'queues', 'resources', 'cron', 'bridge', 'alarms'];
-// Hashed build output: served immutable, and what the start page may prefetch.
-export const hashedAsset = (assetsDir = 'assets') => new RegExp(`^/${assetsDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/.*-[\\w-]{8,}\\.[\\w]+$`);
-export const HASHED_ASSET = hashedAsset();
+export const RUNTIME_FILES = ['runtime', 'worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'r2-store', 'queues', 'resources', 'cron', 'bridge', 'alarms'];
 export const ISOLATE_FILES = ['bindings', 'namespace', 'r2-client', 'd1', 'sql', 'seed-object'];
+/** The bindings a Loader demo installs in each visitor's isolate. Every name the built
+ * configuration declares, the assets binding included, passes the runtime names first:
+ * hosted demos have no approved AI path. */
 export function nativeBindings(config) {
+  admit(DENY, configBindings(config));
   for (const kind of ['kv_namespaces', 'services', 'workflows', 'ai', 'vectorize', 'hyperdrive', 'analytics_engine_datasets', 'browser', 'images', 'send_email', 'dispatch_namespaces', 'mtls_certificates', 'pipelines', 'secrets_store_secrets', 'unsafe', 'vpc_services', 'vpc_networks', 'ratelimits', 'worker_loaders', 'containers', 'ai_search_namespaces', 'ai_search', 'agent_memory', 'connect', 'artifacts', 'unsafe_hello_world', 'flagship', 'logfwdr', 'version_metadata']) {
     const value = config[kind];
     if (!value || (Array.isArray(value) && !value.length)) continue;
@@ -32,7 +36,5 @@ export function nativeBindings(config) {
   return { databases, buckets, objects, queues, assets: config.assets?.binding ?? 'ASSETS' };
 }
 
-// Export one wrapper per binding, including when several bindings share a class.
-export const objectClass = binding => `RerSeed_${binding}`;
 export const objectExports = bindings => (bindings.objects.length ? "\nimport { seedObject } from './seed-object.js';" : '') + bindings.objects.map(({ name, class_name }) =>
   `\nexport const ${objectClass(name)} = seedObject(application[${JSON.stringify(class_name)}], ${JSON.stringify(name)});`).join('');

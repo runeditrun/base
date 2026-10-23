@@ -45,7 +45,8 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
     const remaining = new Set([...(state.owned.worker ? [`worker:${target.worker}`] : []), ...KINDS.flatMap(kind => Object.keys(state.owned[kind]).map(name => `${kind}:${name}`))]);
     const removed = [], failed = [];
     try {
-      if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await writeOwnerState(statePath, state);
+      // Removal deletes the Worker: it keeps serving nothing, so no runtime names apply.
+      if (await settlePendingSecret(api, target.worker, state, {preflight:true, keep:null})) await writeOwnerState(statePath, state);
       const owned = KINDS.flatMap(kind => Object.entries(state.owned[kind]).map(([name, entry]) => ({kind, name, entry})));
       assert(state.owned.worker || owned.length, 'nothing-to-remove');
       // Preflight, read-only.

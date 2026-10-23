@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { assert, hash, resourceName } from '../deploy-kit/validation.mjs';
 import { ownerWorkerName } from '../deploy-kit/owner.mjs';
 import { siteDeclaration } from '../deploy-kit/site.mjs';
+import { DENY, admit } from '../ai/native/names.mjs';
 
 // Native Loader front, admission and visitor session support.
 export const DEMO_FILES = ['worker.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'page-style.mjs', 'theme-script.mjs', 'start-script.mjs', 'diagnostics.mjs', 'operator.mjs', 'measurement.mjs'];
@@ -24,6 +25,8 @@ export function demoDeclaration(value, originVar) {
 /** The demo Worker's name and its Wrangler configuration; no provider request. */
 export function demoPlan({ project, environment, compatibilityDate, originVar, hostVariables = [], declaration, turnstileSiteKey }) {
   assert(/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate ?? '') && /^[A-Z][A-Z0-9_]{0,63}$/.test(originVar ?? ''), 'invalid-plan');
+  // Each visitor's isolate binds its origin under this name (native/visitor.mjs).
+  admit(DENY, [{ type: 'var', name: originVar }]);
   const { domain, name, maxInstances, ownerEmail, settings } = demoDeclaration(declaration, originVar);
   // Keep the historical container name in the ownership hash for released hosts.
   const worker = `${ownerWorkerName(project, environment)}--demo`, hostname = `demo.${domain}`, container = worker.replace(/-+/g, '-');

@@ -1,4 +1,5 @@
 import { assert, hash } from './validation.mjs';
+import { DENY, admit } from '../ai/native/names.mjs';
 
 /** Only the immutable Base docs-search bundle may extend the site Worker. */
 export function siteRuntime(runtime) {
@@ -25,6 +26,7 @@ export async function verifySiteRuntime(api, worker, versionId, runtime, module)
   const expected = siteRuntimeBindings(runtime);
   if (version?.id !== versionId || !Array.isArray(bindings) || bindings.length !== expected.length
     || expected.some(binding => bindings.filter(row => row?.name === binding.name && row.type === binding.type).length !== 1)) throw replaced();
+  admit(DENY, bindings);
   const content = await api.workerContent(worker, versionId);
   const parts = [...content.parts];
   if (content.entry !== module || parts.length !== 1 || parts[0][0] !== module

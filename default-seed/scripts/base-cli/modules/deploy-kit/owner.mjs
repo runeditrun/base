@@ -1,4 +1,5 @@
-import { ownerAi, validateAiPlan, validateAiDeployment } from './ai.mjs';
+import { ownerAi, planNames, recordedNames } from './ai.mjs';
+import { admit } from '../ai/native/names.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
@@ -158,7 +159,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
     crons:[...(declaration.crons ?? [])],vars,
     // Only declarations using these add the keys, so earlier plans and fingerprints are unchanged.
     ...(services.length ? {services} : {}),...(declaration.workersDev === false ? {workersDev:false} : {})});
-  validateAiPlan(plan);
+  planNames(plan);
   return plan;
 }
 function assertOwnerNames(target, plan) {
@@ -199,6 +200,12 @@ export async function writeOwnerState(path, state) {
   await writeFile(temporary,JSON.stringify(state,null,2)+'\n',{flag:'wx',mode:0o600});
   await rename(temporary,path);
 }
+/** The secrets a pending change leaves on the Worker once it settles: before an entry locks, its
+ * runtime names admit them, so a refusal leaves the intent and the receipt untouched. */
+export const pendingSecrets = state => state.receipt && state.pendingSecret?.present ? state.pendingSecret.bindings.map(name => ({type:'secret_text',name})) : [];
+/** The bindings a live Worker keeps serving: all of them, or its secrets when a fresh upload
+ * replaces everything else. */
+export const servedBindings = (live, secretsOnly = false) => (live?.settings?.bindings ?? []).filter(row => !secretsOnly || row?.type === 'secret_text');
 export const resourceId = (kind, row) => ({d1:row.uuid,r2:row.creation_date,kv:row.id,queues:row.queue_id})[kind];
 
 export function checkResourceIdentity(kind, name, row, entry) {
@@ -265,10 +272,14 @@ export function recordSecretChange(state, current, {bindings, present}) {
  * exact script and build fingerprint, with the other secret names unchanged: adopt its version. A confirming PUT also records its
  * own starting version before it writes; its immediate successor can be recovered by the
  * same checks. A several-secret copy must also carry its marker; one uploaded but never deployed
- * is deployed by `deployCopy` when given. Anything later is left to the identity check, which refuses it. */
-export async function settlePendingSecret(api, worker, state, {preflight = false, observe, confirm, deployCopy} = {}) {
+ * is deployed by `deployCopy` when given. Anything later is left to the identity check, which refuses it.
+ * `keep(live)` admits what the Worker serves through the caller's runtime names before anything
+ * is adopted or deployed; only removal, which deletes the Worker, passes null. */
+export async function settlePendingSecret(api, worker, state, {preflight = false, observe, confirm, deployCopy, keep} = {}) {
+  assert(keep !== undefined, 'runtime-names-unprojected');
   if (!state.pendingSecret || !state.receipt) return false;
   const live = await activeWorker(api, worker);
+  keep?.(live);
   if (sameDeployment(live, state.receipt.provider)) {
     // Both deployment and newest version must corroborate an unapplied write.
     // A stale deployment alone must not erase an accepted but unsettled intent.
@@ -276,7 +287,7 @@ export async function settlePendingSecret(api, worker, state, {preflight = false
     const listed = Array.isArray(versions) && versions.every(item => uuid(item?.id)) && new Set(versions.map(item => item.id)).size === versions.length;
     const unchanged = listed && versions[0]?.id === live.versionId;
     const copy = listed && !unchanged && deployCopy ? await undeployedCopy(api, worker, state, versions) : null;
-    if (copy) { await deployCopy(copy); return settlePendingSecret(api, worker, state, {preflight, observe, confirm}); }
+    if (copy) { await deployCopy(copy); return settlePendingSecret(api, worker, state, {preflight, observe, confirm, keep}); }
     observe?.(unchanged ? live : null);
     if (!preflight || !unchanged) return false;
     delete state.pendingSecret;
@@ -306,12 +317,20 @@ export async function settlePendingSecret(api, worker, state, {preflight = false
   recordSecretChange(state, live, state.pendingSecret);
   return true;
 }
-/** Settle a pending secret change under the state lock, before a plan reads the retired list. */
-export async function settleOwnerState({api: provider, target, statePath}) {
+/** Settle a pending secret change under the state lock, before a plan reads the retired list.
+ * `runtime`: the settling entry's runtime names (its plan's; by default the recorded deployment's).
+ * The change's secrets pass them before the lock and again under it, and what the Worker serves
+ * (`secretsOnly`: its secrets, for a deploy that replaces everything else) before it is adopted. */
+export async function settleOwnerState({api: provider, target, statePath, runtime, secretsOnly = false}) {
   const api = withScopeHints(provider);
+  const projection = state => runtime ?? recordedNames(state.receipt, target);
+  const recorded = await readOwnerState(statePath, target);
+  admit(projection(recorded), pendingSecrets(recorded));
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
-    if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await writeOwnerState(statePath, state);
+    const current = projection(state);
+    admit(current, pendingSecrets(state));
+    if (await settlePendingSecret(api, target.worker, state, {preflight:true, keep:live => admit(current, servedBindings(live, secretsOnly))})) await writeOwnerState(statePath, state);
     return state;
   });
 }
@@ -322,8 +341,9 @@ const carriesUpload = (live, fingerprint) => deployedFingerprint(live?.settings)
 /** A completed receipt or the exact identity of an interrupted successful upload proves ownership.
  * An upload whose response or readback was lost is this deploy's own when the live version carries
  * the fingerprint saved just before its PUT: rer records its ids, as a completed readback would. */
-async function checkWorkerIdentity(api, plan, state, save) {
+async function checkWorkerIdentity(api, plan, state, save, keep) {
   const live = await activeWorker(api, plan.worker);
+  keep(live);
   const pending = state.pendingUpload;
   if (pending && !pending.provider && carriesUpload(live, pending.fingerprint)) {
     pending.provider = {versionId:live.versionId,deploymentId:live.deploymentId,etag:live.etag};
@@ -335,14 +355,14 @@ async function checkWorkerIdentity(api, plan, state, save) {
   if (!sameDeployment(live, expected)) throw refuse('owned-resource-replaced','worker',plan.worker);
   return live;
 }
-async function checkOwnedWorker(api, plan, state, save) {
+async function checkOwnedWorker(api, plan, state, save, keep) {
   const settings = await workerSettings(api, plan.worker);
   if (settings === null) {
     if (state.owned.worker?.status === 'created') throw refuse('owned-resource-missing','worker',plan.worker);
     return null;
   }
   if (!state.owned.worker) throw refuse('resource-name-collision','worker',plan.worker);
-  return checkWorkerIdentity(api, plan, state, save);
+  return checkWorkerIdentity(api, plan, state, save, keep);
 }
 
 /** One deploy at a time per state file: an exclusive lock file for the whole run. */
@@ -360,28 +380,34 @@ export async function withStateLock(path, run) {
 }
 
 /** Find or create every declared resource under the owner's account, migrate, upload and check health.
- * Ownership preflight precedes provider writes. A re-run of the same build writes nothing. */
+ * Ownership preflight precedes provider writes. A re-run of the same build writes nothing.
+ * The plan's runtime names, paired with this account and artifact, and the secrets a pending
+ * change would leave are admitted before the lock; under it, the secrets the Worker holds are
+ * admitted before any state write, settlement or creation. */
 export async function ownerDeploy({api: provider, target, plan, artifact, statePath, env = {}, fetch = globalThis.fetch, healthOptions = {}, readiness = {}, settle = {}, declaredSecrets = plan.secrets}) {
   assert(typeof statePath === 'string' && statePath.length, 'missing-owner-state-path');
   const api = withSettledLists(withScopeHints(provider),settle);
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
-  validatePlan(plan); validateAiPlan(plan); assertOwnerNames(target, plan);
-  validateAiDeployment(plan,api.accountId,artifact.source?.sha);
+  validatePlan(plan); const runtime = planNames(plan,{accountId:api.accountId,sourceSha:artifact.source?.sha}); assertOwnerNames(target, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
-  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets}));
+  admit(runtime, pendingSecrets(await readOwnerState(statePath, target)));
+  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, runtime}));
 }
-async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets}) {
+async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, runtime}) {
   const state = await readOwnerState(statePath, target);
+  admit(runtime, pendingSecrets(state));
   const save = () => writeOwnerState(statePath, state);
-  if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
+  // A fresh upload keeps every secret the Worker holds.
+  const keep = live => admit(runtime, servedBindings(live, true));
+  if (await settlePendingSecret(api, target.worker, state, {preflight:true, keep})) await save();
   await checkServiceWorkers(api, plan);
-  const priorWorker = await checkOwnedWorker(api, plan, state, save);
+  const priorWorker = await checkOwnedWorker(api, plan, state, save, keep);
   assert(!state.pendingSecret, 'secret-change-unsettled');
   const exists = priorWorker !== null;
   const create = await ownedResourcesToCreate(api, plan, state);
   if (exists) await checkCronOwnership(api, plan);
   // The declared secrets this run uploads; every other one is inherited unchanged.
-  const {missing:sentSecrets,unset:unsetSecrets} = await secretBindings(api, plan.worker, plan, env, exists);
+  const {missing:sentSecrets,unset:unsetSecrets} = await secretBindings(api, plan.worker, plan, env, exists, runtime);
   // Record intent before each create. A failed or lost response leaves it pending:
   // absent on resume means create again; present means an uncertain outcome to inspect.
   for (const {kind,item} of create) {
@@ -404,7 +430,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     const sending = path === upload && options?.method === 'PUT';
     if (sending) {
       await checkSavedResourceIdentities(api, state);
-      const current = await checkOwnedWorker(api, plan, state, save);
+      const current = await checkOwnedWorker(api, plan, state, save, keep);
       if (!sameDeployment(priorWorker,current)) throw refuse('owned-resource-replaced','worker',plan.worker);
       state.pendingUpload = {fingerprint:await uploadFingerprint(options.body)}; await save();
     }
@@ -428,14 +454,13 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   return {receipt, created:create.map(({kind,item}) => `${kind}:${item.name}`), sentSecrets, unsetSecrets, freshUpload:!exists && receipt.changed};
 }
 
-/** Independent read-only health of the last owner deployment recorded in the state file. */
+/** Independent read-only health of the last owner deployment recorded in the state file.
+ * verifyHealth pairs the plan's runtime names with this account and that deployment's source. */
 export async function ownerHealth({api: provider, target, plan, statePath, fetch = globalThis.fetch, healthOptions = {}}) {
   const api = withSettledLists(withScopeHints(provider));
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
-  validatePlan(plan); validateAiPlan(plan); assertOwnerNames(target, plan);
+  validatePlan(plan); planNames(plan); assertOwnerNames(target, plan);
   const state = await readOwnerState(statePath, target);
   assert(state.receipt, 'missing-owner-receipt');
-  // Health reads the recorded deployment: an approval must be this account's and pair with its source.
-  validateAiDeployment(plan,api.accountId,state.receipt.source?.sha);
   return verifyHealth({...healthOptions, api, plan, receipt:state.receipt, fetch});
 }

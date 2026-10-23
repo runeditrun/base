@@ -14,7 +14,8 @@ export async function keepInstallationKey({ root, environment, declaration, env,
  if (env[secret.environment]) await saveSecrets(root, environment, { INSTALLATION_KEY: env[secret.environment] });
 }
 
-/** Persist both keys before publishing either; a retry always uses this exact pair. */
+/** Persist both keys before publishing either; a retry always uses this exact pair. The first
+ * secret change saves them once its own refusals have passed, before its first write. */
 export async function rotateInstallationKey({ root, environment, declaration, env, owner, state, report, addSecrets }) {
  const current = declaration.secrets?.find(item => item.binding === 'INSTALLATION_KEY');
  const previous = declaration.secrets?.find(item => item.binding === 'INSTALLATION_KEY_PREVIOUS');
@@ -27,9 +28,9 @@ export async function rotateInstallationKey({ root, environment, declaration, en
  const retired = await retiredInstallationKeys(saved);
  retired.set(await installationKeyId(pair.INSTALLATION_KEY_PREVIOUS), pair.INSTALLATION_KEY_PREVIOUS);
  addSecrets([...Object.values(pair), ...retired.values()]);
- await saveSecrets(root, environment, { ...pair, INSTALLATION_KEY_RETIRED: serializeRetired(retired) });
+ const save = () => saveSecrets(root, environment, { ...pair, INSTALLATION_KEY_RETIRED: serializeRetired(retired) });
  // Routine rotation must not revive envelopes from older retired eras.
- await resealAndRetire({root, environment, current, previous, pair, retired:new Map(), env, state, owner, report});
+ await resealAndRetire({root, environment, current, previous, pair, retired:new Map(), env, state, owner, report, save});
  report('Rotated INSTALLATION_KEY, resealed every dependency key, and removed INSTALLATION_KEY_PREVIOUS after verifying the owned Worker. Retired keys remain in private custody for older D1 restores.');
 }
 
@@ -43,8 +44,8 @@ export async function reopenInstallationKey({ root, environment, declaration, en
  if (saved.INSTALLATION_KEY_PREVIOUS && (saved.INSTALLATION_KEY_REOPEN !== kid || saved.INSTALLATION_KEY_PREVIOUS !== retired.get(kid))) throw refuse('Another installation key operation is unfinished. Resume its recorded rotation or reopen first.');
  const pair = { INSTALLATION_KEY: saved.INSTALLATION_KEY, INSTALLATION_KEY_PREVIOUS: retired.get(kid) };
  addSecrets([...Object.values(pair), ...retired.values()]);
- await saveSecrets(root, environment, {...pair, INSTALLATION_KEY_REOPEN:kid});
- await resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report});
+ const save = () => saveSecrets(root, environment, {...pair, INSTALLATION_KEY_REOPEN:kid});
+ await resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report, save});
  report(`Reopened retired installation key ${kid}, resealed and verified every dependency key with the current key, and removed INSTALLATION_KEY_PREVIOUS. Retired custody is retained.`);
 }
 
@@ -56,10 +57,10 @@ async function retiredInstallationKeys(saved) {
  catch { throw unavailable('Retired installation key custody is invalid. Restore the private deployment secrets file before rotating or reopening. Nothing was uploaded.'); }
 }
 
-async function resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report}) {
+async function resealAndRetire({root, environment, current, previous, pair, retired, env, state, owner, report, save}) {
  const values = { ...env, [current.environment]: pair.INSTALLATION_KEY, [previous.environment]: pair.INSTALLATION_KEY_PREVIOUS };
  const extra = state ? ['--state', state] : [];
- await owner('secret', ['--set', current.binding, '--set', previous.binding, ...extra], values);
+ await owner('secret', ['--set', current.binding, '--set', previous.binding, ...extra], values, {beforeWrite:save});
  await owner('rekey', extra, {...values, INSTALLATION_KEY_RETIRED:serializeRetired(retired)}, {notice:report});
  await owner('secret', ['--unset', previous.binding, ...extra], values);
  // The retired key stays private after its binding is read back absent.

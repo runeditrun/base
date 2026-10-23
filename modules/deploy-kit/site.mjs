@@ -7,6 +7,7 @@ import { readinessWindow, readinessAPI } from './readiness-window.mjs';
 import { uploadVersionId } from './uploaded-worker.mjs';
 import { ownedSiteVersion, waitForSiteDomains, waitForSiteUpload } from './site-readback.mjs';
 import { siteRuntime, siteRuntimeBindings } from './site-runtime.mjs';
+import { DENY, emit } from '../ai/native/names.mjs';
 export { servedVersion, siteReadbackSummary } from './site-readback.mjs';
 
 /* A seed's run site (run-<seed>.com): the folder `rer build --site` writes,
@@ -98,6 +99,8 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
   assert(typeof receiptPath === 'string' && receiptPath.length, 'missing-receipt-path');
   assert(plan?.module === SITE_MODULE && Array.isArray(files) && files.some(file => file.path === 'index.html'), 'invalid-site-assets');
   const runtime = siteRuntime(plan.runtime);
+  // The site Worker's fixed bindings pass the runtime names like every other upload.
+  const bindings = emit(DENY, siteRuntimeBindings(runtime));
   const fingerprint = siteFingerprint(plan, files);
   const zones = await api.zoneRequest(`/zones?name=${plan.domain}&account.id=${api.accountId}`);
   const zone = Array.isArray(zones) ? zones.find(row => row?.name === plan.domain && row.account?.id === api.accountId) : null;
@@ -113,7 +116,7 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
 
   const jwt = await uploadAssets(api, plan.worker, files);
   const body = new FormData();
-  body.set('metadata', new Blob([JSON.stringify({ main_module: SITE_MODULE, compatibility_date: plan.compatibilityDate, bindings: siteRuntimeBindings(runtime),
+  body.set('metadata', new Blob([JSON.stringify({ main_module: SITE_MODULE, compatibility_date: plan.compatibilityDate, bindings,
     assets: { jwt, config: { ...plan.assetsConfig, run_worker_first: true } }, annotations: { 'workers/message': `rer-site:${fingerprint}` } })], { type: 'application/json' }));
   body.set(SITE_MODULE, new Blob([runtime?.source ?? SITE_WORKER], { type: 'application/javascript+module' }), SITE_MODULE);
   const window = readiness.window ?? readinessWindow(readiness);

@@ -8,7 +8,7 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
-import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints } from './owner.mjs';
+import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, pendingSecrets } from './owner.mjs';
 import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
@@ -16,9 +16,11 @@ import { ownerSignin } from './owner-signin.mjs';
 import { ownerRekey } from './owner-rekey.mjs';
 import { refuseLocalModels } from './local-only.mjs';
 import { publicOrigin } from './public-origin.mjs';
-import { validateAiDeployment } from './ai.mjs';
-import { refuseAiNames } from '../ai/native/names.mjs';
+import { planNames, recordedNames } from './ai.mjs';
+import { DENY, admit } from '../ai/native/names.mjs';
 
+/** Every owner command; each one but removal admits its runtime names before any lock or write. */
+export const COMMANDS = Object.freeze(['deploy','dry-run','health','secret','remove','inspect','record-owner','signin','rekey']);
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
 const usage = 'usage: owner-cli.mjs deploy|dry-run|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
 
@@ -30,13 +32,15 @@ async function ownerArtifact(root, product, ai) {
   return packageBuild({root,source,runIdentity:{id:'0',attempt:'1'},productDirectory:product,ai});
 }
 
-/** Inputs: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, plus the secrets the declaration names on first deploy. */
-export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, propagation, settle, localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
+/** Inputs: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, plus the secrets the declaration names on first deploy.
+ * `beforeWrite` (deploy and secret): the caller's own local write (key custody), run once every
+ * refusal that precedes the lock has passed and before any state or provider write. */
+export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, propagation, settle, localOnlyKeys = [], notice = line => console.error(line), onCreated, beforeWrite = async () => {}} = {}) {
   let parsed;
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string',multiple:true},unset:{type:'string',multiple:true},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
   const {positionals:[command,...rest],values} = parsed;
-  if (!['deploy','dry-run','health','secret','remove','inspect','record-owner','signin','rekey'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (!COMMANDS.includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
   if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
   await refuseLocalModels(resolve(cwd));
@@ -85,31 +89,39 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${target.environment}.json`);
   // The recorded installation must be this account's before any lock, settlement or change.
   const recorded = await readOwnerState(statePath,target);
+  // Removal deletes the Worker and every resource it recorded: it keeps serving nothing.
   if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
-  if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice});
   if (command === 'secret') {
     // Every named secret is changed in one Worker version, or none is.
     const named = [...new Set(values.set ?? values.unset)], declared = Array.isArray(declaration.secrets) ? declaration.secrets : [];
     const undeclared = named.filter(binding => !declared.some(entry => entry?.binding === binding));
     if (undeclared.length) { const error = new Error('undeclared-secret'); error.resource = undeclared.map(binding => `secret:${binding}`).join(', '); throw error; }
-    // Setting binds a runtime name from its source; removing one never does.
-    if (values.set !== undefined) refuseAiNames({ai:declaration.ai !== undefined,secrets:named.map(binding => declared.find(entry => entry?.binding === binding))});
-    const changes = named.map(binding => ({binding, value:values.set === undefined ? undefined : env[declared.find(entry => entry?.binding === binding).environment]}));
-    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
+    const entries = named.map(binding => declared.find(entry => entry?.binding === binding));
+    // Setting binds a runtime name from its source; removing one never does. A declaration without ai sets no reserved name.
+    if (values.set !== undefined && declaration.ai === undefined) admit(DENY,entries.map(entry => ({type:'secret_text',name:entry.binding,environment:entry.environment})));
+    // ownerSecret admits the result through the recorded deployment's names before it locks.
+    const changes = entries.map(({binding,environment,optional}) => ({binding, environment, optional, value:values.set === undefined ? undefined : env[environment]}));
+    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,beforeWrite}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
   const unretired = ({retiredSecrets = []}) => retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
-  let plan;
+  let plan, runtime;
   if (['deploy','dry-run','health'].includes(command)) {
     // The current build's plan and approval are checked before settlement, which locks and may write state.
     artifact ??= await ownerArtifact(root,values.product,declaration.ai);
     plan = ownerPlan(target,unretired(recorded),artifact,{localOnlyKeys,env});
-    validateAiDeployment(plan,api.accountId,artifact.source.sha);
+    runtime = planNames(plan,{accountId:api.accountId,sourceSha:artifact.source.sha});
     // Health reads the recorded deployment, so the approval must pair with its source too.
-    if (command === 'health' && recorded.receipt) validateAiDeployment(plan,api.accountId,recorded.receipt.source?.sha);
+    if (command === 'health' && recorded.receipt) planNames(plan,{accountId:api.accountId,sourceSha:recorded.receipt.source?.sha});
   }
+  // Every other entry keeps the recorded deployment, whose own names apply.
+  else runtime = recordedNames(recorded.receipt,target);
+  // What an interrupted secret change would leave on the Worker passes those names before any lock or settlement.
+  admit(runtime,pendingSecrets(recorded));
+  if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice});
+  if (command === 'deploy') await beforeWrite();
   // A dry run only reads state: settling an interrupted change may write it.
-  const state = command === 'dry-run' ? recorded : await settleOwnerState({api,target,statePath});
+  const state = command === 'dry-run' ? recorded : await settleOwnerState({api,target,statePath,runtime,secretsOnly:command === 'deploy'});
   if (command === 'dry-run') assert(!state.pendingSecret, 'secret-change-unsettled');
   const {retiredSecrets = []} = state;
   // Settlement can retire or restore a declared secret; the plan follows the settled list.
@@ -138,7 +150,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   if (command === 'dry-run') {
     const checked = withScopeHints(api);
     const exists = await workerSettings(checked,target.worker) !== null;
-    const {unset} = await secretBindings(checked,target.worker,plan,env,exists);
+    const {unset} = await secretBindings(checked,target.worker,plan,env,exists,runtime);
     return {ok:true,dryRun:true,deployed:false,optionalUnset:unset};
   }
   if (command === 'health') {

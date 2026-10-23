@@ -9,7 +9,7 @@ import { checkBoundary } from './boundary.mjs';
 import { localDurableObjects } from './durable-objects.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 import { containerMigrationInventory } from './migration-inventory.mjs';
-import { checkImageVariables } from './image-variables.mjs';
+import { checkImageBindings, checkImageVariables } from './image-variables.mjs';
 import { refuseLocalEnvFiles } from '../deploy-kit/local-only.mjs';
 export async function buildContainer(root, options={}) {
  const previous=process.cwd();process.chdir(root);
@@ -63,11 +63,11 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  try { await refuseLocalEnvFiles(root,['dist']); }
  catch (error) { if (!error.resource) throw error; throw new Error(`The build output holds the local settings file ${error.resource}; a container image never carries one. Remove what copies it into dist/, then build again.`); }
  let workerConfig;
- if (engine === 'workerd') {
-  workerConfig = JSON.parse(await readFile(join(root,'dist/server/wrangler.json'),'utf8'));
-  localDurableObjects(workerConfig,outputExports.get(await realpath(resolve(root,'dist/server',workerConfig.main))));
- }
+ if (engine === 'workerd') workerConfig = JSON.parse(await readFile(join(root,'dist/server/wrangler.json'),'utf8'));
  else workerConfig = parseJsonc(await readFile(join(root,'wrangler.jsonc'),'utf8'));
+ // The runtime binds this configuration's names (worker-engine.mjs, node-engine.mjs).
+ checkImageBindings(workerConfig,require('wrangler').experimental_readRawConfig);
+ if (engine === 'workerd') localDurableObjects(workerConfig,outputExports.get(await realpath(resolve(root,'dist/server',workerConfig.main))));
  const serverEntry = engine === 'workerd' ? resolve(root,'dist/server',workerConfig.main) : resolve(root,'dist/server/index.mjs');
  if (!freshServerFiles.has(serverEntry)) throw new Error('Container server entry was not emitted by this build');
  await checkBoundary(root,{engine,cacheContract,entries:[serverEntry],emittedFiles:freshServerFiles,outputRoot:serverOutput});

@@ -2,13 +2,21 @@ import {readFile} from 'node:fs/promises';
 import {deliveryDeclarationSources} from '../../cli/delivery-declarations.mjs';
 import {sourcePath} from '../delivery-producer/migrations.mjs';
 import {usesManagedMail,validateMailSpec} from '../delivery-producer/mail.mjs';
-import {refuseAiNames} from '../ai/native/names.mjs';
+import {DENY,admit,configBindings} from '../ai/native/names.mjs';
 
-/** Built variables reach the container and hosted-demo runtimes by name: none may be a
- * reserved AI name. Admit only the managed-mail contract's public config through legacy
- * secret declarations. */
+/** Every binding a built configuration declares reaches the container and hosted-demo runtimes by
+ * name (vars, D1, R2, KV, queues, Durable Objects, assets and every other family): neither has an
+ * approved AI path, so none may be a reserved AI name. Checked before either build emits a package,
+ * on the configuration it emitted and, given Wrangler's `readRaw`, on the seed's own configuration
+ * that build came from, every environment included: a build may carry any declared binding forward. */
+export function checkImageBindings(config,readRaw) {
+ const source=config.userConfigPath??config.configPath,raw=readRaw&&typeof source==='string'?readRaw({config:source}).rawConfig:{};
+ admit(DENY,[config,...Object.values(config.env??{}),raw,...Object.values(raw.env??{})].flatMap(configBindings));
+}
+/** Built variables reach those runtimes by name: none may be a reserved AI name. Admit only the
+ * managed-mail contract's public config through legacy secret declarations. */
 export async function checkImageVariables(root,vars,secrets) {
- refuseAiNames({names:Object.keys(vars)});
+ checkImageBindings({vars});
  const overlaps=secrets.filter(secret=>Object.hasOwn(vars,secret.binding));
  if (!overlaps.length) return;
  const publicMail=new Set(),privateNames=new Set();

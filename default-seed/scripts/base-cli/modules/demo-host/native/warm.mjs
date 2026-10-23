@@ -2,7 +2,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { hashedAsset } from './config.mjs';
+import { hashedAsset } from './runtime.mjs';
 
 // The start page prefetches the console's hashed JS and CSS while the visitor
 // waits for the human check and sign-in, so each view's first visit finds its

@@ -8,7 +8,8 @@ import { reconcileResources, reconcileTriggers } from './resources.mjs';
 import { migrate } from './migrations.mjs';
 import { bindingsFor, verifyBindings } from './render.mjs';
 import { waitHealth } from './health-request.mjs';
-import { refuseAiNames } from '../ai/native/names.mjs';
+import { planNames } from './ai.mjs';
+import { admit } from '../ai/native/names.mjs';
 
 function healthError(message, code, lastResult) {
   const error = new Error(message); error.code = code; error.lastResult = lastResult; return error;
@@ -52,10 +53,13 @@ export async function waitForDeploymentHealth(url, {
 /** Authenticated provider readback, then the unauthenticated account-derived /health.
  * Without `readiness`, /health gets the single bounded window of waitForDeploymentHealth.
  * With `readiness` (deploy after an upload) it gets the recorded 90-second wait of health-request.mjs.
- * `asset`, a built file's path, must answer 200 after at most one transient replay. */
+ * `asset`, a built file's path, must answer 200 after at most one transient replay.
+ * Before any provider read, the plan's runtime names must pair with this account and with the
+ * recorded deployment's source; every live binding and secret is read back through them. */
 export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fetch,timeoutMs=30000,intervalMs=2000,now,sleep,readiness,asset}) {
   if (readiness?.window) api = readinessAPI(api, readiness.window);
   assert(receipt?.version === 1 && receipt.accountId === api.accountId && receipt.worker === plan.worker,'receipt-target-mismatch');
+  const runtime = planNames(plan,{accountId:api.accountId,sourceSha:receipt.source?.sha});
   await verifyServiceGrants(api, plan);
   const current = await activeWorker(api,plan.worker);
   assert(current && current.versionId === receipt.provider.versionId && current.deploymentId === receipt.provider.deploymentId && current.etag === receipt.provider.etag,'active-deployment-mismatch');
@@ -64,7 +68,7 @@ export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fe
   assert(origin === receipt.origin,'health-origin-mismatch');
   const resources = await reconcileResources(api,plan,{create:false});
   assert(stable(resources) === stable(receipt.resources),'resource-identity-drift');
-  verifyBindings(current.settings.bindings,bindingsFor(receipt.config,resources,plan));
+  verifyBindings(current.settings.bindings,bindingsFor(receipt.config,resources,plan,runtime));
   await reconcileTriggers(api,plan,resources,{mutate:false});
   const namespaces = await durableNamespaces(api,plan,{requireAll:true});
   assert(stable(namespaces) === stable(receipt.durableObjects),'durable-object-identity-drift');
@@ -73,7 +77,7 @@ export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fe
     assert(!readiness?.window || readiness.window.remaining() > 0, 'missing-deployed-secret');
     const secrets = await api.request(`/workers/scripts/${plan.worker}/secrets`);
     assert(Array.isArray(secrets) && secrets.every(row => typeof row?.name === 'string' && row.type === 'secret_text'), 'invalid-secret-list');
-    refuseAiNames({ai:plan.ai !== undefined,held:secrets.map(row => row.name)});
+    admit(runtime,secrets);
     if (plan.secrets.every(x => x.optional || secrets.some(y => y.name === x.binding && y.type === 'secret_text'))) break;
     assert(readiness?.freshUpload && readiness.window?.remaining() > 0, 'missing-deployed-secret');
     await readiness.window.pause();

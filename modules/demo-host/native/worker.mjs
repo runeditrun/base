@@ -1,6 +1,6 @@
 import front from '../worker.mjs';
 import { bundle } from './loader.mjs';
-import { HASHED_ASSET } from './config.mjs';
+import { HASHED_ASSET } from './runtime.mjs';
 export { HostBridge } from './bridge.mjs';
 export { DemoAssets, DemoEgress } from './loader.mjs';
 export { NativeDemo } from './visitor.mjs';

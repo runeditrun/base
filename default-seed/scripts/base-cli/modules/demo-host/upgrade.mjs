@@ -1,5 +1,6 @@
 import { demoInventory } from './remove.mjs';
 import { removeBucket } from './native/deploy-r2.mjs';
+import { DENY, admit, emit } from '../ai/native/names.mjs';
 
 // Keep the Worker and custom domains throughout the transition. Container apps
 // must go before deleting their backing class; Wrangler then applies the class
@@ -32,11 +33,10 @@ export async function upgradeDemo({ api, plan, report = () => {} }) {
     // The API checks the currently deployed bindings before class deletion.
     // Detach the retired binding first; inherit every other value by name,
     // including secrets, and retain the ownership annotation for a rerun.
-    const body = new FormData();
+    const body = new FormData(), kept = admit(DENY, found.settings.bindings.filter(binding => !(binding.type === 'durable_object_namespace' && binding.class_name === 'DemoContainer')));
     body.set('settings', new Blob([JSON.stringify({
       annotations: { 'workers/message': plan.record },
-      bindings: found.settings.bindings.filter(binding => !(binding.type === 'durable_object_namespace' && binding.class_name === 'DemoContainer'))
-        .map(binding => ({ name: binding.name, type: 'inherit' })),
+      bindings: emit(DENY, kept.map(binding => ({ name: binding.name, type: 'inherit' }))),
     })], { type: 'application/json' }));
     await api.request(`/workers/scripts/${plan.worker}/settings`, { method: 'PATCH', body });
   }

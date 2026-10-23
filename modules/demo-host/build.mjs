@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { containerMigrationInventory as demoMigrationInventory } from '../container/migration-inventory.mjs';
-import { checkImageVariables as checkBuildVariables } from '../container/image-variables.mjs';
+import { checkImageBindings, checkImageVariables as checkBuildVariables } from '../container/image-variables.mjs';
 import { nativeBindings } from './native/config.mjs';
 import { readMigrationRewrites, withRewrites } from '../deploy-kit/migrations.mjs';
 
@@ -30,6 +30,7 @@ export async function buildDemo(root, output, declaration) {
   const workerConfig = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'));
   const entry = await realpath(resolve(root, 'dist/server', workerConfig.main));
   const bindings = nativeBindings(workerConfig);
+  checkImageBindings(workerConfig, require('wrangler').experimental_readRawConfig);
   for (const binding of bindings.objects) if (!entryExports.get(entry)?.has(binding.class_name)) throw new Error(`Loader demo cannot bind ${binding.name}: missing Durable Object export ${binding.class_name}`);
   if (!emitted.has(entry)) throw new Error('Demo Worker entry was not emitted by this build');
   await checkBuildVariables(root, workerConfig.vars ?? {}, declaration.secrets ?? []);

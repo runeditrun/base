@@ -11,6 +11,7 @@ import { RUNTIME_FILES } from '../modules/demo-host/native/config.mjs';
 import { prepareNative } from '../modules/demo-host/native/prepare.mjs';
 import { TESTING_SECRET } from '../modules/demo-host/measurement.mjs';
 import { awaitCertificates } from '../modules/demo-host/certificate.mjs';
+import { DENY, admit, configBindings } from '../modules/ai/native/names.mjs';
 
 export async function nativeDemoCommand(project, options, store, signal, out, operation, app, plan) {
   const folder = join(project.root, '.rer/demo-host');
@@ -41,6 +42,8 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
     if (!/^[1-9][0-9]{2,6}$/.test(process.env.RER_NATIVE_TEST_TTL_MS)) throw invalid('RER_NATIVE_TEST_TTL_MS must be positive milliseconds');
     config.vars.NATIVE_TEST_TTL_MS = process.env.RER_NATIVE_TEST_TTL_MS;
   }
+  // The front Worker's own bindings pass the runtime names like every other upload.
+  admit(DENY, configBindings(config));
   await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   const summary = { worker: plan.worker, origin: plan.origin, mode: 'loader', digest: bundle.digest, modules: Object.keys(bundle.modules).length, minutes: 60, idleMinutes: 15 };
   if (options.dryRun) {
@@ -50,13 +53,15 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   }
   const required = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'];
   if (required.some(name => !process.env[name]?.trim())) throw missing(`${required.join(', ')} are required`);
-  const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
-  config.migrations = await upgradeDemo({ api, plan, report: line => store.report(line) });
-  await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   const testing = TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY);
   const measurement = testing ? process.env.RER_DEMO_MEASUREMENT_TOKEN || randomBytes(32).toString('base64url') : undefined;
   const secrets = { TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY, ...(measurement ? { RER_DEMO_MEASUREMENT_TOKEN: measurement } : {}),
     ...(process.env.RER_DEMO_OPERATOR_TOKEN ? { RER_DEMO_OPERATOR_TOKEN: process.env.RER_DEMO_OPERATOR_TOKEN } : {}) };
+  // So do its secrets, before the first provider write.
+  admit(DENY, Object.keys(secrets).map(name => ({ type: 'secret_text', name })));
+  const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
+  config.migrations = await upgradeDemo({ api, plan, report: line => store.report(line) });
+  await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   const secretFile = join(folder, '.secrets.json');
   await writeFile(secretFile, JSON.stringify(secrets), { mode: 0o600 });
   try {

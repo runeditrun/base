@@ -1,14 +1,15 @@
 import { assert, stable } from './validation.mjs';
+import { planNames } from './ai.mjs';
+import { admit, configBindings, emit, projectionOf } from '../ai/native/names.mjs';
 /** Every request reaches the Worker first, so its routing, origin admission and private-path
  * refusals decide what is served; the Worker serves built files from env.ASSETS itself.
  * `rer verify` serves the local build with this same setting (cli/hosted-output.mjs). */
 export const RUN_WORKER_FIRST = true;
+/** The Worker configuration a plan renders: every name in it passes the plan's runtime names,
+ * whose approval must be this account's and this source's. */
 export function renderConfig(plan, resources, accountId, sourceSha, fingerprint, main, hasAssets = false) {
-  if (plan.ai) {
-    assert(plan.vars.RER_AI_ACCOUNT_ID === accountId,'ai-installation-account-mismatch');
-    assert(plan.ai.authority.sourceSha === sourceSha,'ai-source-approval-mismatch');
-  }
-  return { ...(plan.ai ? {ai:{binding:plan.ai.request.binding}} : {}),name:plan.worker, account_id:accountId, main, compatibility_date:plan.compatibilityDate, compatibility_flags:plan.compatibilityFlags ?? [], workers_dev:plan.workersDev !== false,
+  const runtime = planNames(plan,{accountId,sourceSha});
+  const config = { ...(plan.ai ? {ai:{binding:plan.ai.request.binding}} : {}),name:plan.worker, account_id:accountId, main, compatibility_date:plan.compatibilityDate, compatibility_flags:plan.compatibilityFlags ?? [], workers_dev:plan.workersDev !== false,
     ...(hasAssets ? {assets:{directory:'__static',binding:'ASSETS',run_worker_first:RUN_WORKER_FIRST}} : {}),
     vars:{...plan.vars,RER_DEPLOY_SOURCE:sourceSha,RER_DEPLOY_FINGERPRINT:fingerprint}, version_metadata:{binding:'RER_VERSION'},
     d1_databases:resources.d1.map(x => ({binding:x.binding,database_name:x.name,database_id:x.id})), r2_buckets:resources.r2.map(x => ({binding:x.binding,bucket_name:x.name})),
@@ -17,20 +18,25 @@ export function renderConfig(plan, resources, accountId, sourceSha, fingerprint,
     // Only plans that declare KV add the key, so earlier fingerprints are unchanged.
     ...(resources.kv ? {kv_namespaces:resources.kv.map(x => ({binding:x.binding,id:x.id}))} : {}),
     ...(plan.services ? {services:plan.services.map(serviceEntry)} : {}) };
+  admit(runtime,configBindings(config));
+  return config;
 }
 const serviceEntry = x => ({binding:x.binding,service:x.service,...(x.entrypoint ? {entrypoint:x.entrypoint} : {}),...(x.props ? {props:x.props} : {})});
 function serviceBinding(x) {
   const {binding,...rest} = serviceEntry(x);
   return {type:'service',name:binding,...rest};
 }
-export function bindingsFor(config, resources, plan) {
-  return [ ...(plan.ai ? [{type:'ai',name:plan.ai.request.binding}] : []),...(config.assets ? [{type:'assets',name:'ASSETS'}] : []), ...Object.entries(config.vars).map(([name,text]) => ({type:'plain_text',name,text})), {type:'version_metadata',name:'RER_VERSION'},
+/** The upload's bindings, emitted through the plan's runtime names (`runtime`). */
+export function bindingsFor(config, resources, plan, runtime) {
+  return emit(runtime,[ ...(plan.ai ? [{type:'ai',name:plan.ai.request.binding}] : []),...(config.assets ? [{type:'assets',name:'ASSETS'}] : []), ...Object.entries(config.vars).map(([name,text]) => ({type:'plain_text',name,text})), {type:'version_metadata',name:'RER_VERSION'},
     ...resources.d1.map(x => ({type:'d1',name:x.binding,id:x.id})), ...resources.r2.map(x => ({type:'r2_bucket',name:x.binding,bucket_name:x.name})),
     ...(resources.kv ?? []).map(x => ({type:'kv_namespace',name:x.binding,namespace_id:x.id})),
     ...resources.queues.map(x => ({type:'queue',name:x.binding,queue_name:x.name})), ...plan.durableObjects.map(x => ({type:'durable_object_namespace',name:x.binding,class_name:x.className})),
-    ...(plan.services ?? []).map(serviceBinding) ];
+    ...(plan.services ?? []).map(serviceBinding) ]);
 }
-export function verifyBindings(actual, expected) {
+/** Readback passes the same runtime names as the upload: those `expected` was emitted through,
+ * or none reserved when it is any other list. */
+export function verifyBindings(actual, expected, runtime = projectionOf(expected)) {
   assert(Array.isArray(actual),'invalid-provider-bindings');
   const names = new Set();
   const nativeAi = new Set(expected.filter(x => x.type === 'ai').map(x => x.name));
@@ -43,6 +49,7 @@ export function verifyBindings(actual, expected) {
     assert(binding.type !== 'service' || services.has(binding.name), 'binding-readback-mismatch');
     assert(binding.type !== 'ai' || nativeAi.has(binding.name), 'undeclared-native-ai-binding');
   }
+  admit(runtime,actual);
   for (const desired of expected) {
     const rows = actual.filter(x => x.name === desired.name); assert(rows.length === 1,'binding-readback-mismatch');
     if (desired.type === 'ai') assert(Object.keys(rows[0]).every(key => Object.hasOwn(desired,key)), 'binding-readback-mismatch');

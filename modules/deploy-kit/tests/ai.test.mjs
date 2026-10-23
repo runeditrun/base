@@ -1,17 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdir,mkdtemp,readFile,realpath,rm,writeFile} from 'node:fs/promises';
+import {mkdir,mkdtemp,readdir,readFile,realpath,rm,symlink,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {cloudflare,ownerTarget,ownerPlan,ownerDeploy,ownerHealth,deploy} from '../index.mjs';
-import {main} from '../owner-cli.mjs';
+import {main,COMMANDS} from '../owner-cli.mjs';
 import {hash} from '../validation.mjs';
 import {renderConfig,verifyBindings} from '../render.mjs';
 import {ownerProvider} from './owner-provider.mjs';
-import {checkImageVariables} from '../../container/image-variables.mjs';
+import {checkImageBindings,checkImageVariables} from '../../container/image-variables.mjs';
 import {deployInputs} from '../../container/deploy-input.mjs';
 import {validateCandidateSpec} from '../../delivery-producer/spec.mjs';
+import {CONFIG_FAMILIES,AI_VARIABLES,AI_PRIVACY_TOKEN} from '../../ai/native/names.mjs';
+import {canonical} from '../../ai/native/policy.mjs';
+import {nativeBindings} from '../../demo-host/native/config.mjs';
+import {uploadSecretCopy} from '../owner-secret-copy.mjs';
+import {activeWorker} from '../worker.mjs';
 const model='@cf/qwen/qwen3.8-27b';
 const request={schema:1,provider:'cloudflare',transport:'native',binding:'AI',budgetBinding:'AI_BUDGET',imageBinding:'AI_IMAGES',textModels:[model],imageModels:[],purposes:[{id:'site-read',kind:'text',model}],limits:{calls:10,units:10000000,microUsd:10000000},operations:{textCalls:2,maxInputBytes:10000,maxOutputTokens:1024,imageUnits:0,timeoutMs:1000}};
 
@@ -177,4 +182,85 @@ test('reserved AI names on every channel and unpaired approval at every entry ar
  assert.ok(!bound.some(item=>item.name.startsWith('RER_AI_')||item.type==='ai'));
  for(const [name,text] of Object.entries(lookalikes))assert.ok(bound.some(item=>item.name===name&&item.text===text));
  t.diagnostic(results.join('\n'));
+});
+
+test('every owner command, Worker write and configuration family passes the one runtime-name projection',async t=>{
+ const provider=ownerProvider();t.after(()=>provider.close());const api=cloudflare(provider);
+ const target=await ownerTarget(api,{project:'synthetic',environment:'production'});
+ const root=await realpath(await mkdtemp(join(tmpdir(),'native-ai-projection-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const git=(...args)=>execFileSync('git',['-c','user.email=fixture@example.test','-c','user.name=Fixture','-c','commit.gpgsign=false',...args],{cwd:root,encoding:'utf8'}).trim();
+ for(const dir of ['dist/server','dist/client','migrations/core'])await mkdir(join(root,dir),{recursive:true});
+ const {artifact:inert,declaration:declared,env:{RER_AI_AUTHORITY:approved}}=deploymentInputs(target);
+ const declaration={...declared,secrets:[...declared.secrets,{binding:'A_SECRET',environment:'A_SECRET'},{binding:'B_SECRET',environment:'B_SECRET',optional:true}]};
+ await writeFile(join(root,'.gitignore'),'dist/\n.rer/\n');await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));git('init','-q');git('add','.');git('commit','-qm','projection');
+ await writeFile(join(root,'dist/server/index.js'),Buffer.from(inert.modules[0].base64,'base64'));
+ await writeFile(join(root,'dist/server/wrangler.json'),JSON.stringify({main:'index.js',no_bundle:true,rules:[{type:'ESModule',globs:['**/*.js','**/*.mjs']}],ai:{binding:'AI'}}));
+ const authority={...JSON.parse(approved),sourceSha:git('rev-parse','HEAD')};
+ const env={CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token,RER_AI_AUTHORITY:JSON.stringify(authority),RER_AI_PRIVACY_TOKEN:'synthetic-private-custody-token-2',A_SECRET:'synthetic-a',B_SECRET:'synthetic-b'};
+ // Every binding-bearing Worker write, as the provider edge receives it.
+ const sent=[];
+ const fetch=async(input,init={})=>{
+  const path=new URL(input).pathname.replace(/^\/client\/v4\/accounts\/[^/]+/,'');
+  if(/^\/workers\/scripts\//.test(path)&&['PUT','POST','PATCH'].includes(init.method)){
+   const part=init.body instanceof FormData?init.body.get('metadata')??init.body.get('settings'):null;
+   if(part)sent.push(...JSON.parse(await part.text()).bindings);
+   else if(path.endsWith('/secrets'))sent.push({type:'secret_text',name:JSON.parse(init.body).name});
+  }
+  return provider.fetch(input,init);
+ };
+ const cli=(command,extra=[])=>main([command,'--declaration','deploy.json','--environment','production',...extra],env,{fetch,cwd:root,notice:()=>{}});
+ // The approved path emits exactly the derived variables and the private-token pair, through deploy, health and each secret write.
+ assert.equal((await cli('deploy')).changed,true);assert.equal((await cli('health')).ok,true);
+ for(const change of [['--set','A_SECRET'],['--set','A_SECRET','--set','B_SECRET'],['--unset','B_SECRET']])assert.equal((await cli('secret',change)).ok,true);
+ const derived={RER_AI_REQUEST:canonical(declared.ai),RER_AI_AUTHORITY:canonical(authority),RER_AI_ACCOUNT_ID:provider.accountId,RER_AI_BUCKET_NAME:'synthetic-production-ai-images'};
+ const reserved=sent.filter(binding=>binding.name.startsWith('RER_AI_'));
+ assert.ok(reserved.length&&reserved.every(binding=>binding.type==='inherit'?[...AI_VARIABLES,AI_PRIVACY_TOKEN].includes(binding.name)
+  :binding.type==='plain_text'?binding.text===derived[binding.name]:binding.type==='secret_text'&&binding.name===AI_PRIVACY_TOKEN),JSON.stringify(reserved));
+ const statePath=join(root,'.rer/deploy/production.json'),saved=JSON.parse(await readFile(statePath)),held=provider.state.secrets.map(item=>item.name);
+ // A reserved name the live Worker serves outside the approval: a secret change would inherit it, health would read it back.
+ const extra={type:'plain_text',name:'RER_AI_LIVE',text:'synthetic-live'},live=[provider.state.settings.bindings,provider.state.version.resources.bindings];
+ for(const bindings of live)bindings.push(extra);
+ for(const change of [['--set','A_SECRET'],['--set','A_SECRET','--set','B_SECRET']])for(const command of ['secret','health']){
+  const bytes=await readFile(statePath),writes=provider.state.writes.length;
+  await assert.rejects(cli(command,command==='secret'?change:[]),e=>e.code==='ai_policy_conflict',`live x ${command}`);
+  assert.equal(provider.state.writes.length,writes);assert.deepEqual(await readFile(statePath),bytes);
+ }
+ for(const bindings of live)bindings.splice(bindings.indexOf(extra),1);
+ // An interrupted change that would leave a reserved name: applied at the edge, then staged as a several-secret copy.
+ for(const mode of ['applied','staged']){
+  const state=structuredClone(saved),bindings=['RER_AI_PENDING',...(mode==='staged'?['B_SECRET']:[])];
+  state.pendingSecret={bindings,present:true,versionId:state.receipt.provider.versionId,names:held.filter(name=>!bindings.includes(name)),...(mode==='staged'?{copy:'c3'.repeat(16)}:{})};
+  if(mode==='applied')await api.request(`/workers/scripts/${target.worker}/secrets`,{method:'PUT',body:{name:'RER_AI_PENDING',text:'synthetic-pending',type:'secret_text'}});
+  else await uploadSecretCopy(api,target.worker,await activeWorker(api,target.worker),{marker:state.pendingSecret.copy,changes:[{binding:'RER_AI_PENDING',value:'synthetic-pending'},{binding:'B_SECRET',value:'synthetic-b'}]});
+  await writeFile(statePath,JSON.stringify(state));
+  const bytes=await readFile(statePath),writes=provider.state.writes.length;
+  // Another run's lock: a command that locked or settled before refusing would report owner-state-locked.
+  // Removal deletes the Worker and keeps serving nothing, so it alone settles without runtime names.
+  for(const command of COMMANDS.filter(command=>command!=='remove')){
+   await writeFile(statePath+'.lock','other-run\n');
+   let error;try{await cli(command,{secret:['--set','A_SECRET'],'record-owner':['--outcome','claimed']}[command]);}catch(e){error=e;}finally{await rm(statePath+'.lock');}
+   assert.equal(error?.code,'ai_policy_conflict',`${mode} x ${command}: ${error?.code??error?.message}`);
+   assert.equal(provider.state.writes.length,writes,`${mode} x ${command}`);assert.deepEqual(await readFile(statePath),bytes,`${mode} x ${command}`);
+  }
+ }
+ // Every configuration family a container or hosted-demo build binds, read back or planned; lookalikes stay ordinary.
+ for(const [family,{type,field}] of Object.entries({vars:{type:'plain_text',field:'vars'},...CONFIG_FAMILIES}))for(const name of ['RER_AI_FAMILY','APP_RER_AI_FAMILY']){
+  const item={binding:name,name},config=family==='vars'?{vars:{[name]:'synthetic'}}:{[family]:field===null?{binding:name}:field===undefined?[item]:{[field]:[item]}};
+  if(name.startsWith('APP_')){checkImageBindings(config);continue;}
+  for(const gate of [()=>checkImageBindings(config),()=>nativeBindings(config),()=>verifyBindings([{type,name,text:'synthetic'}],[])])
+   assert.throws(gate,e=>e.code==='ai_policy_conflict'||['ai','service'].includes(type)&&/undeclared-native-ai-binding|binding-readback-mismatch/.test(e.message),`${family}`);
+ }
+ // The builders apply it before emitting a package: to a name the build carries, and to one only the seed's own configuration declares.
+ const {buildContainer}=await import('../../container/build.mjs'),{buildDemo}=await import('../../demo-host/build.mjs'),base=join(import.meta.dirname,'../../..');
+ for(const [label,config] of Object.entries({built:{r2_buckets:[{binding:'RER_AI_BUILT',bucket_name:'synthetic-built'}]},declared:{assets:{binding:'RER_AI_DECLARED',directory:'dist/client'}}}))for(const kind of ['container','hosted demo']){
+  const app=await realpath(await mkdtemp(join(tmpdir(),'native-ai-build-')));t.after(()=>rm(app,{recursive:true,force:true}));
+  for(const dir of ['src','dist/client'])await mkdir(join(app,dir),{recursive:true});
+  await symlink(join(base,'default-seed/node_modules'),join(app,'node_modules'));await writeFile(join(app,'package.json'),'{"type":"module"}');
+  await writeFile(join(app,'src/server.mjs'),`export {default,AiAuthority} from ${JSON.stringify(join(base,'modules/ai/tests/native-worker.mjs'))};`);
+  await writeFile(join(app,'vite.config.mjs'),"import {cloudflare} from '@cloudflare/vite-plugin'; export default {logLevel:'silent',plugins:[cloudflare({inspectorPort:false,viteEnvironment:{name:'ssr'}})],environments:{ssr:{build:{outDir:'dist/server'}}},builder:{buildApp:async b=>b.build(b.environments.ssr)}};");
+  await writeFile(join(app,'wrangler.jsonc'),JSON.stringify({name:'synthetic-build',main:'src/server.mjs',compatibility_date:'2026-09-08',compatibility_flags:['nodejs_compat'],...config}));
+  const output=join(app,'bundle');
+  await assert.rejects(kind==='container'?buildContainer(app,{engine:'workerd',declaration:{},output}):buildDemo(app,output,{}),e=>e.code==='ai_policy_conflict',`${label} x ${kind}`);
+  await assert.rejects(readdir(output),{code:'ENOENT'});
+ }
 });

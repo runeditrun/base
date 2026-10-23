@@ -71,20 +71,53 @@ the derived Worker name (for example `lamp-production`), environment is
 `production`, and tenant is the server-owned installation tenant. Do not put
 `RER_AI_*` variables in seed-controlled `vars`; the consumer derives them.
 
-The whole `RER_AI_` namespace belongs to installation authority. Without an
-`ai` declaration no channel may bind one of these names: variables, the origin
-variable or its public setting, secret bindings or the environment names they
-are read from, resource, service and native bindings, or secrets the live
-Worker already holds (an upload inherits declared secrets and keeps every
-other one). With approved `ai`, deployment derives the four policy variables
-and binds only the approved `RER_AI_PRIVACY_TOKEN` secret. Supplied plans and
-secret changes pass the same check, and anything else is refused with
-`ai_policy_conflict` before it is uploaded. Container settings and built
-variables, hosted demo builds and delivery packages never carry these names.
-Case and prefix lookalikes such as `APP_RER_AI_AUTHORITY` are ordinary names.
-To turn native AI off, first remove the token with
-`rer deploy --unset-secret RER_AI_PRIVACY_TOKEN` while it is still declared,
-then remove `ai` and that secret from the declaration and deploy.
+The whole `RER_AI_` namespace belongs to installation authority, and one
+module, `names.mjs`, decides which runtime names a seed or plan may emit. Its
+projection is an allowlist for the namespace: without approved `ai` it admits
+no `RER_AI_*` name in any channel; with approved `ai` it admits exactly the four
+policy variables, each with the value derived from that approval, and the one
+`RER_AI_PRIVACY_TOKEN` secret bound and sourced under its own name and never
+optional. Ordinary names are untouched, including case and prefix lookalikes
+such as `AI_ENABLED`, `rer_ai_authority` and `APP_RER_AI_AUTHORITY`; the
+kit-owned `RER_DEPLOY_SOURCE`, `RER_DEPLOY_FINGERPRINT`, `RER_VERSION` and
+`ASSETS` are unchanged. A refusal is `ai_policy_conflict`, naming the channel.
+
+Every route that turns a name into a runtime binding goes through that
+projection, and a list that did not come through one admits no reserved name:
+the owner declaration and supplied plans (variables, the origin variable and its
+public setting, secret bindings and the environment names they are read from,
+resource, service and native bindings), the rendered configuration and upload
+metadata, the secrets an upload keeps, secret changes (the secrets a set adds,
+what a pending change would leave, and everything the live Worker serves, since
+a new version inherits it), the deployment of an uploaded several-secret copy,
+container and hosted-demo builds (the configuration each build emitted and the
+seed's own Wrangler configuration in every environment, assets included),
+container settings, the demo origin variable and delivery packages. Readback
+uses the same projection: deploy and health refuse a live binding or secret
+outside it, and a secret change or recovery refuses one before it records or
+deploys anything.
+
+Order: each owner command (deploy, dry run, health, secret changes including
+rotation, reopening and the setup token's retirement, owner claim, sign-in,
+inspection and rekey) computes its names, pairs any approval with the payer and
+the source it deploys or reads, and admits what an interrupted secret change
+would leave before it takes the state lock, settles anything or writes; a
+refusal leaves the pending intent and the receipt untouched. Rotation and
+reopening save their keys, and a first deploy its generated installation key,
+only after those refusals have passed. Removal is the one command that admits
+nothing: it deletes the Worker. Under the lock, what a command keeps serving
+(every secret a fresh upload keeps; everything a secret change inherits) is read
+back before any write. Boundaries this does not cover:
+a custom deploy hook runs the author's own upload code before any kit check (the
+owner kit calls it makes are projected); local runtimes on the owner's machine
+(`rer dev`, `rer verify`, local `rer demo`, local container dev and preview)
+serve the checkout's own settings and are not deployments; and an interrupted
+several-secret copy that staged an unapproved reserved name is never deployed,
+so its change cannot complete and only `rer deploy --remove --yes` clears it.
+An interrupted single reserved secret is removed with
+`rer deploy --unset-secret NAME`. To turn native AI off, first remove the token
+with `rer deploy --unset-secret RER_AI_PRIVACY_TOKEN` while it is still
+declared, then remove `ai` and that secret from the declaration and deploy.
 The first declaration above requests zero spending until both the seed request
 and separate permitted policy explicitly authorize larger finite limits.
 

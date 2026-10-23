@@ -34,7 +34,7 @@ export async function exportProducer({root = process.cwd(), config, output = 'sc
     const aiRoot = fileURLToPath(new URL('../ai/', import.meta.url));
     await writeFile(join(destination.directory,'ai-policy.mjs'), (await readFile(join(aiRoot,'native/policy.mjs'),'utf8')).replace("from '../errors.mjs'", "from './ai-errors.mjs'"), {flag:'wx'});
     await writeFile(join(destination.directory,'ai-errors.mjs'), await readFile(join(aiRoot,'errors.mjs')), {flag:'wx'});
-    await writeFile(join(destination.directory,'ai-names.mjs'), await readFile(join(aiRoot,'native/names.mjs')), {flag:'wx'});
+    await writeFile(join(destination.directory,'ai-names.mjs'), (await readFile(join(aiRoot,'native/names.mjs'),'utf8')).replace("from './policy.mjs'", "from './ai-policy.mjs'"), {flag:'wx'});
     await mkdir(join(destination.directory,'schema'), {recursive:true});
     for (const name of schemaFiles) await writeFile(join(destination.directory,'schema',name), await readFile(join(schemaSource,name)), {flag:'wx'});
     await writeFile(destination.manifest, `${JSON.stringify(config,null,2)}\n`, {flag:'wx'});

@@ -1,4 +1,5 @@
 import { assert, uuid } from './validation.mjs';
+import { admit } from '../ai/native/names.mjs';
 
 // Several secrets change as ONE Worker version, so a half-changed group never runs.
 // Cloudflare's per-secret calls each deploy a version of their own, and its settings
@@ -7,6 +8,8 @@ import { assert, uuid } from './validation.mjs';
 // every binding inherited except the named secrets, which it sets or leaves out. The
 // copy carries a marker rer saved before uploading it, so a copy whose answer was lost,
 // or that was uploaded but not yet deployed, is recognised as this change and no other.
+// An uploaded copy is staged: it serves only once deploySecretCopy sends traffic to it,
+// which admits every binding it carries through the deployment's runtime names first.
 export const copyMessage = marker => `rer-secrets:${marker}`;
 
 /** Upload the copy (not yet deployed) and return its version id. */
@@ -27,8 +30,13 @@ export async function uploadSecretCopy(api, worker, live, {changes, marker}) {
   return version.id;
 }
 
-/** Send all traffic to the copy. */
-export const deploySecretCopy = (api, worker, versionId) => api.request(`/workers/scripts/${worker}/deployments`, {method:'POST', body:{strategy:'percentage', versions:[{version_id:versionId, percentage:100}]}});
+/** Send all traffic to the copy, once every binding it carries passes the deployment's runtime names. */
+export async function deploySecretCopy(api, worker, versionId, runtime) {
+  const version = await api.request(`/workers/scripts/${worker}/versions/${versionId}`);
+  assert(version?.id === versionId && Array.isArray(version.resources?.bindings), 'invalid-secret-copy');
+  admit(runtime, version.resources.bindings);
+  return api.request(`/workers/scripts/${worker}/deployments`, {method:'POST', body:{strategy:'percentage', versions:[{version_id:versionId, percentage:100}]}});
+}
 
 /** The newest version is this change's copy, uploaded right after the receipt's version and not deployed. */
 export async function undeployedCopy(api, worker, {pendingSecret, receipt}, versions) {

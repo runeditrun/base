@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { DENY, admit, configBindings } from '../ai/native/names.mjs';
 
 const modules = fileURLToPath(new URL('../', import.meta.url));
 const here = fileURLToPath(new URL('./', import.meta.url));
@@ -40,10 +41,11 @@ export async function buildEgressWorker(product = here) {
     await mkdir(dirname(join(server, name)), { recursive: true });
     await writeFile(join(server, name), contents);
   }
-  await writeFile(join(server, 'wrangler.json'), JSON.stringify({
-    name: 'egress-service', main: 'egress-service/worker.js', compatibility_date: '2026-09-08',
-    no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }],
-  }, null, 2) + '\n');
+  const config = { name: 'egress-service', main: 'egress-service/worker.js', compatibility_date: '2026-09-08',
+    no_bundle: true, rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }] };
+  // A build configuration's names pass the runtime names like every other; deploy-kit binds from its own plan.
+  admit(DENY, configBindings(config));
+  await writeFile(join(server, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   await mkdir(join(product, 'dist/client'), { recursive: true });
   await mkdir(join(product, 'migrations/core'), { recursive: true });
   return { server, main: 'egress-service/worker.js', modules: Object.keys(files).sort() };

@@ -1,4 +1,4 @@
-import { objectClass } from './config.mjs';
+import { objectClass } from './runtime.mjs';
 import { application, loaded, bundle } from './loader.mjs';
 import { r2Call } from './r2.mjs';
 import { store } from './r2-store.mjs';

@@ -516,9 +516,15 @@ prices and held-proof records. Missing approval returns `ai_hosting_unproven`.
 The consumer derives the payer account/private-bucket name, requires the privacy
 secret, renders `type:ai`, and checks exact readback. A built undeclared raw AI
 binding, binding conflict, account mismatch or undeclared readback fails closed.
-No declaration, supplied plan, secret change or held secret may bind another
-`RER_AI_*` name (`ai_policy_conflict`). The owner CLI checks the current build's
-plan, approval, account and source before it takes the state lock or settles an
-earlier secret change; health also pairs the approval with the recorded deployment.
+Every runtime name passes the one projection in `modules/ai/native/names.mjs`:
+renderers emit through it, uploads accept only what it emitted (any other list
+admits no `RER_AI_*` name), and readback admits through it. No declaration,
+supplied plan, rendered or kept binding, secret change, live binding a copy
+inherits, or container, demo or package build may bind another `RER_AI_*` name
+(`ai_policy_conflict`). Every owner command but removal pairs its approval with
+the payer and source and admits what a pending secret change would leave before
+it takes the state lock, settles or writes; exported `verifyHealth` pairs the
+plan with the recorded deployment before its first provider read. Custom deploy
+hooks and local runtimes are outside this boundary (see the AI consumer guide).
 Provider/account qualification remains held; no inference runs during deployment. See the [AI consumer candidate](../ai/native/README.md)
 for the policy/budget contract and separate provider/hosting qualification gates.
