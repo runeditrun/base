@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gd38c4a06",
+  "cliVersion": "0.2.79-dev.gd74b1618",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1211,7 +1211,7 @@
     },
     "modules/ai/native/README.md": {
       "source": "modules/ai/native/README.md",
-      "sha256": "156f38f486e3bcfcd7aecd3882aa48ddf342f4644e103ecbd730a74be9fceb51"
+      "sha256": "3f8a79eb4ee510be6a6b8449ee06d940530ddf8be7b89d16e5d5b3caa4241ef5"
     },
     "modules/ai/native/authority.mjs": {
       "source": "modules/ai/native/authority.mjs",
@@ -1683,7 +1683,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "9ef4bd3ab2c62dc3e31c322d6cd37d8bee7092373a7b50e356bfde1463871e22"
+      "sha256": "ce57389b054923c8f4cb5c6fcdceb798b8d978dd97a94f3a715ac410ae8f27f4"
     },
     "modules/deploy-kit/ai.mjs": {
       "source": "modules/deploy-kit/ai.mjs",
@@ -1771,7 +1771,7 @@
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
-      "sha256": "91aa032f44ecf7485d0059c2734a12d5b49bd83abeffcf32b76db44c47a01969"
+      "sha256": "0bd25eba4b81f2fc9ef592da6a814565e9692f0e8073df328ced82a209c6ec3d"
     },
     "modules/deploy-kit/owner-secret-copy.mjs": {
       "source": "modules/deploy-kit/owner-secret-copy.mjs",

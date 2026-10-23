@@ -116,7 +116,9 @@ owner kit calls it makes are projected); local runtimes on the owner's machine
 (`rer dev`, `rer verify`, local `rer demo`, local container dev and preview)
 serve the checkout's own settings and are not deployments; and an interrupted
 several-secret copy that staged an unapproved reserved name is never deployed,
-so its change cannot complete and only `rer deploy --remove --yes` clears it.
+so its change cannot complete: every other command refuses it, and only
+`rer deploy --remove --yes`, which deletes the environment's Worker and
+resources, clears it (the copy is one of the Worker's versions and goes with it).
 An interrupted single reserved secret is removed with
 `rer deploy --unset-secret NAME`. To turn native AI off, first remove the token
 with `rer deploy --unset-secret RER_AI_PRIVACY_TOKEN` while it is still

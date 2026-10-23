@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises';
 import { assert, hexId } from './validation.mjs';
 import { resourceKinds, findResource } from './resources.mjs';
 import { activeWorker } from './worker.mjs';
+import { undeployedCopy } from './owner-secret-copy.mjs';
 import { deleteWorker } from './teardown.mjs';
 import { query } from './migrations.mjs';
 import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, sameDeployment, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
@@ -37,7 +38,9 @@ async function confirmEmpty(api, worker, kind, name, id) {
  * drop the state file. Nothing else in the account is touched. Ownership is checked for
  * everything before the first delete; a replaced or uncertain resource refuses it all,
  * except an uncertain one confirmed empty (see confirmEmpty). R2 object purges
- * additionally require the saved creation timestamp and recheck it before each delete. */
+ * additionally require the saved creation timestamp and recheck it before each delete.
+ * An unsettled secret change refuses removal, except a several-secret copy uploaded but
+ * never deployed: it is one of the Worker's versions and is deleted with it, never deployed. */
 export async function ownerRemove({api: provider, target, statePath, clock, sleep}) {
   const api = withSettledLists(withScopeHints(provider));
   return withStateLock(statePath, async () => {
@@ -58,6 +61,9 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
         const live = await activeWorker(api, target.worker);
         if (!sameDeployment(live, expected)) throw refuse('owned-resource-replaced', 'worker', target.worker);
         worker = target.worker;
+        // Dropped from memory only: a later refusal leaves the recorded intent as it was.
+        const versions = state.pendingSecret?.copy && sameDeployment(live, state.receipt?.provider) ? (await api.request(`/workers/scripts/${worker}/versions`))?.items : null;
+        if (Array.isArray(versions) && await undeployedCopy(api, worker, state, versions)) delete state.pendingSecret;
       } else remaining.delete(`worker:${target.worker}`);
       assert(!state.pendingSecret, 'secret-change-unsettled');
       const listed = {}, doomed = [];
