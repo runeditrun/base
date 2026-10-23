@@ -21,13 +21,14 @@ export async function adoptEditor(root, kind) {
   source = `import { createEditorConfigHandler } from '${kind === 'default-seed' ? '../../' : './'}modules/editor/server/config-response.mjs'\n` + source;
   if (kind === 'default-seed') source = source.replace('import { sessionForRequest }', 'import { sessionForRequest, operatorAuth }');
   else {
-    // The template already imports runtimeBindings for its Lobby.
-    source = source.replace('import { authResponse,', 'import { authResponse, operatorAuth,');
+    // The Lobby already uses operatorAuth. Give this optional consumer its
+    // own binding so adopting it cannot duplicate the template's import.
+    source = source.replace('import { authResponse,', 'import { authResponse, operatorAuth as editorOperatorAuth,');
     source = source.replace('new Hono()', 'new Hono<{ Bindings: Bindings }>()');
   }
   source = source.replace(anchor, `  ${kind === 'default-seed' ? 'app' : 'api'}.get('/api/editor/config', async context => {
     const handle = createEditorConfigHandler({
-      requireOwner: request => operatorAuth(${kind === 'default-seed' ? 'context.env' : 'runtimeBindings(context.env)'}).requireEditorOwner(request),
+      requireOwner: request => ${kind === 'default-seed' ? 'operatorAuth(context.env)' : 'editorOperatorAuth(runtimeBindings(context.env))'}.requireEditorOwner(request),
       readConfig: async () => ({enabled:true,managementOrigin:'https://management.example.test',installationId:'dependency-consumer'}),
     })
     return (await handle(context.req.raw))!
