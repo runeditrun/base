@@ -21,6 +21,10 @@ test('rer dev <repo> clones every release tag, so git checkout <tag> works in th
  assert.equal((await run('tar', ['-xzf', await buildPackage(base, join(directory, 'built')), '-C', unpacked])).code, 0);
  const rer = join(unpacked, 'package/global/rer.mjs');
  const env = { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
+ assert.equal((await run(process.execPath, [rer, 'cli', 'install'], { env: { ...env, RER_INSTALL_CHANNEL: 'script' } })).code, 0);
+ const installed = join(home, '.local/bin/rer');
+ const status = async () => JSON.parse((await run(installed, ['cli', 'status', '--json'], { env })).stdout);
+ const initial = await status();
  const git = async (...args) => { const result = await run('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', ...args], { cwd: source, env }); assert.equal(result.code, 0, result.stderr); return result.stdout.trim(); };
  await git('init', '--quiet');
  await writeFile(join(source, 'release.txt'), 'v1.0.0\n');
@@ -32,8 +36,9 @@ test('rer dev <repo> clones every release tag, so git checkout <tag> works in th
 
  // The source is not a runnable checkout, so the launch stops after the clone.
  const clone = join(directory, 'app');
- await run(process.execPath, [rer, 'dev', pathToFileURL(remote).href, '--dir', clone], { cwd: directory, env });
+ await run(installed, ['dev', pathToFileURL(remote).href, '--dir', clone], { cwd: directory, env });
  const checkout = await run('git', ['-C', clone, 'checkout', '--quiet', 'v1.0.0'], { env });
  assert.equal(checkout.code, 0, checkout.stderr);
  assert.equal((await run('git', ['-C', clone, 'show', 'HEAD:release.txt'], { env })).stdout, 'v1.0.0\n');
+ assert.equal((await status()).channel, initial.channel, 'repository startup preserves the installed channel');
 });

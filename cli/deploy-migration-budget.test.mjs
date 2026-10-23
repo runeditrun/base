@@ -1,3 +1,4 @@
+import { productionSender } from './fixtures/production-sender.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, readFile } from 'node:fs/promises';
@@ -7,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { deployProviderFixture } from './fixtures/deploy-provider.mjs';
 
 async function deployFixture(t) {
- const {root, provider, run} = await deployProviderFixture(t, {d1:[{binding:'DB'}],r2:[],vars:{MAIL_PROVIDER:'resend',MAIL_FROM:'owner@example.test',MAIL_API_KEY:'test-only-outbound-key'}});
+ const {root, provider, run} = await deployProviderFixture(t, {d1:[{binding:'DB'}],r2:[],vars:{MAIL_PROVIDER:'resend',MAIL_FROM:productionSender,MAIL_API_KEY:'test-only-outbound-key'}});
  const names = [];
  for (let index = 1; index <= 128; index++) {
   const name = `${String(index).padStart(4, '0')}_schema.sql`;

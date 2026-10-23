@@ -3,7 +3,7 @@ import { parse, help } from './parse.mjs';
 import { output } from './output.mjs';
 import { invalid, RerError } from './errors.mjs';
 import { resolveProject, parsingProfile } from './project.mjs';
-import { check, describe } from './inspect.mjs';
+import { check, describe, doctorSummary } from './inspect.mjs';
 import { selectNodeRuntime } from './node-runtime.mjs';
 
 export async function main(argv = process.argv.slice(2)) {
@@ -51,7 +51,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (options.verb === 'doctor') {
    const result = await (await import('./lifecycle.mjs')).runCommand(project, options, out);
-   if (!options.json) out.human(JSON.stringify(result, null, 2));
+   if (!options.json) out.human(doctorSummary(result));
    out.result(result.ok, result.ok ? 0 : 3, { diagnostics: result }); return result.ok ? 0 : 3;
   }
   // The owner link is printed once to this terminal: never through the logged lifecycle.

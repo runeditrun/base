@@ -10,8 +10,9 @@ export async function requireProductionAuth({ root, declaration, env, setupManif
  const dependencies = setupManifest?.dependencies?.filter(item => item.interface === 'oidc-provider@1') ?? [];
  const bindings = { ...declaration.vars };
  for (const secret of declaration.secrets ?? []) if (env[secret.environment]?.trim()) bindings[secret.binding] = env[secret.environment];
- const mail = await productionMail(root, declaration, env);
+ const mail = await productionMail(root, declaration, env, declarationPath);
  if (!setupManifest?.steps?.some(step => step.type === 'owner-claim') && !dependencies.length && !mail.declared) return;
+ if (mail.senderIssue && options.verb === 'deploy') throw refuse(`${mail.senderIssue} Nothing was built or uploaded.`);
  if (mail.configured()) return;
  if (mail.canInspect && !options.dryRun && declarationPath) {
   try {

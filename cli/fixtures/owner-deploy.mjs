@@ -1,3 +1,4 @@
+import { productionSender } from './production-sender.mjs';
 import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -14,7 +15,7 @@ export async function checkout(t, declaration) {
  await writeFile(join(root, 'dist/server/index.js'), 'export default {scheduled(){},fetch(){}}');
  await writeFile(join(root, 'dist/client/index.html'), 'app');
  await writeFile(join(root, 'migrations/core/0001_owner.sql'), 'CREATE TABLE owner(id TEXT PRIMARY KEY);');
- await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', d1: [{ binding: 'DB' }], vars:{MAIL_PROVIDER:'resend',MAIL_FROM:'owner@example.test',...(!declaration.secrets?.some(item=>item.binding==='MAIL_API_KEY')?{MAIL_API_KEY:'test-only-outbound-key'}:{})}, ...declaration }));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', d1: [{ binding: 'DB' }], vars:{MAIL_PROVIDER:'resend',MAIL_FROM:productionSender,...(!declaration.secrets?.some(item=>item.binding==='MAIL_API_KEY')?{MAIL_API_KEY:'test-only-outbound-key'}:{})}, ...declaration }));
  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.dev.vars\ndeploy.env\n');
  // The local setup's private settings: the owner rer deploy reuses.
  await writeFile(join(root, '.dev.vars'), 'OWNER_EMAIL=owner@example.test\nSESSION_SECRET=local-only-session\n', { mode: 0o600 });
