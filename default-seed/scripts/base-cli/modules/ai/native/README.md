@@ -106,10 +106,10 @@ refusal leaves the pending intent and the receipt untouched. Rotation and
 reopening save their keys, and a first deploy its generated installation key,
 only after those refusals have passed. Removal is the one command that admits
 nothing: it deletes the Worker. Every command that reads the live Worker back
-admits what it serves before any write: a deploy or dry run the secrets a fresh
-upload keeps (a deploy then reads every binding back), a secret change everything
-the new version inherits, and health, inspection, owner claim, sign-in and rekey
-every live binding.
+admits what it serves before any state or provider write: a deploy or dry run
+the secrets a fresh upload keeps (a deploy then reads every binding back), a
+secret change everything the new version inherits, and health, inspection,
+owner claim, sign-in and rekey every live binding.
 Boundaries this does not cover:
 a custom deploy hook runs the author's own upload code before any kit check (the
 owner kit calls it makes are projected); local runtimes on the owner's machine
