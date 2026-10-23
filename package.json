@@ -8,7 +8,7 @@
     "verify:schema": "node onboarding/queued-entry.mjs verify:schema -- sh -c 'node schema/validate.mjs && node schema/validate.mjs --schema SEED && node schema/validate.mjs --schema SETUP && node schema/validate.mjs --schema SETUP --expect-invalid schema/SETUP.invalid.example.json && node --test --test-concurrency=2 schema/*.test.mjs'",
     "verify:reference": "node onboarding/queued-entry.mjs verify:reference -- sh -c \"pnpm --dir default-seed verify\"",
     "verify": "node onboarding/queued-entry.mjs verify -- node scripts/verify.mjs",
-    "edition": "node composition/cli.mjs",
+    "edition": "node edition-authoring/compose.mjs",
     "verify:composition": "node onboarding/queued-entry.mjs verify:composition -- sh -c 'node schema/validate.mjs --schema FAMILY && node schema/validate.mjs --schema COMPOSITION && node --test --test-concurrency=2 composition/*.test.mjs'",
     "verify:modules": "node onboarding/queued-entry.mjs verify:modules -- sh -c 'node --max-old-space-size=4096 --test --test-concurrency=2 modules/*/tests/*.test.ts'",
     "verify:authoring": "node onboarding/queued-entry.mjs verify:authoring -- sh -c 'node --test --test-concurrency=2 authoring/*.test.mjs'",

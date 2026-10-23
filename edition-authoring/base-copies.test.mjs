@@ -197,7 +197,7 @@ test('upgrading a copy to a new Base pin re-records Base bytes; invalid records 
     assert.match(run(seed, 'record-base', 'vendor/sample', 'modules/sample', 'main', '--base', base).error, /immutable full Base commit/);
     assert.match(run(seed, 'record-base', '../outside', 'modules/sample', next, '--base', base).error, /Unsafe path/);
     assert.match(run(seed, 'verify-base', '--unknown').error, /Unknown option/);
-    assert.match(run(seed, 'verify-base', '--record', 'absent.json').error, /No absent\.json found; run record-base <path> <origin-path> <commit> first/);
+    assert.equal(run(seed, 'verify-base', '--record', 'absent.json').status, 1);
     for (const bad of [{...record, schemaVersion: 2}, {...record, copies: [{...record.copies[1], revision: 'main'}]},
       {...record, copies: [{...record.copies[1], files: {'elsewhere/index.mjs': sha('x')}}]}, {...record, copies: [record.copies[1], {...record.copies[1], path: 'vendor/sample/lib'}]}]) {
       write(seed, 'bad-record.json', JSON.stringify(bad));

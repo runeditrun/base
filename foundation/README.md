@@ -221,7 +221,20 @@ Base-only check compares every existing file under `default-seed/migrations/`
 and `foundation/template/migrations/` byte for byte against the highest stable
 `rer-v*` release advertised by `origin` and HEAD's first parent. CI also compares
 the GitHub push event's `before` commit or pull request base, so a multi-commit
-push cannot rewrite migrations published on plain main between releases.
+push cannot rewrite numbered migrations published on plain main between releases.
+
+The release comparison also freezes the initializer's actual `migrationCopies`
+origins, module `schema/*.sql` and `schema.sql` sources, foundation runtime SQL,
+and module `schema.ts`/`schema.mjs`/`schema.js` files exporting `*Migration` or
+`*Schema` arrays (including import-kit). The entire source file is compared,
+including helpers used to construct arrays. This includes the operator-auth
+draft still consumed by older families. A changed schema needs a new source
+file and a new numbered migration. These classes are discovered from committed
+release source, rather than a separate list of paths. A source added after the
+latest release stays editable until its first release; numbered migrations are
+protected by the plain-main comparisons as well. Every initializer mapping must
+resolve to a regular origin file; a missing mapped origin fails closed.
+
 New files pass; changed or removed files fail. It reads the working tree, so
 uncommitted edits are checked too. Shallow clones acquire missing baseline
 commits from `origin`; inaccessible history fails explicitly. Offline runs are
@@ -239,3 +252,39 @@ skip flag. An exception accepts only those exact bytes at that path and
 baseline, remains visible in the check output, and must cover each reported
 baseline explicitly. Remove obsolete exceptions after the released baseline
 advances. The list starts empty.
+
+### Existing families with the old owner draft mapping
+
+Before changing a family's Base pin or composing it, use current Base's
+`pnpm edition <edition> --family-repo <family> --base-repo <base> --output <new>`.
+Its preflight reads the committed descriptor selected by `--ref` (HEAD by
+default), before dispatching pinned tooling. It refuses the legacy
+`modules/operator-auth/accounts/schema/operator-auth.sql` →
+`migrations/core/0001_owner.sql` mapping in `compositions/<edition>.json`.
+Historical direct `composition/cli.mjs` invocations do not run this preflight;
+use the supported `pnpm edition` command when updating an existing family.
+
+1. In the existing runnable edition, restore `migrations/core/0001_owner.sql`
+   from the edition commit originally published or applied. Run
+   `adapt-base migrations/core/0001_owner.sql` through the edition-authoring CLI
+   to acknowledge and freeze those recorded local bytes. Keep the record and
+   acknowledged migration together; never replace 0001 with the newer draft.
+2. In the family repository, copy those same historical bytes into
+   `editions/<edition>/migrations/core/0001_owner.sql` (or the descriptor's
+   `source` directory). Remove the old draft-to-0001 copy from
+   `compositions/<edition>.json`, then commit both changes before composing.
+   Adapting the runnable edition alone does not remove the family's copy mapping.
+3. Refresh the existing edition with `refresh-base <new-base-commit> --base <base>`.
+   Review the adapted conflict's `diffHint` and `schemaDeltas`. Carry each later
+   schema change as a NEW numbered seed migration, for example from the
+   append-only `accounts/schema/scheduled-policy.sql`,
+   `scheduled-policy-hardening.sql` and `last-signin.sql` sources. Record each new
+   verbatim copy with `record-base`, or acknowledge seed-owned adaptations.
+   Retain these new migration bytes in family source too, and commit.
+4. Advance `family.json` to the new Base commit, compose with `pnpm edition`, and
+   compare every existing migration with its published edition bytes. Run
+   `verify-base`, `rer check` and the edition's tests before adopting the output.
+   Commit the runnable edition's retained `base-copies.json` with its migrations.
+
+The new frozen template is only a starting point for new families. It is never
+an instruction to overwrite an existing family's applied 0001.

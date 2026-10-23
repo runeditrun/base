@@ -166,9 +166,14 @@ origin path, Base commit, and the SHA-256 of every copied file:
 
 Migration copies must come from append-only numbered sources such as
 `default-seed/migrations/core/NNNN_*.sql` or a per-change `schema/<change>.sql`.
-Do not record an evolving aggregate schema draft as a verbatim migration. If
+Released schema source files, including import-kit schema arrays and their helpers,
+are frozen byte for byte by Base's migration guard. Add a new source file for
+a later change. Do not record an evolving aggregate schema draft as a verbatim migration. If
 a seed starts from a draft, run `adapt-base <migration>` at creation to record
-seed ownership and its acknowledged bytes. Once published or applied, preserve
+seed ownership and its acknowledged bytes. For an existing family whose composition still maps that draft onto 0001,
+follow [the existing-family move](../foundation/README.md#existing-families-with-the-old-owner-draft-mapping)
+before composing; `pnpm edition` refuses that mapping before writing output.
+Once published or applied, preserve
 that migration and carry every later schema delta in a NEW numbered migration.
 
 Each copy has its own commit, so modules can move to new pins independently. A

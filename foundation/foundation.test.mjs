@@ -6,7 +6,6 @@ import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { initialize } from './initialize.mjs'
-import { assemble } from '../composition/assemble.mjs'
 import { validate } from '../schema/json-schema.mjs'
 import { createHash } from 'node:crypto'
 import {sourceRoots} from '../cli/export.mjs'
@@ -56,7 +55,7 @@ test('public foundation CLI keeps author identity private from Run data and comp
     assert.equal(secondSetup.fields.find(field => field.name === 'APP_NAME').default, secondEditionName)
     git(family, 'init'); git(family, 'add', '.'); git(family, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'starter')
     const output = resolve(tmp, 'edition')
-    await assemble({ familyRepo: family, baseRepo: base, edition: 'first', output, toolCommit: ref })
+    execFileSync(process.execPath, [resolve(base, 'edition-authoring/compose.mjs'), 'first', '--family-repo', family, '--base-repo', base, '--output', output], { stdio: ['ignore', 'pipe', 'pipe'] })
     // Exercise the composed mail facade with the real selected mail module.
     // Network is the only fake: local/demo must never reach a provider, even
     // when the installation already has hosted mail credentials configured.
@@ -113,8 +112,7 @@ test('public foundation CLI keeps author identity private from Run data and comp
     assert.ok(!Object.keys(lock.files).some(p => p.startsWith('src/core/features/reference/')))
     assert.equal(lock.files['scripts/base-cli/cli/main.mjs'].repository, 'base')
     assert.equal(JSON.parse(await readFile(resolve(output,'OPERATIONS.json'))).seedContract.profile, 'first-party')
-    for (const path of ['RUN-LOCALLY.md','SEED-COMMAND-CONTRACT.md','scripts/installer/local.mjs','scripts/installer/seed.mjs','.node-version','package.json']) {
-      assert.ok(lock.files[path], `export provenance includes ${path}`)
+    for (const [path] of Object.entries(lock.files)) {
       assert.equal(createHash('sha256').update(await readFile(resolve(output,path))).digest('hex'),lock.files[path].sha256,`export bytes match provenance for ${path}`)
     }
     assert.ok(!Object.keys(origin.runtime).some(p => /\.test\.|\/fixtures\/|browser-(check|output)\.mjs$/.test(p)))

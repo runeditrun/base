@@ -5,14 +5,29 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
 
 const roots = ['default-seed/migrations/', 'foundation/template/migrations/'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const commit = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
-const protectedPath = value => typeof value === 'string' && roots.some(root => value.startsWith(root)) && !value.split('/').some(part => !part || part === '..' || part === '.');
+const safePath = value => typeof value === 'string' && !value.includes('\\') && !value.split('/').some(part => !part || part === '..' || part === '.');
+const numberedPath = value => roots.some(root => value.startsWith(root));
+// These source classes are documented migration inputs, including aggregate SQL
+// still consumed by older families. Freeze whole files, including TS helpers.
+const sqlOrigin = name => /^(?:modules\/.*(?:\/schema\/.*|\/schema)\.sql|foundation\/runtime\/.*\.sql)$/.test(name);
+const migrationArray = bytes => /export\s+const\s+\w*(?:Migration|Schema)\s*(?::[^=;]+)?=\s*\[/.test(bytes);
+function localBytes(repo, name) {
+  let target = repo;
+  for (const part of name.split('/')) {
+    target = path.join(target, part);
+    if (fs.lstatSync(target).isSymbolicLink()) throw Error(`Migration path is a symlink: ${name}`);
+  }
+  if (!fs.lstatSync(target).isFile()) throw Error(`Migration path is not a file: ${name}`);
+  return fs.readFileSync(target);
+}
 
-function check(repo, extraBase) {
+async function check(repo, extraBase) {
   const git = (...args) => execFileSync('git', ['-C', repo, ...args], {
     env: {...process.env, GIT_NO_REPLACE_OBJECTS: '1'}, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024,
   });
@@ -35,7 +50,8 @@ function check(repo, extraBase) {
     });
   if (!versions.length) throw Error('No published rer-v* release tag available from origin.');
   const release = versions[0].ref;
-  const baselines = new Map([[ensure(advertised.get(release + '^{}') ?? advertised.get(release)), release]]);
+  const released = ensure(advertised.get(release + '^{}') ?? advertised.get(release));
+  const baselines = new Map([[released, release]]);
   const add = (revision, label) => { if (revision && !/^0+$/.test(revision)) baselines.set(ensure(revision), label); };
   // Raw commit headers retain parent IDs even when the checkout is shallow.
   add(/^parent ([a-f0-9]{40})$/m.exec(text('cat-file', '-p', 'HEAD'))?.[1], 'HEAD parent');
@@ -46,6 +62,25 @@ function check(repo, extraBase) {
   }
   if (extraBase) add(extraBase, 'explicit base');
 
+  // Use the initializer's actual mapping, never a second hand-maintained list.
+  const {migrationCopies} = await import(pathToFileURL(path.join(repo, 'foundation/initialize.mjs')));
+  if (!Array.isArray(migrationCopies) || !migrationCopies.length) throw Error('Initializer migration mapping is unavailable.');
+  const origins = new Set();
+  for (const copy of migrationCopies) {
+    if (!safePath(copy.source) || !copy.target?.startsWith('migrations/')) throw Error('Invalid initializer migration mapping.');
+    try { localBytes(repo, copy.source); }
+    catch (error) { if (error.code === 'ENOENT') throw Error(`Mapped migration origin not found: ${copy.source}`); throw error; }
+    origins.add(copy.source);
+  }
+  const entriesAt = baseline => git('ls-tree', '-rz', baseline).toString('utf8').split('\0').filter(Boolean).map(entry => {
+    const [metadata, name] = entry.split('\t'), [mode, type, object] = metadata.split(' ');
+    return {name, mode, type, object};
+  });
+  const releasedEntries = entriesAt(released);
+  const releasedOrigins = new Set(releasedEntries.filter(({name, type, object}) => origins.has(name) || sqlOrigin(name) ||
+    (name.startsWith('modules/') && /(?:^|\/)schema\.(?:ts|mjs|js)$/.test(name) && type === 'blob' && migrationArray(git('cat-file', 'blob', object).toString('utf8')))).map(({name}) => name));
+  const protectedPath = value => safePath(value) && (numberedPath(value) || releasedOrigins.has(value));
+
   const exceptionPath = path.join(repo, 'scripts/migration-exceptions.json');
   const exceptions = JSON.parse(fs.readFileSync(exceptionPath, 'utf8'));
   if (!Array.isArray(exceptions) || exceptions.some(item => !item || !commit(item.baseline) || !protectedPath(item.path) || !digest(item.before) ||
@@ -53,19 +88,16 @@ function check(repo, extraBase) {
   const changes = [], allowed = [];
   let compared = 0;
   for (const [baseline, label] of baselines) {
-    const entries = git('ls-tree', '-rz', baseline, '--', ...roots).toString('utf8').split('\0').filter(Boolean);
-    for (const entry of entries) {
-      const [metadata, name] = entry.split('\t'), [, type, object] = metadata.split(' ');
-      if (type !== 'blob') throw Error(`Migration baseline contains a non-file: ${name}`);
+    // Numbered history also binds plain-main pins. Origins first become frozen
+    // at release, so a newly added schema source remains editable until then.
+    const entries = (baseline === released ? releasedEntries : entriesAt(baseline))
+      .filter(({name}) => numberedPath(name) || (baseline === released && releasedOrigins.has(name)));
+    for (const {name, type, mode, object} of entries) {
+      if (type !== 'blob' || !['100644', '100755'].includes(mode)) throw Error(`Migration baseline contains a non-file: ${name}`);
       const before = hash(git('cat-file', 'blob', object));
       let after = null;
-      try {
-        // Refuse directory/symlink replacements, including linked ancestors.
-        let target = repo;
-        for (const part of name.split('/')) { target = path.join(target, part); if (fs.lstatSync(target).isSymbolicLink()) throw Error(`Migration path is a symlink: ${name}`); }
-        if (!fs.lstatSync(target).isFile()) throw Error(`Migration path is not a file: ${name}`);
-        after = hash(fs.readFileSync(target));
-      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      try { after = hash(localBytes(repo, name)); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
       compared++;
       if (before === after) continue;
       const change = {path: name, baseline, source: label, before, after};
@@ -74,7 +106,7 @@ function check(repo, extraBase) {
     }
   }
   return {ok: changes.length === 0, release, baselines: [...baselines].map(([commit, source]) => ({commit, source})), compared, changes, exceptions: allowed,
-    next: changes.length ? 'Restore published bytes and add a NEW numbered migration. Exceptional history corrections require an exact reviewed entry in scripts/migration-exceptions.json; see foundation/README.md.' : 'Published migrations are unchanged; new numbered migrations are allowed.'};
+    next: changes.length ? 'Restore published bytes and add a NEW numbered migration. Existing families mapping an aggregate draft to a migration must run adapt-base <file> to freeze the recorded bytes, retain those bytes in edition-owned family source and remove the draft mapping before composing; see foundation/README.md. Exceptional history corrections require an exact reviewed entry in scripts/migration-exceptions.json; see foundation/README.md.' : 'Published migrations are unchanged; new numbered migrations are allowed.'};
 }
 
 try {
@@ -86,7 +118,7 @@ try {
     else if (args[i] === '--base-ref') extraBase = args[i + 1];
     else throw Error('Usage: node scripts/check-migrations.mjs [--repo DIR] [--base-ref FULL_COMMIT]');
   }
-  const report = check(repo, extraBase);
+  const report = await check(repo, extraBase);
   console.log(JSON.stringify(report, null, 2));
   process.exitCode = report.ok ? 0 : 1;
 } catch (error) {
