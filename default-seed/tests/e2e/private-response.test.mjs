@@ -1,8 +1,10 @@
 import { completeFirstRun } from '../operator-auth/first-run.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readdir, readFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { chromium } from '@playwright/test'
 import { emittedRuntime, root, owner, setupToken, decodeStart } from '../operator-auth/emitted-runtime.mjs'
 
 async function privateFunctions() {
@@ -112,4 +114,80 @@ test('emitted Worker keeps private documents and each RPC uncached through every
 test('emitted Worker browser retains uncached SSR and hydrated native RPC navigation', async () => {
   const { privateResponseBrowser } = await import('./private-response-browser.mjs')
   await privateResponseBrowser(await privateFunctions())
+})
+
+test('the owner moves people in through the import screen: upload, review, approve, reconcile, reload, undo and the Business setting', async (t) => {
+  const runtime = await emittedRuntime({ noMail: true })
+  t.after(() => runtime.close())
+  const directory = await mkdtemp(join(tmpdir(), 'import-screen-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const bootstrap = await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Screen Owner' } })
+  assert.equal(bootstrap.status, 303)
+  const cookie = bootstrap.headers.get('set-cookie').split(';')[0]
+  await completeFirstRun(runtime.origin, cookie)
+  const native = async () => (await (await runtime.call('/api/operator/import-export', { cookie })).json()).sort((a, b) => a.ref.localeCompare(b.ref))
+  const settings = async () => (await runtime.call('/api/operator/import-settings', { cookie })).json()
+  const browser = await chromium.launch({ headless: true })
+  t.after(() => browser.close())
+
+  for (const width of [1440, 390]) {
+    const records = [
+      { ref: `screen-${width}-ada`, name: 'Ada Screen', email: `ada-${width}@example.test`, details: { team: 'Support' } },
+      { ref: `screen-${width}-bo`, name: 'Bo Screen', email: `bo-${width}@example.test`, details: { team: 'Operations' } },
+    ]
+    const file = join(directory, `people-${width}.json`)
+    await writeFile(file, JSON.stringify(records))
+    const before = await native()
+    const context = await browser.newContext({ viewport: { width, height: 900 } })
+    try {
+      const [name, value] = cookie.split('=')
+      await context.addCookies([{ name, value, url: runtime.origin }])
+      const page = await context.newPage()
+      const problems = []
+      page.on('pageerror', error => problems.push(error.message))
+      page.on('console', message => { if (message.type() === 'error') problems.push(message.text()) })
+      await context.route('**/*', route => new URL(route.request().url()).origin === runtime.origin ? route.continue() : (problems.push('external request'), route.abort()))
+      const notice = page.locator('#notice')
+      const overflow = () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+
+      await page.goto(`${runtime.origin}/app/import`)
+      await page.getByText('Loading history…').waitFor({ state: 'detached' })
+      await page.locator('#bundle').setInputFiles(file)
+      await page.getByRole('button', { name: 'Upload and review', exact: true }).click()
+      await page.locator('#review').waitFor({ state: 'visible' })
+      assert.ok((await page.locator('#fingerprint').textContent()).length >= 32, 'the review shows the reviewed fingerprint')
+      const differences = await page.locator('#differences').innerText()
+      for (const record of records) assert.ok(differences.includes(record.name), `the review lists ${record.name}`)
+      assert.deepEqual(await native(), before, 'reviewing changes no native record')
+
+      // Approval needs the reviewer's explicit confirmation.
+      await page.getByRole('button', { name: 'Apply reviewed import', exact: true }).click()
+      assert.deepEqual(await native(), before, 'an unconfirmed approval applies nothing')
+      await page.locator('#confirmed').check()
+      await page.getByRole('button', { name: 'Apply reviewed import', exact: true }).click()
+      await page.locator('#result-title').getByText('Import completed').waitFor()
+      assert.deepEqual((await native()).filter(person => person.ref.startsWith(`screen-${width}-`)), records, 'the approved plan wrote exactly the reviewed people')
+      assert.equal(await overflow(), true, 'no horizontal overflow at the result')
+
+      await page.getByRole('button', { name: 'Reconcile native records', exact: true }).click()
+      await notice.getByText(/Reconciled: 2 present/).waitFor()
+
+      // The saved plan and its history survive a reload, from the same controls.
+      await page.reload()
+      await page.locator('#history').getByRole('button', { name: 'Open import' }).first().click()
+      await page.locator('#result-title').getByText('Import completed').waitFor()
+      await page.getByRole('button', { name: 'Undo import', exact: true }).click()
+      await page.locator('#result-title').getByText('Import undone').waitFor()
+      assert.deepEqual(await native(), before, 'undo removes what the import wrote')
+      await page.locator('#history').getByText('undone').first().waitFor()
+
+      const enabled = (await settings()).enabled
+      await page.locator('#enabled').setChecked(!enabled)
+      await page.getByRole('button', { name: 'Save import settings', exact: true }).click()
+      await notice.getByText('Import settings saved.').waitFor()
+      assert.equal((await settings()).enabled, !enabled, 'the Business setting is saved through the screen')
+      assert.equal(await overflow(), true)
+      assert.deepEqual(problems, [])
+    } finally { await context.close() }
+  }
 })

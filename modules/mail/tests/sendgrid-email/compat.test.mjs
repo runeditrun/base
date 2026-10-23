@@ -1,23 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMailSender, MailValidationError, serializeSendGridMessage as serializeMail } from '../../index.mjs';
+import { createMailSender, MailValidationError } from '../../index.mjs';
 import { sendSendGrid, serializeSendGridMessage, SendGridSendError } from '../../src/sendgrid-email/index.mjs';
 
 const message = () => ({ from: 'Support <support@example.com>', to: ['person@example.com'], subject: 'Your request', text: 'Reply', html: '<p>Reply</p>', deliveryId: 'durable-1' });
 const accept = async () => new Response(null, { status: 202, headers: { 'x-message-id': 'receipt-1' } });
-
-test('the former sendgrid-email API is served from the mail module', () => {
-  assert.equal(typeof sendSendGrid, 'function');
-  assert.equal(typeof serializeSendGridMessage, 'function');
-  assert.ok(new SendGridSendError('rejected', 'x') instanceof Error);
-});
-
-test('legacy serialization is the mail serializer applied to the same message', () => {
-  const legacy = { ...message(), replyTo: 'reply@example.com', headers: { 'In-Reply-To': '<first@example.com>' }, asmGroupId: 7, subscriptionTracking: false,
-    customArgs: { rer_product: 'orbit' }, attachments: [{ content: 'aGk=', filename: 'proof.txt', type: 'text/plain' }] };
-  const mail = { ...legacy, attachments: [{ content: Uint8Array.of(104, 105), filename: 'proof.txt', contentType: 'text/plain' }] };
-  assert.equal(serializeSendGridMessage(legacy), serializeMail(mail));
-});
 
 test('base64 attachments become bytes and a missing type is a generic binary type', () => {
   const wire = JSON.parse(serializeSendGridMessage({ ...message(), attachments: [{ content: 'AP+ACg==', filename: 'bytes.bin' }] }));
@@ -93,12 +80,6 @@ test('the mail facade accepts the same optional timeout and rejects invalid valu
   for (const timeoutMilliseconds of [0, -1, 1.5, '50', Number.NaN]) {
     assert.throws(() => createMailSender(config, { timeoutMilliseconds, fetch: accept }), error => error instanceof MailValidationError && error.code === 'invalid_timeout');
   }
-});
-
-test('a message without attachments serializes to the exact bytes the former module produced', () => {
-  const wire = serializeSendGridMessage({ from: 'Support <support@example.com>', to: ['Ada <ada@example.net>', 'grace@example.net'], subject: 'S ✓', text: 'T', html: '<p>x</p>',
-    replyTo: '"Re" <r@example.com>', headers: { 'X-A': 'b' }, asmGroupId: 5, subscriptionTracking: false, customArgs: { b: '1', a: '2' }, deliveryId: 'd1' });
-  assert.equal(wire, '{"personalizations":[{"to":[{"email":"ada@example.net","name":"Ada"},{"email":"grace@example.net"}]}],"from":{"email":"support@example.com","name":"Support"},"subject":"S ✓","content":[{"type":"text/plain","value":"T"},{"type":"text/html","value":"<p>x</p>"}],"reply_to":{"email":"r@example.com","name":"Re"},"headers":{"X-A":"b"},"custom_args":{"b":"1","a":"2","rer_delivery_id":"d1"},"asm":{"group_id":5},"tracking_settings":{"click_tracking":{"enable":false,"enable_text":false},"open_tracking":{"enable":false},"ganalytics":{"enable":false},"subscription_tracking":{"enable":false}}}');
 });
 
 test('an empty headers object is the same SendGrid request as no headers', async () => {

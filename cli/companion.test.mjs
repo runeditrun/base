@@ -338,3 +338,46 @@ test('no-turn attestation is explicit, exact and holds the runner lock', { skip:
  assert.ok(existsSync(join(state, 'command-home/filter-ran')), 'the planted filter ran inside the boundary');
  assert.equal(existsSync(outsideMarker), false, 'nor while the attestation was accepted');
 });
+
+test('claude-auth reports success only when the provider confirms a login in the dedicated executor home', async () => {
+ const root = join(directory, 'claude-auth'), home = join(root, 'home'), state = join(root, 'state'), bin = join(root, 'bin');
+ await mkdir(join(home, '.claude'), { recursive: true }); await mkdir(bin, { recursive: true });
+ await writeFile(join(home, '.claude/settings.json'), '{"host":"configuration"}');
+ // The provider CLI is the paid edge: `claude auth login` and `claude auth status --json`.
+ const provider = (login, loggedIn) => `#!${process.execPath}
+const { appendFileSync, existsSync, readdirSync, writeFileSync } = require('node:fs');
+const [group, verb, ...rest] = process.argv.slice(2), home = process.env.HOME, log = ${JSON.stringify(join(root, 'calls.jsonl'))};
+appendFileSync(log, JSON.stringify({ group, verb, rest, home, hostConfiguration: existsSync(home + '/.claude/settings.json'), apiKey: 'ANTHROPIC_API_KEY' in process.env }) + '\\n');
+if (verb === 'login') { if (${login}) writeFileSync(home + '/.signed-in', 'yes'); process.exit(${login} ? 0 : 3); }
+console.log(JSON.stringify({ loggedIn: ${loggedIn} && existsSync(home + '/.signed-in') }));
+`;
+ const authenticate = async (script, ...args) => {
+  await writeFile(join(bin, 'claude'), script, { mode: 0o755 });
+  await rm(join(state, 'executor-home'), { recursive: true, force: true });
+  await rm(join(root, 'calls.jsonl'), { force: true });
+  const result = await companion(['claude-auth', ...args], { home, state, env: { PATH: `${bin}:${process.env.PATH}`, ANTHROPIC_API_KEY: 'host-wide-key-must-not-pass' } });
+  const calls = existsSync(join(root, 'calls.jsonl')) ? (await readFile(join(root, 'calls.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line)) : [];
+  return { result, calls };
+ };
+
+ const ok = await authenticate(provider(true, true));
+ assert.equal(ok.result.code, 0, ok.result.stderr);
+ assert.match(ok.result.stdout, /verified in the dedicated executor home/);
+ assert.deepEqual(ok.calls.map(call => [call.group, call.verb, call.rest]), [['auth', 'login', ['--claudeai']], ['auth', 'status', ['--json']]]);
+ assert.ok(ok.calls.every(call => call.home === join(state, 'executor-home') && !call.hostConfiguration && !call.apiKey), 'only the dedicated home: no host configuration, no host-wide API key');
+ assert.equal(await mode(join(state, 'executor-home')), 0o700);
+
+ const consoleLogin = await authenticate(provider(true, true), '--console');
+ assert.equal(consoleLogin.result.code, 0, consoleLogin.result.stderr);
+ assert.deepEqual(consoleLogin.calls[0].rest, ['--console']);
+
+ const unconfirmed = await authenticate(provider(true, false));
+ assert.notEqual(unconfirmed.result.code, 0, 'a login the provider does not confirm is not success');
+ assert.doesNotMatch(unconfirmed.result.stdout, /verified/);
+ assert.match(unconfirmed.result.stderr, /did not produce a usable dedicated authentication state/);
+
+ const failed = await authenticate(provider(false, true));
+ assert.notEqual(failed.result.code, 0);
+ assert.deepEqual(failed.calls.map(call => call.verb), ['login'], 'status is not consulted after a failed login');
+ assert.doesNotMatch(failed.result.stdout, /verified/);
+});

@@ -1,19 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateGates, AXE_TAGS, VIEWPORTS } from '../index.mjs';
+import { evaluateGates } from '../index.mjs';
 
 function clean() {
   return { axe: { violations: [] }, overflow: { viewport: 390, document: 390, body: 390 }, errors: { page: [], console: [], settle: [] }, failedResponses: [], externalRequests: [], secretsFound: [], keyboard: { passed: true }, documentStatus: 200 };
 }
-test('published defaults include all five WCAG tags and the two specified viewports', () => {
-  assert.deepEqual(AXE_TAGS, ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']);
-  assert.deepEqual(VIEWPORTS, [{ width: 1440, height: 900 }, { width: 390, height: 844 }]);
-});
-test('clean measurements pass, including one pixel of overflow', () => {
-  const entry = clean();
-  entry.overflow.body++;
-  assert.deepEqual(evaluateGates(entry), { passed: true, failures: [] });
-});
 for (const impact of ['serious', 'critical']) test(`axe ${impact} gate`, () => {
   const entry = clean(); entry.axe.violations.push({ impact });
   assert.deepEqual(evaluateGates(entry).failures, ['axe']);

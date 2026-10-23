@@ -205,3 +205,44 @@ test('crashed unadmitted ticks expire atomically with their original ids even be
     assert.equal((await h.runWith(async () => {})).status, 'completed')
   } finally { await h.close() }
 })
+
+test('the owner approves and revokes a scheduled policy through the forms the page renders', async () => {
+  const r = await emittedRuntime()
+  try {
+    const claimed = await r.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Rivera Lee' } })
+    assert.equal(claimed.status, 303)
+    await r.call('/auth/magic-link', { method: 'POST', input: { email: 'owner@example.test' } })
+    const token = new URL(r.mails.at(-1).text.match(/https?:\/\/\S+/)[0]).searchParams.get('token')
+    const confirmed = await r.call('/auth/confirm', { method: 'POST', input: { token } })
+    const cookie = confirmed.headers.get('set-cookie').split(';')[0]
+    assert.equal((await r.call('/setup', { method: 'POST', cookie, body: 'confirm=yes', headers: { 'content-type': 'application/x-www-form-urlencoded' } })).status, 303)
+    const submit = (fields, headers = {}) => r.call('/app/policies', { method: 'POST', cookie, body: new URLSearchParams(fields).toString(), headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers } })
+    // The fields come from the rendered forms, not from the JSON listing.
+    const formFields = html => [...html.matchAll(/<form method="post" action="\/app\/policies">((?:(?!<\/form>)[\s\S])*)<\/form>/g)]
+      .map(([, form]) => Object.fromEntries([...form.matchAll(/<input type="hidden" name="(\w+)" value="([^"]*)">/g)].map(([, name, value]) => [name, value])))
+    const approvals = async () => (await (await r.call('/auth/policies', { cookie })).json()).policies.map(policy => policy.approval)
+    const html = async () => (await r.call('/app/policies', { cookie })).text()
+
+    assert.equal((await r.call('/app/policies')).status, 303, 'the page needs a signed-in owner')
+    const [approve] = formFields(await html())
+    assert.equal(approve.action, 'approve')
+    assert.deepEqual(await approvals(), [null])
+
+    const stale = await submit({ ...approve, versionHash: 'f'.repeat(64) })
+    assert.ok(stale.status >= 400 && (await stale.text()).includes('Request refused'))
+    assert.equal((await submit(approve, { 'sec-fetch-site': 'cross-site' })).status, 403)
+    assert.deepEqual(await approvals(), [null], 'a stale version and a cross-site post approve nothing')
+
+    const approved = await submit(approve)
+    assert.deepEqual([approved.status, approved.headers.get('location')], [303, '/app/policies'])
+    const [approval] = await approvals()
+    assert.equal(approval.versionHash, approve.versionHash)
+    assert.equal(approval.revokedAt ?? null, null)
+    const revoke = formFields(await html()).find(fields => fields.action === 'revoke')
+    assert.equal(revoke.approvalId, approval.id)
+
+    assert.equal((await submit(revoke)).status, 303)
+    assert.notEqual((await (await r.call('/auth/policies', { cookie })).json()).policies[0].approval?.revokedAt ?? null, null)
+    assert.equal(formFields(await html()).some(fields => fields.action === 'revoke'), false, 'a revoked approval offers no second revoke')
+  } finally { await r.close() }
+})

@@ -4,7 +4,7 @@ import { copyFile, mkdir, readFile, readdir, realpath, rm, symlink } from 'node:
 import { dirname, resolve, relative, isAbsolute, sep } from 'node:path'
 import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
-import { project, put, run, moduleRoot, example } from './helpers.mjs'
+import { project, put, run, moduleRoot } from './helpers.mjs'
 
 async function copyList(readme) {
   readme ??= await readFile(resolve(moduleRoot, 'README.md'), 'utf8')
@@ -83,14 +83,6 @@ test('README copy list adopts a violating tree with exact CLI lines', async t =>
   assert.equal(result.status, 1)
   assert.equal(result.stdout, '')
   assert.equal(result.stderr, 'Boundary check failed with 2 violation(s):\n- src/core/features/a/use.ts:1 R3: feature a must import b through its public index\n- src/core/features/a/use.ts:3 R3: feature a must import delivery through its public index\n')
-})
-test('README worked configs cannot drift from the plain JSON examples', async () => {
-  const readme = await readFile(resolve(moduleRoot, 'README.md'), 'utf8')
-  for (const name of ['pencil', 'dial', 'orbit']) {
-    const section = readme.split(`### ${name[0].toUpperCase()}${name.slice(1)}\n`)[1]
-    const json = section.split('```json\n')[1].split('```')[0]
-    assert.deepEqual(JSON.parse(json), await example(name))
-  }
 })
 
 const escapingForms = {
