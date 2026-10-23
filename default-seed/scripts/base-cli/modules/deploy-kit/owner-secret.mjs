@@ -4,7 +4,7 @@ import { activeWorker } from './worker.mjs';
 import { secretNames, validSecretNames } from './owner-secret-names.mjs';
 import { waitHealth } from './health-request.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
-import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDeployment, refuse, recordSecretChange, settlePendingSecret, pendingSecrets, servedBindings } from './owner.mjs';
+import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDeployment, refuse, recordSecretChange, settlePendingSecret, pendingSecrets, servedBindings, liveBindings } from './owner.mjs';
 import { uploadSecretCopy, deploySecretCopy } from './owner-secret-copy.mjs';
 import { recordedNames } from './ai.mjs';
 import { admit } from '../ai/native/names.mjs';
@@ -23,9 +23,10 @@ import { admit } from '../ai/native/names.mjs';
  * re-PUTs the value before accepting its successor as proof of the rotation.
  * A removed declared secret is retired: later plans omit it until it is set again.
  * The new version keeps everything the Worker serves but the changed secrets, so the recorded
- * deployment's runtime names admit what this change and a pending one leave on it before the
- * lock (a change carries its declared `environment` source and `optional` flag when known),
- * and what the live Worker serves under it, before any recovery, intent or provider write. */
+ * deployment's runtime names admit what this change and a pending one leave on it (a change
+ * carries its declared `environment` source and `optional` flag when known) and what the live
+ * Worker serves, read back without a lock, before the lock; and the live Worker again under it,
+ * before any recovery, key custody, intent or provider write. */
 export async function ownerSecret({api: provider, target, statePath, changes, fetch = globalThis.fetch, healthOptions = {}, windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), beforeWrite = async () => {}}) {
   const api = withScopeHints(provider);
   const bindings = changes.map(change => change.binding), present = changes[0]?.value !== undefined;
@@ -33,7 +34,11 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
   assert(changes.every(change => (change.value !== undefined) === present), 'mixed-secret-change');
   for (const {binding, value} of changes) assert(value === undefined || typeof value === 'string' && value.trim(), `missing-secret-${binding}`);
   const recorded = await readOwnerState(statePath, target);
-  if (recorded.receipt) anticipate(recordedNames(recorded.receipt, target), recorded, changes, present);
+  if (recorded.receipt) {
+    const runtime = recordedNames(recorded.receipt, target);
+    anticipate(runtime, recorded, changes, present);
+    admit(runtime, (await liveBindings(api, target.worker, recorded)).filter(row => present || !bindings.includes(row.name)));
+  }
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
     assert(state.receipt && !state.pendingUpload, 'missing-owner-receipt');

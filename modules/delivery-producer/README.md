@@ -185,6 +185,8 @@ A delivery package has no approved native AI route. An `ai` field in
 specification is refused with `ai_hosting_unproven` before anything is packaged,
 exported or passed by `rer check`. A raw Wrangler `ai` binding stays an
 unsupported binding, and no name a package declares may use the reserved
-`RER_AI_` namespace (`ai_policy_conflict`). Native AI is served only by
+`RER_AI_` namespace (`ai_policy_conflict`), including every field of the setup
+manifest it packages, generated or copied, which is refused before its canonical
+bytes are produced. Native AI is served only by
 `rer deploy` to the owner's own Cloudflare account; see the
 [consumer guide](../ai/native/README.md).

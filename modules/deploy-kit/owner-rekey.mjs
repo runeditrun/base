@@ -1,6 +1,6 @@
 import { assert, uuid } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
-import { checkResourceIdentity, readOwnerState, sameDeployment, withStateLock, ownerResourceName, servedBindings } from './owner.mjs';
+import { checkResourceIdentity, readOwnerState, sameDeployment, withStateLock, ownerResourceName, servedBindings, liveBindings } from './owner.mjs';
 import { recordedNames } from './ai.mjs';
 import { admit } from '../ai/native/names.mjs';
 import { retiredInstallationKeys } from '../dependencies/custody.mjs';
@@ -27,8 +27,11 @@ function database(api, id) {
 
 /** Reseal the dependency rows in the declared DB only while the receipt still
  * proves both the Worker and its recorded D1 resource belong to this deployment,
- * read back through the recorded deployment's runtime names (`runtime`). */
+ * read back through the recorded deployment's runtime names (`runtime`): once without
+ * a lock before it locks, so a refusal never waits on another run's lock, and again under it. */
 export async function ownerRekey({ api, target, statePath, declaration, env, runtime, notice = line => console.error(line) }) {
+ const recorded = await readOwnerState(statePath, target);
+ if (recorded.receipt) admit(runtime ?? recordedNames(recorded.receipt, target), await liveBindings(api, target.worker, recorded));
  return withStateLock(statePath, async () => {
   const state = await readOwnerState(statePath, target);
   assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');

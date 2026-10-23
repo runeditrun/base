@@ -4,6 +4,7 @@ import {checkedPath, relativePath} from './paths.mjs';
 import {keys} from './bindings.mjs';
 import {parseSetupManifestBytes, validateSetupManifest} from '../../schema/setup-validation.mjs';
 import {validateMailSetup} from './mail.mjs';
+import {DENY,admit} from '../ai/native/names.mjs';
 
 const setupSchemaUrl = new URL('../../schema/SETUP.schema.json', import.meta.url);
 const outputPath = 'rer-setup.json';
@@ -28,6 +29,9 @@ export async function loadSetupManifest(root, selection, mail) {
   const errors = validateSetupManifest(schema, manifest);
   if (errors.length) throw new Error(`Invalid setup manifest: ${errors.join('; ')}`);
   validateMailSetup(mail, manifest);
+  // Every field becomes a setting the installed runtime reads by name (generated, copied or entered): a
+  // package has no approved AI route, so none may be a reserved AI name, refused before any bytes.
+  admit(DENY, manifest.fields.map(field => ({type: field.kind === 'secret' ? 'secret_text' : 'var', name: field.name})));
   const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   if (selection.manifestFile === outputPath && !inputBytes.equals(bytes)) throw new Error('rer-setup.json must use canonical bytes: JSON.stringify(manifest, null, 2) plus a newline.');
   return {manifest, path: outputPath, bytes, sha256: createHash('sha256').update(bytes).digest('hex')};

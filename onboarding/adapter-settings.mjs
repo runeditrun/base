@@ -12,6 +12,10 @@ import { recoverInterrupted } from './local/recovery.mjs';
 // The shared loopback predicate, beside this copy in Base or in a seed's scripts/.
 const portable = basename(dirname(fileURLToPath(import.meta.url))) === 'base-onboarding';
 const { isLocalhostName } = await import(new URL(portable ? '../base-cli/modules/operator-auth/loopback.mjs' : '../modules/operator-auth/loopback.mjs', import.meta.url));
+const { DENY, admit } = await import(new URL(portable ? '../base-cli/modules/ai/native/names.mjs' : '../modules/ai/native/names.mjs', import.meta.url));
+// Local runtimes start from these settings, read by name: only rer deploy derives a reserved AI name,
+// from an approved ai declaration, so none is saved here or handed to the startup context.
+const refuseReserved = values => admit(DENY, Object.keys(values).map(name => ({ type: 'var', name })));
 
 async function freePort() {
  const socket = createServer();
@@ -64,9 +68,10 @@ const dotenvValue = value => /^[A-Za-z0-9._@:/+=,-]*$/.test(value) ? value : JSO
 async function keepSettings(current, { manifest, store }, { format = 'dotenv' }) {
  const added = Object.fromEntries((manifest?.fields ?? []).filter(field => field.kind === 'secret' && field.input === 'managed' && field.generate && !Object.hasOwn(current.values, field.name))
   .map(field => [field.name, randomBytes(32).toString(field.generate)]));
+ const merged = { ...current.values, ...added };
+ refuseReserved(merged);
  if (!Object.keys(added).length) return current.values;
  store.addSecrets?.(Object.values(added));
- const merged = { ...current.values, ...added };
  await writePrivateFile(current.path, format === 'json' ? JSON.stringify(merged, null, 1) + '\n'
   : current.text.replace(/\n*$/, '\n').replace(/^\n$/, '') + Object.entries(added).map(([key, value]) => `${key}=${dotenvValue(value)}`).join('\n') + '\n');
  return merged;
@@ -98,6 +103,7 @@ async function writeSecrets(context, options) {
   for (const [key, value] of Object.entries(updates)) if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || /[\r\n\0]/.test(value)) throw new TypeError(`Unsupported local setting ${key}.`);
   store.addSecrets?.((manifest?.fields??[]).filter(field=>field.kind==='secret').flatMap(field=>[current.values[field.name],wanted[field.name]]).filter(Boolean));
   const merged = { ...current.values, ...updates };
+  refuseReserved(merged);
   store.addSecrets?.([...generated.map(field => merged[field.name]).filter(Boolean), ...(manifest?.fields??[]).filter(field=>field.kind==='secret').map(field=>merged[field.name]).filter(Boolean), ...credentialValues(merged)]);
   if (Object.keys(updates).length) {
    const replacing = Object.keys(updates).some(key => Object.hasOwn(current.values, key));
@@ -136,6 +142,7 @@ function rewriteOrigin(root, options, values, origin) {
 
 async function rewriteSetting(root, options, values, key, value) {
  const current = await readSettings(root, options), format = options.format ?? 'dotenv', merged = { ...values, [key]: value };
+ refuseReserved(merged);
  const text = format === 'json' ? JSON.stringify(merged, null, 1) + '\n' : current.text.replace(new RegExp(`^${key}=.*$`, 'm'), `${key}=${dotenvValue(value)}`);
  if (format !== 'json' && localVariables(text)[key] !== value) throw new Error(`Could not change ${key} in ${options.file ?? '.dev.vars'}; put ${key}=${value} on its own line.`);
  await writePrivateFile(current.path, text);

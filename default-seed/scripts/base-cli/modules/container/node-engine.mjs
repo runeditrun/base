@@ -9,7 +9,10 @@ import { publicFetch } from './adapters/egress.mjs';
 import { assets } from './assets.mjs';
 import { ensurePortabilitySchema } from './portability-schema.mjs';
 import { migrate } from './migrations.mjs';
+import { DENY, admit, configBindings } from '../ai/native/names.mjs';
 export async function nodeEngine({ root, data, manifest, settings, edge }) {
+ // A container serves no native AI: no name the app's env takes (the manifest's configuration and D1 bindings, these settings) may be a reserved AI name, refused before any state opens.
+ admit(DENY, [...configBindings(manifest.config), ...Object.keys(manifest.migrations).map(name => ({ type:'d1', name })), ...Object.keys(settings ?? {}).map(name => ({ type:'var', name }))]);
  const platform = new DatabaseSync(join(data, 'platform.sqlite')); platform.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON');
  const env = { ...manifest.config.vars, ...settings, ASSETS: assets(join(root, 'dist/client')) }, databases = {}, queues = [];
  for (const [binding, plan] of Object.entries(manifest.migrations)) { const db = new D1(join(data, binding + '.sqlite')); databases[binding] = db; env[binding] = db; await migrate(db, plan); await ensurePortabilitySchema(db, manifest.portabilityMigrations); }

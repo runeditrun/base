@@ -6,9 +6,12 @@ import { incoming, outgoing } from './ingress.mjs';
 import { attachWebSockets } from './websockets.mjs';
 import { parseCron, cronMatches } from '../../cli/scheduled.mjs';
 import { superviseRunner } from './runner.mjs';
+import { DENY, admit, configBindings } from '../ai/native/names.mjs';
 export async function startHost({ root = '/app', data = '/data', settings = process.env, port = Number(process.env.PORT ?? 8080), edge, engineVersion = process.version, automaticTicks=true, runnerEnabled=true } = {}) {
- await mkdir(data, { recursive:true });
  const manifest = JSON.parse(await readFile(join(root, 'container.json'), 'utf8'));
+ // What either engine binds passes the same refusal before the volume is created or its owner recorded.
+ admit(DENY, [...configBindings(manifest.config), ...Object.keys(manifest.migrations).map(name => ({ type:'d1', name })), ...Object.keys(settings).map(name => ({ type:'var', name }))]);
+ await mkdir(data, { recursive:true });
  const release = await recordVolumeOwner(data);
  let engine, server, timer, idleTimer, runner, closing, closeWebSockets, lastMinute = -1, lastRequest=Date.now();
  try {
@@ -41,6 +44,6 @@ export async function startHost({ root = '/app', data = '/data', settings = proc
 }
 if (process.argv[1] === import.meta.filename) {
  let host;
- try { host = await startHost(); console.log('RER_CONTAINER_READY'); } catch (cause) { console.error('Container startup failed:', cause.message?.match(/^[a-z-]+$/)?.[0] ?? cause.name); process.exitCode=1; }
+ try { host = await startHost(); console.log('RER_CONTAINER_READY'); } catch (cause) { console.error('Container startup failed:', cause.message?.match(/^[a-z_-]+$/)?.[0] ?? cause.name); process.exitCode=1; }
  if (host) for (const signal of ['SIGINT','SIGTERM']) process.once(signal,async () => { await host.close(); process.exit(0); });
 }

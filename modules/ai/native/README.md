@@ -91,7 +91,12 @@ upgrade and deploy); delivery packages, their declarations, `rer check` and the
 portable export; `rer verify`; and the run site's declaration. Those paths, the site, egress and docs-search
 builds, and the checkout's local settings that `rer setup`, `rer dev`,
 `rer preview`, local `rer demo` and the local container start from, refuse a
-reserved name (`ai_policy_conflict`) the same way. Container and hosted-demo builds check the
+reserved name (`ai_policy_conflict`) the same way. So does every field of the
+setup manifest a delivery package emits (`rer-setup.json`), generated or
+copied, before its canonical bytes, and every writer of a checkout's local
+settings (first setup, a later run that adds managed secrets, an origin or owner
+rewrite, local email settings), before it writes them or hands them to a start.
+Container and hosted-demo builds check the
 seed's own Wrangler configuration, every environment included, before they
 compile, and the configuration the build emitted before they write a package. A
 hosted demo's upgrade admits what the live demo Worker passes on before it
@@ -116,21 +121,23 @@ Order: deploy, dry run and health plan the whole declaration, secrets retired
 with `--unset-secret` included, and the declaration each retired list a pending
 secret change could leave once settled, then pair the approval with the payer
 and the artifact source (health also with the recorded deployment's source).
-They do it before a deploy saves a first installation key, before the state
-lock and before settlement, so a refusal leaves the lock, the pending intent,
-the receipt and key custody untouched. Secret changes (including rotation,
-reopening and the setup token's retirement) admit, through the recorded
-deployment's names, what this change and a pending one would leave before they
-lock; rotation and reopening save their keys only after those refusals have
-passed. Owner claim, sign-in, inspection and rekey admit a pending change and
-read the live Worker back through the recorded names before they lock, so a
-refusal never waits on another run's lock, and read it again before any state
-or database write. Removal is the one command that admits nothing: it deletes
-the Worker. A deploy or secret change admits, under the lock and before any
-state or provider write, what the live Worker keeps: the secrets a fresh upload
-keeps, or everything the new secret version inherits; a dry run reads the same
-secrets without locking. That readback needs the provider, so a deploy that
-saves a first installation key has saved it by then.
+Every owner command but removal admits what a pending secret change would leave
+(a secret change, including rotation, reopening and the setup token's
+retirement, with what it changes itself, through the recorded deployment's
+names). Every one but removal and dry run then reads the Worker the state
+records back through those names, with read-only requests that need no lock: its
+settings, its active version and the secrets it lists. A deploy admits the
+secrets a fresh upload keeps; a secret change everything the new version
+inherits; health, owner claim, sign-in, inspection and rekey everything they read
+back. All of this happens before a deploy saves a first installation key, before
+rotation or reopening saves its keys, before the state lock and before
+settlement, so a refusal leaves key custody, the lock, the pending intent and the
+receipt untouched and is reported as itself even while another run holds the
+lock. The exported `ownerDeploy`, `ownerSecret` and `ownerRekey` do the same
+before their own lock. Under the lock, each reads the live Worker again before
+any state, database or provider write; a dry run reads the secrets a deploy
+would keep without locking. Removal is the one command that admits nothing: it
+deletes the Worker.
 
 Boundaries this does not cover: a custom deploy hook runs the author's own
 upload code before any kit check (the owner kit calls it makes are projected);
@@ -142,8 +149,16 @@ deploy declaration and the settings it delivers are checked (an image
 Local runtimes serve no native AI: with the Base operator installer, `rer dev`
 and `rer preview` start only once the local settings hold `AUTH_LOCAL=true`,
 local `rer demo` runs in demo mode, and the consumer refuses both modes before
-it reads any authority; the seed's own Wrangler configuration reaches those
-runtimes as written. An interrupted several-secret copy that staged an
+it reads any authority. Two runtime boundaries also refuse a reserved name
+themselves (`ai_policy_conflict`) before they create state or serve:
+`rer preview`'s local Worker, over its final converted configuration (every name
+the pinned Wrangler converter binds from the built configuration and its local
+variables, and the settings and origin rer adds), and the container runtime
+(its node and workerd engines and the host that starts them), over the
+configuration and settings names it merges into the app's env. Neither holds an
+AI approval or a native AI binding: they are boundaries of runtimes that serve
+no native AI, not an AI route. `rer dev` and local
+`rer demo` serve the seed's own Wrangler configuration as written. An interrupted several-secret copy that staged an
 unapproved reserved name is never deployed, so its change cannot complete:
 every other command refuses it, and only `rer deploy --remove --yes`, which
 deletes the environment's Worker and resources, clears it (the copy is one of

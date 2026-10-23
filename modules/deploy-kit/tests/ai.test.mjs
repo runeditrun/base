@@ -16,6 +16,8 @@ import {CONFIG_FAMILIES,AI_VARIABLES,AI_PRIVACY_TOKEN} from '../../ai/native/nam
 import {canonical} from '../../ai/native/policy.mjs';
 import {nativeBindings} from '../../demo-host/native/config.mjs';
 import {uploadSecretCopy} from '../owner-secret-copy.mjs';
+import {ownerSecret} from '../owner-secret.mjs';
+import {ownerRekey} from '../owner-rekey.mjs';
 import {activeWorker} from '../worker.mjs';
 const model='@cf/qwen/qwen3.8-27b';
 const request={schema:1,provider:'cloudflare',transport:'native',binding:'AI',budgetBinding:'AI_BUDGET',imageBinding:'AI_IMAGES',textModels:[model],imageModels:[],purposes:[{id:'site-read',kind:'text',model}],limits:{calls:10,units:10000000,microUsd:10000000},operations:{textCalls:2,maxInputBytes:10000,maxOutputTokens:1024,imageUnits:0,timeoutMs:1000}};
@@ -221,10 +223,12 @@ test('every owner command, Worker write and configuration family passes the one 
  const locked=async(cell,code,run)=>{
   const bytes=await readFile(statePath),writes=provider.state.writes.length;
   await writeFile(statePath+'.lock','other-run\n');
-  let error;try{await run();}catch(e){error=e;}finally{await rm(statePath+'.lock');}
+  let error,lock;try{await run();}catch(e){error=e;}finally{lock=await readFile(statePath+'.lock','utf8');await rm(statePath+'.lock');}
   assert.equal(error?.code??error?.message,code,`${cell}: ${error?.code??error?.message}`);
-  assert.equal(provider.state.writes.length,writes,cell);assert.deepEqual(await readFile(statePath),bytes,cell);
+  assert.equal(provider.state.writes.length,writes,cell);assert.deepEqual(await readFile(statePath),bytes,cell);assert.equal(lock,'other-run\n',cell);
  };
+ let custody=0;
+ const planned=(command,file,extra=[],beforeWrite=async()=>{custody++;})=>main([command,'--declaration',file,'--environment','production',...extra],env,{fetch,cwd:root,notice:()=>{},beforeWrite});
  // A reserved name the live Worker serves outside the approval: a secret change would inherit it, every other
  // command reads it back. Removal deletes it; a dry run reads only the secrets a fresh upload would keep.
  const foreign={type:'plain_text',name:'RER_AI_LIVE',text:'synthetic-live'},live=[provider.state.settings.bindings,provider.state.version.resources.bindings];
@@ -238,8 +242,18 @@ test('every owner command, Worker write and configuration family passes the one 
  // The maintenance commands read it back before they lock: their refusal never waits on another run's lock.
  for(const command of ['inspect','record-owner','signin','rekey'])await locked(`live x ${command} while another run holds the lock`,'ai_policy_conflict',()=>cli(command,extras[command]?.[0]));
  for(const bindings of live)bindings.splice(bindings.indexOf(foreign),1);
- let custody=0;
- const planned=(command,file,extra=[],beforeWrite=async()=>{custody++;})=>main([command,'--declaration',file,'--environment','production',...extra],env,{fetch,cwd:root,notice:()=>{},beforeWrite});
+ // A reserved secret the live Worker holds outside the approval: every entry keeps it or reads it back, so every command
+ // and each exported entry they call refuses it before key custody, the lock or settlement, while another run holds the lock.
+ const heldSecret={type:'secret_text',name:'RER_AI_HELD'},sha=git('rev-parse','HEAD'),artifact={...inert,source:{sha,tree:git('rev-parse','HEAD^{tree}')}};
+ for(const bindings of new Set(live))bindings.push(heldSecret);provider.state.secrets.push({name:heldSecret.name,value:'synthetic-held'});
+ const changes={...extras,secret:[...extras.secret,['--unset','B_SECRET']]};
+ for(const command of COMMANDS.filter(command=>command!=='remove'))for(const extra of changes[command]??[[]])
+  await locked(`held secret x ${command} ${extra.join(' ')} while another run holds the lock`,'ai_policy_conflict',()=>planned(command,'deploy.json',extra));
+ for(const [entry,run] of Object.entries({ownerDeploy:()=>ownerDeploy({api,target,plan:ownerPlan(target,declaration,artifact,{env}),artifact,statePath,env}),
+  ownerSecret:()=>ownerSecret({api,target,statePath,changes:[{binding:'A_SECRET',environment:'A_SECRET',value:'synthetic-a'}],beforeWrite:async()=>{custody++;}}),ownerRekey:()=>ownerRekey({api,target,statePath,declaration,env})}))
+  await locked(`held secret x exported ${entry} while another run holds the lock`,'ai_policy_conflict',run);
+ assert.equal(custody,0);
+ for(const bindings of new Set(live))bindings.splice(bindings.indexOf(heldSecret),1);provider.state.secrets=provider.state.secrets.filter(item=>item.name!==heldSecret.name);
  // A secret retired with --unset-secret stays declared: deploy, dry run and health plan the whole declaration, its binding and its source alike.
  for(const entry of [{binding:'RER_AI_RETIRED',environment:'A_SECRET',optional:true},{binding:'C_SECRET',environment:'RER_AI_RETIRED',optional:true}]){
   await writeFile(join(root,'retired.json'),JSON.stringify({...declaration,secrets:[...declaration.secrets,entry]}));
@@ -279,8 +293,89 @@ test('every owner command, Worker write and configuration family passes the one 
   for(const gate of [()=>checkImageBindings(config),()=>nativeBindings(config),()=>verifyBindings([{type,name,text:'synthetic'}],[])])
    assert.throws(gate,e=>e.code==='ai_policy_conflict'||['ai','service'].includes(type)&&/undeclared-native-ai-binding|binding-readback-mismatch/.test(e.message),`${family}`);
  }
+ const base=join(import.meta.dirname,'../../..'),lookalike=name=>`APP_${name}`,reservedNames=[...AI_VARIABLES,AI_PRIVACY_TOKEN,'RER_AI_FUTURE_SETTING'];
+ // rer preview's converted Worker: a reserved name from the built configuration, a binding family, Wrangler's own local
+ // variables or rer's settings is refused before its runtime starts; lookalikes bind as written and serve.
+ const {productionPlan,projectMiniflare}=await import('../../../onboarding/production-options.mjs');
+ const preview=await realpath(await mkdtemp(join(tmpdir(),'native-ai-preview-')));t.after(()=>rm(preview,{recursive:true,force:true}));
+ for(const dir of ['dist/server','dist/client'])await mkdir(join(preview,dir),{recursive:true});
+ await symlink(join(base,'default-seed/node_modules'),join(preview,'node_modules'));await writeFile(join(preview,'package.json'),'{"type":"module"}');
+ await writeFile(join(preview,'dist/server/index.mjs'),'export default {fetch(request,env){return Response.json(Object.keys(env))}}');
+ const channels={'built variable':name=>({config:{vars:{[name]:'synthetic'}}}),'Wrangler local variable':name=>({config:{},wrangler:`${name}=synthetic\n`}),'rer setting':name=>({config:{},settings:`${name}=synthetic\n`}),
+  'D1 binding':name=>({config:{d1_databases:[{binding:name,database_name:'synthetic',database_id:'00000000-0000-4000-8000-000000000000'}]}}),'R2 binding':name=>({config:{r2_buckets:[{binding:name,bucket_name:'synthetic'}]}}),
+  'KV binding':name=>({config:{kv_namespaces:[{binding:name,id:'synthetic'}]}}),'queue producer':name=>({config:{queues:{producers:[{binding:name,queue:'synthetic'}]}}}),
+  'service binding':name=>({config:{services:[{binding:name,service:'synthetic-upstream'}]}}),'Durable Object binding':name=>({config:{durable_objects:{bindings:[{name,class_name:'Synthetic'}]}}}),
+  'version metadata':name=>({config:{version_metadata:{binding:name}}}),'assets binding':name=>({config:{assets:{binding:name,directory:'../client'}}})};
+ const plannedPreview=async({config,wrangler,settings})=>{
+  await writeFile(join(preview,'dist/server/wrangler.json'),JSON.stringify({name:'synthetic-preview',main:'index.mjs',compatibility_date:'2026-09-08',...config}));
+  for(const [file,text] of [['dist/server/.dev.vars',wrangler],['.dev.vars',settings]])if(text===undefined)await rm(join(preview,file),{force:true});else await writeFile(join(preview,file),text,{mode:0o600});
+  return productionPlan(preview,'http://127.0.0.1:19831',0);
+ };
+ for(const [channel,inputs] of Object.entries(channels)){
+  await assert.rejects(plannedPreview(inputs('RER_AI_PREVIEW')),e=>e.code==='ai_policy_conflict',`${channel} x preview`);
+  const plan=await plannedPreview(inputs(lookalike('RER_AI_PREVIEW')));assert.ok(JSON.stringify(plan.workers[0]).includes('"APP_RER_AI_PREVIEW"'),`${channel} lookalike x preview`);
+ }
+ const served=await plannedPreview({config:{vars:{rer_ai_preview:'synthetic',AI_ENABLED:'true',RER_AI:'synthetic',RER_A1_PREVIEW:'synthetic'}},wrangler:'APP_RER_AI_LOCAL=synthetic\n',settings:'APP_RER_AI_SETTING=synthetic\n'});
+ const {Miniflare,convertV4MiniflareOptions}=await projectMiniflare(preview),mf=new Miniflare(convertV4MiniflareOptions(served));
+ try{await mf.ready;const names=await(await(await mf.getWorker('synthetic-preview')).fetch('http://localhost/')).json();for(const name of ['rer_ai_preview','AI_ENABLED','RER_AI','RER_A1_PREVIEW','APP_RER_AI_LOCAL','APP_RER_AI_SETTING'])assert.ok(names.includes(name),name);}
+ finally{await mf.dispose();}
+ // The container runtime merges settings into the app's env: both engines, and the host that starts them, refuse a reserved
+ // setting or configuration name before they open any state; lookalikes are bound as written.
+ const {nodeEngine}=await import('../../container/node-engine.mjs'),{workerEngine}=await import('../../container/worker-engine.mjs'),{startHost}=await import('../../container/host.mjs');
+ const image=await realpath(await mkdtemp(join(tmpdir(),'native-ai-container-')));t.after(()=>rm(image,{recursive:true,force:true}));
+ for(const dir of ['dist/server','dist/client'])await mkdir(join(image,dir),{recursive:true});
+ await writeFile(join(image,'dist/server/index.mjs'),'export default {fetch(request,env){return Response.json(Object.keys(env))}}');
+ const manifest=vars=>({version:1,entry:'dist/server/index.mjs',config:{compatibility_date:'2026-09-08',vars},migrations:{},portabilityMigrations:[]});
+ await writeFile(join(image,'container.json'),JSON.stringify({...manifest({}),engine:'node'}));
+ for(const [engine,create] of Object.entries({node:nodeEngine,workerd:workerEngine,host:options=>startHost({...options,port:0,automaticTicks:false,runnerEnabled:false})}))for(const name of reservedNames){
+  const data=join(image,`data-${engine}`);
+  for(const [cell,options] of Object.entries({setting:{manifest:manifest({}),settings:{[name]:'synthetic'}},configuration:{manifest:manifest({[name]:'synthetic'}),settings:{}}})){
+   if(engine==='host'&&cell==='configuration')continue;
+   // An engine that started instead of refusing is closed, so the failure is reported rather than left serving.
+   const started=await create({root:image,data,...options}).catch(error=>error);
+   if(!(started instanceof Error))await started.close();
+   assert.equal(started?.code,'ai_policy_conflict',`${cell} ${name} x ${engine}`);
+   await assert.rejects(readdir(data),{code:'ENOENT'},`${cell} ${name} x ${engine} opens no state`);
+  }
+ }
+ for(const [engine,create] of Object.entries({node:nodeEngine,workerd:workerEngine})){
+  const data=join(image,`data-${engine}`);await mkdir(data);
+  const started=await create({root:image,data,manifest:manifest({AI_ENABLED:'true'}),settings:Object.fromEntries(reservedNames.map(name=>[lookalike(name),'synthetic']))});
+  try{const names=await(await started.fetch(new Request('http://localhost/'))).json();for(const name of [...reservedNames.map(lookalike),'AI_ENABLED'])assert.ok(names.includes(name),`${name} x ${engine}`);}
+  finally{await started.close();}
+ }
+ // Setup field names become settings by name. A package refuses a reserved one, generated or copied, before its canonical
+ // bytes; both settings writers (first setup, and a kept file a later run adds managed secrets to) refuse it before they
+ // write it or hand it to the runtime's start. The seed's own fields drive it; lookalikes are kept.
+ const {loadSetupManifest}=await import('../../delivery-producer/setup-manifest.mjs'),{prepareSettings}=await import('../../../onboarding/adapter-settings.mjs');
+ const seed=JSON.parse(await readFile(join(base,'default-seed/rer-setup.json'),'utf8')),renamed=(from,to)=>JSON.parse(JSON.stringify(seed).replaceAll(JSON.stringify(from),JSON.stringify(to)));
+ const setup=await realpath(await mkdtemp(join(tmpdir(),'native-ai-setup-')));t.after(()=>rm(setup,{recursive:true,force:true}));
+ const origin='http://127.0.0.1:19832',secrets={file:'.dev.vars',originKey:'AUTH_ORIGIN',values:{AUTH_LOCAL:'true',AUTH_ORIGIN:origin}},owner='synthetic-owner@example.test';
+ const store={step:async()=>{},addSecrets(){}};
+ for(const field of seed.fields)for(const name of [`RER_AI_${field.name}`,lookalike(`RER_AI_${field.name}`)]){
+  const manifest=renamed(field.name,name),reserved=!name.startsWith('APP_'),generated=field.kind==='secret'&&field.generate;
+  await writeFile(join(setup,'setup.json'),JSON.stringify(manifest));
+  if(reserved)await assert.rejects(loadSetupManifest(setup,{manifestFile:'setup.json'}),e=>e.code==='ai_policy_conflict',`${name} x package`);
+  else assert.ok((await loadSetupManifest(setup,{manifestFile:'setup.json'})).manifest.fields.some(item=>item.name===name),`${name} x package`);
+  // First setup: generated fields are generated, every other field is copied from the setup input.
+  const input=Object.fromEntries(manifest.fields.filter(item=>item.kind!=='secret').map(item=>[item.name,item.kind==='email'?owner:'https://synthetic.example']));
+  const first={root:setup,selectedOrigin:origin,manifest,input,store};
+  await rm(join(setup,'.dev.vars'),{force:true});
+  if(reserved){
+   await assert.rejects(prepareSettings(first,{secrets}),e=>e.code==='ai_policy_conflict',`${name} x first setup`);
+   await assert.rejects(readFile(join(setup,'.dev.vars')),{code:'ENOENT'},`${name} x first setup writes nothing`);assert.equal(first.vars,undefined);
+  } else {await prepareSettings(first,{secrets});assert.ok(Object.hasOwn(first.vars,name)&&(await readFile(join(setup,'.dev.vars'),'utf8')).includes(`${name}=`),`${name} x first setup`);}
+  if(!generated||field.input!=='managed')continue;
+  // A later run keeps the saved file and adds the managed generated secrets it lacks.
+  const kept=`AUTH_LOCAL=true\nAUTH_ORIGIN=${origin}\nOWNER_EMAIL=${owner}\n`,later={root:setup,selectedOrigin:origin,manifest,input:{},store,ownerKey:'OWNER_EMAIL'};
+  await writeFile(join(setup,'.dev.vars'),kept,{mode:0o600});
+  if(reserved){
+   await assert.rejects(prepareSettings(later,{secrets:{...secrets,keepExisting:true}}),e=>e.code==='ai_policy_conflict',`${name} x kept settings`);
+   assert.equal(await readFile(join(setup,'.dev.vars'),'utf8'),kept,`${name} x kept settings writes nothing`);assert.equal(later.vars,undefined);
+  } else {await prepareSettings(later,{secrets:{...secrets,keepExisting:true}});assert.ok(Object.hasOwn(later.vars,name),`${name} x kept settings`);}
+ }
  // The builders apply it before emitting a package: to a name the build carries, and to one only the seed's own configuration declares.
- const {buildContainer}=await import('../../container/build.mjs'),{buildDemo}=await import('../../demo-host/build.mjs'),base=join(import.meta.dirname,'../../..');
+ const {buildContainer}=await import('../../container/build.mjs'),{buildDemo}=await import('../../demo-host/build.mjs');
  for(const [label,config] of Object.entries({built:{r2_buckets:[{binding:'RER_AI_BUILT',bucket_name:'synthetic-built'}]},declared:{assets:{binding:'RER_AI_DECLARED',directory:'dist/client'}}}))for(const kind of ['container','hosted demo']){
   const app=await realpath(await mkdtemp(join(tmpdir(),'native-ai-build-')));t.after(()=>rm(app,{recursive:true,force:true}));
   for(const dir of ['src','dist/client'])await mkdir(join(app,dir),{recursive:true});

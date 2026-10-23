@@ -1,7 +1,11 @@
 import { unlink } from 'node:fs/promises';
 import { privateDirectory, readPrivateFile, writePrivateFile } from './private-files.mjs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomBytes, createHash } from 'node:crypto';
+// The shared runtime-name projection, beside this copy in Base or in a seed's scripts/.
+const portable = basename(dirname(fileURLToPath(import.meta.url))) === 'base-onboarding';
+const { DENY, admit } = await import(new URL(portable ? '../base-cli/modules/ai/native/names.mjs' : '../modules/ai/native/names.mjs', import.meta.url));
 export async function installationReceipt(root,origin,scope){
  await privateDirectory(root,['.seed','installer','private']);
  const path=join(root,'.seed/installer/private',createHash('sha256').update(origin).digest('hex')+'.json');
@@ -23,6 +27,8 @@ export async function localSetupToken(root,key){
 }
 export function stopChild(child){if(!child||!child.pid||child.exitCode!==null||child.signalCode!==null)return;try{process.kill(-child.pid,'SIGTERM')}catch{child.kill('SIGTERM')}}
 export async function persistLocalEmail(root,variables){
+ // Local runtimes read these settings by name: none may be a reserved AI name.
+ admit(DENY,Object.keys(variables).map(name=>({type:'var',name})));
  const path=join(root,'.dev.vars');let content='';try{content=await readPrivateFile(path)}catch(error){if(error.code!=='ENOENT')throw error}
  const lines=content.split(/\r?\n/).filter(line=>!Object.keys(variables).some(key=>line.startsWith(key+'=')));
  await writePrivateFile(path,lines.join('\n').replace(/\n*$/,'\n')+Object.entries(variables).map(([key,value])=>key+'='+JSON.stringify(value)).join('\n')+'\n');

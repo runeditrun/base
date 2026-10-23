@@ -206,6 +206,19 @@ export const pendingSecrets = state => state.receipt && state.pendingSecret?.pre
 /** The bindings a live Worker keeps serving: all of them, or its secrets when a fresh upload
  * replaces everything else. */
 export const servedBindings = (live, secretsOnly = false) => (live?.settings?.bindings ?? []).filter(row => !secretsOnly || row?.type === 'secret_text');
+/** What the Worker the state records keeps serving (`secretsOnly`: its secrets), read back without a
+ * lock: its settings, its active version and the secrets it lists. An entry admits them through its
+ * runtime names before key custody, the lock or settlement, so a refusal never waits on another run's
+ * lock nor follows a write, and admits them again under the lock. A Worker the state does not record
+ * is never kept (deploy refuses it as a collision), so nothing is read for it. */
+export async function liveBindings(provider, worker, state, secretsOnly = false) {
+  if (!state.owned.worker) return [];
+  const api = withScopeHints(provider), live = await activeWorker(api, worker);
+  if (!live) return [];
+  const rows = await api.request(`/workers/scripts/${worker}/secrets`);
+  assert(Array.isArray(rows), 'invalid-secret-list');
+  return [...servedBindings(live), ...(live.version?.resources?.bindings ?? []), ...rows].filter(row => !secretsOnly || row?.type === 'secret_text');
+}
 export const resourceId = (kind, row) => ({d1:row.uuid,r2:row.creation_date,kv:row.id,queues:row.queue_id})[kind];
 
 export function checkResourceIdentity(kind, name, row, entry) {
@@ -386,16 +399,18 @@ export async function withStateLock(path, run) {
 
 /** Find or create every declared resource under the owner's account, migrate, upload and check health.
  * Ownership preflight precedes provider writes. A re-run of the same build writes nothing.
- * The plan's runtime names, paired with this account and artifact, and the secrets a pending
- * change would leave are admitted before the lock; under it, the secrets the Worker holds are
- * admitted before any state write, settlement or creation. */
+ * The plan's runtime names, paired with this account and artifact, admit the secrets a pending
+ * change would leave and those the recorded Worker holds before the lock, and again under it
+ * before any state write, settlement or creation. */
 export async function ownerDeploy({api: provider, target, plan, artifact, statePath, env = {}, fetch = globalThis.fetch, healthOptions = {}, readiness = {}, settle = {}, declaredSecrets = plan.secrets}) {
   assert(typeof statePath === 'string' && statePath.length, 'missing-owner-state-path');
   const api = withSettledLists(withScopeHints(provider),settle);
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   validatePlan(plan); const runtime = planNames(plan,{accountId:api.accountId,sourceSha:artifact.source?.sha}); assertOwnerNames(target, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
-  admit(runtime, pendingSecrets(await readOwnerState(statePath, target)));
+  const recorded = await readOwnerState(statePath, target);
+  admit(runtime, pendingSecrets(recorded));
+  admit(runtime, await liveBindings(api, target.worker, recorded, true));
   return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, runtime}));
 }
 async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, runtime}) {

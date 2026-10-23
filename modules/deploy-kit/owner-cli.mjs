@@ -8,7 +8,7 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
-import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, pendingSecrets, servedBindings, retiredAfter } from './owner.mjs';
+import { ownerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, pendingSecrets, servedBindings, retiredAfter, liveBindings } from './owner.mjs';
 import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
@@ -122,8 +122,9 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   else runtime = recordedNames(recorded.receipt,target);
   // What an interrupted secret change would leave on the Worker passes those names before any lock or settlement.
   admit(runtime,pendingSecrets(recorded));
-  // So does what the live Worker serves, for each command that reads it back whole: one read-only request, so a refusal never waits on another run's lock.
-  if (['inspect','record-owner','signin','rekey'].includes(command)) admit(runtime,servedBindings(await activeWorker(api,target.worker)));
+  // So does what the live Worker serves, read back without a lock before key custody, the lock or settlement, so a refusal never waits on another run's lock:
+  // the secrets a deploy keeps, and everything health, inspection, owner claim and sign-in read back. Rekey reads it itself.
+  if (['deploy','health','inspect','record-owner','signin'].includes(command)) admit(runtime,await liveBindings(api,target.worker,recorded,command === 'deploy'));
   if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice,runtime});
   if (command === 'deploy') await beforeWrite();
   // A dry run only reads state: settling an interrupted change may write it.

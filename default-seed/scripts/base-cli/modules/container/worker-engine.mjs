@@ -4,8 +4,11 @@ import { join } from 'node:path';
 import { rootCertificates } from 'node:tls';
 import { ensurePortabilitySchema } from './portability-schema.mjs';
 import { migrate } from './migrations.mjs';
+import { DENY, admit, configBindings } from '../ai/native/names.mjs';
 async function files(root) { const result = []; for (const item of await readdir(root, { withFileTypes: true })) { const path = join(root, item.name); if (item.isDirectory()) result.push(...await files(path)); else if (/\.(m?js)$/.test(item.name)) result.push(path); } return result; }
 export async function workerEngine({ root, data, manifest, settings, edge }) {
+ // A container serves no native AI: no name the app binds (the manifest's configuration and D1 bindings, these settings) may be a reserved AI name, refused before Miniflare opens any state.
+ admit(DENY, [...configBindings(manifest.config), ...Object.keys(manifest.migrations).map(name => ({ type:'d1', name })), ...Object.keys(settings ?? {}).map(name => ({ type:'var', name }))]);
  const config = manifest.config, directory = join(root, 'dist/server'), entry = join(root, manifest.entry);
  const modules = [entry, ...(await files(directory)).filter(path => path !== entry)].map(path => ({ type: 'ESModule', path }));
  const app = { name:'app', modules, modulesRoot:directory, compatibilityDate:config.compatibility_date, compatibilityFlags:config.compatibility_flags,
