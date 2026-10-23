@@ -137,7 +137,7 @@ export function setupManifestSemanticErrors(data) {
 
     if (isSecret) {
       if (Object.hasOwn(field, 'audience')) fail(`${path}.audience`, `${field.name}: secret fields cannot declare audience`);
-      for (const name of ['default', 'prefill', 'options', 'runtimeEditable']) {
+      for (const name of ['default', 'prefill', 'options', 'runtimeEditable', 'businessField']) {
         if (Object.hasOwn(field, name)) fail(`${path}.${name}`, 'secret fields cannot declare public input metadata');
       }
       if (field.input === 'entered') {
