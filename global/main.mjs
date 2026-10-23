@@ -1,4 +1,4 @@
-import { checkoutVerbs } from '../cli/contract.mjs';
+import { checkoutBootstrap } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
@@ -15,7 +15,8 @@ ${repositoryHelp}
 
 Inside a project (the nearest OPERATIONS.json at or above this folder, or --cwd DIR),
 every verb runs that checkout's own pinned rer: the @runeditrun/rer version its package.json
-pins (installed first by any verb when node_modules holds another), else its vendored scripts/rer.mjs.
+pins (installed first for commands that run project code when node_modules holds another),
+else its vendored scripts/rer.mjs.
 
   rer dev              Launch a first-party checkout with no setup steps: installs dependencies,
                        sets up a local owner and a free port when needed, starts the app and prints
@@ -48,13 +49,10 @@ Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy
 import, doctor, describe, check, release, listing. Run rer VERB --help in a checkout for its flags.
 `;
 
-// The checkout verbs that install the pinned package before they run when
-// node_modules holds another version or none (dev installs it in its launch).
-const installsFirst = new Set(Object.keys(checkoutVerbs).filter(verb => !['dev', 'doctor'].includes(verb)));
-
 export async function main(argv) {
  handleBrokenPipes();
  const [verb] = argv;
+ const installsFirst = checkoutBootstrap(argv) === 'before';
  if (verb === '--version' || verb === '-v') return (await import('./version.mjs')).versionCommand(argv);
  if (verb === 'queue' && argv.length === 2 && argv[1] === '--help') {
   process.stdout.write('Usage: rer queue NAME -- COMMAND [ARGS]\nRun COMMAND once this computer\'s job queue admits it.\n');
@@ -102,7 +100,7 @@ export async function main(argv) {
    const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
    if (code !== undefined) return code;
   }
-  const bootstrap = pinnedPackage(target.root)?.ready === false && installsFirst.has(verb);
+  const bootstrap = pinnedPackage(target.root)?.ready === false && installsFirst;
   if ((bootstrap || ['install', 'setup', 'dev', 'preview', 'build', 'verify'].includes(verb)) && !argv.includes('--help') && !argv.includes('--stop')) {
    const { parse } = await import('../cli/parse.mjs');
    // The door's launch marker belongs to launchDev, which consumes it before
@@ -125,13 +123,13 @@ export async function main(argv) {
  }
  // A checkout that pins its own rer package runs all of it, launching included.
  // Until node_modules holds the pinned version (a fresh clone, or a pulled pin
- // change), every checkout verb installs it with the frozen lockfile and then
+ // change), a command that runs project code installs it with the frozen lockfile and then
  // runs the pinned verb, so a fresh clone checks and a changed pin deploys with
  // the pinned bytes; the zero-setup launch installs it first.
  // Verbs started at once share one install, and one whose pin already looks
  // installed waits for an install still running.
  const pinned = first && mode !== 'package' ? pinnedPackage(target.root) : undefined;
- if (pinned && !pinned.ready && !argv.includes('--help') && installsFirst.has(verb)) {
+ if (pinned && !pinned.ready && !argv.includes('--help') && installsFirst) {
   const { installPinned } = await import('./launch/install-pinned.mjs'), { LaunchFailure } = await import('./launch/failure.mjs');
   try { await installPinned(target.root); }
   catch (failure) {
@@ -142,7 +140,7 @@ export async function main(argv) {
    return failure.exitCode;
   }
  }
- if (mode === 'package' && installsFirst.has(verb)) await (await import('./launch/install-pinned.mjs')).settledPin(target.root);
+ if (mode === 'package' && installsFirst) await (await import('./launch/install-pinned.mjs')).settledPin(target.root);
  if (verb === 'describe' && !argv.includes('--help')) return (await import('./cli/describe.mjs')).describeCommand(target);
  if (first && dispatcher(target.root).mode !== 'bundled' && verb === 'verify' && !argv.includes('--help') && !argv.includes('--site')) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
