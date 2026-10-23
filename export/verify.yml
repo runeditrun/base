@@ -59,18 +59,23 @@ jobs:
         if: ${{ hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
       - run: npm install --global pnpm@10.12.4
+      # Save completed packages; apt keeps partial downloads private to _apt.
       - name: Cache frozen dependencies and Chromium
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
         with:
           path: |
             ~/.local/share/pnpm/store
             ~/.cache/ms-playwright
+            ~/.cache/rer-apt/archives/*.deb
           key: seed-ubuntu24-${{ runner.arch }}-browser-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Install Chromium and system libraries
         if: matrix.browser
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          set -euo pipefail
+          sudo env "PATH=$PATH" "APT_ARCHIVES=$HOME/.cache/rer-apt/archives" python3 scripts/install-chromium-deps.py
+          pnpm exec playwright install chromium
       - name: Reserve disk for native runtime journeys
         if: matrix.browser
         run: |
