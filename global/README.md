@@ -244,8 +244,11 @@ which inside `pnpm run` is the pinned copy in `node_modules/.bin`, so
 `pnpm install --frozen-lockfile && pnpm run build` needs no global `rer`. A global
 `rer` hands every verb to the pinned package, launching included. Until
 `node_modules` holds the pinned version (a fresh clone, or a pulled pin change),
-every verb installs it first (the frozen `pnpm install`), then runs it; verbs
-started at once share that one install.
+commands that run project code install it first (the frozen `pnpm install`),
+then run it; commands started at once share that one install. Help, version,
+read-only `doctor`, and `release sign`, `release receipt` and `release keygen`
+do not install dependencies. The release producer still bootstraps before it
+runs project build or verification scripts.
 Every dependency install, `rer release`'s included, receives an allowlisted
 environment: the shell, locale, terminal and temporary-folder variables, `CI`,
 `TZ`, `SSH_AUTH_SOCK`, `NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `XDG_*`, proxy
