@@ -844,6 +844,7 @@ modules/portability/index.d.mts
 modules/portability/lines.mjs
 modules/portability/hash.mjs
 modules/portability/format.mjs
+modules/portability/references.mjs
 modules/portability/catalogue.mjs
 modules/portability/schema-identity.mjs
 modules/portability/schema-legacy.mjs

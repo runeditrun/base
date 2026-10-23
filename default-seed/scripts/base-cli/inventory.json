@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gea9ea1bc",
+  "cliVersion": "0.2.79-dev.g88266494",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "adc231db5785a69624ee5de90b8227d83e4825133e9f3eb16bf0077e221dcb84"
+      "sha256": "4a527623a99b8d50a6145d58f0ba4ac74e7d2ab6a8762512e0e63dfe642a927b"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -294,6 +294,10 @@
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
       "sha256": "ef2c2e358e3913ba4fc176051496d01d544ba17febc143b1a94089f2e9c7de0c"
+    },
+    "start-origin-diagnostic.mjs": {
+      "source": "onboarding/start-origin-diagnostic.mjs",
+      "sha256": "017e0f280b5da6190313b475a627e230ecb96fc6d0e229869aeab05ff7a4b26f"
     },
     "state.mjs": {
       "source": "onboarding/state.mjs",
@@ -887,7 +891,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "5e6a42b52390abdd28cf649d46faae70f6bcedf81c8d63e67d8d2d773a9f44fc"
+      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -1491,7 +1495,7 @@
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "a6e6cfa5eb152d252e7995c7da83b6421000353d3467818b35ffcd5861f687bd"
+      "sha256": "441870c78d21a520d35cab2d7c1ef75f34586b7954fe271df2b057b958ef7bce"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
@@ -1707,7 +1711,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "0870ac7f170715bc39bb3399f9874b23cfdb3816faf51c9a6eddf6d174024502"
+      "sha256": "fb6c421b35bd4e8227a8d1debb734661305a0433f9266f9c9f9c6f538bb619be"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",
@@ -1771,7 +1775,7 @@
     },
     "modules/deploy-kit/readiness-window.mjs": {
       "source": "modules/deploy-kit/readiness-window.mjs",
-      "sha256": "05f2bd81dcb2f66e7f715a67665e6b7cc7f0dae810b5e36cde30b14007740cff"
+      "sha256": "237cc1de1793d054d4932b223faf4f10c9c32413f2c1d7f5c14ea58e36c4afe2"
     },
     "modules/deploy-kit/receipt.mjs": {
       "source": "modules/deploy-kit/receipt.mjs",
@@ -3371,7 +3375,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "50586b829069d881717c7d69a56a1b932ae92b967be0782e2a291570c7c4b650"
+      "sha256": "0a3485dd35630b4f5762c08863f0fe533e574b4e184481067d9033a9325ba7b2"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -3411,7 +3415,7 @@
     },
     "modules/portability/export.mjs": {
       "source": "modules/portability/export.mjs",
-      "sha256": "f60827ebaa4756432d73bbfce0deb64a336c28b1a5794752af46fe07be98da05"
+      "sha256": "afefcd992a3555be105f0f893d53750da87c5cc286371f4d378eafb69943b826"
     },
     "modules/portability/files.mjs": {
       "source": "modules/portability/files.mjs",
@@ -3455,7 +3459,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "97f32e43387ae5c6c70b1592fa3c4a7ee17a19d41c3a7bd7b11b0b3d1655dbc1"
+      "sha256": "b60cc9006e8bbb4e757369202ffffd1ffcb360b73ad9a9e936f8a31abee4c4b2"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
@@ -3516,6 +3520,10 @@
     "modules/portability/rebuilds.mjs": {
       "source": "modules/portability/rebuilds.mjs",
       "sha256": "625f28cbe8ac7fc73acb5f6cb6497a3342be24143c2dfb7450f3718dd5968344"
+    },
+    "modules/portability/references.mjs": {
+      "source": "modules/portability/references.mjs",
+      "sha256": "e8aa6eeb72efd1dc95da27a4845632695297ab5c8c4e3734ff44459c26e00063"
     },
     "modules/portability/replay-views.mjs": {
       "source": "modules/portability/replay-views.mjs",
