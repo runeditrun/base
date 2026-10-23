@@ -229,7 +229,7 @@ test('the owner approves and revokes a scheduled policy through the forms the pa
     assert.deepEqual(await approvals(), [null])
 
     const stale = await submit({ ...approve, versionHash: 'f'.repeat(64) })
-    assert.ok(stale.status >= 400 && (await stale.text()).includes('Request refused'))
+    assert.equal(stale.status, 409)
     assert.equal((await submit(approve, { 'sec-fetch-site': 'cross-site' })).status, 403)
     assert.deepEqual(await approvals(), [null], 'a stale version and a cross-site post approve nothing')
 

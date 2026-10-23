@@ -15,7 +15,9 @@ test('axe any mode catches moderate and minor; default permits them', () => {
   assert.deepEqual(evaluateGates(entry, { failOn: 'any' }).failures, ['axe']);
 });
 for (const field of ['document', 'body']) test(`overflow ${field} gate`, () => {
-  const entry = clean(); entry.overflow[field] += 2;
+  const entry = clean(); entry.overflow[field] += 1;
+  assert.deepEqual(evaluateGates(entry), { passed: true, failures: [] });
+  entry.overflow[field] += 1;
   assert.deepEqual(evaluateGates(entry).failures, ['overflow']);
 });
 const cases = {

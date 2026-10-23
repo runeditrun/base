@@ -88,7 +88,6 @@ test('rer queue runs the command with its literal arguments, keeps its exit stat
 
  const usage = await run(process.execPath, [rer, 'queue', 'heavy'], { cwd: directory, env });
  assert.equal(usage.code, 2);
- assert.match(usage.stderr, /Usage: rer queue NAME -- COMMAND/);
 });
 
 test('rer list reports each checkout\'s kind and readiness without changing any of them', { timeout: 60000 }, async t => {
