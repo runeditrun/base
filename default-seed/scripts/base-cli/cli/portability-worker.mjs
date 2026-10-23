@@ -74,7 +74,7 @@ catch (error) {
  const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
  // A later migration that changes restorable data is named: it is a file of this installation.
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
- const reExport = error instanceof PortabilityError && error.code === 'schema_mismatch:legacy_schema';
+ const reExport = error instanceof PortabilityError && ['schema_mismatch:legacy_schema','schema_mismatch:unsupported_sql'].includes(error.code);
  // A populated destination names its table or bucket: schema names, never row data.
  const occupied = error instanceof PortabilityError && /^(target|bucket)_not_empty:/.test(error.code) ? error.code.slice(error.code.indexOf(':') + 1) : undefined;
  // Safety diagnostics contain only policy schema names, never source values.
