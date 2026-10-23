@@ -144,7 +144,8 @@ explicitly above it; the tool does not silently omit or truncate large source.
 
 Some editions copy Base modules byte for byte, for example the Base mail module into
 `src/base/modules/mail`. A copy record makes those copies traceable, so a later
-Base change can reach the edition and an accidental edit cannot hide.
+Base change can reach the edition and later accidental edits can be detected
+against the recorded snapshots.
 `base-copies.json` at the edition root records each copy's local path, Base
 origin path, Base commit, and the SHA-256 of every copied file:
 
@@ -219,7 +220,8 @@ writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out files the copy had left out, and re-records each copy.
-It refuses recorded files with undeclared local edits; declare intentional adaptations as described below. To move one copy,
+It refuses undeclared local edits that differ from both the recorded and incoming
+Base bytes; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
 Base removed, and run `record-base` with the new commit. Then run `verify-base`
 and the edition's own tests, and commit the copies with the record. To review
@@ -244,9 +246,9 @@ for an executable file). The existing `files` digest and
 copy's other files move to a newer revision. Repeating the declaration does not
 advance that baseline. Commit the record alongside the adaptation.
 
-The acknowledgement covers exactly those local bytes and mode. After a later
-local change, `refresh-base` refuses the entire refresh before writing any file
-or record, just as it does for undeclared edits. `verify-base` exits nonzero and
+The acknowledgement records those local bytes and mode. With that snapshot
+unchanged, a later change to either makes `refresh-base` refuse the entire refresh
+before writing any file or record. `verify-base` exits nonzero and
 reports `adaptation-modified` or `adaptation-mode` with the file and a runnable
 `acknowledge` command, including `--record` when needed. Review the change, then
 run `adapt-base <file>` again to update the local snapshot. This keeps the original
@@ -255,6 +257,14 @@ Base baseline and upstream conflict notes. Older declarations without an
 and block refresh until the same explicit re-acknowledgement; neither command
 automatically accepts the current bytes.
 
+The record is plain data in the owner's repository, under the owner's control.
+Its acknowledged snapshot guards against accidental later drift in a declared
+file's digest or mode; it is not tamper-evident. A hand edit to the record that
+supplies a digest and mode matching the current file is treated as acknowledged
+by `verify-base` (online or offline) and `refresh-base`, just like running
+`adapt-base`. Both are the same owner trust act. Review record diffs in code
+review like source diffs, alongside the adaptations they acknowledge.
+
 Refresh never writes or removes declared adaptations, including when Base deletes
 the source. It still refreshes every untouched copy. Its `adapted` report lists
 each seed-owned file; `conflict: true` means upstream bytes, mode or existence
@@ -262,8 +272,9 @@ changed against the original baseline. A conflict note supplies a Git diff hint
 for explicit reconciliation. The note remains visible on repeated refreshes until
 you reconcile the baseline; it does not prevent other copies from refreshing.
 A second refresh to the same commit leaves the record and local file bytes
-unchanged. Undeclared local edits still block before any file is written, with
-an instruction naming `adapt-base`.
+unchanged. Undeclared local edits that differ from both the recorded and incoming
+Base bytes still block before any file is written, with an instruction naming
+`adapt-base`.
 
 `verify-base` reports declarations separately: it checks their existence,
 regular-file status, acknowledged local bytes and mode, and retained Base
