@@ -65,12 +65,129 @@ jobs:
           path: |
             ~/.local/share/pnpm/store
             ~/.cache/ms-playwright
+            ~/.cache/rer-apt/archives
           key: seed-ubuntu24-${{ runner.arch }}-browser-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Install Chromium and system libraries
         if: matrix.browser
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          set -euo pipefail
+          # Run OS dependencies as root so apt and dpkg can record their own PIDs.
+          sudo env "PATH=$PATH" "APT_ARCHIVES=$HOME/.cache/rer-apt/archives" python3 - <<'PYTHON'
+          import fcntl
+          import os
+          from pathlib import Path
+          import re
+          import signal
+          import subprocess
+          import tempfile
+          import time
+
+          with tempfile.TemporaryDirectory(prefix="chromium-apt-") as temporary:
+              work = Path(temporary)
+              config = work / "apt.conf"
+              ledger = work / "pids"
+              ledger.touch()
+              def started(pid):
+                  try:
+                      fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+                      return fields[19] if fields[0] != "Z" else None
+                  except FileNotFoundError:
+                      return None
+              # Only signal PIDs recorded by our wrappers, with Linux start-time checks.
+              def cleanup():
+                  for sig, grace in ((signal.SIGTERM, 5), (signal.SIGKILL, 5)):
+                      deadline = time.monotonic() + grace
+                      while True:
+                          alive = False
+                          for row in ledger.read_text().splitlines():
+                              pid, birth = row.split()
+                              pid = int(pid)
+                              if started(pid) == birth:
+                                  try:
+                                      os.kill(pid, sig)
+                                      alive = True
+                                  except ProcessLookupError:
+                                      pass
+                          if not alive:
+                              return
+                          if time.monotonic() >= deadline:
+                              break
+                          time.sleep(0.1)
+                  raise RuntimeError("recorded apt/dpkg process did not stop after SIGKILL")
+              for name in ("apt-get", "dpkg"):
+                  wrapper = work / name
+                  options = ["-c", str(config)] if name == "apt-get" else []
+                  wrapper.write_text("#!/usr/bin/python3\n" +
+                      "import os\nfrom pathlib import Path\n" +
+                      f"with open({str(ledger)!r}, 'a') as record:\n" +
+                      "    record.write(str(os.getpid()) + ' ' + Path('/proc/self/stat').read_text().rsplit(')', 1)[1].split()[19] + chr(10))\n" +
+                      f"os.execv('/usr/bin/{name}', ['/usr/bin/{name}', *{options!r}, *os.sys.argv[1:]])\n")
+                  wrapper.chmod(0o755)
+              archives = Path(os.environ["APT_ARCHIVES"])
+              archives.mkdir(parents=True, exist_ok=True)
+              base = (f'Dir::Cache::archives "{archives}";\n'
+                      'APT::Keep-Downloaded-Packages "true";\n'
+                      'APT::Update::Error-Mode "any";\nAcquire::Retries "1";\n'
+                      'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n'
+                      f'Dir::Bin::dpkg "{work}/dpkg";\n')
+              env = dict(os.environ, PATH=f"{work}:" + os.environ["PATH"], APT_CONFIG=str(config))
+              status = 1
+              try:
+                  for attempt in range(1, 4):
+                      cleanup()
+                      # apt/dpkg use POSIX record locks. Never unlink a system lock file.
+                      deadline = time.monotonic() + 15
+                      for lock in ("/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock",
+                                   "/var/lib/apt/lists/lock", str(archives / "lock")):
+                          with open(lock, "a") as stream:
+                              while True:
+                                  try:
+                                      fcntl.lockf(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                                      break
+                                  except BlockingIOError:
+                                      if time.monotonic() >= deadline:
+                                          raise RuntimeError(f"apt lock did not clear: {lock}")
+                                      time.sleep(0.2)
+                      sources = work / "sources"
+                      sources.mkdir(exist_ok=True)
+                      mirror = (None, "http://mirrors.edge.kernel.org/ubuntu/",
+                                "http://us-east-1.ec2.archive.ubuntu.com/ubuntu/")[attempt - 1]
+                      config.write_text(base)
+                      if mirror:
+                          # Ubuntu hosted images use mirror+file:/etc/apt/apt-mirrors.txt.
+                          # Override the sources apt actually reads, including that URI.
+                          for source in (Path("/etc/apt/sources.list"),
+                                         *Path("/etc/apt/sources.list.d").glob("*")):
+                              if source.is_file() and source.suffix in (".list", ".sources"):
+                                  text = re.sub(r"mirror\+file:[^\s]+|https?://(?:[a-z0-9.-]*archive\.ubuntu\.com|security\.ubuntu\.com|mirrors\.edge\.kernel\.org)/ubuntu/?",
+                                                mirror, source.read_text())
+                                  (sources / source.name).write_text(text)
+                          with config.open("a") as stream:
+                              stream.write(f'Dir::Etc::sourcelist "-";\nDir::Etc::sourceparts "{sources}";\n')
+                      print(f"Chromium apt attempt {attempt}/3: 120s; mirror={mirror or 'configured'}", flush=True)
+                      child = subprocess.Popen(["bash", "-ec", "dpkg --configure -a; pnpm exec playwright install-deps chromium"], env=env)
+                      try:
+                          status = child.wait(timeout=120)
+                      except subprocess.TimeoutExpired:
+                          status = 124
+                          cleanup()
+                          child.terminate()
+                          try:
+                              child.wait(timeout=5)
+                          except subprocess.TimeoutExpired:
+                              child.kill()
+                              child.wait()
+                      if status == 0:
+                          break
+                      print(f"Chromium apt attempt {attempt}/3 failed: exit {status}", flush=True)
+                  if status:
+                      raise SystemExit(f"Chromium system libraries failed after 3 attempts (last exit {status}); see apt output above")
+              finally:
+                  cleanup()
+          PYTHON
+          pnpm exec playwright install chromium
       - name: Reserve disk for native runtime journeys
         if: matrix.browser
         run: |
