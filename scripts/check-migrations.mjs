@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {pathToFileURL} from 'node:url';
+import {migrationMappings} from '../edition-authoring/migration-origins.mjs';
 
 const roots = ['default-seed/migrations/', 'foundation/template/migrations/'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -27,7 +27,7 @@ function localBytes(repo, name) {
   return fs.readFileSync(target);
 }
 
-async function check(repo, extraBase) {
+function check(repo, extraBase) {
   const git = (...args) => execFileSync('git', ['-C', repo, ...args], {
     env: {...process.env, GIT_NO_REPLACE_OBJECTS: '1'}, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024,
   });
@@ -63,8 +63,8 @@ async function check(repo, extraBase) {
   if (extraBase) add(extraBase, 'explicit base');
 
   // Use the initializer's actual mapping, never a second hand-maintained list.
-  const {migrationCopies} = await import(pathToFileURL(path.join(repo, 'foundation/initialize.mjs')));
-  if (!Array.isArray(migrationCopies) || !migrationCopies.length) throw Error('Initializer migration mapping is unavailable.');
+  const migrationCopies = migrationMappings(fs.readFileSync(path.join(repo, 'foundation/initialize.mjs'), 'utf8'));
+  const releasedCopies = migrationMappings(git('show', `${released}:foundation/initialize.mjs`).toString('utf8'));
   const origins = new Set();
   for (const copy of migrationCopies) {
     if (!safePath(copy.source) || !copy.target?.startsWith('migrations/')) throw Error('Invalid initializer migration mapping.');
@@ -77,6 +77,10 @@ async function check(repo, extraBase) {
     return {name, mode, type, object};
   });
   const releasedEntries = entriesAt(released);
+  for (const copy of releasedCopies) {
+    if (!safePath(copy.source) || !releasedEntries.some(entry => entry.name === copy.source && entry.type === 'blob' && ['100644', '100755'].includes(entry.mode))) throw Error(`Released mapped migration origin not found: ${copy.source}`);
+    origins.add(copy.source);
+  }
   const releasedOrigins = new Set(releasedEntries.filter(({name, type, object}) => origins.has(name) || sqlOrigin(name) ||
     (name.startsWith('modules/') && /(?:^|\/)schema\.(?:ts|mjs|js)$/.test(name) && type === 'blob' && migrationArray(git('cat-file', 'blob', object).toString('utf8')))).map(({name}) => name));
   const protectedPath = value => safePath(value) && (numberedPath(value) || releasedOrigins.has(value));
@@ -118,7 +122,7 @@ try {
     else if (args[i] === '--base-ref') extraBase = args[i + 1];
     else throw Error('Usage: node scripts/check-migrations.mjs [--repo DIR] [--base-ref FULL_COMMIT]');
   }
-  const report = await check(repo, extraBase);
+  const report = check(repo, extraBase);
   console.log(JSON.stringify(report, null, 2));
   process.exitCode = report.ok ? 0 : 1;
 } catch (error) {

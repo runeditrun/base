@@ -223,8 +223,9 @@ and `foundation/template/migrations/` byte for byte against the highest stable
 the GitHub push event's `before` commit or pull request base, so a multi-commit
 push cannot rewrite numbered migrations published on plain main between releases.
 
-The release comparison also freezes the initializer's actual `migrationCopies`
-origins, module `schema/*.sql` and `schema.sql` sources, foundation runtime SQL,
+The release comparison also freezes the initializer's actual migration
+origins from both the released inline mapping and today's shared `migrationCopies`
+array (removing a mapping cannot unprotect a released origin), module `schema/*.sql` and `schema.sql` sources, foundation runtime SQL,
 and module `schema.ts`/`schema.mjs`/`schema.js` files exporting `*Migration` or
 `*Schema` arrays (including import-kit). The entire source file is compared,
 including helpers used to construct arrays. This includes the operator-auth
