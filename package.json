@@ -14,7 +14,7 @@
     "verify:authoring": "node onboarding/queued-entry.mjs verify:authoring -- sh -c 'node --test --test-concurrency=2 authoring/*.test.mjs'",
     "verify:deployment": "node onboarding/queued-entry.mjs verify:deployment -- sh -c 'node --test --test-concurrency=2 deployment/*.test.mjs modules/deploy-kit/tests/*.test.mjs modules/demo-host/tests/*.test.mjs'",
     "foundation": "node foundation/cli.mjs",
-    "verify:foundation": "node onboarding/queued-entry.mjs verify:foundation -- sh -c \"node --test --test-concurrency=2 foundation/*.test.mjs && node foundation/verify-export.mjs\"",
+    "verify:foundation": "node onboarding/queued-entry.mjs verify:foundation -- sh -c \"node scripts/check-migrations.mjs && node --test --test-concurrency=2 foundation/*.test.mjs && node foundation/verify-export.mjs\"",
     "verify:operations": "node onboarding/queued-entry.mjs verify:operations -- sh -c 'node --test --test-concurrency=2 operations/*.test.mjs'",
     "verify:mail-relay": "node onboarding/queued-entry.mjs verify:mail-relay -- sh -c 'node --test --test-concurrency=2 infrastructure/sendgrid-event-relay/*.test.ts'",
     "verify:edition-authoring": "node onboarding/queued-entry.mjs verify:edition-authoring -- sh -c 'node --test --test-concurrency=2 edition-authoring/*.test.mjs'",

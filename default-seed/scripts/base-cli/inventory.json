@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g8fe7936f",
+  "cliVersion": "0.2.79-dev.gfec40515",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -387,7 +387,7 @@
     },
     "cli/auth-copy.mjs": {
       "source": "cli/auth-copy.mjs",
-      "sha256": "43df34d7bbcb4cea69f9af499189e9844fb9fe6dece0e6925a27bb7b07352f23"
+      "sha256": "74eee44f242f459ec74fc086bb8d65ebf4af62ccab5b2ec0b7e5c03d7410110e"
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",

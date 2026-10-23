@@ -96,6 +96,11 @@ test('public foundation CLI keeps author identity private from Run data and comp
     const migrations = await Promise.all((await readdir(resolve(output, 'migrations/core')))
       .filter(name => name.endsWith('.sql'))
       .map(async name => ({ name, sql: await readFile(resolve(output, 'migrations/core', name), 'utf8') })))
+    for (const {name} of migrations) {
+      const source = lock.files[`migrations/core/${name}`]
+      const repository = source.repository === 'base' ? base : family
+      assert.doesNotMatch(git(repository, 'show', `HEAD:${source.source}`).split('\n')[0], /Additive schema draft/, 'a composed migration must not track the evolving aggregate schema draft')
+    }
     const ordinals = migrations.map(({ name }) => /^(\d+)_/.exec(name)?.[1]).filter(Boolean)
     assert.equal(new Set(ordinals).size, ordinals.length)
     const dependencySetup = migrations.find(({ sql }) => /CREATE TABLE(?: IF NOT EXISTS)?\s+oa_setup_links\b/.test(sql))
@@ -106,7 +111,6 @@ test('public foundation CLI keeps author identity private from Run data and comp
     const origin = JSON.parse(await readFile(resolve(family, 'foundation.lock.json')))
     assert.ok(origin.runtime['onboarding/server.mjs'])
     assert.ok(!Object.keys(lock.files).some(p => p.startsWith('src/core/features/reference/')))
-    assert.equal(lock.files['migrations/core/0001_owner.sql'].repository, 'base')
     assert.equal(lock.files['scripts/base-cli/cli/main.mjs'].repository, 'base')
     assert.equal(JSON.parse(await readFile(resolve(output,'OPERATIONS.json'))).seedContract.profile, 'first-party')
     for (const path of ['RUN-LOCALLY.md','SEED-COMMAND-CONTRACT.md','scripts/installer/local.mjs','scripts/installer/seed.mjs','.node-version','package.json']) {
