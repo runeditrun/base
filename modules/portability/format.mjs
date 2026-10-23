@@ -2,7 +2,7 @@ import { archiveLines } from './lines.mjs';
 import { canonicalJson, sha256, StreamHash, unbase64, utf8 } from './hash.mjs';
 import { insist, PortabilityError } from './storage.mjs';
 import { validateRow } from './catalogue.mjs';
-import { schemaIdentityOf, rawSchemaIdentityOf } from './schema-identity.mjs';
+import { schemaIdentityOf, rawSchemaIdentityOf, tableSchemaIdentityOf } from './schema-identity.mjs';
 export const FORMAT='runeditrun-portability';
 export const MAX_LINE_BYTES=24*1024*1024;
 export const MAX_PART_BYTES=16*1024*1024;
@@ -38,7 +38,11 @@ async function checkManifestFields(m) {
   // Applied product migrations, recorded by archives since additive restore.
   insist(m.migrations===undefined || (Array.isArray(m.migrations) && m.migrations.every(x=>typeof x==='string')),'manifest_inventory');
   insist(m.tables.every((t,i)=>typeof t.name==='string' && typeof t.sql==='string' && Array.isArray(t.columns) && Array.isArray(t.dependencies) && Number.isSafeInteger(t.count) && t.count>=0 && (!i || m.tables[i-1].name<t.name)),'table_inventory');
-  insist(m.schema===await schemaIdentityOf(m.tables) || m.schema===await rawSchemaIdentityOf(m.tables),'schema_checksum');
+  insist(m.schemaObjects===undefined || (Array.isArray(m.schemaObjects) && m.schemaObjects.every((o,i)=>
+    o && typeof o.name==='string' && ['index','view','trigger'].includes(o.type) && typeof o.table==='string' && typeof o.sql==='string'
+    && (!i || m.schemaObjects[i-1].name<o.name || (m.schemaObjects[i-1].name===o.name && m.schemaObjects[i-1].type<o.type)))),'manifest_inventory');
+  insist(m.schema===await schemaIdentityOf(m.tables,m.schemaObjects) || m.schema===await tableSchemaIdentityOf(m.tables)
+    || m.schema===await rawSchemaIdentityOf(m.tables),'schema_checksum');
   for(const collection of [m.objects,m.payloads]) {
     const keys=new Set();
     for(const entry of collection) {

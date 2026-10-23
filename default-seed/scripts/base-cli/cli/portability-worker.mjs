@@ -74,6 +74,7 @@ catch (error) {
  const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
  // A later migration that changes restorable data is named: it is a file of this installation.
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
+ const reExport = error instanceof PortabilityError && error.code === 'schema_mismatch:legacy_schema';
  // A populated destination names its table or bucket: schema names, never row data.
  const occupied = error instanceof PortabilityError && /^(target|bucket)_not_empty:/.test(error.code) ? error.code.slice(error.code.indexOf(':') + 1) : undefined;
  // Safety diagnostics contain only policy schema names, never source values.
@@ -81,5 +82,5 @@ catch (error) {
  // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
  const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
 }
