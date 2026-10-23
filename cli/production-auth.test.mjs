@@ -5,6 +5,40 @@ import { writeFile, readFile, access, mkdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { portabilityFixture } from './fixtures/portability.mjs';
+import { deployProviderFixture } from './fixtures/deploy-provider.mjs';
+
+test('credentials-only deploy update uses declared live mail secrets with a valid declared sender', async t => {
+ const f=await deployProviderFixture(t,{vars:{MAIL_PROVIDER:'sendgrid',MAIL_FROM:productionSender},r2:[],secrets:[
+  {binding:'MAIL_FROM',environment:'PRODUCT_MAIL_FROM',optional:true},
+  {binding:'SENDGRID_API_KEY',environment:'PRODUCT_MAIL_KEY',optional:true},
+ ]});
+ for(const name of ['PRODUCT_MAIL_FROM','PRODUCT_MAIL_KEY','MAIL_FROM','SENDGRID_API_KEY'])delete process.env[name];
+ const output=[];
+ t.mock.method(process.stdout,'write',chunk=>{output.push(String(chunk));return true;});
+ const run=async()=>{output.length=0;const code=await f.run('--env-file','deploy.env');return {code,events:output.join('').trim().split('\n').filter(Boolean).map(JSON.parse)};};
+ await writeFile(join(f.root,'deploy.env'),'',{mode:0o600});
+ const missing=await run();assert.equal(missing.code,4,JSON.stringify(missing.events));
+ assert.equal(f.provider.state.writes.length,0);
+ await writeFile(join(f.root,'deploy.env'),`PRODUCT_MAIL_FROM=${productionSender}\nPRODUCT_MAIL_KEY=synthetic-mail-credential\n`,{mode:0o600});
+ const first=await run();assert.equal(first.code,0,JSON.stringify(first.events));
+ const writes=f.provider.state.writes.length;
+ await writeFile(join(f.root,'deploy.env'),'');
+ const update=await run();
+ console.error('credentials-only update:',JSON.stringify(update));
+ assert.equal(update.code,0,JSON.stringify(update.events));
+ assert.equal(f.provider.state.writes.length,writes,'an unchanged deployment makes no provider writes');
+ assert.ok(f.provider.state.calls.some(call=>call.path?.endsWith('/secrets')&&call.method==='GET'));
+ // A supplied invalid replacement must not borrow the existing sender's approval.
+ await writeFile(join(f.root,'deploy.env'),'PRODUCT_MAIL_FROM=invalid-sender\n');
+ assert.equal((await run()).code,4);assert.equal(f.provider.state.writes.length,writes);
+ await writeFile(join(f.root,'deploy.env'),'');
+ const declarationPath=join(f.root,'deploy.json'),declaration=JSON.parse(await readFile(declarationPath,'utf8'));
+ delete declaration.vars.MAIL_FROM;
+ declaration.secrets=declaration.secrets.filter(secret=>secret.binding!=='MAIL_FROM');
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ assert.equal((await run()).code,4,'an undeclared live sender cannot satisfy the deployment contract');
+ assert.equal(f.provider.state.writes.length,writes);
+});
 
 // Public commands on the real exported seed. Deliberately dirty source stops a
 // configured deployment before its build or any provider request.
