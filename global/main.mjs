@@ -1,4 +1,4 @@
-import { verbs } from '../cli/contract.mjs';
+import { checkoutVerbs } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
@@ -50,7 +50,7 @@ import, doctor, describe, check, release, listing. Run rer VERB --help in a chec
 
 // The checkout verbs that install the pinned package before they run when
 // node_modules holds another version or none (dev installs it in its launch).
-const installsFirst = new Set([...Object.keys(verbs), 'signin', 'release'].filter(verb => !['dev', 'doctor'].includes(verb)));
+const installsFirst = new Set(Object.keys(checkoutVerbs).filter(verb => !['dev', 'doctor'].includes(verb)));
 
 export async function main(argv) {
  handleBrokenPipes();
