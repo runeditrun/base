@@ -92,3 +92,9 @@ test('CLI restore checks behavioral schema objects and authenticates older schem
   assert.match(result.stderr, /rer export --output/);
  });
 });
+
+// One corpus-derived registration covers every lexical boundary and mutation.
+test('archive schema identity preserves SQLite token boundaries generatively', {timeout:600_000}, async () => {
+ const { schemaGenerative } = await import('./fixtures/schema-generative.mjs');
+ await schemaGenerative();
+});

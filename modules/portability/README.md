@@ -335,13 +335,43 @@ Schema identity covers table definitions (including constraints and generated
 expressions), explicit indexes (including uniqueness and partial predicates),
 views and triggers. Indexes and triggers on excluded tables are excluded with
 their tables, including platform bookkeeping tables. The complete additional
-definitions travel in `schemaObjects`. Compatibility ignores SQL comments and
-whitespace between tokens in every definition, so hosted D1 and local migrations
-agree. Quoted identifiers, string contents and operator boundaries remain
-significant. The original DDL is authenticated by `archiveHash`.
+definitions travel in `schemaObjects`. A single SQLite lexer reads the original
+SQL before removing trivia. Identity records each token's class and canonical
+value, plus a deterministic spelling: a single space separates neighbours
+exactly when concatenating them would change their tokenization. The complete
+joined stream is tokenized again and must reproduce those same tokens.
+Comments and harmless inter-token whitespace therefore compare equally, while
+`x '31'` and `x'31'`, separated minus signs, numbers and combined operators stay
+distinct. No regular expression rewrites SQL.
 
-Older version 2 archives first verify their original raw-DDL or tokenized,
-table-only schema checksum and complete archive proof. Compatibility then uses
+Quoted identifiers (double quotes, backticks, brackets, or a single-quoted string
+used as a name), strings, blobs, numbers, variables and ordinary identifiers keep
+their exact spelling. Only unambiguous reserved keywords fold ASCII case.
+Fallback/JOIN/window keywords retain their spelling: for example, SQLite can
+interpret `DEFAULT ABORT` and `DEFAULT abort` as different string defaults.
+Unicode case and quote styles are never normalized. The lexer follows SQLite's
+[`sqlite3GetToken`](https://github.com/sqlite/sqlite/blob/master/src/tokenize.c)
+and the keyword fallback rules in
+[`parse.y`](https://github.com/sqlite/sqlite/blob/master/src/parse.y).
+The original DDL is authenticated by `archiveHash`.
+
+Unsupported or ambiguous SQL refuses with `schema_mismatch:unsupported_sql` and
+the existing original-installation re-export/recovery instructions; it never
+receives a shared or empty identity. This includes NUL and ill-formed Unicode,
+BOM at token start, vertical-tab whitespace, unterminated quotes/brackets/block
+comments (including bare `/*`), malformed/odd-length blobs, invalid numeric
+separators or numeric identifier suffixes, malformed named/Tcl variables, and
+unknown ASCII punctuation. Valid decimal/hex/exponent/underscore numbers,
+SQLite's longest operators, question-mark and named/Tcl variables, LF/EOF line
+comments, and terminated block comments are recognized. SQLite may accept some
+of the refused whitespace or EOF-comment forms; re-export with supported DDL
+rather than silently discarding their bytes. Virtual tables remain unsupported.
+
+Older version 2 archives first verify their original raw-DDL, table-token, or
+complete-object-token schema checksum and complete archive proof. A read-only
+historical checksum codec projects the real lexer's tokens into those old wire
+encodings. Its lossy result never decides compatibility: complete definitions
+are always compared through the new typed token identity. Compatibility then uses
 any complete `schemaObjects` inventory the archive carries, without rewriting
 its authenticated manifest or parts. Without that inventory, the original
 presence or absence of indexes, views and triggers cannot be established from
@@ -664,7 +694,10 @@ by every upload/finalize request, then every 30 seconds while that request is
 working (including verification, R2 transfers and product callbacks). This is a
 recovery window, not a total restore limit: the measured 20,000-row round trip
 below already takes 171 seconds, and callbacks have no wall-time bound. A fresh
-import returns `409 import_running` with `jobId` and ISO `abortableAt`. The owner
+import returns `409 import_running`. Only a validated internal lease refusal,
+after authorization and for the actor who owns that import, includes `jobId`
+and ISO `abortableAt`. Authorization failures and other actors receive no job or
+lease metadata, even if an error carries the same code or fields. The owner
 can find its active job with `GET /api/portability/imports` (`{active:status}`
 or `{active:null}`), and inspect `GET .../imports/:id`: `abortableAt` and `stale` describe
 its lease. The existing authenticated `POST .../imports/:id/abort` (or CLI
@@ -809,6 +842,8 @@ modules/portability/hash.mjs
 modules/portability/format.mjs
 modules/portability/catalogue.mjs
 modules/portability/schema-identity.mjs
+modules/portability/schema-legacy.mjs
+modules/portability/sqlite-tokens.mjs
 modules/portability/bookkeeping.mjs
 modules/portability/storage.mjs
 modules/portability/copies.mjs
