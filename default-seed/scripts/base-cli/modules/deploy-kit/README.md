@@ -517,8 +517,10 @@ The consumer derives the payer account/private-bucket name, requires the privacy
 secret, renders `type:ai`, and checks exact readback. A built undeclared raw AI
 binding, binding conflict, account mismatch or undeclared readback fails closed.
 Every runtime name passes the one projection in `modules/ai/native/names.mjs`:
-renderers emit through it, uploads accept only what it emitted (any other list
-admits no `RER_AI_*` name), and readback admits through it. No declaration,
+renderers emit through it, a Worker upload accepts only what it emitted (any
+other list admits no `RER_AI_*` name), a staged several-secret copy reaches
+traffic only once the bindings it carries are admitted, and readback admits
+through it. No declaration,
 supplied plan, rendered or kept binding, secret change, live binding a copy
 inherits, or container, demo or package build may bind another `RER_AI_*` name
 (`ai_policy_conflict`). Every owner command but removal pairs its approval with
