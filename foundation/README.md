@@ -207,3 +207,104 @@ Read [the exported local operations guide](../export/RUN-LOCALLY.md),
 [the command contract](../export/SEED-COMMAND-CONTRACT.md),
 [the first-release acceptance guide](../export/FIRST-RELEASE-ACCEPTANCE.md),
 and the composition and edition-authoring guides before changing their paths.
+
+## Published migrations
+
+The initial owner schema is a frozen numbered file in
+`foundation/template/migrations/core/0001_owner.sql`. The initializer copies this
+template into the family; it does not map the evolving operator-auth schema
+draft onto an immutable migration. Keep that file after publishing or applying
+it. Add each later schema delta as a NEW numbered migration.
+
+`pnpm verify:foundation` starts with `node scripts/check-migrations.mjs`. This
+Base-only check compares every existing file under `default-seed/migrations/`
+and `foundation/template/migrations/` byte for byte against the highest stable
+`rer-v*` release advertised by `origin` and HEAD's first parent. CI also compares
+the GitHub push event's `before` commit or pull request base, so a multi-commit
+push cannot rewrite numbered migrations published on plain main between releases.
+
+The release comparison also freezes the initializer's actual migration origins
+from both released and current mappings, every module SQL file, and
+foundation runtime SQL. After a frozen install (`pnpm install --frozen-lockfile`),
+the check uses the existing TypeScript parser to discover released JS/TS SQL
+values without executing them. Exported non-function values containing SQL, or
+derived from SQL through references, spreads and helper calls, are migration
+inputs. Exported migration/schema arrays remain inputs too. Discovery follows
+value bindings to their declarations across imports and re-exports, including
+barrels and helpers without SQL literals or schema filenames. Type-only imports
+and unrelated runtime functions are not dependencies of a schema value.
+
+Exported functions and their reachable declarations also expose runtime schema
+installers, including private functions and imported helpers. Any reached file
+containing DDL (CREATE, ALTER or DROP of a table, index, trigger or view) is an
+input, as are the value bindings that construct that DDL, such as interpolated
+table names. Discovery follows the released binding graph; no installer filename
+list is maintained. It does not freeze an installer's unrelated runtime
+dependencies or SELECT/INSERT-only request handlers.
+
+The entire containing file is frozen, including comments, whitespace and runtime
+exports sharing that file. A comment-only edit outside this SQL dependency graph
+or whitespace-only edit outside this SQL dependency graph is allowed. This includes the operator-auth draft still consumed by older
+families. A changed schema needs a new source file and a new numbered migration.
+Discovery uses committed release source, so removing today's import or export
+cannot unprotect an input. A source added after the latest release stays editable
+until its first release; numbered migrations are protected by plain-main
+comparisons as well. Every initializer mapping must resolve to a regular origin
+file; missing mappings, unparseable released sources and unresolved schema value
+imports fail closed.
+
+New files pass; changed or removed files fail. It reads the working tree, so
+uncommitted edits are checked too. Shallow clones acquire missing baseline
+commits from `origin`; inaccessible history fails explicitly. Offline runs are
+not a substitute. For another known main baseline, also pass
+`--base-ref FULL_COMMIT` (this adds a comparison; it cannot replace release or
+CI baselines).
+
+An exceptional correction to published history requires a reviewed entry in
+`scripts/migration-exceptions.json`, with an explanation of why a new migration
+cannot serve and the affected consumers' recovery plan. Each entry binds exactly
+one comparison: `baseline` (the full commit ID), `path`, `before` (the old bytes'
+SHA-256), `after` (the replacement bytes' SHA-256, or null for deletion), and
+`reason`. The failure report supplies those identities. There is no blanket
+skip flag. An exception accepts only those exact bytes at that path and
+baseline, remains visible in the check output, and must cover each reported
+baseline explicitly. Remove obsolete exceptions after the released baseline
+advances. The current exception retains only the exact already-landed runtime
+exports in import-kit `database.ts` authorized on 23 October 2026; no schema SQL
+changed and no consumer recovery is needed.
+
+### Existing families with the old owner draft mapping
+
+Before changing a family's Base pin or composing it, use current Base's
+`pnpm edition <edition> --family-repo <family> --base-repo <base> --output <new>`.
+Its preflight reads the committed descriptor selected by `--ref` (HEAD by
+default), before dispatching pinned tooling. It refuses the legacy
+`modules/operator-auth/accounts/schema/operator-auth.sql` →
+`migrations/core/0001_owner.sql` mapping in `compositions/<edition>.json`.
+Historical direct `composition/cli.mjs` invocations do not run this preflight;
+use the supported `pnpm edition` command when updating an existing family.
+
+1. In the existing runnable edition, restore `migrations/core/0001_owner.sql`
+   from the edition commit originally published or applied. Run
+   `adapt-base migrations/core/0001_owner.sql` through the edition-authoring CLI
+   to acknowledge and freeze those recorded local bytes. Keep the record and
+   acknowledged migration together; never replace 0001 with the newer draft.
+2. In the family repository, copy those same historical bytes into
+   `editions/<edition>/migrations/core/0001_owner.sql` (or the descriptor's
+   `source` directory). Remove the old draft-to-0001 copy from
+   `compositions/<edition>.json`, then commit both changes before composing.
+   Adapting the runnable edition alone does not remove the family's copy mapping.
+3. Refresh the existing edition with `refresh-base <new-base-commit> --base <base>`.
+   Review the adapted conflict's `diffHint` and `schemaDeltas`. Carry each later
+   schema change as a NEW numbered seed migration, for example from the
+   append-only `accounts/schema/scheduled-policy.sql`,
+   `scheduled-policy-hardening.sql` and `last-signin.sql` sources. Record each new
+   verbatim copy with `record-base`, or acknowledge seed-owned adaptations.
+   Retain these new migration bytes in family source too, and commit.
+4. Advance `family.json` to the new Base commit, compose with `pnpm edition`, and
+   compare every existing migration with its published edition bytes. Run
+   `verify-base`, `rer check` and the edition's tests before adopting the output.
+   Commit the runnable edition's retained `base-copies.json` with its migrations.
+
+The new frozen template is only a starting point for new families. It is never
+an instruction to overwrite an existing family's applied 0001.

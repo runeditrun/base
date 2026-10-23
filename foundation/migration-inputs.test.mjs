@@ -1,0 +1,101 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import {execFileSync, spawnSync} from 'node:child_process';
+
+function fixture(t) {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-inputs-'));
+  t.after(() => fs.rmSync(repo, {recursive: true, force: true}));
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
+  const put = (name, bytes) => {
+    fs.mkdirSync(path.dirname(path.join(repo, name)), {recursive: true});
+    fs.writeFileSync(path.join(repo, name), bytes);
+  };
+  const checkpoint = () => {
+    git('add', '.');
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '-qm', 'migration inputs');
+  };
+  const check = () => {
+    // A real CI event belongs to the checkout running this test, not to this
+    // independent repository. Exercise PR-baseline checks with fixture history.
+    const event = path.join(repo, '.git', 'pull-request.json');
+    fs.writeFileSync(event, JSON.stringify({pull_request: {base: {sha: git('rev-parse', 'rer-v0.0.1^{commit}')}}}));
+    const result = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../scripts/check-migrations.mjs'), '--repo', repo], {
+      encoding: 'utf8', env: {...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event},
+    });
+    assert.equal(result.error, undefined);
+    assert.ok(result.stdout, result.stderr);
+    return {status: result.status, report: JSON.parse(result.stdout)};
+  };
+  git('init', '-q'); git('remote', 'add', 'origin', repo);
+  return {repo, git, put, checkpoint, check};
+}
+
+test('released SQL values and their imported helpers stay immutable while unreleased inputs evolve', t => {
+  const {repo, git, put, checkpoint, check} = fixture(t);
+  const module = `modules/held-${path.basename(repo)}/src/d1`;
+  const helper = `${module}/${path.basename(repo)}-schema.ts`;
+  const scalar = 'modules/example/storage/definition.ts';
+  const sql = 'modules/example/upgrade.sql';
+  const entry = `${module}/entry.ts`;
+  put('foundation/initialize.mjs', `export const migrationCopies = [{repository:'base',source:'${sql}',target:'migrations/core/0001.sql'}];`);
+  put('scripts/migration-exceptions.json', '[]');
+  put(sql, 'CREATE TABLE upgrade (id TEXT);\n');
+  put(scalar, 'export const value = `CREATE TABLE storage (id TEXT)`;\n');
+  // The unseen helper has no SQL literal; only the import and value dependency
+  // reveal that its bytes determine a released schema.
+  put(helper, 'export const table = "held_out";\n');
+  put(entry, `import {table} from './${path.basename(helper)}';\nexport const statements = [\`CREATE TABLE \${table} (id TEXT)\`];\n`);
+  put(`${module}/index.ts`, "export {statements} from './entry.ts';\n");
+  put('modules/example/runtime.ts', 'export const runtime = true;\n');
+  checkpoint(); git('tag', 'rer-v0.0.1');
+  assert.equal(check().status, 0);
+  for (const name of [sql, scalar, entry, helper, `${module}/index.ts`]) {
+    const original = fs.readFileSync(path.join(repo, name));
+    put(name, Buffer.concat([original, Buffer.from('\n')]));
+    const changed = check();
+    assert.notEqual(changed.status, 0);
+    assert.ok(changed.report.changes.some(item => item.path === name));
+    put(name, original);
+  }
+  put('modules/example/runtime.ts', '// Ordinary runtime comments remain editable.\nexport const runtime = true;\n');
+  put(`${module}/new-schema.ts`, 'export const next = ["CREATE TABLE next (id TEXT)"];\n');
+  put('default-seed/migrations/core/0002_next.sql', 'CREATE TABLE next (id TEXT);\n');
+  checkpoint();
+  put(`${module}/new-schema.ts`, 'export const next = ["CREATE TABLE next (id TEXT, value TEXT)"];\n');
+  assert.equal(check().status, 0);
+});
+
+test('released function installers protect unseen DDL helpers while query handlers remain editable', t => {
+  const {repo, git, put, checkpoint, check} = fixture(t);
+  const module = `modules/${path.basename(repo)}`;
+  const helper = `${module}/nested/${path.basename(repo)}.mjs`;
+  const name = `${module}/nested/name.mjs`;
+  const outbox = `${module}/outbox.mjs`;
+  const handler = `${module}/handler.mjs`;
+  put('foundation/initialize.mjs', "export const migrationCopies = [{repository:'base',source:'modules/example/schema.sql',target:'migrations/core/0001.sql'}];");
+  put('modules/example/schema.sql', 'CREATE TABLE example (id TEXT);\n');
+  put('scripts/migration-exceptions.json', '[]');
+  put(name, 'export const table = "installer_rows";\n');
+  put(helper, `import {table} from './name.mjs';\nexport async function install(db) { await db.prepare(\`CREATE TABLE \${table} (id TEXT)\`).run(); }\n`);
+  put(`${module}/index.mjs`, `import {install} from './nested/${path.basename(helper)}';\nimport {handle} from './handler.mjs';\nexport async function create(db) { await install(db); return handle(db); }\n`);
+  put(outbox, 'const schema = "CREATE TABLE outbox (id TEXT)";\nexport const create = db => ({ready: () => db.prepare(schema).run()});\n');
+  const queries = 'export async function handle(db) { await db.prepare("INSERT INTO requests VALUES (?)").bind("value").run(); return db.prepare("SELECT id FROM requests").all(); }\n';
+  put(handler, queries);
+  checkpoint(); git('tag', 'rer-v0.0.1');
+  assert.equal(check().status, 0);
+  for (const [file, before, after] of [[helper, '(id TEXT)', '(ix TEXT)'], [name, 'installer_rows', 'installer_rowz'], [outbox, 'outbox (', 'outbow (']]) {
+    const original = fs.readFileSync(path.join(repo, file), 'utf8');
+    put(file, original.replace(before, after));
+    const changed = check();
+    assert.notEqual(changed.status, 0);
+    assert.ok(changed.report.changes.some(item => item.path === file));
+    put(file, original);
+  }
+  put(handler, '// Handler comments and whitespace can evolve.\n\n' + queries + '\n');
+  assert.equal(check().status, 0);
+  put(handler, queries.replace('SELECT id', 'SELECT 1').replace('INSERT INTO requests', 'INSERT INTO request_log'));
+  assert.equal(check().status, 0);
+});

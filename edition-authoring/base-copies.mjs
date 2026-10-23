@@ -24,6 +24,7 @@ const DEFAULT_DISCOVERY_IGNORES = new Set(['LICENSE', 'CLAUDE.md']);
 const modeOf = executable => executable ? '100755' : '100644';
 const within = (name, prefix) => name === prefix || name.startsWith(prefix + '/');
 const mapped = (name, from, to) => to + name.slice(from.length);
+const migration = name => name.split('/').slice(0, -1).includes('migrations');
 
 function baseRepository(root) {
   const recipe = path.join(root, 'edition.json');
@@ -363,9 +364,19 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     });
     // A migration a database may already have applied is never rewritten in place:
     // the schema change it brings belongs in a new migration of the seed's own.
-    const applied = plans.flatMap(({copy, sources}) => sources.map(([source, {object}]) => [mapped(source, copy.originPath, copy.path), object])
-      .filter(([name, object]) => name.split('/').slice(0, -1).includes('migrations') && local(name) && local(name) !== upstream.get(object)).map(([name]) => name));
-    if (applied.length) throw Error(`Refusing to rewrite migrations that may already be applied: ${applied.join(', ')}. Base changed these files after they were copied; keep them as they are, drop them from ${recordPath}, and add a new migration for the change instead.`);
+    const applied = plans.flatMap(({copy, sources, removed}) => [
+      ...sources.map(([source, {object}]) => [mapped(source, copy.originPath, copy.path), object])
+        .filter(([name, object]) => migration(name) && ((local(name) && local(name) !== upstream.get(object)) ||
+          (Object.hasOwn(copy.files, name) && copy.files[name] !== upstream.get(object)))).map(([name]) => name),
+      ...removed.filter(migration),
+    ]);
+    if (applied.length) throw Error(`Refusing to rewrite or remove migrations that may already be applied: ${applied.join(', ')}. Keep their historical bytes, run adapt-base <file> first, then add a new seed migration carrying the change (refresh-base prints the diffHint).`);
+    const schemaDeltas = plans.flatMap(({copy, sources}) => sources
+      .filter(([source, {object}]) => /(?:^|\/)schema\/.*\.sql$/.test(source) &&
+        copy.files[mapped(source, copy.originPath, copy.path)] !== upstream.get(object))
+      .map(([originPath]) => ({path: mapped(originPath, copy.originPath, copy.path), originPath,
+        note: 'Adopted schema delta may need a new seed migration; preserve all applied migrations.',
+        diffHint: `git -C <base> diff ${copy.revision} ${revision} -- ${JSON.stringify(originPath)}`})));
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
     const changes = [];
     for (const {copy, sources, removed} of plans) {
@@ -391,6 +402,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     delete record.repository;
     validate(record);
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, adapted, schemaDeltas, next: 'Review schemaDeltas for new seed migrations. Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }
 }
