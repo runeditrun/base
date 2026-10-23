@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g7c49663b",
+  "cliVersion": "0.2.79-dev.g9e8e1dc0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3371,7 +3371,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "a6d89b6db35b33c2bf41e4f57243dd953cbfbc4ea26244357da3b4d870b80cc1"
+      "sha256": "0e671f45a6ffa37ffad55cf813931b0701f72a37dbeaf59ff2e59d9895cb2089"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
