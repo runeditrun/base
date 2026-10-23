@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g144aa3ff",
+  "cliVersion": "0.2.79-dev.gf5effd57",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -855,7 +855,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "1e9d8d0664acaf0d979852f7c7c8bb9c7edabf397d113a6f91a1342c88f1ddd4"
+      "sha256": "2e033aac9b0b71debcb7bb3e2e43d27192ae0d1738c6d380f6dfd9fb39793296"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -883,7 +883,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "8d1c6630f5a640369157b27bd689fa9a9e2e2b9a80713c02d57cbb4ce046ca3c"
+      "sha256": "52cd09325481f58c4c01763731cf5b546e4c640bcc18e0ec18bf7375d994c94c"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -963,11 +963,11 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "3db9b904825b26b0af898053801ef0f0e833c5cf8427720cbdd39176ca9f2f51"
+      "sha256": "579c0525859c5e092f90ea023f8b77bd111064a5efda74e00aff1b8022f7310c"
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "89f20721b7ae2b70fc2af87bb58ae3483af1fc0be26bc572efc8dd20bc6bd4f7"
+      "sha256": "6eb18f8f855add909297ddca04f0b7f106b22a967f3b059c6484ab06f975fe4d"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
@@ -1099,7 +1099,7 @@
     },
     "cli/site.mjs": {
       "source": "cli/site.mjs",
-      "sha256": "17d631721624ef55d4e33d5827da505109e56725df9d820eb2b57fa47ac44268"
+      "sha256": "379fe179134eb93ab33d09258b54b8bfc2cce92e8e53cd8599c2f34034b01eac"
     },
     "cli/sqlite-notice.mjs": {
       "source": "cli/sqlite-notice.mjs",

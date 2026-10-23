@@ -1,3 +1,4 @@
+import { productionSender } from './fixtures/production-sender.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, readFile, access, mkdir, rm } from 'node:fs/promises';
@@ -140,7 +141,7 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
   const missing = await error('');
   for (const name of ['MAIL_FROM', 'SENDGRID_API_KEY', 'RESEND_API_KEY']) assert.ok(missing.includes(name), missing);
   for (const key of ['SENDGRID_API_KEY', 'RESEND_API_KEY']) {
-   assert.match(await error(`${key}=test-only-provider-credential\nMAIL_FROM=sender@example.test\n`), /not committed/, `${path}: declared native provider passes preflight`);
+   assert.match(await error(`${key}=test-only-provider-credential\nMAIL_FROM=${productionSender}\n`), /not committed/, `${path}: declared native provider passes preflight`);
   }
   await rm(join(seed.root, path));
  }
@@ -148,22 +149,22 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
  await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: spec } }));
  assert.match(await error('SENDGRID_API_KEY=test-only-provider-credential\n'), /MAIL_FROM/);
  // The documented display-name sender passes like a bare address, quoted or not; an invalid one names the accepted forms.
- for (const from of ['Your Business <sender@example.test>', '"Your Business <sender@example.test>"']) assert.match(await error(`MAIL_FROM=${from}\nRESEND_API_KEY=test-only-provider-credential\n`), /not committed/, from);
- assert.match(await error('MAIL_FROM=Your Business sender@example.test\nRESEND_API_KEY=test-only-provider-credential\n'), /MAIL_FROM \(\S+@\S+ or [^)]*<\S+@\S+>\)/);
- assert.match(await error('MAIL_FROM=sender@example.test\nMAIL_PROVIDER=resend\nSENDGRID_API_KEY=test-only-provider-credential\n'), /RESEND_API_KEY/, 'explicit provider cannot borrow another provider key');
- assert.match(await error('MAIL_FROM=sender@example.test\nMAIL_API_KEY=test-only-provider-credential\n'), /SENDGRID_API_KEY.*RESEND_API_KEY/, 'an ambiguous shared key does not resolve a deferred native provider');
+ for (const from of [`Your Business <${productionSender}>`, `"Your Business <${productionSender}>"`]) assert.match(await error(`MAIL_FROM=${from}\nRESEND_API_KEY=test-only-provider-credential\n`), /not committed/, from);
+ assert.match(await error(`MAIL_FROM=Your Business ${productionSender}\nRESEND_API_KEY=test-only-provider-credential\n`), /MAIL_FROM/);
+ assert.match(await error(`MAIL_FROM=${productionSender}\nMAIL_PROVIDER=resend\nSENDGRID_API_KEY=test-only-provider-credential\n`), /RESEND_API_KEY/, 'explicit provider cannot borrow another provider key');
+ assert.match(await error(`MAIL_FROM=${productionSender}\nMAIL_API_KEY=test-only-provider-credential\n`), /SENDGRID_API_KEY.*RESEND_API_KEY/, 'an ambiguous shared key does not resolve a deferred native provider');
  spec.optionalSecretNames = ['RESEND_API_KEY'];
  await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: spec } }));
- assert.match(await error('MAIL_FROM=sender@example.test\nSENDGRID_API_KEY=test-only-provider-credential\n'), /RESEND_API_KEY/, 'undeclared ambient provider key does not count');
+ assert.match(await error(`MAIL_FROM=${productionSender}\nSENDGRID_API_KEY=test-only-provider-credential\n`), /RESEND_API_KEY/, 'undeclared ambient provider key does not count');
  spec.publicVariableNames = ['MAIL_PROVIDER'];
  await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: spec } }));
- assert.match(await error('MAIL_FROM=sender@example.test\nRESEND_API_KEY=test-only-provider-credential\n'), /MAIL_FROM/, 'undeclared ambient sender does not count');
+ assert.match(await error(`MAIL_FROM=${productionSender}\nRESEND_API_KEY=test-only-provider-credential\n`), /MAIL_FROM/, 'undeclared ambient sender does not count');
  // Fixed deployment-spec variables and the adapter's own deployment binding
  // are source declarations too; a mapped root secret keeps its environment name.
- await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: { publicVariables: { MAIL_PROVIDER: 'resend', MAIL_FROM: 'sender@example.test' }, optionalSecretNames: ['RESEND_API_KEY'] } } }));
+ await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: { publicVariables: { MAIL_PROVIDER: 'resend', MAIL_FROM: productionSender }, optionalSecretNames: ['RESEND_API_KEY'] } } }));
  assert.match(await error('RESEND_API_KEY=test-only-provider-credential\n'), /not committed/);
  await rm(packagingPath);
- declaration.vars.MAIL_FROM = 'sender@example.test';
+ declaration.vars.MAIL_FROM = productionSender;
  declaration.secrets.push({ binding: 'SENDGRID_API_KEY', environment: 'PRODUCT_MAIL_TOKEN' });
  await writeFile(declarationPath, JSON.stringify(declaration));
  assert.match(await error('PRODUCT_MAIL_TOKEN=test-only-provider-credential\n'), /not committed/);

@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, symlink, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
@@ -29,6 +29,21 @@ async function seed(t) {
  };
  return { root, adapter, original, pages, render, build };
 }
+
+test('site dry-run names the usable checkout-relative asset destination in human and JSON output', async t => {
+ const f = await seed(t);
+ for (const json of [false, true]) {
+  const result = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'deploy', '--site', '--dry-run', ...(json ? ['--json'] : [])], {
+   cwd: f.root, env: { PATH: process.env.PATH, HOME: resolve(f.root, '../home'), PWD: f.root, TZ: 'UTC', RER_NO_UPDATE_CHECK: '1' },
+  });
+  const assets = json ? JSON.parse(result.stdout.trim().split('\n').at(-1)).site.assets : /assets: (.*?) \(/.exec(result.stdout)?.[1];
+  assert.ok(assets, result.stdout);
+  assert.equal(isAbsolute(assets), false);
+  assert.ok(!assets.includes('[REDACTED]'), 'the destination remains readable after redaction');
+  assert.ok((await stat(resolve(f.root, assets))).isDirectory(), 'the printed destination identifies the built assets');
+  assert.ok(!(result.stdout + result.stderr).includes(f.root), 'shared dry-run output keeps the checkout path private');
+ }
+});
 
 test('built run-site uses US dates and keeps the one-line command start together', async t => {
  const f = await seed(t);

@@ -10,16 +10,29 @@ const nativeCredential = { sendgrid: 'SENDGRID_API_KEY', resend: 'RESEND_API_KEY
 const present = value => typeof value === 'string' && Boolean(value.trim());
 // The sender forms the mail runtime sends from: a bare address or "Display Name <address>".
 const sender = value => { try { parseAddress(value); return true; } catch { return false; } };
-const SENDER = 'MAIL_FROM (billing@example.com or Your Business <billing@example.com>)';
+const SENDER = "MAIL_FROM (a real sender on your provider's verified domain; bare address or Display Name <address>)";
+const placeholderSender = value => {
+ if (!sender(value)) return false;
+ const { email } = parseAddress(value), [local, domain] = email.toLowerCase().split('@');
+ return /(?:^|\.)(?:invalid|example|test|localhost)$/.test(domain)
+  || /(?:^|\.)example\.(?:com|net|org)$/.test(domain)
+  || /^(?:your-?domain|your-?business|fake|placeholder|changeme)\./.test(domain)
+  || /^(?:fake|placeholder|change-?me|replace-?me|your-?email|your-?name|you)(?:[+._-]|$)/.test(local);
+};
 
 // Packaging can declare inputs that a product's deploy adapter adds to the
 // root declaration later. Read that source contract, never arbitrary ambient
 // keys or the adapter's executable source, before any build or provider write.
-export async function productionMail(root, declaration, env) {
+export async function productionMail(root, declaration, env, declarationPath = 'deploy.json') {
  const bindings = { ...declaration.vars }, secrets = new Set(), publicInputs = new Set(), declaredProviders = new Set();
+ let senderFix = `Edit vars.MAIL_FROM in ${declarationPath}`;
+ const environmentFix = name => `Set ${name} in your environment or owned 0600 --env-file`;
  for (const secret of declaration.secrets ?? []) {
   secrets.add(secret.binding);
-  if (present(env[secret.environment])) bindings[secret.binding] = env[secret.environment];
+  if (present(env[secret.environment])) {
+   bindings[secret.binding] = env[secret.environment];
+   if (secret.binding === 'MAIL_FROM') senderFix = environmentFix(secret.environment);
+  }
  }
  for (const [path, select] of deliveryDeclarationSources) {
   let text;
@@ -31,16 +44,29 @@ export async function productionMail(root, declaration, env) {
   if (!spec) continue;
   for (const name of spec.publicVariableNames ?? []) publicInputs.add(name);
   for (const [name, value] of Object.entries(spec.publicVariables ?? {})) {
-   if (!(name in bindings) || name === 'MAIL_PROVIDER' && bindings[name] === 'later') bindings[name] = value;
+   if (!(name in bindings) || name === 'MAIL_PROVIDER' && bindings[name] === 'later') {
+    bindings[name] = value;
+    if (name === 'MAIL_FROM') senderFix = `Edit publicVariables.MAIL_FROM in ${path}`;
+   }
   }
   for (const name of [...(spec.secretNames ?? []), ...(spec.optionalSecretNames ?? [])]) {
    secrets.add(name);
    // A root secret's explicit environment-to-binding mapping wins.
-   if (!declaration.secrets?.some(secret => secret.binding === name) && present(env[name])) bindings[name] = env[name];
+   if (!declaration.secrets?.some(secret => secret.binding === name) && present(env[name])) {
+    bindings[name] = env[name];
+    if (name === 'MAIL_FROM') senderFix = environmentFix(name);
+   }
   }
   for (const provider of spec.mail?.providers ?? []) if (providers.includes(provider)) declaredProviders.add(provider);
  }
- for (const name of publicInputs) if (present(env[name])) bindings[name] = env[name];
+ for (const name of publicInputs) if (present(env[name])) {
+  bindings[name] = env[name];
+  if (name === 'MAIL_FROM') senderFix = environmentFix(name);
+ }
+ let senderIssue;
+ if (present(bindings.MAIL_FROM) && (!sender(bindings.MAIL_FROM) || placeholderSender(bindings.MAIL_FROM))) {
+  senderIssue = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). ${senderFix}, then run rer deploy --dry-run again.`;
+ }
  const provider = bindings.MAIL_PROVIDER;
  const deferred = !provider || provider === 'later';
  const choices = new Set(declaredProviders);
@@ -63,7 +89,7 @@ export async function productionMail(root, declaration, env) {
    if (provider === 'rer') try { validateRerConfig({ relayUrl: bindings.MAIL_RELAY_URL }); } catch { relaySelected = false; }
    const has = key => present(bindings[key]) || secrets.has(key) && live.includes(key);
    return [
-    ...(!sender(bindings.MAIL_FROM) ? [SENDER] : []),
+    ...(!sender(bindings.MAIL_FROM) || senderIssue ? [senderIssue ?? SENDER] : []),
     ...(!credentialKeys.some(has) ? [credentialText] : []),
     ...(provider === 'cloudflare' && !has('MAIL_ACCOUNT_ID') ? ['MAIL_ACCOUNT_ID'] : []),
     ...(!relaySelected ? ['MAIL_RELAY_URL (assigned HTTPS relay URL)'] : []),
@@ -72,11 +98,12 @@ export async function productionMail(root, declaration, env) {
  });
  return {
   declared: 'MAIL_PROVIDER' in bindings || publicInputs.has('MAIL_PROVIDER') || secrets.has('MAIL_API_KEY') || selected.length > 0,
+  senderIssue,
   configured: (live = []) => routes.some(missing => missing(live).length === 0),
-  canInspect: sender(bindings.MAIL_FROM) && routes.length > 0,
+  canInspect: sender(bindings.MAIL_FROM) && !senderIssue && routes.length > 0,
   missing: routes.length ? routes.map(missing => missing([]).join(', ')).join(' or ') : [
    'MAIL_PROVIDER (resend, sendgrid, cloudflare or rer)',
-   ...(!sender(bindings.MAIL_FROM) ? [SENDER] : []),
+   ...(!sender(bindings.MAIL_FROM) || senderIssue ? [senderIssue ?? SENDER] : []),
    'MAIL_API_KEY',
   ].join(', '),
  };

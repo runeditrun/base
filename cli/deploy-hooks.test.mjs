@@ -1,3 +1,4 @@
+import { productionSender } from './fixtures/production-sender.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, realpath, stat } from 'node:fs/promises';
@@ -202,7 +203,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
  await writeFile(join(root, 'dist/client/index.html'), 'Application');
  await writeFile(join(root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@10.12.4' }));
  const declarationPath = declared ? 'owner-deployment.json' : 'deploy.json';
- const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', vars: {MAIL_PROVIDER:'resend',MAIL_FROM:'owner@example.test'}, secrets: ['OWNER_EMAIL', 'SETUP_TOKEN', 'SESSION_SECRET', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name })) };
+ const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', vars: {MAIL_PROVIDER:'resend',MAIL_FROM:productionSender}, secrets: ['OWNER_EMAIL', 'SETUP_TOKEN', 'SESSION_SECRET', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name })) };
  if (installation) {
   declaration.d1 = [{binding:'DB'}];
   declaration.secrets.push({binding:'INSTALLATION_KEY',environment:'INSTALLATION_KEY'}, {binding:'INSTALLATION_KEY_PREVIOUS',environment:'INSTALLATION_KEY_PREVIOUS',optional:true});
