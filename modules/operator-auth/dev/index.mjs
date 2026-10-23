@@ -15,6 +15,7 @@ import { registerDevAdmission } from '../dev-admission.mjs';
 import { definePersonas } from './personas.mjs';
 import { cliSession } from './cli-session.mjs';
 import { signInRefusal } from './refusal.mjs';
+import { representation } from '../representation.mjs';
 import { decorateLabel } from '../../demo/label.mjs';
 import { oneClickPage } from '../signin/one-click.mjs';
 
@@ -70,7 +71,7 @@ export function withDevIdentity(worker, { bindings = env => env, config: authCon
           return rejectedResponse(request, response);
         } catch (error) {
           if (error instanceof AuthError) {
-            if (path === '/auth/dev/enter' && /\btext\/html\b/.test(request.headers.get('accept') ?? '')) return rejectedResponse(request, await signInRefusal(request, context.config.branding, {
+            if (path === '/auth/dev/enter' && representation(request) === 'html') return rejectedResponse(request, await signInRefusal(request, context.config.branding, {
               status: error.status,
               message: 'This account can no longer use this sign-in link. Choose an available account, or ask an owner or administrator to restore its access.',
             }));

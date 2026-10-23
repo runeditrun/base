@@ -1,6 +1,7 @@
 import { rejectedResponse } from './rejected-response.mjs';
 import { identitySettingsPage } from './accounts/settings-page.mjs';
 import { settingsRefusalPage } from './page.mjs';
+import { representation } from './representation.mjs';
 import { confirmationResponse } from './identity/email-link/confirmation.mjs';
 import { createOidcHandler } from './identity/oidc/index.mjs';
 import { AuthError } from './errors.mjs';
@@ -67,7 +68,7 @@ export function createAuthHandler(auth) {
       if (path === '/auth/domain-rules' && request.method === 'GET') return json(await auth.listDomainRules(request));
       if (path === '/auth/settings/identity' && ['GET', 'HEAD'].includes(request.method)) {
         const value = await auth.identitySettings(request);
-        return /\btext\/html\b/.test(request.headers.get('accept') ?? '')
+        return representation(request) === 'html'
           ? await identitySettingsPage(value, auth.presentation, { saved: url.searchParams.get('saved') === '1', method: request.method })
           : request.method === 'HEAD' ? new Response(null, { headers: { ...securityHeaders(), 'content-type': 'application/json' } }) : json(value);
       }
@@ -127,7 +128,7 @@ export function createAuthHandler(auth) {
         case '/auth/providers/relink': return json(await auth.relinkProvider(request, input));
       }
     } catch (error) {
-      if (path === '/auth/settings/identity' && (/\btext\/html\b/.test(request.headers.get('accept') ?? '') || formPost(request))) {
+      if (path === '/auth/settings/identity' && representation(request) === 'html') {
         const code = error instanceof AuthError ? error.code : 'auth_unavailable';
         const status = error instanceof AuthError ? error.status : 503;
         if (code === 'provider_unlinked') {
@@ -144,6 +145,10 @@ export function createAuthHandler(auth) {
   };
   return async function(request) {
     const response = await handleAuth(request);
+    if (response && request.method === 'HEAD') {
+      void response.body?.cancel();
+      return rejectedResponse(request, new Response(null, { status: response.status, headers: response.headers }));
+    }
     return response ? rejectedResponse(request, response) : response;
   };
 }

@@ -61,6 +61,20 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     assert.match(refusal, /<main>.*<h1>[^<]+<\/h1><p>[^<]+<\/p>/);
     assert.match(refusal, /href="\/signin\?returnTo=%2Fapp%2Fteam"/);
     assert.ok(!cookies(refused).includes('operator_session_local_8787='), 'a refusal never issues a session');
+    for (const accept of ['application/json,text/html;q=0', 'application/json;q=1,text/html;q=0.5', 'application/json']) {
+      const response = await r.call('/auth/dev/enter?as=admin', { key: DEV_KEY, headers: { accept } });
+      assert.equal(response.status, 403);
+      assert.deepEqual(await response.json(), { error: 'sign_in_refused' });
+      assert.equal(cookies(response), '', 'negotiation never issues a session');
+    }
+    for (const accept of [undefined, '*/*', 'text/html;q=invalid']) {
+      const response = await r.call('/auth/dev/enter?as=admin', { key: DEV_KEY, headers: accept ? { accept } : {} });
+      assert.equal(response.status, 403);
+      assert.match(response.headers.get('content-type'), /text\/plain/, 'the direct inactive-persona route retains its main default');
+    }
+    const unknown = await r.call('/auth/dev/enter?as=nobody', { key: DEV_KEY, headers: { accept: 'application/json,text/html;q=0' } });
+    assert.equal(unknown.status, 404);
+    assert.equal(typeof (await unknown.json()).error, 'string');
     assert.equal((await r.call('/auth/operator/status', { method: 'POST', cookie: both, input: { operatorId: person.id, status: 'active' } })).status, 200);
     assert.ok((await (await r.call('/__dev/personas', { key: DEV_KEY })).json()).some(person => person.as === 'admin'), 'reactivation restores the local choice');
     // Signed-out revokes the current session.

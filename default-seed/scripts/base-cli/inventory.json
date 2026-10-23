@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79",
+  "cliVersion": "0.2.79-dev.g398985fa",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3087,7 +3087,7 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "2dbaaa41bc6ea7bfdc5c248c8555125b186b7118dac9cbf7698b3239330324c7"
+      "sha256": "fdf32e07f34130fd1a16ab0870bf8c73fb85c63575397e17d65a9761f9a8e2e3"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
@@ -3095,7 +3095,7 @@
     },
     "modules/operator-auth/dev/refusal.mjs": {
       "source": "modules/operator-auth/dev/refusal.mjs",
-      "sha256": "e7f7ff539865df97c9cc5bbffcfb0df55f906d9c8a91511b728d5634f7f9ba7e"
+      "sha256": "8769e0122454322bc3ab1854d053b26f5ef82a3eb5576108955d30f571e34eed"
     },
     "modules/operator-auth/dev/sign-in-as.d.mts": {
       "source": "modules/operator-auth/dev/sign-in-as.d.mts",
@@ -3269,9 +3269,13 @@
       "source": "modules/operator-auth/rejected-response.mjs",
       "sha256": "38c4e7621901173d0bca9bc62587486951ce24d2e0e31e97f26e1dfe406c9726"
     },
+    "modules/operator-auth/representation.mjs": {
+      "source": "modules/operator-auth/representation.mjs",
+      "sha256": "206c3ae542e00687c2ee6c09a2e3466827c7eb58a97d10779cbeca1af945dcb3"
+    },
     "modules/operator-auth/routes.mjs": {
       "source": "modules/operator-auth/routes.mjs",
-      "sha256": "e1fb7d95925d72a1b90450cbfd06188966ff684ace09748bac983763fb707dce"
+      "sha256": "c3b8780cb96df150ff52ef8e6c20f801ee5fe6fba106b551e257d6da99a732a3"
     },
     "modules/operator-auth/scheduled/definition.mjs": {
       "source": "modules/operator-auth/scheduled/definition.mjs",
