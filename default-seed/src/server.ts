@@ -47,7 +47,7 @@ export default withDemo({
     // The installed variant: the Lobby at / and the public claim state it reads.
     const state = await setupStateResponse(request, bindings)
     if (state) return state
-    const lobby = await lobbyResponse(request, bindings, identity, undefined, operatorAuth(bindings).getSession)
+    const lobby = await lobbyResponse(request, bindings, identity, undefined, request => operatorAuth(bindings).getSession(request))
     if (lobby) return lobby
     if (path === '/signin') {
       const page = await signInResponse(request, bindings, waitUntil)

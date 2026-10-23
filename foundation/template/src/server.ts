@@ -32,7 +32,7 @@ export default withDemo<Bindings, ExportedHandler<Bindings>>({
     // Local dev serves the saved origin's data at its own port (RER_DEV_ORIGIN).
     const state = await setupStateResponse(request, runtimeBindings(env))
     if (state) return state
-    const lobby = await lobbyResponse(request, runtimeBindings(env), identity, undefined, operatorAuth(runtimeBindings(env)).getSession)
+    const lobby = await lobbyResponse(request, runtimeBindings(env), identity, undefined, request => operatorAuth(runtimeBindings(env)).getSession(request))
     if (lobby) return lobby
     return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
   },
