@@ -788,6 +788,7 @@ modules/portability/lines.mjs
 modules/portability/hash.mjs
 modules/portability/format.mjs
 modules/portability/catalogue.mjs
+modules/portability/schema-identity.mjs
 modules/portability/bookkeeping.mjs
 modules/portability/storage.mjs
 modules/portability/copies.mjs
@@ -813,6 +814,7 @@ modules/portability/import-safety.mjs
 modules/portability/payloads.mjs
 modules/portability/journal.mjs
 modules/portability/http.mjs
+modules/portability/http-errors.mjs
 modules/portability/http-client.mjs
 modules/portability/cli.mjs
 modules/portability/cli-options.mjs
