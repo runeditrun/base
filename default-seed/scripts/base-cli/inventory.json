@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5d1673c1",
+  "cliVersion": "0.2.79-dev.g62def0d8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -887,7 +887,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "5e6a42b52390abdd28cf649d46faae70f6bcedf81c8d63e67d8d2d773a9f44fc"
+      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -1491,7 +1491,7 @@
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
-      "sha256": "a6e6cfa5eb152d252e7995c7da83b6421000353d3467818b35ffcd5861f687bd"
+      "sha256": "441870c78d21a520d35cab2d7c1ef75f34586b7954fe271df2b057b958ef7bce"
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
