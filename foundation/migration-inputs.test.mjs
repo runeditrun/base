@@ -18,8 +18,15 @@ test('released SQL values and their imported helpers stay immutable while unrele
     git('-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '-qm', 'migration inputs');
   };
   const check = () => {
-    const result = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../scripts/check-migrations.mjs'), '--repo', repo], {encoding: 'utf8'});
+    // A real CI event belongs to the checkout running this test, not to this
+    // independent repository. Exercise PR-baseline checks with fixture history.
+    const event = path.join(repo, '.git', 'pull-request.json');
+    fs.writeFileSync(event, JSON.stringify({pull_request: {base: {sha: git('rev-parse', 'rer-v0.0.1^{commit}')}}}));
+    const result = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../scripts/check-migrations.mjs'), '--repo', repo], {
+      encoding: 'utf8', env: {...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event},
+    });
     assert.equal(result.error, undefined);
+    assert.ok(result.stdout, result.stderr);
     return {status: result.status, report: JSON.parse(result.stdout)};
   };
   git('init', '-q'); git('remote', 'add', 'origin', repo);
