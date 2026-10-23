@@ -18,20 +18,50 @@ test('member settings navigation gets an actionable document while JSON clients 
   assert.equal((await r.call('/auth/invite', post(owner, { email: 'member@example.com', displayName: 'Jordan', role: 'member' }))).status, 202);
   const joined = await r.call('/auth/confirm', post(undefined, { token: await r.link() }));
   const member = r.session(joined);
-  for (const method of ['GET', 'HEAD']) {
-    const response = await r.call(path, { method, cookie: member, headers: html });
-    assert.equal(response.status, 403);
-    assert.match(response.headers.get('content-type'), /text\/html/);
-    const body = await response.text();
-    if (method === 'HEAD') assert.equal(body, '');
-    else { assert.match(body, /<main>.*<h1>[^<]+<\/h1><p>[^<]+<\/p>/); assert.match(body, /href="\/app"/); }
+  const preferences = [
+    ['application/json, text/html;q=0', 'json'],
+    ['application/json;q=1, text/html;q=0.5', 'json'],
+    ['application/json', 'json'],
+    ['text/html', 'html'],
+    ['text/html,application/json', 'html'],
+    ['application/json,text/html', 'json'],
+    ['application/json;q=0.5,text/html', 'html'],
+    [undefined, 'json'], ['*/*', 'json'], ['*/*;q=0.8', 'json'],
+    ['text/*', 'html'], ['application/*', 'json'],
+    ['text/html;q=0,*/*;q=1', 'json'],
+    ['text/*;q=1,text/html;q=0.2,application/json;q=0.5', 'json'],
+    ['application/json;q=0,*/*;q=0.5', 'html'],
+    ['*/*;q=1,text/html', 'html'],
+    ['TEXT/HTML;CHARSET="UTF-8",application/json;q=0.5', 'html'],
+    ['text/html;charset=iso-8859-1,application/json', 'json'],
+    ['text/html;profile="a,b",application/json', 'json'],
+    [',text/html,,application/json;q=0.5,', 'html'],
+    ['text/html;q=0.,application/json;q=1.000', 'json'],
+    ['text/html;q=bogus,application/json', 'json'],
+    ['text/html;q=0.1234', 'json'], ['text/html,garbage', 'json'],
+    ['text/html;profile="unterminated', 'json'], ['text/html;q=1;q=0', 'json'],
+  ];
+  for (const [accept, expected] of preferences) {
+    const headers = accept === undefined ? {} : { accept };
+    for (const [method, form] of [['GET', false], ['HEAD', false], ['POST', false], ['POST', true]]) {
+      const response = await r.call(path, { method, cookie: member, headers, form,
+        ...(method === 'POST' ? { input: { idpSignIn: form ? 'true' : true } } : {}) });
+      assert.equal(response.status, 403, `${method} ${accept}`);
+      assert.match(response.headers.get('content-type'), expected === 'html' ? /text\/html/ : /application\/json/, `${method} ${accept}`);
+      const body = await response.text();
+      if (method === 'HEAD') assert.equal(body, '');
+      else if (expected === 'json') assert.deepEqual(JSON.parse(body), { error: 'owner_required' });
+      else { assert.match(body, /<main>.*<h1>[^<]+<\/h1><p>[^<]+<\/p>/); assert.match(body, /href="\/app"/); }
+    }
+    for (const method of ['GET', 'HEAD']) {
+      const response = await r.call(path, { method, cookie: owner, headers });
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get('content-type'), expected === 'html' ? /text\/html/ : /application\/json/);
+      if (method === 'HEAD') assert.equal(await response.text(), '');
+      else if (expected === 'json') assert.equal(typeof (await response.json()).idpSignIn, 'boolean');
+      else assert.match(await response.text(), /<form/);
+    }
   }
-  const json = await r.call(path, { cookie: member, headers: { accept: 'application/json' } });
-  assert.equal(json.status, 403);
-  assert.deepEqual(await json.json(), { error: 'owner_required' });
-  const refused = await r.call(path, post(member, { idpSignIn: 'true' }, true));
-  assert.equal(refused.status, 403);
-  assert.match(refused.headers.get('content-type'), /text\/html/);
 });
 
 test('OA and native settings refuse provider enablement without a configured or linked provider and preserve the disabled policy', async t => {
@@ -46,6 +76,11 @@ test('OA and native settings refuse provider enablement without a configured or 
       assert.equal(response.status, 409);
       if (form) { assert.match(response.headers.get('content-type'), /text\/html/); assert.match(await response.text(), /role="alert"/); }
       else assert.deepEqual(await response.json(), { error: 'provider_unlinked' });
+    }
+    for (const accept of [undefined, '*/*', 'application/json', 'application/json,text/html;q=0', 'text/html;q=invalid']) {
+      const response = await r.call(path, { ...post(owner, { idpSignIn: 'true' }, true), headers: accept ? { accept } : {} });
+      assert.equal(response.status, 409);
+      assert.deepEqual(await response.json(), { error: 'provider_unlinked' });
     }
     const settings = await (await r.call(path, { cookie: owner })).json();
     assert.equal(settings.idpSignIn, false);
