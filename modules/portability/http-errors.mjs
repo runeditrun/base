@@ -1,4 +1,4 @@
-import { PortabilityError } from './storage.mjs';
+import { importRunningMetadata } from './import-lease.mjs';
 
 // A code's spelling is not evidence that it is public. Keep the established
 // vocabulary closed, and discard diagnostic suffixes containing schema/input.
@@ -31,7 +31,7 @@ const publicCode = code => typeof code === 'string' && publicCodes.has(code.spli
 
 // Public errors use the existing {error:code} vocabulary. Native messages can
 // contain SQL, row values or credentials; inspect causes only to choose status.
-export function httpFailure(error) {
+export function httpFailure(error,{actor=null}={}) {
  const seen = new Set();let typed,nativeStatus;
  for (let cause = error; cause && !seen.has(cause) && seen.size < 5; cause = cause.cause) {
   seen.add(cause);
@@ -39,7 +39,7 @@ export function httpFailure(error) {
    const code = publicCode(cause.code);
    // A generic server wrapper must not turn a known authority refusal into 500.
    if (!typed || typed.status >= 500 && cause.status < 500) typed = { status: cause.status, body: { error: code,
-    ...(cause instanceof PortabilityError && code === 'import_running' ? { jobId: cause.jobId, abortableAt: cause.abortableAt } : {}) } };
+    ...(cause.status === 409 && cause.code === 'import_running' ? importRunningMetadata(cause,actor) : {}) } };
   }
   if (cause.name === 'TimeoutError' || ['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT'].includes(cause.code))
    nativeStatus = 504;

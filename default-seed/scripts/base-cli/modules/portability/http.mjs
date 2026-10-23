@@ -20,10 +20,12 @@ export async function createPortabilityHandler({db,buckets,policy,appOrigin,base
     if(url.pathname!==basePath && !url.pathname.startsWith(basePath+'/'))return null;
     const route=url.pathname.slice(basePath.length+1).split('/'),[collection,id,action,index]=route;
     const operation=collection==='exports'?'export':collection==='imports'?'import':'unknown';
+    let authorizedActor=null;
     try {
       const actor=await authorize(request,{operation,jobId:id??null});insist(typeof actor==='string' && actor.length>0,'unauthorized',401);
       if(!['GET','HEAD'].includes(request.method))insist(request.headers.get('Origin')===appOrigin,'origin_refused',403);
       if(id)insist(await service.actor(id)===actor,'job_not_found',404);
+      authorizedActor=actor;
       insist(['exports','imports'].includes(collection) && route.length<=4,'route_not_found',404);
       const api=service[collection];
       if(collection==='imports' && request.method==='GET' && !id)return json({active:await api.active(actor)});
@@ -39,6 +41,6 @@ export async function createPortabilityHandler({db,buckets,policy,appOrigin,base
       if(collection==='imports' && request.method==='PUT' && id && action==='parts' && /^(0|[1-9]\d*)$/.test(index??''))return json(await api.uploadPart(id,Number(index),await boundedJson(request,maxBodyBytes)));
       if(collection==='imports' && request.method==='POST' && id && action==='finalize' && !index)return json(await api.finalize(id,await boundedJson(request,maxBodyBytes)));
       throw new PortabilityError('route_not_found',404);
-    }catch(e){const failure=httpFailure(e);return json(failure.body,failure.status);}
+    }catch(e){const failure=httpFailure(e,{actor:authorizedActor});return json(failure.body,failure.status);}
   };
 }
