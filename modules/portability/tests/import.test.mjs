@@ -109,6 +109,32 @@ test('staged product validation can refuse before any R2 write',async t=>{
   const {bundle,target,service}=await setup(t,{policy:{...fixturePolicy,validateStaged:async({read})=>{assert.equal((await read('effects'))[0].enabled,0);return false;}}});
   const id=await stage(service,bundle);await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/staged_validation/);assert.equal((await target.bucket.list()).objects.length,0);
 });
+// Each source policy declares no references, so its archive carries file rows and objects as they are.
+test('restore refuses file references outside the declared prefix before any write',async t=>{
+  const {objectReferences}=fixturePolicy.buckets.FILES;
+  const source=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{prefix:'people/'}}}}),target=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{prefix:'people/',objectReferences}}}}),service=await target.connect();
+  await target.bucket.put('other/kept.bin','unrelated');
+  for(const key of ['other/kept.bin','people-other/x','/people/x','','people/../x']) {
+    await source.db.batch([source.db.prepare('DELETE FROM files'),source.db.prepare('INSERT INTO files VALUES(?)').bind(key)]);
+    // The dot-segment key passes the prefix, so its archive carries an object of that name too.
+    if(key.startsWith('people/'))await source.bucket.put(key,'archived');
+    const bundle=await archive(await source.connect()),id=await stage(service,bundle);
+    await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/object_references:FILES/,JSON.stringify(key));
+    assert.deepEqual((await target.bucket.list()).objects.map(x=>x.key),['other/kept.bin']);assert.equal(await (await target.bucket.get('other/kept.bin')).text(),'unrelated');
+    assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM files').first()).n,0);await service.imports.abort(id);
+  }
+});
+test('restore refuses file references that differ from the archived objects',async t=>{
+  const source=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{}}}}),target=await runtime(t),service=await target.connect();await seed(source);
+  const refused=async()=>{
+    const bundle=await archive(await source.connect()),id=await stage(service,bundle);
+    await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/object_references:FILES/);
+    assert.equal((await target.bucket.list()).objects.length,0);assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM files').first()).n,0);await service.imports.abort(id);
+  };
+  // A referenced object the archive lacks, then an archived object nothing references.
+  await source.bucket.delete('small');await refused();
+  await source.bucket.put('small',Uint8Array.of(1,2,3));await source.db.prepare("DELETE FROM files WHERE key='small'").run();await refused();
+});
 test('replaceable rows, suppressed triggers, NULL secrets and configuration survive restore',async t=>{
   const {bundle,target,service}=await setup(t);await target.db.prepare("INSERT INTO settings VALUES('theme','migration seed')").run();
   // Pooled destinations can retain SQLite internals from earlier cases. Compare
