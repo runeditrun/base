@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cancel superseded seed Verify runs while preserving every main run, including pending ones. Main pushes reuse successful exact-SHA branch verification of the same workflow and repository; lookup failures run all checks. The stable `verify` aggregate accepts only explicitly authorized shard skips. Target the next patch after 0.2.79 (0.2.80); see [Verify workflow adoption](../export/VERIFY-WORKFLOW.md#cancel-superseded-runs-and-reuse-branch-verification) for plan-job, heavy-seed gate and concurrency replacements. Update rer and refresh/merge the seed-owned source templates in the same adoption commit.
+
 ## 0.2.79
 
 - Reuse bounded keep-alive connections in the local dev proxy and retry stale connections for bodyless reads.
