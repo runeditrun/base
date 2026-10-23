@@ -145,7 +145,7 @@ export function createAuthHandler(auth) {
   };
   return async function(request) {
     const response = await handleAuth(request);
-    if (response && request.method === 'HEAD') {
+    if (response && request.method === 'HEAD' && new URL(request.url).pathname === '/auth/settings/identity') {
       void response.body?.cancel();
       return rejectedResponse(request, new Response(null, { status: response.status, headers: response.headers }));
     }
