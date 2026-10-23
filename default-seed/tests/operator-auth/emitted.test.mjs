@@ -186,8 +186,9 @@ test('emitted Worker: a linked Auth provider verifies a signed callback and shar
   try {
     assert.equal((await runtime.call('/auth/dependencies/setup', { method: 'POST', input: { issuer: runtime.provider.issuer, token: setupToken } })).status, 200)
     const ownerCookie = cookieOf(await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Owner' } }))
-    assert.equal((await runtime.call('/auth/settings/identity', { method: 'POST', input: { idpSignIn: true }, cookie: ownerCookie })).status, 200)
+    assert.equal((await runtime.call('/auth/settings/identity', { method: 'POST', input: { idpSignIn: true }, cookie: ownerCookie })).status, 409, 'provider setup must finish before enabling sign-in')
     assert.equal((await runtime.provider.link(runtime.call)).status,200)
+    assert.equal((await runtime.call('/auth/settings/identity', { method: 'POST', input: { idpSignIn: true }, cookie: ownerCookie })).status, 200)
     assert.match(await runtime.call('/signin?returnTo=%2Fapp').then((response) => response.text()), /action="\/auth\/oidc\/auth\/start"/)
     assert.equal((await runtime.call('/auth/oidc/auth/start')).status, 405)
     const start = await runtime.call('/auth/oidc/auth/start', { method: 'POST', input: { returnTo: '/app' } })

@@ -28,7 +28,9 @@ test('auth-3 store upgrade preserves old people, invitations, bindings and nativ
  const auth=createOperatorAuth({db:database(sqlite),clock:()=>now,clientIp:()=> '192.0.2.1',config:{origin:'https://app.example',OWNER_EMAIL:'owner@example.com',SESSION_SECRET:secret,dependencies:true}}),handler=createAuthHandler(auth);
  const request=(path,method='GET')=>new Request('https://app.example'+path,{method,headers:{Origin:'https://app.example',Cookie:'__Host-operator_session='+token,'Content-Type':'application/json'},...(method==='POST'?{body:'{}'}:{})});
  assert.equal((await handler(request('/auth/session'))).status,200);
- assert.deepEqual(await (await handler(request('/auth/settings/identity'))).json(),{idpSignIn:false});
+ const settings=await (await handler(request('/auth/settings/identity'))).json();
+ assert.equal(settings.idpSignIn,false);assert.equal(settings.providerSetup.canEnable,false);
+ assert.equal(settings.providerSetup.providers[0].state,'unlinked');
  assert.equal((await handler(request('/auth/oidc/auth/start','POST'))).status,403);
  assert.deepEqual(snapshot(),before);
 });

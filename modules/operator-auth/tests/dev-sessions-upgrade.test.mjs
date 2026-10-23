@@ -14,7 +14,7 @@ const schemaOf = async db => (await db.prepare("SELECT type,name,tbl_name FROM s
 const status = async (r, letter) => (await r.call('/auth/session', { cookie: cookieFor(letter.repeat(43)) })).status;
 
 test('a populated store upgrades with identical rows; native sessions survive and legacy OIDC needs new provider admission', async () => {
-  const r = await runtime([...await Promise.all(priorMain.map(seedMigration)), await read('./fixtures/dev-sessions/rows.sql')]);
+  const r = await runtime([...await Promise.all(priorMain.map(seedMigration)), await read('./fixtures/dev-sessions/rows.sql')], { externalIssuers: ['https://idp.example.com'] });
   try {
     const migration = await read('../accounts/schema/dev-sessions.sql');
     assert.equal(await seedMigration('0007_dev_sessions.sql'), migration, 'the reference applies the module migration under its own next number');

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g144aa3ff",
+  "cliVersion": "0.2.79",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -775,7 +775,7 @@
     },
     "cli/dev-identity.mjs": {
       "source": "cli/dev-identity.mjs",
-      "sha256": "ab6ef143895ec8ac42f8f210607c004906e747bf0c510ddfd617d18a5006dcc9"
+      "sha256": "96f6ecc985ab22e59f30e7197026bdbee2695b55d655041744bee122a3393649"
     },
     "cli/door-mode.mjs": {
       "source": "cli/door-mode.mjs",
@@ -2947,7 +2947,7 @@
     },
     "modules/operator-auth/accounts/native.mjs": {
       "source": "modules/operator-auth/accounts/native.mjs",
-      "sha256": "e1f15e6ef75b90c343af0a491ff45d342fe46ce027fb370eb045e80bf43947ef"
+      "sha256": "e5b05cdac03d401a9c1660c9100969780d1f5bcf30eb4e9a0024ad2182d1ea7d"
     },
     "modules/operator-auth/accounts/oa.mjs": {
       "source": "modules/operator-auth/accounts/oa.mjs",
@@ -2963,11 +2963,15 @@
     },
     "modules/operator-auth/accounts/provider-control.mjs": {
       "source": "modules/operator-auth/accounts/provider-control.mjs",
-      "sha256": "2fcd981aff97943e71d29a10ab09dfa879dc4707261df9953c7b25a0f22b9650"
+      "sha256": "4bb01cf08c3d7ebeb7eeb4068f11ba10d0c55e3f3bb7aeb336dfbf2b90e50efe"
     },
     "modules/operator-auth/accounts/provider-pin.mjs": {
       "source": "modules/operator-auth/accounts/provider-pin.mjs",
       "sha256": "ebc398d4c8dc573fdc724c3d1a7d790b9b9fbb7e18043eafdc4400ffce84aac6"
+    },
+    "modules/operator-auth/accounts/provider-setup.mjs": {
+      "source": "modules/operator-auth/accounts/provider-setup.mjs",
+      "sha256": "ea40b86f6698e75f32e85d3ef14ff722b7c6b5e09c48c43b0bd2bf6f4193fdc7"
     },
     "modules/operator-auth/accounts/roles.mjs": {
       "source": "modules/operator-auth/accounts/roles.mjs",
@@ -3019,7 +3023,7 @@
     },
     "modules/operator-auth/accounts/settings-page.mjs": {
       "source": "modules/operator-auth/accounts/settings-page.mjs",
-      "sha256": "1f7bfcbceb4c7fbc95a42b23fb62f869aaf02e0b5590ce75419c14235b48af8d"
+      "sha256": "63d7214adcdd9d706794f1eed57d79a143b1081aa61ce125e00593574a3fe544"
     },
     "modules/operator-auth/accounts/status.mjs": {
       "source": "modules/operator-auth/accounts/status.mjs",
@@ -3083,11 +3087,15 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "7ebbdf35008281a0fbeb6a0783243b25b7302ebd414ff8c4af9e6db31f304f21"
+      "sha256": "2dbaaa41bc6ea7bfdc5c248c8555125b186b7118dac9cbf7698b3239330324c7"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
       "sha256": "888afa951b9520376cd1b0cdbe13e75b002213c368be26652e514eca0ca2e485"
+    },
+    "modules/operator-auth/dev/refusal.mjs": {
+      "source": "modules/operator-auth/dev/refusal.mjs",
+      "sha256": "e7f7ff539865df97c9cc5bbffcfb0df55f906d9c8a91511b728d5634f7f9ba7e"
     },
     "modules/operator-auth/dev/sign-in-as.d.mts": {
       "source": "modules/operator-auth/dev/sign-in-as.d.mts",
@@ -3223,7 +3231,7 @@
     },
     "modules/operator-auth/index.d.mts": {
       "source": "modules/operator-auth/index.d.mts",
-      "sha256": "ebbcdb87aba07fdb94de45264d78221627e23685836d54fbdd3ad10aef419c36"
+      "sha256": "2415587207b4e96e8d815cdeb16b8d0152e6d05247365a66f147e9f2a114c1e9"
     },
     "modules/operator-auth/index.mjs": {
       "source": "modules/operator-auth/index.mjs",
@@ -3247,7 +3255,7 @@
     },
     "modules/operator-auth/page.mjs": {
       "source": "modules/operator-auth/page.mjs",
-      "sha256": "29615dcd137433f9119085de757dd331662b9e0ef2130678658a54dcc63c2359"
+      "sha256": "546ff9279dcd282c7d4f2444e48297961634cfb03d7a2c0416fd63f15d342a42"
     },
     "modules/operator-auth/policy.d.mts": {
       "source": "modules/operator-auth/policy.d.mts",
@@ -3263,7 +3271,7 @@
     },
     "modules/operator-auth/routes.mjs": {
       "source": "modules/operator-auth/routes.mjs",
-      "sha256": "4f534707648a72d7fbe5b15bcbc10985a14de2f6872a0d8e7853d6fa782a838a"
+      "sha256": "e1fb7d95925d72a1b90450cbfd06188966ff684ace09748bac983763fb707dce"
     },
     "modules/operator-auth/scheduled/definition.mjs": {
       "source": "modules/operator-auth/scheduled/definition.mjs",

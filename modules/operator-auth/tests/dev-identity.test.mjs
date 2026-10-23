@@ -49,8 +49,20 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     assert.equal((await (await r.call('/auth/session', { cookie: adminCookie })).json()).operator.email, 'admin@dev.localhost');
     await r.db.prepare("UPDATE oa_operators SET role='member' WHERE email='admin@dev.localhost'").run();
     assert.equal((await r.call('/auth/session', { cookie: adminCookie })).status, 401, 'a role change fences the dev session');
-    await r.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email='admin@dev.localhost'").run();
-    assert.equal((await r.call('/auth/dev/enter?as=admin', { cookie: adminCookie })).status, 403, 'a deactivated persona cannot sign in');
+    const person = (await (await r.call('/auth/operators', { cookie: both })).json()).find(person => person.email === 'admin@dev.localhost');
+    assert.equal((await r.call('/auth/operator/status', { method: 'POST', cookie: both, input: { operatorId: person.id, status: 'inactive' } })).status, 200);
+    const personas = await (await r.call('/__dev/personas', { key: DEV_KEY })).json();
+    assert.ok(!personas.some(person => person.as === 'admin' || person.email === 'admin@dev.localhost'), 'a deactivated declaration is not offered by name or email');
+    assert.doesNotMatch(await (await r.call('/signin', { cookie: gateOnly(both) })).text(), /href="\/auth\/dev\/enter\?as=admin/);
+    const refused = await r.call('/auth/dev/enter?as=admin&returnTo=/app/team', { cookie: adminCookie, headers: { accept: 'text/html' } });
+    assert.equal(refused.status, 403, 'a deactivated persona cannot sign in');
+    assert.match(refused.headers.get('content-type'), /text\/html/);
+    const refusal = await refused.text();
+    assert.match(refusal, /<main>.*<h1>[^<]+<\/h1><p>[^<]+<\/p>/);
+    assert.match(refusal, /href="\/signin\?returnTo=%2Fapp%2Fteam"/);
+    assert.ok(!cookies(refused).includes('operator_session_local_8787='), 'a refusal never issues a session');
+    assert.equal((await r.call('/auth/operator/status', { method: 'POST', cookie: both, input: { operatorId: person.id, status: 'active' } })).status, 200);
+    assert.ok((await (await r.call('/__dev/personas', { key: DEV_KEY })).json()).some(person => person.as === 'admin'), 'reactivation restores the local choice');
     // Signed-out revokes the current session.
     const out = await r.call('/auth/dev/enter?as=signed-out', { cookie: both });
     assert.equal(out.headers.get('location'), '/');
