@@ -22,7 +22,8 @@ function fixture(t) {
   const run = (...args) => spawnSync(process.execPath, [cli, ...args, '--base', base], {cwd: seed, encoding: 'utf8'});
   assert.equal(run('record-base', 'scripts/main.mjs', 'tools/main.mjs', revision).status, 0);
   commit(seed);
-  return {base, seed, run};
+  const refresh = revision => spawnSync(process.execPath, [path.join(import.meta.dirname, '../global/rer.mjs'), 'refresh-base', '--ref', revision, '--base', base, '--json'], {cwd: seed, encoding: 'utf8'});
+  return {base, seed, run, refresh};
 }
 
 test('per-file refresh records a transitive runnable module set and repeats without drift', t => {
@@ -58,4 +59,43 @@ test('unresolvable relative imports refuse the entire refresh before source or r
   assert.deepEqual(fs.readFileSync(path.join(seed, 'scripts/main.mjs')), original);
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
   assert.equal(fs.existsSync(path.join(seed, 'outside.mjs')), false);
+});
+
+test('public refresh parses nested superclasses and ASI without inventing regex imports', t => {
+  const {base, seed, refresh} = fixture(t);
+  write(base, 'tools/main.mjs', String.raw`const c = class extends class {} {} / 1; import '.\x2fasi.mjs'; /x/;
+`);
+  write(base, 'tools/asi.mjs', String.raw`const async = 7; const a = async
+function f() {}
+/; import '.\x2fghost.mjs'/ / 1;
+debugger
+/; import '.\x2fghost.mjs'/ / 1; import './real.mjs'; console.log(a);
+`);
+  write(base, 'tools/real.mjs', 'export const real = 42;\n');
+  const result = refresh(commit(base));
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.deepEqual(JSON.parse(result.stdout).adopted.map(item => item.path), ['scripts/asi.mjs', 'scripts/real.mjs']);
+  assert.equal(fs.existsSync(path.join(seed, 'scripts/ghost.mjs')), false);
+  const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout.trim(), '7');
+});
+
+test('public refresh refuses an unparsable transitive helper before writing any files', t => {
+  const {base, seed, refresh} = fixture(t);
+  const before = git(seed, 'status', '--porcelain=v1', '-uall');
+  const original = fs.readFileSync(path.join(seed, 'scripts/main.mjs'));
+  const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  write(base, 'tools/main.mjs', "import './ok.mjs'; import './bad.mjs';\n");
+  // These top-level effects must never run while discovering module requests.
+  write(base, 'tools/ok.mjs', "throw new Error('must only parse'); import './child.mjs';\n");
+  write(base, 'tools/child.mjs', 'export const child = true;\n');
+  write(base, 'tools/bad.mjs', 'export const = 1;\n');
+  const refused = refresh(commit(base));
+  assert.notEqual(refused.status, 0);
+  assert.ok((refused.stderr + refused.stdout).includes('scripts/bad.mjs'), refused.stderr + refused.stdout);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'scripts/main.mjs')), original);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  for (const name of ['ok', 'bad', 'child']) assert.equal(fs.existsSync(path.join(seed, `scripts/${name}.mjs`)), false);
+  assert.equal(git(seed, 'status', '--porcelain=v1', '-uall'), before);
 });

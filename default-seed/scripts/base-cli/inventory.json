@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "a7dcfbeb623af836b961a36d1b2c4cab7bc2849be8ef7730e3f1305ac6eec9a4"
+      "sha256": "ca99515c89252ab607c252ceb9f2ff8970e53b58a8e530618a858d899b769dea"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1185,10 +1185,6 @@
       "source": "edition-authoring/files.mjs",
       "sha256": "9dfb5940c9b793cca5ddf9556b756c81046a371a16a10c5b869487172a6c25ae"
     },
-    "edition-authoring/js-tokens.mjs": {
-      "source": "edition-authoring/js-tokens.mjs",
-      "sha256": "05203e1e1702961f7ffcf3263efb22e0aab162d126d05cf8698b18d3b64f43dc"
-    },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
       "sha256": "255b570052a8e3cd785043c82e2088445d8e181a92c35c397444eafebe2ec1e4"
@@ -1219,7 +1215,7 @@
     },
     "edition-authoring/static-imports.mjs": {
       "source": "edition-authoring/static-imports.mjs",
-      "sha256": "60d813f992e860feb572174861d170c138b15b6ebc55f92aa4ef7da3bedaf79e"
+      "sha256": "0b8413504347d4d384a40c8386bc62ab59462953f64ebf457bd358bce5b24ae9"
     },
     "edition-authoring/updates.mjs": {
       "source": "edition-authoring/updates.mjs",

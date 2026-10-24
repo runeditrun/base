@@ -244,11 +244,14 @@ present. Unrecorded imports outside that origin tree, missing, deleted or kept-o
 dependencies, adapted importers with missing dependencies, and destination
 collisions refuse the entire refresh before writes, with exact `record-base`
 commands for explicit reconciliation. Existing adapted files stay unchanged.
-Imports are read with a complete JavaScript tokenizer, so import text inside
-strings, templates, regular expressions and comments is not an import. A file
-whose declarations cannot be established (JSX, HTML-like comments, or a slash
-that reads both as division and as a regular expression with different imports)
-refuses the refresh instead of being guessed.
+Imports come from Node's V8 module parser (`vm.SourceTextModule.moduleRequests`),
+run in a child using the same Node executable with `--experimental-vm-modules`.
+The child only parses: it never links dependencies or evaluates source. Callers
+need no VM flag or additional packages; this works offline on Node 22.20.0 and
+newer. Strings, templates, regular expressions, comments, dynamic `import()` and
+`import.meta` do not add static dependencies. Syntax the running Node cannot
+parse as an ECMAScript module (including JSX) refuses the entire refresh before
+writes and names the importing file and parser error.
 An absent unadapted singleton is retired from the record entirely and named in
 the `retired` output. As with absent files in directory copies, local absence is
 the removal signal; refresh does not distinguish accidental deletion from an

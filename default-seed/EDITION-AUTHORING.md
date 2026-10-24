@@ -46,9 +46,14 @@ recorded dependencies must remain present. Unrecorded imports outside that origi
 missing, deleted or kept-out dependencies, adapted importers with missing
 dependencies, and destination collisions refuse before any writes and name exact
 `record-base` commands for explicit reconciliation. Existing adapted files are
-retained unchanged. Import text inside strings, templates, regular expressions
-and comments is not an import. A file whose imports cannot be established, such
-as one with JSX or an ambiguous slash, refuses instead of being guessed.
+retained unchanged. Node's V8 module parser supplies the static import/export
+requests. A child of the same Node executable uses `--experimental-vm-modules`
+only to parse, without linking dependencies or evaluating source; callers need
+no extra flag or package, including offline (Node 22.20.0 and newer). Strings,
+templates, regular expressions, comments, dynamic `import()` and `import.meta`
+do not add static dependencies. Invalid or unsupported ECMAScript module syntax,
+including JSX, refuses the entire refresh before writes, naming the importing
+file and parser error.
 
 Use the immutable full commit behind the release tag. Base-checkout form:
 
