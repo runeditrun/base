@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Hosted demos provision explicitly declared generated secrets independently for each visitor, preserve them across runtime restarts, and erase them with the visitor's data. `deploy-demo.json` accepts a validated `generatedSecrets` list using the existing 32-byte hex/base64 encodings.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.
