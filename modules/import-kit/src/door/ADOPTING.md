@@ -101,7 +101,7 @@ Owner history and undo must include jobs from either authority.
    door runs. An entry may supply a mapping that needs that request's whole
    parsed bundle, or a per-request owner principal. Construction is cheap and
    stateless; plans and uploads are reachable only in their own namespace. The
-   optional `intake` is a static per-source format/field declaration, shared
+   optional `intake` is a static declaration of formats and fields per source, shared
    unchanged with both mounts. Declare it when the source contract forbids
    retaining other fields, so the door drops them before any persistent write,
    rather than dropping them later in the product parser. See the
@@ -167,8 +167,8 @@ Owner history and undo must include jobs from either authority.
    starts off, and the owner's switch is what opens the door to Business
    grants. Bodies and results are in [README.md](README.md). Without declared
    intake, upload original bytes through the existing JSON chunk protocol.
-   With intake, POST the full raw stream to the same uploads route as
-   `application/octet-stream`, with `X-Import-Format` and `X-Import-Name`;
+   With intake, POST the full raw stream to the same uploads route with
+   `Content-Type: application/octet-stream`, `X-Import-Format` and `X-Import-Name`;
    custody and response hashes then describe sanitized NDJSON. Do not send
    JSON chunk envelopes or a client sanitizer/hash for that source. Show the
    returned counts, rejections, differences and each
