@@ -59,7 +59,7 @@ export class AuthStore {
     [input.id, input.hash, input.kind, input.returnTo, input.now, input.expiresAt, input.operatorId, ...fence.args]);
     return result?.id === input.id;
   }
-  async invite({ operatorId, expectedVersion, reinviting = false, email, displayName, role, token, now }, actor) {
+  invitationStatements({ operatorId, expectedVersion, reinviting = false, email, displayName, role, token, now }, actor) {
     const fence = this.actorFence(actor, now);
     // Only a witnessed cancellation may reopen an inactive identity. Keep its
     // durable admission guard until confirmation, including through pruning.
@@ -69,7 +69,7 @@ export class AuthStore {
         [displayName, operatorId, email, role, expectedVersion, operatorId, ...fence.args]]
       : [`INSERT INTO oa_operators(id,email,display_name,role,status,created_at)
           SELECT ?,?,?,?,'invited',? WHERE ${fence.sql} ON CONFLICT(email) DO NOTHING`, [operatorId, email, displayName, role, now, ...fence.args]];
-    const results = await this.batch([
+    return [
       prepare,
       [`INSERT INTO oa_tokens(id,token_hash,kind,operator_id,operator_version,issuer_id,issuer_version,return_to,created_at,expires_at)
         SELECT ?,?,'invite',id,version,?,?,?,?,? FROM oa_operators WHERE id=? AND status='invited' AND role=? AND version=?
@@ -82,8 +82,11 @@ export class AuthStore {
       // A link minted while using a dev session stays a dev credential.
       ...(actor.kind === 'dev' ? [[`INSERT INTO oa_dev_credentials(credential,id,created_at)
         SELECT 'oa_tokens',id,? FROM oa_tokens WHERE id=?`, [now, token.id]]] : []),
-    ]);
-    return results[1].results.some(row => row.id === token.id);
+    ];
+  }
+  async invite(input, actor) {
+    const results = await this.batch(this.invitationStatements(input, actor));
+    return results[1].results.some(row => row.id === input.token.id);
   }
   async preview(hash, now) {
     return this.first(`SELECT t.kind,t.expires_at AS expiresAt,t.return_to AS returnTo,o.email,o.role,t.issuer_id AS issuerId,t.issuer_version AS issuerVersion,

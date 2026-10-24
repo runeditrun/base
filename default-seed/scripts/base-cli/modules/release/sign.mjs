@@ -26,6 +26,7 @@ export async function signArtifact(options) {
     if (privateKey.asymmetricKeyType !== 'ed25519') throw new Error();
   } catch { refuse('SIGNATURE_INVALID'); }
   const artifact = await readArtifact(options.artifact);
+  if (options.publisher !== undefined) artifact.subject.publisher = options.publisher;
   const tag = artifact.receipt.tag;
   if (artifact.receipt.status !== 'RELEASED' || !(tag?.created === true ||
     (tag?.adopted === true && tag.object === artifact.subject.tagObject))) refuse('SUBJECT_MISMATCH');
@@ -34,9 +35,10 @@ export async function signArtifact(options) {
   // consumer still needs a separately reviewed anchor with the real owner ID.
   const entry = await publicEntry(privateKey, { scope, publisher: artifact.subject.publisher,
     githubOwner: { login: artifact.subject.repository.split('/')[3], id: 1 }, ...validity(new Date(issuedAt)), issuedAt });
-  const anchors = anchorSet(entry, scope);
+  const anchors = { ...anchorSet(entry, scope), schemaVersion: 2,
+    keys: [{ ...entry, projects: [artifact.subject.project] }] };
   const loaded = await loadAnchors(anchors, anchors.environment);
-  const statement = statementFor(artifact, entry.keyId, issuedAt);
+  const statement = statementFor(artifact, entry.keyId, issuedAt, anchors.schemaVersion);
   const bytes = Buffer.from(JSON.stringify(envelope(privateKey, entry.keyId, PAYLOAD_TYPE, statement)) + '\n');
   await verifyArtifact(artifact, loaded, anchors.environment, bytes);
   const target = resolve(artifact.root, SIGNATURE_FILE);
