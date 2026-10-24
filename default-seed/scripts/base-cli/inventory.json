@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g06e73170",
+  "cliVersion": "0.2.79-dev.ga81b4c83",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -647,7 +647,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "d7eb60c79e80a88a768f7dd9d57cffbb1a935f1e15fed5bfd47afcadd1900f4e"
+      "sha256": "758c82f2f68daaea1809930c78cfb53c17177603e6e0b862fdcb339fca836643"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",

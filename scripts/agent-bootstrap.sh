@@ -4,7 +4,7 @@ set -euo pipefail
 # Base's Vite/Cloudflare packages need >=22.12; its node --test *.ts commands
 # also need default type stripping (22.18+). Keep these pins in cache inputs.
 readonly NODE_VERSION=22.20.0
-readonly PNPM_VERSION=10.34.7
+readonly PNPM_VERSION=10.12.4
 readonly WORKERD_VERSION=1.20260907.1
 readonly PLAYWRIGHT_VERSION=1.63.0
 readonly BIN_DIR=/usr/local/bin

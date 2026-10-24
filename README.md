@@ -212,7 +212,7 @@ serializer and nullable provider receipt, with uncertain outcomes kept explicit.
 
 ## Public commands
 
-The shared `rer` dispatcher provides install, setup, dev, preview, build, verify, reset, deploy, export, import, doctor, describe and check; release keeps its existing producer and flags. This maintained path is required for every first-party seed. See [run it on your computer](export/RUN-LOCALLY.md) for exact flags, Node 22.20.0/pnpm 10.34.7 pins, readiness/sign-in lines, JSON, exits and the independent-project boundary. Local transfer covers declared supported resources; remote transfer requires complete adapter coverage. [CLI sources and export inventory](cli/README.md) documents the one runner and portable source boundary.
+The shared `rer` dispatcher provides install, setup, dev, preview, build, verify, reset, deploy, export, import, doctor, describe and check; release keeps its existing producer and flags. This maintained path is required for every first-party seed. See [run it on your computer](export/RUN-LOCALLY.md) for exact flags, Node 22.20.0/pnpm 10.12.4 pins, readiness/sign-in lines, JSON, exits and the independent-project boundary. Local transfer covers declared supported resources; remote transfer requires complete adapter coverage. [CLI sources and export inventory](cli/README.md) documents the one runner and portable source boundary.
 
 From `default-seed` or a composed first-party edition, use
 `rer preview` for fixed production output or
