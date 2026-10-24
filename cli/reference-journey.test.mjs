@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { localVariables } from '../onboarding/local/environment.mjs';
 import { personaLinks } from './fixtures/persona-links.mjs';
 import { commandDiagnostic } from './fixtures/command-diagnostic.mjs';
+import { productionSender } from './fixtures/production-sender.mjs';
 import { originalArchiveIdentity, recoverArchiveIdentity } from './fixtures/archive-identity.mjs';
 import { archiveRecords, archiveRows, archiveItems, remakeArchive } from './fixtures/archive-records.mjs';
 import { signedOutSetup, ownerSetup } from './fixtures/setup-journey.mjs';
@@ -65,7 +66,21 @@ for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real W
  if(kind==='foundation'){assert.ok(settings.includes(Buffer.from('WORKSPACE_TITLE="Manifest workspace"')),'declared public answer saved');assert.ok(settings.includes(Buffer.from('CONNECTION_PASSWORD=fixture-connection-passphrase')),'entered manifest secret saved privately');}
 assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const description=JSON.parse((await f.run(['describe','--json'])).stdoutText);assert.ok(description.verbs.dev.flags.includes('--port'));
- await f.run(['doctor','--json'],3);assert.ok(settings.equals(await readFile(join(f.root,'.dev.vars'))),'inspection preserves settings');
+ // Setup is locally healthy without the optional Cloudflare deployment inputs.
+ const healthyDoctor=events(await f.run(['doctor','--json'])).at(-1);
+ assert.equal(healthyDoctor.diagnostics.ok,true);
+ assert.deepEqual(healthyDoctor.diagnostics.missingInputs,[]);
+ assert.ok(settings.equals(await readFile(join(f.root,'.dev.vars'))),'inspection preserves settings');
+ // A missing local owner remains a real failure, including after a real install.
+ const incompleteSettings=Buffer.from(settings.toString().replace(/^OWNER_EMAIL=.*(?:\r?\n|$)/m,''));
+ assert.ok(!incompleteSettings.equals(settings),'remove the saved owner from the fixture');
+ try {
+  await writeFile(join(f.root,'.dev.vars'),incompleteSettings,{mode:0o600});
+  const missingOwner=events(await f.run(['doctor','--json'],3)).at(-1);
+  assert.equal(missingOwner.diagnostics.ok,false);
+  assert.ok(missingOwner.diagnostics.missingInputs.includes('OWNER_EMAIL'));
+  assert.ok(incompleteSettings.equals(await readFile(join(f.root,'.dev.vars'))),'failed inspection preserves settings');
+ } finally {await writeFile(join(f.root,'.dev.vars'),settings,{mode:0o600});}
  await f.run(['setup','--owner-email','other-owner@example.test','--non-interactive','--json'],4);
  await f.data('CREATE TABLE cli_reset_probe (value TEXT); INSERT INTO cli_reset_probe VALUES (\'prior owner content\');');
  const repeatedSetup=f.launch(['scripts/rer.mjs','setup','--non-interactive'],process.execPath,{CI:'false'});
@@ -162,8 +177,15 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  url=events(await f.run(['setup','--answers','answers.json','--owner-email','fresh-owner@example.test','--non-interactive','--json'])).find(event=>event.event==='setup-ready').url;port=Number(new URL(url).port);await rm(answers);
  const tables=await f.data("SELECT name FROM sqlite_master WHERE name='cli_reset_probe'");assert.equal(tables[0].results.length,0,'confirmed reset removed prior domain rows');
  const ownerRows=await f.data('SELECT email FROM oa_operators');assert.deepEqual(ownerRows[0].results,[{email:'fresh-owner@example.test'}],'fresh setup has only the new real owner');
- const deploySettings=join(f.root,'.seed/installer/dry-run.env');await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
- const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json'],3);await rm(deploySettings);assert.equal(events(dry).at(-1).ok,false);assert.match(events(dry).find(event=>event.event==='error').message,/cannot read the target secret bindings/);
+ // Reach the missing-account check with an accepted synthetic sender; the
+ // seed's placeholder sender is correctly refused before credential checks.
+ const deployPath=join(f.root,'deploy.json'),deployment=await readFile(deployPath),declaration=JSON.parse(deployment);
+ const deploySettings=join(f.root,'.seed/installer/dry-run.env');
+ try {
+  declaration.vars.MAIL_FROM=productionSender;await writeFile(deployPath,JSON.stringify(declaration));
+  await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
+  const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json'],3);assert.equal(events(dry).at(-1).ok,false);assert.match(events(dry).find(event=>event.event==='error').message,/cannot read the target secret bindings/);
+ } finally {await writeFile(deployPath,deployment);await rm(deploySettings,{force:true});}
  // The run site builds from edition identity alone, even in a set-up checkout.
  const site=events(await f.run(['build','--site','--json'])).at(-1).site,siteRoot=join(f.root,site.path);
  const siteFiles=(await readdir(siteRoot,{recursive:true,withFileTypes:true})).filter(entry=>entry.isFile()).map(entry=>join(entry.parentPath,entry.name));
@@ -210,7 +232,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const second=events(await f.run(['export','--output','exports/second.rer','--json'])).at(-1);
  assert.equal(restored.contentHash,first.contentHash);
  const secondArchive=archiveRecords(await readFile(join(f.root,'exports/second.rer'),'utf8'));
- const expectedSecond=await remakeArchive(firstArchive,{items:archiveItems(firstArchive).map(item=>item.table==='oa_auth_settings'?{...item,row:{...item.row,generation:item.row.generation+1}}:item)});
+ const expectedSecond=await remakeArchive(firstArchive,{schema:firstArchive[0].schema,items:archiveItems(firstArchive).map(item=>item.table==='oa_auth_settings'?{...item,row:{...item.row,generation:item.row.generation+1}}:item)});
  assert.deepEqual(archiveItems(secondArchive),archiveItems(expectedSecond),'re-export changes only the provider authority generation');
  assert.equal(second.contentHash,expectedSecond.at(-1).contentHash);
  assert.deepEqual(second.tables,first.tables);assert.equal(second.objects,first.objects);assert.equal(second.payloads,first.payloads);
