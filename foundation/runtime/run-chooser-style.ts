@@ -26,6 +26,7 @@ h2{font-family:var(--rer-font-heading,var(--rer-font-body,inherit));font-weight:
 .self[data-copied] .paste-panel{display:block;animation:reveal 150ms ease-out}.self[data-copied] .timeline{display:none}
 @keyframes reveal{from{opacity:0}to{opacity:1}}@media(prefers-reduced-motion:reduce){.self[data-copied] .paste-panel{animation:none}}
 .alt{display:grid;gap:2px;margin-top:16px;color:var(--site-body);font-size:15px;line-height:1.5}.alt code{font:400 15px/1.5 var(--site-mono);color:var(--site-ink)}
+.chooser .self .alt code{width:auto;overflow:visible;white-space:normal}
 .requirements,.email-note{margin-top:8px;color:var(--site-body);font-size:14px;line-height:1.5}
 .timeline{margin-top:20px}.timeline-stops,.paste-stops{display:grid;gap:12px;list-style:none;margin:0;padding:0}
 .timeline-stops li,.paste-stops li{position:relative;display:grid;grid-template-columns:16px minmax(0,1fr);gap:12px;align-items:start;min-width:0}
