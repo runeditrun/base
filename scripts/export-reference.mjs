@@ -45,7 +45,7 @@ export async function exportReference(base, target) {
   for (const entry of await readdir(path, { withFileTypes: true })) {
    const file = resolve(path, entry.name), name = relative(target, file);
    if (entry.isDirectory()) { if (!['base-cli', 'base-onboarding', 'modules'].includes(entry.name)) await adapt(file); }
-   else if (/\.(mjs|mts|ts|tsx)$/.test(name)) {
+   else if (/\.(mjs|mts|ts|tsx)$/.test(name) && !business.sources[name]) {
     const original = resolve(reference, name); let bytes = await readFile(file, 'utf8');
     bytes = relocate(bytes, original, file);
     await writeFile(file, bytes);
