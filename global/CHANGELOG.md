@@ -14,6 +14,18 @@
 
 - Cancel superseded seed Verify runs while keeping every main run, including pending ones; push, pull request and dispatch runs of one ref use separate groups, so a dispatch never cancels a push run. A main push skips its shards only when the newest push of the same SHA to another branch or tag passed this workflow, no newer run of that SHA failed, was cancelled or is still running, and every job of that push run succeeded; pull requests and dispatches are never evidence, and lookup failures run all checks. The stable `verify` aggregate accepts only explicitly authorized shard skips. Workflows that call `verify.yml` grant `actions: read` on the calling job, and `verify-ci.mjs --check-workflows` fails when a caller grants less than a called job requests. Target the next patch after 0.2.79 (0.2.80); see [Verify workflow adoption](../export/VERIFY-WORKFLOW.md#cancel-superseded-runs-and-reuse-branch-verification) for every concurrency variant, the caller diff, plan-job and gate recipes. Update rer and refresh/merge the seed-owned source templates in the same adoption commit.
 
+## 0.2.80
+
+- Healthy doctor now exits 0 when local settings are present.
+- Restore installation archives using SQL-aware schema identity and an object inventory; ignore SQL comments while preserving behavioral schema checks and staged file validation.
+- Expose edition adoption and `refresh-base` in the packaged CLI, preserve adaptation acknowledgements and offline provenance, and retire absent singleton Base copies.
+- Accept a successful exact-SHA branch push or dispatch Verify for releases, including when a duplicate main run failed; reuse qualified branch verification in seed workflows.
+- Keep harness ingress listeners bound across Worker generations and let test runtimes own ephemeral ports.
+- Link demo exits to the seed's canonical Run chooser, bootstrap pinned demo commands, and improve shared header, link and minimum text sizes.
+- Limit Business profile hints to declared public input names and reject credential-shaped hints and duplicate field claims.
+- Update compatible dependencies while retaining Node 22.20.0 and pnpm 10.12.4; pnpm 10.34.7 is not adopted.
+- Give Chromium apt attempts separate deadlines and clean up timed-out attempts and cache payloads.
+
 ## 0.2.79
 
 - Reuse bounded keep-alive connections in the local dev proxy and retry stale connections for bodyless reads.
