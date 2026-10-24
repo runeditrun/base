@@ -77,6 +77,9 @@ export async function upgradeFixture(t, { keep = false } = {}) {
  await writeFile(join(source, migration), "ALTER TABLE upgrade_records ADD COLUMN edition TEXT NOT NULL DEFAULT 'upgraded';\n");
  await git(source, 'add', '.'); await git(source, 'commit', '-qm', 'Add reference data evolution');
  const v2 = await network.publish(source, '2.0.0');
+ // Publisher main may record a newer release than the one being acquired.
+ // That history is not an installed owner's baseline in a fresh clone.
+ await git(source, 'commit', '--allow-empty', '-qm', 'Record current publisher release', '-m', `RER-Upstream-Release: ${repository}@${v2.commit}`);
  await git(directory, 'clone', '--bare', source, remote);
  const port = await freePort(), url = `http://127.0.0.1:${port}`;
  async function launch(release = v1.tag) {

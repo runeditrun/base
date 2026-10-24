@@ -72,6 +72,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   installed = await recordedRelease(checkout).catch(() => undefined);
   journal.from = installed;
   const current = await preflight(checkout);
+  const wasRunning = Boolean(await runningApp(checkout));
   operation = await acquireOperation(checkout);
   try { await serverResources(checkout, { env: { ...process.env, RER_SERVERS_LOAD_THRESHOLD: undefined } }); }
   catch { throw failure('disk_low'); }
@@ -90,7 +91,20 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    journal.result = result; await writeJournal(checkout, journal); await phase('ready');
    return result;
   }
-  if (journalKey && journal.journalKey === journalKey && journal.result) return journal.result;
+  if (journalKey && journal.journalKey === journalKey && journal.result) {
+   if (journal.wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
+   return journal.result;
+  }
+  if (journal.stage === 'verified') {
+   if (current.head !== journal.prepared?.candidate || current.branch !== journal.branch || to && ![journal.target.commit, journal.target.tag].includes(to)) throw failure('refused');
+   switched = true;
+   if (journal.wasRunning) await health(checkout, (await runningApp(checkout))?.url ?? await startApp(checkout, operation));
+   else await stopApp(checkout, operation);
+   const result = output('updated', journal, started);
+   journal.stage = 'complete'; journal.result = result; await writeJournal(checkout, journal);
+   await cleanupMerge(checkout, journal.prepared); await phase('ready');
+   return result;
+  }
   const unfinished = journal.version === 1 && !['verified', 'rolled_back', 'complete'].includes(journal.stage);
   if (unfinished) {
    if (journalKey && journal.journalKey && journalKey !== journal.journalKey) throw failure('refused');
@@ -98,6 +112,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    if (journal.prepared?.candidate && current.head === journal.prepared.candidate && ['switch_pending', 'switched', 'installed', 'started'].includes(journal.stage)) {
     switched = true;
     if (to && ![journal.target.commit, journal.target.tag].includes(to)) throw failure('refused');
+    await stopApp(checkout, operation);
     await phase('get');
     const verified = await resolveRelease({ checkout, to: journal.target.commit, repository: journal.from.repository, anchors });
     if (verified.commit !== journal.target.commit) throw failure('release_unverified');
@@ -121,10 +136,11 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     const target = await resolveRelease({ checkout, to, repository: from.repository, anchors });
     const ancestry = await git(checkout, ['merge-base', '--is-ancestor', from.commit, target.commit], { allow: [1] });
     if (ancestry.code) throw failure('release_unverified');
-    journal = { version: 1, journalKey, head: current.head, branch: current.branch, from, target, stage: 'preparing' };
+    journal = { version: 1, journalKey, head: current.head, branch: current.branch, from, target, wasRunning, stage: 'preparing' };
     await writeJournal(checkout, journal);
     try { journal.prepared = await prepareMerge({ checkout, base: from.commit, head: current.head, target: target.commit, tag: target.tag, repository: from.repository }); }
     catch (error) {
+     journal.prepared ??= error.prepared;
      if (error.error_code === 'needs_integration' && error.prepared) {
       journal.prepared = error.prepared; journal.stage = 'needs_integration'; await writeJournal(checkout, journal);
      }
@@ -135,7 +151,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    await phase('install');
    if (check) return output('refused', journal, started);
    await phase('database');
-   journal.wasRunning = Boolean(await runningApp(checkout));
+   journal.wasRunning ??= wasRunning;
    journal.stage = 'stopping'; await writeJournal(checkout, journal);
    await stopApp(checkout, operation);
    try {
@@ -159,6 +175,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   if (switched) {
    try {
     await rollback(checkout, journal, operation);
+    if (journal.prepared) await cleanupMerge(checkout, journal.prepared);
     const result = output('rolled_back', journal, started, code);
     journal.result = result; await writeJournal(checkout, journal); await phase('failed', code);
     return result;
@@ -171,6 +188,12 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   if (journal.wasRunning && operation) {
    try { if (!await runningApp(checkout)) await health(checkout, await startApp(checkout, operation)); }
    catch { await phase('failed', 'rollback_failed'); return output('refused', journal, started, 'rollback_failed'); }
+  }
+  if (operation && journal.head && code !== 'needs_integration') {
+   try {
+    if (journal.prepared) await cleanupMerge(checkout, journal.prepared);
+    await rm(join(checkout, '.rer/upgrade/journal.json'), { force: true });
+   } catch { /* Preserve a preparation somebody edited; never discard their work. */ }
   }
   await phase('failed', code);
   return output(code === 'needs_integration' ? 'needs_integration' : 'refused', journal, started, code);

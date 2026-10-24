@@ -95,7 +95,7 @@ async function selectRelease({ root, release, anchors, fresh }) {
  const [{ resolveRelease, recordedRelease }, { text, git: command }, { failure }] = await Promise.all([
   import('../local-run/release.mjs'), import('../local-run/process.mjs'), import('../local-run/error.mjs'),
  ]);
- const verified = await resolveRelease({ checkout: root, to: release, anchors });
+ const verified = await resolveRelease({ checkout: root, to: release, anchors, fresh });
  if (fresh) {
   const branch = await command(root, ['symbolic-ref', '--quiet', 'HEAD'], { allow: [1] });
   if (branch.code !== 0) throw failure('not_on_branch');

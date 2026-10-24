@@ -126,7 +126,7 @@ async function tagForCommit(checkout, commit) {
 }
 
 async function minimumVersion(checkout, commit) {
- const result = await git(checkout, ['show', `${commit}:RELEASE.json`], { allow: [128], maxBuffer: 65536 });
+ const result = await git(checkout, ['show', `${commit}:RELEASE.json`], { allow: [128], maxBuffer: 4 * 1024 * 1024 });
  if (result.code !== 0) return undefined;
  let release;
  try { release = JSON.parse(result.stdout); } catch { refuse('release_unverified'); }
@@ -145,16 +145,16 @@ export async function ensureRerVersion(minimum) {
  } catch { refuse('rer_update_required'); }
 }
 
-export async function resolveRelease({ checkout, repository: supplied, to, anchors } = {}) {
+export async function resolveRelease({ checkout, repository: supplied, to, anchors, fresh = false } = {}) {
  try {
   const repository = await originRepository(checkout);
   if (supplied !== undefined && repositoryIdentity(supplied) !== repository) refuse('refused');
   const recorded = await installedRecord(checkout);
   if (recorded && recorded.repository !== repository) refuse('refused');
-  // A new clone has no installation record. Existing installations must have a
-  // valid first-parent baseline; setup verifies before creating that record.
+  // Publisher main can record a newer release than the requested initial one.
+  // Only existing installations have an owner baseline to enforce here.
   let base;
-  try { base = await recordedRelease(checkout); }
+  try { if (!fresh) base = await recordedRelease(checkout); }
   catch (error) { if (recorded || error.error_code !== 'release_not_found') throw error; }
   let tag;
   if (to !== undefined) {
