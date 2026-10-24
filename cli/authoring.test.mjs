@@ -28,7 +28,8 @@ async function fixture(t) {
  const result = (...args) => { const r = run(...args); assert.equal(r.status, 0, r.stdout + r.stderr); return JSON.parse(r.stdout.trim().split('\n').at(-1)); };
  const old = (...args) => { const r = spawnSync(process.execPath, [path.join(pkg, 'edition-authoring/cli.mjs'), ...args], {env, cwd: seed, encoding: 'utf8'}); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
  write(seed, '.gitignore', 'node_modules/\n');
- write(seed, 'package.json', JSON.stringify({devDependencies: {'@runeditrun/rer': version}}));
+ write(seed, '.node-version', process.versions.node + '\n');
+ write(seed, 'package.json', JSON.stringify({engines: {node: process.versions.node}, devDependencies: {'@runeditrun/rer': version}}));
  fs.mkdirSync(path.join(seed, 'node_modules/@runeditrun'), {recursive: true}); fs.symlinkSync(pkg, path.join(seed, 'node_modules/@runeditrun/rer'));
  write(seed, 'rer-project.json', JSON.stringify({schema: 1, projectId: 'example/seed'}));
  write(seed, 'adapter.mjs', 'export const commandAdapter = {verbs: {}};\n');
