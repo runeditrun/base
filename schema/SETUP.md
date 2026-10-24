@@ -50,6 +50,15 @@ fields, including developer settings. Audience does not change requiredness,
 defaults, conditions, runtime editability or submitted values. Existing
 manifests without audience keep their current behavior.
 
+Public fields may declare an optional `businessField` hint identifying the
+business profile value represented by the input. The closed vocabulary is
+`owner_email`, `legal_name`, `timezone`, `currency`, `jurisdiction`, `mail_sender`,
+`display_name`, `owner_name`, `brand_color`, `logo_ref`, `entity_type`,
+`state_of_organization`, `fiscal_year_start`, `books_start_date`, `tax_method`,
+`country` and `state`. Unknown hints are refused. Secrets cannot declare the
+hint, including entered, managed and generated secrets. The hint alone does
+not supply an answer, change input validation or alter field visibility.
+
 A field may declare `localDefault`, a value that only the zero-setup local
 launch (`rer dev` on a checkout that is not set up) fills into an empty active
 field. It takes one of three forms: a literal string for a public field, which
