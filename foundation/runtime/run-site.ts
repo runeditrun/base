@@ -159,7 +159,7 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
     + `<ol class="steps"><li class="step"><div class="body"><h2>Start ${name}</h2>${codeBlock([startLine(run)], `Start ${run.name}`)}`
     + `<p class="alt">Already have Node 22 or later? ${inlineStart(run)} does the same.</p>`
     + `<p class="note">It installs rer for you alone (with its own Node if you have no Node 22 or later), gets ${name} into the folder ${inlineCode(run.clone.slice(npxStart.length + 'dev '.length).split('/').at(-1)!)}, installs everything, makes you the owner and prints a link that opens ${name} signed in. To start it again later, run the same line from the same folder.</p>`
-    + `<p class="note">This free copy runs only on your computer: it sends no email, and nobody else can open it.</p>`
+    + `<p class="note">This free copy runs only on your computer: nobody else can open it, and it sends no email until you set up a mail provider.</p>`
     + `</div></li>${hosted}</ol>`
     + `<footer class="facts"><p>${escape(runRequirements)}</p><p>Source: <a href="${escape(run.repository)}">${source}</a> · ${escape(run.licence)} license</p></footer></main>`
   return document(identity, `Run ${run.name}`, `Run ${run.name} on your computer. 100% free and open source.`, RUN, body, COPY_SCRIPT, homepage?.styles)
