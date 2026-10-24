@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { inspectionMs, isExited, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
 import { readOwnedTree } from './process-tree.mjs'
 import { uncheckedInspection } from './process-diagnostics.mjs'
+import { commandFailure } from './failures.mjs'
 
 const graceMs = 1000
 const cleanupMs = 30000
@@ -126,9 +127,20 @@ export async function stopOwnedGroup(child, signal, ownership) {
     for (const member of stopped.values()) {
       try { await send(member, 'SIGCONT', false) } catch (error) { errors.push(error) }
     }
-    // Preserve the original failure while reporting a failure to resume an owned process.
-    // eslint-disable-next-line no-unsafe-finally
-    if (errors.length) throw new AggregateError([cleanupError, ...errors].filter(Boolean),
-      [cleanupError?.message, 'Could not resume every suspended owned process.', ...errors.map((error) => error.message)].filter(Boolean).join(' '))
+    if (errors.length) {
+      const causes = [cleanupError, ...errors].filter(Boolean)
+      const aggregate = new AggregateError(causes,
+        [cleanupError?.message, 'Could not resume every suspended owned process.', ...errors.map((error) => error.message)].filter(Boolean).join(' '))
+      // The CLI exposes only approved diagnostics. Preserve unchecked identity
+      // failures through aggregation without approving arbitrary cause messages.
+      if (causes.some(uncheckedInspection)) {
+        const failure = commandFailure('Process inspection is unchecked: cleanup could not verify every suspended process before resuming it. No unverified process was signalled.', { ownershipUnchecked: true })
+        failure.cause = aggregate
+        // eslint-disable-next-line no-unsafe-finally
+        throw failure
+      }
+      // eslint-disable-next-line no-unsafe-finally
+      throw aggregate
+    }
   }
 }

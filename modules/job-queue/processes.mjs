@@ -5,37 +5,48 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { shared } from '../../cli/shared.mjs';
 const execute = promisify(execFile);
 const { commandFailure } = await shared('failures.mjs');
+const inspectionMs = 3000;
 
-async function inspected(read) {
+async function inspected(read, timeout = inspectionMs) {
   let timer;
   const unchecked = () => commandFailure('Process inspection is unchecked: the process metadata could not be read within its bound. No unverified process was signalled.', { ownershipUnchecked: true });
   try {
     return await Promise.race([read(), new Promise((_, reject) => {
-      timer = setTimeout(() => reject(unchecked()), 3000);
+      timer = setTimeout(() => reject(unchecked()), timeout);
     })]);
   } catch { throw unchecked();
   } finally { clearTimeout(timer); }
 }
 
-export async function processInfo(pid) {
+export async function processInfo(pid, timeout = inspectionMs) {
   if (!Number.isInteger(pid) || pid < 1) throw Error('Invalid process PID');
-  return inspected(() => inspectProcess(pid));
+  timeout = Math.max(1, Math.min(timeout, inspectionMs));
+  return inspected(() => inspectProcess(pid, timeout), timeout);
 }
 
-async function inspectProcess(pid) {
+async function inspectProcess(pid, timeout) {
   if (process.platform === 'linux') {
+    const signal = AbortSignal.timeout(timeout);
+    let stat;
     try {
-      const [stat, boot, command] = await Promise.all([readFile(`/proc/${pid}/stat`, { encoding: 'utf8', signal: AbortSignal.timeout(3000) }),
-        readFile('/proc/sys/kernel/random/boot_id', { encoding: 'utf8', signal: AbortSignal.timeout(3000) }), readFile(`/proc/${pid}/cmdline`, { encoding: 'utf8', signal: AbortSignal.timeout(3000) })]);
-      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
-      return { pid, start: `${boot.trim()}:${fields[19]}`, zombie: /^[ZX]$/i.test(fields[0]),
-        title: command.replace(/\0/g, ' ').trim() };
+      stat = await readFile(`/proc/${pid}/stat`, { encoding: 'utf8', signal });
     } catch (error) { if (error.code === 'ENOENT' || error.code === 'ESRCH') return null; throw error; }
+    // Only an absent PID stat proves exit. Missing global boot metadata or a
+    // vanished/unreadable command is an unchecked identity, never group custody.
+    const [boot, command] = await Promise.all([
+      readFile('/proc/sys/kernel/random/boot_id', { encoding: 'utf8', signal }),
+      readFile(`/proc/${pid}/cmdline`, { encoding: 'utf8', signal }),
+    ]);
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/);
+    if (!stat.startsWith(`${pid} (`) || !stat.includes(') ') || !/^\d+$/.test(fields[19] ?? '') || !boot.trim())
+      throw Error('Invalid process identity');
+    return { pid, start: `${boot.trim()}:${fields[19]}`, zombie: /^[ZX]$/i.test(fields[0]),
+      title: command.replace(/\0/g, ' ').trim() };
   }
   if (process.platform !== 'darwin') throw Error('Job queue supports macOS and Linux');
   try {
     const { stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'stat=', '-o', 'command='],
-      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout: 3000, killSignal: 'SIGKILL' });
+      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, killSignal: 'SIGKILL' });
     const match = stdout.trim().match(/^(.{24})\s+(\S+)\s+(.*)$/);
     if (!match) throw Error(`Cannot inspect process ${pid}`);
     return { pid, start: match[1], zombie: /^[ZX]/i.test(match[2]), title: match[3] };
@@ -51,10 +62,10 @@ export function signalGroup(pgid, signal) {
   catch (error) { if (error.code === 'ESRCH') return false; throw error; }
 }
 
-const groupLive = pgid => inspected(() => readGroupLive(pgid));
-async function readGroupLive(pgid) {
+const groupLive = (pgid, timeout = inspectionMs) => inspected(() => readGroupLive(pgid, timeout), timeout);
+async function readGroupLive(pgid, timeout) {
   if (process.platform === 'darwin') {
-    const { stdout } = await execute('/bin/ps', ['-A', '-o', 'pgid=', '-o', 'stat='], { timeout: 3000, killSignal: 'SIGKILL' });
+    const { stdout } = await execute('/bin/ps', ['-A', '-o', 'pgid=', '-o', 'stat='], { timeout, killSignal: 'SIGKILL' });
     // A member already exiting (stat flag E) cannot be signalled and is ending,
     // like a zombie; killpg answers EPERM for a group of only such members.
     return stdout.trim().split('\n').some(line => {
@@ -62,7 +73,7 @@ async function readGroupLive(pgid) {
       return Number(group) === pgid && !/^[ZX]/i.test(state) && !state.includes('E');
     });
   }
-  const signal = AbortSignal.timeout(3000);
+  const signal = AbortSignal.timeout(timeout);
   for (const name of (await readdir('/proc')).filter(name => /^\d+$/.test(name))) {
     try {
       signal.throwIfAborted();
@@ -96,13 +107,23 @@ export async function stopGroup(owner, graceMs) {
   if (!owner?.pgid) return;
   if (!Number.isInteger(owner.pgid) || owner.pgid < 2 || owner.pgid !== owner.pid)
     throw Error('Invalid lease process group');
-  const verify = async () => {
-    const current = await processInfo(owner.pid);
+  const verify = async (timeout) => {
+    const current = await processInfo(owner.pid, timeout);
     return !current || (current.start === owner.start
-      && (current.zombie || !owner.marker || !current.title || current.title.includes(owner.marker)));
+      && (current.zombie || !owner.marker || current.title.includes(owner.marker)));
   };
   if (await deliverGroupSignal(owner.pgid, 'SIGTERM', { verify })) {
     await delay(graceMs);
-    await deliverGroupSignal(owner.pgid, 'SIGKILL', { verify });
+    if (await deliverGroupSignal(owner.pgid, 'SIGKILL', { verify })) {
+      // Delivery is not completion. Keep the reservation until the owned group
+      // is gone (or zombie-only); never wait on a recycled group's new lifetime.
+      const deadline = performance.now() + inspectionMs;
+      for (;;) {
+        const remaining = Math.max(1, Math.ceil(deadline - performance.now()));
+        if (!await groupLive(owner.pgid, remaining) || !await verify(Math.max(1, Math.ceil(deadline - performance.now())))) return;
+        if (performance.now() >= deadline) throw Error('Owned processes remain after cancellation: live job group survived SIGKILL.');
+        await delay(Math.min(25, deadline - performance.now()));
+      }
+    }
   }
 }

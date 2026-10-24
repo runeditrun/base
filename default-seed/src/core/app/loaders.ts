@@ -24,6 +24,17 @@ export const requireOperator = createServerFn({ method: 'GET' }).handler(async (
   return session
 })
 
+export const loadBusinessBrand = createServerFn({ method: 'GET' }).handler(async () => {
+  const [{ sessionForStartRequest }, { requestBindings }, { businessSettings }] = await Promise.all([
+    import('../platform/auth/start-session.server'), import('../platform/bindings.server'), import('../platform/business.server'),
+  ])
+  const bindings = requestBindings()
+  if (!await sessionForStartRequest(bindings)) throw redirect({ href: '/signin?returnTo=%2Fapp', reloadDocument: true })
+  const settings = businessSettings(bindings)
+  return { ...await settings.publicBrand(), timezone: await settings.resolve('timezone', 'UTC') as string,
+    ownerName: await settings.resolve('owner_name', '') as string }
+})
+
 export const loadPrivateDashboard = createServerFn({ method: 'GET' }).handler(async () => {
   const [{ sessionForStartRequest }, { readDashboard }, { requestBindings }] = await Promise.all([
     import('../platform/auth/start-session.server'),

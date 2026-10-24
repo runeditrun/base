@@ -27,22 +27,33 @@ export function administration(context) {
     if (!target) deny('operator_not_found', 404);
     return target;
   }
-  return {
-    async invite(request, input) {
+  async function prepareInvitation(request, input, snapshot) {
       const role = input.role ?? 'member';
       if (!DEFAULT_ROLES.includes(role)) throw new AuthError('invalid_role');
       const actor = await actorFor(request, 'operators:invite', undefined, role);
       const email = normalizeEmail(input.email);
-      await limit(request, email, 'invite');
+      // A trusted server batch supplies its read snapshot; browser requests
+      // retain the per-IP and mailbox invitation limits.
+      if (!snapshot) await limit(request, email, 'invite');
       if (!emailAllowed(email, config.allowList)) deny('email_not_allowed');
-      const existing = await store.byEmail(email);
+      const existing = snapshot ? snapshot.operator : await store.byEmail(email);
       const reinviting = existing?.status === 'inactive' && !!await store.cancellation(existing.id);
       if (existing && (existing.role !== role || (!reinviting && existing.status !== 'invited'))) deny('invitation_conflict', 409);
       const now = clock();
       const token = await newToken('invite', safeReturnTo(input.returnTo));
-      const created = await store.invite({ operatorId: existing?.id ?? crypto.randomUUID(), expectedVersion: existing?.version ?? 1, reinviting, email, displayName: displayName(input.displayName), role, token, now }, actor);
+      const mutation = { operatorId: existing?.id ?? crypto.randomUUID(), expectedVersion: existing?.version ?? 1, reinviting, email, displayName: displayName(input.displayName), role, token, now };
+      return { mutation, actor, statements: store.invitationStatements(mutation, actor), async afterCommit() {
+        const issued = await store.first('SELECT id FROM oa_tokens WHERE id=? AND revoked_at IS NULL AND consumed_at IS NULL', [token.id]);
+        if (issued) await sendLink(email, token);
+      } };
+  }
+  return {
+    prepareInvitation,
+    async invite(request, input) {
+      const plan = await prepareInvitation(request, input);
+      const created = await store.invite(plan.mutation, plan.actor);
       if (!created) deny('invitation_conflict', 409);
-      await sendLink(email, token);
+      await plan.afterCommit();
       return { status: 'accepted' };
     },
     async listOperators(request) {

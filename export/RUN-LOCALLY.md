@@ -1,27 +1,20 @@
 # Run it locally
 
-To bring existing data into a seed, sign in as the owner and use its import
-screen. First step: open this path on the destination app:
+Start a published seed with one line:
 
-```text
-/app/import
+```sh
+curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>
 ```
 
-Upload a supported source export, review the plan and its differences, then
-approve that exact plan to apply it. Reconcile the result against native data;
-use Undo from the same history when needed. Base's reference accepts people JSON
-here, not installation `.rer` archives. Editions adopt this same door
-with their own supported readers and native adapters.
+Git is required; rer brings Node and pnpm. Already have Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same.
 
-Start a published seed with one line:
-`npx -y @runeditrun/rer dev just-every/<repo>`, for example
-`npx -y @runeditrun/rer dev just-every/run-inkwell`. It clones the seed into
-`./<repo>`, installs its dependencies, sets up a local owner and starts the app.
-The clone has every commit and release tag (file contents arrive as a checkout
-needs them), so `git checkout <tag>` adopts an older release.
-To set up without starting, use `npx -y @runeditrun/rer setup just-every/<repo>`.
-Without Node 22 or later, the [RER installer](https://runeditrun.com) runs the
-same line: `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/<repo>`.
+For example, use
+`curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell`.
+It clones the seed into `./<repo>`, installs its dependencies, sets up a local
+owner and starts the app. The clone has every commit and release tag (file
+contents arrive as a checkout needs them), so `git checkout <tag>` adopts an
+older release. To set up without starting, use
+`curl -fsSL https://runeditrun.com/install.sh | sh -s -- setup <owner/repo>`.
 It installs `rer` in `~/.local/bin` with its own Node and edits no shell
 profile: when `~/.local/bin` is not on PATH for new terminals, its install step
 ends with the one command that adds it for your shell (for zsh:
@@ -40,6 +33,19 @@ package mode. Vendored mode carries Base's exported CLI; package mode pins an
 exact `@runeditrun/rer` devDependency. In both modes the checkout's
 `OPERATIONS.json` argv and `package.json` aliases select the version that
 `rer VERB` runs.
+
+To bring existing data into a seed, sign in as the owner and use its import
+screen. First step: open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters.
 
 ## Launch with one command
 

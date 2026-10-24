@@ -5,7 +5,11 @@ import { readArtifact } from './statement.mjs';
 import { SIGNATURE_FILE, readBounded, safePath, refuse } from './signing-io.mjs';
 
 export async function verifyArtifact(artifact, anchors, environment, bytes, highest) {
-  const result = await verifyRelease(bytes, anchors, { environment, expect: artifact.subject,
+  const expect = { ...artifact.subject };
+  // V2 authenticates the publisher with the signing anchor. A project's owner
+  // component is no longer evidence of its publisher namespace.
+  if (anchors.schemaVersion === 2) delete expect.publisher;
+  const result = await verifyRelease(bytes, anchors, { environment, expect,
     files: artifact.files, highest, unsigned: { project: artifact.subject.project, version: artifact.subject.version } });
   if (result.verdict !== 'VERIFIED') refuse(result.code ?? 'SIGNATURE_MISSING');
   return result;

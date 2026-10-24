@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Treat zombie and dead owned processes as completed during setup, dev and resume cleanup, without signalling or waiting for them. Keep live descendant escalation and birth checks, verify group identity immediately before each signal, preserve locks when owner inspection is unavailable, and report bounded inspection failures as unchecked.
+- Treat zombie and dead owned processes as completed during setup, dev and resume cleanup, without signalling or waiting for them. Keep live descendant escalation and birth checks, verify group identity immediately before each signal, preserve locks when owner inspection is unavailable, and report bounded inspection failures as unchecked, including failed resume inspections. Queue cleanup requires readable identity metadata and observes completion after SIGKILL before releasing its reservation.
+- Add signed runtime Business settings, same-origin logos, app accent fills, local overrides and owner-scoped team reconciliation. The reference seed adopts the module; owners can stop settings with fresh sign-in proof.
 
 ## 0.2.80
 

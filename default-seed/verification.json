@@ -68,7 +68,7 @@
       "hosted": false,
       "commands": [
         "pnpm run build",
-        "node --test --test-concurrency=1 tests/operator-auth/emitted.test.mjs tests/operator-auth/scheduled-*.test.mjs"
+        "node --test --test-concurrency=1 tests/operator-auth/emitted.test.mjs tests/operator-auth/scheduled-*.test.mjs tests/operator-auth/business-settings.test.mjs"
       ]
     },
     {

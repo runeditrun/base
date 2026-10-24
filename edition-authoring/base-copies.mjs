@@ -13,6 +13,7 @@ import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
 import {requireMaterializedCopies} from './copy-checkout.mjs';
+import {completeRuntimeCopies} from './runtime-dependencies.mjs';
 
 export const RECORD = 'base-copies.json';
 const commit = /^[a-f0-9]{40}$/, sha256 = /^[a-f0-9]{64}$/;
@@ -382,6 +383,14 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
       return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
+    completeRuntimeCopies(plans, {tree: next, read, local, upstream, revision, checkTarget(name) {
+      safe(name); noLinks(root, name);
+      const target = path.join(root, name);
+      if (fs.existsSync(target) && !fs.lstatSync(target).isFile()) throw Error(`Runtime dependency is not a regular file: ${name}`);
+    }});
+    // Closure may add individually recorded siblings when the seed originally
+    // selected runtime files one at a time instead of copying the directory.
+    record.copies = plans.map(plan => plan.copy).sort((a, b) => a.path.localeCompare(b.path));
     // A migration a database may already have applied is never rewritten in place:
     // the schema change it brings belongs in a new migration of the seed's own.
     const applied = plans.flatMap(({copy, sources}) => sources.map(([source, {object}]) => [mapped(source, copy.originPath, copy.path), object])

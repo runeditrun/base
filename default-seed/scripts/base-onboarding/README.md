@@ -222,6 +222,10 @@ Group discovery precedes the final identity check for every TERM and KILL.
 A same-birth zombie supervisor's erased title does not hide live descendants;
 birth mismatches still reject cleanup. Unavailable owner metadata preserves
 an existing operation lock, including a legacy lock without a birth stamp.
+Missing boot or command metadata is unchecked, rather than evidence that a queue
+supervisor has exited. After SIGKILL, queue cleanup observes live membership for
+up to three seconds and retains the reservation if the group survives or cannot
+be inspected. Failed resume inspections keep the approved unchecked diagnostic.
 
 
 ## Data, deployment and verification
