@@ -1,7 +1,7 @@
 # Operator auth (IF-055-CORE-v1)
 
 Portable server-only ESM: import `createOperatorAuth`, `createAuthHandler` and
-`createSignInHandler` from `modules/operator-auth/index.mjs`. TypeScript
+`createSignInHandler` from `./modules/operator-auth/index.mjs`. TypeScript
 declarations are `index.d.mts`. No framework or mail transport is bundled. Apply
 `accounts/schema/operator-auth.sql` once for a fresh auth database (and
 `identity/oidc/schema/oidc.sql` when the app offers identity providers). Preserve applied migration history in an existing
@@ -594,7 +594,7 @@ an independently captured pre-update source snapshot containing the complete
 root. With the frozen workspace dependencies installed, run:
 
 ```sh
-OA_BASELINE_SOURCE=/path/to/snapshot node --test modules/operator-auth/tests/reinvitation-upgrade.mjs
+OA_BASELINE_SOURCE=/path/to/snapshot node --test ./modules/operator-auth/tests/reinvitation-upgrade.mjs
 ```
 
 Runtime tests use the locked Wrangler Miniflare/esbuild dependencies and run the
@@ -608,7 +608,7 @@ deployment remain separate.
 
 ## Adopting this version
 
-Copy the **complete** `modules/operator-auth/` directory from one reviewed Base
+Copy the **complete** `./modules/operator-auth/` directory from one reviewed Base
 revision into the seed's operator-auth source location. Keep its layers
 (`identity/`, `accounts/`, `dev/`), runtime files, declarations, schema,
 conformance files and tests from that same revision; `rer check` names any copied
@@ -707,3 +707,35 @@ OA accounts offer a bounded, hash-pinned scheduled policy door, separate from
 human sessions. Read [SCHEDULED-POLICY.md](SCHEDULED-POLICY.md) for the design,
 additive migration, declaration, owner approval/revocation flow and audit contract.
 The reference `/app/policies` screen and Worker scheduled handler show adoption.
+
+### Business settings and the default team adapter
+
+An edition that adopts `./modules/business-settings` passes its runtime instance as
+`createOperatorAuth({ ..., businessSettings })`. It supplies `publicBrand()`,
+`read()` provenance and `stop(actorId, guard?)`. The optional guard is the OA
+session's live SQL authority fence: include it in the stop transaction. The
+owner-only sign-in settings page shows the source Business, revision and applied
+time, with a `business:stop` step-up control. Public sign-in uses the runtime
+name and versioned same-origin logo; no Business colour is applied there. For
+Base's setup frame, pass the instance as `theme.businessSettings`.
+
+OA compositions expose the server-only `auth.businessTeam` adapter. The Business
+runtime calls `ownerEmail()` to bind trust to the current claimed owner, then
+`prepare({ members, managed, ownerEmail, roles, guard })`. Here `members` is the
+verified roster; `managed` contains only durable Business-owned rows
+`{email,operatorId,invite,state}`; `roles` maps `admin` and `member` to the app's
+non-owner OA roles; and `guard:{sql,args}` proves this document's accepted
+revision and fresh nonce. Batch the returned `statements` with settings, logo
+and managed-row writes on the same D1 binding, then call `afterCommit()` to send
+invitations. Never call it before a successful batch.
+
+The adapter preserves the configured role policy and repeats claimed-owner and
+target versions in SQL. New and reissued invitations use the existing
+administration invitation preparation, issuer authority, cancellation ledger
+and app mail sender. Removal cancels pending invitations or deactivates an
+accepted account, invalidating its sessions. Re-adding an unaccepted account
+requires its invitation; accepted accounts reactivate. Existing unowned
+operators return `conflict`, and owner operators are never changed or granted.
+Audit rows retain the claimed owner as actor and record `via: "via Business by <owner email>"`. Native account compositions
+supply their own team adapter and can use the same optional branding/settings
+integration.
