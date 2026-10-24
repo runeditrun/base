@@ -80,6 +80,14 @@ async function post(origins, document, signal, reloadOrigin) {
    if (reloading && await reloadPause(signal)) continue;
    break;
   }
+  // Vite can answer a proxy error while the changed binding restarts its
+  // Worker. Wait only for this known managed reload, within the same budget.
+  if (reloading && [500, 502, 503, 504].includes(response.status)) {
+   const status = response.status;
+   await response.body?.cancel();
+   if (await reloadPause(signal)) continue;
+   throw failed(`The app did not finish reloading Business settings (HTTP ${status}). Run rer business sync again.`);
+  }
   if (![200, 409].includes(response.status)) throw failed(`The app refused Business settings (HTTP ${response.status}). Its current values were kept.`);
   let ack;
   try { ack = await response.json(); } catch { throw failed('The app did not acknowledge Business settings.'); }
