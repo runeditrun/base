@@ -4,6 +4,7 @@ import { vendorKey, disconnect, status } from './local-commands.mjs';
 import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
+import { sync } from './sync.mjs';
 
 const usage = `Usage: rer business VERB
   scan [DIR...] [--json]          Names-only local discovery
@@ -11,6 +12,7 @@ const usage = `Usage: rer business VERB
                                  Pair this computer, waiting until the owner approves in the browser
                                  (up to the code's 10 minutes); run it again to resume
   run [--once]                   Run consented local discovery; vendor upload integration pending
+  sync [--app ID] [--leave]       Pull Business settings into this checkout, or leave and keep current values
   next                           Return one templated question or nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
                                  Catalog vendor or none; uses, sells, both, product-dependency
@@ -37,6 +39,9 @@ export async function businessCommand(argv) {
    }
    if (options.code !== undefined && !/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(options.code)) return invalid();
    await connect(options);
+  } else if (verb === 'sync') {
+   if (args.length && !(args.length === 1 && args[0] === '--leave') && !(args.length === 2 && args[0] === '--app' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,399}$/.test(args[1]))) return invalid();
+   process.stdout.write(await sync({ app: args[0] === '--app' ? args[1] : undefined, leave: args[0] === '--leave' }) + '\n');
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
   else if (verb === 'run' && (!args.length || args.length === 1 && args[0] === '--once')) await run({ once: args[0] === '--once' });
