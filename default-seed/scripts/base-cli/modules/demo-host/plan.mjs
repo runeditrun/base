@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { assert, hash, resourceName } from '../deploy-kit/validation.mjs';
 import { ownerWorkerName } from '../deploy-kit/owner.mjs';
 import { siteDeclaration } from '../deploy-kit/site.mjs';
+import { demoRunUrl } from '../demo/run-url.mjs';
 
 // Native Loader front, admission and visitor session support.
 export const DEMO_FILES = ['worker.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs', 'page-style.mjs', 'theme-script.mjs', 'start-script.mjs', 'diagnostics.mjs', 'operator.mjs', 'measurement.mjs'];
@@ -11,11 +12,7 @@ export function demoDeclaration(value, originVar) {
   assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'ownerEmail', 'settings', 'runUrl'].includes(key)), 'invalid-demo-declaration');
   siteDeclaration({ version: 1, domain: value.domain });
   assert(typeof value.name === 'string' && value.name.trim() === value.name && value.name.length > 0 && value.name.length <= 60 && !/[\p{Cc}\p{Cf}]/u.test(value.name), 'invalid-demo-name');
-  const runUrl = value.runUrl ?? `https://${value.domain}/run`;
-  let run;
-  try { run = new URL(runUrl); } catch { assert(false, 'invalid-demo-run-url'); }
-  assert(typeof runUrl === 'string' && run.protocol === 'https:' && !run.username && !run.password && run.pathname === '/run' && !run.search && !run.hash, 'invalid-demo-run-url');
-  siteDeclaration({ version: 1, domain: run.hostname });
+  const runUrl = demoRunUrl(value.runUrl === undefined ? `https://${value.domain}/run` : value.runUrl);
   const maxInstances = value.maxInstances ?? 10;
   assert(Number.isSafeInteger(maxInstances) && maxInstances >= 1 && maxInstances <= 100, 'invalid-demo-max-instances');
   const ownerEmail = value.ownerEmail;
