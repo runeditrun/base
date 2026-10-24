@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc957441a",
+  "cliVersion": "0.2.79-dev.g3d1d696d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1079,7 +1079,7 @@
     },
     "cli/site-preview.mjs": {
       "source": "cli/site-preview.mjs",
-      "sha256": "cb63d279cea036b9db49b0af02fefa7bb2e1d215b93b83c5a2b5463034c2ce8c"
+      "sha256": "158c7269d25269a2495209444adb4fc70b4f636a3736f48d7daf5faed7d1518b"
     },
     "cli/site-private.mjs": {
       "source": "cli/site-private.mjs",

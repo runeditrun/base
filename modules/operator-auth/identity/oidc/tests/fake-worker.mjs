@@ -33,9 +33,9 @@ export default {
     let request = incoming;
     if (new URL(incoming.url).pathname === '/__test_dispatch') { const { url, ...init } = await incoming.json(); request = new Request(url, init); }
     const url = request.url;
-    const setup = JSON.parse(env.TEST_SETUP);
     const db = env.DB;
     const current = await state(db);
+    const setup = current.browserSetup ?? JSON.parse(env.TEST_SETUP);
     const offset = current.clock ?? 0;
     const now = () => Date.now() + offset;
     const patch = current.fakes ?? {};

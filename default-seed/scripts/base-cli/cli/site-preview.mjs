@@ -47,7 +47,10 @@ export async function sitePreview(folder, { host = '127.0.0.1', ports }) {
    server.once('error', failed);
    server.listen(port, host, () => { server.off('error', failed); resolve(true); });
   });
-  if (bound) return { url: `http://${host === '::1' ? '[::1]' : host}:${port}`, port, close: () => new Promise(resolve => { server.closeAllConnections?.(); server.close(() => resolve()); }) };
+  if (bound) {
+   const port = server.address().port;
+   return { url: `http://${host === '::1' ? '[::1]' : host}:${port}`, port, close: () => new Promise(resolve => { server.closeAllConnections?.(); server.close(() => resolve()); }) };
+  }
  }
  throw new Error('No free port for the run site preview.');
 }

@@ -41,7 +41,7 @@ test('relocated temporary seed runs the copied CLI through a directory symlink',
   const config = join(alias, 'review.config.mjs'), evidence = join(alias, 'evidence');
   // A relocated seed owns its server too; no fixture or import escapes Base's copy.
   await writeFile(join(seed, 'server.mjs'), `import { createServer } from 'node:http';
-createServer((_req,res)=>{res.setHeader('content-type','text/html');res.end('<!doctype html><html lang="en"><head><title>Relocated review</title></head><body><main><h1>Relocated review</h1><a href="/">Home</a></main></body></html>');}).listen(Number(process.argv[2]),'127.0.0.1');`);
+const server=createServer((_req,res)=>{res.setHeader('content-type','text/html');res.end('<!doctype html><html lang="en"><head><title>Relocated review</title></head><body><main><h1>Relocated review</h1><a href="/">Home</a></main></body></html>');});server.listen(Number(process.argv[2]),'127.0.0.1',()=>console.log('RER_READY http://127.0.0.1:'+server.address().port));`);
   await writeFile(config, `export default ${JSON.stringify({ start: { cwd: '.', command: process.execPath, args: ['server.mjs', '{PORT}'], readyTimeoutMs: 10_000 }, widths: [390], routes: [{ name: 'relocated', path: '/' }] })};`);
   const result = await invoke(join(alias, 'vendor/base/modules/review-harness/cli.mjs'), ['--config', config, '--evidence', evidence]);
   assert.equal(result.code, 0, result.stdout);
