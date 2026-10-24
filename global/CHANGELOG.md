@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep demo Run exits out of the host layout; use spare label space, truncate the exit itself and reveal its full accessible link on keyboard focus without moving header controls.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.
