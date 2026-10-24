@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g38b77c8c",
+  "cliVersion": "0.2.80-dev.g69e4102e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
       "source": "onboarding/README.md",
-      "sha256": "d9774a8f0bca4c1b73055b0688088b7966df7a61a85ff59a69d60febf6066d83"
+      "sha256": "c691f92422f5c557ac38ce839eb4260aeefc85355ec56dd97cfc1d51e869b9d3"
     },
     "activity.mjs": {
       "source": "onboarding/activity.mjs",
@@ -133,7 +133,7 @@
     },
     "local/operation.mjs": {
       "source": "onboarding/local/operation.mjs",
-      "sha256": "df39f61408454dfa303281170eb6f9b30ea092df1eb7a2a862ff813d9914c052"
+      "sha256": "31038acfee4aee62ed1d4e49158912c7f1628ca9f0ca1782457bd0ac930159ac"
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
@@ -141,7 +141,7 @@
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
-      "sha256": "a14d7508b1cdc4a120178c49948ebf3795bcf6697ab181b4ce552fde4499d90d"
+      "sha256": "7f6d87f4c81a9f3a4bc34ac682077f2ab3e76a675ec5dbb0e96f2f9eb9be89e6"
     },
     "local/recovery.mjs": {
       "source": "onboarding/local/recovery.mjs",
@@ -209,11 +209,11 @@
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "613672943c05d74542e6548b8a459d7880a6e05ae14e4fcdf5e2971b8692ff3c"
+      "sha256": "198b4b247a35ced657706e4fabe4bd53291f9921f093f7a5df68386587d36914"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "569bbb90f9a579f3a54d7b6f21365b17dd6181420da941b2e8cfc58d4d7ea73e"
+      "sha256": "bae8cb04c18a5ee8c46da9b048be1f860645f53e13ea4be1e7611b09cd44a5d3"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
@@ -2703,7 +2703,7 @@
     },
     "modules/job-queue/processes.mjs": {
       "source": "modules/job-queue/processes.mjs",
-      "sha256": "4fa6649d94bf4809413d964537ad9e60f68c3b8985f079cfc5acb0fd475a7613"
+      "sha256": "10e10f03731479998b14fb238bad691e2db2826feacf3346014c5fac0499755a"
     },
     "modules/job-queue/resources.mjs": {
       "source": "modules/job-queue/resources.mjs",

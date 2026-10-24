@@ -119,7 +119,11 @@ async function psIdentity(pid, timeout) {
   try {
     ({ stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'ucomm='],
       { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
-  } catch (error) { if (error.code === 1 && !error.stdout?.trim()) return; throw transient('Could not inspect process identity.') }
+  } catch (error) {
+    if (error.code === 1 && !error.killed && !error.signal && typeof error.stdout === 'string'
+      && typeof error.stderr === 'string' && !error.stdout.trim() && !error.stderr.trim()) return
+    throw transient('Could not inspect process identity.')
+  }
   const match = stdout.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.{24})\s+(.+?)\s*$/)
   if (!match) throw transient('Invalid process identity.')
   const [, id, parent, groupId, uid, state, birth, command] = match

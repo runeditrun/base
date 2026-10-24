@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
 import { isExited, inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
+import { commandFailure } from './failures.mjs'
 
 const execute = promisify(execFile)
 const scopes = new WeakMap()
@@ -80,7 +81,7 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
           if (process.platform !== 'linux') for (const [pid, text] of await readEnvironments([member.pid], Math.max(1, inspectionEnd - Date.now()))) environments.set(pid, text)
           continue
         }
-        throw new Error(`Could not inspect ownership of process ${member.pid} (${error.code ?? 'missing'}, state ${current.state}).`)
+        throw commandFailure(`Could not inspect ownership of process ${member.pid}. Process inspection is unchecked.`, { ownershipUnchecked: true })
       }
     }
     if (environment.split(/[\0\s]+/).some(value => value.startsWith(marker + '=')
@@ -103,8 +104,9 @@ async function readEnvironments(pids, timeout) {
   } catch (error) {
     // ps may lose a candidate while it enumerates. Keep partial private output
     // only for that exit code; each missing identity is checked by the caller.
-    if (error.code === 1 && typeof error.stdout === 'string') stdout = error.stdout
-    else throw new Error('Could not inspect scoped process ownership.')
+    if (error.code === 1 && !error.killed && !error.signal && typeof error.stdout === 'string'
+      && typeof error.stderr === 'string' && !error.stderr.trim()) stdout = error.stdout
+    else throw commandFailure('Could not inspect scoped process ownership. Process inspection is unchecked.', { ownershipUnchecked: true })
   }
   const environments = new Map()
   for (const line of stdout.split('\n')) {

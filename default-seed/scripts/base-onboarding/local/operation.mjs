@@ -106,10 +106,12 @@ async function staleIdentity(path) {
   try {
     const status = await handle.stat({ bigint: true })
     const id = key(status)
-    try {
-      const owner = JSON.parse(await handle.readFile('utf8'))
-      if (Number.isSafeInteger(owner.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
-    } catch { /* Half-written or unreadable: judged by age below. */ }
+    let owner
+    try { owner = JSON.parse(await handle.readFile('utf8')) }
+    catch (error) { if (!(error instanceof SyntaxError)) throw error }
+    // An unreadable owner is unchecked, regardless of the lock's age. Only
+    // malformed/unfinished records may use the grace-period rule below.
+    if (Number.isSafeInteger(owner?.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
     return Date.now() - Number(status.mtimeMs) > graceMs ? id : undefined
   } finally { await handle.close() }
 }

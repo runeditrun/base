@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { setTimeout as delay } from 'node:timers/promises'
-import { readProcessTable } from './process-table.mjs'
+import { readProcessTable, sameBirth } from './process-table.mjs'
 import { uncheckedInspection } from './process-diagnostics.mjs'
 
 const transient = () => Object.assign(new Error('Could not read process identities.'), { transient: true })
@@ -23,8 +25,28 @@ test('an unreadable process table is unchecked within its bound', async () => {
   assert.ok(Date.now() - started < 1500, 'unresponsive readers cannot hang cleanup')
 })
 
-test('a slow successful read still returns the observed table', async () => {
-  assert.deepEqual(await readProcessTable(1000, undefined, async () => { await delay(100); return table }), table)
+// A seed's test cleanup (Uptime's browser suites) reads the table to find what
+// its run left behind. A slow read inside the deadline must still discover
+// and stop the real stray, rather than merely return a synthetic table.
+test('a slow process table does not fail a passing run and its stray child is still stopped', async () => {
+  const slow = async () => { await delay(400); return readProcessTable() }
+  const run = spawn(process.execPath, [new URL('./fixtures/stray-child-run.mjs', import.meta.url).pathname], { detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
+  const exited = once(run, 'exit')
+  const stray = Number((await once(run.stdout, 'data'))[0].toString())
+  try {
+    const table = await readProcessTable(3000, undefined, slow)
+    const owned = table.filter(row => row.pid === run.pid)
+    for (const row of table) if (owned.some(parent => parent.pid === row.ppid)) owned.push(row)
+    assert.ok(owned.some(row => row.pid === stray), 'the stray was found through the slow table')
+    process.kill(-run.pid, 'SIGTERM')
+    assert.deepEqual(await exited, [0, null], 'the run passed')
+    for (const row of (await readProcessTable(3000, undefined, slow)).filter(row => owned.some(old => sameBirth(old, row)))) process.kill(row.pid, 'SIGTERM')
+    const gone = Date.now() + 10000
+    while ((await readProcessTable(3000, undefined, slow)).some(row => owned.some(old => sameBirth(old, row)) && !row.state.startsWith('Z')) && Date.now() < gone) await delay(50)
+    assert.throws(() => process.kill(stray, 0), { code: 'ESRCH' }, 'the stray child was stopped')
+  } finally {
+    for (const pid of [-run.pid, stray]) try { process.kill(pid, 'SIGKILL') } catch {}
+  }
 })
 
 test('a failure that is not transient is reported at once', async () => {

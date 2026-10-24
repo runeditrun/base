@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Treat zombie and dead owned processes as completed during setup, dev and resume cleanup, without signalling or waiting for them. Keep live descendant escalation and birth checks, verify group identity immediately before each signal, preserve locks when owner inspection is unavailable, and report bounded inspection failures as unchecked.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.

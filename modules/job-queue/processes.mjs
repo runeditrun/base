@@ -2,15 +2,18 @@ import { readFile, readdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
+import { shared } from '../../cli/shared.mjs';
 const execute = promisify(execFile);
+const { commandFailure } = await shared('failures.mjs');
 
 async function inspected(read) {
   let timer;
+  const unchecked = () => commandFailure('Process inspection is unchecked: the process metadata could not be read within its bound. No unverified process was signalled.', { ownershipUnchecked: true });
   try {
     return await Promise.race([read(), new Promise((_, reject) => {
-      timer = setTimeout(() => reject(Object.assign(Error('Process inspection is unchecked: its read deadline expired.'),
-        { ownershipUnchecked: true })), 3000);
+      timer = setTimeout(() => reject(unchecked()), 3000);
     })]);
+  } catch { throw unchecked();
   } finally { clearTimeout(timer); }
 }
 
@@ -36,7 +39,11 @@ async function inspectProcess(pid) {
     const match = stdout.trim().match(/^(.{24})\s+(\S+)\s+(.*)$/);
     if (!match) throw Error(`Cannot inspect process ${pid}`);
     return { pid, start: match[1], zombie: /^[ZX]/i.test(match[2]), title: match[3] };
-  } catch (error) { if (error.code === 1 && !error.stdout?.trim()) return null; throw error; }
+  } catch (error) {
+    if (error.code === 1 && !error.killed && !error.signal && typeof error.stdout === 'string'
+      && typeof error.stderr === 'string' && !error.stdout.trim() && !error.stderr.trim()) return null;
+    throw error;
+  }
 }
 
 export function signalGroup(pgid, signal) {
@@ -67,10 +74,13 @@ async function readGroupLive(pgid) {
   return false;
 }
 
-export async function deliverGroupSignal(pgid, signal, { send = signalGroup, live = groupLive } = {}) {
+export async function deliverGroupSignal(pgid, signal, { send = signalGroup, live = groupLive, verify = async () => true } = {}) {
   // Exited members cannot receive signals, and never justify a group signal.
   // A failed inspection propagates: unknown membership grants no authority.
   if (!await live(pgid)) return false;
+  // Discovery yields to the OS. Verify the recorded lifetime after it, with
+  // no further awaited work between that final identity and signal delivery.
+  if (!await verify()) return false;
   try { return send(pgid, signal); }
   catch (error) {
     // Darwin excludes zombies in killpg and can return EPERM for a stopped group.
@@ -86,15 +96,13 @@ export async function stopGroup(owner, graceMs) {
   if (!owner?.pgid) return;
   if (!Number.isInteger(owner.pgid) || owner.pgid < 2 || owner.pgid !== owner.pid)
     throw Error('Invalid lease process group');
-  const current = await processInfo(owner.pid);
-  if (current && (current.start !== owner.start
-    || (owner.marker && current.title && !current.title.includes(owner.marker)))) return;
-  if (await deliverGroupSignal(owner.pgid, 'SIGTERM')) {
+  const verify = async () => {
+    const current = await processInfo(owner.pid);
+    return !current || (current.start === owner.start
+      && (current.zombie || !owner.marker || !current.title || current.title.includes(owner.marker)));
+  };
+  if (await deliverGroupSignal(owner.pgid, 'SIGTERM', { verify })) {
     await delay(graceMs);
-    // Check again immediately before escalation, including the recycled PID case.
-    const after = await processInfo(owner.pid);
-    if (after && (after.start !== owner.start
-      || (owner.marker && after.title && !after.title.includes(owner.marker)))) return;
-    await deliverGroupSignal(owner.pgid, 'SIGKILL');
+    await deliverGroupSignal(owner.pgid, 'SIGKILL', { verify });
   }
 }
