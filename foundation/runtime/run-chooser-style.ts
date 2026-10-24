@@ -9,17 +9,17 @@ main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art) + 40px)}
 .badge{background:color-mix(in srgb,var(--done) 14%,var(--surface));color:var(--done-ink)}
 h2{font-family:var(--rer-font-heading,var(--rer-font-body,inherit));font-weight:700;color:var(--site-ink)}
 .self h2{margin-top:10px;font-size:28px;line-height:1.15;letter-spacing:-.02em}
-.self-body{max-width:34em;margin-top:6px;color:var(--site-body);font-size:17px;line-height:1.5}
+.self-body{overflow-wrap:anywhere;max-width:34em;margin-top:6px;color:var(--site-body);font-size:17px;line-height:1.5}
 .chooser a{color:var(--rer-link,var(--site-ink));text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
 .chooser a svg{display:inline-block;width:16px;height:16px;margin-left:6px;vertical-align:-2px}
 .guide{margin-top:18px;font-size:16px;font-weight:600}.guide a{display:inline-block;padding:6px 0}
 .code{position:relative;container:code / inline-size;margin-top:20px;border-radius:12px;background:var(--code-bg);color:var(--code-ink)}
 .code pre{margin:0;padding:16px 128px 16px 20px;font:500 15px/1.6 var(--site-mono);white-space:pre-wrap;overflow-wrap:anywhere}.code pre code{font:inherit;color:inherit}
 .code-word{white-space:nowrap}.code-repo{display:inline-block;max-width:100%;vertical-align:top;white-space:normal;overflow-wrap:anywhere}
-.copy{position:absolute;top:50%;right:12px;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 18px;border:0;border-radius:999px;background:var(--code-ink);color:var(--code-bg);font:600 15px/1 var(--rer-font-body,inherit);cursor:pointer}
-.copy[hidden]{display:none}.copy::after{content:'';position:absolute;inset:-3px 0}
-.copy:hover{background:color-mix(in srgb,var(--code-bg) 14%,var(--code-ink))}.copy:focus-visible{outline:2px solid var(--code-ink);outline-offset:3px;border-radius:999px}
-.copy svg{display:none;width:15px;height:15px;fill:none;stroke:var(--done-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.copy[data-copied] svg{display:block}
+.chooser .code .copy{position:absolute;top:50%;right:12px;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 18px;border:0;border-radius:999px;background:var(--code-ink);color:var(--code-bg);font:600 15px/1 var(--rer-font-body,inherit);cursor:pointer}
+.chooser .code .copy[hidden]{display:none}.chooser .code .copy::after{content:'';position:absolute;inset:-3px 0}
+.chooser .code .copy:hover{background:color-mix(in srgb,var(--code-bg) 14%,var(--code-ink))}.chooser .code .copy:focus-visible{outline:2px solid var(--code-ink);outline-offset:3px;border-radius:999px}
+.chooser .code .copy svg{display:none;width:15px;height:15px;fill:none;stroke:var(--done-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.chooser .code .copy[data-copied] svg{display:block}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .paste-panel{display:none;margin-top:12px;padding:18px 20px;border-radius:12px;background:color-mix(in srgb,var(--site-ink) 4%,var(--surface))}
 .paste-panel h3{margin:0;color:var(--site-ink);font-size:16px;line-height:1.3;font-weight:600}
@@ -58,7 +58,7 @@ h2{font-family:var(--rer-font-heading,var(--rer-font-body,inherit));font-weight:
 .paste-track{grid-template-columns:minmax(0,1fr) 132px;margin-top:14px}.paste-stops{grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.6fr);gap:12px}
 .paste-stops .stop-label{font-size:14px}.paste-stops li:not(:last-child)::after{top:10.5px}
 }
-@container code (max-width:700px){.code pre{padding:58px 20px 16px}.copy{top:10px;right:10px;transform:none;min-height:40px;padding:0 16px}}
+@container code (max-width:700px){.code pre{padding:58px 20px 16px}.chooser .code .copy{top:10px;right:10px;transform:none;min-height:40px;padding:0 16px}}
 @container code (max-width:480px){.code pre{padding:58px 14px 14px;font-size:14px}}
 @media(max-width:760px){
 body{--art:180px}main{padding:0 16px calc(var(--art) + 40px)}.intro{text-align:left;padding-top:24px}.intro h1{font-size:40px;line-height:1.08}
