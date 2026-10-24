@@ -60,7 +60,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
    { cwd: root, encoding: 'utf8', env: { ...env, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_NO_UPDATE_CHECK: '1' }, timeout: 120000, maxBuffer: 1024 * 1024 }) }; }
   catch (error) { return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }; }
  };
- const localExit = async () => JSON.parse((await demoSockets().config({ root }, { command: 'serve' })).define['import.meta.rerDemo']);
+ const localExit = async (command = 'serve') => JSON.parse((await demoSockets().config({ root }, { command })).define['import.meta.rerDemo']);
  const built = await rer();
  assert.equal(built.code, 0, built.stdout + built.stderr);
  const config = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8'));
@@ -97,6 +97,24 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  const canonicalConfig = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8'));
  assert.equal((await localExit()).url, canonicalConfig.vars.DEMO_RUN_URL);
  assert.equal(new URL(canonicalConfig.vars.DEMO_RUN_URL).hostname, 'run-fixture.test');
+ // Supported OPERATIONS spellings use the same path resolver through Vite's
+ // serve/build hooks and the public hosted packaging command.
+ const operations = JSON.parse(await readFile(join(root, 'OPERATIONS.json'), 'utf8'));
+ const adapterSource = await readFile(join(root, 'adapter.mjs'), 'utf8');
+ for (const [adapter, site] of [['./adapter.mjs', 'config/site.json'], ['config/adapter.mjs', './config/site.json'], ['./config/./nested-adapter.mjs', 'config/./site.json']]) {
+  await writeFile(join(root, adapter), adapterSource.replace("declaration:'config/site.json'", `declaration:${JSON.stringify(site)}`));
+  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ ...operations, seedContract: { ...operations.seedContract, adapter } }));
+  const packaged = await rer();
+  assert.equal(packaged.code, 0, packaged.stdout + packaged.stderr);
+  const hosted = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8')).vars.DEMO_RUN_URL;
+  for (const command of ['serve', 'build']) assert.equal((await localExit(command)).url, hosted);
+  assert.equal(hosted, canonicalConfig.vars.DEMO_RUN_URL);
+ }
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ ...operations, seedContract: { ...operations.seedContract, adapter: '../adapter.mjs' } }));
+ for (const command of ['serve', 'build']) await assert.rejects(() => localExit(command), /contained checkout path/);
+ const escaped = await rer();
+ assert.equal(escaped.code, 2, escaped.stdout + escaped.stderr);
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(operations));
  await configure({ ...declaration, runUrl: 'https://override-fixture.test/run' });
  assert.equal((await localExit()).url, 'https://override-fixture.test/run');
  await configure();
@@ -110,7 +128,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
 
  for (const runUrl of ['http://run-fixture.test/run', 'https://run-fixture.test/', 'javascript:alert(1)', 'data:text/html,unsafe', '//outside.test/run', {}, 42, null, true, ['https://run-fixture.test/run'], 'https://user:password@run-fixture.test/run', 'https://run-\nfixture.test/run']) {
   await configure({ ...declaration, runUrl });
-  await assert.rejects(localExit, /invalid-demo-run-url/);
+  await assert.rejects(() => localExit(), /invalid-demo-run-url/);
   const refused = await rer();
   assert.equal(refused.code, 2);
   assert.match(refused.stdout, /invalid-demo-run-url/);

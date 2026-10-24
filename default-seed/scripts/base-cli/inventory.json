@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.ge8867823",
+  "cliVersion": "0.2.79-dev.g2e0340b9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -979,7 +979,7 @@
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",
-      "sha256": "1e59668e4b77b3a3af012980e32e8ac370b80f9b25da169214c817dccd65e4cf"
+      "sha256": "bbe4232614d2b9033932ecad4d758521c64975dc697a93fed2cfa34b511c0f91"
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
@@ -1535,7 +1535,7 @@
     },
     "modules/demo/declaration.mjs": {
       "source": "modules/demo/declaration.mjs",
-      "sha256": "2e53eb9ea3679711fce0c7525546d20fa7838b555084308bee9073f8c9c1909a"
+      "sha256": "cb482eeecf701747b215ad8f0e54c824ce327bb2a7f71f5fadfdfc852c39efd9"
     },
     "modules/demo/effects.mjs": {
       "source": "modules/demo/effects.mjs",
@@ -1548,6 +1548,10 @@
     "modules/demo/index.mjs": {
       "source": "modules/demo/index.mjs",
       "sha256": "a90f58afaf7d7d54121f1e49746a51631c1b12c603e44edba81b1570eaa68d96"
+    },
+    "modules/demo/input-path.mjs": {
+      "source": "modules/demo/input-path.mjs",
+      "sha256": "8af0b0ef529dfd70ac9f8152c55719776a718ccf2a6501603d852b627cfcca5a"
     },
     "modules/demo/label.d.mts": {
       "source": "modules/demo/label.d.mts",
