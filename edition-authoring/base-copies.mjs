@@ -308,8 +308,10 @@ export function adaptCopy(root, {positional: [name], record: recordPath}) {
 // its files. Recorded files and files already equal to Base at that commit are
 // kept current; files Base added under a copied path since the copy's pin are
 // adopted (tests only into copies that carry tests); recorded files that Base or
-// the export removed are dropped. Local edits are refused, never overwritten, and
-// so is any change to an existing file under a migrations folder.
+// the export removed are dropped. Absent unadapted singleton copies are retired
+// entirely, just as absent files are dropped from directory copies. Local edits
+// are refused, never overwritten, as is any change to an existing file under a
+// migrations folder.
 export function refreshCopies(root, {positional: [revision], record: recordPath, base}) {
   if (!commit.test(revision)) throw Error('Refresh to an immutable full Base commit');
   const filename = recordFile(root, recordPath);
@@ -346,7 +348,14 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
           diffHint: `git -C <base> diff ${baseline} ${revision} -- ${JSON.stringify(originPath)}`} : {})};
     }));
     const plans = record.copies.map(copy => {
+      // Absence is the existing directory-copy removal signal; there is no
+      // separate deletion-intent marker. Only an absent, unadapted singleton
+      // may retire its whole copy. Non-files and declared adaptations are not
+      // removals, and a still-present singleton must retain a Base source.
+      const retired = Object.keys(copy.files).length === 1 && Object.hasOwn(copy.files, copy.path) &&
+        !files.has(copy.path) && !fs.existsSync(path.join(root, copy.path)) && !Object.hasOwn(copy.adapted || {}, copy.path);
       const pinned = read.tree(copy.revision);
+      if (retired) return {copy, sources: [], retired, removed: [copy.path]};
       const tests = Object.keys(copy.files).some(name => testSource(mapped(name, copy.path, copy.originPath)));
       const sources = [...next].filter(([name, {object}]) => {
         if (!within(name, copy.originPath)) return false;
@@ -359,7 +368,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         return !pinned.has(name) && (tests || !testSource(name));
       });
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
-      return {copy, sources, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
+      return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
     // A migration a database may already have applied is never rewritten in place:
     // the schema change it brings belongs in a new migration of the seed's own.
@@ -388,9 +397,10 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       changes.push({path: copy.path, from: copy.revision, files: sources.length, added, removed});
       Object.assign(copy, {revision, files: recorded, modes});
     }
+    record.copies = plans.filter(plan => !plan.retired).map(plan => plan.copy);
     delete record.repository;
     validate(record);
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }
 }
