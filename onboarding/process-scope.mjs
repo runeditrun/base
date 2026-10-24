@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
-import { extensionMs, inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
+import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
+import { boundedProcessRead } from './process-read.mjs'
+import { commandFailure } from './failures.mjs'
 
 const execute = promisify(execFile)
 const scopes = new WeakMap()
@@ -41,9 +43,14 @@ export function processScopeEnvironment(scope, environment) {
 }
 export async function scopedProcesses(scope, table, timeout = inspectionMs, previous = []) {
   if (!scopes.has(scope)) throw new Error('Unknown process scope.')
-  // Reading environments is the slowest inspection on a busy Mac; it shares
-  // process-table's bounded extension rather than failing at the ordinary bound.
-  const inspectionEnd = Date.now() + timeout + extensionMs
+  // Discovery and reconciliation share one capped budget; an expired read
+  // cannot reopen time through an identity or environment retry.
+  const inspectionEnd = performance.now() + Math.min(timeout, inspectionMs)
+  const remaining = () => {
+    const left = Math.floor(inspectionEnd - performance.now())
+    if (left <= 0) throw commandFailure('Process ownership inspection deadline expired.', { ownershipUnchecked: true })
+    return left
+  }
   // Inspect same-user candidates in one bounded call. A child can change cwd,
   // detach and lose its parent between captures; the exclusive inherited marker
   // still proves ownership. Arguments/environment never leave this function.
@@ -60,13 +67,14 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
     && (member.uid === undefined || member.uid === process.getuid())
 )
   if (!candidates.length) return []
-  const environments = process.platform === 'linux' ? new Map() : await readEnvironments(candidates.map(member => member.pid), Math.max(1, inspectionEnd - Date.now()))
+  const environments = process.platform === 'linux' ? new Map() : await readEnvironments(candidates.map(member => member.pid), remaining())
   const matches = []
   inspectCandidate: for (const member of candidates) {
     let environment
     for (;;) {
+      const timeout = remaining()
       try {
-        if (process.platform === 'linux') environment = await readFile(`/proc/${member.pid}/environ`, { encoding: 'utf8', signal: AbortSignal.timeout(Math.max(1, inspectionEnd - Date.now())) })
+        if (process.platform === 'linux') environment = await boundedProcessRead((_bound, signal) => readFile(`/proc/${member.pid}/environ`, { encoding: 'utf8', signal }), timeout)
         else environment = environments.get(member.pid)
         if (environment === undefined) throw new Error('Missing process ownership metadata.')
         break
@@ -77,14 +85,14 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
         // Exit may remove environ before stat or the zombie state catches up.
         // Reconcile the same birth inside this bounded inspection; never treat
         // a transient read error as foreign ownership or completed cleanup.
-        const current = await readProcessIdentity(member.pid, Math.max(1, inspectionEnd - Date.now()))
+        const current = await readProcessIdentity(member.pid, remaining())
         if (!sameBirth(current, member) || current.state.startsWith('Z')) continue inspectCandidate
-        if (Date.now() < inspectionEnd && (process.platform !== 'linux' || ['ENOENT', 'ESRCH'].includes(error.code))) {
+        if (performance.now() < inspectionEnd && (process.platform !== 'linux' || ['ENOENT', 'ESRCH'].includes(error.code))) {
           // The same live birth is still between images (fork/exec) or being
           // reaped. Wait for its environment to become readable, up to the
           // inspection deadline, instead of reading the batch listing once.
           await delay(5)
-          if (process.platform !== 'linux') for (const [pid, text] of await readEnvironments([member.pid], Math.max(1, inspectionEnd - Date.now()))) environments.set(pid, text)
+          if (process.platform !== 'linux') for (const [pid, text] of await readEnvironments([member.pid], remaining())) environments.set(pid, text)
           continue
         }
         throw new Error(`Could not inspect ownership of process ${member.pid} (${error.code ?? 'missing'}, state ${current.state}).`)
@@ -106,12 +114,12 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
 async function readEnvironments(pids, timeout) {
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['eww', '-p', pids.join(','), '-o', 'pid=', '-o', 'command='], { timeout, maxBuffer: 16 * 1024 * 1024 }))
+    ({ stdout } = await boundedProcessRead((bound, signal) => execute('/bin/ps', ['eww', '-p', pids.join(','), '-o', 'pid=', '-o', 'command='], { timeout: bound, signal, killSignal: 'SIGKILL', maxBuffer: 16 * 1024 * 1024 }), timeout))
   } catch (error) {
     // ps may lose a candidate while it enumerates. Keep partial private output
     // only for that exit code; each missing identity is checked by the caller.
     if (error.code === 1 && typeof error.stdout === 'string') stdout = error.stdout
-    else throw new Error('Could not inspect scoped process ownership.')
+    else throw commandFailure('Could not inspect scoped process ownership.', { ownershipUnchecked: true })
   }
   const environments = new Map()
   for (const line of stdout.split('\n')) {

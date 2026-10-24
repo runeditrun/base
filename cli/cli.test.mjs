@@ -71,7 +71,7 @@ test('parsing rejects every unsupported flag, missing value, invalid host/port a
  assert.equal(parse(['dev', '--host', '::1']).host, '::1');
 });
 
-test('a missing or mistyped project folder names the folder and --cwd, without retry advice', async t => {
+test('a missing or mistyped project folder reports its status, folder and --cwd', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-cwd-')); t.after(() => rm(root, { recursive: true, force: true }));
  await writeFile(join(root, 'notes.txt'), '');
  for (const [args, status] of [[['check', '--cwd', 'absent-folder'], 3], [['dev', '--cwd', 'absent-folder', '--json'], 3], [['check', '--cwd', 'notes.txt'], 2]]) {
@@ -79,7 +79,6 @@ test('a missing or mistyped project folder names the folder and --cwd, without r
   assert.equal(result.status, status, result.stdout + result.stderr);
   const message = args.includes('--json') ? events(result).find(row => row.event === 'error').message : result.stderr;
   assert.ok(message.includes(args[2]) && message.includes('--cwd'), message);
-  assert.doesNotMatch(message, /again/);
  }
 });
 

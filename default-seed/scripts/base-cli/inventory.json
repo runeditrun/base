@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g0388ba44",
+  "cliVersion": "0.2.80-dev.gc12ed8eb",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -141,7 +141,7 @@
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
-      "sha256": "6e1f1f972d823202d3be5d141d6a7961428a0c282eb0ebb61c78e1c477d98a37"
+      "sha256": "d125675850ed319790762665a4fc50b61fea59bd498789266afae49006700926"
     },
     "local/recovery.mjs": {
       "source": "onboarding/local/recovery.mjs",
@@ -201,19 +201,23 @@
     },
     "process-cleanup.mjs": {
       "source": "onboarding/process-cleanup.mjs",
-      "sha256": "7a51918592c1f241434d22b2813c9c3cb0945df056719803a0ba991ccff8eaba"
+      "sha256": "bb396f04e053557318d45174662b447c3695516d190994a223315face5506e44"
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "66deeb06c25f60cd87f2d6c5924f37c4b20b9328faf7d4595dc461282531d612"
+      "sha256": "19e859ce68bcf0f1acce455c7b44d7e4b8fc1301211e0c3ff8ebb9302ab6a1da"
+    },
+    "process-read.mjs": {
+      "source": "onboarding/process-read.mjs",
+      "sha256": "82ea73e0f05808e555632fa50a0bf33df4278a8ef3f2928b5c32d70f87ac4448"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "1a5aba4f85e42728b2da9df645e940688d174a8899d89a7b73e9b6bf4ed46712"
+      "sha256": "67c8d05d84aa7ab37090cc5708c2fb7b453066b842e94821b5a938809786b474"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "70aeb820e2a7032e77df402a1d46406f3b7c3bbe8454ba30352734eed3def477"
+      "sha256": "c2e4f291217f63c92e2fb21795487eeda1fb922186cdd405eee63a9db72de300"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
@@ -2671,7 +2675,7 @@
     },
     "modules/job-queue/command.mjs": {
       "source": "modules/job-queue/command.mjs",
-      "sha256": "b449b2c2641d2949e1274e1200cb4a51b169f4ac5c56d0e77960a0436b876954"
+      "sha256": "1cbe0b21cf97204e43e341326b1b8fe7e72304bce4dacb46a40ea5d0128398c9"
     },
     "modules/job-queue/config.mjs": {
       "source": "modules/job-queue/config.mjs",
@@ -2683,7 +2687,7 @@
     },
     "modules/job-queue/index.mjs": {
       "source": "modules/job-queue/index.mjs",
-      "sha256": "275b5c60aa2c0e50545941f679a30e5582cfdc7b145f1b4804b973cb7745e0dd"
+      "sha256": "33d93bbee63bc5f70f5906fa7de2dcee5d1e9a4463ede6025a198cd7555832fe"
     },
     "modules/job-queue/load-admission.mjs": {
       "source": "modules/job-queue/load-admission.mjs",
@@ -2719,7 +2723,7 @@
     },
     "modules/job-queue/supervisor.mjs": {
       "source": "modules/job-queue/supervisor.mjs",
-      "sha256": "fdcab79f4632209d7529ac4bc47792df59cdeabf6bbed6f1afb4b5efdce5c76c"
+      "sha256": "276dfe28e3633c99aab3c48121375375d20a8aaac0b50c1ea409c1623a141814"
     },
     "modules/job-queue/waiting.mjs": {
       "source": "modules/job-queue/waiting.mjs",

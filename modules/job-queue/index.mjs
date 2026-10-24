@@ -69,7 +69,7 @@ export async function createQueue(options = {}) {
       repository, priority: opts.priority ?? 'normal',
       enqueuedAt: Date.now(), owner: lifetime.info };
     active++;
-    let keepLease = false, lastWaitReportAt = 0, lastWaitSignature;
+    let keepLease = false, remainingPids, lastWaitReportAt = 0, lastWaitSignature;
     try {
       await mutate(state => { job.sequence = ++state.sequence; state.queued.push(job); });
       await opts.onQueued?.(job);
@@ -111,16 +111,22 @@ export async function createQueue(options = {}) {
         const remaining = opts.maxWait === undefined ? config.pollMs : Math.min(config.pollMs, Math.max(1, opts.maxWait * 1000 - elapsed));
         await delay(remaining, undefined, { signal: controller.signal }).catch(error => { if (error.name !== 'AbortError') throw error; });
       }
-      return await execute(command, job, config, owner => mutate(state => {
+      const result = await execute(command, job, config, owner => mutate(state => {
         const lease = state.running.find(item => item.id === job.id);
         if (!lease) throw Error('Job reservation disappeared');
         lease.owner = owner;
       }), controller.signal, opts.onStarted, opts);
-    } catch (error) { keepLease = Boolean(error.keepLease); throw error; }
+      keepLease = Boolean(result.keepLease); remainingPids = result.pids;
+      return result;
+    } catch (error) { keepLease ||= Boolean(error.keepLease); throw error; }
     finally {
       try {
         await mutate(state => { state.queued = state.queued.filter(item => item.id !== job.id);
-          if (!keepLease) state.running = state.running.filter(item => item.id !== job.id); });
+          if (!keepLease) state.running = state.running.filter(item => item.id !== job.id);
+          else if (remainingPids) {
+            const lease = state.running.find(item => item.id === job.id);
+            if (lease) lease.pids = remainingPids;
+          } });
       } finally {
         active--;
         process.off('SIGINT', interrupt); process.off('SIGTERM', terminate);

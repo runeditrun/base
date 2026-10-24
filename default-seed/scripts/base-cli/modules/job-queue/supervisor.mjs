@@ -26,6 +26,7 @@ process.on('message', message => {
   started = true;
   const child = spawn('/usr/bin/nice', ['-n', String(message.nice), ...message.command],
     { cwd: message.cwd, env: { ...process.env, RER_JOB_MEMBERSHIP: message.membership }, stdio: 'inherit' });
+  if (child.pid && process.connected) process.send({ started: { pid: child.pid } });
   child.once('error', error => process.send?.({ done: { code: 127, error: error.message } }));
   child.once('exit', (code, signal) => {
     if (process.connected) process.send({ done: { code, signal } });
