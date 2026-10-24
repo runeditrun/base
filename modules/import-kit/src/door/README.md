@@ -395,7 +395,7 @@ preserving jobs until a compatible adapter is restored. Explicit
 `reversalPolicy` settings still override the automatic choice for new jobs.
 For example, Orbit's native preserving adapter needs only this shared door
 update, with no Orbit-specific vendored changes. Preserving apply validates and
-fences the preparation before each batch's native writes; an invalid first
+fences the preparation before its first native publication; an invalid first
 preparation fails with no native rows applied. See [ADOPTING.md](ADOPTING.md).
 
 When an erasure withdrew the live import's snapshot, nothing can be compared

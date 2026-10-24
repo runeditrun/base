@@ -73,12 +73,13 @@ Owner history and undo must include jobs from either authority.
    Apply resume, status, undo and request replay use that stored policy, even
    after an adapter upgrade or a different mount setting. Adding the method
    never upgrades an earlier strict job. Removing it from an adapter needed by
-   an existing preserving job refuses active apply/undo before that batch's
-   effects. Restore a compatible adapter for undo; an apply refusal marks the
-   accepted plan failed and requires a new plan and approval. Keep adapter ownership
+   an existing preserving job refuses active undo before reversal effects;
+   restore a compatible adapter to continue. Apply resumes still use the stored
+   policy. The first publication of a queued preserving job also needs a valid
+   preparation; if refused, that plan needs a new plan and approval. Keep adapter ownership
    projections compatible with previously recorded undo evidence.
 
-   Before publishing each preserving apply batch, the kit validates the
+   Before the first preserving apply publication, the kit validates the
    adapter's preparation for that batch's prospective effects and fences its
    observations before any native writes. Invalid preparation structure on the
    first batch answers 409 `import_door_apply_failed`; a false SQL fence answers
