@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gbe13c2ea",
+  "cliVersion": "0.2.79-dev.g04d91694",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3636,6 +3636,10 @@
     "modules/release/README.md": {
       "source": "modules/release/README.md",
       "sha256": "f1d15f6e888682d9a0a4900b2f036d0327c8e3349e54e8691e800815bd970050"
+    },
+    "modules/release/anchors/production.json": {
+      "source": "modules/release/anchors/production.json",
+      "sha256": "2e25900cd052b035d25abff52d11a8f426589bb33d365baaead4ea96e3f73a5e"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
