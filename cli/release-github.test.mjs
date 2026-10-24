@@ -34,12 +34,8 @@ test('rer release refuses absent, unsuccessful or untrusted GitHub evidence with
     ['failed', { conclusion: 'failure' }, /conclusion failure/],
     ['cancelled', { conclusion: 'cancelled' }, /conclusion cancelled/],
     ['pending', { status: 'in_progress', conclusion: null }, /not completed/],
-    ['wrong SHA', { head_sha: 'a'.repeat(40) }, /different source SHA/],
-    ['pull request merge ref', { event: 'pull_request', head_branch: 'refs/pull/1/merge' }, /event must be/],
     ['wrong repository', { repository: { full_name: 'other/source' } }, /different source repository/],
-    ['fork', { head_repository: { full_name: 'other/source' } }, /different source repository/],
     ['wrong workflow', { workflow_id: 43 }, /different workflow/],
-    ['feature branch', { head_branch: 'feature' }, /neither default branch nor release tag/],
   ]) await t.test(name, () => {
     const { result, receipt } = f.invoke(patch ? [{ ...f.run, ...patch }] : []);
     assert.equal(result.status, 1, result.stdout);
@@ -47,7 +43,6 @@ test('rer release refuses absent, unsuccessful or untrusted GitHub evidence with
     assert.equal(receipt.gates.verify.status, 'FAIL');
     assert.match(receipt.gates.verify.details, reason);
     assert.ok(receipt.gates.verify.message.includes(f.sha));
-    assert.match(receipt.gates.verify.message, /Push.*re-run.*--local-verify/);
     assert.equal(receipt.publicExport, null);
     assert.equal(existsSync(f.env.BUILD_MARKER), false);
     assert.equal(existsSync(f.env.VERIFY_MARKER), false);
@@ -59,6 +54,42 @@ test('rer release refuses absent, unsuccessful or untrusted GitHub evidence with
     const { result, receipt } = f.invoke([], [], extra);
     assert.equal(result.status, 1, result.stdout);
     assert.match(receipt.gates.verify.details, reason);
+  }
+});
+
+test('rer release accepts exact-SHA branch Verify despite a failed default-branch duplicate', async t => {
+  const f = await source(t);
+  const green = { ...f.run, id: 40040194727, head_branch: 'sd-penny-rel6' };
+  const failed = { ...f.run, id: 40041446585, conclusion: 'failure' };
+  for (const runs of [[failed, green], [green, failed]]) {
+    const { result, receipt, output } = f.invoke(runs);
+    assert.equal(result.status, 0, result.stdout);
+    const gate = receipt.gates.verify;
+    assert.equal(gate.status, 'PASS');
+    assert.equal(gate.runId, green.id);
+    assert.equal(gate.branch, green.head_branch);
+    assert.equal(gate.event, green.event);
+    assert.equal(gate.runUrl, `https://github.com/${repository}/actions/runs/${green.id}`);
+    assert.equal(gate.information.length, 1);
+    assert.equal(gate.information[0].runId, failed.id);
+    assert.equal(gate.information[0].conclusion, failed.conclusion);
+    assert.equal(read(join(output, receipt.siteRelease.path)).provenance.gates.verify.information[0].runId, failed.id);
+  }
+});
+
+test('rer release refuses successful branch Verify from a fork or a nearly matching SHA', async t => {
+  const f = await source(t);
+  const branch = { ...f.run, head_branch: 'feature', event: 'pull_request' };
+  for (const run of [
+    { ...branch, head_repository: { full_name: 'fork/Hello-World' } },
+    { ...branch, head_sha: (f.sha[0] === 'a' ? 'b' : 'a') + f.sha.slice(1) },
+  ]) {
+    const { result, receipt } = f.invoke([run]);
+    assert.equal(result.status, 1, result.stdout);
+    assert.equal(receipt.status, 'BLOCKED');
+    assert.equal(receipt.gates.verify.status, 'FAIL');
+    assert.equal(receipt.publicExport, null);
+    assert.equal(existsSync(f.env.BUILD_MARKER), false);
   }
 });
 

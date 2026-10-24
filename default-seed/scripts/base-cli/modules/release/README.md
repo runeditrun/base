@@ -63,11 +63,18 @@ For a GitHub source, the producer uses the operator's existing `gh` authenticati
 to resolve the source repository's **Verify** workflow for the exact selected
 commit. The source identity comes from its GitHub `origin` (HTTPS or SSH), or the
 committed `rer-project.json.sourceRepository` when no GitHub origin is present;
-it is independent of the publication destination. Only a completed successful
-`push` or `workflow_dispatch` run on the default branch or the version's release
-tag qualifies. The run and head repository must both match the source repository,
-and a release tag must resolve remotely to the exact source commit. PR merge runs,
-other SHAs, repositories, branches and unsuccessful runs cannot authorize release.
+it is independent of the publication destination. A completed successful run of
+the selected workflow qualifies when its `head_sha` equals the source commit
+exactly and both its run repository and `head_repository.full_name` match the
+source repository. Any branch or event can qualify, including same-repository
+`pull_request`, `push` and `workflow_dispatch` runs. Fork runs and PR merge runs
+whose SHA differs from the source commit cannot authorize release. A run on the
+version's release tag still requires that tag to resolve remotely to the source
+commit. The exact SHA fixes both the source tree and workflow file content, so
+choosing another branch cannot weaken that workflow's proof for the commit.
+When several runs qualify, the highest run ID is selected. Failed or unfinished
+duplicates do not invalidate a qualifying success; the receipt records them as
+informational entries, including their run identities and outcomes.
 `gates.verify` records the source repository and commit, `workflowId`,
 `workflowFile`, `workflowName`, `runId`,
 `runUrl`, event, branch and conclusion in both receipt and site provenance.
@@ -87,15 +94,17 @@ script, when declared, in a disposable clone. `gates.verify.install` and
 `gates.verify.build` record those local results; failure or a tracked-source
 mutation blocks release. Publication/history/annotation scans, exact-source
 packaging, package integrity checks and the separate signing commands still run
-locally. A missing green Verify blocks with the exact SHA and instructions to
-push or re-run it. API/authentication failures also block, without substituting
+locally. A missing green Verify blocks with the exact SHA and the rejected run
+details; an unfinished run is named. Wait for an active run or follow the source
+repository's verification policy. API/authentication failures also block, without substituting
 local verification.
 
 Pass **`--local-verify`** to explicitly retain the previous behavior: frozen
 installation, `pnpm run verify`, then the committed `pnpm run verify:release`
 when declared, with its result in `gates.verify.release`. Sources without a
 GitHub origin or committed source identity also retain this behavior. This local
-path needs the seed's browser prerequisites and any resources its verification
+path is appropriate only when the repository's verification policy permits it
+and needs the seed's browser prerequisites and any resources its verification
 requires. Routine CI and default verification do not invoke the release-only
 script.
 
