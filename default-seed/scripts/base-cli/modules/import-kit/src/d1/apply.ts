@@ -9,7 +9,7 @@ import { effectIdentity } from '../storage/provenance.ts';
 import type { D1ImportContext, D1Sql } from './types.ts';
 import type { D1UndoEffect } from './undo-types.ts';
 import { reversalState } from './undo-state.ts';
-import { atomic, atomicCount, atomicPrefix, authorize, guard, limits, sql, fitsBatch } from './database.ts';
+import { atomic, atomicCount, atomicPrefix, authorize, guard, limits, sql, fitsBatch, readAtomic } from './database.ts';
 import { stored, boundary, storedReads } from './jobs.ts';
 import { custodyGuards, validatedProvenance, inventoryGuards, reusedSourceGuards } from './integrity.ts';
 import { supersedeTarget } from './history.ts';
@@ -53,18 +53,18 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
         scope = nextScope; entries.push(entry); effects += entry.effects.length; planned = spent;
         if (!fits) break;
       }
-      // Admit the preserving adapter before the first native publication.
-      // These are prospective effects: observations describe the current
-      // before-images, not an undo decision. The complete preparation guards
-      // must precede ALL writes (a whole-native-set guard can cover many entries).
+      // Check the preserving contract before the first native publication.
+      // This read-only admission makes no undo decision and authorizes no
+      // effects. Apply still fences its own exact before-images atomically.
+      // Do not copy this potentially large native snapshot into staging's
+      // compact baseline, which must fit every private publication batch.
       if (undoEffects) {
         const { classifyUndo } = await import('./undo-snapshot.ts');
         const { database, targets } = context.storage;
         if (!targets.preparePreservedUndo) throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
         const snapshot = await targets.preparePreservedUndo(database, context.destination, structuredClone(undoEffects));
         const admission = classifyUndo(undoEffects, snapshot, context);
-        statements.unshift(...admission.guards);
-        scope.nativeGuards.push(...admission.guards);
+        await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');
       }
       const request = publication(job, entries.length, statements, scope), done = job.checkpoint + entries.length === job.total;
       await atomic(context, 'apply', request.statements, returnReads, request.scope);

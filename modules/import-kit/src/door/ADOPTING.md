@@ -80,11 +80,12 @@ Owner history and undo must include jobs from either authority.
    projections compatible with previously recorded undo evidence.
 
    Before the first preserving apply publication, the kit validates the
-   adapter's preparation for that batch's prospective effects and fences its
-   observations before any native writes. Invalid preparation structure on the
-   first batch answers 409 `import_door_apply_failed`; a false SQL fence answers
-   `import_door_apply_constraint`. Both leave a failed job at checkpoint zero
-   and no imported native rows; a new plan and approval are required.
+   adapter's preparation for that batch's prospective effects in a read-only
+   admission. Invalid structure or a false observation fence answers 409
+   `import_door_apply_failed`, with a failed job at checkpoint zero and no
+   imported native rows; a new plan and approval are required. Admission makes
+   no undo decision and does not authorize effects: apply retains its existing
+   exact before-image and current-authority guards in each write transaction.
    A later failed batch leaves earlier committed progress available to undo.
 
    Preserving undo reverses unchanged independent rows and leaves native edits,
