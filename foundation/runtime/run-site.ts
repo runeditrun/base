@@ -10,6 +10,7 @@ import { iconHead } from './icon-head'
 // This file is copied unchanged to src/base by both maintained exporters.
 import { checkIdentity, type EditionIdentity } from './identity'
 import { ink } from './theme-frame'
+import type { SiteHosting } from './hosting-page'
 import type { SeedContract } from './seed-contract.mjs'
 
 /** Every Run page string and command for one seed. */
@@ -209,5 +210,8 @@ export interface SiteBuild {
  * CONTRACT.md as parseContract reads it, absent when the seed has none; rer
  * stops the build, naming the line, when it does not parse. The entry renders
  * it at /contract with contractPageHtml and passes it to the other pages.
+ * `hosting` is what rer read from the seed's deploy, setup and mail
+ * declarations for /docs/hosting (hostingPageHtml): null when the seed does
+ * not deploy to Workers from them.
  */
-export interface SiteContext { styles: string[]; clients: Record<string, string>; contract?: SeedContract }
+export interface SiteContext { styles: string[]; clients: Record<string, string>; contract?: SeedContract; hosting?: SiteHosting | null }

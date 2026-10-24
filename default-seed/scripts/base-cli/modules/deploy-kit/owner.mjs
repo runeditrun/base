@@ -28,6 +28,13 @@ const ENTRY_KEYS = {d1:['binding'],r2:['binding','locationHint'],kv:['binding'],
 
 export function refuse(code, kind, name) { const error = new Error(code); error.resource = `${kind}:${name}`; return error; }
 
+/** Where a declaration deploys: `platforms` when it lists them, else Workers alone. */
+export function ownerPlatforms(declaration) {
+  const platforms = declaration.platforms ?? ['workers'];
+  assert(Array.isArray(platforms) && platforms.length > 0 && new Set(platforms).size === platforms.length && platforms.every(item => ['workers','container'].includes(item)), 'invalid-platforms');
+  return platforms;
+}
+
 export function ownerWorkerName(project, environment) {
   assert(typeof project === 'string' && /^(?:[a-z0-9][a-z0-9-]*\/)?[a-z0-9-]+$/.test(project) && segment.test(project.split('/').at(-1)), 'invalid-owner-project');
   assert(typeof environment === 'string' && environment.length <= 32 && segment.test(environment), 'invalid-owner-environment');
@@ -116,7 +123,7 @@ export function localOnlyBinding(declaration, localOnlyKeys = []) {
 export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], env = {} } = {}) {
   assert(declaration?.version === 1 && typeof declaration === 'object' && Object.keys(declaration).every(key => DECLARATION_KEYS.includes(key)), 'invalid-owner-declaration');
   assert(declaration.publicSettings === undefined || Array.isArray(declaration.publicSettings) && new Set(declaration.publicSettings).size === declaration.publicSettings.length && declaration.publicSettings.every(name => typeof name === 'string' && /^[A-Z][A-Z0-9_]*$/.test(name)), 'invalid-public-settings');
-  if (declaration.platforms !== undefined) assert(Array.isArray(declaration.platforms) && declaration.platforms.length > 0 && new Set(declaration.platforms).size === declaration.platforms.length && declaration.platforms.every(item => ['workers','container'].includes(item)), 'invalid-platforms');
+  ownerPlatforms(declaration);
   if (declaration.container !== undefined) {
     const config=declaration.container;
     assert(config&&typeof config==='object'&&!Array.isArray(config)&&Object.keys(config).every(key=>['engine','cacheContract','runner','hostVariables','ingress'].includes(key))&&['node','workerd'].includes(config.engine),'invalid-container');

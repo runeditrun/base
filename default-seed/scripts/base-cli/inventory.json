@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g948e4225",
+  "cliVersion": "0.2.80-dev.g74296e98",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -731,7 +731,7 @@
     },
     "cli/deploy-needs.mjs": {
       "source": "cli/deploy-needs.mjs",
-      "sha256": "ecd307ad3ed7b0b464e6f3fef2da17a8bd1d62efe801289f2b52e9b5ae4a03b3"
+      "sha256": "be09b4800b4848aaee29e3abb50df621b2e6464431653ad754c6f690b2943a45"
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",
@@ -1069,6 +1069,10 @@
       "source": "cli/site-entities.json",
       "sha256": "99f7de5d06ab0bd778237f75a419bff42822336ed0fe41253e7942bc99ca7db5"
     },
+    "cli/site-hosting.mjs": {
+      "source": "cli/site-hosting.mjs",
+      "sha256": "3517e4858f3bed388e5b75f6009308ea4b4b1da5e3ccd5af21c37a0c2af9e75f"
+    },
     "cli/site-input-assets.mjs": {
       "source": "cli/site-input-assets.mjs",
       "sha256": "070b00f9408e694fca7bb65fa90e9a8c392fe5e8f042b648536dd1c212e418c5"
@@ -1099,7 +1103,7 @@
     },
     "cli/site-render.mjs": {
       "source": "cli/site-render.mjs",
-      "sha256": "af3a4844ef1a1f1a9817d7fa2f7a679d028b591d4aadd81aae3a1d796e8d0620"
+      "sha256": "7cffbc666a2caeb68519c8120d9b1b78114d780fc0598f8c7d5de686d6f169f7"
     },
     "cli/site-runtime.mjs": {
       "source": "cli/site-runtime.mjs",
@@ -1111,7 +1115,7 @@
     },
     "cli/site.mjs": {
       "source": "cli/site.mjs",
-      "sha256": "379fe179134eb93ab33d09258b54b8bfc2cce92e8e53cd8599c2f34034b01eac"
+      "sha256": "485384416040d1dba7395c294693b8810d7ccfc8be9c69ebe694b8e7f8ae24c9"
     },
     "cli/sqlite-notice.mjs": {
       "source": "cli/sqlite-notice.mjs",
@@ -1815,7 +1819,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "19551dfa4ef8f26faec2622fffbee04f194c45271648602315193487ff312b89"
+      "sha256": "309827d12239ee7ca0b2277bc1314eaabaee51362d2d7008c33091dc5af361dd"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
