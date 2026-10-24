@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo. Restore exact retained-value and complete catch-up undo report checks.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.
