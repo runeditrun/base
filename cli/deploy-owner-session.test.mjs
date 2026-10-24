@@ -13,13 +13,13 @@ test('deploy claims leave no live session, normal sign-in works, and browser cla
   const r = await fresh(), table = native ? 'sessions' : 'oa_sessions';
   const live = async app => (await app.db.prepare(`SELECT count(*) AS n FROM ${table} WHERE revoked_at IS NULL AND expires_at>?`).bind(Date.now()).first()).n;
   let bootstrapCookie, refuseSignout = false, app = r;
-  const claim = () => claimHostedOwner({
+  const claim = store => claimHostedOwner({
    hook: {}, declaration: { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] },
-   deployed: { origin: ORIGIN }, env: { SETUP_TOKEN: SETUP }, addSecret() {},
+   deployed: { origin: ORIGIN }, env: { SETUP_TOKEN: SETUP }, addSecret() {}, store,
    fetch: async (input, init) => {
     const url = new URL(input);
     assert.equal(url.origin, ORIGIN);
-    if (refuseSignout && url.pathname === '/auth/signout') return new Response(null, { status: 503 });
+    if (refuseSignout && url.pathname === '/auth/signout') return new Response(null, { status: refuseSignout });
     const headers = new Headers(init.headers);
     const response = await app.call(url.pathname, { method: init.method, input: JSON.parse(init.body), cookie: headers.get('cookie'), headers: { Origin: headers.get('origin') } });
     if (url.pathname === '/auth/bootstrap') bootstrapCookie = app.session(response);
@@ -47,7 +47,14 @@ test('deploy claims leave no live session, normal sign-in works, and browser cla
 
   // A refused sign-out must prevent deploy from reporting a successful claim.
   app = await fresh();
-  refuseSignout = true;
+  refuseSignout = 503;
   await assert.rejects(claim(), { message: 'owner-claim-failed' });
+  // An app with no sign-out at Base's route (its own accounts sign out
+  // elsewhere) claims and goes on to the token's removal, and says so.
+  app = await fresh();
+  refuseSignout = 404;
+  const reports = [];
+  assert.equal(await claim({ report: line => reports.push(line) }), 'claimed');
+  assert.equal(reports.length, 1, 'one line explains the session rer could not sign out');
  });
 });

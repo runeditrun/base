@@ -28,9 +28,9 @@ export const commandAdapter = { ...lifecycle, deployDeclaration: 'deploy.json', 
  const git = (...args) => execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'commit.gpgsign=false', ...args], { cwd: root, stdio: 'pipe' }).toString().trim();
  git('init', '-q'); git('add', '.'); git('commit', '-qm', 'fixture');
  const again = "rer deploy --environment review --env-file 'owner credentials.env' --cwd .";
- const run = async mode => {
+ const run = async (mode, { signout } = {}) => {
   try { return { code: 0, ...await promisify(execFile)(process.execPath, [new URL('../../bin/rer.mjs', import.meta.url).pathname, 'deploy', '--environment', 'review', '--env-file', 'owner credentials.env', '--cwd', root, '--json'], {
-   cwd: root, env: { ...process.env, CI: 'true', RER_TEST_FINAL_HEALTH: mode, NODE_OPTIONS: `--import=${new URL('./finalizing-deploy-network.mjs', import.meta.url).href}` }, timeout: 30000,
+   cwd: root, env: { ...process.env, CI: 'true', RER_TEST_FINAL_HEALTH: mode, ...(signout ? { RER_TEST_SIGNOUT: String(signout) } : {}), NODE_OPTIONS: `--import=${new URL('./finalizing-deploy-network.mjs', import.meta.url).href}` }, timeout: 30000,
   }) }; } catch (error) { if (typeof error.code !== 'number') throw error; return error; }
  };
  return { root, run, again };

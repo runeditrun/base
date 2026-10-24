@@ -15,8 +15,11 @@ globalThis.fetch = async (input, init = {}) => {
   if (token !== provider.state.secrets.find(item => item.name === 'SETUP_TOKEN')?.value) return Response.json({ error: 'invalid_setup_token' }, { status: 403 });
   if (++claimRoutes === 1) return new Response('error code: 1042', {status:404});
   if (++claims !== 1) throw Error('The first deploy must claim only once');
-  return new Response(null, { status: 303 });
+  // RER_TEST_SIGNOUT: the claim signs the owner in, and the app answers this
+  // status at Base's sign-out route (Slate, which signs out elsewhere: 404).
+  return new Response(null, { status: 303, headers: process.env.RER_TEST_SIGNOUT ? { 'set-cookie': 'session=test-only; HttpOnly' } : {} });
  }
+ if (url.pathname === '/auth/signout' && process.env.RER_TEST_SIGNOUT) return new Response(null, { status: Number(process.env.RER_TEST_SIGNOUT) });
  if (url.pathname === '/api/identity/setup-status') return Response.json({ setupRequired: false });
  if (finalizing && url.pathname === '/health') {
   probes++; elapsed += 10000;

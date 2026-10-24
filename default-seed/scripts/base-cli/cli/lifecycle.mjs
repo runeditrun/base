@@ -124,9 +124,13 @@ async function runLifecycle(project, options, out, deployRedaction) {
   const { appFetch } = await shared('app-fetch.mjs');
   const emailKey = localSettingKeys(project).email;
   const privateSettings = [...adapter.settings, '.rer/local/models.json', ...(project.privateInputs??[])];
+  // The setup a zero-setup rer dev runs claims the first owner on the seed's
+  // dev target, which serves from source: no production build, which build,
+  // preview, verify and deploy each make when they need one.
+  const devFirst = options.verb === 'setup' && process.env[localDefaultsVariable] === '1' && Boolean(adapter.dev);
   const run = () => adapter.run(project.root, input ?? { [emailKey]: options.ownerEmail ?? selected?.vars[emailKey] }, store,
    child => { app = child; }, signal,
-   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, privateSettings, devKey: devKey ?? undefined });
+   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, devFirst, privateSettings, devKey: devKey ?? undefined });
   // A production build never sees the checkout's local settings, whatever the seed's build runs.
   if (options.verb === 'build') await withoutLocalSettings(project.root, { settings: privateSettings, operationToken: operation?.token }, run);
   else await run();

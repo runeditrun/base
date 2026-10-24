@@ -25,7 +25,10 @@ npx -y @runeditrun/rer dev just-every/run-inkwell   # only with Node 22 or later
 ```
 
 Each of these installs the user CLI, clones into `./run-inkwell`, install dependencies, set
-up a local owner and start the app. Open the printed `RER_OPEN` link to sign in.
+up a local owner and start the app. The last line names the app and its address;
+`rer open` (or `rer dev --open` at the start) opens it in your browser, signed in.
+Every next step it prints runs as printed from the folder you started in: after
+an npx start or before `~/.local/bin` is on PATH, it names the launcher's path.
 Use `setup <repo>` to stop after setup, or `install <repo>` to stop after
 dependency installation; each prints the next command. The repo can be
 `<owner>/<repo>`, a GitHub HTTPS URL (with or without `.git`), or a git URL.
@@ -61,6 +64,10 @@ the installer provides. With no arguments the script names the next command,
 `rer dev <owner>/<repo>`, and ends with the PATH line below when one is needed.
 
 No installer edits shell profiles. The canonical launcher is `~/.local/bin/rer`.
+A redirected install keeps it out of there: `RER_BIN_DIR` names its folder,
+else `XDG_BIN_HOME`, else the `bin` beside a set `XDG_DATA_HOME` (for
+`XDG_DATA_HOME=/scratch/share`, `/scratch/bin/rer`); the PATH line below then
+names that folder.
 Installation creates that directory if needed and never writes into another
 PATH directory. It names any existing `rer` elsewhere on PATH and leaves it
 unchanged. If `~/.local/bin` is absent from PATH, another command shadows it,
@@ -103,6 +110,16 @@ install in place.
 Not supported: native Windows (`install.sh` and `rer` say to use WSL2), and
 `OPERATIONS.json` version 1 projects.
 
+`rer doctor` outside a project checks this computer instead: git, the Node rer
+runs on, the `rer` command on PATH, free disk against a server start's guard,
+github.com and the npm registry, and the loopback port `rer dev` starts from.
+Every look is bounded, so it answers offline too. A missing requirement (no git,
+too little disk) fails with exit 3; what only slows a start warns. `--json`
+prints one result event with `diagnostics.scope: "machine"` and its checks.
+Without git, `rer dev <repo>` stops before cloning with exit 3, the code
+`git_missing`, and the command that installs it (`xcode-select --install`, or
+the Linux package manager's).
+
 ## Update
 
 ```sh
@@ -136,7 +153,8 @@ In a first-party checkout this is the whole launch. It installs dependencies whe
 `node_modules` is missing, incomplete (no `node_modules/.modules.yaml`, or an
 install a launch started did not finish) or older than the lockfile, sets up a local owner
 (`owner@<checkout-name>.test`) on the first free port from 8787 when the checkout
-has never been set up (`--port N` picks the port), fills any setup answer the
+has never been set up (`--port N` picks the port, and a busy `--port N` is refused
+naming its holder), fills any setup answer the
 seed declares a `localDefault` for in `rer-setup.json` (a literal, a generated
 secret kept only in the checkout's private settings, or the chosen local
 origin), starts the app and prints:
@@ -145,7 +163,17 @@ origin), starts the app and prints:
 RER_READY http://127.0.0.1:8787
 RER_SIGNED_IN owner@cradle.test
 RER_OPEN http://127.0.0.1:8787/__dev/key#...
+Cradle is running. Open it: http://127.0.0.1:8787 (signed in as owner@cradle.test: use the RER_OPEN link above, or run rer open)
 ```
+
+The `RER_OPEN` link holds the checkout's dev key, so it is printed only to a
+terminal. Without one (an agent, a pipe, CI, a log) neither the lines nor
+`--json`'s ready event carry it, and the last line says to run `rer open`.
+`rer open [--cwd DIR]` opens the running app in the browser on this computer,
+signed in, from the link `rer dev` keeps in the checkout's owner-only
+`.rer/local/open-url`; it prints only the address. `rer dev --open` does the
+same at ready. The browser is `$BROWSER` when set, else `open` (macOS) or
+`xdg-open` (Linux).
 
 A seed that declares a run site prints one more line after those,
 `RER_SITE http://127.0.0.1:8788`: a local preview of its static run site (its
@@ -171,9 +199,18 @@ Without a terminal (an agent's shell tool) it returns as soon as the app is read
 and leaves it running, printing the server's private log path; in a terminal it
 stays in the foreground and Ctrl-C stops it. `--detach` and `--foreground`
 override the choice, and `--json` prints `progress` events and the ready event. A
-first launch can take minutes: it prints a progress line at least every 30
-seconds, and if the calling command is killed the launch carries on; run
-`rer dev` again to reattach. A second `rer dev` reprints the ready lines.
+first launch can take minutes. Each line names the step that runs: getting the
+code, installing dependencies, setting up the local database and owner (with
+setup's own steps as they start), starting the app. A step quiet for 5 seconds
+gets one line saying so, then one every 20 seconds. If the calling command is
+killed the launch carries on; run `rer dev` again to reattach. When the port a
+first launch chose is taken before its setup or its start uses it, the launch
+moves to the next free port and says so. The setup a first launch runs claims
+the owner on the seed's dev target, so it makes no production build (build,
+preview, verify and deploy make one when they need it); a seed with no dev
+target still builds there. Every process probe of the launch is bounded (3
+seconds for the launcher's own look at the process table), so a loaded computer
+slows a launch by seconds, not minutes. A second `rer dev` reprints the ready lines.
 `rer dev --stop` stops the server, or a launch still preparing (which then
 reports that it was stopped), waits until every process they started has
 exited and says what it stopped; if any is still running it exits non-zero

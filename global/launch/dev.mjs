@@ -2,27 +2,34 @@
 // (an agent's shell tool) the preparation and start run in a detached worker
 // and this command returns once the app is ready, leaving it running; in a
 // terminal it stays in the foreground as the dispatcher's own dev does.
-// --detach and --foreground override the choice.
+// --detach and --foreground override the choice. Without a terminal the ready
+// lines never carry the dev-key link; `openApp` (rer dev --open, or a caller
+// that wants the same) opens the app signed in on this computer at ready.
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createWriteStream, existsSync } from 'node:fs';
 import { open, realpath, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dispatcher } from '../checkout.mjs';
 import { delegate } from '../delegate.mjs';
 import { ownRoot } from '../package-info.mjs';
+import { cwdArgument, rerWord } from '../cli/invocation.mjs';
+import { openInBrowser, productName, savedOpenUrl } from '../open.mjs';
 import { LaunchFailure } from './failure.mjs';
-import { describeCheckout } from './facts.mjs';
+import { describeCheckout, portBusy } from './facts.mjs';
 import { prepare } from './prepare.mjs';
+import { watchReady } from './ready-watch.mjs';
 import { printer } from './render.mjs';
 import { stopLaunch } from './stop.mjs';
 import { launchDirectory, liveWorker } from './state.mjs';
 
 const workerPath = fileURLToPath(new URL('./worker.mjs', import.meta.url));
 
-export async function launchDev(target) {
+// `shellDirectory`: the folder of the person's shell, where next-step commands
+// run (rer dev <repo> starts this launch inside the clone it made).
+export async function launchDev(target, { openApp = false, shellDirectory = process.cwd() } = {}) {
  const args = target.args.slice(1);
  if (args.includes('--detach') && args.includes('--foreground')) { process.stderr.write('Choose one of --detach and --foreground.\n'); return 2; }
  // --door-start: the front door is starting this checkout (internal).
@@ -41,10 +48,21 @@ export async function launchDev(target) {
   try { return await stopLaunch(target, devArgs, { checkout, directory }); }
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
  }
- const here = await realpath(process.cwd()).catch(() => undefined);
- const out = printer({ json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
+ const closing = await closingFor(checkout, { openApp, shellDirectory, keyless: doorStart || !process.stdout.isTTY });
+ const out = printer({ json: devArgs.includes('--json'), stopHint: closing.stopHint, keyless: closing.keyless, name: closing.name, openHint: closing.openHint, open: closing.opener, reattach: closing.reattach });
  const detach = args.includes('--detach') || (!args.includes('--foreground') && !process.stdout.isTTY);
- return detach ? detached(target, devArgs, directory, out, doorStart) : foreground(target, devArgs, directory, out, doorStart);
+ return detach ? detached(target, devArgs, directory, out, doorStart) : foreground(target, devArgs, directory, out, doorStart, closing, { openApp, shellDirectory });
+}
+
+// What the ready lines and the closing line need: the app's name, the next-step
+// commands as the person's shell runs them, whether the key stays out, and the
+// browser opener when the launch was asked to open the app.
+export async function closingFor(checkout, { openApp = false, shellDirectory = process.cwd(), keyless = !process.stdout.isTTY } = {}) {
+ const here = await realpath(shellDirectory).catch(() => undefined), word = rerWord(), again = cwdArgument(checkout, here);
+ return {
+  keyless, name: await productName(checkout), stopHint: `${word} dev --stop${again}`, openHint: `${word} open${again}`, reattach: `${word} dev${again}`,
+  opener: openApp ? async ready => openInBrowser(ready.openUrl ?? await savedOpenUrl(checkout)) : undefined,
+ };
 }
 
 // Preparation can install a pin whose entry is another global launcher. Keep
@@ -65,7 +83,7 @@ async function accepted(root, devArgs) {
  try { (await import(pathToFileURL(parser).href)).parse(['dev', ...devArgs], process.cwd()); return true; } catch { return false; }
 }
 
-async function foreground(target, devArgs, directory, out, doorStart) {
+async function foreground(target, devArgs, directory, out, doorStart, closing, { openApp, shellDirectory }) {
  const holder = await liveWorker(directory);
  if (holder) {
   out.attaching(holder.startedAt);
@@ -76,10 +94,29 @@ async function foreground(target, devArgs, directory, out, doorStart) {
  let prepared;
  // The same progress lines as a detached launch while install or setup runs.
  const heartbeat = setInterval(() => out.heartbeat(), 1000);
- try { prepared = await prepare({ root: target.root, args: devArgs, env: process.env, report: fields => out.phase(fields), directory, log: text => log.write(text + '\n'), children: new Set(), doorStart }); }
+ try {
+  prepared = await prepare({ root: target.root, args: devArgs, env: process.env, report: fields => out.phase(fields), directory, log: text => log.write(text + '\n'), children: new Set(), doorStart });
+  // The app starts in this process: a port taken since this launch's setup
+  // chose it is left for the next free one before the start.
+  if (prepared.move && await portBusy(prepared.port)) { await prepared.release?.(); prepared.release = (await prepared.move(prepared.port)).release; }
+ }
  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; out.failure(failure); return failure.exitCode; }
  finally { clearInterval(heartbeat); log.end(); }
  Object.assign(process.env, prepared.added);
+ return handOver(target, closing, { openApp, shellDirectory, json: devArgs.includes('--json'), foreground: true });
+}
+
+// The checkout's own rer serves in this process and prints its own ready
+// lines. A pinned launcher that adds the closing line itself (it has
+// launch/ready-watch.mjs) gets --open and the person's folder; for any other,
+// this process reads the lines as they are written, keeps the key out of a
+// non-terminal and adds the closing line, opening the browser when asked.
+export function handOver(target, closing, { openApp, shellDirectory, json, foreground }) {
+ const { launcher } = dispatcher(target.root);
+ if (launcher && existsSync(join(dirname(launcher), 'launch/ready-watch.mjs'))) {
+  if (openApp) target.args.push('--open');
+  process.env.RER_SHELL_CWD = shellDirectory;
+ } else watchReady({ ...closing, json, foreground });
  return delegateDev(target);
 }
 
@@ -116,7 +153,7 @@ async function follow(directory, token, out, { worker, quiet = false }) {
     const event = JSON.parse(line);
     if (event.event === 'phase') out.phase(event);
     else if (event.event === 'redirect') return event.token ? follow(directory, event.token, out, { quiet }) : missing(directory);
-    else if (event.event === 'ready') { if (!quiet) out.ready(event.ready, event); return 0; }
+    else if (event.event === 'ready') { if (!quiet) await out.ready(event.ready, event); return 0; }
     else if (event.event === 'failed') { out.failure(new LaunchFailure(event.exitCode, event.message, event.error)); return event.exitCode; }
    }
    continue;
@@ -134,6 +171,6 @@ async function follow(directory, token, out, { worker, quiet = false }) {
 }
 
 function missing(directory) {
- process.stderr.write(`rer dev: the launch stopped before it finished. Run rer dev again; its log is ${join(directory, 'launch.log')}.\n`);
+ process.stderr.write(`rer dev: the launch stopped before it finished. Run ${rerWord()} dev again; its log is ${join(directory, 'launch.log')}.\n`);
  return 1;
 }

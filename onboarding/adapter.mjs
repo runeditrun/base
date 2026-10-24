@@ -66,7 +66,10 @@ export function localInstaller(hooks = {}) {
   // Overrides are runtime bindings only; never republish the saved settings.
   if (['dev','preview'].includes(verb) && hooks.secrets?.originKey) context.vars[hooks.secrets.originKey] = context.origin;
   store.addSecrets?.(Object.entries(context.vars).filter(([key]) => /secret|token|password/i.test(key)).map(([, value]) => value));
-  if (['installer', 'setup', 'build'].includes(verb) && hooks.build) await build(context, hooks);
+  // `devFirst`: the setup a zero-setup rer dev runs. It claims the owner on
+  // the dev target, from source, so it makes no production build.
+  const devFirst = verb === 'setup' && options.devFirst === true && Boolean(options.dev);
+  if ((['installer', 'build'].includes(verb) || verb === 'setup' && !devFirst) && hooks.build) await build(context, hooks);
   // Every dev start applies pending local migrations before starting the app.
   // A demo uses only options.demo.state, then claims the owner there.
   const demo = verb === 'dev' && Boolean(options.demo);
@@ -79,7 +82,7 @@ export function localInstaller(hooks = {}) {
    }
   }
   await options.beforeStart?.(context);
-  if (['installer', 'setup', 'dev', 'preview'].includes(verb) && hooks.start) await start(context, verb === 'preview' ? {...hooks,start:options.preview} : verb === 'dev' && options.dev ? { ...hooks, start: options.dev } : hooks);
+  if (['installer', 'setup', 'dev', 'preview'].includes(verb) && hooks.start) await start(context, verb === 'preview' ? {...hooks,start:options.preview} : (verb === 'dev' || devFirst) && options.dev ? { ...hooks, start: options.dev } : hooks);
   if ((['installer', 'setup'].includes(verb) || demo) && hooks.owner) {
    if (typeof hooks.owner === 'function' || Array.isArray(hooks.owner)) await phase(context, hooks, 'owner', hooks.owner);
    else await owner(context, hooks.owner);

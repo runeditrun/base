@@ -11,8 +11,9 @@
 # differently from this script's own check), and installs through the
 # package's own `rer cli install`: the same layout as
 # `npx -y @runeditrun/rer cli install`. A failure leaves any previous install
-# selected and working. It never edits shell profiles: when ~/.local/bin is not
-# on PATH for new terminals, its last line is the one to run that adds it.
+# selected and working. It never edits shell profiles: when the launcher's
+# folder (~/.local/bin, unless RER_BIN_DIR, XDG_BIN_HOME or XDG_DATA_HOME moves
+# it) is not on PATH for new terminals, its last line is the one to run that adds it.
 #
 # Needs curl and tar. If Node 22 or later is absent, installs the pinned official
 # Node release in rer's own data directory. macOS/Linux x64/arm64; Windows: WSL2.
@@ -151,12 +152,32 @@ NODE
   || fail "rer cli install failed; any previous install is still selected."
  if [ "$#" -eq 0 ]; then return; fi
  # The command can tell the person how to run rer again from their own shell,
- # where ~/.local/bin may not be on PATH yet.
- RER_INVOKED_AS="$HOME/.local/bin/rer"
+ # where the launcher's folder may not be on PATH yet.
+ bin=$(bin_folder)
+ RER_INVOKED_AS="$bin/rer"
  if [ "$(command -v rer 2>/dev/null || true)" = "$RER_INVOKED_AS" ]; then RER_INVOKED_AS=rer; fi
- PATH="$PATH:$HOME/.local/bin"
+ # The next step is the repository's own start, which runs now. Only the verb
+ # and repository are named: the rest of the command line stays unprinted.
+ case "${1:-}" in
+  dev | setup | install)
+   case $RER_INVOKED_AS in "$HOME"/*) shown="~${RER_INVOKED_AS#"$HOME"}" ;; *) shown=$RER_INVOKED_AS ;; esac
+   case "${2:--}" in -*) printf 'Next: %s %s (running it now)\n' "$shown" "$1" ;; *) printf 'Next: %s %s %s (running it now)\n' "$shown" "$1" "$2" ;; esac ;;
+ esac
+ PATH="$PATH:$bin"
  export PATH RER_INVOKED_AS
- "$HOME/.local/bin/rer" "$@"
+ "$bin/rer" "$@"
+}
+
+# The launcher's folder, by the rule rer cli install follows
+# (global/cli/layout.mjs): RER_BIN_DIR, else XDG_BIN_HOME, else the bin beside a
+# redirected XDG_DATA_HOME, else ~/.local/bin. A redirected install never
+# writes the account's own ~/.local/bin.
+bin_folder() {
+ if [ -n "${RER_BIN_DIR:-}" ]; then printf '%s\n' "$RER_BIN_DIR"
+ elif [ -n "${XDG_BIN_HOME:-}" ]; then printf '%s\n' "$XDG_BIN_HOME"
+ elif [ -n "${XDG_DATA_HOME:-}" ]; then printf '%s/bin\n' "$(dirname "$XDG_DATA_HOME")"
+ else printf '%s/.local/bin\n' "$HOME"
+ fi
 }
 
 install_node() {
