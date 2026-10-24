@@ -5,6 +5,7 @@ import { invalid, refuse } from './errors.mjs';
 import { readDeployEnvFile } from '../modules/deploy-kit/env-file.mjs';
 import { publicOrigin } from '../modules/deploy-kit/public-origin.mjs';
 import { keptSecrets, rotations, savedSecrets } from './deploy-secrets.mjs';
+import { publicRuntimeConfig } from './business/public-config.mjs';
 
 // The values a Workers deploy reads for its declared secrets: this process's
 // environment, then the --env-file (which wins), then what rer supplies itself:
@@ -20,6 +21,7 @@ export async function deployEnvironment({ root, options, declaration, setupManif
   catch (error) { throw invalid(`The --env-file ${options.envFile} could not be used: ${error.code === 'ENOENT' ? 'no such file' : error.message}.`); }
   Object.assign(env, values);
  }
+ Object.assign(env, await publicRuntimeConfig(root));
  const originSetting = declaration.publicOriginSetting;
  if (originSetting !== undefined && env[originSetting] === undefined && settings) {
   const { readSettings } = await shared('adapter-settings.mjs');

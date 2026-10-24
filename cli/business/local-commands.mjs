@@ -9,10 +9,10 @@ import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
 import { rerCommand } from './invocation.mjs';
 
-export async function paired() {
+export async function paired({ signal } = {}) {
  const state = await loadState();
  if (!state?.origin || !state.businessId || !state.executorId) throw Error(`This computer is not paired. Run ${rerCommand()} business connect --code CODE.`);
- const credential = await createCredentialStore().get(credentialHandle(state.origin));
+ const credential = await createCredentialStore().get(credentialHandle(state.origin), { signal });
  if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then connect again with a new code from ${state.origin}/business.`);
  return { state, credential };
 }

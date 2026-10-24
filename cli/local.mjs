@@ -9,6 +9,27 @@ import { defaultPort, firstFreePort, busyPortMessage } from './port.mjs';
 import { localSettingKeys } from './settings.mjs';
 import { doorSite } from './door.mjs';
 import { selectDoor } from './door-mode.mjs';
+import { publicRuntimeConfig, trustKey } from './business/public-config.mjs';
+
+// Wrangler already watches the adapter's local settings. Project only the
+// public trust into that dev input; its source remains .rer/business-runtime.json.
+// Deployment continues to exclude this entire private settings file.
+export async function materializeBusinessTrust(project, { leave = false } = {}) {
+ const config = leave ? {} : await publicRuntimeConfig(project.root);
+ if (!leave && !config[trustKey]) return;
+ const settings = project.adapter?.hooks?.secrets;
+ if (!settings) throw Error('This checkout has no local runtime settings. Declare its settings before running rer business sync.');
+ const { readSettings } = await shared('adapter-settings.mjs');
+ const current = await readSettings(project.root, settings), value = config[trustKey];
+ if (current.values[trustKey] === value) return;
+ const values = { ...current.values };
+ if (value === undefined) delete values[trustKey]; else values[trustKey] = value;
+ const retained = (current.text ?? '').replace(/^[ \t]*(?:export[ \t]+)?RER_BUSINESS_TRUST[ \t]*=.*(?:\r?\n|$)/gm, '');
+ const text = settings.format === 'json' ? JSON.stringify(values, null, 1) + '\n'
+  : retained + (value === undefined ? '' : `${retained && !retained.endsWith('\n') ? '\n' : ''}${trustKey}=${JSON.stringify(value)}\n`);
+ const { writePrivateFile } = await shared('private-files.mjs');
+ await writePrivateFile(current.path, text);
+}
 
 export async function selectedOrigin(project, options, { setup = false } = {}) {
  const { readSettings } = await shared('adapter-settings.mjs');

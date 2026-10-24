@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pull signed Business settings into local and self-hosted apps with `rer business sync`; joined checkouts pull once after dev readiness with a three-second budget. Public trust under `.rer/` reaches both dev and deployment; `--leave` keeps the app's current values.
+
 - Cancel superseded seed Verify runs while keeping every main run, including pending ones; push, pull request and dispatch runs of one ref use separate groups, so a dispatch never cancels a push run. A main push skips its shards only when the newest push of the same SHA to another branch or tag passed this workflow, no newer run of that SHA failed, was cancelled or is still running, and every job of that push run succeeded; pull requests and dispatches are never evidence, and lookup failures run all checks. The stable `verify` aggregate accepts only explicitly authorized shard skips. Workflows that call `verify.yml` grant `actions: read` on the calling job, and `verify-ci.mjs --check-workflows` fails when a caller grants less than a called job requests. Target the next patch after 0.2.79 (0.2.80); see [Verify workflow adoption](../export/VERIFY-WORKFLOW.md#cancel-superseded-runs-and-reuse-branch-verification) for every concurrency variant, the caller diff, plan-job and gate recipes. Update rer and refresh/merge the seed-owned source templates in the same adoption commit.
 
 ## 0.2.79
