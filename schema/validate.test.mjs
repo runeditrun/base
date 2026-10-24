@@ -191,7 +191,13 @@ const sensitiveSetupNames = [
   'SESSION_SECRET', 'API_KEY', 'MAIL_API_KEY', 'STRIPE_SECRET_KEY',
   'RER_IDENTITY_PRIVATE_KEY', 'OPAQUE_CREDENTIAL', 'SETUP_TOKEN', 'DATABASE_PASSWORD',
   'ACCESSKEY', 'apikey', 'privateKey', 'dbPassword', 'clientSecret',
-  'AUTH_TOKEN', 'SIGNING_KEY', 'RER_PROFILE', 'rer_profile', 'CREDENTIALS'
+  'AUTH_TOKEN', 'SIGNING_KEY', 'RER_PROFILE', 'rer_profile', 'CREDENTIALS',
+  'APITOKEN', 'CLIENTSECRET', 'DATABASEPASSWORD', 'SERVICECREDENTIAL',
+  'GITHUBTOKEN', 'WEBHOOKSECRET', 'SMTPPASSWORD', 'DBPASSWD', 'BACKUPPASSPHRASE',
+  'OAUTHCREDENTIAL', 'PAYMENTAPIKEY', 'SSHPRIVATEKEY', 'AWSACCESSKEY', 'JWTSIGNINGKEY',
+  'sessionToken', 'clientSECRET', 'databasePassword', 'serviceCredential',
+  'servicetoken', 'clientsecret', 'accountcredential', 'serviceApiKey',
+  'mailPrivateKey', 'cloudAccessKey', 'jwtSigningKey', 'serverKey2', 'clientAuth2'
 ];
 const setupProbes = [
   ...sensitiveSetupNames.map(name => [

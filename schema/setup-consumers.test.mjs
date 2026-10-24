@@ -34,6 +34,17 @@ test('setup CLI and installer accept public business hints and developer audienc
  const input={WORKSPACE_TITLE:'synthetic-base-1',PROFILE:'local',SERVICE_URL:'https://service.example.test'};
  for(const name of Object.keys(input))assert.equal(model.fieldVisible(name,input),true);
  assert.equal(model.validateInput(input).SERVICE_URL,input.SERVICE_URL);
+ // Similar letters in ordinary Business names must not trigger the refusal.
+ for(const name of ['DISPLAY_NAME','SUPPORT_EMAIL','TIMEZONE','BUSINESS_NAME','LEGAL_NAME','WEBSITE','KEYBOARD_LAYOUT','MONKEY_NAME','TOKENIZER_LANG','AUTHOR_NAME','PASSPORT_COUNTRY','PATCH_POLICY','SIGNAL_REGION','SECRETARY_NAME','TOKENIZATION_LANGUAGE']){
+  const candidate={...manifest,fields:[{name,label:'Business value',kind:'text',businessField:'display_name'}]};
+  await writeFile(file,JSON.stringify(candidate));
+  assert.equal(spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'}).status,0,name);
+  for(const path of ['../onboarding/setup-manifest.mjs','../default-seed/scripts/base-onboarding/setup-manifest.mjs']){
+   const {loadInstallerSeed:load}=await import(path);
+   const {model:publicModel}=await load(destination,{product:'Business',setup:{manifestFile:'rer-setup.json'}});
+   assert.equal(publicModel.validateInput({[name]:'A business value'})[name],'A business value',name);
+  }
+ }
  manifest.fields[0].audience='owner';
  manifest.fields[2].audience='developer';
  await writeFile(file,JSON.stringify(manifest));
@@ -58,6 +69,12 @@ test('setup CLI and installer consumers refuse invalid business hints, sensitive
    'RER_IDENTITY_PRIVATE_KEY','OPAQUE_CREDENTIAL','SETUP_TOKEN','DATABASE_PASSWORD',
    'ACCESSKEY','apikey','privateKey','dbPassword','clientSecret',
    'AUTH_TOKEN','SIGNING_KEY','RER_PROFILE','rer_profile','CREDENTIALS',
+   'APITOKEN','CLIENTSECRET','DATABASEPASSWORD','SERVICECREDENTIAL',
+   'GITHUBTOKEN','WEBHOOKSECRET','SMTPPASSWORD','DBPASSWD','BACKUPPASSPHRASE',
+   'OAUTHCREDENTIAL','PAYMENTAPIKEY','SSHPRIVATEKEY','AWSACCESSKEY','JWTSIGNINGKEY',
+   'sessionToken','clientSECRET','databasePassword','serviceCredential',
+   'servicetoken','clientsecret','accountcredential','serviceApiKey',
+   'mailPrivateKey','cloudAccessKey','jwtSigningKey','serverKey2','clientAuth2',
   ].map(name=>[
    data=>{Object.assign(data.fields[0],{name,businessField:'legal_name'});},
    new RegExp(`(?=.*${name})(?=.*(?:secret|vault))`,'i'),
@@ -95,13 +112,23 @@ test('a standalone installer copy reads the manifest and validates its declared 
  const manifest={schema:1,title:'Independent setup',groups:[],fields:[
   {name:'WORKSPACE_TITLE',label:'Workspace title',kind:'text',required:true},
   {name:'CONNECTION_PASSWORD',label:'Connection password',kind:'secret',input:'entered',ownerVisible:true,required:true},
+  {name:'AUTH_MODE',label:'Authentication mode',kind:'select',required:true,default:'local',options:[{value:'local',label:'Local'},{value:'oidc',label:'OIDC'}]},
+  {name:'COOKIE_CONSENT',label:'Cookie consent',kind:'text',required:true,default:'essential'},
  ],steps:[{type:'extension',id:'workspace'}]};
  await writeFile(join(destination,'rer-setup.json'),JSON.stringify(manifest));
- const {loadInstallerSeed}=await import(pathToFileURL(join(destination,'kit/setup-manifest.mjs')));
- const seed=await loadInstallerSeed(destination,{product:'Independent setup',setup:{manifestFile:'rer-setup.json'}});
- assert.throws(()=>seed.model.validateInput({WORKSPACE_TITLE:'A workspace'}),/required setup inputs/);
- const answers=seed.model.validateInput({WORKSPACE_TITLE:'A workspace',CONNECTION_PASSWORD:'fixture-passphrase'});
- assert.equal(answers.WORKSPACE_TITLE,'A workspace');
- assert.ok(answers.CONNECTION_PASSWORD==='fixture-passphrase','entered secret remains in installation input');
- assert.throws(()=>seed.model.validateInput({...answers,UNDECLARED:'value'}),/Undeclared setup input/);
+ for(const path of [pathToFileURL(join(destination,'kit/setup-manifest.mjs')).href,new URL('../onboarding/setup-manifest.mjs',import.meta.url).href,new URL('../default-seed/scripts/base-onboarding/setup-manifest.mjs',import.meta.url).href]){
+  const {loadInstallerSeed}=await import(path);
+  const seed=await loadInstallerSeed(destination,{product:'Independent setup',setup:{manifestFile:'rer-setup.json'}});
+  assert.equal(seed.model.initialDraft({}).AUTH_MODE,'local');
+  assert.equal(seed.model.initialDraft({}).COOKIE_CONSENT,'essential');
+  assert.ok(seed.model.safeKeys.includes('AUTH_MODE'));
+  assert.ok(seed.model.safeKeys.includes('COOKIE_CONSENT'));
+  assert.throws(()=>seed.model.validateInput({WORKSPACE_TITLE:'A workspace'}),/required setup inputs/);
+  const answers=seed.model.validateInput({WORKSPACE_TITLE:'A workspace',CONNECTION_PASSWORD:'fixture-passphrase',AUTH_MODE:'oidc',COOKIE_CONSENT:'essential only'});
+  assert.equal(answers.WORKSPACE_TITLE,'A workspace');
+  assert.ok(answers.CONNECTION_PASSWORD==='fixture-passphrase','entered secret remains in installation input');
+  assert.equal(answers.AUTH_MODE,'oidc');
+  assert.equal(answers.COOKIE_CONSENT,'essential only');
+  assert.throws(()=>seed.model.validateInput({...answers,UNDECLARED:'value'}),/Undeclared setup input/);
+ }
 });

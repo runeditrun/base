@@ -27,6 +27,7 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  for(const field of manifest.fields)if(field.kind==='secret'&&field.input!=='entered'&&!field.generate&&
   (field.required||field.presentations?.some(item=>item.required))&&!supplied.includes(field.name))throw Error(`rer-setup.json: required managed secret ${field.name} needs adapter supplied declaration.`);
  const own=installerInputs({...presentation.features,ownerBootstrap});
+ for(const field of manifest.fields)if(Object.hasOwn(field,'businessField')&&setupFieldIsSecret(field,own.secretScopes))throw Error(`rer-setup.json: ${field.name} cannot claim a Business field because it is secret or vault-bound`);
  // Compile browser roles once from the manifest, preserving its input names.
  // The first required text field names the workspace; URL/colour fields provide
  // artwork context. Installer-owned hosting inputs are outside that context.
@@ -58,8 +59,8 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  const generatedId=preferred=>{let id=preferred,index=1;while(groupIds.has(id))id=preferred+'-'+index++;groupIds.add(id);return id;};
  const groups=[...(manifest.fields.some(field=>!field.group)?[{id:generatedId('ungrouped'),title:manifest.title,keys:manifest.fields.filter(field=>!field.group).map(field=>field.name)}]:[]),
   ...manifest.groups.map(group=>({...group,audience:group.audience??'owner',title:group.label,keys:manifest.fields.filter(field=>field.group===group.id).map(field=>field.name)})),...own.groups.map(group=>({...group,id:generatedId(group.id)}))];
- const safeKeys=Object.keys(fields).filter(key=>!setupFieldIsSecret({...fields[key],name:key},secretScopes));
- const defaults=Object.fromEntries(manifest.fields.filter(field=>!setupFieldIsSecret(field,secretScopes)&&field.default!==undefined).map(field=>[field.name,field.default]));
+ const safeKeys=Object.keys(fields).filter(key=>fields[key].type!=='password');
+ const defaults=Object.fromEntries(manifest.fields.filter(field=>field.kind!=='secret'&&field.default!==undefined).map(field=>[field.name,field.default]));
  const internal={...presentation,product:presentation.product??{name:manifest.title},fields,safeKeys,secretScopes,setupGroups:groups,
   summaryDefaults:Object.keys(defaults),initialValues:()=>defaults,nameKey,
   requiredKeys(draft){return [...manifest.fields.filter(field=>{const current=active(field,draft);return current?.required&&(field.kind!=='secret'||field.input==='entered');}).map(field=>field.name),...Object.keys(own.fields).filter(key=>!own.fields[key].optional)];},
