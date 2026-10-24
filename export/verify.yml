@@ -71,7 +71,7 @@ jobs:
       - name: Check edition source lock freshness
         if: ${{ hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
-      - run: npm install --global pnpm@10.34.7
+      - run: npm install --global pnpm@10.12.4
       # Save completed packages; apt keeps partial downloads private to _apt.
       - name: Cache frozen dependencies and Chromium
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684

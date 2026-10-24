@@ -31,7 +31,7 @@ Caches reduce setup time without replacing the frozen install or verification.
 These package scripts work with both contained and packaged RER.
 
 The template's application Node version remains 22.20.0 and pnpm remains
-10.34.7. Preserve the seed's exact package pins and lockfile. The pinned checkout
+10.12.4. Preserve the seed's exact package pins and lockfile. The pinned checkout
 and setup-node v7 actions run their own code on Node 24; action runtime upgrades
 do not change application engines.
 
@@ -474,7 +474,7 @@ the helper requires to have succeeded, already ran it on that SHA's lanes:
         with:
           node-version: 22.20.0
       - if: steps.lanes.outputs.reused != 'true'
-        run: npm install --global pnpm@10.34.7
+        run: npm install --global pnpm@10.12.4
       - if: steps.lanes.outputs.reused != 'true'
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
