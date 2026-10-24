@@ -1,13 +1,10 @@
-import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
 import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
-import { boundedProcessRead } from './process-read.mjs'
+import { boundedProcessRead, readProcessCommand } from './process-read.mjs'
 import { commandFailure } from './failures.mjs'
 
-const execute = promisify(execFile)
 const scopes = new WeakMap()
 const baselines = new WeakMap()
 const birthKey = member => `${member.pid}:${member.birth}`
@@ -114,7 +111,7 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
 async function readEnvironments(pids, timeout) {
   let stdout
   try {
-    ({ stdout } = await boundedProcessRead((bound, signal) => execute('/bin/ps', ['eww', '-p', pids.join(','), '-o', 'pid=', '-o', 'command='], { timeout: bound, signal, killSignal: 'SIGKILL', maxBuffer: 16 * 1024 * 1024 }), timeout))
+    ({ stdout } = await readProcessCommand('/bin/ps', ['eww', '-p', pids.join(','), '-o', 'pid=', '-o', 'command='], { timeout, maxBuffer: 16 * 1024 * 1024 }))
   } catch (error) {
     // ps may lose a candidate while it enumerates. Keep partial private output
     // only for that exit code; each missing identity is checked by the caller.

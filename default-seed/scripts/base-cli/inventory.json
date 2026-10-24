@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gc12ed8eb",
+  "cliVersion": "0.2.80-dev.g2251cbe7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -141,7 +141,7 @@
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
-      "sha256": "d125675850ed319790762665a4fc50b61fea59bd498789266afae49006700926"
+      "sha256": "2624ff866337422315e01a1436bdacf1ceab53200f924f19626e6278395d163d"
     },
     "local/recovery.mjs": {
       "source": "onboarding/local/recovery.mjs",
@@ -205,19 +205,19 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "19e859ce68bcf0f1acce455c7b44d7e4b8fc1301211e0c3ff8ebb9302ab6a1da"
+      "sha256": "c1d5045840b1f7563f7a67466523f10af99dd0a5c6172deef9a4ed8988bce790"
     },
     "process-read.mjs": {
       "source": "onboarding/process-read.mjs",
-      "sha256": "82ea73e0f05808e555632fa50a0bf33df4278a8ef3f2928b5c32d70f87ac4448"
+      "sha256": "1efc58af4317d950dfa9d588f8905d087a22ec5f640319975e347639efe9beeb"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "67c8d05d84aa7ab37090cc5708c2fb7b453066b842e94821b5a938809786b474"
+      "sha256": "4b96b3347c28a8557eba582ba4e4272457516d5081d49fc1c85a9a44f59a3980"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "c2e4f291217f63c92e2fb21795487eeda1fb922186cdd405eee63a9db72de300"
+      "sha256": "b3aed4b9b779a58e11ebc7649497e246aef30e0e0422e8a2f63ab18ff9dc1300"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",

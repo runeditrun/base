@@ -1,9 +1,6 @@
-import { execFile } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
-import { promisify } from 'node:util'
-import { processReadMs } from '../process-read.mjs'
+import { processReadMs, readProcessCommand } from '../process-read.mjs'
 
-const execute = promisify(execFile)
 export const validPid = (pid) => Number.isSafeInteger(pid) && pid > 0 && pid <= 0x7fffffff
 
 // Inspect only numeric process metadata: command lines can contain credentials.
@@ -42,7 +39,7 @@ async function processGroup(pgid, signal, deadline) {
     }
     return group
   }
-  const { stdout } = await execute('/bin/ps', [
+  const { stdout } = await readProcessCommand('/bin/ps', [
     '-ax', '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'stat=', '-o', 'lstart=',
   ], { env: { ...process.env, LC_ALL: 'C' }, timeout: Math.max(1, deadline - Date.now()), signal, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 })
   const group = []
@@ -115,7 +112,7 @@ async function startTime(pid, signal) {
   }
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['-o', 'lstart=', '-p', String(pid)], {
+    ({ stdout } = await readProcessCommand('/bin/ps', ['-o', 'lstart=', '-p', String(pid)], {
       env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, killSignal: 'SIGKILL', timeout: 3000,
     }))
   } catch (error) {

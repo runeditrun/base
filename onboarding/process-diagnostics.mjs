@@ -1,5 +1,3 @@
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
 import {lstat,realpath,readFile,readdir,readlink} from 'node:fs/promises';
 import {basename,join} from 'node:path';
 import {availableParallelism,homedir,loadavg} from 'node:os';
@@ -7,8 +5,7 @@ import {isIP} from 'node:net';
 import {setTimeout as delay} from 'node:timers/promises';
 import {commandFailure,approvedFailure} from './failures.mjs';
 import {stateFiles} from './local/state-files.mjs';
-import {boundedProcessRead,processReadMs} from './process-read.mjs';
-const exec=promisify(execFile);
+import {boundedProcessRead,processReadMs,readProcessCommand} from './process-read.mjs';
 // macOS supplies lsof in /usr/sbin, which a command PATH may omit.
 // Diagnose sockets with the system utility even when that PATH is constrained.
 const lsof=process.platform==='darwin'?'/usr/sbin/lsof':'lsof';
@@ -36,7 +33,7 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
   const remaining=Math.floor(deadline-performance.now());
   if(remaining<=0)break;
   const timeout=Math.min(processReadMs,remaining);
-  try{return (await boundedProcessRead((bound,signal)=>exec(command,args,{timeout:bound,maxBuffer,signal,killSignal:'SIGKILL'}),timeout,context.signal)).stdout;}
+  try{return (await readProcessCommand(command,args,{timeout,maxBuffer,signal:context.signal})).stdout;}
   catch(error){
    // A cancelled caller stops inspecting: the abort is never an ownership verdict.
    if(context.signal?.aborted)throw context.signal.reason;

@@ -1,11 +1,8 @@
-import { execFile } from 'node:child_process'
 import { readFile, readdir, stat } from 'node:fs/promises'
-import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
-import { boundedProcessRead, processReadMs } from './process-read.mjs'
+import { boundedProcessRead, processReadMs, readProcessCommand } from './process-read.mjs'
 import { commandFailure } from './failures.mjs'
 
-const execute = promisify(execFile)
 // The entire read, including transient retries, shares this hard maximum.
 export const inspectionMs = processReadMs
 // A snapshot taken while processes start or exit can hold a row ps has not yet
@@ -91,7 +88,7 @@ async function processGroup(pgid, signal, timeout) {
   }
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', [
+    ({ stdout } = await readProcessCommand('/bin/ps', [
       '-ax', '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=',
     ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, timeout, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
   } catch (error) { if (signal.aborted) throw error; throw transient('Could not read process identities.') }
@@ -127,7 +124,7 @@ export async function readProcessIdentity(pid, timeout = inspectionMs, extension
 async function psIdentity(pid, timeout, signal) {
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'ucomm='],
+    ({ stdout } = await readProcessCommand('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'ucomm='],
       { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, signal, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
   } catch (error) { if (error.code === 1 && !error.killed && !error.signal && !error.stdout?.trim() && !error.stderr?.trim()) return; throw transient('Could not inspect process identity.') }
   const match = stdout.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.{24})\s+(.+?)\s*$/)
