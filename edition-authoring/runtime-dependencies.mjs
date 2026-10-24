@@ -47,7 +47,7 @@ function resolve(tree, source, specifier) {
   return found;
 }
 
-export function completeRuntimeCopies(plans, {tree, read, local, upstream, revision, recordPath, checkTarget}) {
+export function completeRuntimeCopies(plans, {tree, read, local, upstream, revision, checkTarget}) {
   const queue = plans.flatMap(plan => plan.sources.filter(([source]) => source.startsWith(runtime) && code.test(source))
     .map(([source]) => ({source, target: mapped(source, plan.copy.originPath, plan.copy.path), baseline: plan.copy.revision})));
   const seen = new Set();
@@ -67,7 +67,11 @@ export function completeRuntimeCopies(plans, {tree, read, local, upstream, revis
       const previous = actual && read.tree(baseline).get(source);
       const previousDigest = previous && read.digests([previous.object]).get(previous.object);
       if (actual && actual !== upstream.get(tree.get(source).object) && actual !== previousDigest) {
-        throw Error(`Runtime dependency ${target} contains seed-owned source; no files were refreshed. To retain it, record-base ${target} ${source} ${revision} --record ${JSON.stringify(recordPath)} --base <checkout>, then adapt-base ${target} --record ${JSON.stringify(recordPath)}, then refresh again.`);
+        // Existing unrecorded siblings belong to the seed, just as in the
+        // ordinary copy selection. They already satisfy this import's presence;
+        // only an absent sibling needs to be supplied by Base. Recorded edits
+        // and acknowledgements were checked before closure planning.
+        return;
       }
       if (!plan) {
         if (plans.some(plan => inside(plan.copy.path, target))) throw Error(`Runtime dependency ${target} overlaps an existing Base copy`);
