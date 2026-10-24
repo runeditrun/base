@@ -133,6 +133,39 @@ Custom replay runners can supply each plan entry's `aliases` and pass
 `{dataOnly}` as `migrationReplay`'s third argument. Verified archive ledger
 hashes take precedence over name-only placement where available.
 
+### Leaving RER Managed: the Platform ledger rule
+
+A Managed installation's D1 keeps its history in `rer_migrations`, which the
+Platform runner writes; a native installation uses `d1_migrations`. The ledger
+is deployment history, never product schema or data. Base maps it by migration
+identity, name and SHA-256 of the file:
+
+- Export from a Platform-ledger source records `manifest.migrationLedger` (see
+  "Migration history" below) and never archives `rer_migrations` as a table.
+- Import into a native installation matches every entry to exactly one
+  checkout file by hash; a name may confirm that file but cannot point at
+  another. A file the checkout does not have or whose content differs refuses
+  as `migration_ledger:unknown:<name>`, a name on one file with the hash of
+  another as `migration_ledger:conflict:<name>`, and the CLI prints the fix.
+  A checkout file the Platform history lacks refuses at the preflight as
+  `migration_ledger:unapplied`, naming the file; apply it with Platform first.
+- Adapters with their own archive format (not Base's) call `mapMigrationLedger`
+  instead of comparing ledger controllers: it returns the entries named by the
+  checkout's files, or refuses with the same constant codes.
+
+```js
+import { mapMigrationLedger } from '@runeditrun/rer/portability-migrations';
+
+// Export: the source's ledger rows (rer_migrations or not), as native identities.
+const ledger = await mapMigrationLedger({ root, binding: 'DB', platformMigrations, entries: rows });
+// Import: the archive's entries must map without refusal; write no ledger rows.
+await mapMigrationLedger({ root, binding: 'DB', platformMigrations, entries: archive.ledger });
+```
+
+Call `nativeMigrationPreflight` before each native apply as below: a sole,
+fully applied `rer_migrations` returns `{nativeApply:false}` for export and
+import alike, so a seed's own guard must not require `d1_migrations`.
+
 ### Before an adapter's native migrations
 
 Seed adapters sometimes prepare schema before calling `localPortability`.
@@ -192,7 +225,7 @@ provider operation.
 | Compatible `d1_migrations`, every recorded name exactly equal to its checkout filename | `{nativeApply:true}`; Wrangler may apply its pending files. Plain Wrangler names remain supported; tracked history must also match hashes and applied states. |
 | Native alias-only or hash-only relocation, or an unmapped native data-only row | `migration_ledger:incompatible`; restore the matching checkout or reconcile through the owning runner before native apply. |
 | Sole, fully applied matching `rer_migrations` | `{nativeApply:false}`; preserve Platform's ledger and skip Wrangler. |
-| Any pending checkout file with Platform history | `migration_ledger:unapplied`; apply it through the owning runner first. |
+| Any pending checkout file with Platform history | `migration_ledger:unapplied`, naming the file (`error.migration`); apply it through the owning runner first. |
 | Multiple ledgers, even empty | `migration_ledger:multiple`; reconcile history through its owning runner. |
 | Legacy `_rer_deploy_migrations` alone | `migration_ledger:runner`; use its owning runner, which can adopt the history. |
 | Invalid ledger shape, row or binding | `migration_ledger:incompatible` or `migration_ledger:binding`. |
@@ -440,6 +473,18 @@ them into a scratch database to find the archive's place in that history:
 - Archives record the applied migration names in `manifest.migrations` (since
   additive restore). Every recorded migration must be applied here, and
   replaying exactly those must give the archive's schema identity.
+- Archives exported from an installation RER Platform migrated (a Managed
+  installation leaving for native) also carry `manifest.migrationLedger`:
+  `{origin:'rer_migrations',entries:[{name,sha256}]}` in application order,
+  each entry named by the exporting checkout's file with that SHA-256, so
+  `manifest.migrations` lists native file names whatever prefix Platform
+  recorded. Where the exporter has no checkout files (a hosted export), the
+  ledger's own names are kept beside their hashes. Import resolves each entry
+  by hash exactly as it does an archived ledger table (next item), so a
+  Platform prefix needs no declaration and a changed file refuses. Platform's
+  ledger is never imported as product tables. Native sources record no
+  `migrationLedger`; their archives are unchanged, and v1 and earlier v2
+  archives remain importable.
 - Older archives that still carry their source's migration ledger as a table
   (`rer_migrations` and the other ledgers above, from before they became
   bookkeeping) are placed by it. Every name it records must be applied here,

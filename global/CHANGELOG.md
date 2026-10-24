@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Treat RER Platform's `rer_migrations` ledger as a first-class source when a Managed installation leaves for native: exports record `manifest.migrationLedger` (native file names with SHA-256, origin `rer_migrations`), imports map it by hash and refuse only a true mismatch with a named code and fix, and the ledger is never archived as product tables. Native-source archives, v1 recovery and existing refusals are unchanged.
+- Add `mapMigrationLedger` to `@runeditrun/rer/portability-migrations` for adapters with their own archive format, and name the unapplied checkout file in the preflight refusal.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.

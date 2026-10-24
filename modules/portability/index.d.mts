@@ -13,6 +13,8 @@ export interface Manifest {
   excludedTables: string[]; excludedColumns: Record<string,string[]>; requiredConfiguration: string[]; partCount: number; epoch: number; journal: string[];
   /** Applied product migrations; absent from archives made before additive restore. */
   migrations?: string[];
+  /** Present when RER Platform's runner migrated the source: each applied migration by native file name and SHA-256, in application order. */
+  migrationLedger?: {origin:'rer_migrations';entries:{name:string;sha256:string}[]};
 }
 export type Item = {kind:'row';table:string;index:number;row:Row;rowid?:number} | {kind:'object';bucket:string;key:string;offset:number;data:string} | {kind:'payload';name:string;offset:number;data:string};
 export interface Part {kind:'part';index:number;items:Item[];sha256:string}
