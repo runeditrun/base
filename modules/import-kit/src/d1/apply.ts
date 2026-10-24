@@ -2,10 +2,10 @@ import { retainedSql } from './retained-values.ts';
 import { nativeStagingScope, readStagedTarget, expectedStagedTarget, type NativeStagingScope } from './native-staging-context.ts';
 import { targetGuards } from './target-guards.ts';
 import { D1RequestLimitError, requestContext, remaining } from './budget.ts';
-import type { ImportJob, PlanEntry, ProvenanceRow, TargetRow } from '../types.ts';
+import type { ImportJob, PlanEntry } from '../types.ts';
 import { canonicalJson, sha256, attachmentHash } from '../provenance/identity.ts';
 import { validateEffect } from '../plan/index.ts';
-import { effectIdentity } from '../storage/provenance.ts';
+import { prospectiveEffect, admissionWindow } from './apply-effects.ts';
 import type { D1ImportContext, D1Sql } from './types.ts';
 import type { D1UndoEffect } from './undo-types.ts';
 import { reversalState } from './undo-state.ts';
@@ -21,6 +21,8 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
   const id = typeof jobOrId === 'string' ? jobOrId : jobOrId.id, { batchSize, maxBatches } = limits(context);
   await authorize(context, 'apply');
   let current = await stored(id, context, 'apply'), published: ImportJob | undefined;
+  let admittedThrough = current.job.checkpoint;
+  let preparing = context.storage.targets.preparePreservedUndo;
   try {
     for (let count = 0; count < maxBatches; count++) {
       const { job, plan } = current;
@@ -59,19 +61,15 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
       // effects. Apply still fences its own exact before-images atomically.
       // Do not copy this potentially large native snapshot into staging's
       // compact baseline, which must fit every private publication batch.
-      if (undoEffects) {
+      if (undoEffects && (job.checkpoint >= admittedThrough || preparing !== context.storage.targets.preparePreservedUndo)) {
         const { classifyUndo } = await import('./undo-snapshot.ts');
         const { database, targets } = context.storage;
         if (typeof targets.preparePreservedUndo !== 'function') throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
+        const end = await admissionWindow(job, entries, undoEffects, plan, context, maxBatches - count, batchSize, planned);
         const snapshot = await targets.preparePreservedUndo(database, context.destination, structuredClone(undoEffects));
         const admission = classifyUndo(undoEffects, snapshot, context);
-        if (context.maxBatchBytes === undefined) {
-          // Unbounded publications can check admission in their existing atomic
-          // guard run, before native writes, without a second read transaction.
-          statements.unshift(...admission.guards);
-        } else {
-          await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');
-        }
+        await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');
+        admittedThrough = end; preparing = targets.preparePreservedUndo;
       }
       const request = publication(job, entries.length, statements, scope), done = job.checkpoint + entries.length === job.total;
       await atomic(context, 'apply', request.statements, returnReads, request.scope);
@@ -113,13 +111,12 @@ async function publishEntry(id: string, entry: PlanEntry, ordinal: number, conte
     validateEffect(effect);
     const before = await readStagedTarget(context, scope, effect.targetKind, effect.targetId);
     if (before ? effect.expectedRevision !== before.revision : effect.expectedRevision !== undefined) throw new Error('TARGET_REVISION_CONFLICT');
-    const appliedRevision = sha256(canonicalJson([id, entry.identity, index, 'applied']));
-    const row: TargetRow = { destination: context.destination, targetKind: effect.targetKind, targetId: effect.targetId, value: effect.value, revision: appliedRevision, ...(effect.attachment ? { attachment: effect.attachment } : {}) };
+    const prospective = prospectiveEffect(id, entry, index, before, context.destination);
+    const { expected: row, provenance: p } = prospective;
     expectedStagedTarget(scope,effect.targetKind,effect.targetId,true);
     const post = targetGuards(targets, row, context.destination, effect.targetKind, effect.targetId);
     scope.postGuards.push(...post);
-    const p: ProvenanceRow = { id: effectIdentity(id, entry.identity, index), jobId: id, sourceIdentity: entry.identity, sourceKind: entry.source.kind, sourceId: entry.source.sourceId, sourceHash: entry.source.payloadHash, artifactHash: entry.source.artifactHash, location: entry.source.location, destination: context.destination, targetKind: effect.targetKind, targetId: effect.targetId, valueHash: sha256(canonicalJson(effect.value)), attachmentHash: attachmentHash(effect.attachment), appliedRevision, before: before ?? null, reversed: false };
-    undoEffects?.push({ provenance: p, expected: row, retained: false });
+    undoEffects?.push(prospective);
     await supersedeTarget(p, before, context, statements);
     const record_json=canonicalJson(p);
     statements.push(...targetGuards(targets,before ?? null, context.destination, effect.targetKind, effect.targetId), ...targets.write(row), ...post, changed(retainedSql(['INSERT INTO ik_provenance(id,job_id,ordinal,effect_ordinal,source_identity,destination,target_kind,target_id,record_json) VALUES(', ',', ',', ',', ',', ',', ',', ',', ',', ')'], [p.id, id, ordinal, index, entry.identity, context.destination, effect.targetKind, effect.targetId, record_json], [8]),putRow('ik_provenance',{id:p.id,job_id:id,ordinal,effect_ordinal:index,source_identity:entry.identity,destination:context.destination,target_kind:effect.targetKind,target_id:effect.targetId,reversed:0,record_json})));
