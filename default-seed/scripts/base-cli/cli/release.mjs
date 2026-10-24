@@ -40,7 +40,7 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --help                 Print this help without performing release work.
 
 Signing and receipt commands:
-  rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer]
+  rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer] [--publisher NAMESPACE]
   rer release receipt --artifact DIR --anchors FILE [--environment test] [--after VERSION:SHA256]
   rer release keygen --scope test|rer --publisher NAMESPACE --github-owner LOGIN --github-owner-id ID --anchor-out FILE
     [--not-before YYYY-MM-DDTHH:MM:SSZ] [--not-after YYYY-MM-DDTHH:MM:SSZ]

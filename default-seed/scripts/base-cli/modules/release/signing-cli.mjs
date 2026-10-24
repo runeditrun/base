@@ -4,7 +4,7 @@ const semver = '(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)';
 const versionOK = value => new RegExp(`^${semver}$`).test(value) && value.split('.').every(part => Number.isSafeInteger(Number(part)));
 const dateOK = value => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value.replace('Z', '.000Z');
 function parse(verb, args) {
-  const fields = { sign: ['artifact', 'key-file', 'scope'], receipt: ['artifact', 'anchors', 'environment', 'after'],
+  const fields = { sign: ['artifact', 'key-file', 'scope', 'publisher'], receipt: ['artifact', 'anchors', 'environment', 'after'],
     keygen: ['scope', 'publisher', 'github-owner', 'github-owner-id', 'anchor-out', 'not-before', 'not-after', 'unsigned-through'] }[verb];
   const options = { unsignedThrough: {} };
   const invalid = () => { throw new TypeError('ARGUMENT_INVALID'); };
@@ -23,6 +23,7 @@ function parse(verb, args) {
   if (options.scope !== undefined && !['test', 'rer'].includes(options.scope)) invalid();
   if (verb === 'receipt' && (!options.artifact || !options.anchors || (options.environment !== undefined && options.environment !== 'test') || (options.after && (!new RegExp(`^${semver}:[a-f0-9]{64}$`).test(options.after) || !versionOK(options.after.split(':')[0]))))) invalid();
   if (verb === 'sign' && (!options.artifact || Boolean(options['key-file']) === Boolean(options['key-stdin']))) invalid();
+  if (verb === 'sign' && options.publisher !== undefined && !/^[a-z0-9][a-z0-9-]{0,38}$/.test(options.publisher)) invalid();
   if (verb === 'keygen') {
     if (!options.scope || !options['anchor-out'] || !/^[a-z0-9][a-z0-9-]{0,38}$/.test(options.publisher ?? '') || !/^[a-z0-9][a-z0-9-]{0,38}$/.test(options['github-owner'] ?? '') || !/^[1-9]\d*$/.test(options['github-owner-id'] ?? '') || !Number.isSafeInteger(Number(options['github-owner-id']))) invalid();
     for (const name of ['not-before', 'not-after']) if (options[name] !== undefined && !dateOK(options[name])) invalid();
