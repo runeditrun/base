@@ -51,7 +51,7 @@ export async function unreadableCommands(browser, url, width) {
     const page = await context.newPage();
     await page.goto(url);
     const blocks = await commandBlocks(page);
-    if (blocks.length < 2) throw new Error(`The Run page shows ${blocks.length} command blocks; it has the install line and the start line.`);
+    if (blocks.length !== 1) throw new Error(`The Run page shows ${blocks.length} command blocks; one line installs rer and starts the seed.`);
     return blocks.filter(block => block.covered || block.clipped).map(block => block.command);
   } finally { await context.close(); }
 }
