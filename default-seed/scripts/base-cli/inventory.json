@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80",
+  "cliVersion": "0.2.80-dev.g24b4b9df",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1587,7 +1587,7 @@
     },
     "modules/demo/README.md": {
       "source": "modules/demo/README.md",
-      "sha256": "588a9366d73137a819deea8786096c703a5c439f71397f01ffea60930280b1da"
+      "sha256": "9af51ce8172da9bfd34f45e5670c8abd56c6c7d5bbc2aabbc47a19fb45543e11"
     },
     "modules/demo/declaration.mjs": {
       "source": "modules/demo/declaration.mjs",
@@ -1619,7 +1619,7 @@
     },
     "modules/demo/navigation.mjs": {
       "source": "modules/demo/navigation.mjs",
-      "sha256": "40f7804e47dd61fea1b6d86564617513e02c6c362fff129211354d679c5f220a"
+      "sha256": "7fdcc00237d250934c8e9963534c062baa2d326f2de28aacdeb5021841cfca00"
     },
     "modules/demo/responses.mjs": {
       "source": "modules/demo/responses.mjs",

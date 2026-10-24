@@ -37,39 +37,51 @@ export const NAVIGATION_SCRIPT = `(() => {
     const bounds = parent.getBoundingClientRect();
     const rtl = layout.direction === 'rtl';
     const height = parseFloat(getComputedStyle(link).lineHeight);
-    const top = box.top + (box.height - height) / 2;
+    let top = box.top + (box.height - height) / 2;
     // Clip only our own allocation to the viewport and any clipping ancestors.
     let left = Math.max(0, bounds.left + parseFloat(layout.paddingLeft));
     let right = Math.min(document.documentElement.clientWidth, bounds.right - parseFloat(layout.paddingRight));
+    let bottom = bounds.bottom - parseFloat(layout.paddingBottom);
     for (let ancestor = parent; ancestor; ancestor = ancestor.parentElement) {
       const style = getComputedStyle(ancestor);
       if (style.overflowX !== 'visible') {
         const clip = ancestor.getBoundingClientRect();
         left = Math.max(left, clip.left + ancestor.clientLeft);
         right = Math.min(right, clip.left + ancestor.clientLeft + ancestor.clientWidth);
+        bottom = Math.min(bottom, clip.top + ancestor.clientTop + ancestor.clientHeight);
       }
     }
     left = Math.min(document.documentElement.clientWidth, left);
     right = Math.max(left, right);
     const start = rtl ? box.left : box.right;
-    for (const sibling of parent.children) {
-      if (sibling === position || sibling.hasAttribute('data-rer-demo-exit')) continue;
+    const siblings = [...parent.children].filter(sibling => sibling !== position && !sibling.hasAttribute('data-rer-demo-exit'));
+    const outerLeft = left, outerRight = right;
+    for (const sibling of siblings) {
       const rect = sibling.getBoundingClientRect();
       if (!rect.width || rect.bottom <= top || rect.top >= top + height) continue;
-      if (rtl && rect.right <= start) left = Math.max(left, rect.right);
-      if (!rtl && rect.left >= start) right = Math.min(right, rect.left);
+      if (rtl && rect.left < start) left = Math.max(left, Math.min(start, rect.right));
+      if (!rtl && rect.right > start) right = Math.min(right, Math.max(start, rect.left));
     }
     const range = document.createRange();
     range.selectNodeContents(link.firstElementChild);
     const natural = range.getBoundingClientRect().width;
     const gap = parseFloat(getComputedStyle(link).fontSize) / 2;
     const room = Math.max(0, (rtl ? start - left : right - start) - 2 * gap);
-    const width = Math.min(natural, room);
+    let width = Math.min(natural, room);
+    let x = Math.max(left, Math.min(right, rtl ? start - gap - width : start + gap));
+    // A vertical rail may already have an empty row under the lockup. Use it
+    // only if the whole exit fits there without touching any existing item.
+    const below = box.bottom + gap;
+    const belowX = rtl ? box.right - gap - natural : box.left + gap;
+    if (width < natural && below + height <= bottom && belowX >= outerLeft && belowX + natural <= outerRight && siblings.every(sibling => {
+      const rect = sibling.getBoundingClientRect();
+      return !rect.width || rect.bottom <= below || rect.top >= below + height || rect.right <= belowX || rect.left >= belowX + natural;
+    })) { width = natural; x = belowX; top = below; }
     // With no readable room, retain a keyboard stop, revealed in the top layer
     // on focus. Neither its box nor its focus ring can extend the document.
     const concealed = width < height;
     set(link, { width: (concealed ? 0 : width) + 'px', height: height + 'px', clipPath: concealed ? 'inset(50%)' : 'none' });
-    place(link, Math.max(left, Math.min(right, rtl ? start - gap - width : start + gap)), top);
+    place(link, x, top);
   };
   const schedule = () => {
     if (pending) return;
@@ -96,7 +108,7 @@ export const NAVIGATION_SCRIPT = `(() => {
       text.textContent = link.title;
       link.append(text);
       // Own only the exit's box, including when a host styles all nav anchors.
-      set(link, { position: 'absolute', display: 'block', boxSizing: 'border-box', margin: '0', padding: '0', border: '0', minWidth: '0', maxWidth: 'none', inset: 'auto', width: '0', overflow: 'visible' });
+      set(link, { position: 'absolute', display: 'block', boxSizing: 'border-box', margin: '0', padding: '0', border: '0', minWidth: '0', maxWidth: 'none', inset: 'auto', width: '0', overflow: 'visible', background: 'transparent' });
       link.addEventListener('focus', () => {
         if (!link.matches(':focus-visible')) return;
         link.showPopover();
@@ -108,7 +120,7 @@ export const NAVIGATION_SCRIPT = `(() => {
       link.addEventListener('blur', () => {
         if (!link.matches(':popover-open')) return;
         link.hidePopover();
-        set(link, { position: 'absolute', maxWidth: 'none', padding: '0', background: '', color: '' });
+        set(link, { position: 'absolute', maxWidth: 'none', padding: '0', background: 'transparent', color: '' });
         schedule();
       });
       position.after(link);

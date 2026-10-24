@@ -37,7 +37,7 @@ Production build/deploy refuses that setting; ordinary builds keep real effects.
   local and hosted demos. No per-seed link is required. CSS adds the label suffix without
   changing the application's hydrated text; CSP allows exact hashes only.
 
-  The exit uses only spare space beside the label and truncates its own text.
+  The exit uses only spare space beside or directly below the label and truncates its own text.
   It stays out of the host layout, preserving sibling rectangles and document
   width relative to the same header with the Demo suffix but no exit. It never
   repairs an already overflowing host header. With no readable room it remains
