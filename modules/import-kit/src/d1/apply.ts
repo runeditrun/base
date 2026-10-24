@@ -29,7 +29,7 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
       if (job.state === 'completed') { await atomic(context, 'apply', [...boundary(job, plan, 'apply'), ...custodyGuards(plan, id), ...await inventoryGuards(job, plan, context)], 0, nativeStagingScope(job, plan)); return job; }
       if (!['queued', 'applying', 'failed'].includes(job.state)) throw new Error('IMPORT_ALREADY_REVERSING');
       const statements: D1Sql[] = [...boundary(job, plan, 'apply'), ...custodyGuards(plan, id), ...await inventoryGuards(job, plan, context)], entries: PlanEntry[] = [], returnReads = storedReads(job);
-      const undoEffects: D1UndoEffect[] | undefined = job.checkpoint === 0 && reversalState(job).policy === 'preserve-conflicts' ? [] : undefined;
+      const undoEffects: D1UndoEffect[] | undefined = reversalState(job).policy === 'preserve-conflicts' ? [] : undefined;
       let effects = 0, scope = nativeStagingScope(job, plan);
       let prefix = atomicPrefix(context, 'apply', statements, scope);
       let planned = prefix ? prefix.count(progress(job, 0), returnReads) : cost(context, publication(job, 0, statements, scope), returnReads);
@@ -53,7 +53,8 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
         scope = nextScope; entries.push(entry); effects += entry.effects.length; planned = spent;
         if (!fits) break;
       }
-      // Check the preserving contract before the first native publication.
+      // Check the preserving contract before every native publication, including
+      // batches resumed from a nonzero checkpoint.
       // This read-only admission makes no undo decision and authorizes no
       // effects. Apply still fences its own exact before-images atomically.
       // Do not copy this potentially large native snapshot into staging's
@@ -61,7 +62,7 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
       if (undoEffects) {
         const { classifyUndo } = await import('./undo-snapshot.ts');
         const { database, targets } = context.storage;
-        if (!targets.preparePreservedUndo) throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
+        if (typeof targets.preparePreservedUndo !== 'function') throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
         const snapshot = await targets.preparePreservedUndo(database, context.destination, structuredClone(undoEffects));
         const admission = classifyUndo(undoEffects, snapshot, context);
         await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');

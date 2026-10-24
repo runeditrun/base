@@ -73,17 +73,18 @@ Owner history and undo must include jobs from either authority.
    Apply resume, status, undo and request replay use that stored policy, even
    after an adapter upgrade or a different mount setting. Adding the method
    never upgrades an earlier strict job. Removing it from an adapter needed by
-   an existing preserving job refuses active undo before reversal effects;
-   restore a compatible adapter to continue. Apply resumes still use the stored
-   policy. The first publication of a queued preserving job also needs a valid
-   preparation; if refused, that plan needs a new plan and approval. Keep adapter ownership
+   an existing preserving job refuses further apply batches and active undo
+   before native effects; restore a compatible adapter to undo earlier batches.
+   Apply resumes still use the stored policy. Every preserving publication
+   needs a valid preparation; if refused, that plan needs a new plan and approval. Keep adapter ownership
    projections compatible with previously recorded undo evidence.
 
-   Before the first preserving apply publication, the kit validates the
-   adapter's preparation for that batch's prospective effects in a read-only
-   admission. Invalid structure or a false observation fence answers 409
-   `import_door_apply_failed`, with a failed job at checkpoint zero and no
-   imported native rows; a new plan and approval are required. Admission makes
+   Before every preserving apply publication, including resumed or replayed
+   applies with pending work, the kit validates the adapter's preparation for
+   that batch's prospective effects in a read-only admission. Invalid structure
+   or a false observation fence answers 409 `import_door_apply_failed`, with no
+   effects from the refused batch. At checkpoint zero no imported native rows
+   remain; a new plan and approval are required. Admission makes
    no undo decision and does not authorize effects: apply retains its existing
    exact before-image and current-authority guards in each write transaction.
    A later failed batch leaves earlier committed progress available to undo.

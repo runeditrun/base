@@ -1260,10 +1260,14 @@ test('A declared door adapter preserves native edits on undo, with durable polic
   const early=await l.call('undo',{planId:base.body.planId});
   assert.deepEqual([early.status,early.body.error],[409,'import_superseded']);
   l.runtime.native().prepare("UPDATE native_records SET revision='owner-edit',value_json=? WHERE id='4'").run(canonicalJson({local:'owner'}));
-  await l.undo(layer.body.planId);await l.undo(base.body.planId);
-  assert.deepEqual(l.runtime.native().prepare('SELECT id FROM native_records').all().map(r=>r.id),['4']);
-  const retained=(await readD1ImportUndoReport(baseJob.id,{...l.runtime.context(),namespace:baseJob.namespace})).dispositions.filter(r=>r.disposition==='retained');
-  assert.deepEqual(retained.map(r=>[r.targetId,r.reason]),[['4','superseded']]);
+  assert.equal((await l.undo(layer.body.planId)).body.job.state,'undone');
+  assert.equal((await l.undo(base.body.planId)).body.job.state,'undone');
+  assert.deepEqual(l.runtime.native().prepare('SELECT id,value_json FROM native_records').all().map(r=>[r.id,r.value_json]),[['4',canonicalJson({local:'owner'})]]);
+  const reports=(await readD1ImportUndoReport(baseJob.id,{...l.runtime.context(),namespace:baseJob.namespace})).dispositions;
+  assert.equal(reports.length,30);
+  assert.equal(reports.filter(r=>r.disposition==='reversed').length,29);
+  assert.deepEqual(reports.filter(r=>r.disposition==='retained').map(r=>[r.targetId,r.reason]),[['4','superseded']]);
+  assert.equal((await readD1ImportJob(baseJob.id,{...l.runtime.context(),namespace:baseJob.namespace,reversalPolicy:'preserve-conflicts'})).state,'undone');
 });
 
 test('An undeclared door adapter keeps strict undo, including jobs created before a preserving adapter upgrade',async t=>{

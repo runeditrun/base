@@ -390,15 +390,17 @@ and deletions (and required dependencies), and completes with `job.state:
 when everything reversed. Native owner history can page that report with its
 normal kit authorization. A second door undo is idempotent. The policy is saved
 with the job, never inferred again during resume, undo or replay. Adding the
-method later leaves old strict jobs strict; removing it refuses active work on
-preserving jobs until a compatible adapter is restored. Explicit
+method later leaves old strict jobs strict; removing it refuses further apply
+batches and active undo on preserving jobs. Restore a compatible adapter to
+undo previously applied batches. Explicit
 `reversalPolicy` settings still override the automatic choice for new jobs.
 For example, Orbit's native preserving adapter needs only this shared door
 update, with no Orbit-specific vendored changes. Preserving apply validates and
-checks the preparation in a read-only admission before its first native
-publication; apply still atomically fences its own exact before-images and
-current authority; an invalid first
-preparation fails with no native rows applied. See [ADOPTING.md](ADOPTING.md).
+checks the preparation for every pending batch in a read-only admission before
+that batch publishes, including resumed apply. Apply still atomically fences
+its own exact before-images and current authority. An invalid preparation
+refuses the entire pending batch; at checkpoint zero no native rows are applied.
+Earlier admitted batches remain available to Undo. See [ADOPTING.md](ADOPTING.md).
 
 When an erasure withdrew the live import's snapshot, nothing can be compared
 with it: an owner-session `plan` retires it as the baseline and plans a new

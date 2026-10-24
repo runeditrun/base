@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g4daf5cb8",
+  "cliVersion": "0.2.80-dev.g82bce5ed",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1995,7 +1995,7 @@
     },
     "modules/import-kit/src/d1/apply.ts": {
       "source": "modules/import-kit/src/d1/apply.ts",
-      "sha256": "c04b4af6f9fa352953d6b2df59ed2a088ac65357d5f17a681433176d17bc0367"
+      "sha256": "5ef5f0112d2f7992e6d276f14c38cf9968eb73407333629cc49660e8c7d17977"
     },
     "modules/import-kit/src/d1/atomic-prefix.ts": {
       "source": "modules/import-kit/src/d1/atomic-prefix.ts",
