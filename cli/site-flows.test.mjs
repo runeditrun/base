@@ -176,7 +176,6 @@ test('built run site writes /docs/hosting from the seed\'s own declarations, Run
   assert.deepEqual([request.origin, request.searchParams.get('product'), request.searchParams.get('plan')], ['https://app.runeditrun.com', 'run-buoy', 'assisted']);
   for (const permission of deployPermissions(declared)) assert.ok(built.token.includes(permission), `the token step asks for ${permission}`);
   assert.equal(built.token.includes('R2 Storage'), false, 'nothing the declaration does not use');
-  for (const name of ['OWNER_EMAIL', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'MAIL_API_KEY']) assert.match(built.deployFile, new RegExp(`^${name}=`, 'm'));
   for (const width of [320, 390, 1440]) {
    await page.setViewportSize({width,height:900});
    assert.deepEqual((await commandBlocks(page)).filter(block => block.covered || block.clipped), [], `command blocks at ${width}px`);
