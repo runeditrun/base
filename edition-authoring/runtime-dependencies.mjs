@@ -61,7 +61,10 @@ export function completeRuntimeCopies(plans, {tree, read, local, upstream, revis
     checkTarget(target);
     let plan = plans.find(plan => inside(target, plan.copy.path));
     if (plan && mapped(target, plan.copy.path, plan.copy.originPath) !== source) throw Error(`Runtime dependency ${target} conflicts with its Base copy mapping`);
-    if (plan?.copy.adapted?.[target]) return; // Acknowledged seed source remains seed-owned.
+    if (plan?.copy.adapted?.[target]) {
+      queue.push({source, target, baseline});
+      return; // Keep seed bytes while supplying the shipped module's dependencies.
+    }
     if (!plan?.sources.some(([name]) => name === source)) {
       const actual = local(target);
       const previous = actual && read.tree(baseline).get(source);
@@ -69,8 +72,10 @@ export function completeRuntimeCopies(plans, {tree, read, local, upstream, revis
       if (actual && actual !== upstream.get(tree.get(source).object) && actual !== previousDigest) {
         // Existing unrecorded siblings belong to the seed, just as in the
         // ordinary copy selection. They already satisfy this import's presence;
-        // only an absent sibling needs to be supplied by Base. Recorded edits
-        // and acknowledgements were checked before closure planning.
+        // only an absent sibling needs to be supplied by Base. Keep traversing
+        // the shipped graph so a later adoption cannot omit its dependencies.
+        // Recorded edits and acknowledgements were checked before planning.
+        queue.push({source, target, baseline});
         return;
       }
       if (!plan) {
