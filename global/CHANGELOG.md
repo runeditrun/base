@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Keep per-file vendored authoring scripts runnable across `refresh-base`: refresh follows each recorded script's static relative imports, adopts missing helpers inside the copied origin directory (reported as `adopted`), and refuses before any write for unresolvable imports. Static import/export requests now come from Node's V8 module parser in a child of the same Node executable with `--experimental-vm-modules`; it never links or evaluates source, needs no caller flags or packages, and works offline on Node 22.20.0 and newer. Dynamic imports and `import.meta` stay outside closure; invalid or unsupported module syntax refuses the entire refresh before writes with the importing file and parser error.
+- Keep per-file vendored authoring scripts runnable across `refresh-base`: refresh follows each recorded script's static relative imports, adopts missing helpers inside the copied origin directory (reported as `adopted`), and refuses before any write for unresolvable imports. Static import/export requests now come from Node's V8 module parser in a child of the same Node executable with `--experimental-vm-modules`; it never links or evaluates source, needs no caller flags or packages, and works offline using the `SourceTextModule.moduleRequests` API (verified on Node 22.20.0 and 26.8.1). Parser startup failures and unavailable APIs also refuse refresh. Dynamic imports and `import.meta` stay outside closure; invalid or unsupported module syntax refuses the entire refresh before writes with the importing file and parser error.
 
 ## 0.2.80
 

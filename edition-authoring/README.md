@@ -247,8 +247,9 @@ commands for explicit reconciliation. Existing adapted files stay unchanged.
 Imports come from Node's V8 module parser (`vm.SourceTextModule.moduleRequests`),
 run in a child using the same Node executable with `--experimental-vm-modules`.
 The child only parses: it never links dependencies or evaluates source. Callers
-need no VM flag or additional packages; this works offline on Node 22.20.0 and
-newer. Strings, templates, regular expressions, comments, dynamic `import()` and
+need no VM flag or additional packages; this works offline. The child requires
+`SourceTextModule.moduleRequests` (verified on Node 22.20.0 and 26.8.1). Parser
+startup failures and unavailable APIs also refuse the refresh. Strings, templates, regular expressions, comments, dynamic `import()` and
 `import.meta` do not add static dependencies. Syntax the running Node cannot
 parse as an ECMAScript module (including JSX) refuses the entire refresh before
 writes and names the importing file and parser error.

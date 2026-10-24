@@ -49,7 +49,9 @@ dependencies, and destination collisions refuse before any writes and name exact
 retained unchanged. Node's V8 module parser supplies the static import/export
 requests. A child of the same Node executable uses `--experimental-vm-modules`
 only to parse, without linking dependencies or evaluating source; callers need
-no extra flag or package, including offline (Node 22.20.0 and newer). Strings,
+no extra flag or package, including offline. The child requires the
+`SourceTextModule.moduleRequests` API (verified on Node 22.20.0 and 26.8.1);
+parser startup failures and unavailable APIs also refuse the refresh. Strings,
 templates, regular expressions, comments, dynamic `import()` and `import.meta`
 do not add static dependencies. Invalid or unsupported ECMAScript module syntax,
 including JSX, refuses the entire refresh before writes, naming the importing
