@@ -253,7 +253,9 @@ test('refresh-base moves every copy to one Base commit and drops a legacy record
     fs.copyFileSync(path.join(base, 'modules/sample/index.mjs'), path.join(seed, 'vendor/sample/index.mjs'));
     ok(seed, 'refresh-base', exported, '--base', base);
     assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
-    assert.match(run(seed, 'refresh-base', 'main', '--base', base).error, /immutable full Base commit/);
+    const beforeInvalid = fs.readFileSync(recordPath);
+    assert.notEqual(run(seed, 'refresh-base', 'main', '--base', base).status, 0);
+    assert.deepEqual(fs.readFileSync(recordPath), beforeInvalid);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 

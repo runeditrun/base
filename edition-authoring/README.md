@@ -1,8 +1,11 @@
 # Edition-owned source authoring 1.1.0
 
-Copy this directory's `.mjs` files into `scripts/edition-authoring/` of any edition.
-Node 22+ and Git are the only authoring dependencies. Builds and integration remain
-ordinary edition code. This tool never runs source-provided scripts.
+Seeds pin the published `@runeditrun/rer` package and use `rer adopt-edition`
+and `rer refresh-base --ref FULL_COMMIT`; do not vendor authoring CLI files.
+See [EDITION-AUTHORING.md](../export/EDITION-AUTHORING.md) for adoption, acquisition,
+offline use and JSON output. Node 22+ and Git are the authoring dependencies.
+Builds and integration remain ordinary edition code. This tool never runs
+source-provided scripts. Existing local authoring scripts remain supported.
 
 The recommended path is a maintained complete edition with tested component
 choices, UI, infrastructure and commands that save implementation and adaptation
@@ -42,6 +45,11 @@ claim that edited local source equals upstream. `parent`, when present, is
 `{repository, revision}`. There may be at most one foundation. Semantic
 compatibility, route/resource conflicts and migration transitions require product
 tests; unique paths alone do not establish compatibility.
+
+Commands below use the historical local-script form. Package adopters run
+`node node_modules/@runeditrun/rer/edition-authoring/cli.mjs` in its place; Base
+authors can run `node /absolute/base/edition-authoring/cli.mjs` from the seed root.
+The public adoption and refresh verbs call these same implementation helpers.
 
 Commands, run at the edition root:
 
@@ -172,9 +180,14 @@ bytes, so anyone holding that commit can check the record and a public reader
 sees no private address. To read Base, `record-base`, `refresh-base` and
 `verify-base` use `--base <checkout>` or the seed's `edition.json` component
 runeditrun/base: `source.repository` for Git source or `source.origin.repository`
-for local source. Without either, pass `--base <checkout>`, or `--offline` to
-verify local bytes. Older records with a `repository` field are still read and
-verified from it; recording or refreshing drops the field.
+for local source. Without either, `runeditrun/base` resolves to the public
+`https://github.com/runeditrun/base.git` repository. Pass `--offline` to verify
+local bytes without acquisition; offline refresh requires `--base <checkout>`.
+Offline source reads use a temporary repository sharing only the checkout’s
+object store and HEAD, with no remotes or inherited Git configuration. This
+prevents lazy fetches on Git 2.43 as well as newer Git. Missing objects require
+an online refresh without `--offline`; corrupt objects require checkout repair.
+Older records with a `repository` field are still read and verified from it; recording or refreshing drops the field.
 `modes` records each file's Git mode in Base, `100644` or `100755`, using the
 owner executable bit; a record
 without `modes` still verifies, but without mode checks until it is re-recorded.
@@ -190,8 +203,8 @@ the copy leaves out (`notCopied`), local files that differ from Base
 (`differs`, bytes or executable bit) and local files with no Base counterpart (`localOnly`). Pass
 `--base /absolute/base-checkout` to read a local Base checkout instead of
 cloning the recorded repository, and `--record <file>` for another record path.
-An acquisition URL or local source checkout belongs in the seed's own source
-declaration; a publisher-qualified identity alone is not a clone address.
+An explicit acquisition URL or local source checkout can remain in the seed's
+own source declaration; the default Base publisher identity uses its public URL.
 
 **Verify.** `... verify-base` checks three things and exits nonzero on any finding:
 
@@ -220,6 +233,18 @@ writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out files the copy had left out, and re-records each copy.
+An absent unadapted singleton is retired from the record entirely and named in
+the `retired` output. As with absent files in directory copies, local absence is
+the removal signal; refresh does not distinguish accidental deletion from an
+intentional removal. Absent files marked `skip-worktree`, `assume-unchanged`
+or `fsmonitor-valid`, and recorded children beneath uninitialized submodules,
+refuse before writes with the corresponding Git repair command. After submodule
+initialization, the child index and recorded bytes are read. Unreadable index
+evidence also refuses safely. Offline refresh suppresses promisor lazy fetching;
+a missing local object names an online refresh command, preserving the record.
+Verify before refreshing to inspect missing copies. Deleted
+adaptations still block refresh, and a singleton still present locally whose
+Base source disappeared still reports an error.
 It refuses undeclared local edits that differ from both the recorded and incoming
 Base bytes; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
