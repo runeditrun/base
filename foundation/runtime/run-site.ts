@@ -67,9 +67,8 @@ export function checkRunData(run: RunData): RunData {
   return run
 }
 
-// Shared by the pages: tokens from the seed's rer-theme.css, readable neutrals
-// when it cannot load, the one header (at the page gutter on every page, with
-// the seed's wordmark weight) and the floor art.
+// Shared by the three pages: tokens from the seed's rer-theme.css, readable
+// neutrals when it cannot load, the header and the floor art.
 const BASE = '*,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-adjust:100%}'
   + 'body{--art:max(26vh,150px);--site-ink:var(--rer-text,#172033);--site-body:var(--rer-muted,#475569);--site-accent:var(--rer-accent,var(--rer-brand-accent,var(--rer-text,#172033)));--site-accent-ink:var(--rer-accent-text,var(--rer-brand-accent-text,var(--rer-surface,#fff)));'
   + '--site-line:color-mix(in srgb,var(--rer-border,#64748b) 28%,transparent);--site-mono:var(--rer-font-mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);'
@@ -80,8 +79,7 @@ const BASE = '*,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-
   + '.bar,main{position:relative;z-index:1}.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;max-width:1440px;margin:0 auto;padding:26px 56px 0}'
   + '.brand{display:inline-flex;align-items:center;gap:12px;font:600 28px/1 var(--rer-font-heading,var(--rer-font-body,inherit));font-weight:var(--rer-wordmark-weight,600);letter-spacing:var(--rer-wordmark-tracking,-.02em);color:var(--site-ink)}.brand img{width:40px;height:40px}'
   // The brand takes only its narrowest width when deciding whether the nav still fits beside it, so a long name wraps the nav onto its own row instead of pushing it past the viewport.
-  + '.bar .brand{flex:1 1 0;max-width:max-content}.bar nav{display:flex;flex-wrap:wrap;gap:36px;font-weight:500;font-size:16px}'
-  + '.bar nav a:hover,.bar nav a[aria-current=page]{text-decoration:underline;text-underline-offset:4px}.bar nav a[aria-current=page]{text-decoration-color:var(--site-accent);text-decoration-thickness:2px}'
+  + '.bar .brand{flex:1 1 0;max-width:max-content}.bar nav{display:flex;flex-wrap:wrap;gap:36px;font-weight:500;font-size:16px}.bar nav a:hover,.bar nav a[aria-current=page]{text-decoration:underline;text-underline-offset:4px}.bar nav a[aria-current=page]{text-decoration-color:var(--site-accent);text-decoration-thickness:2px}'
   + 'h1{font:600 64px/1.08 var(--rer-font-heading,var(--rer-font-body,inherit));letter-spacing:-.03em;color:var(--site-ink);text-wrap:balance}'
   + '.sub{margin-top:24px;color:var(--site-body);font-size:21px;text-wrap:pretty}'
   + '@media(max-width:760px){body{font-size:16px;--art:180px}.bar{padding:18px 16px 0}.brand{font-size:23px;gap:9px}.brand img{width:32px;height:32px}.bar nav{gap:22px;font-size:15px}.bar nav a{min-height:24px}h1{font-size:38px;line-height:1.12}.sub{font-size:16.5px;margin-top:16px}}'
@@ -131,3 +129,85 @@ export function document(identity: EditionIdentity, title: string, description: 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${head}<title>${escape(title)}</title><meta name="description" content="${escape(description)}">`
     + `${iconHead}${identity.fonts ? `<link rel="stylesheet" href="${escape(identity.fonts)}">` : ''}<link rel="stylesheet" href="${escape(identity.theme)}"><style>${identity.accentColor ? `:root{--rer-brand-accent:${identity.accentColor};--rer-brand-accent-text:${ink(identity.accentColor)}}` : ''}${BASE}${style}</style>`
     + `${styles.map(href => `<link rel="stylesheet" href="${escape(href)}">`).join('')}</head>`
+    + `<body>${identity.band ? `<div class="art" aria-hidden="true"><img src="${escape(identity.band)}" alt=""></div>` : ''}${body}${script ? `<script>${script}</script>` : ''}</body></html>`
+}
+/** Docs, Roadmap and Source: Docs when the site has /docs, Roadmap (/contract) when the seed has a CONTRACT.md. */
+export function siteLinks(run: RunData, contract: SeedContract | undefined, current?: 'contract'): string {
+  return `${run.docs ? '<a href="/docs">Docs</a>' : ''}${contract ? `<a href="/contract"${current === 'contract' ? ' aria-current="page"' : ''}>Roadmap</a>` : ''}<a href="${escape(run.repository)}">Source</a>`
+}
+export function header(identity: EditionIdentity, run: RunData, contract?: SeedContract, current?: 'contract'): string {
+  return `<header class="bar"><a class="brand" href="/"><img src="${escape(identity.mark)}" alt="" width="40" height="40"><span>${escape(identity.product)}</span></a>`
+    + `<nav aria-label="Site">${siteLinks(run, contract, current)}</nav></header>`
+}
+// Keep each word/path whole, leaving the original whitespace between words so
+// inline commands can wrap at spaces and selection copies the same text.
+const inlineCode = (value: string) => `<code>${escape(value).replace(/\S+/g, word => `<span class="code-word">${word}</span>`)}</code>`
+// The one-line alternative can break only before the repository; keep plain spaces for copying.
+const inlineStart = (run: RunData) => `<code><span class="code-word">${escape(npxStart)}dev</span> <span class="code-word">${escape(run.clone.slice(npxStart.length + 'dev '.length))}</span></code>`
+// A command line never wraps beside a shell pipe: `install.sh | sh` stays whole,
+// so a narrow block breaks before the URL or after its last slash instead.
+const pipelines = (line: string) => escape(line).replace(/[^\s/]+(?: \| \S+)+/g, words => `<span class="code-word">${words}</span>`)
+const codeBlock = (lines: string[], label: string) => `<div class="code"><pre aria-label="${escape(label)}"><code>${lines.map(pipelines).join('\n')}</code></pre>`
+  + `<button class="copy" type="button" data-copy="${escape(lines.join('\n'))}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="2"/><path d="M3 10.5V4a1.5 1.5 0 0 1 1.5-1.5H10"/></svg><span>Copy</span></button></div>`
+
+/** The Run page at /run. `contract`, the seed's parsed CONTRACT.md, links /contract from the header. */
+export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: SeedContract, homepage?: HomepageHeader): string {
+  checkIdentity(identity); checkRunData(run)
+  const name = escape(run.name), source = escape(run.repository.replace(/^https:\/\//, ''))
+  const hosted = run.hosted.map(option => `<li class="step option"><div class="body"><h2>${escape(option.title)}</h2><p>${escape(option.body)}</p><p class="go"><a href="${escape(option.href)}">${escape(option.action)}</a></p></div></li>`).join('')
+  const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>Run ${name} on your computer.</h1><p class="sub">100% free and open source. One line, and ${name} opens in your browser.</p></div>`
+    + `<ol class="steps"><li class="step"><div class="body"><h2>Start ${name}</h2>${codeBlock([startLine(run)], `Start ${run.name}`)}`
+    + `<p class="alt">Already have Node 22 or later? ${inlineStart(run)} does the same.</p>`
+    + `<p class="note">It installs rer for you alone (with its own Node if you have no Node 22 or later), gets ${name} into the folder ${inlineCode(run.clone.slice(npxStart.length + 'dev '.length).split('/').at(-1)!)}, installs everything, makes you the owner and prints a link that opens ${name} signed in. To start it again later, run the same line from the same folder.</p>`
+    + `<p class="note">This free copy runs only on your computer: it sends no email, and nobody else can open it.</p>`
+    + `</div></li>${hosted}</ol>`
+    + `<footer class="facts"><p>${escape(runRequirements)}</p><p>Source: <a href="${escape(run.repository)}">${source}</a> · ${escape(run.licence)} license</p></footer></main>`
+  return document(identity, `Run ${run.name}`, `Run ${run.name} on your computer. 100% free and open source.`, RUN, body, COPY_SCRIPT, homepage?.styles)
+}
+
+/** Base's composed homepage for a seed without an approved one: its primary action is Run <Seed>. */
+export function siteHomeHtml(identity: EditionIdentity, run: RunData, contract?: SeedContract): string {
+  checkIdentity(identity); checkRunData(run)
+  const body = `${header(identity, run, contract)}<main><div class="hero"><h1>${escape(identity.tagline)}</h1><p class="sub">100% free and open source.</p>`
+    + `<div class="actions"><a class="btn" href="/run">Run ${escape(identity.product)}${ARROW}</a>${run.docs ? '<a class="link" href="/docs">Read the docs</a>' : ''}</div></div></main>`
+  return document(identity, identity.product, identity.tagline, HOME, body)
+}
+
+/**
+ * A docs page that moved, for a static host with no redirect rules: it sends the
+ * browser on to `to` at once and links it for anyone it does not. The seed's
+ * site entry serves it at /docs/install with to = '/docs/getting-started'
+ * whenever its docs have no install page of their own.
+ */
+export function docsMovedHtml(identity: EditionIdentity, run: RunData, to: string, title: string, contract?: SeedContract): string {
+  checkIdentity(identity); checkRunData(run)
+  if (!/^\/docs\/[a-z0-9-]+$/.test(to)) throw new Error('A moved docs page points to /docs/<slug>.')
+  const body = `${header(identity, run, contract)}<main><div class="hero"><h1>${escape(title)}</h1><p class="sub">This page moved.</p><div class="actions"><a class="btn" href="${to}">${escape(title)}${ARROW}</a></div></div></main>`
+  return document(identity, `${title} · ${identity.product}`, identity.tagline, HOME, body, '', [], `<meta http-equiv="refresh" content="0; url=${to}"><link rel="canonical" href="${to}">`)
+}
+
+/** 404.html: the static host serves it for every path the site does not have. */
+export function siteNotFoundHtml(identity: EditionIdentity, run: RunData, contract?: SeedContract, homepage?: HomepageHeader): string {
+  checkIdentity(identity); checkRunData(run)
+  const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="hero"><h1>Page not found</h1><p class="sub">This page is not part of the ${escape(identity.product)} site.</p><div class="actions"><a class="link" href="/">Go to the homepage</a></div></div></main>`
+  return document(identity, `Not found · ${identity.product}`, identity.tagline, HOME, body, '', homepage?.styles)
+}
+
+/** What a seed's site entry returns: each page by path, and the public files they use. */
+export interface SiteBuild {
+ pages: { path: string; html: string }[]; assets: string[];
+ /** Sections from the same render, using its published heading ids. */
+ searchPages?: { href: string; searchSections: { anchor: string; titlePath: string[]; text: string }[] }[];
+}
+
+/**
+ * What `rer build --site` passes to sitePages(): `styles`, the site paths of the
+ * stylesheets the entry's CSS imports compiled to (empty when it imports none).
+ * A page whose components import CSS links them in its head. `clients` maps
+ * each declared island name to its bundled module URL; `styles` also includes
+ * the client entries' compiled stylesheets. `contract` is the seed's
+ * CONTRACT.md as parseContract reads it, absent when the seed has none; rer
+ * stops the build, naming the line, when it does not parse. The entry renders
+ * it at /contract with contractPageHtml and passes it to the other pages.
+ */
+export interface SiteContext { styles: string[]; clients: Record<string, string>; contract?: SeedContract }
