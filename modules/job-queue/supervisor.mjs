@@ -19,6 +19,9 @@ process.on('disconnect', stop);
 const lifetime = await identity();
 process.send({ ready: { ...lifetime.info, marker, pgid: process.pid } });
 process.on('message', message => {
+  // Only the original parent owns this IPC channel. Even without a process
+  // table birth stamp, this live group leader can end its own group safely.
+  if (message.stop) { stop(); return; }
   if (started || stopping || !message.command) return;
   started = true;
   const child = spawn('/usr/bin/nice', ['-n', String(message.nice), ...message.command],

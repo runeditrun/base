@@ -40,6 +40,7 @@ async function entry(path, running) {
 }
 
 export async function listCommand(args) {
+ if (args.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write('Usage: rer list [DIR] [--json]\nThe checkouts in DIR (default: here), newest first, with whether rer dev can launch them,\nwhether they are set up, and their running URL. --json for data.\n'); return 0; }
  const json = args.includes('--json'), positional = args.filter(arg => arg !== '--json');
  if (positional.length > 1 || positional.some(arg => arg.startsWith('-'))) { process.stderr.write('Usage: rer list [DIR] [--json]\n'); return 2; }
  let directory;

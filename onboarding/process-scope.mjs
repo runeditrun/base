@@ -18,8 +18,14 @@ const marker = 'RER_ONBOARDING_PROCESS_OWNER'
 // immutable exclusion avoids repeatedly reading foreign environments; it never
 // authorizes signalling a process. Every later match still requires its token.
 export async function createProcessBaseline() {
+  let table
+  try { table = await readProcessTable(3000, undefined, undefined, 0) } catch {
+    // This exclusion is only an optimization. Without it, later discovery
+    // inspects every candidate and still requires its private scope marker.
+    return undefined
+  }
   const baseline = Object.freeze({})
-  baselines.set(baseline, new Set((await readProcessTable()).map(birthKey)))
+  baselines.set(baseline, new Set(table.map(birthKey)))
   return baseline
 }
 export function createProcessScope(baseline, token = randomUUID()) {

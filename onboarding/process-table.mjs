@@ -21,10 +21,10 @@ const retryMs = 10
 export const extensionMs = 25000
 async function withinBound(timeout, attempt, extension = extensionMs) {
   const deadline = Date.now() + timeout + extension
-  const slow = setTimeout(() => process.emitWarning(
+  const slow = extension > 0 ? setTimeout(() => process.emitWarning(
     `Process inspection is taking longer than ${timeout} ms on a busy machine; waiting up to ${extension} ms more.`,
-    { code: 'RER_PROCESS_INSPECTION_SLOW' }), timeout)
-  slow.unref()
+    { code: 'RER_PROCESS_INSPECTION_SLOW' }), timeout) : undefined
+  slow?.unref()
   try {
     for (;;) {
       try { return await attempt(Math.max(1, deadline - Date.now())) } catch (error) {
@@ -74,7 +74,7 @@ export function parseLinuxProcess(pid, pgid, text) {
   return { pid, ppid, pgid, state: fields[0], birth: fields[19], command: text.slice(text.indexOf('(') + 1, text.lastIndexOf(')')) }
 }
 
-async function processGroup(pgid, signal) {
+async function processGroup(pgid, signal, timeout) {
   if (process.platform === 'linux') {
     // Minimal Linux containers need not install ps. Procfs provides exact
     // start ticks and includes zombies until their actual parent reaps them.
@@ -91,7 +91,7 @@ async function processGroup(pgid, signal) {
   try {
     ({ stdout } = await execute('/bin/ps', [
       '-ax', '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=',
-    ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
+    ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, timeout, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
   } catch (error) { if (signal.aborted) throw error; throw transient('Could not read process identities.') }
   const group = []
   for (const line of stdout.split('\n').filter((line) => line.trim())) {
@@ -113,21 +113,32 @@ async function processGroup(pgid, signal) {
 // Executable inspection is limited to owned candidates. Asking macOS ps for
 // comm across every user process invokes expensive argv lookups and can make
 // cleanup slower than the existing bounded shutdown contract.
-export async function readProcessIdentity(pid, timeout = inspectionMs) {
+export async function readProcessIdentity(pid, timeout = inspectionMs, extension = extensionMs) {
   if (!validPid(pid) || !(timeout > 0)) throw new Error('Invalid process identity deadline.')
-  if (process.platform === 'linux') return withinBound(timeout, (remaining) => linuxProcess(pid, undefined, AbortSignal.timeout(remaining)))
-  return withinBound(timeout, (remaining) => psIdentity(pid, remaining))
+  return withinBound(timeout, async remaining => {
+    const controller = new AbortController()
+    let timer
+    try {
+      const read = process.platform === 'linux' ? linuxProcess(pid, undefined, controller.signal) : psIdentity(pid, remaining, controller.signal)
+      return await Promise.race([read, new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error('Process identity inspection deadline expired.'))
+          controller.abort()
+        }, remaining)
+      })])
+    } finally { clearTimeout(timer) }
+  }, extension)
 }
 
 // macOS ps comm is read from the process's own argv, which process.title
 // rewrites (the job supervisor retitles itself after launch). ucomm is the
 // kernel's executable name: set only by exec, so it survives a retitle.
-async function psIdentity(pid, timeout) {
+async function psIdentity(pid, timeout, signal) {
   let stdout
   try {
     ({ stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'ucomm='],
-      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
-  } catch (error) { if (error.code === 1 && !error.stdout?.trim()) return; throw transient('Could not inspect process identity.') }
+      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, signal, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
+  } catch (error) { if (error.code === 1 && !error.killed && !error.signal && !error.stdout?.trim() && !error.stderr?.trim()) return; throw transient('Could not inspect process identity.') }
   const match = stdout.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.{24})\s+(.+?)\s*$/)
   if (!match) throw transient('Invalid process identity.')
   const [, id, parent, groupId, uid, state, birth, command] = match
@@ -143,7 +154,7 @@ export async function readProcessTable(timeout = inspectionMs, pgid, read = proc
     const controller = new AbortController()
     let timer
     try {
-      return await Promise.race([read(pgid, controller.signal), new Promise((_, reject) => {
+      return await Promise.race([read(pgid, controller.signal, remaining), new Promise((_, reject) => {
         timer = setTimeout(() => {
           controller.abort()
           reject(new Error('Process inspection deadline expired.'))

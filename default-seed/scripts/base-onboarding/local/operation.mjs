@@ -52,7 +52,11 @@ export async function localOperation(root, inheritedToken) {
 }
 
 async function currentProcess() {
-  return { pid: process.pid, start: await processStart(process.pid) }
+  let start
+  try { start = await processStart(process.pid) } catch (error) {
+    if (error.code !== 'PROCESS_INSPECTION_UNAVAILABLE') throw error
+  }
+  return { pid: process.pid, start }
 }
 
 // A recorded owner is alive only while its PID exists and, when the record
@@ -63,7 +67,10 @@ export async function ownerAlive(owner) {
     if (error.code !== 'EPERM') throw error
   }
   if (typeof owner.start !== 'string') return true
-  return await processStart(owner.pid) === owner.start
+  try { return await processStart(owner.pid) === owner.start } catch (error) {
+    if (error.code !== 'PROCESS_INSPECTION_UNAVAILABLE') throw error
+    return true // An unreadable birth is never permission to take a live lock.
+  }
 }
 
 // Removing a stale lock by name alone could remove a lock another starter has
@@ -108,10 +115,9 @@ async function staleIdentity(path) {
   try {
     const status = await handle.stat({ bigint: true })
     const id = key(status)
-    try {
-      const owner = JSON.parse(await handle.readFile('utf8'))
-      if (Number.isSafeInteger(owner.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
-    } catch { /* Half-written or unreadable: judged by age below. */ }
+    let owner
+    try { owner = JSON.parse(await handle.readFile('utf8')) } catch { /* Half-written: judged by age below. */ }
+    if (Number.isSafeInteger(owner?.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
     return Date.now() - Number(status.mtimeMs) > graceMs ? id : undefined
   } finally { await handle.close() }
 }

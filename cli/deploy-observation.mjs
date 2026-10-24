@@ -5,7 +5,7 @@ import { retireOwnerClaimSession } from './deploy-claim-session.mjs';
 // call the shared owner helper themselves. Never issue a second claim after it.
 // The kit's deployment record, when the hook keeps one there, is checked before
 // linking with its live setup token; rer checks the origin the hook returns too.
-export async function observeOwner({ paths, inspect, beforeClaim, addSecret, deployed: knownDeployment, tokenKey }, run) {
+export async function observeOwner({ paths, inspect, beforeClaim, addSecret, deployed: knownDeployment, tokenKey, signOutPath }, run) {
  const fetch = globalThis.fetch, claims = [], sessions = [];
  globalThis.fetch = async (input, init = {}) => {
   const url = new URL(input instanceof Request ? input.url : input);
@@ -37,7 +37,7 @@ export async function observeOwner({ paths, inspect, beforeClaim, addSecret, dep
  try { return await observeReadiness(() => run(claims)); }
  finally {
   globalThis.fetch = fetch;
-  await Promise.all(sessions.map(({ response, origin }) => retireOwnerClaimSession(fetch, response, origin)));
+  await Promise.all(sessions.map(({ response, origin }) => retireOwnerClaimSession(fetch, response, origin, signOutPath)));
  }
 }
 

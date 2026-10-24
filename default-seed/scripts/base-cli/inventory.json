@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g5d1d2024",
+  "cliVersion": "0.2.80-dev.g0388ba44",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "4a527623a99b8d50a6145d58f0ba4ac74e7d2ab6a8762512e0e63dfe642a927b"
+      "sha256": "a63da254382ab203d2dcb6afe837a692f761f5052c5ba458d09a64fb9ae791dc"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -57,7 +57,7 @@
     },
     "command-custody.mjs": {
       "source": "onboarding/command-custody.mjs",
-      "sha256": "60c2be80991054feb4c9d56205e65ed0c8d01cfbe10dec698eb312bf90faecf6"
+      "sha256": "7028c770ebd5ed54097bbe58feaafe5ef76a7750567471dda272ca7e18f69975"
     },
     "command-recovery.mjs": {
       "source": "onboarding/command-recovery.mjs",
@@ -133,7 +133,7 @@
     },
     "local/operation.mjs": {
       "source": "onboarding/local/operation.mjs",
-      "sha256": "879f2b1068afeb8e9340c317b6156faec7099ceeabf3b1e310489c79e9fa048c"
+      "sha256": "5285ee63dcc1a28b341e8756d0ce629239a73938a9463a48af6af77281d9e651"
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
@@ -141,7 +141,7 @@
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
-      "sha256": "8b7c9324fc1fb11757cd0fa68e0b8214588c57e641f6039629ceea54e658133f"
+      "sha256": "6e1f1f972d823202d3be5d141d6a7961428a0c282eb0ebb61c78e1c477d98a37"
     },
     "local/recovery.mjs": {
       "source": "onboarding/local/recovery.mjs",
@@ -205,15 +205,15 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "15503277b5517faed1fe7d5e0215c1aa6f03ba3ca2dad3bd44af1cc5892aa823"
+      "sha256": "66deeb06c25f60cd87f2d6c5924f37c4b20b9328faf7d4595dc461282531d612"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "d33ba3b90be242e7b6bd0c734fbff793f0ae84df2cffad5834f41062c98a3b72"
+      "sha256": "1a5aba4f85e42728b2da9df645e940688d174a8899d89a7b73e9b6bf4ed46712"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "6ce0568487c59076c891c8c6ab16f3eebee30bfeedfdaad7e44838b66ab4c813"
+      "sha256": "70aeb820e2a7032e77df402a1d46406f3b7c3bbe8454ba30352734eed3def477"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
@@ -391,7 +391,7 @@
     },
     "cli/archive.mjs": {
       "source": "cli/archive.mjs",
-      "sha256": "2ec5f162e824dfe3e43def0c8751dc5adaf933cc99010c3dafff32f118809811"
+      "sha256": "82d3aa55a630f316d078c8a7710d7e97b8df2b9cdc69d3a60515d5cd65cadaaa"
     },
     "cli/auth-copy.mjs": {
       "source": "cli/auth-copy.mjs",
@@ -655,7 +655,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "9b1b0dbd375a311a07d60b6cde973c4a3e1584ff26da4655008ae23977959624"
+      "sha256": "a3bce81c9fd43b03847108f8fae3906ffa3c4504672cadf21d65805858069e5f"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -703,11 +703,11 @@
     },
     "cli/deploy-claim-session.mjs": {
       "source": "cli/deploy-claim-session.mjs",
-      "sha256": "4edd39c5300b3436248539abc1d0d36b2cef0862d83c929dd4eac0a20aae74f7"
+      "sha256": "ae5031f0bf6ae1fa9eeb36ba491d7cbb4f6e38c4442afd2d57ac4da1ae34d715"
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "0f660f125f95f0ee960c2c68bdf6b705b09f717759c409a8d59543a02fbb3ec4"
+      "sha256": "7eeaf68e1ec03e2c0159bc32f446d8c8680f36939547e6b6d1f7736ee0e6661a"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -735,7 +735,7 @@
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",
-      "sha256": "ec800f97efbe3501f22c969621072ebb9c4ffd397e8eaa1b430943c8387e2f08"
+      "sha256": "dbfafb458cc497ca3bf7e223dc96e999df7e71969913e307790a606fb61cbcd3"
     },
     "cli/deploy-owner-input.mjs": {
       "source": "cli/deploy-owner-input.mjs",
@@ -743,7 +743,7 @@
     },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
-      "sha256": "a18cbd514579b07790df4ac9dc697915ac8fe57913143a087b409219668d6f2d"
+      "sha256": "0454188f5f7464ad84b9301e97f20314d531043a74b1df7bb2600d234f51b9df"
     },
     "cli/deploy-product.mjs": {
       "source": "cli/deploy-product.mjs",
@@ -855,7 +855,7 @@
     },
     "cli/import-origin.mjs": {
       "source": "cli/import-origin.mjs",
-      "sha256": "9d93eda603f74f455a3bf957fdc54e91a620f9c763fff160fc16292a6caaaa81"
+      "sha256": "ba5931c174204aee8078afb578ba0ba9053c1d89578c2b8b2145f185843a52ea"
     },
     "cli/import-summary.mjs": {
       "source": "cli/import-summary.mjs",
@@ -867,7 +867,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "c2f6889ae9ff06168877f8b23b331c5150fabf7a95d0048ce6b63c2a7532d04d"
+      "sha256": "8a99322fc6ac7515bb4730bc94939e922f67ce6fbe28f5e7491222b5390d9621"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -875,7 +875,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "d1599705962888376ac2c2ff66ab31608745fdbcf2a171be00244dde6dd5407c"
+      "sha256": "ba3f7aa1b77b9fc1cf6d1c8a1c279296426fd8f5abab6dc5c3829da0da6c619c"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -883,7 +883,7 @@
     },
     "cli/listing.mjs": {
       "source": "cli/listing.mjs",
-      "sha256": "2e23130b586818b985296ba611e92843167b0a6350d29f861ba0a3189d32f4a0"
+      "sha256": "ec982ea04cb14051b845c741552fbb3f0aec3aa3fa522468cf506f01bf04e89a"
     },
     "cli/local-env.mjs": {
       "source": "cli/local-env.mjs",
@@ -895,11 +895,11 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "5a0c1a005d051031c539d4bae486bce0091268a47799d00d094aa0674831b66f"
+      "sha256": "8bf04d01f2e54d68671c738c177e89aaed563aa6e194b38848ed6176800e1eea"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
+      "sha256": "3fd495b2b66bd8e9b680cf8fbf51b2ce245d89200332cfe5e9e808126ab119c3"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -931,7 +931,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "e0461513266d44d5763ce3c9aa1fa76e54d6a61a3e226c9f7d0f7f09fbe281e5"
+      "sha256": "29531295aa01698fd3dd0a6e9b0a858a44cb6b674ae234accf250d26259bde03"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -983,15 +983,15 @@
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
-      "sha256": "d3b9dfb181d6f4ad4ef057fdd15a6b9a9e33b08464f0b446eafb91a5d6353c40"
+      "sha256": "34bd0b9be54f698c1f5d52a7f02ae99afeaf324d473ad9a774171deeb69758f4"
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",
-      "sha256": "bbe4232614d2b9033932ecad4d758521c64975dc697a93fed2cfa34b511c0f91"
+      "sha256": "93c1489e1561180b4528efc7e7e8de08627289ed73eb969aeea92feaae922a7f"
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "e4fc3082169d48bba6fd3b76f7813be615295995725f6dda04901889fe3b3aaf"
+      "sha256": "f16c79b38da78b617b4b679bebbdf65e15c4fded47322584e672551ee69cd14b"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -1015,7 +1015,7 @@
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
-      "sha256": "dc0fd0f89a2e046393845f17b354194ea9a143879629b89b8506621eecda5647"
+      "sha256": "a71519cc9c5a4e964f37e51ad74ce04fbba207563613ab183be73e105e4e8de7"
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",
@@ -1123,7 +1123,7 @@
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
-      "sha256": "bf0a4727930d749563a0c675b1b0715350bc1b4321154dea653d154fdc7e878b"
+      "sha256": "599b03c8304100ed98147f4d9166bfbf3e75df769f7765b4d91e762459a3f5d9"
     },
     "cli/upstream-agent.mjs": {
       "source": "cli/upstream-agent.mjs",
@@ -2671,7 +2671,7 @@
     },
     "modules/job-queue/command.mjs": {
       "source": "modules/job-queue/command.mjs",
-      "sha256": "98cfd0ce8c5dfd7d7bbd865075e02ce88c472f595ee4f996c1b570f58f5e5fb3"
+      "sha256": "b449b2c2641d2949e1274e1200cb4a51b169f4ac5c56d0e77960a0436b876954"
     },
     "modules/job-queue/config.mjs": {
       "source": "modules/job-queue/config.mjs",
@@ -2679,7 +2679,7 @@
     },
     "modules/job-queue/identity.mjs": {
       "source": "modules/job-queue/identity.mjs",
-      "sha256": "6846f930bb008594602e96bdb18e4b2ed043dc4cb6ccfd52225099b55c6ff605"
+      "sha256": "2089da3e142673c6ef8817e4d13eef4cb6b9a26870ba9df5f9fa939d48a1ff99"
     },
     "modules/job-queue/index.mjs": {
       "source": "modules/job-queue/index.mjs",
@@ -2691,7 +2691,7 @@
     },
     "modules/job-queue/membership.mjs": {
       "source": "modules/job-queue/membership.mjs",
-      "sha256": "93ee4b02bef24d78092b6a759d6e828312a7b525ab7edfd6b9f84a0bf43f8133"
+      "sha256": "56cea772d6513c390c52129cde2eda924486389d6be9f61ba473825b16f8dcb7"
     },
     "modules/job-queue/module.json": {
       "source": "modules/job-queue/module.json",
@@ -2703,7 +2703,7 @@
     },
     "modules/job-queue/processes.mjs": {
       "source": "modules/job-queue/processes.mjs",
-      "sha256": "7ccc5569b720187e782c3ab5636d7201ea565638212529dbbb102f87aa9f5d39"
+      "sha256": "b71dcc1e5d1de9cea920cc83f0d91e6f244bc848031ad1e6c27ef41849397c88"
     },
     "modules/job-queue/resources.mjs": {
       "source": "modules/job-queue/resources.mjs",
@@ -2719,7 +2719,7 @@
     },
     "modules/job-queue/supervisor.mjs": {
       "source": "modules/job-queue/supervisor.mjs",
-      "sha256": "19ab4716e7e561bce1db74cd411d24cd1ceeceac0e9afeaf30da0673c1f4b846"
+      "sha256": "fdcab79f4632209d7529ac4bc47792df59cdeabf6bbed6f1afb4b5efdce5c76c"
     },
     "modules/job-queue/waiting.mjs": {
       "source": "modules/job-queue/waiting.mjs",

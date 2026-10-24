@@ -87,9 +87,26 @@ export const sameProcess = (left, right) => left?.pid === right?.pid
 // Returns undefined when no process has this PID.
 export async function processStart(pid) {
   if (!validPid(pid)) throw new Error('Invalid process identity.')
+  const controller = new AbortController()
+  let timer
+  try {
+    return await Promise.race([startTime(pid, controller.signal), new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error('Process identity inspection deadline expired.'))
+        controller.abort()
+      }, 3000)
+    })])
+  } catch (cause) {
+    // Unknown is distinct from an absent PID: lock callers keep live owners
+    // and may acquire their own exclusive lock without claiming a birth.
+    throw Object.assign(new Error('Process identity inspection is unavailable.', { cause }), { code: 'PROCESS_INSPECTION_UNAVAILABLE' })
+  } finally { clearTimeout(timer) }
+}
+
+async function startTime(pid, signal) {
   if (process.platform === 'linux') {
     let text
-    try { text = await readFile(`/proc/${pid}/stat`, 'utf8') } catch (error) {
+    try { text = await readFile(`/proc/${pid}/stat`, { encoding: 'utf8', signal }) } catch (error) {
       if (error.code === 'ENOENT' || error.code === 'ESRCH') return undefined
       throw error
     }
@@ -100,11 +117,11 @@ export async function processStart(pid) {
   let stdout
   try {
     ({ stdout } = await execute('/bin/ps', ['-o', 'lstart=', '-p', String(pid)], {
-      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, killSignal: 'SIGKILL', timeout: 5000,
+      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, killSignal: 'SIGKILL', timeout: 3000,
     }))
   } catch (error) {
     // ps exits 1 when the PID does not exist.
-    if (error.code === 1 && !String(error.stdout ?? '').trim()) return undefined
+    if (error.code === 1 && !error.killed && !error.signal && !String(error.stdout ?? '').trim() && !String(error.stderr ?? '').trim()) return undefined
     throw error
   }
   if (!stdout.trim()) return undefined
