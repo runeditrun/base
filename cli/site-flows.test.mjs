@@ -335,7 +335,7 @@ test('built Roadmap preserves product prose while removing explicit source citat
  await writeFile(join(f.root, 'CONTRACT.md'), input);
  const built = await f.build();
  assert.equal(built.code, 0, built.stdout + built.stderr);
- const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const page = await browser.newPage(); await page.goto(preview.url + '/contract');
   const clause = page.locator('tr.clause[data-id="COLLAB-001"]');

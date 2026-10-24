@@ -53,11 +53,11 @@ const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'p
 // names are ambiguous (product names use them too), so need a path or locator.
 // The parser has already removed Gap/title backticks, so code delimiters alone
 // cannot distinguish citations from ordinary words consistently across fields.
-const fileName = String.raw`[\w@.-]+\.(?:[cm]?[jt]sx?|sql|jsonc?|toml|md|ya?ml|sh|css|html|csv|py|png|svg)\b`
-const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public|config|secrets|deploy|operations|evidence|\.github)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b${fileName}:\d+(?::\d+)?\b`, 'gi')
+const fileName = String.raw`[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b`
+const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public|config|secrets|deploy|operations|evidence|\.github)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b[\w@.-]+\.(?:[cm]?[jt]sx?|sql|jsonc?|toml|md|ya?ml|sh|css|html):\d+(?::\d+)?\b`, 'gi')
 const bareSourceFile = /\b[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b/gi
 // Config names are repository citations even when their .js suffix is ambiguous.
-const configFile = /(?<![\w.])(?:[\w@.-]+\.config\.[cm]?[jt]s|\.env(?:\.[\w-]+)*)(?![\w-]|\.[\w-])/gi
+const configFile = /(?<![\w.])(?:rer-theme\.css|[\w@.-]+\.config\.[cm]?[jt]s|\.env(?:\.[\w-]+)*)(?![\w-]|\.[\w-])/gi
 const windowsPath = /(?<![\w])(?:[a-z]:\\|(?:src|tests?|scripts?|modules?|packages?|config|secrets)\\)[\w@.*?\\[\]-]*(?::\d+(?::\d+)?)?/gi
 const publicText = (value: string) => value
   .replace(/\bin audited\s+`?src\/`?\s+and\s+`?tests\/`?/gi, '')
