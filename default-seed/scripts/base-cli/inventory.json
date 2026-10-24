@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g43ae7131",
+  "cliVersion": "0.2.79-dev.gc10a13c5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -133,7 +133,7 @@
     },
     "local/operation.mjs": {
       "source": "onboarding/local/operation.mjs",
-      "sha256": "879f2b1068afeb8e9340c317b6156faec7099ceeabf3b1e310489c79e9fa048c"
+      "sha256": "5285ee63dcc1a28b341e8756d0ce629239a73938a9463a48af6af77281d9e651"
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
@@ -141,7 +141,7 @@
     },
     "local/process-table.mjs": {
       "source": "onboarding/local/process-table.mjs",
-      "sha256": "8b7c9324fc1fb11757cd0fa68e0b8214588c57e641f6039629ceea54e658133f"
+      "sha256": "6e1f1f972d823202d3be5d141d6a7961428a0c282eb0ebb61c78e1c477d98a37"
     },
     "local/recovery.mjs": {
       "source": "onboarding/local/recovery.mjs",
@@ -983,7 +983,7 @@
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
-      "sha256": "d3b9dfb181d6f4ad4ef057fdd15a6b9a9e33b08464f0b446eafb91a5d6353c40"
+      "sha256": "34bd0b9be54f698c1f5d52a7f02ae99afeaf324d473ad9a774171deeb69758f4"
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",
@@ -2671,7 +2671,7 @@
     },
     "modules/job-queue/command.mjs": {
       "source": "modules/job-queue/command.mjs",
-      "sha256": "98cfd0ce8c5dfd7d7bbd865075e02ce88c472f595ee4f996c1b570f58f5e5fb3"
+      "sha256": "b449b2c2641d2949e1274e1200cb4a51b169f4ac5c56d0e77960a0436b876954"
     },
     "modules/job-queue/config.mjs": {
       "source": "modules/job-queue/config.mjs",
@@ -2719,7 +2719,7 @@
     },
     "modules/job-queue/supervisor.mjs": {
       "source": "modules/job-queue/supervisor.mjs",
-      "sha256": "19ab4716e7e561bce1db74cd411d24cd1ceeceac0e9afeaf30da0673c1f4b846"
+      "sha256": "fdcab79f4632209d7529ac4bc47792df59cdeabf6bbed6f1afb4b5efdce5c76c"
     },
     "modules/job-queue/waiting.mjs": {
       "source": "modules/job-queue/waiting.mjs",

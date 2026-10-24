@@ -1,3 +1,5 @@
+import { qualifyHints } from './hints.mjs';
+
 // What `rer dev` prints while it launches: one line per step, one honest line
 // after every 5 seconds of quiet, a `progress` event
 // for each with --json, then the dispatcher's ready lines and, last, one line
@@ -47,10 +49,10 @@ export function printer({ json, stopHint, keyless = false, name, openHint, open,
   },
   failure(failure) {
    if (json) {
-    if (failure.event) process.stdout.write(JSON.stringify(failure.event) + '\n');
-    else event('error', { code: 'launch_refused', message: failure.message, exitCode: failure.exitCode });
+    if (failure.event) process.stdout.write(JSON.stringify(qualifyHints(failure.event, stopHint)) + '\n');
+    else event('error', { code: 'launch_refused', message: qualifyHints(failure.message, stopHint), exitCode: failure.exitCode });
     event('result', { ok: false, exitCode: failure.exitCode });
-   } else process.stderr.write(failure.message + '\n');
+   } else process.stderr.write(qualifyHints(failure.message, stopHint) + '\n');
   },
  };
 }

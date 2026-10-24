@@ -10,6 +10,8 @@ import { realpath } from 'node:fs/promises';
 import { dispatcher, pinnedPackage } from '../checkout.mjs';
 import { liveServers } from '../registry.mjs';
 import { productName } from '../open.mjs';
+import { rerWord } from '../cli/invocation.mjs';
+import { shellQuote } from '../../cli/node-runtime-cache.mjs';
 import { checkCapacity, personEnvironment, pinPolicy } from './capacity.mjs';
 import { bringBackDoor, doorPlan } from './door.mjs';
 import { LaunchFailure, freshSetupRecovery } from './failure.mjs';
@@ -50,7 +52,10 @@ export async function prepare({ root, args, setupArgs = [], env, report, directo
   if (doorStart) throw new LaunchFailure(3, `${root} is not installed, and the front door starts only prepared checkouts. Run rer dev in it once.`);
   const current = await pinPolicy(root, 'package');
   const capacity = await checkCapacity(await realpath(root), { ...env, ...personEnvironment(env, args, current) }, current);
-  if (capacity.own) throw new LaunchFailure(3, `A server of ${root} is running, but its node_modules lacks the rer version it pins. Stop it with rer dev --stop, then run rer dev again.`);
+  if (capacity.own) {
+   const command = `${rerWord(env)} dev --cwd ${shellQuote(root)}`;
+   throw new LaunchFailure(3, `A server of ${root} is running, but its node_modules lacks the rer version it pins. Stop it with ${command} --stop, then run ${command} again.`);
+  }
   report({ phase: 'install', message: `installing ${name}'s dependencies (pnpm install)` });
   await recorded(directory, installState, () => installPinned(root, { env, output: text => log(text.trimEnd()), children, signal }));
   installed = true;

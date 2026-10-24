@@ -131,9 +131,10 @@ export async function handOver(target, closing, { openApp, shellDirectory, json,
  const output = watchReady({ ...closing, json, foreground, piped,
   onOutput: () => progress.activity(), onReady: () => clearInterval(heartbeat) });
  // Run the prepared pin's verbs directly; its global launcher would prepare
- // again and add a second closing line. Keep its foreground lifetime explicit.
+ // again and add a second closing line. Pipes are only a filtered transport;
+ // they must not decide the requested serving lifetime.
  const args = target.args.filter(arg => !['--door-start', '--detach', '--foreground'].includes(arg));
- if (foreground) args.push('--foreground');
+ args.push(foreground ? '--foreground' : '--detach');
  if (!piped) {
   try { return await delegate(target, args, { entryOnly: true }); }
   finally { clearInterval(heartbeat); }

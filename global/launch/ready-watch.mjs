@@ -2,6 +2,7 @@
 // re-exec. Hold whole lines so no credential prefix escapes into a pipe.
 import { StringDecoder } from 'node:string_decoder';
 import { closingLine } from './render.mjs';
+import { qualifyHints } from './hints.mjs';
 
 const keySentence = 'Open that link on this computer.';
 
@@ -17,11 +18,12 @@ export function watchReady({ keyless, json, name, openHint, stopHint, opener, fo
  const read = text => {
   if (json) {
    let event;
-   try { event = JSON.parse(text); } catch { return text; }
-   if (event?.event !== 'ready' || typeof event.url !== 'string') return text;
+   try { event = JSON.parse(text); } catch { return qualifyHints(text, stopHint); }
+   const shown = qualifyHints(event, stopHint);
+   if (event?.event !== 'ready' || typeof event.url !== 'string') return JSON.stringify(shown);
    ready ??= event;
-   if (!keyless || event.openUrl === undefined) return text;
-   const { openUrl, ...rest } = event;
+   if (!keyless || event.openUrl === undefined) return JSON.stringify(shown);
+   const { openUrl, ...rest } = shown;
    return JSON.stringify(rest);
   }
   const [tag, ...value] = text.split(' ');
@@ -29,10 +31,7 @@ export function watchReady({ keyless, json, name, openHint, stopHint, opener, fo
   else if (ready && !finished && tag === 'RER_SIGNED_IN') ready.signedInAs = value.join(' ');
   else if (ready && !finished && tag === 'RER_OPEN') ready.openUrl = value.join(' ');
   if (keyless && (tag === 'RER_OPEN' || text.startsWith(keySentence))) return undefined;
-  if (!stopHint) return text;
-  const invocation = stopHint.slice(0, stopHint.indexOf(' dev --stop'));
-  return text.replace(/rer dev --stop(?: --cwd (?:'[^']*'|"[^"]*"|\S+))?/g, () => stopHint)
-   .replace(/\brer (?=(?:dev|preview) --cwd (?:'[^']*'|"[^"]*"|\S+) --stop\b)/g, () => invocation + ' ');
+  return qualifyHints(text, stopHint);
  };
  const stream = output => {
   const decoder = new StringDecoder('utf8');

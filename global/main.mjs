@@ -163,15 +163,10 @@ export async function main(argv) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
   if (code !== undefined) return code;
  }
- if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target, { openApp, shellDirectory });
- // A pin that launches with its own rer prints its own ready lines: it gets
- // --open and the person's folder, or an older pin's lines get the same keyless
- // output, closing line and --open here (handOver).
- if (verb === 'dev' && mode === 'package' && !argv.includes('--help') && !argv.includes('--stop')) {
-  const { closingFor, handOver } = await import('./launch/dev.mjs');
-  const foreground = argv.includes('--foreground') || !argv.includes('--detach') && process.stdout.isTTY;
-  return handOver(target, await closingFor(target.root, { openApp, shellDirectory }), { openApp, shellDirectory: shellDirectory ?? process.cwd(), json: argv.includes('--json'), foreground });
- }
+ // An installed pin may still need setup after an interrupted first launch.
+ // Every dev start takes preparation before handing off the pinned verbs;
+ // package-mode stop remains that pin's own command.
+ if (verb === 'dev' && mode && !argv.includes('--help') && (mode !== 'package' || !argv.includes('--stop'))) return (await import('./launch/dev.mjs')).launchDev(target, { openApp, shellDirectory });
  // Every other server start or queued job on a vendored pin gets the person
  // defaults too (a pinned package applies its own).
  if (mode === 'vendored') {
