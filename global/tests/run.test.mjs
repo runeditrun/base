@@ -1,4 +1,4 @@
-// rer run, queue and list through the installed command's door: a project's documented
+// rer run, queue, list and doctor through the installed command's door: a project's documented
 // `pnpm run X -- ARGS` works as `rer run X -- ARGS` with no pnpm on PATH.
 // Only the npm registry is a fixture, serving a pnpm release.
 import test from 'node:test';
@@ -119,4 +119,19 @@ test('rer list reports each checkout\'s kind and readiness without changing any 
  for (const name of Object.keys(byName)) assert.ok(human.stdout.includes(name));
  assert.equal((await list(join(directory, 'missing'))).code, 3, 'a folder that does not exist is refused');
  assert.equal((await list('--wat')).code, 2);
+});
+
+test('rer doctor outside a project checks this computer, answers with the registry unreachable, and fails without git', { timeout: 60000 }, async t => {
+ const directory = await realpath(await mkdtemp(join(tmpdir(), 'rer-doctor-'))), nodeOnly = join(directory, 'node-only');
+ t.after(() => rm(directory, { recursive: true, force: true }));
+ await mkdir(nodeOnly);
+ await symlink(process.execPath, join(nodeOnly, 'node'));
+ const doctor = PATH => run(process.execPath, [rer, 'doctor', '--json'], { cwd: directory, env: { HOME: join(directory, 'home'), PATH, RER_NO_UPDATE_CHECK: '1', npm_config_registry: 'http://127.0.0.1:9' } });
+ const ready = await doctor(process.env.PATH), result = JSON.parse(ready.stdout);
+ assert.equal(result.diagnostics.scope, 'machine', 'no project is needed');
+ assert.equal(ready.code, 0, ready.stdout + ready.stderr);
+ assert.equal(result.diagnostics.checks.find(check => check.id === 'registry')?.status, 'warn', 'an unreachable registry warns, and the check still answers');
+ const withoutGit = await doctor(nodeOnly);
+ assert.equal(withoutGit.code, 3, withoutGit.stdout);
+ assert.ok(JSON.parse(withoutGit.stdout).diagnostics.checks.some(check => check.status === 'fail'));
 });

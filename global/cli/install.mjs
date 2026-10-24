@@ -7,6 +7,7 @@ import { basename, join, resolve } from 'node:path';
 import { ownManifest, ownRoot, packageDigest, packageFileList } from '../package-info.mjs';
 import { installRecord, launcherOwner, launcherScript, layout } from './layout.mjs';
 import { pathAdvice } from './path-link.mjs';
+import { rerWord } from './invocation.mjs';
 import { runningDoor } from '../../cli/door.mjs';
 import { channelOf } from './status.mjs';
 
@@ -40,12 +41,13 @@ async function writeLauncher(paths) {
  await rename(temporary, paths.launcher);
 }
 
-// The next step, then (when needed) the exact line that puts rer on PATH, last.
-// install.sh running a command itself, and rer update, set RER_INSTALL_NO_NEXT.
-// Business connect also suppresses PATH advice: it uses the launcher directly.
+// The next step, as this shell can run it now, then (when needed) the exact
+// line that puts rer on PATH, last. install.sh running a command itself, and
+// rer update, set RER_INSTALL_NO_NEXT. Business connect also suppresses PATH
+// advice: it uses the launcher directly.
 async function closing(paths) {
  const advice = process.env.RER_INSTALL_NO_PATH ? '' : await pathAdvice(paths);
- return `${process.env.RER_INSTALL_NO_NEXT ? '' : 'Next, start an app: rer dev <owner>/<repo>\n'}${advice ? advice + '\n' : ''}`;
+ return `${process.env.RER_INSTALL_NO_NEXT ? '' : `Next, start an app: ${rerWord()} dev <owner>/<repo>\n`}${advice ? advice + '\n' : ''}`;
 }
 
 export async function install({ quiet = false } = {}) {
@@ -55,6 +57,10 @@ export async function install({ quiet = false } = {}) {
  const launcher = await launcherOwner(paths.launcher);
  if (launcher.state === 'foreign') {
   process.stderr.write(`rer cli install: ${paths.launcher} already exists and was not written by rer cli install (it may be the unrelated npm package "rer"). Nothing was changed. Remove or rename it, then run the install again.\n`);
+  return 4;
+ }
+ if (launcher.state === 'ours' && (!launcher.root || resolve(launcher.root) !== resolve(paths.data))) {
+  process.stderr.write(`rer cli install: ${paths.launcher} already runs another install root${launcher.root ? ` (${launcher.root})` : ''}. Nothing was changed. Choose a separate launcher folder with RER_BIN_DIR or XDG_BIN_HOME, then run the install again.\n`);
   return 4;
  }
  const record = await installRecord(paths), current = await readLink(paths.current);
