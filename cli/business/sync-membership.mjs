@@ -10,17 +10,20 @@ export async function checkoutConnection(root) {
  return { membership, trust };
 }
 
-export async function confirmConnection(connection, state, app, { replace = false } = {}) {
+export function connectionDiffers(connection, state, app) {
  const { membership, trust } = connection;
- const subject = `${state.businessId}/${app}`;
- const different = trust && (trust.issuer !== state.origin || trust.subject !== subject)
-  || membership && (membership.app !== app || membership.businessId && membership.businessId !== state.businessId
-   || membership.issuer && membership.issuer !== state.origin);
- if (!different) return;
- const refuse = () => Object.assign(Error('This checkout is connected to another Business app. To switch, run rer business sync --replace in a terminal and confirm.'), { code: 'business_checkout_connected' });
- if (!replace || !process.stdin.isTTY || !process.stderr.isTTY) throw refuse();
+ return Boolean(trust && (trust.issuer !== state.origin || trust.subject.split('/')[0] !== state.businessId || app && trust.subject !== `${state.businessId}/${app}`)
+  || membership && (app && membership.app !== app || membership.businessId && membership.businessId !== state.businessId
+   || membership.issuer && membership.issuer !== state.origin));
+}
+
+export const connectionRefusal = () => Object.assign(Error('This checkout is connected to another Business app. To switch, run rer business sync --replace in a terminal and confirm.'), { code: 'business_checkout_connected' });
+
+export async function confirmConnection(connection, state, app, { replace = false } = {}) {
+ if (!connectionDiffers(connection, state, app)) return;
+ if (!replace || !process.stdin.isTTY || !process.stderr.isTTY) throw connectionRefusal();
  const prompt = createInterface({ input: process.stdin, output: process.stderr });
  try {
-  if (await prompt.question('Replace this checkout’s Business connection? Type yes: ') !== 'yes') throw refuse();
+  if (await prompt.question('Replace this checkout’s Business connection? Type yes: ') !== 'yes') throw connectionRefusal();
  } finally { prompt.close(); }
 }

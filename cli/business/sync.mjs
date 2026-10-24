@@ -6,7 +6,7 @@ import { checkout, sameSeed, appOrigins } from './sync-checkout.mjs';
 import { materializeBusinessTrust } from '../local.mjs';
 import { shared } from '../shared.mjs';
 import { verifySettings } from './sync-document.mjs';
-import { checkoutConnection, confirmConnection } from './sync-membership.mjs';
+import { checkoutConnection, confirmConnection, connectionDiffers, connectionRefusal } from './sync-membership.mjs';
 
 const fields = new Set(['display_name', 'owner_name', 'brand_color', 'timezone', 'logo', 'team']);
 export const syncFailure = 'Business sync could not finish; the app keeps its current values. Run rer business sync when connected.';
@@ -17,13 +17,16 @@ const refused = error => error.status === 409 && error.reason === 'business_sett
  : error.status === 401 ? 'Business pairing expired or was revoked. Run rer business connect --code CODE.'
  : 'Business sync is offline or the server did not answer. The app keeps its current values; run rer business sync when connected.';
 
-async function pull({ app, seed, signal }) {
+async function pull({ app, seed, signal, connection, replace }) {
  if (!await loadState()) throw Object.assign(failed('This computer is not paired. Run rer business connect --code CODE.', 'business_not_paired'), { exitCode: 2 });
  const { state, credential } = await paired({ signal }).catch(error => {
   if (error.code === 'business_not_paired') throw Object.assign(failed('Business pairing is missing or incomplete. Run rer business disconnect, then rer business connect --code CODE.', 'business_not_paired'), { exitCode: 2 });
   throw error;
  });
  signal.throwIfAborted();
+ const changingBusiness = connectionDiffers(connection, state);
+ if (changingBusiness && (!replace || !process.stdin.isTTY || !process.stderr.isTTY)) throw connectionRefusal();
+ app ??= changingBusiness ? undefined : connection.membership?.app;
  const api = new Api(state.origin, credential);
  let result, chosen;
  try {
@@ -100,7 +103,7 @@ export async function sync({ root = process.cwd(), app, leave = false, replace =
   return 'Business settings disconnected; the app keeps its current values.';
  }
  const connection = await checkoutConnection(root);
- const result = await pull({ app: app ?? connection.membership?.app, seed, signal });
+ const result = await pull({ app, seed, signal, connection, replace });
  await confirmConnection(connection, result.state, result.app, { replace });
  signal.throwIfAborted();
  await writePublicJson(root, publicConfigPath, { [trustKey]: result.trust });
