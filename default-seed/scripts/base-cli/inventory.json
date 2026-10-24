@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gadb60ab9",
+  "cliVersion": "0.2.79-dev.gb2a6cea0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -213,7 +213,7 @@
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "1f812fb7cac6b924912fee442cdcea88975a699e2906805e154a46d14237c42f"
+      "sha256": "70aeb820e2a7032e77df402a1d46406f3b7c3bbe8454ba30352734eed3def477"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",

@@ -74,7 +74,7 @@ export function parseLinuxProcess(pid, pgid, text) {
   return { pid, ppid, pgid, state: fields[0], birth: fields[19], command: text.slice(text.indexOf('(') + 1, text.lastIndexOf(')')) }
 }
 
-async function processGroup(pgid, signal) {
+async function processGroup(pgid, signal, timeout) {
   if (process.platform === 'linux') {
     // Minimal Linux containers need not install ps. Procfs provides exact
     // start ticks and includes zombies until their actual parent reaps them.
@@ -91,7 +91,7 @@ async function processGroup(pgid, signal) {
   try {
     ({ stdout } = await execute('/bin/ps', [
       '-ax', '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=',
-    ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
+    ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, timeout, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
   } catch (error) { if (signal.aborted) throw error; throw transient('Could not read process identities.') }
   const group = []
   for (const line of stdout.split('\n').filter((line) => line.trim())) {
@@ -154,7 +154,7 @@ export async function readProcessTable(timeout = inspectionMs, pgid, read = proc
     const controller = new AbortController()
     let timer
     try {
-      return await Promise.race([read(pgid, controller.signal), new Promise((_, reject) => {
+      return await Promise.race([read(pgid, controller.signal, remaining), new Promise((_, reject) => {
         timer = setTimeout(() => {
           controller.abort()
           reject(new Error('Process inspection deadline expired.'))
