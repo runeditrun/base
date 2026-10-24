@@ -272,6 +272,9 @@ export function createOidcProviders({ admission, db, config: input, clientIp, fe
       // Only a pin can be ended; a provider never linked has nothing to unlink.
       const previous = await store.link(id);
       check(previous, 'oidc_not_linked', 409);
+      // Preserve the successful response for an ended pin, without an audit
+      // callback or another mutation. The unaudited path keeps its behavior.
+      if (audit && previous.status === 'unlinked') return;
       if (audit) await store.adminChange(id, null, null, previous, audit);
       else await store.unlink(id);
     },

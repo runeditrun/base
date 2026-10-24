@@ -432,6 +432,12 @@ administrative behavior is unchanged. This hook covers the OA-backed
 administrative methods below; it does not cover native accounts adapters or
 other write paths.
 
+An already-unlinked provider remains a successful no-op (HTTP 200, as without
+the hook) and produces no audit row. An audited unlink advances the pin's
+generation in the same statement; the batch checks the old snapshot and that
+new generation before inserting audit rows. A suppressed or stale mutation
+returns 409 and rolls back the batch.
+
 `actorId` is the authenticated actor's opaque `oa_operators.id`. `subjectId` is
 the target operator's opaque id, including the operator owning a revoked
 session; domain and provider actions use `null`. `now` is the action's clock

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g7cf129f6",
+  "cliVersion": "0.2.80-dev.gfa6e3b89",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2987,7 +2987,7 @@
     },
     "modules/operator-auth/README.md": {
       "source": "modules/operator-auth/README.md",
-      "sha256": "2c5763de085c70cd0367d4f6c973745c4facbcec60d5149c49a80e0dff925432"
+      "sha256": "33853275c9db165652abceb0a67112c285368f630f2d3ddc9812e3d4e489d4d0"
     },
     "modules/operator-auth/SCHEDULED-POLICY.md": {
       "source": "modules/operator-auth/SCHEDULED-POLICY.md",
@@ -3271,7 +3271,7 @@
     },
     "modules/operator-auth/identity/oidc/admin-audit.mjs": {
       "source": "modules/operator-auth/identity/oidc/admin-audit.mjs",
-      "sha256": "42db6cbc61282bc383d5a2de27bf0dc37faed6db978d58a26a4e7d627530ed89"
+      "sha256": "666db8c483d4c3a1f24d87a67ececf36863c60da855f809ae738f88cd9afd8cd"
     },
     "modules/operator-auth/identity/oidc/aes-gcm.mjs": {
       "source": "modules/operator-auth/identity/oidc/aes-gcm.mjs",
@@ -3299,7 +3299,7 @@
     },
     "modules/operator-auth/identity/oidc/index.mjs": {
       "source": "modules/operator-auth/identity/oidc/index.mjs",
-      "sha256": "140b116e6b0da65c981e67e5a162ad9bfc6cf7ba14bd9c1bd720748c1eb91ed4"
+      "sha256": "e176aa4b31fd681039507bec49dabab491e4b21e084c3225f09a1c879282572b"
     },
     "modules/operator-auth/identity/oidc/jwt.mjs": {
       "source": "modules/operator-auth/identity/oidc/jwt.mjs",
@@ -3459,7 +3459,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "887e653b13085680dabcc39a326145521c6852ad0750f70821a7cb69abf55120"
+      "sha256": "5e5942f6b13b2c1eab557a6d65e6b8fa548e52052e054e7c8d538cd203241adb"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",

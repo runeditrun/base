@@ -644,13 +644,17 @@ its v2 output succeeds; do not reset the recovered installation to retry.
 continue after that snapshot. R2 listing records size and etag; changes or missing
 objects fail subsequent reads. D1 and R2 do not share a cross-binding transaction.
 
-`createPortability` and `createPortabilityHandler` accept an optional synchronous
+The direct service factory `createPortability` accepts an optional synchronous
 `onExport({id, actor, scope})` callback returning `[sql, args][]`. Its SQL is
 appended to that same snapshot/job-creating D1 batch. A thrown callback or failed
 statement refuses creation; failed SQL rolls back the job, snapshots and audit
 rows together. With no hook, export behavior is unchanged. This records job
 creation, not successful download: a later build, file-write or download failure
 does not erase a committed creation audit.
+
+This hook applies to exports created through that service, including the file
+adapter used by CLI exports. `createPortabilityHandler` does not accept or
+forward `onExport`; the HTTP export handler has no audit hook.
 
 `id` is the export job id, `scope` is the constant `'installation'`, and `actor`
 is the opaque caller id, with the direct/CLI sentinel `'direct'` normalized to

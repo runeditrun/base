@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add seed-owned transactional audit hooks for native operator administration and direct installation export creation. Provider unlink audits require a new pin generation; already-unlinked requests keep HTTP 200 without another audit row. The export hook belongs to the direct `createPortability` service; the HTTP handler has no hook.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.

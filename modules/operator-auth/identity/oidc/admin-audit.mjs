@@ -15,7 +15,9 @@ export async function adminProviderChange(db, id, provider, metadata, previous, 
       ? [`UPDATE oa_identity_providers SET preset=?,status='linked',issuer=?,client_id=?,jwks_uri=?,authorization_endpoint=?,token_endpoint=?,algorithms=?,token_auth_method=?,response_iss=?,interface_version=?,linked_at=?,pending_issuer=NULL,pending_client_id=NULL,pending_preset=NULL,pending_at=NULL,jwks=NULL,jwks_fetched_at=NULL WHERE provider_id=? RETURNING provider_id`, args]
       : [`INSERT INTO oa_identity_providers(preset,issuer,client_id,jwks_uri,authorization_endpoint,token_endpoint,algorithms,token_auth_method,response_iss,interface_version,linked_at,provider_id,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'linked') RETURNING provider_id`, args]);
   } else {
-    statements.push(["UPDATE oa_identity_providers SET status='unlinked' WHERE provider_id=? RETURNING provider_id", [id]],
+    // Advance this pin's generation too: its old unlinked status cannot witness
+    // this request, and trigger side effects on other rows prove nothing here.
+    statements.push(["UPDATE oa_identity_providers SET status='unlinked',linked_at=? WHERE provider_id=? AND linked_at=? AND status='linked' RETURNING provider_id", [revision, id, previous.linkedAt]],
       ['DELETE FROM oa_domain_rules WHERE provider_id=?', [id]]);
   }
   statements.push([`DELETE FROM oa_identity_provider_health WHERE provider_id LIKE ? AND provider_id NOT IN
@@ -23,7 +25,7 @@ export async function adminProviderChange(db, id, provider, metadata, previous, 
   return auditMutation(store, { audit,
     event: { action: provider ? 'providers.relink' : 'providers.unlink', actorId, subjectId: null, detail: id, now },
     before: { sql: `${fence.sql} AND ${snapshot.sql}`, args: [...fence.args, ...snapshot.args] },
-    after: { sql: 'EXISTS(SELECT 1 FROM oa_identity_providers WHERE provider_id=? AND linked_at=? AND status=?)', args: [id, provider ? revision : previous.linkedAt, provider ? 'linked' : 'unlinked'] },
+    after: { sql: 'EXISTS(SELECT 1 FROM oa_identity_providers WHERE provider_id=? AND linked_at=? AND status=?)', args: [id, revision, provider ? 'linked' : 'unlinked'] },
     statements,
   });
 }
