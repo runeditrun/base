@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gb7163b5a",
+  "cliVersion": "0.2.79-dev.g63db9732",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "bfc18610482e9a8811c287cc7880255d8eb11b81cf683b378513c2c309a877fc"
+      "sha256": "371851b14598095f8195ff3cec8b547c874848f07fd2b5479dfb1b049724b0da"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1204,6 +1204,10 @@
     "edition-authoring/release.mjs": {
       "source": "edition-authoring/release.mjs",
       "sha256": "40acdb670edbde2eafa731f535bbe7403360a3327b576ed47355936bcc4a543a"
+    },
+    "edition-authoring/runtime-dependencies.mjs": {
+      "source": "edition-authoring/runtime-dependencies.mjs",
+      "sha256": "cd1098d1c1dc907c72e0e15a85ece7c2b3f2ee78059a12df7f229c5a6167052c"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",

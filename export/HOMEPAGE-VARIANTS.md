@@ -159,10 +159,8 @@ The Run page shows “Run <Seed> on your computer.” and one copyable command:
 `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` for
 the seed's repository. It gets the seed, installs everything, makes you the
 owner and prints a link that opens it signed in. To start it again later, run
-the same line from the same folder. The Node alternative reads “Already have
-Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same.”
-Base supplies the one requirements sentence, “git is required; rer brings Node
-and pnpm.”; remove a seed's old `requirements` field when adopting this renderer.
+the same line from the same folder. Base supplies the combined sentence: “Git is required; rer brings Node and pnpm. Already have Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same.”
+When adopting this renderer, remove a seed's old `requirements` field when adopting this renderer.
 The page also says “This free copy runs only on your computer: nobody else can
 open it, and it sends no email until you set up a mail provider.” A README's
 “Run locally” uses the same installer command and Node alternative. `hosted`

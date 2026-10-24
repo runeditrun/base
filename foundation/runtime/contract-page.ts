@@ -47,29 +47,29 @@ const plainCounts = (counts: Counts) => order.map(status => `${counts[status]} $
 const areaCount = (n: number) => `${n} ${n === 1 ? 'area' : 'areas'}`
 const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'push further' : clause.kind
 
-// Source citations stay in CONTRACT.md. A dotted product name is not a file
-// citation, and a word made of a-f is not a commit. Recognize repository roots,
-// source extensions, path separators and line locators instead. Bare .js/.jsx/.css
-// names are ambiguous (product names use them too), so need a path or locator.
-// The parser has already removed Gap/title backticks, so code delimiters alone
-// cannot distinguish citations from ordinary words consistently across fields.
+// Redact repository citations, never surrounding prose. Bare .js/.jsx/.css
+// names are ambiguous product words; a repository root, separator or line
+// locator supplies file context. Other source/config/document suffixes (including
+// bare README.md) identify repository files. Dots inside kept words, leading
+// dots and sentence punctuation are not cleanup characters.
 const fileName = String.raw`[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b`
 const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public|config|secrets|deploy|operations|evidence|\.github)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b[\w@.-]+\.(?:[cm]?[jt]sx?|sql|jsonc?|toml|md|ya?ml|sh|css|html):\d+(?::\d+)?\b`, 'gi')
 const bareSourceFile = /\b[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b/gi
 // Config names are repository citations even when their .js suffix is ambiguous.
 const configFile = /(?<![\w.])(?:rer-theme\.css|[\w@.-]+\.config\.[cm]?[jt]s|\.env(?:\.[\w-]+)*)(?![\w-]|\.[\w-])/gi
 const windowsPath = /(?<![\w])(?:[a-z]:\\|(?:src|tests?|scripts?|modules?|packages?|config|secrets)\\)[\w@.*?\\[\]-]*(?::\d+(?::\d+)?)?/gi
-const publicText = (value: string) => value
-  .replace(/\bin audited\s+`?src\/`?\s+and\s+`?tests\/`?/gi, '')
-  .replace(windowsPath, '').replace(sourcePath, '').replace(configFile, '').replace(bareSourceFile, '')
+const removePath = (citation: string) => /[.,;:!?]+$/.exec(citation)?.[0] ?? ''
+
+/** Public clause prose, shared by display and search. Only citation spans go;
+ * whitespace is normalized without trimming or rewriting any kept token. */
+export const publicText = (value: string) => value
+  .replace(windowsPath, removePath).replace(sourcePath, removePath)
+  .replace(configFile, '').replace(bareSourceFile, '')
+  // A short hash needs an explicit citation label and a digit, so ordinary
+  // words such as "revision defaced" remain prose. Full SHA digests stand alone.
   .replace(/(\b(?:commit|revision|changeset|sha(?:-?(?:1|256))?)(?:\s+|\s*[:=#]\s*))([0-9a-f]{7,64})\b/gi, (citation, label: string, hash: string) => /[0-9]/.test(hash) ? label : citation)
-  .replace(/\bat\s+(?:commit|revision|changeset)\s+[a-f]{7,40}\b(?=\s*[,.;:]|$)/gi, '')
-  .replace(/\bat\s+([0-9][0-9a-f]{6,39})\b/gi, (reference, hash: string) => /[a-f]/i.test(hash) ? '' : reference)
   .replace(/\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b/gi, '')
-  .replace(/`+/g, '')
-  .replace(/\(\s*\)|\[\s*\]/g, '')
-  .replace(/\s+([,.;:])/g, '$1').replace(/([,;:])(?:\s*[,;:])+/g, '$1')
-  .replace(/\s+/g, ' ').replace(/^[\s,;:.]+|[\s,;:]+$/g, '').trim()
+  .replace(/\s+/g, ' ').trim()
 
 function clauseRow(clause: ContractClause, contractUrl: string): string {
   const line = `${contractUrl}?plain=1#L${clause.line}`
