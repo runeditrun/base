@@ -89,12 +89,21 @@ through. Multiple conventional files or matching names are refused with the
 candidates and `--verify-workflow` remedy. This optional declaration does not
 change `operations.verify`, the seed's local command.
 
-The selected workflow must have a completed successful `push` or
-`workflow_dispatch` run for the exact source SHA in the same repository, on its
-default branch or the release tag when that tag resolves to the same commit.
+The selected workflow must have a completed successful run whose `head_sha`
+equals the source commit exactly, with both its run repository and
+`head_repository.full_name` matching the source repository. Any branch or event
+can qualify, including same-repository `pull_request`, `push` and
+`workflow_dispatch` runs; forks and different SHAs cannot. The exact SHA fixes
+the source tree and workflow file content. Release-tag runs still require the
+tag to resolve remotely to that commit. The highest qualifying run ID is chosen
+deterministically. Failed or unfinished duplicates are informational entries in
+the receipt and do not invalidate a qualifying success.
 `gates.verify` in the receipt and site provenance records `workflowFile`,
-`workflowName`, `workflowId`, `runId` and `runUrl`. `--local-verify` explicitly
-runs frozen installation and the seed's local verification targets instead.
+`workflowName`, `workflowId`, `runId`, `runUrl`, branch, event and conclusion.
+When no run qualifies, the refusal names unfinished runs and advises following
+the repository's verification policy. `--local-verify` explicitly runs frozen
+installation and the seed's local verification targets instead, only when that
+policy permits it.
 
 For a tag-first patch release from an already public source, push the branch,
 create `git -c tag.gpgSign=false tag -a --cleanup=verbatim v<version> <exact-source-sha> -m "$release_message"`, push that
