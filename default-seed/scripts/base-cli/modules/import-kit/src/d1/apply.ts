@@ -65,12 +65,18 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
         if (typeof targets.preparePreservedUndo !== 'function') throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
         const snapshot = await targets.preparePreservedUndo(database, context.destination, structuredClone(undoEffects));
         const admission = classifyUndo(undoEffects, snapshot, context);
-        await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');
+        if (context.maxBatchBytes === undefined) {
+          // Unbounded publications can check admission in their existing atomic
+          // guard run, before native writes, without a second read transaction.
+          statements.unshift(...admission.guards);
+        } else {
+          await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');
+        }
       }
       const request = publication(job, entries.length, statements, scope), done = job.checkpoint + entries.length === job.total;
       await atomic(context, 'apply', request.statements, returnReads, request.scope);
       current = await stored(id, context, 'apply'); published = current.job;
-      if (done || remaining(context) < 200) return published;
+      if (done || (!undoEffects && remaining(context) < 200)) return published;
     }
   } catch (error) {
     // Later preflight has no native effects. Its measured budget exhaustion
