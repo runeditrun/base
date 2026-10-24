@@ -39,7 +39,10 @@ change('src/routes/app.tsx',"import { requireOperator, loadBusinessBrand }", "im
 change('src/core/app/loaders.ts', '  return session', `  const editorBindings = requestBindings() as ReturnType<typeof requestBindings> & { EDITOR_MANAGEMENT_ORIGIN?: string; EDITOR_INSTALLATION_ID?: string }
   return {...session,editorEnabled:Boolean(editorBindings.EDITOR_MANAGEMENT_ORIGIN && editorBindings.EDITOR_INSTALLATION_ID)}`);
 change('src/routes/app.tsx','  const business = Route.useLoaderData()', '  const business = Route.useLoaderData()\n  const { editorEnabled } = Route.useRouteContext()');
-change('src/routes/app.tsx','    <Outlet />','    {editorEnabled && <EditorShell />}<Outlet />');
+// This consumer's compiled edits address the first native main child. Keep
+// that leaf before the Business workspace without dropping either surface.
+change('src/routes/app.tsx','    <Outlet />','');
+change('src/routes/app.tsx','  return <>','  return <>\n    {editorEnabled && <EditorShell />}<Outlet />');
 // The sign-in page is operator-auth's server-rendered page, outside the route tree and the editor.
 for(const file of ['app.index.tsx','records.tsx','reference.tsx']) {
  const path=join(seed,'src/routes',file);let text=readFileSync(path,'utf8');text="import { useLeaf } from '../editor-shell'\n"+text;text=text.replace(/(function [A-Z][A-Za-z]+\(\) \{)/,'$1\n  useLeaf()');writeFileSync(path,text);
