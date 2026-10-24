@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
 import { codeChipBreaksWord, commandBlocks, runLayoutTheme } from './fixtures/run-page.mjs';
 import { headerLayout, splitCardLayout } from './fixtures/contract-page.mjs';
+import { parseContract } from '../foundation/runtime/seed-contract.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -52,8 +53,8 @@ test('built run-site uses US dates and keeps the one-line command start together
  const identity = join(f.root, 'src/core/app/identity.ts'), theme = join(f.root, 'public/rer-theme.css');
  await writeFile(identity, (await readFile(identity, 'utf8')).replace("product: 'Default seed'", "product: 'Chest'"));
  await writeFile(theme, await readFile(theme, 'utf8') + runLayoutTheme);
- // This fixture has documentation, so its header exercises all three links.
- await writeFile(f.pages, (await readFile(f.pages, 'utf8')).replace('pages: [', "pages: [{ path: '/docs', html: '<!doctype html><title>Docs</title><h1>Documentation</h1>' },"));
+ // A seed with docs and no install article serves Base's moved-page helper.
+ await writeFile(f.pages, (await readFile(f.pages, 'utf8')).replace('import { runPageHtml,', 'import { docsMovedHtml, runPageHtml,').replace('pages: [', "pages: [{ path: '/docs', html: '<!doctype html><title>Docs</title><h1>Documentation</h1>' }, { path: '/docs/getting-started', html: '<!doctype html><title>Getting started</title><h1>Getting started</h1>' }, { path: '/docs/install', html: docsMovedHtml(identity, run, '/docs/getting-started', 'Getting started') },"));
  await writeFile(join(f.root, 'public/favicon.svg'), await readFile(join(f.root, 'public/brand/mark.svg')));
  const result = await f.build({TZ:'America/Los_Angeles'});
  assert.equal(result.code, 0, result.stdout + result.stderr);
@@ -62,6 +63,13 @@ test('built run-site uses US dates and keeps the one-line command start together
   const context = await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/Los_Angeles',permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
   await page.goto(preview.url + '/contract');
   const contractDate = { text:await page.locator('time').textContent(), datetime:await page.locator('time').getAttribute('datetime'), dataDate:await page.locator('#progress').getAttribute('data-date') };
+  const moved = await context.request.get(preview.url + '/docs/install');
+  assert.equal(moved.status(), 200);
+  const movedHtml = await moved.text();
+  assert.match(movedHtml, /http-equiv="refresh"/);
+  assert.match(movedHtml, /rel="canonical" href="\/docs\/getting-started"/);
+  await page.goto(preview.url + '/docs/install');
+  await page.waitForURL(preview.url + '/docs/getting-started');
   await page.goto(preview.url + '/run');
   await page.evaluate(() => document.fonts.ready);
   assert.deepEqual(await page.locator('link[rel=icon], link[rel=apple-touch-icon]').evaluateAll(links => links.map(link => ({ href: link.getAttribute('href'), sizes: link.getAttribute('sizes') }))), [{ href: '/favicon.svg', sizes: 'any' }], 'the built shared head selects the existing small icon instead of the full mark');
@@ -102,12 +110,27 @@ test('built run-site uses US dates and keeps the one-line command start together
   }
   // Exercise the same built run site with both kinds populated, using the
   // existing full contract fixture rather than a hand-built card fragment.
-  await writeFile(join(f.root, 'CONTRACT.md'), await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md')));
+  const slate = await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md'), 'utf8');
+  // Expand a "see the clause" gap to that clause's own full text, exercising
+  // long-form gaps without inventing a second contract or changing its status.
+  const long = parseContract(slate).clauses.find(clause => clause.id === 'COLLAB-001');
+  await writeFile(join(f.root, 'CONTRACT.md'), slate.replace(/^(\| `COLLAB-001`[^\n]*?)\| see the clause \|/m, (_, row) => `${row}| ${long.text.replace(/\s+/g, ' ').replaceAll('|', '\\|')} |`));
   const contractBuild = await f.build();
   assert.equal(contractBuild.code, 0, contractBuild.stdout + contractBuild.stderr);
   await page.reload();
-  await page.getByRole('navigation', {name:'Site', exact:true}).getByRole('link', {name:'Contract', exact:true}).click();
+  await page.getByRole('navigation', {name:'Site', exact:true}).getByRole('link', {name:'Roadmap', exact:true}).click();
   await page.evaluate(() => document.fonts.ready);
+  const rendered = await page.locator('body').textContent();
+  assert.doesNotMatch(rendered, /\b[0-9a-f]{7,40}\b|\b(?:src|tests)\/|\b[\w./-]+\.(?:ts|mjs|sql)\b/i);
+  assert.equal(await page.locator('[data-commit], a[href*="/commit/"]').count(), 0);
+  const disclosure = page.locator('details.gap').first();
+  assert.ok(await disclosure.count(), 'long product gaps are disclosed on request');
+  await disclosure.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await disclosure.getAttribute('open'), '');
+  assert.ok(await disclosure.locator('p').isVisible());
+  await page.keyboard.press('Space');
+  assert.equal(await disclosure.getAttribute('open'), null);
   assert.equal(await page.locator('.card.split > div').count(), 2, 'both clause kinds are visible');
   for (const width of [860, 1000, 1160]) {
    await page.setViewportSize({width,height:900});
@@ -117,7 +140,7 @@ test('built run-site uses US dates and keeps the one-line command start together
    assert.equal(layout.sideways, false, `split-card sideways overflow at ${width}px`);
    assert.equal(layout.pageSideways, false, `contract sideways overflow at ${width}px`);
   }
-  // The header keeps its links on screen at the narrowest phone: Docs, Contract and Source beside a long name wrap below it.
+  // The header keeps its links on screen at the narrowest phone: Docs, Roadmap and Source beside a long name wrap below it.
   for (const path of ['/contract', '/run']) {
    await page.goto(preview.url + path);
    await page.setViewportSize({width:320,height:700});
