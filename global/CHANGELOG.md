@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Replace the shared Run page with a three-way chooser, exact one-line Copy, listing-aware Assisted and Managed links, and a shared sign-up switch for the hosting guide.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.
