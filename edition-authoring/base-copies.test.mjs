@@ -489,7 +489,7 @@ test('declared Purse-shaped adaptations survive refresh while untouched copies a
     for (const name of adapted) write(seed, name, `Seed adaptation ${name}\n`);
     ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
     ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
-    write(base, 'modules/sample/index.mjs', 'updated untouched copy\n');
+    write(base, 'modules/sample/index.mjs', '// updated untouched copy\n');
     write(base, adapted[0], 'changed upstream workflow\n');
     write(base, 'src/base/untouched.ts', 'updated untouched sibling\n');
     fs.rmSync(path.join(base, adapted[1]));
@@ -508,7 +508,7 @@ test('declared Purse-shaped adaptations survive refresh while untouched copies a
     assert.deepEqual(report.adapted.filter(item => item.conflict).map(item => item.path).sort(), adapted.slice(0, 3).sort());
     assert.ok(report.adapted.filter(item => item.conflict).every(item => item.diffHint.includes(next)));
     for (const name of adapted) assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), `Seed adaptation ${name}\n`);
-    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), 'updated untouched copy\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), '// updated untouched copy\n');
     assert.equal(fs.readFileSync(path.join(seed, 'src/base/untouched.ts'), 'utf8'), 'updated untouched sibling\n');
     assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
@@ -537,12 +537,12 @@ test('adaptations require renewed acknowledgement when local bytes or mode chang
     const record = ['--record', recordPath];
     ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base, ...record);
     ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base, ...record);
-    write(seed, name, 'acknowledged seed implementation\n');
+    write(seed, name, '// acknowledged seed implementation\n');
     ok(seed, 'adapt-base', name, ...record);
-    write(seed, name, 'later seed implementation\n');
-    write(base, 'modules/sample/index.mjs', 'upstream implementation changed\n');
-    write(base, 'modules/sample/lib/util.mjs', 'updated untouched sibling\n');
-    write(base, 'tools/helper.mjs', 'updated untouched copy\n');
+    write(seed, name, '// later seed implementation\n');
+    write(base, 'modules/sample/index.mjs', '// upstream implementation changed\n');
+    write(base, 'modules/sample/lib/util.mjs', '// updated untouched sibling\n');
+    write(base, 'tools/helper.mjs', '// updated untouched copy\n');
     const next = commit(base);
     const before = fs.readFileSync(recordFile);
     const refused = run(seed, 'refresh-base', next, '--base', base, ...record);
@@ -564,9 +564,9 @@ test('adaptations require renewed acknowledgement when local bytes or mode chang
     acknowledge();
     const refreshed = ok(seed, 'refresh-base', next, '--base', base, ...record);
     assert.equal(refreshed.adapted.find(item => item.path === name).conflict, true);
-    assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), 'later seed implementation\n');
-    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/lib/util.mjs'), 'utf8'), 'updated untouched sibling\n');
-    assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'updated untouched copy\n');
+    assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), '// later seed implementation\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/lib/util.mjs'), 'utf8'), '// updated untouched sibling\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), '// updated untouched copy\n');
     assert.equal(ok(seed, 'verify-base', '--base', base, ...record).ok, true);
     const unchanged = fs.readFileSync(recordFile);
     ok(seed, 'refresh-base', next, '--base', base, ...record);
