@@ -7,13 +7,13 @@ import { decorateLabel } from '../label.mjs';
 const require = createRequire(new URL('../../../default-seed/package.json', import.meta.url));
 const { chromium } = require('@playwright/test');
 
-test('demo and dev titles stay singular through empty titles, mode switches and head mutations', async () => {
+test('demo decoration keeps singular titles and its run exit through client navigation', async () => {
   const server = createServer(async (request, response) => {
     const url = new URL(request.url!, 'http://localhost');
     const title = url.searchParams.has('title') ? `<title>${url.searchParams.get('title')}</title>` : '';
-    const decorated = await decorateLabel(new Response(`<head>${title}</head><body></body>`, {
+    const decorated = await decorateLabel(new Response(`<head>${title}</head><body><nav><a href="/app" data-rer-name>Workspace</a></nav></body>`, {
       headers: { 'content-type': 'text/html', 'content-security-policy': "default-src 'none'; script-src 'none'; style-src 'none'" },
-    }), url.searchParams.get('mode'));
+    }), url.searchParams.get('mode'), { name: 'Example', url: 'https://run-example.test/run' });
     response.writeHead(decorated.status, Object.fromEntries(decorated.headers));
     response.end(await decorated.text());
   });
@@ -34,6 +34,15 @@ test('demo and dev titles stay singular through empty titles, mode switches and 
         assert.equal(html.match(/<title>(.*?)<\/title>/s)?.[1], input === null ? undefined : expected, 'server title has one suffix and no empty-name separator');
         await page.goto(url);
         assert.equal(await page.title(), expected);
+        const exits = page.locator('[data-rer-demo-exit]');
+        if (mode === 'Demo') {
+          await exits.waitFor();
+          assert.equal(await exits.getAttribute('href'), 'https://run-example.test/run');
+          assert.equal(await page.locator('nav > a[href="/app"]').count(), 1, 'the product navigation remains');
+          await page.evaluate(() => { document.querySelector('nav')!.innerHTML = '<a href="/app" data-rer-name>Another workspace</a>'; });
+          await exits.waitFor();
+          assert.equal(await exits.count(), 1, 'client navigation keeps one exit per marked product label');
+        } else assert.equal(await exits.count(), 0, 'ordinary dev has no demo exit');
         await page.evaluate(title => {
           if (title === null) document.querySelector('title')?.remove();
           else document.title = title;

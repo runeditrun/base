@@ -9,10 +9,11 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  // Old releases wrote sizing and mode selectors. Consume their removal here
  // so pinning this release needs no per-seed declaration edit.
  const { instanceType: retiredSize, mode: retiredMode, ...nativeDeclaration } = declaration;
+ if (nativeDeclaration.runUrl === undefined && project.adapter.site?.declaration) nativeDeclaration.runUrl = `https://${(await read(project.adapter.site.declaration)).domain}/run`;
  if (retiredSize !== undefined || retiredMode !== undefined) store.report('Hosted demos now use the native Loader host; remove the retired instanceType and mode keys from deploy-demo.json.');
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, hostVariables: app.container?.hostVariables, declaration: nativeDeclaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }
- catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds version, domain, name, and optionally maxInstances, ownerEmail and plain settings.`); }
+ catch (error) { throw invalid(`The demo deploy declaration is invalid (${error.message}). deploy-demo.json holds version, domain, name, and optionally maxInstances, ownerEmail, runUrl and plain settings.`); }
  if (options.remove) return removeDemo(plan, store, signal);
  if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const supplied = process.env.RER_DEMO_MEASUREMENT_TOKEN?.trim();
