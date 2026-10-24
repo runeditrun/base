@@ -1,8 +1,9 @@
 # rer
 
 `rer` is the Run Edit Run command. Install it once, then run `rer <verb>` in any
-Run Edit Run checkout: every verb runs that checkout's own pinned copy, so a
-checkout always gets the behaviour it was built and tested with.
+Run Edit Run checkout. Checkout verbs run its own pinned copy, so it gets the
+behaviour it was built and tested with. Global commands such as `rer upgrade`
+and signed release acquisition run the installed CLI.
 
 For source authors, `rer adopt-edition` adds a recipe and lock to existing tracked
 seed source while preserving copy/composition provenance. `rer refresh-base
@@ -45,6 +46,21 @@ reused; any other non-empty folder is refused. Inside a checkout, the commands
 without a repository work as before. Dev follows the usual terminal behaviour:
 Ctrl-C stops a foreground app; without a terminal it returns once ready and
 leaves the app running. The restart command includes `cd` into the checkout.
+
+To start a verified publisher-signed release:
+
+```sh
+rer dev just-every/run-slate --release v0.3.0
+rer dev just-every/run-slate --release FULL_COMMIT --dir slate
+```
+
+The release must have a signed `rer-release.dsse.json` asset on GitHub. Rer
+checks its repository, tag and commit against the production publisher anchors
+bundled in the package before installing or running project code. A new clone's
+default branch starts at that commit, and `.rer/release.json` records the
+verified release. An existing checkout of that release is reused without
+resetting its owner commits or private state; a different existing checkout is
+refused. `--anchors FILE` selects trusted anchors for a community publisher.
 
 Install `rer` with one of these commands:
 
@@ -114,12 +130,15 @@ install in place.
 Not supported: native Windows (`install.sh` and `rer` say to use WSL2), and
 `OPERATIONS.json` version 1 projects.
 
-## Update
+## Update rer
 
 ```sh
 rer update               # the latest published version
 rer update --version X   # exactly X
 ```
+
+`rer update` updates the CLI itself. `rer upgrade` updates the application in a
+checkout.
 
 `rer update` follows the way `rer` was installed. A user install (`npx` or
 `install.sh`) downloads the version from the registry, checks it as `install.sh`
@@ -136,6 +155,38 @@ In a terminal, `rer` checks the registry at most once a day and prints one line
 when a newer version is published. It never prints in `--json` output or when
 output is not a terminal, never delays a command by more than about 1.5 seconds,
 and `RER_NO_UPDATE_CHECK=1` turns it off.
+
+## Upgrade an application
+
+Run these inside a checkout acquired at a signed release:
+
+```sh
+rer upgrade --check                 # check the signed release without applying it
+rer upgrade                        # apply the latest signed release
+rer upgrade --to FULL_COMMIT        # apply a specific signed release commit
+rer upgrade --continue              # finish an integration on the update branch
+rer upgrade --restore BACKUP        # restore a retained local backup
+rer upgrade --json                  # closed machine-readable events and result
+rer upgrade --anchors FILE          # trust this publisher anchor file
+rer upgrade --allow-data-change TABLE
+```
+
+The checkout must be clean and on a branch. Rer fetches and verifies releases
+from its recorded GitHub origin, merges owner commits with the release, and
+preserves existing migration history. Conflicts leave the original checkout
+unchanged and an update branch for your agent to integrate before
+`rer upgrade --continue`.
+
+Before installing, rer stops the app and snapshots its local state. It installs
+through the checkout's dispatcher, applies migrations, starts the app and checks
+health and prior table counts. A failure after switching restores the previous
+commit and state. The last two backups stay on this computer. A previously
+stopped app is stopped again after verification.
+
+`--allow-data-change TABLE` permits a reviewed table-count decrease only from a
+TTY; background supervisors cannot pass it. JSON events contain safe phase and
+result fields, without private settings, paths or sign-in links. Keep anchor
+files you supply under your own control.
 
 ## Launch a checkout
 
@@ -302,6 +353,8 @@ line that still names it. A later refresh is a version bump:
 
 | Import | What it gives | Vendored path it replaces |
 | --- | --- | --- |
+| `@runeditrun/rer/local-run` | `setupRelease`, `upgrade`: signed local setup and upgrade APIs with closed phase events | Global CLI API |
+| `@runeditrun/rer/modules/release/anchors/production.json` | Bundled production publisher trust anchors | Global release trust |
 | `@runeditrun/rer/adapter` | `commandAdapter` | `scripts/base-cli/cli/adapter.mjs` |
 | `@runeditrun/rer/deploy` | `ownerDeploy` | `scripts/base-cli/cli/deploy.mjs` |
 | `@runeditrun/rer/portability` | `localPortability` | `scripts/base-cli/cli/portability.mjs` |
@@ -380,7 +433,7 @@ there lists its flags:
 `export`, `import`, `doctor`, `describe`, `check`, `release`,
 `release sign`, `release receipt` and `release keygen`.
 
-Anywhere: `rer list [DIR]`, `rer cli status|install|uninstall`, `rer update`,
+Global commands: `rer upgrade` (inside a checkout), `rer list [DIR]`, `rer cli status|install|uninstall`, `rer update`,
 `rer queue NAME -- COMMAND`, `rer --version` and `rer --help`.
 
 Licence: MIT.
