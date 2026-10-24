@@ -24,8 +24,8 @@ export async function identity() {
   } };
 }
 
-export async function alive(owner) {
-  const current = await processInfo(owner.pid);
+export async function alive(owner, inspection) {
+  const current = await processInfo(owner.pid, inspection);
   if (!current || current.zombie || current.start !== owner.start) return false;
   if (!owner.socket || !owner.token) throw Error('Lease lacks lifetime identity');
   return new Promise((resolve, reject) => {
@@ -41,7 +41,7 @@ export async function alive(owner) {
         // busy owner can answer late. Neither proves death: reclaim only a process
         // that is gone; otherwise retain the owner until the next sample.
         try {
-          const after = await processInfo(owner.pid);
+          const after = await processInfo(owner.pid, inspection);
           resolve(Boolean(after && !after.zombie && after.start === owner.start));
         } catch (failure) { reject(failure); }
       }

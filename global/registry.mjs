@@ -16,9 +16,8 @@ export async function liveServers(env = process.env) {
  for (const record of state.running ?? []) {
   // An identity that cannot be verified is kept, as the dispatchers keep it,
   // and so is one the process table does not answer for within a few seconds.
-  let running = true, timer;
-  try { running = await Promise.race([alive(record.owner), new Promise(resolve => { timer = setTimeout(resolve, 3500, true); })]); } catch {}
-  clearTimeout(timer);
+  let running = true;
+  try { running = await alive(record.owner, { bound: 3000 }); } catch {}
   if (running) live.push(record);
  }
  return live;

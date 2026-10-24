@@ -92,7 +92,13 @@ export async function checkoutRepository({ url, root, directory, repository = ur
  // that is itself partial chains one git process per missing object. Git's
  // own progress shows only in a terminal.
  const partial = url.startsWith('file:') ? [] : ['--filter=blob:none'];
- const code = await runCommand('git', ['clone', ...partial, ...(process.stderr.isTTY ? [] : ['--quiet']), '--', url, root]);
+ let heartbeat = setTimeout(function waiting() {
+  report(`still getting ${repository} into ${directory}`);
+  heartbeat = setTimeout(waiting, 20000);
+ }, 5000);
+ let code;
+ try { code = await runCommand('git', ['clone', ...partial, ...(process.stderr.isTTY ? [] : ['--quiet']), '--', url, root]); }
+ finally { clearTimeout(heartbeat); }
  if (code !== 0) throw refuse(`Could not clone into ${directory}. Check the git URL and access, then rerun the command.`);
 }
 

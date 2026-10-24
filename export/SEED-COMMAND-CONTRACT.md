@@ -383,6 +383,21 @@ For an optional canonical public origin, declare `"publicOriginSetting": "PUBLIC
 
 A seed's own deploy hook (the `commandAdapter` option `deploy`) returns `{deployed: true, origin}` once its upload is live (an https origin; rer refuses an http one off loopback before sending it anything), plus `setupToken`, the setup token its Worker holds, when that is not the `SETUP_TOKEN` rer passed it in the environment. `rer deploy` then waits until the origin's `/health` names the checkout's commit and claims the owner with that token, needing no deployment record from the hook. A hook that deploys with the kit under its own state file also returns that file as `state` (the kit's `deploy` result names it); rer then reads that record for every later step, so it issues, claims with and retires the setup token, and `--set-secret`, `--unset-secret` and `rer deploy --remove --yes` act on what the hook deployed.
 
+When a hosted owner claim returns a session cookie, rer revokes that session
+before reporting success. The adapter's `hooks.owner.signOutPath` declares the
+revoking route; function owner hooks declare the same property on the function.
+Without a declaration rer tries `/auth/signout`, then `/api/auth/logout` only
+when the first route answers 404 or 405. Both routes must implement server-side
+session revocation; the compatibility route supports native accounts such as
+Slate's. An explicit declaration never falls back. It must be an absolute
+same-app path without a query or fragment. rer POSTs `{}` with the claim cookies and the deployment Origin,
+without following redirects. The route must revoke the server session and
+return 204. Missing routes after the permitted compatibility attempt, redirects,
+other statuses and network failures fail owner finalization; discarding cookies
+does not retire a session.
+Applications with native accounts must expose or declare their actual revoking
+route before deployment can complete.
+
 For a hosted owner claim, deploy reuses the name saved by `rer setup` in the
 checkout's `.seed/installer/setup-answers.json`, under the adapter's
 `input.names.name` field (default `displayName`). If no name is known,

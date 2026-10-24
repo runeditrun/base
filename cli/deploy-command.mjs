@@ -125,7 +125,7 @@ export async function deployCommand(context) {
  let deployed, claimed, linked = false, linkResult, step = 'custom deploy';
  const link = async (token, origin) => { if (!linked) { const state = await inspect(origin); linkResult = await linkDependencies?.(state?.origin ?? origin, token); linked = true; } return linkResult; };
  try {
-  const result = await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret, deployed: () => deployed, tokenKey: setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField, report: line => store.report(line) }, async claims => {
+  const result = await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret, deployed: () => deployed, tokenKey: setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField, signOutPath: adapter.hooks?.owner?.signOutPath }, async claims => {
    observedClaims = claims;
    const saved = { ...process.env };
    try {
