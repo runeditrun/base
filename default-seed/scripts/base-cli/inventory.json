@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc957441a",
+  "cliVersion": "0.2.79-dev.gf9e1e792",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -269,7 +269,11 @@
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
-      "sha256": "946adc2e484ace3dfee960a58a6215fa55a600079aa7e2cf52264704ece74998"
+      "sha256": "2aa43379cfd4bb29b3b5ee42cff9d938085560c68be2a12f3883408987641195"
+    },
+    "schema/business-field-inputs.mjs": {
+      "source": "onboarding/schema/business-field-inputs.mjs",
+      "sha256": "02ec0a4f21bfff9008c306b7a2fa6dea9fe0ea6584f13da7978e5ef45a054e60"
     },
     "schema/dependencies.mjs": {
       "source": "onboarding/schema/dependencies.mjs",
@@ -277,11 +281,11 @@
     },
     "schema/json-schema.mjs": {
       "source": "onboarding/schema/json-schema.mjs",
-      "sha256": "243b8808b3a6540c8ccec586b69dc16c09d53c965863e5478d5dc1fbd229a5ae"
+      "sha256": "f964a1f8bab23bfad0c8b6552d8e717091619fa438e0d6e65a9801e1d97782bc"
     },
     "schema/setup-validation.mjs": {
       "source": "onboarding/schema/setup-validation.mjs",
-      "sha256": "7ee1a46a742570cd5d3df605732c0777473f419f7b63b6c5ad1c238406a1625f"
+      "sha256": "339797a913d8bf0899ae8a5d0ce861a370101a2349b2bbfbee301db658d14ca7"
     },
     "secrets.mjs": {
       "source": "onboarding/secrets.mjs",
@@ -289,11 +293,11 @@
     },
     "server.mjs": {
       "source": "onboarding/server.mjs",
-      "sha256": "307ea35fa6791bc6359ace47d81debd09813183190b470744c54719a479324c4"
+      "sha256": "fdc84158170d44c4ff9c87301c7209468c0ffbaab9c086d6be722be0e74c229f"
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
-      "sha256": "ef2c2e358e3913ba4fc176051496d01d544ba17febc143b1a94089f2e9c7de0c"
+      "sha256": "46cd56ab6ff6d36e2c045334ce48521f682812d359f97d7e34b9243eb70d16de"
     },
     "start-origin-diagnostic.mjs": {
       "source": "onboarding/start-origin-diagnostic.mjs",
