@@ -57,7 +57,10 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
     await runtime.close(); runtime = null
 
     const trust = testTrust(), ownerCookie = await boot({ RER_BUSINESS_TRUST: JSON.stringify(trust) })
-    assert.equal(await runtime.call('/rer-business.css').then(response => response.text()), '')
+    // Static app rules are served before adoption; no Business accent is set.
+    const unbrandedCss = await runtime.call('/rer-business.css')
+    assert.equal(unbrandedCss.headers.get('content-type'), 'text/css; charset=utf-8')
+    assert.doesNotMatch(await unbrandedCss.text(), /--rer-business-accent:/)
     const beforeHomepage = await capture('/', 'homepage-before')
     const logoBytes = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><defs><path id="leaf" d="M55 22C24 20 20 40 27 55c22 5 34-10 28-33Z"/></defs><rect width="80" height="80" rx="16" fill="#245943"/><use href="#leaf" fill="#fff"/></svg>')
     const logo = { sha256: digest(logoBytes), type: 'image/svg+xml', bytes: logoBytes.length }
