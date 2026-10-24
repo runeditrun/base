@@ -8,9 +8,14 @@ export const DEMO_FILES = ['worker.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs
 const FRONT_SET = /^(?:RER_.*|SESSION_SECRET|SETUP_TOKEN|OWNER_EMAIL)$/;
 const SECRET = /SECRET|TOKEN|PASSWORD|_KEY$/;
 export function demoDeclaration(value, originVar) {
-  assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'ownerEmail', 'settings'].includes(key)), 'invalid-demo-declaration');
+  assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'ownerEmail', 'settings', 'runUrl'].includes(key)), 'invalid-demo-declaration');
   siteDeclaration({ version: 1, domain: value.domain });
   assert(typeof value.name === 'string' && value.name.trim() === value.name && value.name.length > 0 && value.name.length <= 60 && !/[\p{Cc}\p{Cf}]/u.test(value.name), 'invalid-demo-name');
+  const runUrl = value.runUrl ?? `https://${value.domain}/run`;
+  let run;
+  try { run = new URL(runUrl); } catch { assert(false, 'invalid-demo-run-url'); }
+  assert(typeof runUrl === 'string' && run.protocol === 'https:' && !run.username && !run.password && run.pathname === '/run' && !run.search && !run.hash, 'invalid-demo-run-url');
+  siteDeclaration({ version: 1, domain: run.hostname });
   const maxInstances = value.maxInstances ?? 10;
   assert(Number.isSafeInteger(maxInstances) && maxInstances >= 1 && maxInstances <= 100, 'invalid-demo-max-instances');
   const ownerEmail = value.ownerEmail;
@@ -18,13 +23,13 @@ export function demoDeclaration(value, originVar) {
   const settings = value.settings ?? {};
   assert(settings && typeof settings === 'object' && !Array.isArray(settings) && Object.entries(settings).every(([name, setting]) =>
     /^[A-Z][A-Z0-9_]{0,63}$/.test(name) && !FRONT_SET.test(name) && !SECRET.test(name) && name !== originVar && typeof setting === 'string' && setting.length <= 1024), 'invalid-demo-settings');
-  return { domain: value.domain, name: value.name, maxInstances, ownerEmail, settings };
+  return { domain: value.domain, name: value.name, runUrl, maxInstances, ownerEmail, settings };
 }
 
 /** The demo Worker's name and its Wrangler configuration; no provider request. */
 export function demoPlan({ project, environment, compatibilityDate, originVar, hostVariables = [], declaration, turnstileSiteKey }) {
   assert(/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate ?? '') && /^[A-Z][A-Z0-9_]{0,63}$/.test(originVar ?? ''), 'invalid-plan');
-  const { domain, name, maxInstances, ownerEmail, settings } = demoDeclaration(declaration, originVar);
+  const { domain, name, runUrl, maxInstances, ownerEmail, settings } = demoDeclaration(declaration, originVar);
   // Keep the historical container name in the ownership hash for released hosts.
   const worker = `${ownerWorkerName(project, environment)}--demo`, hostname = `demo.${domain}`, container = worker.replace(/-+/g, '-');
   assert(resourceName(worker), 'owner-name-too-long');
@@ -44,7 +49,7 @@ export function demoPlan({ project, environment, compatibilityDate, originVar, h
     name: worker, main: 'worker.mjs', compatibility_date: compatibilityDate, workers_dev: false, preview_urls: false,
     routes: hostnames.map(pattern => ({ pattern, custom_domain: true })),
     observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },
-    vars: { DEMO_ORIGIN: `https://${hostname}`, DEMO_SITE: `https://${domain}`, DEMO_NAME: name, DEMO_ORIGIN_VAR: originVar, DEMO_MAX_INSTANCES: String(maxInstances), DEMO_SETTINGS: JSON.stringify(settings), DEMO_SECONDARY_ORIGINS: JSON.stringify(secondaryHosts.map(host => `https://${host}`)),
+    vars: { DEMO_ORIGIN: `https://${hostname}`, DEMO_SITE: `https://${domain}`, DEMO_NAME: name, DEMO_RUN_URL: runUrl, DEMO_ORIGIN_VAR: originVar, DEMO_MAX_INSTANCES: String(maxInstances), DEMO_SETTINGS: JSON.stringify(settings), DEMO_SECONDARY_ORIGINS: JSON.stringify(secondaryHosts.map(host => `https://${host}`)),
       ...(ownerEmail ? { DEMO_OWNER_EMAIL: ownerEmail } : {}), ...(turnstileSiteKey ? { TURNSTILE_SITE_KEY: turnstileSiteKey } : {}) },
     durable_objects: { bindings: [{ name: 'DEMO', class_name: 'NativeDemo' }, { name: 'CAPACITY', class_name: 'DemoCapacity' }] },
     migrations: [{ tag: 'native-v2', new_sqlite_classes: ['NativeDemo', 'DemoCapacity'] }],

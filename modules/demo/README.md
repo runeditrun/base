@@ -28,7 +28,11 @@ Production build/deploy refuses that setting; ordinary builds keep real effects.
   Put `data-rer-name` on the product's text label, for example
   `<span data-rer-name>Uptime</span>`, to show **Uptime Demo** in its nav.
   The same attribute shows **Uptime Dev** under the local dev wrapper. No bar,
-  layout offset or timer is injected. CSS adds the label suffix without
+  layout offset or timer is injected. In demo mode a **Run <Seed>** link sits
+  beside each marked navigation label and opens `https://<domain>/run`. The
+  existing `demoSockets()` Vite plugin supplies the public `name` and canonical
+  run-site `domain` from `deploy-demo.json` and `deploy-site.json`; an explicit
+  `runUrl` in the demo declaration takes precedence. No per-seed link is required. CSS adds the label suffix without
   changing the application's hydrated text; CSP allows exact hashes only.
 
 Public sockets, WebSockets and event streams remain usable for checks. The

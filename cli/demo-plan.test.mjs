@@ -18,7 +18,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  const primary = 'demo.test.run-fixture.test', page = `page.${primary}`, status = `status.${primary}`;
  const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN',
   platforms: ['workers'], container: { hostVariables: ['STATUS_HOST', 'APP_HOST', 'PAGE_HOST', 'PAGE_ALIAS'] } };
- const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture', instanceType: 'standard-1',
+ const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture', instanceType: 'standard-1', runUrl: 'https://run-fixture.test/run',
   settings: { APP_HOST: primary, PAGE_HOST: page, PAGE_ALIAS: page, STATUS_HOST: status, UNROUTED_HOST: 'outside.example.test' } };
  const configure = async (demo = declaration, deploy = app) => {
   await writeFile(join(root, 'owner-deployment.json'), JSON.stringify(deploy));
@@ -78,6 +78,10 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  await configure({ ...JSON.parse(JSON.stringify(declaration).replaceAll('demo.test.', 'demo.')), domain: 'run-fixture.test' });
  await execute('bash', ['-c', step], { cwd: root });
  assert.deepEqual(JSON.parse(await readFile(join(root, 'deploy-demo.json'), 'utf8')), declaration);
+ const scoped = await rer();
+ assert.equal(scoped.code, 0, scoped.stdout + scoped.stderr);
+ const scopedConfig = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8'));
+ assert.equal(scopedConfig.vars.DEMO_RUN_URL, 'https://run-fixture.test/run');
  await configure();
 
  const workerConfig = JSON.parse(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
@@ -87,6 +91,12 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  assert.match(missingClass.stdout + missingClass.stderr, /cannot bind COUNTER:.*MissingCounter/);
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify(workerConfig));
 
+ for (const runUrl of ['http://run-fixture.test/run', 'https://run-fixture.test/', 'javascript:alert(1)', 'https://user:password@run-fixture.test/run']) {
+  await configure({ ...declaration, runUrl });
+  const refused = await rer();
+  assert.equal(refused.code, 2);
+  assert.match(refused.stdout, /invalid-demo-run-url/);
+ }
  for (const value of [undefined, '', 'Page.' + primary, 'outside.example.test', primary + '.outside.test', 'other' + primary,
   'https://' + page, page + ':443', 'a'.repeat(64) + '.' + primary, 'bad..' + primary]) {
   await configure({ ...declaration, settings: { ...declaration.settings, PAGE_HOST: value } });
