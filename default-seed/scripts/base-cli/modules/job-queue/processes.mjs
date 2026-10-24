@@ -18,7 +18,11 @@ async function inspected(read, timeout = inspectionMs) {
   } finally { clearTimeout(timer); }
 }
 
-export async function processInfo(pid, timeout = inspectionMs) {
+export async function processInfo(pid) {
+  return processInfoWithin(pid, inspectionMs);
+}
+
+async function processInfoWithin(pid, timeout = inspectionMs) {
   if (!Number.isInteger(pid) || pid < 1) throw Error('Invalid process PID');
   timeout = Math.max(1, Math.min(timeout, inspectionMs));
   return inspected(() => inspectProcess(pid, timeout), timeout);
@@ -108,7 +112,7 @@ export async function stopGroup(owner, graceMs) {
   if (!Number.isInteger(owner.pgid) || owner.pgid < 2 || owner.pgid !== owner.pid)
     throw Error('Invalid lease process group');
   const verify = async (timeout) => {
-    const current = await processInfo(owner.pid, timeout);
+    const current = await processInfoWithin(owner.pid, timeout);
     return !current || (current.start === owner.start
       && (current.zombie || !owner.marker || current.title.includes(owner.marker)));
   };
