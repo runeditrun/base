@@ -1,9 +1,9 @@
 import { resolve } from 'node:path';
-import { commonFlags, serverDefaults, signinVerb, verbs } from './contract.mjs';
+import { authoringVerbs, commonFlags, serverDefaults, signinVerb, verbs } from './contract.mjs';
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
-const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo']);
+const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo', '--offline']);
 export const mailbox = value => typeof value === 'string' && value.length <= 254 && /^[a-zA-Z0-9.!+_%\-]+@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+$/.test(value);
 export const validOwnerName = value => typeof value === 'string' && Boolean(value.trim()) && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value);
 // A loopback host: the shared predicate (including `*.localhost` door names),
@@ -26,7 +26,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  // Independent projects own verb names; only the common wrapper flags apply
  // to unknown names. Profile resolution rejects undeclared commands later.
  if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run rer --help.');
- const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
+ const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
  let separator = false;
  for (let i = 0; i < args.length; i++) {
   const flag = args[i];
@@ -107,10 +107,10 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys(verbs).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n`;
- const known = verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n`;
+ const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
- return `${door}Usage: rer ${verb} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
+ return `${door}Usage: rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
 }
 
 function distance(a,b){let row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(next[j-1]+1,row[j]+1,row[j-1]+(a[i-1]===b[j-1]?0:1));row=next;}return row[b.length];}
