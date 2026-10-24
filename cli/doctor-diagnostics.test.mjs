@@ -54,7 +54,7 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  assert.equal(diagnostics.state.safe, false);
  assert.ok(diagnostics.state.issue.includes('dist'), 'the state issue names the overlapping location');
  assert.ok(diagnostics.pnpm.issue.includes('packageManager') && diagnostics.pnpm.issue.includes('pnpm --version'), 'the pnpm issue names the declaration to correct and the command that failed');
- assert.deepEqual([diagnostics.node.expected, diagnostics.node.actual], [pinnedNode, process.versions.node]);
+ assert.deepEqual(diagnostics.node, { actual: process.versions.node, expected: pinnedNode }, 'the Node check keeps its machine-readable shape');
  const human = await run([]);
  if (process.env.RER_TEST_EVIDENCE_DIRECTORY) await writeFile(join(process.env.RER_TEST_EVIDENCE_DIRECTORY, 'doctor-human.txt'), human);
  const summaryAt = human.lastIndexOf('\ndoctor:');

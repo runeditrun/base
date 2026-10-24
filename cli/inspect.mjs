@@ -244,7 +244,7 @@ export async function doctor(project, store, signal) {
  const inputs = project.profile === 'first-party' ? requiredLocalSettings(project, values) : [];
  const warnings = project.profile === 'first-party' ? await cacheWarnings(project.root) : [];
  return { dependencies, warnings, browser, operations: diagnostic, ok: browser?.ok !== false && !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
-  node: { actual: process.versions.node, expected: expectedNode, autoSelect: process.env.RER_NODE_AUTO !== '0' },
+  node: { actual: process.versions.node, expected: expectedNode },
   pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,
   ai: { issues: aiIssues },
   missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])], deploymentInputs,
@@ -253,10 +253,10 @@ export async function doctor(project, store, signal) {
 
 export function doctorSummary(result) {
  const lines = [result.ok ? 'Local checks passed.' : 'Local checks need attention.'];
- const { actual: node, expected: nodePin, autoSelect } = result.node;
+ const { actual: node, expected: nodePin } = result.node;
  if (nodePin === node) lines.push(`Node: ${node} (expected ${nodePin}).`);
- // rer's own commands switch to the pinned Node; only this shell's tools need a change.
- else if (nodePin) lines.push(`Node: this shell has ${node}; the project needs ${nodePin}.`, autoSelect
+ // rer's own commands switch to the pinned Node unless RER_NODE_AUTO=0; only this shell's tools need a change.
+ else if (nodePin) lines.push(`Node: this shell has ${node}; the project needs ${nodePin}.`, process.env.RER_NODE_AUTO !== '0'
   ? `  rer runs this checkout's commands with Node ${nodePin} by itself, downloading it once if needed. To run tools directly in this shell, switch it to Node ${nodePin}.`
   : `  Automatic Node selection is off (RER_NODE_AUTO=0): unset RER_NODE_AUTO so rer runs this checkout's commands with Node ${nodePin}, or switch this shell to Node ${nodePin}.`);
  if (result.pnpm) {

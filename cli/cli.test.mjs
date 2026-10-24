@@ -7,7 +7,7 @@ import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { exportCLI, inventory } from './export.mjs';
-import { parse } from './parse.mjs';
+import { parse, help } from './parse.mjs';
 import { verbs, commonFlags } from './contract.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 const base = resolve(import.meta.dirname, '..'), cli = join(base, 'bin/rer.mjs');
@@ -42,6 +42,8 @@ test('every command help is effect-free outside a checkout, before adapters and 
  const value = { '--cwd': '.', '--port': '4000', '--host': '127.0.0.1', '--idle-timeout': '60' };
  for (const flag of advertised) assert.doesNotThrow(() => parse(['demo', flag, ...(value[flag] ? [value[flag]] : [])]), flag);
  for (const flag of verbs.dev.flags.filter(flag => flag !== '--demo' && !advertised.includes(flag))) assert.throws(() => parse(['demo', flag, '1']), error => error.exitCode === 2 && error.message.includes('rer demo --help'), flag);
+ // rer dev --demo takes what rer demo takes.
+ for (const argv of [['--login'], ['--platform', 'container'], ['--as', 'owner']]) assert.throws(() => parse(['dev', '--demo', ...argv]), error => error.exitCode === 2 && error.message.includes('rer demo --help'), argv[0]);
  for (const argv of [['dev','--foreground','--help'], ['preview','--detach','--help']]) assert.equal(run(root,argv).status,0);
  assert.deepEqual(await readdir(root), []);
  await writeFile(join(root,'OPERATIONS.json'),'{invalid configuration');
@@ -51,14 +53,18 @@ test('every command help is effect-free outside a checkout, before adapters and 
 
 test('parsing rejects every unsupported flag, missing value, invalid host/port and duplicate before effects', () => {
  for (const verb of Object.keys(verbs)) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
- // A refusal suggests a flag only for a near miss; otherwise it names just the verb's help.
- const refusal = argv => { try { parse(argv); } catch (error) { return error.message; } assert.fail(`${argv.join(' ')} was accepted`); };
- for (const [verb, typed, meant] of [['dev', '--prot', '--port'], ['check', '--jsn', '--json'], ['deploy', '--dryrun', '--dry-run'], ['setup', '--email', '--owner-email'], ['export', '--out', '--output']]) assert.ok(refusal([verb, typed]).includes(meant), `${verb} ${typed}`);
- for (const [verb, typed] of [['check', '--frobnicate'], ['export', '--xyz'], ['install', '--verbose'], ['deploy', '--port'], ['check', 'positional'], ['dev', '3000']]) {
-  const message = refusal([verb, typed]);
-  assert.ok(message.includes(`rer ${verb} --help`), message);
-  assert.deepEqual(verbs[verb].flags.filter(flag => flag !== '--help' && message.includes(flag)), [], message);
- }
+ // A refusal names the verb's help, and a flag only for a near miss: one that verb's help lists.
+ const named = argv => {
+  try { parse(argv); } catch (error) {
+   assert.ok(error.message.includes(`rer ${argv[0]} --help`), error.message);
+   const flags = (error.message.match(/--[\w-]+/g) ?? []).filter(flag => flag !== argv[1] && flag !== '--help');
+   assert.ok(flags.every(flag => /^Flags: (.*)$/m.exec(help(argv[0]))[1].split(', ').includes(flag)), error.message);
+   return flags;
+  }
+  assert.fail(`${argv.join(' ')} was accepted`);
+ };
+ for (const [argv, meant] of [[['dev', '--prot'], '--port'], [['check', '--jsn'], '--json'], [['deploy', '--dryrun'], '--dry-run'], [['setup', '--email'], '--owner-email'], [['dev', '--timeout', '60'], '--idle-timeout'], [['import', '--legacy'], '--legacy-v1'], [['dev', '--port=3000'], '--port']]) assert.deepEqual(named(argv), [meant], argv.join(' '));
+ for (const argv of [['check', '--frobnicate'], ['export', '--xyz'], ['install', '--verbose'], ['deploy', '--port'], ['check', 'positional'], ['dev', '3000'], ['import', '--file'], ['install', '--queue'], ['dev', '--log'], ['deploy', '--remote'], ['deploy', '--name'], ['demo', '--dmeo']]) assert.deepEqual(named(argv), [], argv.join(' '));
  for (const argv of [['dev', '--port'], ['dev', '--port', '0'], ['dev', '--port', '65536'], ['dev', '--port', '1.5'], ['setup', '--owner-email', 'owner name <a@b.test>'], ['check', '--profile', 'independent'], ['dev', '--json', '--json']]) assert.throws(() => parse(argv), error => error.exitCode === 2);
  for (const host of ['0.0.0.0', '::', 'example.test', '[::1]']) assert.throws(() => parse(['dev', '--host', host]), error => error.exitCode === 4);
  assert.equal(parse(['dev', '--', '--port', '08787']).port, 8787);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g62def0d8",
+  "cliVersion": "0.2.79-dev.g78ee2503",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -855,7 +855,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "e4fe4e62f1bc5467aefcf4a02234b4817b4e6778f45cdfd02630b015807b5e39"
+      "sha256": "d0be0c74707d5647b789cf76311f53cb85723943ef47b56cb33806b0ecdc4681"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -919,7 +919,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "f6ce38021e5eee0ffbd45f3fa952e838f9bdc98c79f7e2498ad010738d21a960"
+      "sha256": "f02981d4e50038b97b95fba0891e8681ce60dd05a7eff63a42052e757172d12c"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
