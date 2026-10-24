@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gfa8fedef",
+  "cliVersion": "0.2.79-dev.g13aa95f8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3743,7 +3743,7 @@
     },
     "modules/release/vectors/generate.mjs": {
       "source": "modules/release/vectors/generate.mjs",
-      "sha256": "b35bea01dc1991cad02dabc4b487f258f11c22516892a555763c22aba2211d76"
+      "sha256": "e960932dee6cea3bbeea65429b41e0e250ee6b7190ce94ecb33fa8fe92f0bc04"
     },
     "modules/release/vectors/publisher-projects.mjs": {
       "source": "modules/release/vectors/publisher-projects.mjs",
