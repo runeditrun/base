@@ -173,7 +173,7 @@ export function header(identity: EditionIdentity, run: RunData, contract?: SeedC
 // The one-line alternative can break only before the repository; keep plain spaces for copying.
 const inlineStart = (run: RunData) => `<code><span class="code-word">${escape(npxStart)}dev</span> <span class="code-word">${escape(run.clone.slice(repoStart.length))}</span></code>`
 // Preserve install.sh | sh as one code word at narrow widths.
-const pipelines = (line: string) => escape(line).replace(/[^\s/]+(?: \| \S+)+/g, words => `<span class="code-word">${words}</span>`)
+const pipelines = (line: string) => escape(line).replace(/[^\s/]+(?: \| \S+)+/g, words => `<span class="code-word">${words}</span>`).replace('https://runeditrun.com/', 'https://runeditrun.com/<wbr>')
 const TICK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>'
 const codeBlock = (command: string, label: string) => `<div class="code"><pre aria-label="${escape(label)}"><code>${pipelines(command)}</code></pre>`
   + `<button class="copy" type="button" data-copy="${escape(command)}" hidden>${TICK}<span>${escape(PATHS.self.copy.idle)}</span></button><span class="sr-only" role="status" aria-live="polite"></span></div>`
