@@ -23,9 +23,9 @@ const unavailable = (operation, binary, result) => {
 
 // All process output stays in memory. In particular, never attach a child error:
 // OS tools may put credential material in their diagnostics.
-function execute(command, args, input, env) {
+function execute(command, args, input, env, { signal } = {}) {
  return new Promise(resolve => {
-  const child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(command, args, { env, signal, stdio: ['pipe', 'pipe', 'pipe'] });
   const out = [], err = []; let size = 0, failed = false;
   const timer = setTimeout(() => { failed = true; child.kill('SIGKILL'); }, 30000);
   const collect = list => chunk => { size += chunk.length; if (size > 262144) { failed = true; child.kill('SIGKILL'); } else list.push(chunk); };
@@ -55,7 +55,7 @@ function checkedSecret(secret) {
  * run is a process-edge seam for tests, not a selectable storage backend.
  */
 export function createCredentialStore({ platform = process.platform, env = process.env, run } = {}) {
- const command = run ?? ((binary, args, input) => execute(binary, args, input, env));
+ const command = run ?? ((binary, args, input, options) => execute(binary, args, input, env, options));
  if (!['darwin', 'linux'].includes(platform)) throw new Error('OS credential storage is available only on macOS (Keychain) and Linux (Secret Service). No credential was written to a file.');
  const binary = platform === 'darwin' ? 'security' : 'secret-tool';
  const call = async (operation, ...args) => {
@@ -66,11 +66,11 @@ export function createCredentialStore({ platform = process.platform, env = proce
  };
  const macArgs = handle => ['-s', service, '-a', handle];
  const linuxArgs = handle => ['application', service, 'handle', handle];
- async function get(handle) {
+ async function get(handle, options) {
   checkedHandle(handle);
   const result = platform === 'darwin'
-   ? await call('read', '/usr/bin/security', ['find-generic-password', ...macArgs(handle), '-w'])
-   : await call('read', 'secret-tool', ['lookup', ...linuxArgs(handle)]);
+   ? await call('read', '/usr/bin/security', ['find-generic-password', ...macArgs(handle), '-w'], undefined, options)
+   : await call('read', 'secret-tool', ['lookup', ...linuxArgs(handle)], undefined, options);
   if (platform === 'darwin' && result.code === 44 || platform === 'linux' && result.code === 1 && !result.stderr.trim()) return null;
   if (result.code !== 0) throw unavailable('read', binary, result);
   return result.stdout.replace(/\r?\n$/, '');

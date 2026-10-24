@@ -9,7 +9,9 @@ import {serverResources} from './server-resources.mjs';
 import { productionBuild } from './preview-cache.mjs';
 import {localSettingKeys} from './settings.mjs';
 import { shared } from './shared.mjs';
-import { availablePort,selectedOrigin,stateSafety,refuseLegacyProcess } from './local.mjs';
+import { availablePort,selectedOrigin,stateSafety,refuseLegacyProcess,materializeBusinessTrust } from './local.mjs';
+import { syncOnReady,syncFailure } from './business/sync.mjs';
+import { readPublicJson,membershipPath } from './business/public-config.mjs';
 import { tools } from './inspect.mjs';
 import { invalid,missing,refuse,RerError,lifecycleError } from './errors.mjs';
 import { processInfo } from '../modules/job-queue/processes.mjs';
@@ -93,6 +95,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   const {loadInstallerSeed}=await shared('setup-manifest.mjs');
   const seed=project.adapter.setup?await loadInstallerSeed(project.root,project.adapter):undefined;project.setupManifest=seed?.manifest;
   const keys=localSettingKeys(project);
+  if(options.verb==='dev'&&!options.demo)await materializeBusinessTrust(project);
   selected=await selectedOrigin(project,options);
   if(!selected.door)await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb});
   if(!selected.vars[keys.email])throw missing('Private owner settings are missing. Run rer setup first.');
@@ -169,7 +172,16 @@ async function emitReady(out,options,root,url,dev,siteUrl,demo){
   const {privateDirectory,writePrivateFile}=await shared('private-files.mjs');
   await writePrivateFile(join(await privateDirectory(root,['.rer','local']),'open-url'),dev.openUrl+'\n');
  }
+ // Snapshot membership before readiness so a subsequent manual join cannot
+ // race this startup into a second, concurrent pull. No network work here.
+ let membership,unreadable;
+ const business=options.verb==='dev'&&!options.demo;
+ if(business)try{membership=await readPublicJson(root,membershipPath);}catch{unreadable=true;}
  ready(out,url,dev||undefined,options.json,siteUrl,demo);
+ if(business){
+  const report=message=>options.json?out.event('business-sync',{message}):out.progress(message+'\n');
+  if(unreadable)report(syncFailure);else if(membership)void syncOnReady(root,url,report,membership);
+ }
 }
 async function devReady(url,key,options,signal){
  const as=options.as??'owner',persona=await resolvePersona(url,key,as,signal);
