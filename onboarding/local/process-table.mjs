@@ -89,18 +89,19 @@ export async function processStart(pid) {
   if (!validPid(pid)) throw new Error('Invalid process identity.')
   if (process.platform === 'linux') {
     let text
-    try { text = await readFile(`/proc/${pid}/stat`, 'utf8') } catch (error) {
+    try { text = await readFile(`/proc/${pid}/stat`, { encoding: 'utf8', signal: AbortSignal.timeout(3000) }) } catch (error) {
       if (error.code === 'ENOENT' || error.code === 'ESRCH') return undefined
       throw error
     }
     const fields = text.slice(text.lastIndexOf(')') + 2).trim().split(/\s+/)
     if (!/^\d+$/.test(fields[19] ?? '')) throw new Error('Invalid process identity.')
+    if (/^[ZX]$/i.test(fields[0])) return undefined
     return `linux:${fields[19]}`
   }
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['-o', 'lstart=', '-p', String(pid)], {
-      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, killSignal: 'SIGKILL', timeout: 5000,
+    ({ stdout } = await execute('/bin/ps', ['-o', 'lstart=', '-o', 'stat=', '-p', String(pid)], {
+      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, killSignal: 'SIGKILL', timeout: 3000,
     }))
   } catch (error) {
     // ps exits 1 when the PID does not exist.
@@ -108,7 +109,10 @@ export async function processStart(pid) {
     throw error
   }
   if (!stdout.trim()) return undefined
-  const started = Date.parse(`${stdout.trim()} UTC`)
+  const match = stdout.trim().match(/^(.{24})\s+(\S+)$/)
+  if (!match) throw new Error('Invalid process identity.')
+  if (/^[ZX]/i.test(match[2])) return undefined
+  const started = Date.parse(`${match[1]} UTC`)
   if (!Number.isFinite(started)) throw new Error('Invalid process identity.')
   return `ps:${started}`
 }

@@ -4,23 +4,23 @@ import { readOwnedGroup, sameProcess, validPid } from '../process-table.mjs'
 
 const graceMs = 750
 const cleanupMs = 7000
-const isZombie = (member) => member.state.startsWith('Z')
+const isZombie = (member) => /^[ZX]/i.test(member.state)
 const isStopped = (member) => /^[Tt]/.test(member.state)
 const key = (member) => `${member.pid}:${member.birth}`
 const isLeaf = (member, group) => !group.some((other) => other.ppid === member.pid)
 
-// Preserve the group leader until all descendants have disappeared, including
-// zombies. A living parent must get time to reap each child before it is stopped.
+// Preserve the group leader until all live descendants have exited. Exited
+// children cannot block a parent that does not reap them.
 export async function stopOwnedGroup(child, signal) {
   const pgid = child.pid
   if (!validPid(pgid)) throw new Error('Invalid owned process group.')
   const deadline = Date.now() + cleanupMs
-  let group = await readOwnedGroup(pgid)
+  let group = (await readOwnedGroup(pgid)).filter(member => !isZombie(member))
   if (!group.length) {
     // A final fork can overlap ps while the command exits. Observe its exit
     // first and confirm absence with another scan before claiming cleanup.
     await delay(25)
-    group = await readOwnedGroup(pgid)
+    group = (await readOwnedGroup(pgid)).filter(member => !isZombie(member))
     if (!group.length && (child.exitCode !== null || child.signalCode !== null)) return
   }
   const leader = group.find((member) => member.pid === pgid)
@@ -32,7 +32,7 @@ export async function stopOwnedGroup(child, signal) {
   let lastGroup = group
 
   const snapshot = async (limit = deadline) => {
-    const current = await readOwnedGroup(pgid, Math.min(1000, limit - Date.now()))
+    const current = (await readOwnedGroup(pgid, Math.min(1000, limit - Date.now()))).filter(member => !isZombie(member))
     if (Date.now() >= limit) throw new Error('Process inspection deadline expired.')
     const owner = current.find((member) => member.pid === pgid)
     // The unreaped, directly owned leader anchors the group identity. After

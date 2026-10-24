@@ -212,6 +212,14 @@ explicit recovery rather than adopted, moved or deleted silently. Reset uses
 the adapter's declared removal inventory and preserves source, dependencies,
 exports and deployment receipts.
 
+Cleanup counts only live owned processes. Zombie or dead states (`Z`/`X`) have
+already exited: they receive no signals, do not block parent escalation, and
+cannot cause a remaining-process failure. Node reaps its direct children before
+the command store finishes closing. Inspections have a three-second read bound;
+an unreadable table is marked unchecked and grants no signalling authority.
+Live children retain birth-identity checks and TERM-to-KILL escalation.
+
+
 ## Data, deployment and verification
 
 To back up and restore this installation, use the local archive runner. This
