@@ -18,7 +18,7 @@ export function resolveSources(root, retain = false, diagnostics = false, additi
   const recipe = manifest(root);
   const files = Object.assign(tracked(root, diagnostics), additionalFiles);
   // The recipe is input even before initial adoption has staged it.
-  files['edition.json'] = {data: fs.readFileSync(path.join(root, 'edition.json')).toString('base64'), executable: false};
+  files['edition.json'] ??= {data: fs.readFileSync(path.join(root, 'edition.json')).toString('base64'), executable: false};
   const components = [];
   for (const component of recipe.components) {
     const selected = component.source;

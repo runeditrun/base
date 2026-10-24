@@ -33,7 +33,7 @@ async function fixture(t) {
  fs.mkdirSync(path.join(seed, 'node_modules/@runeditrun'), {recursive: true}); fs.symlinkSync(pkg, path.join(seed, 'node_modules/@runeditrun/rer'));
  write(seed, 'rer-project.json', JSON.stringify({schema: 1, projectId: 'example/seed'}));
  write(seed, 'adapter.mjs', 'export const commandAdapter = {verbs: {}};\n');
- write(seed, 'OPERATIONS.json', JSON.stringify({version: 2, project: 'historical/seed', runtime: {requirements: []}, requiredEnvironment: [], seedContract: {version: 1, profile: 'first-party', adapter: 'adapter.mjs'}, commands: {}}));
+ write(seed, 'OPERATIONS.json', JSON.stringify({version: 2, project: 'historical/seed', runtime: {requirements: []}, requiredEnvironment: [], seedContract: {version: 1, profile: 'first-party', adapter: 'adapter.mjs'}, commands: {describe: {argv: ['node', 'app.mjs'], inputs: ['app.mjs'], effects: 'Read fixture metadata.'}}}));
  write(seed, 'composition.lock.json', '{"historical":true}\n');
  write(seed, 'app.mjs', 'export const app = true;\n');
  write(source, 'module/one.mjs', 'export const one = 1;\n'); write(source, 'module/two.mjs', 'export const two = 1;\n');
