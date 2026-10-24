@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, writeFile, rm, stat, symlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { credentialHandle } from './business/state.mjs';
 import { deployEnvironment } from './deploy-inputs.mjs';
@@ -12,6 +13,7 @@ import { renderConfig, bindingsFor } from '../modules/deploy-kit/render.mjs';
 import { withoutLocalSettings } from './local-env.mjs';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
+import { useWorkspaceDependencies } from './fixtures/workspace-dependencies.mjs';
 import { localVariables } from '../onboarding/local/environment.mjs';
 import { signSettings, testDocument, fixtureKeys } from '../modules/business-settings/testing/index.mjs';
 
@@ -19,7 +21,7 @@ const base = join(import.meta.dirname, '..');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 test('sync joins an existing checkout with verified scoped pairing, keeps public trust for dev and deploy, and a joined offline dev reaches ready', { timeout: 600_000 }, async t => {
- const directory = await mkdtemp(join(base, '.business-connect-sync-'));
+ const directory = await mkdtemp(join(tmpdir(), '.business-connect-sync-'));
  const home = join(directory, 'home'), root = join(directory, 'checkout');
  await mkdir(home); await mkdir(root);
  const children = new Set(), transcript = [];
@@ -30,7 +32,7 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
   }
   await rm(directory, { recursive: true, force: true });
  });
- const env = await isolatedQueue(t, { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1',
+ const env = await isolatedQueue(t, { PATH: process.env.PATH, HOME: home, CI: 'true', RER_NODE_AUTO: '0', RER_NO_UPDATE_CHECK: '1',
   NODE_OPTIONS: `--import=${join(import.meta.dirname, 'fixtures/business/register.mjs')}` });
  function start(entry, args, cwd = root) {
   const child = spawn('perl', ['-e', 'setpgrp(0,0); exec @ARGV', '--', process.execPath, entry, ...args], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -150,10 +152,12 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
 
  // Exercise the real maintained app and managed-server readiness hook offline.
  const runtime = join(directory, 'runtime'); await exportReference(base, runtime);
- await symlink(join(base, 'default-seed/node_modules'), join(runtime, 'node_modules'), 'dir');
+ await useWorkspaceDependencies(runtime);
+ const setup = start(join(runtime, 'scripts/rer.mjs'), ['setup', '--owner-email', 'sync-owner@example.test', '--non-interactive', '--json'], runtime);
+ assert.equal(await setup.done, 0, setup.output);
  await mkdir(join(runtime, '.rer'), { recursive: true });
  await writeFile(join(runtime, '.rer/business.json'), JSON.stringify({ v: 1, app: 'notes-one', seed: 'runeditrun/default-seed-reference' }), { mode: 0o600 });
- const dev = start(join(base, 'global/rer.mjs'), ['dev', '--cwd', runtime, '--foreground', '--json']);
+ const dev = start(join(runtime, 'scripts/rer.mjs'), ['dev', '--foreground', '--json'], runtime);
  const deadline = Date.now() + 480_000;
  while (!dev.output.split('\n').some(line => { try { return JSON.parse(line).event === 'ready'; } catch { return false; } })) {
   assert.equal(dev.exitCode, null, 'the real app reaches readiness'); assert.ok(Date.now() < deadline, 'real app readiness deadline'); await delay(100);
