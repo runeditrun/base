@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "findings": [
+    {
+      "rule": "hygiene.github-missing",
+      "path": "global/tests/recovery-info.test.mjs",
+      "blob": "60ae9c0e0dff337faa2dd9ea94158037af732d78",
+      "reason": "Intentional non-existent repository identity as a mismatched-repository negative input; no network or publisher use.",
+      "reviewer": "gr lane orchestrator (Run Edit Run fleet)",
+      "date": "2026-10-24"
+    },
+    {
+      "rule": "hygiene.github-missing",
+      "path": "global/tests/recovery-info.test.mjs",
+      "blob": "b06dddcc6272b6895d3d3c229431aeaba87f2c10",
+      "reason": "Intentional non-existent repository identity as a mismatched-repository negative input; no network or publisher use.",
+      "reviewer": "gr lane orchestrator (Run Edit Run fleet)",
+      "date": "2026-10-24"
+    }
+  ]
+}
