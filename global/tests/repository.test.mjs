@@ -2,7 +2,7 @@
 // on one reused checkout. Every source and dependency below is local.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -36,6 +36,15 @@ test('rer dev <repo> clones every release tag, so git checkout <tag> works in th
  const remote = join(directory, 'app.git');
  await git('clone', '--quiet', '--bare', source, remote);
 
+ // Without git, nothing is fetched: the refusal names the missing tool and how
+ // to install it, with exit 3 and the stable code git_missing.
+ const nodeOnly = join(directory, 'node-only');
+ await mkdir(nodeOnly);
+ await symlink(process.execPath, join(nodeOnly, 'node'));
+ const noGit = await run(installed, ['dev', pathToFileURL(remote).href, '--dir', join(directory, 'no-git'), '--json'], { cwd: directory, env: { ...env, PATH: nodeOnly } });
+ assert.equal(noGit.code, 3, noGit.stderr + noGit.stdout);
+ assert.equal(JSON.parse(noGit.stdout.trim().split('\n')[0]).code, 'git_missing');
+ await assert.rejects(access(join(directory, 'no-git')), 'nothing was cloned');
  // The source is not a runnable checkout, so the launch stops after the clone.
  const clone = join(directory, 'app');
  await run(installed, ['dev', pathToFileURL(remote).href, '--dir', clone], { cwd: directory, env });

@@ -3,9 +3,27 @@ import { lstat, mkdir, readdir, realpath } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { invalid, refuse } from '../../cli/errors.mjs';
+import { RerError, invalid, refuse } from '../../cli/errors.mjs';
 
 const git = promisify(execFile);
+
+// Git gets the repository; without it nothing else can start. A Mac without
+// Apple's command line tools has a /usr/bin/git that only asks for them (and
+// opens their installer), or names the missing developer path after a macOS
+// update, so either answer counts as missing too. The refusal carries the
+// stable code git_missing and exit 3, like any missing tool.
+export async function gitPreflight(repository, env = process.env) {
+ let failure;
+ try { await git('git', ['--version'], { env, timeout: 30000 }); return; }
+ catch (error) { failure = error; }
+ const tools = /xcode-select|xcrun: error|active developer path|developer tools|command line tools/i.test(String(failure.stderr ?? ''));
+ if (failure.code !== 'ENOENT' && !tools) return;
+ throw new RerError('git_missing', [
+  `rer needs Git${repository ? ` to get ${repository}` : ''}, and ${tools ? 'this Mac has no command line developer tools, which include Git' : 'Git is not installed on this computer'}. Git is the tool that downloads an app's code.`,
+  'Install it, then run the same command again:',
+  process.platform === 'darwin' ? '  xcode-select --install   (Apple\'s command line tools, with Git; a window asks you to confirm)' : '  sudo apt install git   (Debian, Ubuntu; Fedora: sudo dnf install git)',
+ ].join('\n'), 3);
+}
 
 function repository(value) {
  if (/^[\w.-]+\/[\w.-]+$/.test(value)) return `https://github.com/${value}`;
@@ -41,10 +59,12 @@ export function repoArguments(argv) {
  if (args.includes('--cwd')) throw invalid('Use --dir with a repository, or --cwd inside a checkout.');
  const name = basename(url.replace(/\/+$/, '').replace(/\.git$/, ''));
  if (!name || ['.', '..'].includes(name) || /[?#\\]/.test(name)) throw invalid('The git URL must name a repository.');
- return { verb: argv[0], url, args, root: resolve(cwd, directory ?? name), directory: directory ?? name };
+ return { verb: argv[0], url, repository: argv[1], args, root: resolve(cwd, directory ?? name), directory: directory ?? name };
 }
 
-export async function checkoutRepository({ url, root, directory }) {
+// `report` names what happens next: the reuse of a clone, or the clone.
+export async function checkoutRepository({ url, root, directory, repository = url }, { report = () => {} } = {}) {
+ await gitPreflight(repository);
  const conflict = () => refuse(`Folder ${directory} is not an empty folder or a clone of this repository. Choose another folder with --dir DIR.`);
  let info;
  try { info = await lstat(root); } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -58,16 +78,27 @@ export async function checkoutRepository({ url, root, directory }) {
      git('git', ['-C', root, 'config', '--get', 'remote.origin.url']),
      git('git', ['-C', root, 'rev-parse', '--show-toplevel']),
     ]);
-    if (await realpath(root) === await realpath(top.trim()) && identity(origin.trim(), root) === identity(url, process.cwd())) return;
+    if (await realpath(root) === await realpath(top.trim()) && identity(origin.trim(), root) === identity(url, process.cwd())) { report(`using the clone of ${repository} already in ${directory}`); return; }
    } catch { /* A non-clone is refused by the same single-line message. */ }
    throw conflict();
   }
  }
  await mkdir(resolve(root, '..'), { recursive: true });
+ report(`getting ${repository} into ${directory}`);
  // Every commit and release tag, so `git checkout <tag>` adopts an older
  // release; file contents arrive when a checkout needs them (a host without
- // partial clone sends them all).
- const code = await runCommand('git', ['clone', '--filter=blob:none', '--', url, root]);
+ // partial clone sends them all). A file:// source is cloned whole: its objects
+ // are already on this computer, and fetching them lazily from a local clone
+ // that is itself partial chains one git process per missing object. Git's
+ // own progress shows only in a terminal.
+ const partial = url.startsWith('file:') ? [] : ['--filter=blob:none'];
+ let heartbeat = setTimeout(function waiting() {
+  report(`still getting ${repository} into ${directory}`);
+  heartbeat = setTimeout(waiting, 20000);
+ }, 5000);
+ let code;
+ try { code = await runCommand('git', ['clone', ...partial, ...(process.stderr.isTTY ? [] : ['--quiet']), '--', url, root]); }
+ finally { clearTimeout(heartbeat); }
  if (code !== 0) throw refuse(`Could not clone into ${directory}. Check the git URL and access, then rerun the command.`);
 }
 

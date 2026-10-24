@@ -28,9 +28,23 @@ export async function launchDirectory(checkout, env = process.env) {
 
 async function readJson(path) { try { return JSON.parse(await readFile(path, 'utf8')); } catch (error) { if (error.code === 'ENOENT' || error instanceof SyntaxError) return undefined; throw error; } }
 
+// The process table answers in milliseconds. On a loaded computer where it did
+// not (a cold launch once stood 67 s on one look), each look ends at this
+// bound and the launch goes on with a defined fallback instead of waiting.
+export const lookBound = 3000;
+
+// This process's own identity, read once. Unanswered, a claim records no start
+// time: the claim then lives while its PID does, and nothing waits on ps.
+let own;
+export const ownIdentity = () => own ??= processInfo(process.pid, { bound: lookBound }).catch(() => undefined).then(info => info ?? { pid: process.pid, start: null });
+
+// A holder whose liveness the process table does not answer for is kept: no
+// claim is taken over on an unchecked look.
 async function live(holder) {
  if (!holder?.pid) return false;
- const current = await processInfo(holder.pid);
+ if (holder.start === null) { try { process.kill(holder.pid, 0); return true; } catch (error) { return error.code === 'EPERM'; } }
+ let current;
+ try { current = await processInfo(holder.pid, { bound: lookBound }); } catch { return true; }
  return Boolean(current && !current.zombie && current.start === holder.start);
 }
 
@@ -58,13 +72,25 @@ async function linkClaim(path, record) {
 export async function claimPort(port, env = process.env) {
  const directory = join(serversDirectory(env), 'launches', 'ports'), path = join(directory, `${port}.json`);
  await mkdir(directory, { recursive: true, mode: 0o700 });
- const { start } = await processInfo(process.pid);
+ const { start } = await ownIdentity();
  for (let attempt = 0; attempt < 2; attempt++) {
   if (await linkClaim(path, { pid: process.pid, start })) return { release: async () => { if ((await readJson(path))?.pid === process.pid) await rm(path, { force: true }); } };
   if (await live(await readJson(path))) return undefined;
   await rm(path, { force: true });
  }
  return undefined;
+}
+
+// The ports other live launches have claimed for their setup.
+export async function claimedPorts(env = process.env) {
+ const directory = join(serversDirectory(env), 'launches', 'ports'), ports = [];
+ let entries;
+ try { entries = await readdir(directory); } catch (error) { if (error.code === 'ENOENT') return ports; throw error; }
+ for (const entry of entries) {
+  const port = Number(/^(\d+)\.json$/.exec(entry)?.[1]), holder = port ? await readJson(join(directory, entry)) : undefined;
+  if (holder && holder.pid !== process.pid && await live(holder)) ports.push(port);
+ }
+ return ports;
 }
 
 // One pinned-package install per checkout at a time: two verbs started at once
@@ -76,7 +102,7 @@ const pause = () => new Promise(resolveWait => setTimeout(resolveWait, 200));
 
 export async function claimPinInstall(checkout, { env = process.env, signal, onWait } = {}) {
  await launchDirectory(checkout, env);
- const path = pinInstallPath(checkout, env), { start } = await processInfo(process.pid);
+ const path = pinInstallPath(checkout, env), { start } = await ownIdentity();
  for (let waited = false; ; ) {
   signal?.throwIfAborted();
   if (await linkClaim(path, { pid: process.pid, start })) return async () => { if ((await readJson(path))?.pid === process.pid) await rm(path, { force: true }); };
@@ -102,7 +128,7 @@ export async function settledPinInstall(checkout, { env = process.env, signal, o
 export async function claimLaunch(directory, token) {
  const path = join(directory, 'worker.json');
  for (let attempt = 0; attempt < 3; attempt++) {
-  const { start, title: command } = await processInfo(process.pid), checkout = await realpath(process.cwd());
+  const { start, title: command } = await ownIdentity(), checkout = await realpath(process.cwd());
   if (await linkClaim(path, { token, pid: process.pid, start, command, checkout, startedAt: Date.now(), events: `events-${token}.jsonl` })) {
    for (const entry of await readdir(directory)) if (/^events-.*\.jsonl$/.test(entry) && entry !== `events-${token}.jsonl`) await rm(join(directory, entry), { force: true });
    return true;

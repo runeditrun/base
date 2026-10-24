@@ -4,6 +4,7 @@ import {localDependencyLinks} from './dependency-doctor.mjs';
 import { contained } from './project.mjs';
 import { missing, refuse } from './errors.mjs';
 import { locateExport, locateImport } from './archive-path.mjs';
+import { shellQuote } from './node-runtime-cache.mjs';
 export async function transfer(project, options, signal, custody) {
  if (options.verb === 'export' && options.target === 'remote' && project.adapter.portability?.hostedExport !== undefined) {
   return (await import('./hosted-export-command.mjs')).runHostedExport(project, options, custody.store, signal);
@@ -17,7 +18,10 @@ export async function transfer(project, options, signal, custody) {
   if(!options.output)throw missing('Legacy v1 recovery requires --output FILE for the new v2 backup.');
   if(target!=='local'||options.platform==='container'||api?.legacyRecovery!==true)throw refuse('Legacy v1 recovery is supported only by the local Workers portability adapter in an empty isolated installation.');
  }else if(direction==='import' && (options.acknowledgeUnverifiedMetadata||options.output))throw refuse('--acknowledge-unverified-metadata and import --output require --legacy-v1.');
- if (!api || typeof api[direction] !== 'function' || (target === 'remote' && api.remote !== true)) throw refuse(`Complete ${target} ${direction} is unsupported: the reviewed portability API and binding policy must be adopted first.`);
+ if (!api || typeof api[direction] !== 'function') throw refuse(`This seed does not support installation archive ${direction}: its command adapter declares no portability ${direction}. Run rer check to see what it lacks.`);
+ if (target === 'remote' && api.remote !== true) throw refuse(direction === 'import'
+  ? `This seed cannot restore an installation archive into a hosted app. To restore into the local app on this computer instead, run: rer import --input ${shellQuote(file)} --yes. To bring records into a hosted app, use its owner import screen at /app/import.`
+  : 'This seed cannot export a hosted app as an installation archive. Drop --target remote to back up the local app on this computer.');
  const located = direction === 'export' ? await locateExport(project.root, file) : await locateImport(project.root, file), path = located.path;
  const legacyOutput = options.legacyV1 ? await locateExport(project.root, options.output) : undefined;
  const legacyRecovery=legacyOutput?{output:legacyOutput.path,acknowledged:options.acknowledgeUnverifiedMetadata}:undefined;

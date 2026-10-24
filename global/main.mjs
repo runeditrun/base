@@ -1,4 +1,4 @@
-import { checkoutBootstrap } from '../cli/contract.mjs';
+import { checkoutBootstrap, checkoutOutside } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
@@ -21,8 +21,10 @@ else its vendored scripts/rer.mjs.
   rer dev              Launch a first-party checkout with no setup steps: installs dependencies,
                        sets up a local owner and a free port when needed, starts the app and prints
                        RER_READY and a sign-in link. Without a terminal it returns once the app is
-                       ready and leaves it running (--detach and --foreground override); allow up
-                       to 10 minutes on a first launch, or rerun it to reattach. rer dev --stop stops it.
+                       ready and leaves it running (--detach and --foreground override), and never
+                       prints the sign-in link; allow up to 10 minutes on a first launch, or rerun
+                       it to reattach. --open opens the app signed in at ready. rer dev --stop stops it.
+  rer open             Open the checkout's running app in your browser on this computer, signed in.
   rer run SCRIPT [ARGS]
                        Run a package.json script with the pnpm and Node the checkout pins (rer keeps
                        them off PATH): where a project's docs say pnpm run X, run rer run X.
@@ -52,9 +54,21 @@ import, doctor, describe, check, release, listing. Run rer VERB --help in a chec
 export async function main(argv) {
  handleBrokenPipes();
  const [verb] = argv;
+ // --open belongs to this launcher: rer dev opens the app at ready. The
+ // checkout's dispatcher never sees it. rer dev <repo> starts the launch inside
+ // its clone and names the person's own folder for the next-step lines.
+ const openApp = verb === 'dev' && argv.includes('--open');
+ if (openApp) argv = argv.filter(arg => arg !== '--open');
+ const shellDirectory = process.env.RER_SHELL_CWD;
+ delete process.env.RER_SHELL_CWD;
+ // npm and pnpm (and tools built on update-notifier) print upgrade notices of
+ // their own; the commands rer runs never do, unless the person asked for them.
+ process.env.npm_config_update_notifier ??= 'false';
+ process.env.NO_UPDATE_NOTIFIER ??= '1';
  const installsFirst = checkoutBootstrap(argv) === 'before';
  if (verb === '--version' || verb === '-v') return (await import('./version.mjs')).versionCommand(argv);
- if (verb === 'queue' && argv.length === 2 && argv[1] === '--help') {
+ // A --help after the -- separator belongs to COMMAND.
+ if (verb === 'queue' && argv.slice(1, argv.includes('--') ? argv.indexOf('--') : undefined).includes('--help')) {
   process.stdout.write('Usage: rer queue NAME -- COMMAND [ARGS]\nRun COMMAND once this computer\'s job queue admits it.\n');
   return 0;
  }
@@ -72,6 +86,7 @@ export async function main(argv) {
  if (verb === 'list') return (await import('./list.mjs')).listCommand(argv.slice(1));
  if (verb === 'door') return (await import('./door/command.mjs')).doorCommand(argv.slice(1));
  if (verb === 'run') return (await import('./run.mjs')).runScript(argv.slice(1));
+ if (verb === 'open') return (await import('./open.mjs')).openCommand(argv.slice(1));
  if (repositoryCommands[verb] && argv.includes('--help')) {
   const { help } = await import('../cli/parse.mjs');
   process.stdout.write(`${help(verb)}\n${repositoryCommands[verb].usage}\n${repositoryCommands[verb].effects}\n${repositoryHelp}`);
@@ -79,13 +94,16 @@ export async function main(argv) {
  }
  try {
   const repository = repoArguments(argv);
-  if (repository) return await (await import('./cli/repo-command.mjs')).repoCommand(repository);
+  if (repository) return await (await import('./cli/repo-command.mjs')).repoCommand(repository, { openApp });
  } catch (error) {
   process.stderr.write(error.message + '\n');
   return typeof error.exitCode === 'number' ? error.exitCode : 1;
  }
  const target = locate(argv);
  if (target.profile === 'unsupported') { process.stderr.write(unsupportedMessage(target.root, target.version) + '\n'); return 2; }
+ // A checkout verb with no project around it does what the contract says it
+ // does there: rer doctor checks this computer.
+ if (target.profile === 'none' && checkoutOutside(argv) === 'machine') return (await import('./doctor.mjs')).machineDoctor(argv.slice(1));
  const first = target.profile === 'first-party', mode = first ? dispatcher(target.root).mode : undefined;
  if (first) {
   // Carry the effective directories to older dispatchers that used account HOME.
@@ -146,7 +164,15 @@ export async function main(argv) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
   if (code !== undefined) return code;
  }
- if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target);
+ if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target, { openApp, shellDirectory });
+ // A pin that launches with its own rer prints its own ready lines: it gets
+ // --open and the person's folder, or an older pin's lines get the same keyless
+ // output, closing line and --open here (handOver).
+ if (verb === 'dev' && mode === 'package' && !argv.includes('--help') && !argv.includes('--stop')) {
+  const { closingFor, handOver } = await import('./launch/dev.mjs');
+  const foreground = argv.includes('--foreground') || !argv.includes('--detach') && process.stdout.isTTY;
+  return handOver(target, await closingFor(target.root, { openApp, shellDirectory }), { openApp, shellDirectory: shellDirectory ?? process.cwd(), json: argv.includes('--json'), foreground });
+ }
  // Every other server start or queued job on a vendored pin gets the person
  // defaults too (a pinned package applies its own).
  if (mode === 'vendored') {
