@@ -274,8 +274,11 @@ their selected `foundation/runtime` modules, plus companion declarations. This
 recovers required siblings even when they existed before the old pin or each
 renderer was recorded individually. New siblings go beside the importing
 renderer at its recorded destination (for example `src/base/runtime/` in Slate),
-and receive copy records. The maintained exporters already ship the complete
-runtime directory. An unrecorded dependency equal to its old Base baseline can
+and receive copy records. Refresh reports these siblings in each copy's `added`
+list; the top-level `adopted` list reports the non-runtime JavaScript graph above.
+Both dependency graphs are planned before writes. The maintained exporters
+already ship the complete runtime directory. An unrecorded dependency equal to
+its old Base baseline can
 advance too. Existing unrecorded dependencies with different seed bytes stay
 in place. Recorded edits still require explicit adaptation acknowledgement;
 acknowledged adaptations are preserved.
