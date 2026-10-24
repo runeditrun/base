@@ -14,7 +14,7 @@ h2{font-family:var(--rer-font-heading,var(--rer-font-body,inherit));font-weight:
 .chooser a svg{display:inline-block;width:16px;height:16px;margin-left:6px;vertical-align:-2px}
 .guide{margin-top:18px;font-size:16px;font-weight:600}.guide a{display:inline-block;padding:6px 0}
 .code{position:relative;container:code / inline-size;margin-top:20px;border-radius:12px;background:var(--code-bg);color:var(--code-ink)}
-.code pre{margin:0;padding:16px 128px 16px 20px;font:500 15px/1.6 var(--site-mono);white-space:pre-wrap;overflow-wrap:anywhere}.code pre code{font:inherit;color:inherit}
+.code pre{margin:0;padding:16px 128px 16px 20px;font:500 15px/1.6 var(--site-mono)}.chooser .self .code pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:visible}.code pre code{font:inherit;color:inherit}
 .code-word{white-space:nowrap}.code-repo{display:inline-block;max-width:100%;vertical-align:top;white-space:normal;overflow-wrap:anywhere}
 .chooser .code .copy{position:absolute;top:50%;right:12px;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 18px;border:0;border-radius:999px;background:var(--code-ink);color:var(--code-bg);font:600 15px/1 var(--rer-font-body,inherit);cursor:pointer}
 .chooser .code .copy[hidden]{display:none}.chooser .code .copy::after{content:'';position:absolute;inset:-3px 0}
