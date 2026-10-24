@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g3c8859d8",
+  "cliVersion": "0.2.80-dev.g4336f57c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "bfc18610482e9a8811c287cc7880255d8eb11b81cf683b378513c2c309a877fc"
+      "sha256": "371851b14598095f8195ff3cec8b547c874848f07fd2b5479dfb1b049724b0da"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -991,7 +991,7 @@
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "e4fc3082169d48bba6fd3b76f7813be615295995725f6dda04901889fe3b3aaf"
+      "sha256": "a6a76c05fe5d0bb3e1c203aa293e514d9bc47e19bfea4a1c5819dec8a6e3ad3f"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -1167,7 +1167,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "bcd240ebbe52adfdd58255b34ee27ab3ff118bc24bdfe7b1803c1a883ce85279"
+      "sha256": "f656c9491306fa5d003a6ea8625fccfd1ab0ad6bee239e5d85ae2908874824e3"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1204,6 +1204,10 @@
     "edition-authoring/release.mjs": {
       "source": "edition-authoring/release.mjs",
       "sha256": "40acdb670edbde2eafa731f535bbe7403360a3327b576ed47355936bcc4a543a"
+    },
+    "edition-authoring/runtime-dependencies.mjs": {
+      "source": "edition-authoring/runtime-dependencies.mjs",
+      "sha256": "1b56cb344febdb0213eda8585960ae417822244e5d061592f4374626ecf7fe4f"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",
@@ -3643,7 +3647,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "f1d15f6e888682d9a0a4900b2f036d0327c8e3349e54e8691e800815bd970050"
+      "sha256": "0e52ddd20da16f02342a75c69bf548496f4fc73c9bc0ad264dc9c0920793afe0"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -3711,15 +3715,15 @@
     },
     "modules/release/sign.mjs": {
       "source": "modules/release/sign.mjs",
-      "sha256": "7239d3de4947ee25b819a8d1bb56fbaeb107187b1e0de87ae55541f0b6420f42"
+      "sha256": "cf149ff7aaa07cd2153e91854ce0f2a450f7f9f8eebc5fed255f7c4c98181028"
     },
     "modules/release/signature.mjs": {
       "source": "modules/release/signature.mjs",
-      "sha256": "c9e6d4d79e558fff05b91613fc573dd8918e238367abe0825f723110e990cf24"
+      "sha256": "0b707ac814b8c506f3aac6b705bdaceb1aeeec43dbe584046de9a7de1a23bd89"
     },
     "modules/release/signing-cli.mjs": {
       "source": "modules/release/signing-cli.mjs",
-      "sha256": "cd896ad4f92f9afb30fcc4f087003ec5ae9745d9c502a4a8b8de90c078406889"
+      "sha256": "70c5f8478f0cc8e08c9c887b46a4fadeaeb5b0ba3f09537a19a480a249e8cfdc"
     },
     "modules/release/signing-io.mjs": {
       "source": "modules/release/signing-io.mjs",
@@ -3739,7 +3743,7 @@
     },
     "modules/release/statement.mjs": {
       "source": "modules/release/statement.mjs",
-      "sha256": "906b8554f3268a9602bf5b164eee5b83c6c7aad111cc1adcc6929a6594a50af9"
+      "sha256": "e212ff5cf9d9960ac0028102ff80a937947d1f0eb09eb92bc1278979369dc504"
     },
     "modules/release/tag-adoption.mjs": {
       "source": "modules/release/tag-adoption.mjs",
@@ -3751,11 +3755,15 @@
     },
     "modules/release/vectors/generate.mjs": {
       "source": "modules/release/vectors/generate.mjs",
-      "sha256": "b35bea01dc1991cad02dabc4b487f258f11c22516892a555763c22aba2211d76"
+      "sha256": "e960932dee6cea3bbeea65429b41e0e250ee6b7190ce94ecb33fa8fe92f0bc04"
+    },
+    "modules/release/vectors/publisher-projects.mjs": {
+      "source": "modules/release/vectors/publisher-projects.mjs",
+      "sha256": "37cc4abf6fc578264cc8610c6bb60f99516c112562ff4c9274dde6e50245db41"
     },
     "modules/release/vectors/release-signature-vectors.json": {
       "source": "modules/release/vectors/release-signature-vectors.json",
-      "sha256": "aa83370b92ae2eeeb52bae4320a58a6fefb66482250fcf0bbe26b5d17c955959"
+      "sha256": "723011d04de4f48f4ebcb30d5a9b26be5a6873d05ea80b5da4006f7a1db41286"
     },
     "modules/release/verify-workflow.mjs": {
       "source": "modules/release/verify-workflow.mjs",
@@ -3763,7 +3771,7 @@
     },
     "modules/release/verify.mjs": {
       "source": "modules/release/verify.mjs",
-      "sha256": "d670d91c016d25e33c2c5f7716e4d081513960a90ec540ac48ead9ef8ebb4c0a"
+      "sha256": "0d4d721260c825e80b9df1813160d2130a92c65e9a1c304f5cb175094c34da8b"
     },
     "modules/site/docs-search/SearchField.tsx": {
       "source": "modules/site/docs-search/SearchField.tsx",
