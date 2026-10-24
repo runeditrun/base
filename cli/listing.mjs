@@ -2,7 +2,7 @@ import { writeListing } from '../modules/release/listing.mjs';
 import { previousListing } from '../modules/release/previous-listing.mjs';
 
 export async function dispatchListing(args) {
-  if (args.length === 1 && args[0] === '--help') {
+  if (args.includes('--help')) {
     console.log('Usage: rer listing --repo DIR --ref COMMIT --output NEW_DIR\n\nRead committed listing facts and assets without gates, signing or tags.\nWrites listing.json and its relative asset paths. --ref defaults to HEAD.');
     return 0;
   }

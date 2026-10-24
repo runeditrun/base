@@ -1,5 +1,3 @@
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
 import {lstat,realpath,readFile,readdir,readlink} from 'node:fs/promises';
 import {basename,join} from 'node:path';
 import {availableParallelism,homedir,loadavg} from 'node:os';
@@ -7,7 +5,7 @@ import {isIP} from 'node:net';
 import {setTimeout as delay} from 'node:timers/promises';
 import {commandFailure,approvedFailure} from './failures.mjs';
 import {stateFiles} from './local/state-files.mjs';
-const exec=promisify(execFile);
+import {boundedProcessRead,processReadMs,readProcessCommand} from './process-read.mjs';
 // macOS supplies lsof in /usr/sbin, which a command PATH may omit.
 // Diagnose sockets with the system utility even when that PATH is constrained.
 const lsof=process.platform==='darwin'?'/usr/sbin/lsof':'lsof';
@@ -18,14 +16,24 @@ export const inspectionContext=({budgetMs=15000,...details}={})=>({deadline:perf
 // times. The search itself is bounded by its candidate count, not by this.
 export const searchContext=(details={})=>inspectionContext({budgetMs:Math.round(15000*Math.min(4,Math.max(1,loadavg()[0]/availableParallelism()))),...details});
 export const uncheckedInspection=error=>approvedFailure(error)?.ownershipUnchecked===true;
+// Procfs and command probes use the same hard per-read maximum. A failed read
+// remains unchecked, including when a larger ownership-decision budget exists.
+const proc=async(read,context)=>{
+ try{return await boundedProcessRead(read,Math.min(processReadMs,context.deadline-performance.now()),context.signal);}
+ catch(error){
+  if(context.signal?.aborted)throw context.signal.reason;
+  throw commandFailure('Could not check local process ownership within its inspection bound.',{ownershipUnchecked:true});
+ }
+};
 const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,noMatch=false,positiveResult}={})=>{
  const invocation=[command,...args].join(' ').replaceAll(homedir(),'~');
+ const deadline=Math.min(context.deadline,performance.now()+processReadMs);
  let failure;
  for(let attempt=0;attempt<2;attempt++){
-  const remaining=Math.floor(context.deadline-performance.now());
+  const remaining=Math.floor(deadline-performance.now());
   if(remaining<=0)break;
-  const timeout=attempt===0?Math.min(3000,remaining):remaining;
-  try{return (await exec(command,args,{timeout,maxBuffer,signal:context.signal})).stdout;}
+  const timeout=Math.min(processReadMs,remaining);
+  try{return (await readProcessCommand(command,args,{timeout,maxBuffer,signal:context.signal})).stdout;}
   catch(error){
    // A cancelled caller stops inspecting: the abort is never an ownership verdict.
    if(context.signal?.aborted)throw context.signal.reason;
@@ -46,7 +54,7 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
 
 export async function processName(pid,context=inspectionContext()){
  try{process.kill(pid,0);}catch(error){if(error.code==='ESRCH')return 'process';}
- if(process.platform==='linux'){const name=await readFile(`/proc/${pid}/comm`,'utf8').catch(()=>'');if(name)return name.trim().replace(/[^a-zA-Z0-9._-]/g,'').slice(0,80)||'process';}
+ if(process.platform==='linux'){const name=await proc((_bound,signal)=>readFile(`/proc/${pid}/comm`,{encoding:'utf8',signal}).catch(()=>''),context);if(name)return name.trim().replace(/[^a-zA-Z0-9._-]/g,'').slice(0,80)||'process';}
  // A completed quiet ps exit 1 means the PID has exited. Its display label
  // is optional; this does not prove listener ownership or process liveness.
  const text=await run('/bin/ps',['-p',String(pid),'-o','comm='],context,{noMatch:true});
@@ -78,12 +86,12 @@ export async function listeners(pids,context=inspectionContext(),port){
   return rows;
  }
  const sockets=new Map();
- for(const file of ['tcp','tcp6'])for(const line of (await readFile('/proc/net/'+file,'utf8').catch(()=>'' )).trim().split('\n').slice(1)){
+ for(const file of ['tcp','tcp6'])for(const line of (await proc((_bound,signal)=>readFile('/proc/net/'+file,{encoding:'utf8',signal}).catch(error=>{if(error.code==='ENOENT')return '';throw error;}),context)).trim().split('\n').slice(1)){
   const parts=line.trim().split(/\s+/);if(parts[3]==='0A'&&(!port||parseInt(parts[1].split(':')[1],16)===port))sockets.set(parts[9],{name:linuxAddress(parts[1]),family:file==='tcp'?'IPv4':'IPv6'});
  }
  const found=[];
- for(const pid of pids??await linuxPids()){
-  const held=[];for(const target of await descriptors(pid)){const inode=/^socket:\[(\d+)\]$/.exec(target)?.[1];if(sockets.has(inode))held.push(sockets.get(inode));}
+ for(const pid of pids??await linuxPids(context)){
+  const held=[];for(const target of await descriptors(pid,context)){const inode=/^socket:\[(\d+)\]$/.exec(target)?.[1];if(sockets.has(inode))held.push(sockets.get(inode));}
   if(held.length)found.push({pid,names:held.map(socket=>socket.name),sockets:held});
  }
  if(!pids&&!port)context.allListeners=found;
@@ -99,12 +107,12 @@ function linuxAddress(local){
   [...Array(8)].map((_,i)=>address.readUInt16BE(i*2).toString(16)).join(':').replace(/(^|:)0(?::0)+(?=:|$)/,':').replace(/^:([^:])/, '::$1').replace(/([^:]):$/, '$1::');
  return `${host.includes(':')?'['+host+']':host}:${parseInt(port,16)}`;
 }
-async function linuxPids(){return (await readdir('/proc')).filter(name=>/^\d+$/.test(name)).map(Number);}
-async function descriptors(pid){return Promise.all((await readdir(`/proc/${pid}/fd`).catch(()=>[])).map(fd=>readlink(`/proc/${pid}/fd/${fd}`).catch(()=>'')));}
+async function linuxPids(context){return (await proc(()=>readdir('/proc'),context)).filter(name=>/^\d+$/.test(name)).map(Number);}
+async function descriptors(pid,context){return proc(async()=>Promise.all((await readdir(`/proc/${pid}/fd`).catch(()=>[])).map(fd=>readlink(`/proc/${pid}/fd/${fd}`).catch(()=>''))),context);}
 
 const portOf=name=>Number(/:(\d+)$/.exec(name)?.[1]);
 export async function processCwd(pid,context=inspectionContext()){
- if(process.platform==='linux')return readlink(`/proc/${pid}/cwd`).catch(()=>undefined);
+ if(process.platform==='linux')return proc(()=>readlink(`/proc/${pid}/cwd`).catch(()=>undefined),context);
  return records(await run(lsof,['-nP','-b','-w','-a','-p',String(pid),'-d','cwd','-Fpn'],context)).flatMap(row=>row.names)[0];
 }
 // Every TCP port some process listens on, on any address: a wildcard listener
@@ -198,14 +206,19 @@ async function callerLineage(context){
  return lineage;
 }
 export async function localProcessConflict(root,savedOrigin,context=inspectionContext()){
- root=await realpath(root);const lineage=await callerLineage(context);
+ root=await realpath(root);
  // Inspect canonical state before optional socket diagnostics spend the shared
  // budget. This is file custody, not a claim that another process owns a port.
  const state=join(root,'.wrangler/state');
  let hasState=true;try{await lstat(state);}catch(error){if(error.code==='ENOENT')hasState=false;else throw error;}
+ // A checkout with no local state and no saved origin (a fresh clone) has
+ // nothing another process could hold: no state files and no port of its own,
+ // so no process table or socket scan is spent on it.
+ if(!hasState&&!savedOrigin)return;
+ const lineage=await callerLineage(context);
  let held;
  if(hasState){
-  if(process.platform==='linux'){for(const pid of await linuxPids())if(!lineage.has(pid)&&(await descriptors(pid)).some(path=>path.startsWith(state+'/'))){held={pid};break;}}
+  if(process.platform==='linux'){for(const pid of await linuxPids(context))if(!lineage.has(pid)&&(await descriptors(pid,context)).some(path=>path.startsWith(state+'/'))){held={pid};break;}}
   else {
    const files=await stateFiles(state);
    // Path selection needs stat, so -b (which skips stat) is inappropriate here.
@@ -230,7 +243,7 @@ export async function localProcessConflict(root,savedOrigin,context=inspectionCo
  for(const row of all){
   if(lineage.has(row.pid))continue;
   const onSavedPort=port&&row.names.some(name=>Number(/:(\d+)$/.exec(name)?.[1])===port);
-  const cwd=process.platform==='linux'?[await readlink(`/proc/${row.pid}/cwd`).catch(()=>undefined)].filter(Boolean):cwdRecords.filter(item=>item.pid===row.pid).flatMap(item=>item.names);
+  const cwd=process.platform==='linux'?[await processCwd(row.pid,context)].filter(Boolean):cwdRecords.filter(item=>item.pid===row.pid).flatMap(item=>item.names);
   const places=(await Promise.all(cwd.map(path=>realpath(path).catch(()=>undefined)))).filter(Boolean),inCheckout=places.includes(root);
   // A listener running somewhere else is another program's or another checkout's
   // server: it does not use this checkout's state, so it only blocks the port.

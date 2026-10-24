@@ -22,6 +22,18 @@ async function probe(root, env, signal, store, timeoutMs) {
  catch (error) { if (signal?.aborted) throw error; return { reason: error.reason ?? error.message, diagnostic: error.diagnostic }; }
 }
 export async function ensureProjectPnpm(root, options = {}) {
+ const report = options.report ?? (() => {}), started = Date.now();
+ let last = started;
+ const progress = text => { last = Date.now(); report(text); };
+ // Provisioning precedes the launch renderer, including its first version
+ // probe and command-store acquisition. Keep that whole wait visible too.
+ const heartbeat = setInterval(() => {
+  if (Date.now() - last >= 5000) progress(`Still preparing pnpm for this project (${Math.round((Date.now() - started) / 1000)}s).`);
+ }, 250);
+ try { return await prepareProjectPnpm(root, { ...options, report: progress }); }
+ finally { clearInterval(heartbeat); }
+}
+async function prepareProjectPnpm(root, options) {
  if (options.store) return ensure(root, options);
  // Global bootstrap has no adapter or lifecycle store yet. Give it the same
  // command custody, with a temporary log and cancellation lasting through the

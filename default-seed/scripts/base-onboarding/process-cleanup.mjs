@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
 import { readOwnedTree } from './process-tree.mjs'
+import { uncheckedInspection } from './process-diagnostics.mjs'
 
 const graceMs = 1000
 const cleanupMs = 30000
@@ -32,13 +33,19 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const stopped = new Map()
   let lastGroup = []
 
-  // Every inspection gets its full bound (and process-table's extension): a
-  // slow but complete read is still a valid observation. The cleanup deadline
-  // ends the loop below, and only processes observed alive at it fail cleanup.
+  // An unchecked observation grants no signal authority. Retry discovery with
+  // a fresh bounded read while cleanup still has time to establish custody.
   const snapshot = async () => {
-    const current = await inspect(inspectionMs)
-    lastGroup = current
-    return current
+    for (;;) {
+      try {
+        const current = await inspect(inspectionMs)
+        lastGroup = current
+        return current
+      } catch (error) {
+        if (!uncheckedInspection(error) || Date.now() >= deadline) throw error
+        await delay(pollMs)
+      }
+    }
   }
   const send = async (member, name, requireLeaf = true) => {
     // Recheck both identity and children immediately before each numeric PID

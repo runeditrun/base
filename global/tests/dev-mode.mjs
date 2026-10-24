@@ -58,6 +58,7 @@ export async function devModes(t, seed, environment) {
   });
   await until(() => stdout.includes('"event":"ready"') || closed, () => `launch reached readiness: ${stdout}${stderr}`, 120_000);
   assert.ok(stdout.includes('"event":"ready"'), stdout + stderr);
+  assert.ok(!(stdout + stderr).includes('rer-dev='), 'output without a terminal never carries the sign-in link');
   assert.equal((await fetch(url + '/health')).status, 200);
   assert.ok(JSON.parse(await readFile(join(root, 'node_modules/@runeditrun/rer/package.json'), 'utf8')).version, 'dev installed the checkout pin before starting');
   if (mode === '--foreground') {

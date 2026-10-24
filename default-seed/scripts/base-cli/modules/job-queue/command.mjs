@@ -10,13 +10,14 @@ export function signalExit(signal) { return 128 + (constants.signals[signal] ?? 
 export async function execute(command, job, config, adopt, signal, onStarted, options = {}) {
   const child = (options.spawn ?? spawn)(process.execPath, [fileURLToPath(new URL('./supervisor.mjs', import.meta.url)), randomUUID(), String(config.killGraceMs)],
     { cwd: job.repository, env: options.env ?? process.env, detached: true, stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
-  let owner, finish, outcome, reported = false;
+  let owner, workerPid, finish, outcome, reported = false;
   const done = new Promise(resolve => { finish = resolve; });
   const exited = new Promise(resolve => child.once('close', (code, signame) => {
     finish({ code: code ?? signalExit(signame), signal: signame }); resolve();
   }));
   child.once('error', error => finish({ code: 127, error: error.message }));
   child.on('message', message => {
+    if (Number.isSafeInteger(message.started?.pid) && message.started.pid > 0) workerPid = message.started.pid;
     if (message.done) { reported = true; finish({ ...message.done,
       code: message.done.code ?? signalExit(message.done.signal) }); }
   });
@@ -25,7 +26,7 @@ export async function execute(command, job, config, adopt, signal, onStarted, op
   // can wait forever, because descendants still hold the inherited output pipes.
   child.once('exit', (code, signame) => {
     if (owner && !reported) finish({ code: code ?? signalExit(signame), signal: signame, supervisorEnded: true,
-      error: `${job.label}: the job's supervisor ended before the job finished; what remained of the job was stopped and its slot released.` });
+      error: `${job.label}: the job's supervisor ended before the job finished.` });
   });
   const ended = () => child.exitCode !== null || child.signalCode !== null;
   const abort = () => finish({ code: signalExit(signal.reason || 'SIGTERM'), signal: signal.reason });
@@ -54,15 +55,34 @@ export async function execute(command, job, config, adopt, signal, onStarted, op
       // Stop escaped descendants through custody first, then finish the group
       // this run created even if custody cleanup fails. The ready owner's start
       // time and unique marker protect against a replacement group leader.
-      try { await options.cleanup?.(child,outcome); }
+      let custodyCleaned = false;
+      try {
+        if (options.cleanup) { await options.cleanup(child,outcome); custodyCleaned = true; }
+      }
       finally {
-        if (owner) await stopGroup(owner, config.killGraceMs);
+        if (owner?.unchecked) {
+          // This is the original supervisor's live IPC channel, not a PID
+          // ownership claim. Ask that group leader to stop its
+          // own group, including surviving workers, before it exits. Never
+          // signal an unchecked group from the caller or release it early.
+          if (!ended() && child.connected) await new Promise((resolve, reject) => {
+            child.send({ stop: true }, error => error ? reject(error) : resolve());
+          });
+          else if (!custodyCleaned) {
+            const pids = [owner.pid, workerPid].filter(Number.isSafeInteger);
+            const error = `${job.label}: work may still be running (recorded PIDs ${pids.join(', ')}, process group ${owner.pgid}); its slot is retained because cleanup could not be confirmed.`;
+            if (!outcome) throw Error(error);
+            Object.assign(outcome, { keepLease: true, pids, error });
+          }
+        } else if (owner) await stopGroup(owner, config.killGraceMs);
         else child.kill('SIGKILL'); // The supervisor has not been given GO.
       }
       // Its group is stopped; output still arriving on a dead supervisor's pipes
       // comes from escaped descendants, which the caller's cleanup stops.
       if (outcome?.supervisorEnded) { child.stdout?.destroy(); child.stderr?.destroy(); }
       await exited;
+      if (outcome?.supervisorEnded && !outcome.keepLease)
+        outcome.error += ' Remaining work was stopped and its slot released.';
       if (owner?.socket) await unlink(owner.socket).catch(error => { if (error.code !== 'ENOENT') throw error; });
     } catch (error) { error.keepLease = true; throw error; }
   }
