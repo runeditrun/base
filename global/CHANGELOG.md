@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Count only server snapshot elements still in the body when waiting for hydration, so effect-created tooltips, portals and other widgets do not cause false timeouts.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.
