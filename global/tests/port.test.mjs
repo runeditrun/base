@@ -2,7 +2,8 @@
 // checkout was set up on, and when another process takes the port it chose
 // before setup can use it, or after setup before the app starts there, the
 // launch moves to the next free port, says which, and comes up there. Its
-// setup claims the owner on the dev target, with no production build. The
+// setup claims the owner on the dev target, as the seed declares it can
+// (setup.claimOnDev), with no production build. The
 // checkout is a minimal vendored first-party seed whose dispatcher is Base's
 // own CLI; on its first setup, and again on its first start, the dispatcher
 // starts an unrelated listener on the chosen port, as another program would.
@@ -51,7 +52,7 @@ import { commandAdapter as declare } from ${source('cli/adapter.mjs')};
 const app = context => ['node', ['app.mjs', String(context.runtimePort ?? new URL(context.origin).port)]];
 const lifecycle = localInstaller({ secrets: { file: '.dev.vars', format: 'dotenv', originKey: 'AUTH_ORIGIN', values: ({ origin }) => ({ AUTH_ORIGIN: origin }) },
  build: ['node', ['-e', "require('node:fs').writeFileSync('production-build', '')"]], start: app, signIn: async () => {} });
-export const commandAdapter = declare(lifecycle, { dev: app, setup: { manifestFile: 'rer-setup.json' }, input: { names: { email: 'OWNER_EMAIL' } }, settings: ['.dev.vars'] });
+export const commandAdapter = declare(lifecycle, { dev: app, setup: { manifestFile: 'rer-setup.json', claimOnDev: true }, input: { names: { email: 'OWNER_EMAIL' } }, settings: ['.dev.vars'] });
 `);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/port', runtime: { requirements: [] }, requiredEnvironment: [],
   seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local port flow.' }])) }));

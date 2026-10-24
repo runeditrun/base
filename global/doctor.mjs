@@ -49,6 +49,7 @@ async function disk(env) {
 
 async function reach(name, url) {
  const started = Date.now();
+ if (!URL.canParse(url)) return { status: 'warn', message: `${name} is not an address rer can reach (npm_config_registry).` };
  try { await fetch(url, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(3000) }); return { status: 'ok', message: `${name} answers (${Date.now() - started} ms)` }; }
  catch { return { status: 'warn', message: `${name} did not answer within 3 s: offline, or behind a proxy this check does not use. Getting and installing an app needs it.` }; }
 }
@@ -67,7 +68,7 @@ export async function machineDoctor(args, env = process.env) {
  if (unknown !== undefined) { process.stderr.write(`Unsupported flag ${unknown} for doctor outside a project. Run rer doctor --help.\n`); return 2; }
  const registry = (env.npm_config_registry || 'https://registry.npmjs.org').replace(/\/+$/, '');
  const names = ['git', 'node', 'rer', 'disk', 'github', 'registry', 'loopback'];
- const results = await Promise.all([git(), node(), launcher(), disk(env), reach('github.com', 'https://github.com/'), reach(new URL(registry).host, `${registry}/`), loopback(env)]);
+ const results = await Promise.all([git(), node(), launcher(), disk(env), reach('github.com', 'https://github.com/'), reach(URL.canParse(registry) ? new URL(registry).host : registry, `${registry}/`), loopback(env)]);
  const checks = names.map((id, index) => ({ id, ...results[index] })), ok = checks.every(check => check.status !== 'fail'), exitCode = ok ? 0 : 3;
  if (json) { process.stdout.write(JSON.stringify({ version: 1, verb: 'doctor', event: 'result', ok, exitCode, diagnostics: { scope: 'machine', checks } }) + '\n'); return exitCode; }
  const lines = ['rer doctor: this computer (no project in this folder)', ...checks.map(check => `  ${check.status.padEnd(5)} ${check.id.padEnd(9)} ${check.message.replaceAll('\n', '\n                  ')}`)];

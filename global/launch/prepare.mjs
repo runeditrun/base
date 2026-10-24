@@ -26,7 +26,7 @@ export const flagValue = (args, flag) => { const index = args.indexOf(flag); ret
 // The steps a pin's setup names on stderr (onboarding/adapter-labels.mjs), as
 // a person reads them, and the notes it prints between them.
 const setupSteps = name => new Map([
- ['Building your application', `building ${name} (setup on this pin makes a production build to claim the first owner)`],
+ ['Building your application', `building ${name} (this seed's setup makes a production build)`],
  ['Applying database migrations', 'applying database migrations'],
  ['Starting your application on this computer', `starting ${name} once to claim its first owner`],
  ['Claiming the first owner', 'claiming the first owner'],

@@ -209,10 +209,12 @@ step quiet for 5 seconds gets one line saying so, then one every 20 seconds
 which port it takes instead, and leaves the port above each port another
 checkout uses, keeps or is setting up on for that checkout's run site. When the
 port it chose is taken before its setup or its start uses it, the launch moves
-to the next free port and says so. The setup a first launch runs claims
-the owner on the seed's dev target, so it makes no production build (build,
-preview, verify and deploy make one when they need it); a seed with no dev
-target still builds there. Every process probe of the launch is bounded (3
+to the next free port and says so. A seed that declares `setup: { claimOnDev:
+true }` in its command adapter (its local migrations and owner claim work from
+source) gets a first launch whose setup claims the owner on its dev target and
+makes no production build (build, preview, verify and deploy make one when they
+need it); every other seed's setup still builds, since its migrations may read
+the build's output. Every process probe of the launch is bounded (3
 seconds for the launcher's own look at the process table), so a loaded computer
 slows a launch by seconds, not minutes. A second `rer dev` reprints the ready lines.
 `rer dev --stop` stops the server, or a launch still preparing (which then
