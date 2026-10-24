@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g00bc1284",
+  "cliVersion": "0.2.79-dev.g5f8ab332",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2987,7 +2987,7 @@
     },
     "modules/operator-auth/README.md": {
       "source": "modules/operator-auth/README.md",
-      "sha256": "b5b6a257551f409b82fb89e11c2ef7883b01ef21e7f056e821a7af9f56606d9b"
+      "sha256": "d615bf4e5099533ae7c308346ff0e77d6769685dc26c67e3683fa27888943289"
     },
     "modules/operator-auth/SCHEDULED-POLICY.md": {
       "source": "modules/operator-auth/SCHEDULED-POLICY.md",

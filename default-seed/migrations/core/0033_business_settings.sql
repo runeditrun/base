@@ -6,7 +6,6 @@ CREATE TABLE bs_settings (
   stopped INTEGER NOT NULL DEFAULT 0 CHECK(stopped IN(0,1)),
   token TEXT NOT NULL DEFAULT ''
 );
-INSERT INTO bs_settings(singleton) VALUES(1);
 CREATE TABLE bs_overrides (
   field TEXT PRIMARY KEY CHECK(field IN('display_name','owner_name','brand_color','logo','timezone')),
   value TEXT NOT NULL,

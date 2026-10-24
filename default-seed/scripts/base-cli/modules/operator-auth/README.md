@@ -1,7 +1,7 @@
 # Operator auth (IF-055-CORE-v1)
 
 Portable server-only ESM: import `createOperatorAuth`, `createAuthHandler` and
-`createSignInHandler` from `modules/operator-auth/index.mjs`. TypeScript
+`createSignInHandler` from `./modules/operator-auth/index.mjs`. TypeScript
 declarations are `index.d.mts`. No framework or mail transport is bundled. Apply
 `accounts/schema/operator-auth.sql` once for a fresh auth database (and
 `identity/oidc/schema/oidc.sql` when the app offers identity providers). Preserve applied migration history in an existing
@@ -594,7 +594,7 @@ an independently captured pre-update source snapshot containing the complete
 root. With the frozen workspace dependencies installed, run:
 
 ```sh
-OA_BASELINE_SOURCE=/path/to/snapshot node --test modules/operator-auth/tests/reinvitation-upgrade.mjs
+OA_BASELINE_SOURCE=/path/to/snapshot node --test ./modules/operator-auth/tests/reinvitation-upgrade.mjs
 ```
 
 Runtime tests use the locked Wrangler Miniflare/esbuild dependencies and run the
@@ -608,7 +608,7 @@ deployment remain separate.
 
 ## Adopting this version
 
-Copy the **complete** `modules/operator-auth/` directory from one reviewed Base
+Copy the **complete** `./modules/operator-auth/` directory from one reviewed Base
 revision into the seed's operator-auth source location. Keep its layers
 (`identity/`, `accounts/`, `dev/`), runtime files, declarations, schema,
 conformance files and tests from that same revision; `rer check` names any copied
@@ -710,7 +710,7 @@ The reference `/app/policies` screen and Worker scheduled handler show adoption.
 
 ### Business settings and the default team adapter
 
-An edition that adopts `modules/business-settings` passes its runtime instance as
+An edition that adopts `./modules/business-settings` passes its runtime instance as
 `createOperatorAuth({ ..., businessSettings })`. It supplies `publicBrand()`,
 `read()` provenance and `stop(actorId, guard?)`. The optional guard is the OA
 session's live SQL authority fence: include it in the stop transaction. The

@@ -1,13 +1,12 @@
 import { checkedLogo } from './logo.ts';
-import { ack, managed, settingsRow, snapshot } from './store.ts';
+import { ack, initialSettings, managed, settingsRow, snapshot } from './store.ts';
 import { SettingsError } from './types.ts';
 import type { Options, SettingsDocument } from './types.ts';
 
 /** The accepted revision and every native team write commit in one D1 transaction. */
 export async function apply(options: Options, document: SettingsDocument, suppliedLogo: unknown): Promise<Response> {
   const { db, business } = options;
-  const before = await settingsRow(db);
-  if (!before) throw new Error('business_settings_migration_required');
+  const before = await settingsRow(db) ?? initialSettings();
   if (before.stopped) throw new SettingsError('not_found', 404);
   if (document.rev <= before.rev) return Response.json(ack(await snapshot(db), business), { status: 409, headers: { 'cache-control': 'no-store' } });
   if (before.document && (JSON.parse(before.document) as SettingsDocument).business !== document.business) throw new SettingsError('business_binding_mismatch');
@@ -20,7 +19,8 @@ export async function apply(options: Options, document: SettingsDocument, suppli
   const now = new Date().toISOString(), token = crypto.randomUUID();
   const guard = { sql: 'EXISTS(SELECT 1 FROM bs_settings WHERE singleton=1 AND rev=? AND token=? AND stopped=0)', args: [document.rev, token] };
   const fence = document.detached ? { sql: 'EXISTS(SELECT 1 FROM bs_settings WHERE singleton=1 AND rev=? AND token=?)', args: guard.args } : guard;
-  const statements = [db.prepare(`UPDATE bs_settings SET rev=?,document=?,applied_at=?,stopped=?,token=? WHERE singleton=1 AND stopped=0 AND rev=?`)
+  const statements = [db.prepare('INSERT INTO bs_settings(singleton) VALUES(1) ON CONFLICT(singleton) DO NOTHING'),
+    db.prepare(`UPDATE bs_settings SET rev=?,document=?,applied_at=?,stopped=?,token=? WHERE singleton=1 AND stopped=0 AND rev=?`)
     .bind(document.rev, document.detached ? before.document : JSON.stringify(document), now, document.detached ? 1 : 0, token, before.rev)];
   if (!document.detached && business.values.includes('logo')) {
     if (!document.logo) statements.push(db.prepare(`DELETE FROM bs_logo WHERE ${guard.sql}`).bind(...guard.args));

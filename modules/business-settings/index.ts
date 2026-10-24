@@ -78,6 +78,7 @@ export function createBusinessSettings(options: Options) {
   async function stop(actor: string, guard: Guard = { sql: '1', args: [] }): Promise<void> {
     if (typeof actor !== 'string' || !actor.trim() || actor.length > 254) throw new SettingsError('actor_required', 400);
     await db.batch([
+      db.prepare('INSERT INTO bs_settings(singleton) VALUES(1) ON CONFLICT(singleton) DO NOTHING'),
       db.prepare(`UPDATE bs_settings SET stopped=1 WHERE singleton=1 AND ${guard.sql}`).bind(...guard.args),
       db.prepare(`INSERT INTO bs_audit(actor,action,changed_at) SELECT ?,'stopped',? WHERE ${guard.sql}`).bind(actor, new Date().toISOString(), ...guard.args),
       db.prepare(`INSERT INTO bs_assert(value) VALUES(CASE WHEN ${guard.sql} THEN 1 ELSE NULL END)`).bind(...guard.args),

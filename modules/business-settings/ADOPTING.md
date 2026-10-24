@@ -7,10 +7,10 @@ defines transport, limits and method results.
 
 ## 1. Bring in source and the migration
 
-Copy `modules/business-settings` from the selected Base revision to the same
-relative path in the seed. Its production entry is `modules/business-settings/index.ts`.
-It imports `ink` from `foundation/runtime/theme-frame.ts`, which imports
-`foundation/runtime/icon-head.ts`: copy both files at those paths too, or
+Copy `./modules/business-settings` from the selected Base revision to the same
+relative path in the seed. Its production entry is `./modules/business-settings/index.ts`.
+It imports `ink` from `./foundation/runtime/theme-frame.ts`, which imports
+`./foundation/runtime/icon-head.ts`: copy both files at those paths too, or
 adapt those imports coherently to the seed's source layout. Keep these
 server modules out of browser bundles. This recipe uses source imports and
 does not require or promise an npm package subpath export.
@@ -21,14 +21,14 @@ history. The updated source supplies `auth.businessTeam` and the Business
 branding/stop integration. Native-account compositions need their own team
 adapter; passing `businessSettings` alone does not provide one.
 
-Copy `modules/business-settings/schema/0001_business_settings.sql` into the
+Copy `./modules/business-settings/schema/0001_business_settings.sql` into the
 seed's normal migration directory under its next unused migration number.
-The maintained reference uses `default-seed/migrations/core/0033_business_settings.sql`.
+The maintained reference uses `./default-seed/migrations/core/0033_business_settings.sql`.
 Do not replace an applied migration or assume 0033 is free in another seed.
 Apply it through the seed's existing local/deployment migration lifecycle,
-on the same D1 binding as the native accounts. It creates the singleton
-settings record and `bs_overrides`, `bs_logo`, `bs_team`, `bs_audit`, `bs_assert`.
-Without it database operations fail with `business_settings_migration_required`.
+on the same D1 binding as the native accounts. It creates settings storage and `bs_overrides`, `bs_logo`, `bs_team`, `bs_audit`, `bs_assert`.
+Apply it before starting the runtime. The first document or owner stop creates
+the singleton row; a fresh installation stays empty for archive restore.
 
 ## 2. Declare the slots the app actually renders
 
