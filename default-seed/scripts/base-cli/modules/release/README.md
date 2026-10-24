@@ -557,7 +557,7 @@ must contain 1–1024 unique, well-formed project IDs. There is no top-level
   version 2 key without `projects`, are refused with `ANCHORS_INVALID`.
 
 Project IDs use the verifier's existing `validProject` grammar: exactly
-`OWNER/NAME`, where `OWNER` matches `[a-z0-9][a-z0-9-]{0,38}` and `NAME` is a
+`OWNER`, a slash, and `NAME`, where `OWNER` matches `[a-z0-9][a-z0-9-]{0,38}` and `NAME` is a
 nonempty printable ASCII component (U+0020–U+007E), excluding `/`, `\` and the
 whole components `.` and `..`. Names remain literal and case-sensitive; this
 change introduces no name-length limit. Arrays containing duplicates or invalid
@@ -584,7 +584,7 @@ serial freshness, unsigned-version floors and environment/scope checks remain
 unchanged. In particular, `projects` does not change the enrolment's
 `unsignedThrough` or the manifest's `legacyUnsigned` policy.
 
-For example, to sign project `learning/beam` using a key whose publisher is
+For example, to sign project `octocat/hello-world` using a key whose publisher is
 `just-every`, use:
 
 ```sh
@@ -592,11 +592,11 @@ rer release sign --artifact /path/to/release --key-stdin --publisher just-every
 ```
 
 Pipe the signing key from the vault into that command as described above. Its
-version 2 anchor must list `learning/beam` in that key's `projects`. Verify with
+version 2 anchor must list `octocat/hello-world` in that key's `projects`. Verify with
 `rer release receipt --artifact /path/to/release --anchors /path/to/anchors-v2.json`.
 The receipt check matches the signed project, repository and files against the
 artifact while authenticating the publisher through the anchor; it does not
-infer the publisher from `learning/`. The signer's temporary self-proof anchor
+infer the publisher from the project owner component. The signer's temporary self-proof anchor
 manifest uses version 2 and lists exactly the one project being signed.
 
 The dependency-free verifier source is `modules/release/signature.mjs`; it has
