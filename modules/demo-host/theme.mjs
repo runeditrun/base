@@ -22,6 +22,9 @@ export async function prepareTheme(folder, assets) {
     files.set(prefix + path, bytes);
     paths.push(prefix + path);
   }
-  const stylesheets = [prefix + '/rer-theme.css', ...['/fonts/fonts.css', '/rer-theme.css'].filter(path => files.has(path))];
-  return { paths, css: inlineTheme(files, stylesheets) };
+  const seed = ['/fonts/fonts.css', '/rer-theme.css'].filter(path => files.has(path));
+  // A seed theme without --rer-link links in its own --rer-text, as the theme
+  // grammar reads it (onboarding/theme.mjs), never in the default's link colour.
+  const link = files.has('/rer-theme.css') ? ':root{--rer-link:var(--rer-text)}' : '';
+  return { paths, css: [inlineTheme(files, [prefix + '/rer-theme.css']), link, inlineTheme(files, seed)].join('\n') };
 }

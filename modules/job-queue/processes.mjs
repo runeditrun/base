@@ -4,25 +4,42 @@ import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 const execute = promisify(execFile);
 
-// `bound` (ms), when given, is the most a look may take: ps is killed then,
-// and the look fails with code ETIMEDOUT even if ps cannot be ended, so a
-// caller with a fallback never waits on a process table that does not answer.
-export async function processInfo(pid, { bound } = {}) {
-  if (!bound) return lookUp(pid);
+export const inspectionBound = 3000;
+
+// Every process read has a deadline, including callers that omit `bound`.
+// A failed read is unknown, never evidence of death or authority to signal.
+async function inspect(read, bound = inspectionBound) {
+  if (!Number.isFinite(bound) || bound <= 0) throw Error('Invalid process inspection bound');
+  bound = Math.min(bound, inspectionBound);
+  const controller = new AbortController();
   let timer;
   try {
-    return await Promise.race([lookUp(pid, bound), new Promise((_resolve, reject) => {
-      timer = setTimeout(() => reject(Object.assign(Error(`Process inspection did not answer within ${bound} ms`), { code: 'ETIMEDOUT' })), bound + 250);
-    })]);
+    const deadline = new Promise((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(Object.assign(Error(`Process inspection did not answer within ${bound} ms`), { code: 'ETIMEDOUT' }));
+        controller.abort();
+      }, bound);
+    });
+    return await Promise.race([read(bound, controller.signal), deadline]);
   } finally { clearTimeout(timer); }
 }
 
-async function lookUp(pid, bound) {
+export const processInfo = (pid, { bound } = {}) => inspect((limit, signal) => lookUp(pid, limit, signal), bound);
+
+// Ancestry and group readers share the same bound and kill their own ps child.
+export const processSnapshot = (args, { bound } = {}) => inspect(async limit => {
+  const { stdout } = await execute('/bin/ps', args,
+    { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout: limit, killSignal: 'SIGKILL' });
+  return stdout;
+}, bound);
+
+async function lookUp(pid, bound, signal) {
   if (!Number.isInteger(pid) || pid < 1) throw Error('Invalid process PID');
   if (process.platform === 'linux') {
     try {
-      const [stat, boot, command] = await Promise.all([readFile(`/proc/${pid}/stat`, 'utf8'),
-        readFile('/proc/sys/kernel/random/boot_id', 'utf8'), readFile(`/proc/${pid}/cmdline`, 'utf8')]);
+      const options = { encoding: 'utf8', signal };
+      const [stat, boot, command] = await Promise.all([readFile(`/proc/${pid}/stat`, options),
+        readFile('/proc/sys/kernel/random/boot_id', options), readFile(`/proc/${pid}/cmdline`, options)]);
       const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
       return { pid, start: `${boot.trim()}:${fields[19]}`, zombie: fields[0] === 'Z',
         title: command.replace(/\0/g, ' ').trim() };
@@ -31,7 +48,7 @@ async function lookUp(pid, bound) {
   if (process.platform !== 'darwin') throw Error('Job queue supports macOS and Linux');
   try {
     const { stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'stat=', '-o', 'command='],
-      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, ...(bound ? { timeout: bound, killSignal: 'SIGKILL' } : {}) });
+      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout: bound, killSignal: 'SIGKILL' });
     const match = stdout.trim().match(/^(.{24})\s+(\S+)\s+(.*)$/);
     if (!match) throw Error(`Cannot inspect process ${pid}`);
     return { pid, start: match[1], zombie: match[2].startsWith('Z'), title: match[3] };
@@ -43,9 +60,11 @@ export function signalGroup(pgid, signal) {
   catch (error) { if (error.code === 'ESRCH') return false; throw error; }
 }
 
-async function groupLive(pgid) {
+const groupLive = pgid => inspect((_bound, signal) => lookUpGroup(pgid, signal));
+
+async function lookUpGroup(pgid, signal) {
   if (process.platform === 'darwin') {
-    const { stdout } = await execute('/bin/ps', ['-A', '-o', 'pgid=', '-o', 'stat=']);
+    const stdout = await processSnapshot(['-A', '-o', 'pgid=', '-o', 'stat=']);
     // A member already exiting (stat flag E) cannot be signalled and is ending,
     // like a zombie; killpg answers EPERM for a group of only such members.
     return stdout.trim().split('\n').some(line => {
@@ -54,8 +73,9 @@ async function groupLive(pgid) {
     });
   }
   for (const name of (await readdir('/proc')).filter(name => /^\d+$/.test(name))) {
+    signal.throwIfAborted();
     try {
-      const stat = await readFile(`/proc/${name}/stat`, 'utf8');
+      const stat = await readFile(`/proc/${name}/stat`, { encoding: 'utf8', signal });
       const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
       if (Number(fields[2]) === pgid && fields[0] !== 'Z') return true;
     } catch (error) { if (!['ENOENT', 'ESRCH'].includes(error.code)) throw error; }
@@ -79,6 +99,8 @@ export async function stopGroup(owner, graceMs) {
   if (!owner?.pgid) return;
   if (!Number.isInteger(owner.pgid) || owner.pgid < 2 || owner.pgid !== owner.pid)
     throw Error('Invalid lease process group');
+  if (!owner.start || owner.unchecked)
+    throw Object.assign(Error('Cannot signal an unverified process group'), { code: 'PROCESS_UNVERIFIED' });
   const current = await processInfo(owner.pid);
   if (current && !current.zombie && (current.start !== owner.start
     || (owner.marker && current.title && !current.title.includes(owner.marker)))) return;

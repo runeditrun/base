@@ -90,16 +90,24 @@ test('tag-first release refuses invalid existing tags without changing their ide
   });
 });
 
-test('release branch Verify alone still cannot release, including with a valid adopted tag', async t => {
+test('release branch Verify authorizes tag creation and adoption at the exact source commit', async t => {
   const f = await source(t);
   const branchRun = [{ ...f.run, head_branch: 'release/v1.2.3' }];
   const noTag = f.invoke(branchRun, ['--tag', 'v1.2.3'], {}, { dryRun: false });
-  assert.equal(noTag.result.status, 1, noTag.result.stdout);
-  assert.match(noTag.receipt.gates.verify.details, /neither default branch nor release tag/);
-  assert.equal(git(f.repo, 'tag', '--list'), '');
-  const oid = publishTag(f);
+  assert.equal(noTag.result.status, 0, noTag.result.stdout);
+  assert.equal(noTag.receipt.status, 'RELEASED');
+  assert.equal(noTag.receipt.gates.verify.runId, f.run.id);
+  assert.equal(noTag.receipt.tag.created, true);
+  const oid = git(f.repo, 'rev-parse', 'refs/tags/v1.2.3');
+  assert.equal(noTag.receipt.publicExport.tagObject, oid);
+  git(f.repo, 'push', f.remote, 'refs/tags/v1.2.3');
   const tagged = f.invoke(branchRun, ['--tag', 'v1.2.3'], tagRun(f, oid), { dryRun: false });
-  assert.equal(tagged.result.status, 1, tagged.result.stdout);
-  assert.match(tagged.receipt.gates.verify.details, /neither default branch nor release tag/);
-  assert.equal(tagged.receipt.publicExport, null);
+  assert.equal(tagged.result.status, 0, tagged.result.stdout);
+  assert.equal(tagged.receipt.status, 'RELEASED');
+  assert.equal(tagged.receipt.gates.verify.runId, f.run.id);
+  assert.equal(tagged.receipt.tag.adopted, true);
+  assert.equal(tagged.receipt.tag.created, false);
+  assert.equal(tagged.receipt.tag.object, oid);
+  assert.equal(tagged.receipt.publicExport.tagObject, oid);
+  assert.equal(git(f.remote, 'rev-parse', 'refs/tags/v1.2.3'), oid);
 });

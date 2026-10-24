@@ -7,6 +7,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { isolatedQueue } from './fixtures/queue.mjs';
+import { demoSockets } from '../modules/demo/vite.mjs';
 
 const execute = promisify(execFile);
 
@@ -18,7 +19,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  const primary = 'demo.test.run-fixture.test', page = `page.${primary}`, status = `status.${primary}`;
  const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN',
   platforms: ['workers'], container: { hostVariables: ['STATUS_HOST', 'APP_HOST', 'PAGE_HOST', 'PAGE_ALIAS'] } };
- const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture', instanceType: 'standard-1',
+ const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture', instanceType: 'standard-1', runUrl: 'https://run-fixture.test/run',
   settings: { APP_HOST: primary, PAGE_HOST: page, PAGE_ALIAS: page, STATUS_HOST: status, UNROUTED_HOST: 'outside.example.test' } };
  const configure = async (demo = declaration, deploy = app) => {
   await writeFile(join(root, 'owner-deployment.json'), JSON.stringify(deploy));
@@ -45,7 +46,9 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ name: 'demo-plan-fixture', main: 'src/server.ts', compatibility_date: app.compatibilityDate, assets: {directory:'public',binding:'ASSETS'}, d1_databases:[{binding:'DB',database_name:'fixture',database_id:'00000000-0000-0000-0000-000000000001',migrations_dir:'migrations'}] }));
  await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('./deploy.mjs', import.meta.url).href)};
  const lifecycle = {run:async()=>{},settings:[],hooks:{}};
- export const commandAdapter = {...lifecycle,deploy:ownerDeploy('owner-deployment.json',lifecycle)};`);
+ export const commandAdapter = {...lifecycle,site:{declaration:'config/site.json'},deploy:ownerDeploy('owner-deployment.json',lifecycle)};`);
+ await mkdir(join(root, 'config'));
+ await writeFile(join(root, 'config/site.json'), JSON.stringify({ version: 1, domain: 'run-fixture.test' }));
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [],
   seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'],
    inputs: ['adapter.mjs', 'owner-deployment.json'], effects: 'Plan the fixture demo.' } } }));
@@ -57,6 +60,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
    { cwd: root, encoding: 'utf8', env: { ...env, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_NO_UPDATE_CHECK: '1' }, timeout: 120000, maxBuffer: 1024 * 1024 }) }; }
   catch (error) { return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }; }
  };
+ const localExit = async (command = 'serve') => JSON.parse((await demoSockets().config({ root }, { command })).define['import.meta.rerDemo']);
  const built = await rer();
  assert.equal(built.code, 0, built.stdout + built.stderr);
  const config = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8'));
@@ -78,6 +82,41 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  await configure({ ...JSON.parse(JSON.stringify(declaration).replaceAll('demo.test.', 'demo.')), domain: 'run-fixture.test' });
  await execute('bash', ['-c', step], { cwd: root });
  assert.deepEqual(JSON.parse(await readFile(join(root, 'deploy-demo.json'), 'utf8')), declaration);
+ const scoped = await rer();
+ assert.equal(scoped.code, 0, scoped.stdout + scoped.stderr);
+ const scopedConfig = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8'));
+ assert.equal(scopedConfig.vars.DEMO_RUN_URL, 'https://run-fixture.test/run');
+ // The supported custom site declaration keeps both exits canonical even when
+ // a stale standard filename points somewhere else on a scoped demo host.
+ await writeFile(join(root, 'deploy-site.json'), JSON.stringify({ version: 1, domain: 'wrong-fixture.test' }));
+ const withoutRunUrl = { ...declaration };
+ delete withoutRunUrl.runUrl;
+ await configure(withoutRunUrl);
+ const canonical = await rer();
+ assert.equal(canonical.code, 0, canonical.stdout + canonical.stderr);
+ const canonicalConfig = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8'));
+ assert.equal((await localExit()).url, canonicalConfig.vars.DEMO_RUN_URL);
+ assert.equal(new URL(canonicalConfig.vars.DEMO_RUN_URL).hostname, 'run-fixture.test');
+ // Supported OPERATIONS spellings use the same path resolver through Vite's
+ // serve/build hooks and the public hosted packaging command.
+ const operations = JSON.parse(await readFile(join(root, 'OPERATIONS.json'), 'utf8'));
+ const adapterSource = await readFile(join(root, 'adapter.mjs'), 'utf8');
+ for (const [adapter, site] of [['./adapter.mjs', 'config/site.json'], ['config/adapter.mjs', './config/site.json'], ['./config/./nested-adapter.mjs', 'config/./site.json']]) {
+  await writeFile(join(root, adapter), adapterSource.replace("declaration:'config/site.json'", `declaration:${JSON.stringify(site)}`));
+  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ ...operations, seedContract: { ...operations.seedContract, adapter } }));
+  const packaged = await rer();
+  assert.equal(packaged.code, 0, packaged.stdout + packaged.stderr);
+  const hosted = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8')).vars.DEMO_RUN_URL;
+  for (const command of ['serve', 'build']) assert.equal((await localExit(command)).url, hosted);
+  assert.equal(hosted, canonicalConfig.vars.DEMO_RUN_URL);
+ }
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ ...operations, seedContract: { ...operations.seedContract, adapter: '../adapter.mjs' } }));
+ for (const command of ['serve', 'build']) await assert.rejects(() => localExit(command), /contained checkout path/);
+ const escaped = await rer();
+ assert.equal(escaped.code, 2, escaped.stdout + escaped.stderr);
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(operations));
+ await configure({ ...declaration, runUrl: 'https://override-fixture.test/run' });
+ assert.equal((await localExit()).url, 'https://override-fixture.test/run');
  await configure();
 
  const workerConfig = JSON.parse(await readFile(join(root, 'wrangler.jsonc'), 'utf8'));
@@ -87,6 +126,13 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  assert.match(missingClass.stdout + missingClass.stderr, /cannot bind COUNTER:.*MissingCounter/);
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify(workerConfig));
 
+ for (const runUrl of ['http://run-fixture.test/run', 'https://run-fixture.test/', 'javascript:alert(1)', 'data:text/html,unsafe', '//outside.test/run', {}, 42, null, true, ['https://run-fixture.test/run'], 'https://user:password@run-fixture.test/run', 'https://run-\nfixture.test/run']) {
+  await configure({ ...declaration, runUrl });
+  await assert.rejects(() => localExit(), /invalid-demo-run-url/);
+  const refused = await rer();
+  assert.equal(refused.code, 2);
+  assert.match(refused.stdout, /invalid-demo-run-url/);
+ }
  for (const value of [undefined, '', 'Page.' + primary, 'outside.example.test', primary + '.outside.test', 'other' + primary,
   'https://' + page, page + ':443', 'a'.repeat(64) + '.' + primary, 'bad..' + primary]) {
   await configure({ ...declaration, settings: { ...declaration.settings, PAGE_HOST: value } });

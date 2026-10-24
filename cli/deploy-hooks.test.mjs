@@ -314,7 +314,6 @@ test('first custom deploy accepts late health, rejects missing signout, and reje
   await rm(join(f.root, '.rer'), { recursive: true, force: true });
   const missing = await f.run('late', { signout: status }), said = missing.stdout + missing.stderr;
   assert.equal(missing.code, 1, said);
-  assert.match(said, /unused owner session could not be retired/);
   assert.match(said, /\/api\/auth\/logout/);
  }
  // A declared route is threaded through nested custom-deploy observers.

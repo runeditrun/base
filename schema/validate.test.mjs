@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { checkSchema, validate } from './json-schema.mjs';
+import { validateSetupManifest } from './setup-validation.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (name) => JSON.parse(readFileSync(join(here, name), 'utf8'));
@@ -185,6 +186,27 @@ for (const [name, text, expected] of seedProbes) {
   });
 }
 
+const setupSchema = read('SETUP.schema.json');
+const setupProbes = [
+  ...[
+    ['LEGAL_NAME', 'TRADING_NAME', 'legal_name'],
+    ['OWNER_EMAIL', 'SUPPORT_EMAIL', 'owner_email']
+  ].map(([first, second, businessField]) => [
+    `two inputs claiming ${businessField}`,
+    [first, second].map(name => ({ name, label: 'Profile value', kind: 'text', businessField })),
+    new RegExp(`(?=.*${first})(?=.*${second})(?=.*${businessField})`)
+  ])
+];
+
+for (const [name, fields, message] of setupProbes) {
+  test(`the setup manifest ${message ? 'rejects' : 'accepts'} ${name}`, () => {
+    const manifest = { schema: 1, title: 'Settings', groups: [], fields, steps: [{ type: 'extension', id: 'workspace' }] };
+    const errors = validateSetupManifest(setupSchema, manifest);
+    if (message) assert.ok(errors.some(error => message.test(error)), `expected ${message}, got ${JSON.stringify(errors)}`);
+    else assert.deepEqual(errors, []);
+  });
+}
+
 test('required is satisfied only by own properties', () => {
   const own = { type: 'object', required: ['constructor'], properties: {}, additionalProperties: false };
   assert.deepEqual(validate(own, JSON.parse('{}')), ['$: missing required property "constructor"']);
@@ -219,6 +241,7 @@ test('an unsupported keyword in an untaken conditional branch throws', () => {
   };
   assert.deepEqual(validate(probe, { kind: 'b' }), [], 'validate cannot see a branch the document does not take');
   assert.throws(() => checkSchema(probe), /unsupported schema keyword "minProperties"/);
+  assert.throws(() => checkSchema({not: {minProperties: 1}}), /unsupported schema keyword "minProperties" at #\/not/);
 });
 
 test('an unsupported format anywhere in the schema throws', () => {

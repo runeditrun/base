@@ -59,6 +59,10 @@ export async function install({ quiet = false } = {}) {
   process.stderr.write(`rer cli install: ${paths.launcher} already exists and was not written by rer cli install (it may be the unrelated npm package "rer"). Nothing was changed. Remove or rename it, then run the install again.\n`);
   return 4;
  }
+ if (launcher.state === 'ours' && (!launcher.root || resolve(launcher.root) !== resolve(paths.data))) {
+  process.stderr.write(`rer cli install: ${paths.launcher} already runs another install root${launcher.root ? ` (${launcher.root})` : ''}. Nothing was changed. Choose a separate launcher folder with RER_BIN_DIR or XDG_BIN_HOME, then run the install again.\n`);
+  return 4;
+ }
  const record = await installRecord(paths), current = await readLink(paths.current);
  const script = launcherScript(paths.data);
  let present = false;

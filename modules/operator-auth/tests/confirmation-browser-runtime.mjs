@@ -28,23 +28,22 @@ export async function browserRuntime(overrides = {}) {
     SETUP_TOKEN: 'browser-test-only-setup-token-at-least-32-characters',
     MAIL_FROM: 'auth@example.com', ipLimit: 1000, emailLimit: 1000, ...overrides,
   };
-  const options = (port = 0) => ({
+  const options = {
     ...convertV4MiniflareOptions({
-      host: '127.0.0.1', port, modules: true, script: output.outputFiles[0].text,
+      host: '127.0.0.1', port: 0, modules: true, script: output.outputFiles[0].text,
       compatibilityDate: '2026-09-01', d1Databases: { DB: 'browser-auth' },
       bindings: { TEST_CONFIG: JSON.stringify(config) },
     }),
     resourcePersistencePath: join(directory, 'state'),
-  });
-  const mf = new Miniflare(options());
+  };
+  const mf = new Miniflare(options);
   try {
     const address = await mf.ready;
     config.origin = address.origin;
-    // Bind config to the actual ephemeral listener before any test requests.
-    // Neither the fixture nor production derives authority from a request.
-    await mf.setOptions(options(Number(address.port)));
-    await mf.ready;
+    // Publish trusted fixture configuration without restarting the listener.
     const db = await mf.getD1Database('DB');
+    await db.exec('CREATE TABLE browser_config (value TEXT NOT NULL);');
+    await db.prepare('INSERT INTO browser_config(value) VALUES(?)').bind(JSON.stringify(config)).run();
     await applySql(db, schema);
     await db.exec('CREATE TABLE browser_mail (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL);');
     const post = (path, input, headers = {}) => fetch(new URL(path, config.origin), {

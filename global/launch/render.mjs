@@ -1,9 +1,9 @@
 // What `rer dev` prints while it launches: one line per step, one honest line
-// once a step has been quiet for 5 seconds (then every 20), a `progress` event
+// after every 5 seconds of quiet, a `progress` event
 // for each with --json, then the dispatcher's ready lines and, last, one line
 // a person reads first: the app's name, its address and how to open it.
 const elapsed = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
-const firstQuiet = 5000, quiet = 20000, advise = 30000;
+const quiet = 5000, advise = 30000;
 
 // `keyless`: stdout is not a terminal (an agent, a pipe, CI, a log) or the
 // front door started the launch. The ready lines then never carry the dev-key
@@ -12,7 +12,7 @@ const firstQuiet = 5000, quiet = 20000, advise = 30000;
 // `reattach` is the command that picks a stopped wait up again.
 export function printer({ json, stopHint, keyless = false, name, openHint, open, reattach = 'rer dev' }) {
  const started = Date.now();
- let current = 'preparing', last = Date.now(), stepStarted = Date.now(), quietLines = 0, advised = false;
+ let current = 'preparing', last = Date.now(), stepStarted = Date.now(), advised = false;
  const event = (name, fields) => process.stdout.write(JSON.stringify({ version: 1, verb: 'dev', event: name, ...fields }) + '\n');
  const line = text => process.stderr.write(`rer dev: ${text}\n`);
  const progress = (phase, message) => {
@@ -21,11 +21,11 @@ export function printer({ json, stopHint, keyless = false, name, openHint, open,
   else line(message);
  };
  return {
-  phase({ phase, message }) { if (phase !== 'note') { current = message; stepStarted = Date.now(); quietLines = 0; } progress(phase, message); },
+  phase({ phase, message }) { if (phase !== 'note') { current = message; stepStarted = Date.now(); } progress(phase, message); },
   attaching(startedAt) { progress('attach', `attaching to the launch already preparing this checkout (started ${elapsed(Date.now() - startedAt)} ago)`); },
+  activity() { last = Date.now(); },
   heartbeat() {
-   if (Date.now() - last < (quietLines ? quiet : firstQuiet)) return;
-   quietLines++;
+   if (Date.now() - last < quiet) return;
    const long = !advised && Date.now() - stepStarted >= advise;
    if (long) advised = true;
    progress('waiting', `still ${current} (${elapsed(Date.now() - stepStarted)})${long ? `. A first launch can take a few minutes; if this command is stopped, run ${reattach} again to reattach.` : ''}`);

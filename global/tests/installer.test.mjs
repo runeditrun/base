@@ -89,7 +89,7 @@ test('install.sh and rer update install verified registry releases, the Run page
  assert.equal((await run('sh', ['-l', '-c', 'rer --version'], env)).stdout.trim(), manifest.version, 'a new shell finds rer after the line ran once');
  // A redirected data folder (XDG_DATA_HOME) or bin folder (RER_BIN_DIR) keeps
  // the launcher out of the account's own ~/.local/bin.
- for (const [redirect, launcher] of [[{ XDG_DATA_HOME: join(directory, 'xdg/share') }, join(directory, 'xdg/bin/rer')], [{ RER_BIN_DIR: join(directory, 'own-bin') }, join(directory, 'own-bin/rer')]]) {
+ for (const [redirect, launcher] of [[{ XDG_DATA_HOME: join(directory, 'xdg/share') }, join(directory, 'xdg/share/bin/rer')], [{ RER_BIN_DIR: join(directory, 'own-bin') }, join(directory, 'own-bin/rer')]]) {
   const elsewhere = { ...env, HOME: join(directory, 'redirect-home'), ...redirect };
   const placed = await run('sh', [installer], elsewhere);
   assert.equal(placed.code, 0, placed.stderr);
@@ -97,6 +97,22 @@ test('install.sh and rer update install verified registry releases, the Run page
   await assert.rejects(access(join(elsewhere.HOME, '.local/bin')), 'nothing is written to ~/.local/bin');
   await rm(join(directory, 'redirect-home'), { recursive: true, force: true });
  }
+ // A data-only redirect beside the normal data directory must preserve the
+ // existing launcher. The script also runs its command through the new one.
+ const originalLauncher = await readFile(rer, 'utf8');
+ const redirected = { ...env, XDG_DATA_HOME: join(home, '.local/redirected-data') };
+ const redirectedRer = join(redirected.XDG_DATA_HOME, 'bin/rer');
+ const dataOnly = await run('sh', [installer, '--version'], redirected);
+ assert.equal(dataOnly.code, 0, dataOnly.stderr);
+ assert.equal((await run(redirectedRer, ['--version'], redirected)).stdout.trim(), manifest.version);
+ assert.equal(await readFile(rer, 'utf8'), originalLauncher);
+ // Even an explicit bin override cannot silently retarget another install.
+ const collision = { ...redirected, XDG_DATA_HOME: join(directory, 'collision-data'), RER_BIN_DIR: dirname(rer) };
+ const refused = await run('sh', [installer], collision);
+ assert.notEqual(refused.code, 0);
+ assert.equal(await readFile(rer, 'utf8'), originalLauncher);
+ assert.equal(await selected(), manifest.version);
+ await assert.rejects(access(collision.XDG_DATA_HOME));
 
  // The Run page's step 2 runs on what install.sh put on PATH and nothing else:
  // no npx and no Node on PATH. The private Node install.sh downloads when there

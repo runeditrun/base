@@ -169,13 +169,13 @@ NODE
 }
 
 # The launcher's folder, by the rule rer cli install follows
-# (global/cli/layout.mjs): RER_BIN_DIR, else XDG_BIN_HOME, else the bin beside a
-# redirected XDG_DATA_HOME, else ~/.local/bin. A redirected install never
+# (global/cli/layout.mjs): RER_BIN_DIR, else XDG_BIN_HOME, else bin inside an
+# explicitly set XDG_DATA_HOME, else ~/.local/bin. A redirected install never
 # writes the account's own ~/.local/bin.
 bin_folder() {
  if [ -n "${RER_BIN_DIR:-}" ]; then printf '%s\n' "$RER_BIN_DIR"
  elif [ -n "${XDG_BIN_HOME:-}" ]; then printf '%s\n' "$XDG_BIN_HOME"
- elif [ -n "${XDG_DATA_HOME:-}" ]; then printf '%s/bin\n' "$(dirname "$XDG_DATA_HOME")"
+ elif [ -n "${XDG_DATA_HOME:-}" ]; then printf '%s/bin\n' "${XDG_DATA_HOME%/}"
  else printf '%s/.local/bin\n' "$HOME"
  fi
 }

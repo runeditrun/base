@@ -3,11 +3,9 @@
 // server-start guard, github.com and the npm registry, and the loopback port
 // rer dev starts from. Read-only; every look is bounded, so it answers offline
 // too. A missing requirement fails (exit 3); what only slows a start warns.
-import { execFile } from 'node:child_process';
 import { statfs } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { promisify } from 'node:util';
 import { serversDiskFloor } from '../cli/server-resources.mjs';
 import { probePort } from '../onboarding/port-probe.mjs';
 import { gitPreflight } from './cli/repository.mjs';
@@ -18,12 +16,11 @@ import { ownManifest } from './package-info.mjs';
 import { serversDirectory } from './registry.mjs';
 
 const usage = 'Usage: rer doctor [--json]\nOutside a project: checks this computer for what rer needs (git, Node, the rer command, disk, network, loopback port). Inside one: that project\'s diagnostics.\n';
-const run = promisify(execFile), gib = bytes => `${(Number(bytes) / 1024 ** 3).toFixed(2)} GiB`;
+const gib = bytes => `${(Number(bytes) / 1024 ** 3).toFixed(2)} GiB`;
 
-async function git() {
- try { await gitPreflight(); } catch (error) { return { status: 'fail', message: error.message }; }
- const version = await run('git', ['--version'], { timeout: 5000 }).then(({ stdout }) => stdout.trim(), () => 'git');
- return { status: 'ok', message: version };
+async function git(env) {
+ try { return { status: 'ok', message: await gitPreflight(undefined, env) }; }
+ catch (error) { return { status: 'fail', message: error.message }; }
 }
 
 function node() {
@@ -68,7 +65,7 @@ export async function machineDoctor(args, env = process.env) {
  if (unknown !== undefined) { process.stderr.write(`Unsupported flag ${unknown} for doctor outside a project. Run rer doctor --help.\n`); return 2; }
  const registry = (env.npm_config_registry || 'https://registry.npmjs.org').replace(/\/+$/, '');
  const names = ['git', 'node', 'rer', 'disk', 'github', 'registry', 'loopback'];
- const results = await Promise.all([git(), node(), launcher(), disk(env), reach('github.com', 'https://github.com/'), reach(URL.canParse(registry) ? new URL(registry).host : registry, `${registry}/`), loopback(env)]);
+ const results = await Promise.all([git(env), node(), launcher(), disk(env), reach('github.com', 'https://github.com/'), reach(URL.canParse(registry) ? new URL(registry).host : registry, `${registry}/`), loopback(env)]);
  const checks = names.map((id, index) => ({ id, ...results[index] })), ok = checks.every(check => check.status !== 'fail'), exitCode = ok ? 0 : 3;
  if (json) { process.stdout.write(JSON.stringify({ version: 1, verb: 'doctor', event: 'result', ok, exitCode, diagnostics: { scope: 'machine', checks } }) + '\n'); return exitCode; }
  const lines = ['rer doctor: this computer (no project in this folder)', ...checks.map(check => `  ${check.status.padEnd(5)} ${check.id.padEnd(9)} ${check.message.replaceAll('\n', '\n                  ')}`)];

@@ -1,9 +1,9 @@
 import { resolve } from 'node:path';
-import { commonFlags, demoVerb, serverDefaults, signinVerb, verbs } from './contract.mjs';
+import { authoringVerbs, commonFlags, demoVerb, serverDefaults, signinVerb, verbs } from './contract.mjs';
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
-const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo']);
+const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo', '--offline']);
 export const mailbox = value => typeof value === 'string' && value.length <= 254 && /^[a-zA-Z0-9.!+_%\-]+@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+$/.test(value);
 export const validOwnerName = value => typeof value === 'string' && Boolean(value.trim()) && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value);
 // A loopback host: the shared predicate (including `*.localhost` door names),
@@ -32,7 +32,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run rer --help.');
  const name = demo ? 'demo' : verb;
  // The flags this verb's help lists; rer demo also carries the --demo it adds itself.
- const helpFlags = independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : demo ? demoVerb.flags : (verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags;
+ const helpFlags = independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : demo ? demoVerb.flags : (verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags;
  const allowed = new Set(demo ? ['--demo', ...helpFlags] : helpFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
  let separator = false;
  for (let i = 0; i < args.length; i++) {
@@ -63,6 +63,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  }
  if (options.help) return options;
  if (deferTail) { options.cwd=resolve(cwd,options.cwd);return options; }
+ if (verb === 'refresh-base' && !independent && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run rer refresh-base --help.');
  if (options.detach && options.foreground) throw invalid('Choose one of --detach and --foreground.');
  if(options.stop && ['--port','--host','--idle-timeout','--detach','--foreground','--no-queue','--as','--login','--models','--models-service','--door','--direct'].some(flag=>options.supplied.has(flag)))throw invalid('--stop cannot be combined with start-only flags.');
  // --port and --host always mean direct mode; --door and --direct pick a mode.
@@ -119,10 +120,10 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys(verbs).join(', ')}, demo, signin, release, listing, archive\nRun rer VERB --help for flags.\n`;
- const known = verb === 'demo' ? demoVerb : verbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({ ...verbs, ...authoringVerbs }).join(', ')}, demo, signin, release, listing, archive\nRun rer VERB --help for flags.\n`;
+ const known = verb === 'demo' ? demoVerb : verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
- return `${door}Usage: rer ${verb} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
+ return `${door}Usage: rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
 }
 
 // What people type for a flag whose name qualifies it, on a verb where it can

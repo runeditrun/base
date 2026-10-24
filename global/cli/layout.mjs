@@ -3,16 +3,16 @@
 // Launcher: rer in the bin folder, using the installer's private Node when present.
 // The bin folder follows the data folder, so a redirected install never writes
 // the account's own ~/.local/bin: RER_BIN_DIR, else XDG_BIN_HOME, else the bin
-// beside a redirected XDG_DATA_HOME (its ../bin), else $HOME/.local/bin.
+// inside an explicitly set XDG_DATA_HOME, else $HOME/.local/bin.
 import { readFile, lstat } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export function binDirectory(env = process.env, home = env.HOME || homedir()) {
  if (env.RER_BIN_DIR) return resolve(env.RER_BIN_DIR);
  if (env.XDG_BIN_HOME) return resolve(env.XDG_BIN_HOME);
- if (env.XDG_DATA_HOME) return join(dirname(resolve(env.XDG_DATA_HOME)), 'bin');
+ if (env.XDG_DATA_HOME) return join(resolve(env.XDG_DATA_HOME), 'bin');
  return join(home, '.local/bin');
 }
 

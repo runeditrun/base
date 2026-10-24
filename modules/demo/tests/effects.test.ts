@@ -8,7 +8,7 @@ const ROOT = new URL('../../', import.meta.url);
 // Exercise the real Worker entry; replace only the external network edge.
 async function worker(t, bindings) {
   const calls = [];
-  const modules = ['demo/tests/fixture.mjs', ...['index', 'effects', 'responses', 'label'].map(name => `demo/${name}.mjs`), ...['http', 'csp', 'errors', 'crypto', 'loopback'].map(name => `operator-auth/${name}.mjs`)];
+  const modules = ['demo/tests/fixture.mjs', ...['index', 'effects', 'responses', 'label', 'navigation'].map(name => `demo/${name}.mjs`), ...['http', 'csp', 'errors', 'crypto', 'loopback'].map(name => `operator-auth/${name}.mjs`)];
   const mf = new Miniflare(convertV4MiniflareOptions({ modulesRoot: fileURLToPath(ROOT), modules: modules.map(path => ({ type: 'ESModule', path: fileURLToPath(new URL(path, ROOT)) })), compatibilityDate: '2026-09-08', d1Databases: { DB: 'demo' }, bindings,
     outboundService(request) { calls.push(`${request.method} ${request.url}`); return Response.json({ reached: new URL(request.url).pathname }, { status: 202, headers: { 'x-message-id': 'real-network-id' } }); },
   }));

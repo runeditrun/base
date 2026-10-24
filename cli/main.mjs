@@ -1,4 +1,5 @@
 import './sqlite-notice.mjs';
+import {authoringVerbs} from './contract.mjs';
 import { parse, help } from './parse.mjs';
 import { output } from './output.mjs';
 import { invalid, RerError } from './errors.mjs';
@@ -38,6 +39,11 @@ export async function main(argv = process.argv.slice(2)) {
   if(options.noQueue){const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw invalid('--no-queue requires the original caller CI=true.');}finally{await policy.close();}}
   const runtime = await selectNodeRuntime(options, argv, out);
   if (runtime) return runtime.exitCode;
+  if (!independent && Object.hasOwn(authoringVerbs, options.verb)) {
+   const result = (await import('./authoring.mjs')).authoringCommand(options);
+   if (!options.json) out.human(JSON.stringify(result, null, 2));
+   out.result(true, 0, result); return 0;
+  }
   project ??= await resolveProject(options.cwd);
   if (project.profile === 'independent' && !['describe', 'check', 'doctor'].includes(options.verb)) options = parse(argv, process.cwd(), { independent: true });
   else if (options.forwarded.length) throw invalid('First-party commands accept only the documented flags, without forwarded arguments.');

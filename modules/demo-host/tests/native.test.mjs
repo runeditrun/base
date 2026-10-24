@@ -41,7 +41,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
       durableObjects: { DEMO: { className: 'NativeDemo', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
       ratelimits: { STARTS: { namespace_id: '1001', simple: { limit: 3, period: 60 } } },
-      bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}', DEMO_SECONDARY_ORIGINS: '["https://page.demo.example.test"]',
+      bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_RUN_URL: 'https://canonical.example.test/run', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}', DEMO_SECONDARY_ORIGINS: '["https://page.demo.example.test"]',
         TURNSTILE_SITE_KEY: 'fixture-site-key', TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA', RER_DEMO_MEASUREMENT_TOKEN: measurement, NATIVE_TEST_TTL_MS: '12000' },
       serviceBindings: { ASSETS: () => new Response('fixture-asset') },
       outboundService: request => { if (request.url === 'https://network.example.test/') return new Response('network'); assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify'); return Response.json({ success: true }); },
@@ -65,7 +65,10 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     for (let i = 0; i < 10; i++) await capacity.acquire(capacityNamespace.newUniqueId().toString(), Date.now() + 60_000, 100, 'retired-visitor');
     const home = await fetch('/');
     assert.equal(home.status, 200);
-    assert.match(await home.text(), /<link rel="prefetch" href="\/app-assets\/chunk-ABCDEFGH\.js">/, "the start page prefetches the seed's built chunks");
+    const homeHtml = await home.text();
+    assert.ok(homeHtml.includes(`href="https://canonical.example.test/run"`), 'the start door leads to the canonical run chooser');
+    assert.ok(homeHtml.includes(`href="https://example.test/"`), 'the original home exit remains available');
+    assert.match(homeHtml, /<link rel="prefetch" href="\/app-assets\/chunk-ABCDEFGH\.js">/, "the start page prefetches the seed's built chunks");
     // A start without a readable form is a clean 400 before any place is reserved.
     for (const init of [{}, { body: '{"x":1}', headers: { 'content-type': 'application/json' } }, { body: 'x', headers: { 'content-type': 'multipart/form-data; boundary=none' } }]) {
       const refused = await fetch('/__demo/start', `rer_demo_measure=${measurement}`, { method: 'POST', ...init, headers: { 'cf-connecting-ip': '203.0.113.9', accept: 'application/json', ...init.headers } });

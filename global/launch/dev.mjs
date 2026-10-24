@@ -20,6 +20,8 @@ import { openInBrowser, productName, savedOpenUrl } from '../open.mjs';
 import { LaunchFailure } from './failure.mjs';
 import { describeCheckout, portBusy } from './facts.mjs';
 import { prepare } from './prepare.mjs';
+import { projectNodePin } from '../../cli/node-runtime-discovery.mjs';
+import { pipedHandoff } from './handoff.mjs';
 import { watchReady } from './ready-watch.mjs';
 import { printer } from './render.mjs';
 import { stopLaunch } from './stop.mjs';
@@ -93,7 +95,7 @@ async function foreground(target, devArgs, directory, out, doorStart, closing, {
  const log = createWriteStream(join(directory, 'launch.log'), { flags: 'a', mode: 0o600 });
  let prepared;
  // The same progress lines as a detached launch while install or setup runs.
- const heartbeat = setInterval(() => out.heartbeat(), 1000);
+ const heartbeat = setInterval(() => out.heartbeat(), 250);
  try {
   prepared = await prepare({ root: target.root, args: devArgs, env: process.env, report: fields => out.phase(fields), directory, log: text => log.write(text + '\n'), children: new Set(), doorStart });
   // The app starts in this process: a port taken since this launch's setup
@@ -101,26 +103,40 @@ async function foreground(target, devArgs, directory, out, doorStart, closing, {
   if (prepared.move && await portBusy(prepared.port)) { await prepared.release?.(); prepared.release = (await prepared.move(prepared.port)).release; }
  }
  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; out.failure(failure); return failure.exitCode; }
- finally { clearInterval(heartbeat); log.end(); }
+ finally { log.end(); if (!prepared) clearInterval(heartbeat); }
  Object.assign(process.env, prepared.added);
  const name = closing.name ?? 'the app';
- return handOver(target, closing, { openApp, shellDirectory, json: devArgs.includes('--json'), foreground: true,
-  starting: () => out.phase({ phase: 'start', message: prepared.own ? `${name} is already running; checking it` : `starting ${name}` }) });
+ try { return await handOver(target, closing, { openApp, shellDirectory, heartbeat, out, json: devArgs.includes('--json'), foreground: true,
+  starting: () => out.phase({ phase: 'start', message: prepared.own ? `${name} is already running; checking it` : `starting ${name}` }) }); }
+ finally { clearInterval(heartbeat); }
 }
 
-// The checkout's own rer serves in this process and prints its own ready
-// lines. A pinned launcher that adds the closing line itself (it has
-// launch/ready-watch.mjs) gets --open and the person's folder, and names its
-// own start; for any other, this process names the start (`starting`), reads
-// the lines as they are written, keeps the key out of a non-terminal and adds
-// the closing line, opening the browser when asked.
-export function handOver(target, closing, { openApp, shellDirectory, json, foreground, starting = () => {} }) {
- const { launcher } = dispatcher(target.root);
- if (launcher && existsSync(join(dirname(launcher), 'launch/ready-watch.mjs'))) {
+// Preparation is complete. Preserve the normal in-process foreground owner
+// when Node matches; otherwise pipe the pinned dispatcher so its inherited
+// re-exec cannot bypass the filter. Detached workers already read private logs.
+export async function handOver(target, closing, { openApp, shellDirectory, json, foreground, heartbeat, out, starting = () => {} }) {
+ const { launcher, entry } = dispatcher(target.root);
+ const progress = out ?? printer({ ...closing, json, open: closing.opener });
+ heartbeat ??= setInterval(() => progress.heartbeat(), 250);
+ const pin = await projectNodePin(target.root);
+ const piped = Boolean(pin && pin !== process.versions.node);
+ if (!piped && launcher && existsSync(join(dirname(launcher), 'launch/ready-watch.mjs'))) {
   if (openApp) target.args.push('--open');
   process.env.RER_SHELL_CWD = shellDirectory;
- } else { starting(); watchReady({ ...closing, json, foreground }); }
- return delegateDev(target);
+  clearInterval(heartbeat);
+  return delegateDev(target);
+ }
+ if (!out) progress.phase({ phase: 'start', message: `starting ${closing.name ?? 'the app'}` });
+ starting();
+ const output = watchReady({ ...closing, json, foreground, piped,
+  onOutput: () => progress.activity(), onReady: () => clearInterval(heartbeat) });
+ if (!piped) return delegateDev(target);
+ // Run the prepared pin's verbs directly; its global launcher would prepare
+ // again and add a second closing line. Keep its foreground lifetime explicit.
+ const args = target.args.filter(arg => !['--door-start', '--detach', '--foreground'].includes(arg));
+ if (foreground) args.push('--foreground');
+ try { return await pipedHandoff(entry, args, target.root, output); }
+ finally { clearInterval(heartbeat); }
 }
 
 async function detached(target, devArgs, directory, out, doorStart) {

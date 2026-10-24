@@ -1,9 +1,7 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { alive } from './identity.mjs';
-const execute = promisify(execFile);
+import { processSnapshot } from './processes.mjs';
 
 // Environment conveys a capability, never a boolean exemption. Validate both
 // the live lease and the calling process's actual ancestry before sharing it.
@@ -21,7 +19,9 @@ export async function liveMembership(value = process.env.RER_JOB_MEMBERSHIP) {
 }
 
 export async function descendantOf(owner) {
- const {stdout}=await execute('/bin/ps',['-A','-o','pid=','-o','ppid=']);
+ // Unanswered ancestry never shares a slot or policy exemption. Both callers
+ // catch inspection failure and require normal admission instead.
+ const stdout=await processSnapshot(['-A','-o','pid=','-o','ppid=']);
  const parents=new Map(stdout.trim().split('\n').map(line=>line.trim().split(/\s+/).map(Number))),visited=new Set();
  for(let pid=process.pid;pid>1&&!visited.has(pid);pid=parents.get(pid)){
   if(pid===owner)return true;visited.add(pid);

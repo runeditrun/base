@@ -10,17 +10,22 @@ const git = promisify(execFile);
 // Git gets the repository; without it nothing else can start. A Mac without
 // Apple's command line tools has a /usr/bin/git that only asks for them (and
 // opens their installer), or names the missing developer path after a macOS
-// update, so either answer counts as missing too. The refusal carries the
-// stable code git_missing and exit 3, like any missing tool.
+// update, so either answer counts as missing too. An installed command that
+// fails or cannot identify itself as Git needs repair before we can use it.
+// Return its version so doctor uses the same successful probe.
 export async function gitPreflight(repository, env = process.env) {
  let failure;
- try { await git('git', ['--version'], { env, timeout: 30000 }); return; }
+ try {
+  const { stdout } = await git('git', ['--version'], { env, timeout: 30000 });
+  const version = stdout.trim();
+  if (/^git version \S+/.test(version)) return version;
+ }
  catch (error) { failure = error; }
- const tools = /xcode-select|xcrun: error|active developer path|developer tools|command line tools/i.test(String(failure.stderr ?? ''));
- if (failure.code !== 'ENOENT' && !tools) return;
- throw new RerError('git_missing', [
-  `rer needs Git${repository ? ` to get ${repository}` : ''}, and ${tools ? 'this Mac has no command line developer tools, which include Git' : 'Git is not installed on this computer'}. Git is the tool that downloads an app's code.`,
-  'Install it, then run the same command again:',
+ const tools = /xcode-select|xcrun: error|active developer path|developer tools|command line tools/i.test(String(failure?.stderr ?? ''));
+ const missing = failure?.code === 'ENOENT' || tools;
+ throw new RerError(missing ? 'git_missing' : 'git_unusable', [
+  `rer needs Git${repository ? ` to get ${repository}` : ''}, and ${tools ? 'this Mac has no command line developer tools, which include Git' : missing ? 'Git is not installed on this computer' : 'the Git command on PATH could not run successfully on this computer'}. Git is the tool that downloads an app's code.`,
+  missing ? 'Install it, then run the same command again:' : 'Repair or reinstall Git for this computer and make sure the working Git command is first on PATH, then run the same command again:',
   process.platform === 'darwin' ? '  xcode-select --install   (Apple\'s command line tools, with Git; a window asks you to confirm)' : '  sudo apt install git   (Debian, Ubuntu; Fedora: sudo dnf install git)',
  ].join('\n'), 3);
 }
@@ -94,7 +99,7 @@ export async function checkoutRepository({ url, root, directory, repository = ur
  const partial = url.startsWith('file:') ? [] : ['--filter=blob:none'];
  let heartbeat = setTimeout(function waiting() {
   report(`still getting ${repository} into ${directory}`);
-  heartbeat = setTimeout(waiting, 20000);
+  heartbeat = setTimeout(waiting, 5000);
  }, 5000);
  let code;
  try { code = await runCommand('git', ['clone', ...partial, ...(process.stderr.isTTY ? [] : ['--quiet']), '--', url, root]); }

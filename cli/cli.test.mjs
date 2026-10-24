@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { exportCLI, inventory } from './export.mjs';
 import { parse, help } from './parse.mjs';
-import { verbs, commonFlags } from './contract.mjs';
+import { authoringVerbs, verbs, commonFlags } from './contract.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 const base = resolve(import.meta.dirname, '..'), cli = join(base, 'bin/rer.mjs');
 const environment = () => ({ PATH: process.env.PATH, HOME: process.env.HOME, TZ: 'UTC' });
@@ -26,11 +26,11 @@ const events = result => result.stdout.trim().split('\n').map(line => JSON.parse
 
 test('every command help is effect-free outside a checkout, before adapters and tools', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-help-')); t.after(() => rm(root, { recursive: true, force: true }));
- for (const verb of [...Object.keys(verbs), 'demo', 'signin']) {
+ for (const verb of [...Object.keys({ ...verbs, ...authoringVerbs }), 'demo', 'signin']) {
   const json = run(root, [verb, '--help', '--json']); assert.equal(json.status, 0); assert.equal(events(json).at(-1).event, 'result');
  }
  // The complete public command tree, through the checkout dispatcher and the installed rer.
- const checkout = [...Object.keys(verbs), 'demo', 'signin', 'release', 'release sign', 'release receipt', 'release keygen', 'listing', 'archive', 'archive diff', 'business', 'companion'];
+ const checkout = [...Object.keys({ ...verbs, ...authoringVerbs }), 'demo', 'signin', 'release', 'release sign', 'release receipt', 'release keygen', 'listing', 'archive', 'archive diff', 'business', 'companion'];
  const installed = [...checkout, 'update', 'list', 'cli', 'cli status', 'cli install', 'cli uninstall', 'queue', 'queue NAME', 'door', 'door enable', 'run'];
  for (const [entry, commands] of [[cli, checkout], [join(base, 'global/rer.mjs'), installed]]) for (const command of commands) {
   const result = run(root, [...command.split(' '), '--help'], entry, { ...environment(), RER_NO_UPDATE_CHECK: '1' });
@@ -47,12 +47,12 @@ test('every command help is effect-free outside a checkout, before adapters and 
  for (const argv of [['dev','--foreground','--help'], ['preview','--detach','--help']]) assert.equal(run(root,argv).status,0);
  assert.deepEqual(await readdir(root), []);
  await writeFile(join(root,'OPERATIONS.json'),'{invalid configuration');
- for(const verb of Object.keys(verbs))assert.equal(run(root,[verb,'--','--help','--json']).status,0,'package-forwarded help precedes configuration validation');
+ for(const verb of Object.keys({...verbs, ...authoringVerbs}))assert.equal(run(root,[verb,'--','--help','--json']).status,0,'package-forwarded help precedes configuration validation');
  assert.deepEqual(await readdir(root),['OPERATIONS.json']);
 });
 
 test('parsing rejects every unsupported flag, missing value, invalid host/port and duplicate before effects', () => {
- for (const verb of Object.keys(verbs)) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
+ for (const verb of Object.keys({ ...verbs, ...authoringVerbs })) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
  // A refusal names the verb's help, and a flag only for a near miss: one that verb's help lists.
  const named = argv => {
   try { parse(argv); } catch (error) {
