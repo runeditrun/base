@@ -49,7 +49,9 @@ async function persistent(files, folders) {
 // Empty when `rer` already runs this launcher in this terminal and new ones.
 // Otherwise the advice ends with the exact line to run.
 export async function pathAdvice(paths, env = process.env) {
- const entries = [...new Set((env.PATH ?? '').split(delimiter).filter(Boolean).map(entry => resolve(entry)))];
+ // npm exec (npx) puts node_modules/.bin folders on PATH for its own run only:
+ // they are not the person's PATH, and their rer is not one to report.
+ const entries = [...new Set((env.PATH ?? '').split(delimiter).filter(entry => entry && !entry.endsWith(join('node_modules', '.bin'))).map(entry => resolve(entry)))];
  const bin = resolve(paths.bin), lines = [];
  let firstCommand;
  for (const directory of entries) {

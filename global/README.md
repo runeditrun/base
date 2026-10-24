@@ -200,12 +200,16 @@ and leaves it running, printing the server's private log path; in a terminal it
 stays in the foreground and Ctrl-C stops it. `--detach` and `--foreground`
 override the choice, and `--json` prints `progress` events and the ready event. A
 first launch can take minutes. Each line names the step that runs: getting the
-code, installing dependencies, setting up the local database and owner (with
-setup's own steps as they start), starting the app. A step quiet for 5 seconds
-gets one line saying so, then one every 20 seconds. If the calling command is
-killed the launch carries on; run `rer dev` again to reattach. When the port a
-first launch chose is taken before its setup or its start uses it, the launch
-moves to the next free port and says so. The setup a first launch runs claims
+code (or reusing its clone), installing dependencies, setting up the local
+database and owner (with setup's own steps as they start), starting the app. A
+step quiet for 5 seconds gets one line saying so, then one every 20 seconds
+(`--json`: a `progress` event with `phase` `get`, `install`, `setup`, `start`,
+`note`, `waiting` or `attach`). If the calling command is killed the launch carries on; run
+`rer dev` again to reattach. A first launch whose starting port is taken says
+which port it takes instead, and leaves the port above each port another
+checkout uses, keeps or is setting up on for that checkout's run site. When the
+port it chose is taken before its setup or its start uses it, the launch moves
+to the next free port and says so. The setup a first launch runs claims
 the owner on the seed's dev target, so it makes no production build (build,
 preview, verify and deploy make one when they need it); a seed with no dev
 target still builds there. Every process probe of the launch is bounded (3

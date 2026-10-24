@@ -103,20 +103,23 @@ async function foreground(target, devArgs, directory, out, doorStart, closing, {
  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; out.failure(failure); return failure.exitCode; }
  finally { clearInterval(heartbeat); log.end(); }
  Object.assign(process.env, prepared.added);
- return handOver(target, closing, { openApp, shellDirectory, json: devArgs.includes('--json'), foreground: true });
+ const name = closing.name ?? 'the app';
+ return handOver(target, closing, { openApp, shellDirectory, json: devArgs.includes('--json'), foreground: true,
+  starting: () => out.phase({ phase: 'start', message: prepared.own ? `${name} is already running; checking it` : `starting ${name}` }) });
 }
 
 // The checkout's own rer serves in this process and prints its own ready
 // lines. A pinned launcher that adds the closing line itself (it has
-// launch/ready-watch.mjs) gets --open and the person's folder; for any other,
-// this process reads the lines as they are written, keeps the key out of a
-// non-terminal and adds the closing line, opening the browser when asked.
-export function handOver(target, closing, { openApp, shellDirectory, json, foreground }) {
+// launch/ready-watch.mjs) gets --open and the person's folder, and names its
+// own start; for any other, this process names the start (`starting`), reads
+// the lines as they are written, keeps the key out of a non-terminal and adds
+// the closing line, opening the browser when asked.
+export function handOver(target, closing, { openApp, shellDirectory, json, foreground, starting = () => {} }) {
  const { launcher } = dispatcher(target.root);
  if (launcher && existsSync(join(dirname(launcher), 'launch/ready-watch.mjs'))) {
   if (openApp) target.args.push('--open');
   process.env.RER_SHELL_CWD = shellDirectory;
- } else watchReady({ ...closing, json, foreground });
+ } else { starting(); watchReady({ ...closing, json, foreground }); }
  return delegateDev(target);
 }
 
