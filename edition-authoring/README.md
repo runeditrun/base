@@ -252,9 +252,9 @@ renderer was recorded individually. New siblings go beside the importing
 renderer at its recorded destination (for example `src/base/runtime/` in Slate),
 and receive copy records. The maintained exporters already ship the complete
 runtime directory. An unrecorded dependency equal to its old Base baseline can
-advance too. An existing dependency with different seed bytes
-stops refresh before any write; record it and declare its adaptation explicitly
-to retain it. Acknowledged adaptations are preserved.
+advance too. Existing unrecorded dependencies with different seed bytes stay
+in place. Recorded edits still require explicit adaptation acknowledgement;
+acknowledged adaptations are preserved.
 It refuses undeclared local edits that differ from both the recorded and incoming
 Base bytes; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
