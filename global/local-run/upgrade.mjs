@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { realpath, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { serverResources } from '../../cli/server-resources.mjs';
 import { git, text } from './process.mjs';
 import { failure, phases, errorCodes } from './error.mjs';
@@ -65,12 +66,18 @@ async function apply(checkout, journal, operation, phase, allowed) {
  * output stay in the local journal; only the design's closed outputs escape. */
 export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDiagnostic, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
  const started = Date.now(), phase = phases(onPhase);
- let journal = {}, operation, installed, switched = false;
+ let journal = {}, operation, installed, switched = false, preserveJournal = false, restoring = false;
  try {
   if (allowDataChange.length && !process.stdin.isTTY) throw failure('refused');
   try { checkout = await realpath(checkout); } catch { throw failure('checkout_missing'); }
   installed = await recordedRelease(checkout).catch(() => undefined);
   journal.from = installed;
+  journal = await readJournal(checkout) ?? {};
+  preserveJournal = journal.stage === 'rollback_failed';
+  if (preserveJournal && !restore) {
+   await phase('failed', 'rollback_failed');
+   return output('refused', journal, started, 'rollback_failed');
+  }
   const current = await preflight(checkout);
   const wasRunning = Boolean(await runningApp(checkout));
   operation = await acquireOperation(checkout);
@@ -82,10 +89,11 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    const { appendFile } = await import('node:fs/promises');
    await appendFile(resolve(checkout, exclude), '\n.rer/\n', { mode: 0o600 });
   }
-  journal = await readJournal(checkout) ?? {};
   if (restore) {
+   preserveJournal = true;
    const { metadata } = await backup(checkout, restore);
-   journal = { version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: metadata.wasRunning };
+   journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: metadata.wasRunning };
+   restoring = true;
    await rollback(checkout, journal, operation);
    const result = output('rolled_back', journal, started);
    journal.result = result; await writeJournal(checkout, journal); await phase('ready');
@@ -107,7 +115,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   }
   const unfinished = journal.version === 1 && !['verified', 'rolled_back', 'complete'].includes(journal.stage);
   if (unfinished) {
-   if (journalKey && journal.journalKey && journalKey !== journal.journalKey) throw failure('refused');
+   if (journalKey && journal.journalKey && journalKey !== journal.journalKey) { preserveJournal = true; throw failure('refused'); }
    if (current.branch !== journal.branch) throw failure('not_on_branch');
    if (journal.prepared?.candidate && current.head === journal.prepared.candidate && ['switch_pending', 'switched', 'installed', 'started'].includes(journal.stage)) {
     switched = true;
@@ -136,7 +144,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     const target = await resolveRelease({ checkout, to, repository: from.repository, anchors });
     const ancestry = await git(checkout, ['merge-base', '--is-ancestor', from.commit, target.commit], { allow: [1] });
     if (ancestry.code) throw failure('release_unverified');
-    journal = { version: 1, journalKey, head: current.head, branch: current.branch, from, target, wasRunning, stage: 'preparing' };
+    journal = { version: 1, journalKey: journalKey ?? randomUUID(), checkout_name: basename(checkout), head: current.head, branch: current.branch, from, target, wasRunning, stage: 'preparing' };
     await writeJournal(checkout, journal);
     try { journal.prepared = await prepareMerge({ checkout, base: from.commit, head: current.head, target: target.commit, tag: target.tag, repository: from.repository }); }
     catch (error) {
@@ -172,6 +180,11 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   if (error.diagnostic) onDiagnostic?.(error.diagnostic);
   journal.from ??= installed;
   const code = errorCodes.has(error.error_code) ? error.error_code : 'refused';
+  if (restoring) {
+   journal.stage = 'rollback_failed'; await writeJournal(checkout, journal).catch(() => {});
+   await phase('failed', 'rollback_failed');
+   return output('refused', journal, started, 'rollback_failed');
+  }
   if (switched) {
    try {
     await rollback(checkout, journal, operation);
@@ -185,9 +198,16 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     return output('refused', journal, started, 'rollback_failed');
    }
   }
+  if (preserveJournal) {
+   await phase('failed', code);
+   return output('refused', journal, started, code);
+  }
   if (journal.wasRunning && operation) {
    try { if (!await runningApp(checkout)) await health(checkout, await startApp(checkout, operation)); }
-   catch { await phase('failed', 'rollback_failed'); return output('refused', journal, started, 'rollback_failed'); }
+   catch {
+    journal.stage = 'rollback_failed'; await writeJournal(checkout, journal).catch(() => {});
+    await phase('failed', 'rollback_failed'); return output('refused', journal, started, 'rollback_failed');
+   }
   }
   if (operation && journal.head && code !== 'needs_integration') {
    try {

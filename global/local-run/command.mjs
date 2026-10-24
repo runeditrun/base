@@ -1,7 +1,25 @@
-import { basename } from 'node:path';
 import { locate } from '../checkout.mjs';
 import { upgrade } from './upgrade.mjs';
 import { readJournal } from './state.mjs';
+import { recoveryInfo } from './recovery.mjs';
+
+const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
+
+async function printRecovery(checkout) {
+ let identity = {};
+ try {
+  const journal = await readJournal(checkout);
+  identity = { journalKey: journal?.journalKey, repository: journal?.from?.repository,
+   fromCommit: journal?.from?.commit, toCommit: journal?.target?.commit };
+ } catch { /* The safe reader supplies the closed unavailable result. */ }
+ const recovery = await recoveryInfo({ checkout, ...identity });
+ if (recovery.status === 'unavailable') {
+  process.stderr.write(`Recovery unavailable (${recovery.reason}). Inspect the local upgrade journal with your agent.\n`);
+  return;
+ }
+ process.stderr.write('Open a terminal in the parent folder containing the reported checkout folder; locate that folder locally if necessary.\n');
+ process.stderr.write(`cd -- ${shellQuote(recovery.checkout_name)} &&\nrer dev --stop &&\ngit reset --hard ${shellQuote(recovery.previous_head)} && rer upgrade --restore ${shellQuote(recovery.backup_name)}\n`);
+}
 
 export const help = `Usage: rer upgrade [--check] [--to COMMIT] [--continue] [--restore BACKUP]
                    [--json] [--anchors FILE] [--allow-data-change TABLE] [--cwd DIR]
@@ -41,9 +59,6 @@ export async function upgradeCommand(args) {
   const journal = await readJournal(checkout);
   if (journal?.prepared?.worktree) process.stderr.write(`Resolve and commit the integration in ${journal.prepared.worktree}, then run rer upgrade --continue in the original checkout.\n`);
  }
- if (result.error_code === 'rollback_failed') {
-  const journal = await readJournal(checkout);
-  process.stderr.write(`cd ${JSON.stringify(basename(checkout))}\nrer dev --stop\ngit reset --hard ${journal.head} && rer upgrade --restore ${journal.backup}\n`);
- }
+ if (result.error_code === 'rollback_failed') await printRecovery(checkout);
  return result.outcome === 'updated' || options.check && !result.error_code || options.restore && !result.error_code ? 0 : 1;
 }

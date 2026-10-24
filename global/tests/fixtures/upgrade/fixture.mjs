@@ -11,15 +11,16 @@ import { buildPackage } from '../../../../scripts/rer-package.mjs';
 import { localD1 } from '../../../../cli/fixtures/local-d1.mjs';
 import { isolatedQueue } from '../../../../cli/fixtures/queue.mjs';
 import { run as execute, freePort } from '../../harness.mjs';
+import { stopOwnedApp } from './owned-app.mjs';
 import { releaseNetwork, repository, repositoryURL } from './releases.mjs';
 
 const base = resolve(import.meta.dirname, '../../../..');
 export const migration = 'migrations/core/0034_upgrade_details.sql';
 export const ownerRow = { id: 'owner-record', body: 'Keep this customer record' };
 
-export async function upgradeFixture(t, { keep = false } = {}) {
+export async function upgradeFixture(t, { keep = false, checkoutName = 'owner checkout' } = {}) {
  const directory = await realpath(await mkdtemp(join(tmpdir(), 'rer-upgrade-')));
- const source = join(directory, 'publisher'), root = join(directory, 'owner checkout');
+ const source = join(directory, 'publisher'), root = join(directory, checkoutName);
  const remote = join(directory, 'origin.git'), home = join(directory, 'home');
  await mkdir(home);
  const inherited = Object.fromEntries(['TMPDIR', 'TMP', 'TEMP', 'COREPACK_HOME', 'npm_config_store_dir',
@@ -44,9 +45,9 @@ export async function upgradeFixture(t, { keep = false } = {}) {
  const packaged = join(directory, 'rer'); await mkdir(packaged);
  await command('tar', ['-xzf', await buildPackage(base, join(directory, 'package')), '-C', packaged]);
  const rer = join(packaged, 'package/global/rer.mjs');
- const run = (args, options = {}) => execute(process.execPath, [rer, ...args], { cwd: root, env, ...options });
+ const run = (args, options = {}) => execute(process.execPath, [rer, ...args], { cwd: root, env, detached: true, ...options });
  function start(args, options = {}) {
-  const child = spawn(process.execPath, [rer, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], ...options });
+  const child = spawn(process.execPath, [rer, ...args], { cwd: root, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'], ...options });
   children.add(child); child.stdoutText = ''; child.stderrText = '';
   child.stdout.on('data', bytes => { child.stdoutText += bytes; });
   child.stderr.on('data', bytes => { child.stderrText += bytes; });
@@ -54,8 +55,7 @@ export async function upgradeFixture(t, { keep = false } = {}) {
   return child;
  }
  async function dispose() {
-  // The public stop door verifies registry ownership; never sweep by pattern.
-  await run(['dev', '--stop']).catch(() => {});
+  await stopOwnedApp(env, root);
   for (const child of children) child.kill('SIGTERM');
   await Promise.all([...children].map(child => child.done));
   if (!keep) await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
@@ -85,7 +85,7 @@ export async function upgradeFixture(t, { keep = false } = {}) {
  async function launch(release = v1.tag) {
   const result = await run(['dev', repositoryURL, '--release', release, '--anchors', network.anchors,
    '--dir', root, '--port', String(port), '--direct', '--json'], { cwd: directory });
-  assert.equal(result.code, 0, result.stderr + result.stdout);
+  assert.equal(result.code, 0, 'Signed fixture launch failed; credential-bearing output withheld');
   return result;
  }
  async function ownerCommit(path = 'owner-customisation.md', contents = 'Owner instructions survive upstream updates.\n') {

@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { upgradeFixture } from './fixtures/upgrade/fixture.mjs';
+import { readJournal } from '../local-run/state.mjs';
+import { stopOwnedApp } from './fixtures/upgrade/owned-app.mjs';
+
+const result = r => r.stdout.split('\n').flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } }).findLast(e => e.event === 'result');
+
+test('restore refuses lost saved state and rollback failure survives a public retry', { timeout: 20 * 60_000 }, async t => {
+ const f = await upgradeFixture(t);
+ await f.launch(); await f.ownerCommit(); await f.addRow();
+ const local = join(f.root, '.rer/local'), record = join(local, 'recovery-record.json');
+ await mkdir(local, { recursive: true }); await writeFile(record, 'saved owner bytes\n');
+ await rm(join(f.root, '.dev.vars.previous'), { force: true });
+ const updated = await f.run(['upgrade', '--to', f.v2.commit, '--anchors', f.anchors, '--json']);
+ assert.equal(updated.code, 0, updated.stderr + updated.stdout);
+ const journal = await readJournal(f.root), saved = join(f.root, '.rer/upgrade/backups', journal.backup, 'state/.rer/local');
+ await cp(saved, join(f.directory, 'saved-local'), { recursive: true });
+ await writeFile(record, 'live owner bytes\n'); await rm(saved, { recursive: true });
+ const journalBytes = await readFile(join(f.root, '.rer/upgrade/journal.json'));
+ const refused = await f.run(['upgrade', '--restore', journal.backup, '--json']);
+ assert.equal(result(refused).outcome, 'refused');
+ assert.equal(await readFile(record, 'utf8'), 'live owner bytes\n');
+ assert.deepEqual(await readFile(join(f.root, '.rer/upgrade/journal.json')), journalBytes);
+ t.diagnostic(JSON.stringify({ door: 'restore', result: result(refused), liveOwnerKept: true, journalKept: true }));
+ await cp(join(f.directory, 'saved-local'), saved, { recursive: true });
+ await stopOwnedApp(f.env, f.root);
+ const failed = { ...journal, stage: 'rollback_failed' }; delete failed.result;
+ await writeFile(join(f.root, '.rer/upgrade/journal.json'), JSON.stringify(failed));
+ const failedBytes = await readFile(join(f.root, '.rer/upgrade/journal.json'));
+ const retry = await f.run(['upgrade', '--to', f.v2.commit, '--anchors', f.anchors, '--json']);
+ assert.equal(result(retry).error_code, 'rollback_failed');
+ assert.deepEqual(await readFile(join(f.root, '.rer/upgrade/journal.json')), failedBytes);
+ await writeFile(join(f.root, '.dev.vars.previous'), 'created after snapshot');
+ const repaired = await f.run(['upgrade', '--restore', journal.backup, '--json']);
+ assert.equal(repaired.code, 0, repaired.stderr + repaired.stdout);
+ assert.equal(await readFile(record, 'utf8'), 'saved owner bytes\n');
+ assert.equal(await f.git(f.root, 'rev-parse', 'HEAD'), journal.head);
+ assert.equal((await readJournal(f.root)).stage, 'rolled_back');
+ await assert.rejects(readFile(join(f.root, '.dev.vars.previous')), { code: 'ENOENT' });
+ t.diagnostic(JSON.stringify({ door: 'retry-and-restore', refused: result(retry), repaired: result(repaired), byteExact: true }));
+});
