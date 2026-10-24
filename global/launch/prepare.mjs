@@ -117,6 +117,9 @@ export async function prepare({ root, args, setupArgs = [], env, report, directo
   let from = last?.port;
   for (let attempt = 1; ; attempt++) {
    const { port, release } = await choose(from);
+   // The first choice passed over the port the search starts from: say so.
+   const first = from ?? Number(childEnv.RER_DEV_PORT_FROM ?? 8787);
+   if (attempt === 1 && !explicit && port !== first) note(`port ${first} is taken, so ${name} takes the next free port, ${port}`);
    try { await setUp(port, `setting up ${name}'s local database and owner (${owner}) on port ${port}`); }
    catch (failure) {
     await release?.();
