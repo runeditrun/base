@@ -2,14 +2,15 @@ import { readFile } from 'node:fs/promises';
 import { contained } from './project.mjs';
 import { invalid, missing, RerError } from './errors.mjs';
 import { demoPlan } from '../modules/demo-host/plan.mjs';
+import { demoRunDeclaration } from '../modules/demo/declaration.mjs';
 
 export async function demoHostCommand(project, options, store, signal, out, operation) {
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Missing or malformed ${path}.`); } };
  const app = await read(project.adapter.deploy?.declaration ?? 'deploy.json'), declaration = await read('deploy-demo.json');
  // Old releases wrote sizing and mode selectors. Consume their removal here
  // so pinning this release needs no per-seed declaration edit.
- const { instanceType: retiredSize, mode: retiredMode, ...nativeDeclaration } = declaration;
- if (nativeDeclaration.runUrl === undefined && project.adapter.site?.declaration) nativeDeclaration.runUrl = `https://${(await read(project.adapter.site.declaration)).domain}/run`;
+ const { instanceType: retiredSize, mode: retiredMode, ...nativeInput } = declaration;
+ const nativeDeclaration = await demoRunDeclaration(nativeInput, { root: project.root, adapter: project.adapter, read });
  if (retiredSize !== undefined || retiredMode !== undefined) store.report('Hosted demos now use the native Loader host; remove the retired instanceType and mode keys from deploy-demo.json.');
  let plan;
  try { plan = demoPlan({ project: app.project, environment: options.environment ?? 'production', compatibilityDate: app.compatibilityDate, originVar: app.originVar, hostVariables: app.container?.hostVariables, declaration: nativeDeclaration, turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() }); }

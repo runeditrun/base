@@ -31,8 +31,10 @@ Production build/deploy refuses that setting; ordinary builds keep real effects.
   layout offset or timer is injected. In demo mode a **Run <Seed>** link sits
   beside each marked navigation label and opens `https://<domain>/run`. The
   existing `demoSockets()` Vite plugin supplies the public `name` and canonical
-  run-site `domain` from `deploy-demo.json` and `deploy-site.json`; an explicit
-  `runUrl` in the demo declaration takes precedence. No per-seed link is required. CSS adds the label suffix without
+  run-site `domain` from `deploy-demo.json` and the command adapter's
+  `site.declaration` (normally `deploy-site.json`); an explicit HTTPS `/run`
+  `runUrl` in the demo declaration takes precedence and is validated for both
+  local and hosted demos. No per-seed link is required. CSS adds the label suffix without
   changing the application's hydrated text; CSP allows exact hashes only.
 
 Public sockets, WebSockets and event streams remain usable for checks. The

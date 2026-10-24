@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g4ef3b875",
+  "cliVersion": "0.2.79-dev.ge8867823",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -659,7 +659,7 @@
     },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
-      "sha256": "69a45d30c8c077d71230c6de35a07bf60be15e088451626f9fb46c5ec8347073"
+      "sha256": "ab3be270e6cee0d87b879e8e97d18f03fb5271ba893bf510195ee67ff2a546a0"
     },
     "cli/demo-native.mjs": {
       "source": "cli/demo-native.mjs",
@@ -1499,7 +1499,7 @@
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
-      "sha256": "dddcfa316a9876ad0cc113e17aaf0e1bb2d50e73d03272d8b45e322fd42ee39d"
+      "sha256": "92fd66c643e2f0f62f15025503edb972425b7c25ce4ed91f0af6c4fb7de4a48c"
     },
     "modules/demo-host/remove.mjs": {
       "source": "modules/demo-host/remove.mjs",
@@ -1531,7 +1531,11 @@
     },
     "modules/demo/README.md": {
       "source": "modules/demo/README.md",
-      "sha256": "fa180e615b0c7082f313d40e50e50d8fadd2c76a8824c432ad13c730643050a7"
+      "sha256": "5d6dbd49a11d39876075d82c5e7b6a0ca9135de3bcc7bc6f52ecd080a9b84b82"
+    },
+    "modules/demo/declaration.mjs": {
+      "source": "modules/demo/declaration.mjs",
+      "sha256": "2e53eb9ea3679711fce0c7525546d20fa7838b555084308bee9073f8c9c1909a"
     },
     "modules/demo/effects.mjs": {
       "source": "modules/demo/effects.mjs",
@@ -1551,7 +1555,7 @@
     },
     "modules/demo/label.mjs": {
       "source": "modules/demo/label.mjs",
-      "sha256": "bb4816f91c729e53e07ace7e998b70f4196b7a4ec2a74f86f7cfdeee8c0149b2"
+      "sha256": "7ca757507f3d3495a8777f3058dfa55d946b1656d6e31bec1c9c774dde1f3fb3"
     },
     "modules/demo/navigation.mjs": {
       "source": "modules/demo/navigation.mjs",
@@ -1560,6 +1564,10 @@
     "modules/demo/responses.mjs": {
       "source": "modules/demo/responses.mjs",
       "sha256": "f91b6cb14dfde5c30750e6d248820f7218a855353e43e2defbc10fcc25fedc5d"
+    },
+    "modules/demo/run-url.mjs": {
+      "source": "modules/demo/run-url.mjs",
+      "sha256": "b8726c289cb528cde1b885133d138113884ef445358b3a7a1659864e67caa561"
     },
     "modules/demo/sockets.mjs": {
       "source": "modules/demo/sockets.mjs",
@@ -1571,7 +1579,7 @@
     },
     "modules/demo/vite.mjs": {
       "source": "modules/demo/vite.mjs",
-      "sha256": "187ae814beda8dab3eed3beb3b837e40b7af806016b79fec06974327337faeff"
+      "sha256": "e9d55fc14de56dd3fdc5a3c3aee4db4b4f29b1fc5b6bbefbab882f0233dc605f"
     },
     "modules/dependencies/README.md": {
       "source": "modules/dependencies/README.md",
