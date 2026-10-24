@@ -99,7 +99,7 @@ test('packed authoring preserves source and provenance on invalid adoption and r
  assert.equal(run('refresh-base', '--ref', revision, '--base', source).status, 4);
  assert.deepEqual(fs.readFileSync(recordPath), adapted);
  // No-record adoption still creates a lock valid after the new inputs are staged.
- fs.rmSync(recordPath); git(seed, 'rm', '--cached', 'one.mjs');
+ fs.rmSync(recordPath); git(seed, 'rm', '--cached', 'one.mjs', 'base-copies.json');
  result('adopt-edition'); git(seed, 'add', 'edition.json', 'sources.lock.json', 'base-copies.json');
  assert.equal(old('check').ok, true);
  const recipe = fs.readFileSync(path.join(seed, 'edition.json'));
