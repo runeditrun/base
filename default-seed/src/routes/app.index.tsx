@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { OperatorAccess } from '../core/features/auth/access'
 import { loadPrivateDashboard } from '../core/app/loaders'
 
@@ -9,6 +9,7 @@ export const Route = createFileRoute('/app/')({
 
 function OperatorApp() {
   const dashboard = Route.useLoaderData()
+  const business = getRouteApi('/app').useLoaderData()
   return (
     <section>
       <h1>Native session protected operator app</h1>
@@ -18,7 +19,7 @@ function OperatorApp() {
       <p><a href="/app/people">People and recent activity</a></p>
       <p><a href="/app/import">Move your people in</a></p>
       <p><a href="/app/policies">Scheduled policy approvals</a></p>
-      <OperatorAccess />
+      <OperatorAccess timezone={business.timezone} />
     </section>
   )
 }

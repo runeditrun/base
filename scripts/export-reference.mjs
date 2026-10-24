@@ -3,6 +3,7 @@ import { resolve, relative, dirname, basename } from 'node:path';
 import { exportCLI } from '../cli/export.mjs';
 import { createHash } from 'node:crypto';
 import { testSource } from '../composition/git-source.mjs';
+import { exportBusinessSettings } from '../export/business-settings.mjs';
 
 export async function exportReference(base, target) {
  const reference = resolve(base, 'default-seed'), excluded = new Set(['node_modules', 'dist', '.wrangler', '.rer', '.cache', '.state', '.dev.vars', '.dev.vars.previous', '.seed', 'scripts/base-cli', 'scripts/base-onboarding', 'playwright-report', 'test-results']);
@@ -19,16 +20,17 @@ export async function exportReference(base, target) {
  // People imports and their erasure run on import-kit's D1 engine.
  for (const part of ['src', 'schema', 'CONTRACT.md']) await cp(resolve(base, 'modules/import-kit', part), resolve(target, 'src/modules/import-kit', part), runtime(resolve(base, 'modules/import-kit', part)));
  await cp(resolve(base, 'foundation/runtime'), resolve(target, 'src/base'), { recursive: true });
+ const business = await exportBusinessSettings(base, target);
  await exportCLI(base, target);
  for (const name of ['RUN-LOCALLY.md','SEED-COMMAND-CONTRACT.md','HOMEPAGE-VARIANTS.md','VERIFY-WORKFLOW.md','DEMO.md']) await cp(resolve(base,'export',name), resolve(target,name));
  await mkdir(resolve(target, '.github/workflows'), { recursive: true });
  for (const name of ['verify.yml', 'verify-nightly.yml']) await cp(resolve(base, 'export', name), resolve(target, '.github/workflows', name));
  await cp(resolve(base,'LICENSE'), resolve(target,'LICENSE'));
  const idp = 'modules/operator-auth/identity/oidc/tests/idp.mjs', idpTarget = 'tests/operator-auth/idp.mjs';
- const maps = { [resolve(base, 'modules/dependencies')]: resolve(target, 'src/modules/dependencies'), [resolve(base, 'modules/owner-claim')]: resolve(target, 'src/modules/owner-claim'), [resolve(base, 'modules/demo')]: resolve(target, 'src/modules/demo'), [resolve(base, idp)]: resolve(target, idpTarget), [resolve(base, 'onboarding')]: resolve(target, 'scripts/base-onboarding'), [resolve(base, 'modules/mail')]: resolve(target, 'src/modules/mail'), [resolve(base, 'modules/ai')]: resolve(target, 'src/modules/ai'), [resolve(base, 'modules/operator-auth')]: resolve(target, 'src/modules/operator-auth'), [resolve(base, 'foundation/runtime')]: resolve(target, 'src/base'), [resolve(base, 'modules/portability')]: resolve(target, 'src/modules/portability'), [resolve(base, 'modules/erasure')]: resolve(target, 'src/modules/erasure'), [resolve(base, 'modules/import-kit')]: resolve(target, 'src/modules/import-kit') };
+ const maps = { ...business.maps, [resolve(base, 'modules/dependencies')]: resolve(target, 'src/modules/dependencies'), [resolve(base, 'modules/owner-claim')]: resolve(target, 'src/modules/owner-claim'), [resolve(base, 'modules/demo')]: resolve(target, 'src/modules/demo'), [resolve(base, idp)]: resolve(target, idpTarget), [resolve(base, 'onboarding')]: resolve(target, 'scripts/base-onboarding'), [resolve(base, 'modules/mail')]: resolve(target, 'src/modules/mail'), [resolve(base, 'modules/ai')]: resolve(target, 'src/modules/ai'), [resolve(base, 'modules/operator-auth')]: resolve(target, 'src/modules/operator-auth'), [resolve(base, 'foundation/runtime')]: resolve(target, 'src/base'), [resolve(base, 'modules/portability')]: resolve(target, 'src/modules/portability'), [resolve(base, 'modules/erasure')]: resolve(target, 'src/modules/erasure'), [resolve(base, 'modules/import-kit')]: resolve(target, 'src/modules/import-kit') };
  const helper = 'scripts/install-chromium-deps.py', helperSource = 'export/install-chromium-deps.py';
  await cp(resolve(base, helperSource), resolve(target, helper));
- const sources = { [helper]: { source: helperSource, sha256: createHash('sha256').update(await readFile(resolve(target, helper))).digest('hex') } };
+ const sources = { ...business.sources, [helper]: { source: helperSource, sha256: createHash('sha256').update(await readFile(resolve(target, helper))).digest('hex') } };
  function relocate(bytes, original, file) {
   return bytes.replace(/(['"])(\.\.[^'"\n]+)\1/g, (literal, quote, specifier) => {
    const absolute = resolve(dirname(original), specifier);
@@ -43,7 +45,7 @@ export async function exportReference(base, target) {
   for (const entry of await readdir(path, { withFileTypes: true })) {
    const file = resolve(path, entry.name), name = relative(target, file);
    if (entry.isDirectory()) { if (!['base-cli', 'base-onboarding', 'modules'].includes(entry.name)) await adapt(file); }
-   else if (/\.(mjs|mts|ts|tsx)$/.test(name)) {
+   else if (/\.(mjs|mts|ts|tsx)$/.test(name) && !business.sources[name]) {
     const original = resolve(reference, name); let bytes = await readFile(file, 'utf8');
     bytes = relocate(bytes, original, file);
     await writeFile(file, bytes);

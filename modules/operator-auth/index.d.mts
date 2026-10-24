@@ -10,7 +10,7 @@ export interface AuthPresentation { readonly productName: string; readonly accen
 export interface LinkPreview { kind: 'magic' | 'invite' | 'step_up' | 'owner'; expiresInMinutes: number }
 /** A step-up confirmation proves the session's operator again; it issues no new session. */
 export interface StepUpConfirmed { stepUp: StepUpAction; returnTo: string; cookie?: undefined }
-export type StepUpAction = 'providers:unlink' | 'providers:relink' | 'domains:change' | 'owner:transfer' | 'export' | 'delete' | 'credentials:mint' | 'email:change';
+export type StepUpAction = 'providers:unlink' | 'providers:relink' | 'domains:change' | 'owner:transfer' | 'export' | 'delete' | 'credentials:mint' | 'email:change' | 'business:stop';
 export const STEP_UP_ACTIONS: readonly StepUpAction[];
 export type ProviderPreset = 'auth' | 'google' | 'microsoft' | 'okta' | 'legacy-rs256';
 /** One identity provider. Secrets and the private key are server bindings, never source text. */
@@ -91,7 +91,24 @@ export interface AuthHooks<R extends string = Role> {
   afterConfirm?(input: { request: Request; operator: Operator<R>; session: CompletedSession<R>['session']; method: 'email' | 'oidc'; returnTo: string }): void | { returnTo?: string } | Promise<void | { returnTo?: string }>;
 }
 export type { ScheduledPolicy, ScheduledPolicyDoor, PolicyApproval, PolicyRun } from './scheduled/index.mjs';
+export interface BusinessSettingsIntegration {
+  publicBrand(): Promise<{ displayName?: string; logo?: string }>;
+  read(): Promise<{ document: { business: string } | null; rev: number; appliedAt: string | null; stopped: boolean }>;
+  /** The OA actor fence is supplied for an atomic owner-authority check. */
+  stop(actor: string, guard?: { sql: string; args: unknown[] }): Promise<void>;
+}
+export interface BusinessTeamRow { email: string; operatorId: string | null; invite: number; state: 'invited' | 'active' | 'inactive' | 'conflict' }
+export interface BusinessTeamAdapter {
+  ownerEmail(): Promise<string | null>;
+  prepare(input: {
+    members: Array<{ email: string; name: string; role: 'admin' | 'member'; invite: number }>;
+    managed: BusinessTeamRow[]; ownerEmail: string; roles: { admin: string; member: string };
+    /** Evaluated after the Business revision/nonce CAS in the same D1 batch. */
+    guard: { sql: string; args: unknown[] };
+  }): Promise<{ statements: Statement[]; rows: BusinessTeamRow[]; afterCommit(): Promise<void> }>;
+}
 export interface AuthOptions<R extends string = Role> {
+  businessSettings?: BusinessSettingsIntegration;
   /** OA store only: trusted source, re-read at approval/run/action time. */
   scheduledPolicies?: () => import('./scheduled/index.mjs').ScheduledPolicy[];
   db: Database; config: AuthConfig; mailSender?: MailSender; clientIp: (request: Request) => string | Promise<string>; rolePolicy?: RolePolicy; clock?: () => number;
@@ -145,6 +162,12 @@ export interface IdentityProviders {
 }
 export interface DomainRule { domain: string; providerId: string; createdAt: number }
 export interface OperatorAuth<R extends string = Role> {
+  /** OA accounts only. Signed Business documents must be verified before calling. */
+  readonly businessTeam?: BusinessTeamAdapter;
+  readonly businessSettings?: BusinessSettingsIntegration;
+  publicPresentation?(): Promise<AuthPresentation>;
+  businessSettingsInfo?(request: Request): Promise<{ business: string | null; rev: number; appliedAt: string | null; stopped: boolean }>;
+  stopBusinessSettings?(request: Request): Promise<{ stopped: true }>;
   readonly scheduledPolicies?: import('./scheduled/index.mjs').ScheduledPolicyDoor;
   /** Key-gated local development or an isolated hosted demo; unavailable in production. */
   readonly oneClick?: {

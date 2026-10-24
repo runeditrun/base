@@ -3,7 +3,7 @@ import type { Operator, Session } from '../../../../../modules/operator-auth/ind
 
 type SessionRow = { id: string; kind: string; createdAt: number; expiresAt: number; active: boolean }
 type OperatorRow = Operator & { signInUrl?: string }
-export function OperatorAccess() {
+export function OperatorAccess({ timezone = 'UTC' }: { timezone?: string }) {
   const [session, setSession] = useState<Session>()
   const [operators, setOperators] = useState<OperatorRow[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
@@ -76,6 +76,7 @@ export function OperatorAccess() {
     <button onClick={() => { void request('signout', {}).then(() => { window.location.href = '/signin' }).catch((error: Error) => setMessage(error.message)) }}>Sign out</button>
     {message ? <p role="status">{message}</p> : null}
     {session && session.operator.role !== 'member' ? <>
+      {session.operator.role === 'owner' ? <p><a href="/auth/settings/identity">Business and sign-in settings</a></p> : null}
       <h3>Invite an operator</h3>
       <form onSubmit={invite}>
         <label>Name <input name="displayName" required maxLength={200} /></label>
@@ -94,6 +95,6 @@ export function OperatorAccess() {
     </> : null}
     <h3>Sessions</h3>
     {selected ? <button onClick={() => { setSelected(undefined); void refresh().catch((error: Error) => setMessage(error.message)) }}>Show my sessions</button> : null}
-    <ul>{sessions.map((item) => <li key={item.id}>{item.kind} · {item.active ? 'Active' : 'Ended'} · expires {new Date(item.expiresAt).toLocaleString()}{' '}{item.active ? <button onClick={() => void mutate('session/revoke', { sessionId: item.id })}>Revoke</button> : null}</li>)}</ul>
+    <ul>{sessions.map((item) => <li key={item.id}>{item.kind} · {item.active ? 'Active' : 'Ended'} · expires {new Date(item.expiresAt).toLocaleString(undefined, { timeZone: timezone })}{' '}{item.active ? <button onClick={() => void mutate('session/revoke', { sessionId: item.id })}>Revoke</button> : null}</li>)}</ul>
   </section>
 }

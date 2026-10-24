@@ -37,6 +37,19 @@ separate from reviewed source import: it requires an empty destination and has
 no door plan or Undo. The reference door accepts people JSON source exports,
 not `.rer` archives; do not imply that `rer import --input` uses the door.
 
+## Runtime Business settings adoption
+
+Seeds that take Business name, logo, timezone, app accent or team changes
+while running follow the [Business settings adoption recipe](../modules/business-settings/ADOPTING.md).
+Declare the optional `rer-setup.json` `business` block only for slots the seed
+renders at runtime. Integrate the signed settings door, its D1 migration,
+native team authority and owner overrides; declaring metadata alone does not
+adopt the feature. Logo uses the same-origin document route, never a
+`businessField: "logo_ref"` environment input. Keep the Business accent inside
+the signed-in app shell and preserve approved public pages and product marks.
+The recipe documents source-copy dependencies, mail display-name integration
+and the assembled-seed checks; it does not promise a package export.
+
 ## Browser-free agent check
 
 After the pinned `pnpm install --frozen-lockfile`, run `pnpm run verify:agent`.
