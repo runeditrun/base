@@ -25,6 +25,16 @@ test('the built hydration check rejects a server element that never hydrates', a
  });
 });
 
+test('the built hydration check rejects an unadopted same-tag replacement of a server element', async t => {
+ await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true, replaceServer: true }), { pages: ['/'] }), error => {
+  assert.equal(error.code, 'hydration_units_failed');
+  assert.equal(error.exitCode, 1);
+  assert.ok(error.failures.length > 0);
+  assert.ok(error.hydration.pages.every(page => !page.skipped));
+  return true;
+ });
+});
+
 // A built seed whose Worker only routes app paths, the way Start entries did before
 // serving assets; `adopted` serves built files and the deploy identity as Base asks.
 const worker=adopted=>`export default {async fetch(request,env){
