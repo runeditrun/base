@@ -80,7 +80,8 @@ else `XDG_BIN_HOME`, else the `bin` inside a set `XDG_DATA_HOME` (for
 `XDG_DATA_HOME=/scratch/share`, `/scratch/share/bin/rer`); the PATH line below then
 names that folder.
 Installation creates that directory if needed and never writes into another
-PATH directory. It names any existing `rer` elsewhere on PATH and leaves it
+PATH directory. If its launcher already belongs to another install root, rer
+refuses to replace it; choose a separate `RER_BIN_DIR` or `XDG_BIN_HOME`. It names any existing `rer` elsewhere on PATH and leaves it
 unchanged. If `~/.local/bin` is absent from PATH, another command shadows it,
 or no startup file of your shell adds it for new terminals, its last line is
 one command to run: it appends `export PATH="$HOME/.local/bin:$PATH"` to that
