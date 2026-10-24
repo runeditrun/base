@@ -64,7 +64,7 @@ export function createDoorHandler(prefix: string, database: D1Database,
       if (url.search || url.hash) throw new DoorError('query_transport_forbidden',400);
       admitted = await admit(request,action,budgeted);
       if (!admitted) return Response.json({error:'not_found'},{status:404,headers});
-      if (action === 'uploads' && request.headers.get('Content-Type')?.split(';')[0] === 'application/octet-stream') {
+      if (action === 'uploads' && admitted.options.intake && request.headers.get('Content-Type')?.split(';')[0] === 'application/octet-stream') {
         const result = await streamUpload(admitted,request);
         await authorized(admitted);
         return Response.json(result,{headers});

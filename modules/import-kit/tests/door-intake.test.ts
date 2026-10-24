@@ -119,6 +119,8 @@ test('declared intake never persists forbidden bytes across boundaries; sanitize
 
 test('undeclared door retains exact existing bytes and uses its ordinary public lifecycle',async t=>{
   const d=await door(t,'operator');
+  const unsupported=await d.request(d.origin+'/api/operator/import/uploads',{method:'POST',headers:{Origin:d.origin,Cookie:'test-owner-session','Content-Type':'application/octet-stream'},body:'[]'});
+  assert.equal(unsupported.status,400);
   const bytes=Buffer.from('\ufeff[\r\n {"id":"unchanged","title":"Historical 次😀"}\r\n]\r\n');
   const id=await d.upload(bytes);assert.deepEqual(await storedBytes(d.db,id),bytes);
   const raw=await d.upload(Buffer.from('[{"id":"old","passwordHash":"synthetic-legacy-retained"}]'));
