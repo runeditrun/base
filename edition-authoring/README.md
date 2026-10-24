@@ -219,7 +219,17 @@ edition's verify command next to `check`.
 writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
-export removed, keeps out files the copy had left out, and re-records each copy.
+export removed, keeps out unrelated files the copy had left out, and re-records each copy.
+Runtime copies also include the recursive relative imports and re-exports of
+their selected `foundation/runtime` modules, plus companion declarations. This
+recovers required siblings even when they existed before the old pin or each
+renderer was recorded individually. New siblings go beside the importing
+renderer at its recorded destination (for example `src/base/runtime/` in Slate),
+and receive copy records. The maintained exporters already ship the complete
+runtime directory. An unrecorded dependency equal to its old Base baseline can
+advance too. Existing unrecorded dependencies with different seed bytes stay
+in place. Recorded edits still require explicit adaptation acknowledgement;
+acknowledged adaptations are preserved.
 It refuses undeclared local edits that differ from both the recorded and incoming
 Base bytes; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
