@@ -400,7 +400,9 @@ checks the preparation for every pending batch in a read-only admission before
 that batch publishes, including resumed apply. Apply still atomically fences
 its own exact before-images and current authority. An invalid preparation
 refuses the entire pending batch; at checkpoint zero no native rows are applied.
-Earlier admitted batches remain available to Undo. See [ADOPTING.md](ADOPTING.md).
+Earlier admitted batches remain available to Undo. A preparation may cover several small consecutive batches
+within one request; every exact prospective effect must match that admission
+before its own batch publishes. Admission never carries across requests. See [ADOPTING.md](ADOPTING.md).
 
 When an erasure withdrew the live import's snapshot, nothing can be compared
 with it: an owner-session `plan` retires it as the baseline and plans a new

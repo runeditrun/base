@@ -88,6 +88,10 @@ Owner history and undo must include jobs from either authority.
    no undo decision and does not authorize effects: apply retains its existing
    exact before-image and current-authority guards in each write transaction.
    A later failed batch leaves earlier committed progress available to undo.
+   For small consecutive batches in one request, preparation can admit a window
+   before any of its effects publish. Every batch checks its exact prospective
+   effects against that admission; changed effects or adapter methods require a
+   new preparation. Admission never carries across requests.
 
    Preserving undo reverses unchanged independent rows and leaves native edits,
    native deletions and their required dependencies untouched. The door returns

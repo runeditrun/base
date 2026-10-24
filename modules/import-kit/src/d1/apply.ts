@@ -64,15 +64,17 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
       if (undoEffects && (!admitted.size || undoEffects.some(effect => admitted.get(effect.provenance.id) !== sha256(canonicalJson(effect))) || preparing !== context.storage.targets.preparePreservedUndo)) {
         const { classifyUndo } = await import('./undo-snapshot.ts');
         const { database, targets } = context.storage;
-        if (typeof targets.preparePreservedUndo !== 'function') throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
+        const prepare = targets.preparePreservedUndo;
+        if (typeof prepare !== 'function') throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
         await admissionWindow(job, entries, undoEffects, plan, context, maxBatches - count, batchSize, planned);
-        const snapshot = await targets.preparePreservedUndo(database, context.destination, structuredClone(undoEffects));
+        const snapshot = await prepare.call(targets, database, context.destination, structuredClone(undoEffects));
         const admission = classifyUndo(undoEffects, snapshot, context);
         await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');
         admitted.clear();
         for (const effect of undoEffects) admitted.set(effect.provenance.id, sha256(canonicalJson(effect)));
-        preparing = targets.preparePreservedUndo;
+        preparing = prepare;
       }
+      if (undoEffects && preparing !== context.storage.targets.preparePreservedUndo) throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
       const request = publication(job, entries.length, statements, scope), done = job.checkpoint + entries.length === job.total;
       await atomic(context, 'apply', request.statements, returnReads, request.scope);
       current = await stored(id, context, 'apply'); published = current.job;
