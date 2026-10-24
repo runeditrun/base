@@ -21,7 +21,7 @@ The same start also fits on one line:
 
 ```sh
 curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell
-npx -y @runeditrun/rer dev just-every/run-inkwell   # only with Node 22 or later on PATH
+npm_config_update_notifier=false npx -y @runeditrun/rer dev just-every/run-inkwell   # only with Node 22 or later on PATH
 ```
 
 Each of these installs the user CLI, clones into `./run-inkwell`, install dependencies, set
