@@ -141,34 +141,33 @@ export default defineConfig({ plugins: [docsSite(), react()] })
 ```
 
 and add `deploy-site.json` (`{"version": 1, "domain": "run-<seed>.com"}`); list
-it in `vite.config.ts` `server.fs.allow` when the Worker imports it. Keep every
-Run page string and command in one `RunData` value (`src/site/run.ts` or
+it in `vite.config.ts` `server.fs.allow` when the Worker imports it. Keep the seed-specific
+Run page data in one `RunData` value (`src/site/run.ts` or
 `run.json`):
 
 | Field | Cradle | Uptime |
 | --- | --- | --- |
 | `name` | `Cradle` | `Uptime` |
-| `repository` | `https://github.com/just-every/cradle` | `https://github.com/just-every/uptime-monitor` |
-| `clone` | `npx -y @runeditrun/rer dev just-every/cradle` | `npx -y @runeditrun/rer dev just-every/uptime-monitor --dir uptime` |
-| `folder` | `cradle` | `uptime` |
-| `requirements` | `Runs on macOS, Linux or Windows with WSL2, with git. The installer brings Node when it is missing, and rer brings pnpm.` | same |
+| `repository` | `https://github.com/just-every/run-cradle` | `https://github.com/just-every/run-uptime` |
+| `clone` | `npx -y @runeditrun/rer dev just-every/run-cradle` | `npx -y @runeditrun/rer dev just-every/run-uptime` |
+| `folder` | `run-cradle` | `run-uptime` |
 | `licence` | `MIT` | `MIT` |
 | `docs` | `true` once `/docs` is built | `true` |
 | `hosted` | `[]` | `[]` |
 
-The Run page then reads, exactly: "Run <Seed> on your computer."; "100% free and
-open source. One line, and <Seed> opens in your browser."; **Start <Seed>**,
+The Run page shows “Run <Seed> on your computer.” and one copyable command:
 `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` for
-the seed's own repository ;
-"Git is required; rer brings Node and pnpm. Already have Node 22 or later?
-`npx -y @runeditrun/rer dev <owner/repo>` does the same."; then "rer gets <Seed>,
-installs everything, makes you the owner and prints a link that opens <Seed>
-signed in. To start it again later, run the same line from the same folder.", the requirements
-line and "Source: <repository> · MIT license". Use the repository and directory
-from `clone` for both commands. A README's "Run locally" shows the same single
-installer command and Node alternative, so the Run page and the README agree.
-`hosted` is the slot for hosted options, shown as cards under the command when
-RER hosting opens; leave it empty until then.
+the seed's repository. It gets the seed, installs everything, makes you the
+owner and prints a link that opens it signed in. To start it again later, run
+the same line from the same folder. The Node alternative reads “Already have
+Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same.”
+Base supplies the one requirements sentence, “git is required; rer brings Node
+and pnpm.”; remove a seed's old `requirements` field when adopting this renderer.
+The page also says “This free copy runs only on your computer: nobody else can
+open it, and it sends no email until you set up a mail provider.” A README's
+“Run locally” uses the same installer command and Node alternative. `hosted`
+is the slot for hosted options, shown as cards below the command; leave it empty
+until RER hosting opens.
 
 `src/site/pages.tsx` exports `sitePages({ styles })`. Every CSS file your
 components import (Landing's `import './styles'`, the docs styles) compiles into
