@@ -8,7 +8,7 @@ const output=resolve(process.argv[2] || '');
 if(!process.argv[2] || existsSync(output))throw new Error('Pass a new empty consumer directory');
 mkdirSync(output,{recursive:true});
 const revision=execFileSync('git',['rev-parse','HEAD'],{cwd:base,encoding:'utf8'}).trim();
-execFileSync('tar',['-x','-C',output],{input:execFileSync('git',['archive','HEAD','default-seed','foundation/runtime','modules/operator-auth','modules/dependencies','modules/owner-claim','modules/demo','modules/mail','modules/ai','modules/portability','modules/d1-transport','modules/erasure','modules/import-kit/src','modules/import-kit/schema','modules/editor/src','onboarding'],{cwd:base,maxBuffer:20e6})});
+execFileSync('tar',['-x','-C',output],{input:execFileSync('git',['archive','HEAD','default-seed','foundation/runtime','modules/operator-auth','modules/business-settings','modules/dependencies','modules/owner-claim','modules/demo','modules/mail','modules/ai','modules/portability','modules/d1-transport','modules/erasure','modules/import-kit/src','modules/import-kit/schema','modules/editor/src','onboarding'],{cwd:base,maxBuffer:20e6})});
 cpSync(join(output,'modules/editor/src'),join(output,'default-seed/src/editor'),{recursive:true});
 const seed=join(output,'default-seed');
 const change=(file,from,to)=>{const path=join(seed,file),text=readFileSync(path,'utf8');if(!text.includes(from))throw new Error(`Missing source marker: ${file}`);writeFileSync(path,text.replace(from,to));};
@@ -35,10 +35,11 @@ export function useLeaf(){useEditorLeafReady(typeof location==='undefined'?'ssr'
 change('src/editor-shell.tsx',"import { useState }", "import { useState, useCallback }");
 change('src/editor-shell.tsx',"const [error,setError]=useState(false);return", "const [error,setError]=useState(false);const setErrorState=useCallback(()=>setError(true),[]);return");
 change('src/editor-shell.tsx',";function setErrorState(){setError(true);}", ";");
-change('src/routes/app.tsx',"import { requireOperator }", "import { EditorShell } from '../editor-shell'\nimport { requireOperator }");
+change('src/routes/app.tsx',"import { requireOperator, loadBusinessBrand }", "import { EditorShell } from '../editor-shell'\nimport { requireOperator, loadBusinessBrand }");
 change('src/core/app/loaders.ts', '  return session', `  const editorBindings = requestBindings() as ReturnType<typeof requestBindings> & { EDITOR_MANAGEMENT_ORIGIN?: string; EDITOR_INSTALLATION_ID?: string }
   return {...session,editorEnabled:Boolean(editorBindings.EDITOR_MANAGEMENT_ORIGIN && editorBindings.EDITOR_INSTALLATION_ID)}`);
-change('src/routes/app.tsx','return <Outlet />','const { editorEnabled } = Route.useRouteContext(); return <>{editorEnabled && <EditorShell />}<Outlet /></>');
+change('src/routes/app.tsx','  const business = Route.useLoaderData()', '  const business = Route.useLoaderData()\n  const { editorEnabled } = Route.useRouteContext()');
+change('src/routes/app.tsx','    <Outlet />','    {editorEnabled && <EditorShell />}<Outlet />');
 // The sign-in page is operator-auth's server-rendered page, outside the route tree and the editor.
 for(const file of ['app.index.tsx','records.tsx','reference.tsx']) {
  const path=join(seed,'src/routes',file);let text=readFileSync(path,'utf8');text="import { useLeaf } from '../editor-shell'\n"+text;text=text.replace(/(function [A-Z][A-Za-z]+\(\) \{)/,'$1\n  useLeaf()');writeFileSync(path,text);

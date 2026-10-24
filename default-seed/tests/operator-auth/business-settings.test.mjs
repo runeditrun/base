@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 import { emittedRuntime, owner, root, setupToken } from './emitted-runtime.mjs'
 import { signSettings, testDocument, testTrust } from '../../../modules/business-settings/testing/index.mjs'
@@ -136,7 +136,7 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
     const oversized = await runtime.call('/api/rer/business-settings', { method: 'POST', body: JSON.stringify({ settings: 'x'.repeat(512 * 1024) }) })
     assert.equal(oversized.status, 413); evidence.door.push({ request: 'more than 512 KB', status: oversized.status, response: await oversized.json() })
 
-    await build({ entryPoints: [join(root, '../modules/business-settings/index.ts')], bundle: true, platform: 'node', format: 'esm', outfile: join(scratch, 'api.mjs') })
+    await build({ entryPoints: [fileURLToPath(new URL('../../../modules/business-settings/index.ts', import.meta.url))], bundle: true, platform: 'node', format: 'esm', outfile: join(scratch, 'api.mjs') })
     const { createBusinessSettings } = await import(pathToFileURL(join(scratch, 'api.mjs')))
     const settings = createBusinessSettings({ db: runtime.db, business, trust })
     await settings.setOverride('display_name', 'Cedar Studio', owner)
