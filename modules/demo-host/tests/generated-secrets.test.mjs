@@ -14,7 +14,11 @@ test('hosted encrypted-record visitors start independently, retain their keys ac
     mf = host.mf;
     const visitors = await Promise.all(['203.0.113.1', '203.0.113.2'].map(ip => startCopy(mf, ip)));
     for (const { response } of visitors) assert.equal(response.status, 303, await response.text());
-    const info = await Promise.all(visitors.map(async ({ cookie }) => (await fetchCopy(mf, '/key-info', cookie)).json()));
+    const info = await Promise.all(visitors.map(async ({ cookie }) => {
+      const response = await fetchCopy(mf, '/key-info', cookie);
+      assert.equal(response.status, 200, 'key metadata is available after start');
+      return response.json();
+    }));
     for (const row of info) {
       assert.equal(row.bytes, 32);
       assert.equal(row.length, 44);
@@ -26,7 +30,9 @@ test('hosted encrypted-record visitors start independently, retain their keys ac
     await mf.dispose();
     mf = new Miniflare(host.options);
     for (const [index, { cookie }] of visitors.entries()) {
-      assert.deepEqual(await (await fetchCopy(mf, '/key-info', cookie)).json(), info[index]);
+      const metadata = await fetchCopy(mf, '/key-info', cookie);
+      assert.equal(metadata.status, 200, 'saved visitor is available after runtime restart');
+      assert.deepEqual(await metadata.json(), info[index]);
       const company = await fetchCopy(mf, '/company', cookie);
       assert.equal(company.status, 200);
       assert.match(await company.text(), /October payroll · 6 people/);

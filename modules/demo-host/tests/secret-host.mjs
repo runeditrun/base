@@ -33,7 +33,7 @@ export async function secretHost(folder, { baselineVisitor, generatedSecrets = d
       TURNSTILE_SITE_KEY: 'fixture-site-key', TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA', RER_DEMO_MEASUREMENT_TOKEN: 'fixture-measurement-token-1234567890123456' },
     serviceBindings: { ASSETS: () => new Response('asset') },
     outboundService: request => { if (request.url !== 'https://challenges.cloudflare.com/turnstile/v0/siteverify') throw new Error('Unexpected network request'); return Response.json({ success: true }); },
-    ...(persist ? { isolatedResourcePersistencePath: persist } : {}), ...(log ? { log } : {}), ...(handleStructuredLogs ? { handleStructuredLogs } : {}),
+    ...(persist ? { resourcePersistencePath: persist } : {}), ...(log ? { log } : {}), ...(handleStructuredLogs ? { handleStructuredLogs } : {}),
   });
   return { options, mf: new Miniflare(options) };
 }

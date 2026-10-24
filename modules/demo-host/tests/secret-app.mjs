@@ -30,7 +30,7 @@ export default {
       const row = await env.DB.prepare('SELECT iv,data FROM company WHERE id=1').first();
       if (path === '/export') return Response.json({ company: row }, { headers: { 'content-disposition': 'attachment; filename=company.json' } });
       const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: Uint8Array.from(atob(row.iv), c => c.charCodeAt(0)) }, key, Uint8Array.from(atob(row.data), c => c.charCodeAt(0)));
-      return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Harbor Print Studio Demo</title><main><h1>Harbor Print Studio</h1><p>${new TextDecoder().decode(data)}</p><a href="/export">Export encrypted company</a></main>`, { headers: { 'content-type': 'text/html' } });
+      return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Harbor Print Studio Demo</title><main><h1>Harbor Print Studio</h1><p>${new TextDecoder().decode(data)}</p><a href="/export">Export encrypted company</a></main>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     } catch (error) { return Response.json({ error: error.message }, { status: error.status ?? 500 }); }
   },
 };
