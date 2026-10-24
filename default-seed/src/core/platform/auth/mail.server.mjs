@@ -20,7 +20,7 @@ function businessSender(env, sender) {
 // Construct only on a send: first-owner setup never depends on mail credentials.
 export function operatorMail(env) {
   if (env.RER_DEMO === '1' || localDevelopmentEnabled(env)) {
-    return businessSender(env, createMailSender({ provider: 'development', mode: 'development' }))
+    return createMailSender({ provider: 'development', mode: 'development' })
   }
   if (!env.MAIL_PROVIDER || env.MAIL_PROVIDER === 'development') return undefined
 
