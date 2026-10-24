@@ -35,6 +35,25 @@ without a repository work as before. Dev follows the usual terminal behaviour:
 Ctrl-C stops a foreground app; without a terminal it returns once ready and
 leaves the app running. The restart command includes `cd` into the checkout.
 
+`rer dev <repo> --guide CODE` (and `rer dev --guide CODE` inside a checkout, and
+the installer line with `-- dev <repo> --guide CODE`) takes the code a Run guide
+page shows, and tells that page which phase the launch is in: `get`, `install`,
+`database`, `start`, then `ready`, or `failed` with an `error_code`. An event
+holds only `v`, `phase`, `step`, `total` (4), `elapsed_ms`, `rer_version`, `os`
+and, on failure, one of `get_failed`, `install_failed`, `database_failed`,
+`start_failed`, `refused`, `needs_input` or `stopped`: no path, environment value,
+host name, link or error text. It is best effort and never delays the launch:
+each post has two seconds, runs beside the launch, is never retried, and any
+failure is dropped; a failed launch also prints one
+`RER_GUIDE_FAILED phase=… error_code=…` line. `RER_GUIDE_ORIGIN` points it at
+another platform than https://app.runeditrun.com.
+
+`rer prompt <repo> [--guide CODE]` prints the one block to paste into Claude Code
+or Codex so it runs the app: the install-and-start line (with `--guide CODE` when
+given), the repository, and the rules (never print the `RER_OPEN` link, open the
+app with `rer open`, never put credentials in chat, report the phase and
+`error_code` on failure). It reads and writes nothing and needs no project.
+
 Install `rer` with one of these commands:
 
 ```sh
