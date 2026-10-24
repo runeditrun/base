@@ -643,6 +643,38 @@ its v2 output succeeds; do not reset the recovered installation to retry.
 `exports.create(actor?)` copies all tables in one D1 batch. Product writes may
 continue after that snapshot. R2 listing records size and etag; changes or missing
 objects fail subsequent reads. D1 and R2 do not share a cross-binding transaction.
+
+`createPortability` and `createPortabilityHandler` accept an optional synchronous
+`onExport({id, actor, scope})` callback returning `[sql, args][]`. Its SQL is
+appended to that same snapshot/job-creating D1 batch. A thrown callback or failed
+statement refuses creation; failed SQL rolls back the job, snapshots and audit
+rows together. With no hook, export behavior is unchanged. This records job
+creation, not successful download: a later build, file-write or download failure
+does not erase a committed creation audit.
+
+`id` is the export job id, `scope` is the constant `'installation'`, and `actor`
+is the opaque caller id, with the direct/CLI sentinel `'direct'` normalized to
+`null`. Job ownership still stores `'direct'` for existing direct callers.
+The callback receives no names, emails, IdP identifiers, tokens, record data,
+object keys or file paths. Pass only opaque operator ids as authenticated actors.
+The seed owns audit storage, migrations, retention, erasure and archive policy;
+Base adds no audit table. For a CLI installation export, wire the seed's existing
+`operation_audit` schema to action `installation.export`, actor_id `NULL` and
+feature `rer export`, for example:
+
+```js
+const service = await createPortability({db, buckets, policy,
+  onExport: ({id, actor}) => [[
+    'INSERT INTO operation_audit(id,action,actor_id,feature) VALUES(?,?,?,?)',
+    [id, 'installation.export', actor, 'rer export'],
+  ]],
+});
+```
+
+Adapt the statement to the seed's schema and use the service in its existing
+export adapter. Hooks return SQL only; external side effects cannot share the
+D1 transaction. Do not write these events to the erasure tombstone journal.
+
 Transfer bookkeeping lives in sidecar tables, so product tables up to D1's
 100-column limit retain the full column and binding capacity. A keyless table
 with 100 columns or generated columns restores its rowids with two updates in

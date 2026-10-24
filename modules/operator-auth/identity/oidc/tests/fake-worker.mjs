@@ -58,6 +58,10 @@ export default {
     };
     const providers = setup.providers.map(p => ({ ...p, ...(p.privateKeyName ? { privateKey: setup.keys[p.privateKeyName].private } : {}), privateKeyName: undefined, ...current.config?.[p.id] }));
     const hooks = {
+      audit: setup.audit ? event => {
+        const insert = ['INSERT INTO fixture_admin_audit(payload) VALUES(?)', [JSON.stringify(event)]];
+        return current.auditFailure ? [insert, ['INSERT INTO fixture_admin_audit(payload) VALUES(NULL)', []]] : [insert];
+      } : undefined,
       beforeMagicLink: setup.hooks?.quietFor ? ({ email }) => email !== setup.hooks.quietFor : undefined,
       afterConfirm: setup.hooks?.reviewFor || setup.hooks?.refuseFor ? async ({ operator, session, method }) => {
         await db.prepare('INSERT INTO fixture_hook_calls(session_id,method) VALUES(?,?)').bind(session.id,method).run();

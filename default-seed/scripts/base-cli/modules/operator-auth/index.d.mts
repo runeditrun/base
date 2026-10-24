@@ -84,11 +84,27 @@ export interface VerifiedIdentity extends VerifiedPrincipal { email: string; ema
 /** Deployment-owned association, never populated from token claims or HTTP input. */
 export interface IdentityAdmissionConfig { issuer: string; subjectEmails?: Record<string, string> }
 export type IdentityAdmission<R extends string = Role> = (request: Request, identity: VerifiedPrincipal, input?: { returnTo?: string }) => Promise<CompletedSession<R>>;
+export type AuthAuditAction = 'operators.invite' | 'operators.cancel-invite' | 'operators.deactivate' | 'operators.reactivate' | 'operators.role' | 'sessions.revoke' | 'domains.rule.set' | 'domains.rule.lift' | 'providers.unlink' | 'providers.relink';
+/** OA administrative mutation metadata only; no private identity, record or file data. */
+export interface AuthAuditEvent {
+  action: AuthAuditAction;
+  /** Opaque oa_operators.id of the authenticated actor. */
+  actorId: string;
+  /** Target oa_operators.id; null for domain and provider actions. */
+  subjectId: string | null;
+  /** New role/status, normalized domain, provider id, or null for session revocation. */
+  detail: string | null;
+  /** Action clock time in milliseconds since the Unix epoch. */
+  now: number;
+}
+export type AuthAuditStatement = [sql: string, args: unknown[]];
 export interface AuthHooks<R extends string = Role> {
   /** Before an email link is sent to an active operator. Return false to send nothing; the public answer is unchanged. */
   beforeMagicLink?(input: { request: Request; email: string; operator: Operator<R> }): boolean | void | Promise<boolean | void>;
   /** After an email-link or provider sign-in completes. Return a returnTo to redirect; throw to refuse (the new session is revoked). */
   afterConfirm?(input: { request: Request; operator: Operator<R>; session: CompletedSession<R>['session']; method: 'email' | 'oidc'; returnTo: string }): void | { returnTo?: string } | Promise<void | { returnTo?: string }>;
+  /** OA administration only: pure SQL generation for the same mutation batch. Failure refuses the action; no external writes. */
+  audit?(input: AuthAuditEvent): AuthAuditStatement[] | Promise<AuthAuditStatement[]>;
 }
 export type { ScheduledPolicy, ScheduledPolicyDoor, PolicyApproval, PolicyRun } from './scheduled/index.mjs';
 export interface AuthOptions<R extends string = Role> {
