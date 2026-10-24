@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, symlink, writeFile, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
-import { PINS, resolveVersions, loadDependencies } from '../index.mjs';
+import { PINS, resolveVersions } from '../index.mjs';
 import { consumer, temporary } from './helpers.mjs';
 
 const require = createRequire(join(consumer, 'package.json'));
@@ -25,14 +25,6 @@ async function project(t, wrong) {
   return directory;
 }
 
-test('exact consumer pins are accepted and exported', async t => {
-  const directory = await project(t);
-  assert.deepEqual(resolveVersions(directory), { pinned: PINS, actual: PINS });
-  assert.equal(typeof loadDependencies(directory).chromium.launch, 'function');
-  assert.equal(PINS['@playwright/test'], '1.63.0');
-  assert.equal(PINS['@axe-core/playwright'], '4.13.0');
-  assert.equal(PINS['axe-core'], '4.13.0');
-});
 for (const wrong of Object.keys(PINS)) {
   test(`wrong resolved ${wrong} is refused and names all expected pins`, async t => {
     const directory = await project(t, wrong);

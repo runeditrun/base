@@ -6,7 +6,7 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
@@ -14,7 +14,7 @@ import { tarball } from '../../scripts/rer-package/tarball.mjs';
 import { integrity, localRegistry } from '../../scripts/rer-package/registry.mjs';
 import { aliases, pins, verbs } from '../../cli/contract.mjs';
 import { readPackage } from '../update/archive.mjs';
-import { run } from './harness.mjs';
+import { freePort, run } from './harness.mjs';
 import { devModes } from './dev-mode.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
@@ -112,6 +112,37 @@ const installedVersion = async root => JSON.parse(await readFile(join(root, 'nod
 
 test('fresh package checkouts preserve foreground, detach and piped-default launch lifetimes', { timeout: 240_000 }, async t => {
  await devModes(t, name => seed(name, versions.first), environment());
+});
+
+test('a fresh demo installs its newer checkout pin before loading the seed adapter', { timeout: 120_000 }, async () => {
+ const { root, records } = await seed('fresh-demo', versions.next);
+ const loaded = join(records, 'adapter.json');
+ await appendFile(join(root, 'adapter.mjs'), `\nrequire('node:fs').writeFileSync(${JSON.stringify(loaded)}, JSON.stringify({ version: require('@runeditrun/rer/package.json').version, installed: require('node:fs').readdirSync(${JSON.stringify(records)}).some(name => name.startsWith('install-')) }));\n`);
+ assert.ok(!existsSync(join(root, 'node_modules')), 'the demo is the first command in a fresh checkout');
+ const result = await run(process.execPath, [launcher, 'demo', '--port', String(await freePort()), '--foreground', '--json'], { cwd: root, env: environment() });
+ const adapter = JSON.parse(await readFile(loaded, 'utf8').catch(error => { throw new Error(result.stdout + result.stderr, { cause: error }); }));
+ assert.equal(adapter.version, versions.next, 'the seed loaded the newer pinned implementation');
+ assert.ok(adapter.installed, 'the dependency install completed before project code loaded');
+ assert.ok(!(result.stdout + result.stderr).includes('invalid_invocation'), result.stdout + result.stderr);
+});
+
+test('offline release file operations skip checkout installation while the producer bootstraps', { timeout: 120_000 }, async () => {
+ const { root, records } = await seed('release-files', versions.next);
+ const files = await realpath(root), artifact = join(files, 'absent-artifact'), anchors = join(files, 'absent-anchors');
+ const offline = environment({ npm_config_offline: 'true', npm_config_store_dir: join(directory, 'empty-release-store') });
+ const receipt = await run(process.execPath, [launcher, 'release', 'receipt', '--artifact', artifact, '--anchors', anchors], { cwd: root, env: offline });
+ assert.equal(receipt.code, 1, receipt.stderr + receipt.stdout);
+ assert.equal(JSON.parse(receipt.stdout).code, 'FILE_MISSING', 'receipt reaches artifact validation offline');
+ for (const args of [['sign', '--artifact', artifact, '--key-file', join(root, 'absent-key')], ['keygen']]) {
+  const result = await run(process.execPath, [launcher, 'release', ...args], { cwd: root, env: offline });
+  assert.ok(JSON.parse(result.stdout).verdict === 'REFUSED', result.stderr + result.stdout);
+ }
+ assert.ok(!existsSync(join(root, 'node_modules')), 'file operations leave the pristine checkout uninstalled');
+ assert.equal((await recorded(records, 'install')).length, 0);
+ const producer = await run(process.execPath, [launcher, 'release'], { cwd: root, env: environment() });
+ assert.equal(producer.code, 2, producer.stderr + producer.stdout);
+ assert.equal(await installedVersion(root), versions.next, 'the producer dispatches with its checkout pin');
+ assert.equal((await recorded(records, 'install')).length, 1);
 });
 
 test('a fresh clone installs dependencies without credentials, and its deploy still receives them', { timeout: 240_000 }, async () => {
