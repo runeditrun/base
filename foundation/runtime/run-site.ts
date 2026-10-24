@@ -37,9 +37,9 @@ export interface HostedOption { title: string; body: string; href: string; actio
 
 const npxStart = 'npx -y @runeditrun/rer '
 const repoStart = `${npxStart}dev `
-// GitHub repository ids: an alphanumeric owner (hyphens inside) and a
-// repository name made of letters, digits, dots, underscores and hyphens.
-const repositoryId = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$/
+// GitHub repository ids: up to 39 owner characters with single internal
+// hyphens, and up to 100 repository characters (excluding dot directories).
+const repositoryId = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}\/(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/
 // Escape independently of validation; repository ids need no escaping in POSIX shells.
 const shellArgument = (value: string) => /^[A-Za-z0-9_./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\"'\"'")}'`
 /**
