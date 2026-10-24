@@ -214,6 +214,13 @@ serializer and nullable provider receipt, with uncertain outcomes kept explicit.
 
 The shared `rer` dispatcher provides install, setup, dev, preview, build, verify, reset, deploy, export, import, doctor, describe and check; release keeps its existing producer and flags. This maintained path is required for every first-party seed. See [run it on your computer](export/RUN-LOCALLY.md) for exact flags, Node 22.20.0/pnpm 10.12.4 pins, readiness/sign-in lines, JSON, exits and the independent-project boundary. Local transfer covers declared supported resources; remote transfer requires complete adapter coverage. [CLI sources and export inventory](cli/README.md) documents the one runner and portable source boundary.
 
+The pnpm 10.34.7 update is deferred. On Ubuntu 24.04 with Node 22.20.0, all five
+launcher package-pin cases fail: dependency install/build markers are absent,
+producer and changed-pin install counts are zero, and a deliberately failing
+dependency install exits zero. Main and the same updated dependency graph with
+only pnpm restored to 10.12.4 both pass all five unchanged cases. Keep the mature
+npm updates and revisit the tool update separately.
+
 From `default-seed` or a composed first-party edition, use
 `rer preview` for fixed production output or
 `rer dev` for live HMR.
