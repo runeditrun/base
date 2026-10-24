@@ -410,7 +410,7 @@ test('built chooser keeps self first and carries each paid plan through the shar
  try {
   const page = await browser.newPage();
   for (const [mode, product, managed] of [['request', 'errors-workbench', true], ['app', 'errors-workbench', true], ['app', 'errors-workbench', false], ['app', null, true]]) {
-   await writeFile(data, original.replace("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`));
+   await writeFile(data, original.replaceAll("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`));
    await writeFile(renderer, source.replace("signups: 'request' as", `signups: '${mode}' as`));
    const result = await f.build();
    assert.equal(result.code, 0, result.stdout + result.stderr);
