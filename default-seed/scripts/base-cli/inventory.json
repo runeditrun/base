@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.ge8fd3d10",
+  "cliVersion": "0.2.79-dev.g0b07aa9c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -273,7 +273,7 @@
     },
     "schema/credential-names.mjs": {
       "source": "onboarding/schema/credential-names.mjs",
-      "sha256": "d6a0725c66ceefcabb31c952e2382257c4c36c53a0b3ed5a94ff07f37b7f2baa"
+      "sha256": "480c446ff369f851df34c0c191af0b864a4d4c7cea43b11b98af13c5c06afab5"
     },
     "schema/dependencies.mjs": {
       "source": "onboarding/schema/dependencies.mjs",
@@ -297,7 +297,7 @@
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
-      "sha256": "5011a5dea7f29e01d2aa0256a1e90af8bcade977a524a60116a5432b787d5094"
+      "sha256": "b7b283b93496596b07835d7d3b6966258f8123d2b695a2d1c36da859bf1356b8"
     },
     "start-origin-diagnostic.mjs": {
       "source": "onboarding/start-origin-diagnostic.mjs",
