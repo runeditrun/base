@@ -4,7 +4,7 @@ import { inventory } from './export.mjs';
 import { lstat, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { delimiter, dirname, resolve } from 'node:path';
-import { aliases, demoVerb, pins, requiredHooks, serverDefaults, signinVerb, verbs, releaseFlags } from './contract.mjs';
+import { authoringVerbs, aliases, demoVerb, pins, requiredHooks, serverDefaults, signinVerb, verbs, releaseFlags } from './contract.mjs';
 import { runningVersion } from './version.mjs';
 import { contained, readPackage } from './project.mjs';
 import { shared } from './shared.mjs';
@@ -49,6 +49,7 @@ export async function describe(project) {
    return [verb, { flags: (verbs[verb]?.flags ?? releaseFlags).filter(flag => capability.flags?.includes(flag)), effects }];
   }).concat(capabilities.dev?.flags?.includes('--demo') ? [['demo', { flags: demoVerb.flags.filter(flag => capabilities.dev.flags.includes(flag)), effects: demoVerb.effects }]] : [])
    // rer signin is rer's own: any seed it can deploy, it can sign the owner in to.
+   .concat(Object.entries(authoringVerbs))
    .concat(capabilities.deploy ? [['signin', { flags: signinVerb.flags, effects: signinVerb.effects }]] : [])),
   aliases: Object.fromEntries(Object.entries(aliases).filter(([alias, verb]) => pkg.scripts?.[alias] === commandLine(verb, declaredPackage(pkg) !== undefined))),
   local: { state: project.adapter?.state, settings: project.adapter?.settings ?? [], installerState: '.seed/installer', ...await localState(project), origin: await savedOrigin(project), ...(project.adapter?.devIdentity ? { devIdentity: true, devKey: '.rer/local/dev-key.env' } : {}) },

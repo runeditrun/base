@@ -25,6 +25,12 @@ export const demoVerb = Object.freeze({ bootstrap: 'before', flags: [...commonFl
 // `rer signin` is rer's own, not a seed operation: any seed rer deploys, it can
 // sign the owner in to, so no seed declares it and check does not ask for it.
 export const signinVerb = Object.freeze({ bootstrap: 'before', flags: [...commonFlags, '--environment', '--env-file'], effects: 'A one-time sign-in link for the hosted owner, without mail. Uses the Cloudflare credentials that deployed --environment (default production; from the environment or --env-file) to write a single-use grant for the recorded owner into that deployment\'s auth database, then prints the link once to this terminal; it is never saved. The link works once, only for that owner, expires within 15 minutes, and its use is recorded in the owner\'s audit log. Signed in this way, the owner can correct a wrong email in settings.' });
+// Source-authoring commands belong to rer, not the seed adapter/OPERATIONS.
+// Their project-package bootstrap uses the same contract as every checkout verb.
+export const authoringVerbs = Object.freeze({
+ 'adopt-edition': {bootstrap: 'before', flags: [...commonFlags], effects: 'Add edition.json and sources.lock.json for the existing tracked local source, preserving declared project identity and existing copy/composition records. Create an empty base-copies.json only when none exists. Review and stage the new authoring inputs; no source regeneration, install setup or commit.'},
+ 'refresh-base': {bootstrap: 'before', flags: [...commonFlags, '--ref', '--base', '--record', '--offline'], effects: 'Refresh recorded Base copies to --ref FULL_COMMIT, preserving acknowledged adaptations and applied migrations; announce removed singleton retirement. Acquire committed source from the declared Base repository (default https://github.com/runeditrun/base.git), or use --base CHECKOUT. --offline requires --base and never acquires remote source. Refuse incomplete sparse checkouts without changing their records. Review the diff and run edition tests before committing.'},
+});
 export const aliases = Object.fromEntries([...Object.keys(verbs).filter(v => v !== 'install'), 'release', 'deps', 'rer'].map(name => [name, name === 'deps' ? 'install' : name === 'rer' ? null : name]));
 export const releaseFlags = ['--repo', '--project', '--repository', '--output', '--ref', '--public-base', '--dry-run', '--local-verify', '--verify-workflow', '--scan-timeout-seconds', '--tag', '--clean-history', '--onto', '--env-file', '--allow-placeholder-mark', '--no-queue'];
 export const releaseVerb = Object.freeze({
@@ -35,7 +41,7 @@ export const releaseVerb = Object.freeze({
 // All checkout commands, including those supplied by rer rather than declared
 // as seed operations. Bootstrap belongs to the selected command: before
 // dispatch, during launch, or never. A subcommand inherits its verb's policy.
-export const checkoutVerbs = Object.freeze({ ...verbs, demo: demoVerb, signin: signinVerb, release: releaseVerb });
+export const checkoutVerbs = Object.freeze({ ...verbs, ...authoringVerbs, demo: demoVerb, signin: signinVerb, release: releaseVerb });
 export function checkoutBootstrap([verb, ...args]) {
  if (args.includes('--help')) return 'never';
  const command = checkoutVerbs[verb];

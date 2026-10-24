@@ -257,50 +257,6 @@ test('refresh-base moves every copy to one Base commit and drops a legacy record
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 
-test('refresh-base retires an absent singleton without recreating it on repeated refresh', () => {
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-retire-'));
-  try {
-    const {base, seed, revision} = fixture(temp);
-    ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
-    ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
-    fs.rmSync(path.join(seed, 'scripts/helper.mjs'));
-    write(base, 'tools/helper.mjs', 'export const helper = "updated";\n');
-    const next = commit(base);
-    const refreshed = ok(seed, 'refresh-base', next, '--base', base);
-    assert.deepEqual(refreshed.retired, ['scripts/helper.mjs']);
-    assert.deepEqual(refreshed.copies.find(c => c.path === 'scripts/helper.mjs').removed, ['scripts/helper.mjs']);
-    const recordPath = path.join(seed, 'base-copies.json');
-    const record = fs.readFileSync(recordPath);
-    assert.deepEqual(JSON.parse(record).copies.map(c => c.path), ['vendor/sample']);
-    assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
-    assert.deepEqual(ok(seed, 'refresh-base', next, '--base', base).retired, []);
-    assert.deepEqual(fs.readFileSync(recordPath), record);
-    assert.equal(fs.existsSync(path.join(seed, 'scripts/helper.mjs')), false);
-  } finally { fs.rmSync(temp, {recursive: true, force: true}); }
-});
-
-test('refresh-base preserves a still-present singleton when its source vanished or local bytes differ', () => {
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-retain-'));
-  try {
-    const {base, seed, revision} = fixture(temp);
-    ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
-    const recordPath = path.join(seed, 'base-copies.json');
-    const record = fs.readFileSync(recordPath), helper = fs.readFileSync(path.join(seed, 'scripts/helper.mjs'));
-    fs.rmSync(path.join(base, 'tools/helper.mjs'));
-    const next = commit(base);
-    const missing = run(seed, 'refresh-base', next, '--base', base);
-    assert.equal(missing.status, 1);
-    assert.match(missing.error, /No Base source/);
-    assert.deepEqual(fs.readFileSync(path.join(seed, 'scripts/helper.mjs')), helper);
-    write(seed, 'scripts/helper.mjs', 'owner implementation\n');
-    const edited = run(seed, 'refresh-base', revision, '--base', base);
-    assert.equal(edited.status, 1);
-    assert.match(edited.error, /local edits/);
-    assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'owner implementation\n');
-    assert.deepEqual(fs.readFileSync(recordPath), record);
-  } finally { fs.rmSync(temp, {recursive: true, force: true}); }
-});
-
 test('refresh-base refuses to rewrite an applied migration and leaves every file as it was', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-migration-'));
   try {

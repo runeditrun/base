@@ -39,14 +39,14 @@ function open(record, base, root) {
     const repository = fs.realpathSync(base);
     return {repository, head: git(repository, 'rev-parse', 'HEAD'), close() {}};
   }
-  const source = record.repository ?? baseRepository(root);
-  if (source === 'runeditrun/base') throw Error('Base has a publisher-qualified identity only; pass --base <checkout> or --offline');
+  const declared = record.repository ?? baseRepository(root);
+  const source = declared === 'runeditrun/base' ? 'https://github.com/runeditrun/base.git' : declared;
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-'));
   try {
     execFileSync('git', ['clone', '--bare', '--quiet', '--', source, temporary], {env: {...process.env, GIT_NO_REPLACE_OBJECTS: '1'}, stdio: 'pipe'});
   } catch {
     fs.rmSync(temporary, {recursive: true, force: true});
-    throw Error(`Cannot read Base repository ${source}; pass --base <checkout> or --offline`);
+    throw Error('Cannot acquire Base source. Clone https://github.com/runeditrun/base.git when online, then repeat with --base <checkout>.');
   }
   return {repository: temporary, head: null, close: () => fs.rmSync(temporary, {recursive: true, force: true})};
 }
@@ -113,7 +113,9 @@ export function validate(record) {
 function seedFiles(root) {
   if (fs.realpathSync(git(root, 'rev-parse', '--show-toplevel')) !== fs.realpathSync(root)) throw Error('Run at the edition repository root');
   const files = new Map();
-  const names = raw(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').toString('utf8').split('\0').filter(Boolean);
+  let names;
+  try { names = raw(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').toString('utf8').split('\0').filter(Boolean); }
+  catch { throw Error('Cannot read the Git index. Run git status and repair the checkout before working with Base copies; no copy record was changed.'); }
   for (const name of [...new Set(names)].sort()) {
     safe(name);
     let stat;
@@ -134,7 +136,7 @@ function reader(origin) {
       if (!trees.has(revision)) {
         let resolved;
         try { resolved = git(origin.repository, 'rev-parse', '--verify', '--quiet', `${revision}^{commit}`); } catch { resolved = ''; }
-        if (resolved !== revision) throw Error(`Base commit ${revision} is not available`);
+        if (resolved !== revision) throw Error(`Base commit ${revision} is not available. Check the full commit with git -C <base-checkout> rev-parse <tag>^{commit}, fetch it, then repeat with --base <base-checkout>`);
         const entries = new Map();
         for (const entry of raw(origin.repository, 'ls-tree', '-rz', '--full-tree', revision).toString('utf8').split('\0').filter(Boolean)) {
           const tab = entry.indexOf('\t');
@@ -304,6 +306,22 @@ export function adaptCopy(root, {positional: [name], record: recordPath}) {
   return {adapted: name, revision: copy.adapted[name], sha256: copy.files[name], acknowledged: copy.acknowledged[name], record: recordPath};
 }
 
+// A missing working file can still be deliberately excluded by Git. Read the
+// actual index (including expanded sparse-index entries), never infer deletion
+// intent from worktree absence alone. Refuse before any record or source write.
+function requireMaterializedCopies(root, record, files) {
+  let entries;
+  try { entries = raw(root, 'ls-files', '-t', '-z').toString('utf8').split('\0').filter(Boolean); }
+  catch { throw Error('Cannot read the Git index to distinguish removed copies from sparse exclusions. Repair the checkout with git status, then repeat refresh-base; no copy record was changed.'); }
+  const excluded = new Set();
+  for (const entry of entries) {
+    if (!/^[A-Z] /.test(entry)) throw Error('Cannot interpret the Git index checkout state; run git status and repair the index before refresh-base. No copy record was changed.');
+    if (entry.startsWith('S ')) excluded.add(entry.slice(2));
+  }
+  const missing = record.copies.flatMap(copy => Object.keys(copy.files)).filter(name => !files.has(name) && excluded.has(name));
+  if (missing.length) throw Error(`Base copies are excluded by the Git sparse checkout, not removed: ${missing.join(', ')}. Run git sparse-checkout disable, then repeat refresh-base. No copy record was changed.`);
+}
+
 // Move every recorded copy to one Base commit, after any export tool has written
 // its files. Recorded files and files already equal to Base at that commit are
 // kept current; files Base added under a copied path since the copy's pin are
@@ -312,12 +330,14 @@ export function adaptCopy(root, {positional: [name], record: recordPath}) {
 // entirely, just as absent files are dropped from directory copies. Local edits
 // are refused, never overwritten, as is any change to an existing file under a
 // migrations folder.
-export function refreshCopies(root, {positional: [revision], record: recordPath, base}) {
-  if (!commit.test(revision)) throw Error('Refresh to an immutable full Base commit');
+export function refreshCopies(root, {positional: [revision], record: recordPath, base, offline}) {
+  if (!commit.test(revision)) throw Error('Refresh requires an immutable full 40-character Base commit. Resolve the release tag with git -C <base-checkout> rev-parse <tag>^{commit}, then repeat with --ref <commit> --base <base-checkout>.');
+  if (offline && !base) throw Error('Offline refresh needs a Base checkout. Repeat rer refresh-base --ref <commit> --offline --base <checkout> containing that commit.');
   const filename = recordFile(root, recordPath);
   if (!filename) throw Error(`No ${recordPath} found; run record-base <path> <origin-path> <commit> first`);
   const record = validate(JSON.parse(fs.readFileSync(filename, 'utf8')));
   const files = seedFiles(root);
+  requireMaterializedCopies(root, record, files);
   const origin = open(record, base, root);
   try {
     const read = reader(origin);

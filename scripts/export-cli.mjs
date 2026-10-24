@@ -28,6 +28,6 @@ if(existsSync(resolve(target,'tests/local-setup/fixtures'))){
  await cp(resolve(base,'onboarding/local/fixtures'),fixtures,{recursive:true});
 }
 
-for (const name of ['RUN-LOCALLY.md', 'SEED-COMMAND-CONTRACT.md', 'HOMEPAGE-VARIANTS.md', 'DEMO.md']) await cp(resolve(base, 'export', name), resolve(target, name));
+for (const name of ['EDITION-AUTHORING.md', 'RUN-LOCALLY.md', 'SEED-COMMAND-CONTRACT.md', 'HOMEPAGE-VARIANTS.md', 'DEMO.md']) await cp(resolve(base, 'export', name), resolve(target, name));
 
 await cp(resolve(base, 'export/install-chromium-deps.py'), resolve(target, 'scripts/install-chromium-deps.py'));
