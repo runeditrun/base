@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc7320998",
+  "cliVersion": "0.2.79-dev.g43392334",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -345,7 +345,7 @@
     },
     "ui/style.css": {
       "source": "onboarding/ui/style.css",
-      "sha256": "0f389f002fe0454da8a0ccf382f8bcd691ed60a6341c9b6caf7cfacd9d587a05"
+      "sha256": "ed825ecaef8a27c9f940cf9febe10ba664e4a93fd7661c50c80ccccc6cc7a80a"
     },
     "ui/theme.css": {
       "source": "onboarding/ui/theme.css",
@@ -1375,7 +1375,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "916848a7c9262fa669482a7a80d7403bd71db59aa4a25f70e926dc6ce700bfeb"
+      "sha256": "d13fed5f17eb0434f0de34ac005bc251fec405b4eb753037fc9358aa6669f1c6"
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
@@ -1491,7 +1491,7 @@
     },
     "modules/demo-host/page-style.mjs": {
       "source": "modules/demo-host/page-style.mjs",
-      "sha256": "6a2ab271d26fd9a5c1343106d6247500cb3c58f83d5fd8dae109bd637217485e"
+      "sha256": "cd7dcd1dd5b952e2f3543060d0089bd7ae0c1155b178ffbe67bdf56349974e31"
     },
     "modules/demo-host/pages.mjs": {
       "source": "modules/demo-host/pages.mjs",
@@ -1519,7 +1519,7 @@
     },
     "modules/demo-host/theme.mjs": {
       "source": "modules/demo-host/theme.mjs",
-      "sha256": "0b3c3d78ad9fcbefd4816a530cf3e78ce5c4ab7becedfa80ffdbbb31945901ee"
+      "sha256": "9cd820ade5f08c15062040ba013d2ad209538f20754eee38eb19fb3aa8390015"
     },
     "modules/demo-host/upgrade.mjs": {
       "source": "modules/demo-host/upgrade.mjs",
@@ -3707,7 +3707,7 @@
     },
     "modules/site/docs-search/search.css": {
       "source": "modules/site/docs-search/search.css",
-      "sha256": "2bc96258d55d20bd0ccc479b7bb54378c0eb0a75b68984ef87c02e097172ee1b"
+      "sha256": "44ce24bd0708975375a8f46bda17dc6a4750019c338cdc18d9e591c1fdabb8e4"
     },
     "modules/site/docs-search/sections.ts": {
       "source": "modules/site/docs-search/sections.ts",
