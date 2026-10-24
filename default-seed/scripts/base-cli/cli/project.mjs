@@ -1,4 +1,4 @@
-import { readFile, lstat, realpath } from 'node:fs/promises';
+import { readFile, lstat, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readOperations } from '../operations/operations.mjs';
@@ -19,7 +19,7 @@ export async function contained(root, path, { optional = false, privateFile = fa
 }
 
 export async function resolveProject(root) {
- root = await realpath(root);
+ root = await projectFolder(root);
  let loaded;
  try { loaded = await readOperations(root); } catch (error) {
   if (error.code === 'ENOENT') throw missing('OPERATIONS.json or a declared input is missing. See the project operating documentation.');
@@ -33,6 +33,15 @@ export async function resolveProject(root) {
   catch { throw invalid('The declared adapter could not be loaded. Restore its portable sources.'); }
  }
  return { root, ...loaded, profile: marker ? 'first-party' : 'independent', adapter };
+}
+
+// A wrong folder is a permanent mistake: name it and the flag that chose it.
+async function projectFolder(path) {
+ let status;
+ try { status = await stat(path); }
+ catch (error) { if (['ENOENT', 'ENOTDIR'].includes(error.code)) throw missing(`The project folder does not exist: ${path}. Correct --cwd, or run this command from the project folder.`); throw error; }
+ if (!status.isDirectory()) throw invalid(`The project folder is a file, not a folder: ${path}. Point --cwd at the folder that holds OPERATIONS.json.`);
+ return realpath(path);
 }
 
 // Only the descriptor marker distinguishes package forwarding from a raw

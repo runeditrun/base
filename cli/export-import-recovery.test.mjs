@@ -63,7 +63,7 @@ if (args.includes('--fail')) process.exit(7);
  }
 });
 
-test('import requires an explicit remote target for a non-local origin and leaves the checkout untouched', { timeout: 10 * 60_000 }, async t => {
+test('import refuses a non-local origin before any effect and names --target remote only to a seed that restores remotely', { timeout: 10 * 60_000 }, async t => {
  const seed = await portabilityFixture(t);
  await seed.run(['export', '--output', 'exports/empty.rer']);
  await seed.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('backup',3,125,'Saved invoice')");
@@ -89,7 +89,9 @@ test('import requires an explicit remote target for a non-local origin and leave
    assert.equal(plain.stdout, '');
    assert.equal(plain.stderr.trimEnd().split('\n').length, 1);
    assert.ok(plain.stderr.includes(new URL(origin).origin));
-   assert.match(plain.stderr, /--target remote/);
+   // This seed cannot restore remotely: the guidance names the local restore instead.
+   assert.doesNotMatch(plain.stderr, /--target remote/);
+   assert.ok(plain.stderr.includes("rer import --input 'exports/saved.rer' --yes"), plain.stderr);
    const events = await seed.run(args, 4);
    assert.deepEqual(events.map(row => row.event), ['error', 'result']);
    assert.equal(events[0].message, plain.stderr.trimEnd());
@@ -99,12 +101,18 @@ test('import requires an explicit remote target for a non-local origin and leave
  }
  // Even missing archive/session/journal files are not inspected before the origin refusal.
  const missing = await seed.run(['import', '--origin', 'https://example.invalid', '--input', 'missing.rer', '--session-file', 'missing.session', '--journal', 'missing-journal.rer', '--yes'], 4);
- assert.match(missing[0].message, /--target remote/);
+ assert.ok(missing[0].message.includes("rer import --input 'missing.rer' --yes"), missing[0].message);
  assert.deepEqual(await snapshot(), before);
  assert.equal((await seed.data('SELECT COUNT(*) AS count FROM computed_entries'))[0].results[0].count, 0);
- // An explicitly remote request still reaches the existing adapter capability refusal.
+ // A seed that restores into its hosted app is pointed at --target remote instead.
+ const adapterPath = join(seed.root, 'scripts/installer/local.mjs'), adapter = await readFile(adapterPath, 'utf8'), settled = await snapshot();
+ await writeFile(adapterPath, adapter + '\ncommandAdapter.portability.remote = true;\n');
+ assert.match((await seed.text(['import', '--origin', 'https://example.invalid', '--input', 'exports/saved.rer', '--yes'], 4)).stderr, /--target remote/);
+ await writeFile(adapterPath, adapter);
+ assert.deepEqual(await snapshot(), settled);
+ // An explicitly remote request still reaches the adapter capability refusal, which names the local restore.
  const remote = await seed.run(['import', '--origin', 'https://example.invalid', '--target', 'remote', '--input', 'exports/saved.rer', '--yes'], 4);
- assert.match(remote.find(row => row.event === 'error').message, /Complete remote import is unsupported/);
+ assert.ok(remote.find(row => row.event === 'error').message.includes("rer import --input 'exports/saved.rer' --yes"));
  // All direct loopback spellings at the configured port, and an omitted origin, still restore.
  for (const origin of ['http://127.0.0.1:18987', 'http://localhost:18987', 'http://[::1]:18987', undefined]) {
   await seed.run(['reset', '--yes']);

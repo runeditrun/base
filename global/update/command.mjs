@@ -59,6 +59,7 @@ async function npmGlobal(version) {
 }
 
 export async function update(args) {
+ if (args.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(`${usage}Move to the latest published rer (--version X for an exact one), the way it was installed:\nnpx and install.sh installs switch atomically, npm installs run npm.\n`); return 0; }
  const options = parse(args);
  if (!options) { process.stderr.write(`Unsupported: rer update ${args.join(' ')}\n${usage}`); return 2; }
  const { channel } = await channelOf(layout()), current = ownManifest().version;
