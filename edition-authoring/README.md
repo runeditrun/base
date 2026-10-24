@@ -5,7 +5,9 @@ and `rer refresh-base --ref FULL_COMMIT`; do not vendor authoring CLI files.
 See [EDITION-AUTHORING.md](../export/EDITION-AUTHORING.md) for adoption, acquisition,
 offline use and JSON output. Node 22+ and Git are the authoring dependencies.
 Builds and integration remain ordinary edition code. This tool never runs
-source-provided scripts. Existing local authoring scripts remain supported.
+source-provided scripts. Existing per-file vendored authoring scripts remain
+supported; to migrate, pin the package, run `rer adopt-edition`, then drop the
+vendored scripts and their copy records.
 
 The recommended path is a maintained complete edition with tested component
 choices, UI, infrastructure and commands that save implementation and adaptation
@@ -233,6 +235,15 @@ writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out files the copy had left out, and re-records each copy.
+For per-file JavaScript copies, refresh follows static relative imports and
+exports, including side-effect imports, transitively up to 64 levels inside
+the original copied origin directory tree. Missing helpers are copied and
+reported under `adopted`, with separate file entries in `base-copies.json` that
+preserve the existing per-file mapping. Already recorded dependencies must remain
+present. Unrecorded imports outside that origin tree, missing, deleted or kept-out
+dependencies, adapted importers with missing dependencies, and destination
+collisions refuse the entire refresh before writes, with exact `record-base`
+commands for explicit reconciliation. Existing adapted files stay unchanged.
 An absent unadapted singleton is retired from the record entirely and named in
 the `retired` output. As with absent files in directory copies, local absence is
 the removal signal; refresh does not distinguish accidental deletion from an

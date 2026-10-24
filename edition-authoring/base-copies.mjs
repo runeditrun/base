@@ -13,6 +13,7 @@ import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
 import {requireMaterializedCopies} from './copy-checkout.mjs';
+import {closeImports} from './copy-imports.mjs';
 
 export const RECORD = 'base-copies.json';
 const commit = /^[a-f0-9]{40}$/, sha256 = /^[a-f0-9]{64}$/;
@@ -382,6 +383,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
       return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
+    const adopted = closeImports({root, record, recordPath, plans, next, read, revision, local, files});
     // A migration a database may already have applied is never rewritten in place:
     // the schema change it brings belongs in a new migration of the seed's own.
     const applied = plans.flatMap(({copy, sources}) => sources.map(([source, {object}]) => [mapped(source, copy.originPath, copy.path), object])
@@ -413,6 +415,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     delete record.repository;
     validate(record);
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, adopted, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }
 }

@@ -37,6 +37,17 @@ with `git submodule update --init`; after initialization, refresh reads the
 child's own index and bytes. Unreadable index evidence and deleted declared
 adaptations also refuse.
 
+Per-file vendored JavaScript copies remain supported. Refresh follows static
+relative imports and exports, including side-effect imports, transitively up to
+64 levels inside the original copied origin directory tree. It copies missing
+helpers and reports them under `adopted`, recording separate file entries in
+`base-copies.json` while preserving the existing per-file mapping. Already
+recorded dependencies must remain present. Unrecorded imports outside that origin tree,
+missing, deleted or kept-out dependencies, adapted importers with missing
+dependencies, and destination collisions refuse before any writes and name exact
+`record-base` commands for explicit reconciliation. Existing adapted files are
+retained unchanged.
+
 Use the immutable full commit behind the release tag. Base-checkout form:
 
 ```sh
@@ -78,8 +89,9 @@ node node_modules/@runeditrun/rer/edition-authoring/cli.mjs adapt-base LOCAL_FIL
 Stage intentional source changes before `lock`, then review and commit the lock.
 Refresh does not silently update a source lock. See Base's
 [authoring protocol](https://github.com/runeditrun/base/blob/main/edition-authoring/README.md)
-for comparisons, retained origins and release operations. Existing seeds with
-local authoring scripts can continue using them unchanged.
+for comparisons, retained origins and release operations. To migrate from
+vendored scripts, pin the package, run `rer adopt-edition`, then drop the vendored
+scripts and their copy records.
 
 Both public verbs accept `--help`, `--cwd PATH`, `--non-interactive` and `--json`.
 Help exits 0 before configuration, adapters or tools. `describe --json` includes
@@ -90,7 +102,7 @@ installed package pin, installing that pin when needed.
 With `--json`, stdout is newline-delimited event objects. Success ends with
 `{version:1, verb, event:"result", ok:true, exitCode:0, ...details}`. Adoption
 details include `adopted`, `created`, `record`, `preservedCopyRecord` and `next`.
-Refresh details include `refreshed`, `record`, `copies`, `retired`, `adapted` and
+Refresh details include `refreshed`, `record`, `copies`, `retired`, `adopted`, `adapted` and
 `next`; each copy reports `path`, `from`, `files`, `added` and `removed`.
 Refusal emits an `error` event with `code`, `message` and `exitCode`, then a failed
 `result`; authoring safety refusals exit 4 and malformed invocations exit 2.
