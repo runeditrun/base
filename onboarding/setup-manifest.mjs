@@ -1,6 +1,7 @@
 import {parseSetupManifestBytes, validateSetupManifest, setupConditionMatches, validateSetupValue, setupFieldAudience} from './schema/setup-validation.mjs';
 import {createModel} from './ui/model-core.mjs';
 import {installerInputs} from './installer-inputs.mjs';
+import {setupFieldIsSecret} from './schema/credential-names.mjs';
 
 const legacy=['fields','safeKeys','setupGroups','requiredKeys','secretScopes','summaryDefaults','initialValues','installInput'];
 export function refuseLegacySetup(value) {
@@ -57,8 +58,8 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  const generatedId=preferred=>{let id=preferred,index=1;while(groupIds.has(id))id=preferred+'-'+index++;groupIds.add(id);return id;};
  const groups=[...(manifest.fields.some(field=>!field.group)?[{id:generatedId('ungrouped'),title:manifest.title,keys:manifest.fields.filter(field=>!field.group).map(field=>field.name)}]:[]),
   ...manifest.groups.map(group=>({...group,audience:group.audience??'owner',title:group.label,keys:manifest.fields.filter(field=>field.group===group.id).map(field=>field.name)})),...own.groups.map(group=>({...group,id:generatedId(group.id)}))];
- const safeKeys=Object.keys(fields).filter(key=>fields[key].type!=='password');
- const defaults=Object.fromEntries(manifest.fields.filter(field=>field.kind!=='secret'&&field.default!==undefined).map(field=>[field.name,field.default]));
+ const safeKeys=Object.keys(fields).filter(key=>!setupFieldIsSecret({...fields[key],name:key},secretScopes));
+ const defaults=Object.fromEntries(manifest.fields.filter(field=>!setupFieldIsSecret(field,secretScopes)&&field.default!==undefined).map(field=>[field.name,field.default]));
  const internal={...presentation,product:presentation.product??{name:manifest.title},fields,safeKeys,secretScopes,setupGroups:groups,
   summaryDefaults:Object.keys(defaults),initialValues:()=>defaults,nameKey,
   requiredKeys(draft){return [...manifest.fields.filter(field=>{const current=active(field,draft);return current?.required&&(field.kind!=='secret'||field.input==='entered');}).map(field=>field.name),...Object.keys(own.fields).filter(key=>!own.fields[key].optional)];},

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc957441a",
+  "cliVersion": "0.2.79-dev.ge8fd3d10",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -265,11 +265,15 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "56a77c2149626eaa3a69764f25b21421ce0be22ce8a11540350ee9f391e77e1a"
+      "sha256": "2fb04ae911a5e6f8cf3781a29cfc64ba049990522e0a78f80cb99879d36af848"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
       "sha256": "2aa43379cfd4bb29b3b5ee42cff9d938085560c68be2a12f3883408987641195"
+    },
+    "schema/credential-names.mjs": {
+      "source": "onboarding/schema/credential-names.mjs",
+      "sha256": "d6a0725c66ceefcabb31c952e2382257c4c36c53a0b3ed5a94ff07f37b7f2baa"
     },
     "schema/dependencies.mjs": {
       "source": "onboarding/schema/dependencies.mjs",
@@ -281,7 +285,7 @@
     },
     "schema/setup-validation.mjs": {
       "source": "onboarding/schema/setup-validation.mjs",
-      "sha256": "c24deb8bd0efc9e941cd7d42c1ae6429751feb5d125b6b8a2b8bee23fbb9d89a"
+      "sha256": "a3f2e47f68d1c8821c62adea43a84eb4205bd91013e6185c67f7a066bc4fb8a0"
     },
     "secrets.mjs": {
       "source": "onboarding/secrets.mjs",
@@ -289,11 +293,11 @@
     },
     "server.mjs": {
       "source": "onboarding/server.mjs",
-      "sha256": "307ea35fa6791bc6359ace47d81debd09813183190b470744c54719a479324c4"
+      "sha256": "3cc7c5203fb40e95e97e8ed812e9156c6d1b931c9ae2ce79c18c46817ebcaf3c"
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
-      "sha256": "ef2c2e358e3913ba4fc176051496d01d544ba17febc143b1a94089f2e9c7de0c"
+      "sha256": "5011a5dea7f29e01d2aa0256a1e90af8bcade977a524a60116a5432b787d5094"
     },
     "start-origin-diagnostic.mjs": {
       "source": "onboarding/start-origin-diagnostic.mjs",

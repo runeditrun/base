@@ -39,19 +39,36 @@ test('setup CLI and installer accept public business hints and developer audienc
  await writeFile(file,JSON.stringify(manifest));
  assert.equal((await loadInstallerSeed(destination,{product:'Workspace',setup:{manifestFile:'rer-setup.json'}})).model.fieldDefinition('WORKSPACE_TITLE',{}).audience,'owner');
 });
-test('setup CLI and installer refuse unknown business hints, hints on secrets, unknown audiences and owner overrides',async t=>{
+test('setup CLI and installer consumers refuse invalid business hints, sensitive inputs, duplicate claims, audiences and owner overrides',async t=>{
  const destination=await mkdtemp(join(tmpdir(),'invalid-setup-audience-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));
  const base={schema:1,title:'Settings',groups:[{id:'technical',label:'Technical settings'}],fields:[
   {name:'PROFILE',label:'Profile',kind:'text',group:'technical'},
  ],steps:[{type:'extension',id:'workspace'}]};
  const {loadInstallerSeed}=await import('../onboarding/setup-manifest.mjs');
+ const {loadInstallerSeed:loadShippedInstallerSeed}=await import('../default-seed/scripts/base-onboarding/setup-manifest.mjs');
  for(const [mutate,message] of [
   [data=>{data.fields[0].businessField='unknown_business_field';},/businessField.*not one of/],
   [data=>{data.fields[0].businessField=null;},/businessField.*not one of/],
   [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:true,input:'entered',businessField:'owner_email'});},/kind is "secret".*excluded schema/],
   [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,input:'managed',businessField:'legal_name'});},/kind is "secret".*excluded schema/],
   [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,generate:'hex',businessField:'mail_sender'});},/kind is "secret".*excluded schema/],
+  ...[
+   'SESSION_SECRET','API_KEY','MAIL_API_KEY','STRIPE_SECRET_KEY',
+   'RER_IDENTITY_PRIVATE_KEY','OPAQUE_CREDENTIAL','SETUP_TOKEN','DATABASE_PASSWORD',
+   'ACCESSKEY','apikey','privateKey','dbPassword','clientSecret',
+   'AUTH_TOKEN','SIGNING_KEY','RER_PROFILE','rer_profile','CREDENTIALS',
+  ].map(name=>[
+   data=>{Object.assign(data.fields[0],{name,businessField:'legal_name'});},
+   new RegExp(`(?=.*${name})(?=.*(?:secret|vault))`,'i'),
+  ]),
+  ...[
+   ['LEGAL_NAME','TRADING_NAME','legal_name'],
+   ['OWNER_EMAIL','CONTACT_EMAIL','owner_email'],
+  ].map(([first,second,businessField])=>[
+   data=>{data.fields=[first,second].map(name=>({name,label:'Profile value',kind:'text',businessField}));},
+   new RegExp(`(?=.*${first})(?=.*${second})(?=.*${businessField})`),
+  ]),
   [data=>{data.fields[0].audience='admin';},/PROFILE.*audience.*owner.*developer/],
   [data=>{data.groups[0].audience='admin';},/technical.*audience.*owner.*developer/],
   [data=>{data.groups[0].audience='developer';data.fields[0].audience='owner';},/PROFILE.*owner.*developer.*technical/],
@@ -62,13 +79,14 @@ test('setup CLI and installer refuse unknown business hints, hints on secrets, u
   const result=spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'});
   assert.equal(result.status,1);assert.match(result.stderr,message);
   await assert.rejects(loadInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
+  await assert.rejects(loadShippedInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
  }
 });
 test('onboarding vendors the exact portable Base schema and validators',async()=>{
- for(const name of ['SETUP.schema.json','json-schema.mjs','setup-validation.mjs']){
+ for(const name of ['SETUP.schema.json','json-schema.mjs','setup-validation.mjs','credential-names.mjs']){
   assert.deepEqual(await readFile(new URL('onboarding/schema/'+name,root)),await readFile(new URL('schema/'+name,root)));
  }
- for(const name of ['json-schema.mjs','setup-validation.mjs'])assert.doesNotMatch(await readFile(new URL('schema/'+name,root),'utf8'),/node:/);
+ for(const name of ['json-schema.mjs','setup-validation.mjs','credential-names.mjs'])assert.doesNotMatch(await readFile(new URL('schema/'+name,root),'utf8'),/node:/);
 });
 test('a standalone installer copy reads the manifest and validates its declared answers', async t=>{
  const destination=await mkdtemp(join(tmpdir(),'copied-setup-reader-'));
