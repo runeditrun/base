@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { upgradeFixture } from './fixtures/upgrade/fixture.mjs';
 import { readJournal } from '../local-run/state.mjs';
 import { stopOwnedApp } from './fixtures/upgrade/owned-app.mjs';
@@ -16,7 +16,9 @@ test('restore refuses lost saved state and rollback failure survives a public re
  await rm(join(f.root, '.dev.vars.previous'), { force: true });
  const updated = await f.run(['upgrade', '--to', f.v2.commit, '--anchors', f.anchors, '--json']);
  assert.equal(updated.code, 0, updated.stderr + updated.stdout);
- const journal = await readJournal(f.root), saved = join(f.root, '.rer/upgrade/backups', journal.backup, 'state/.rer/local');
+ const journal = await readJournal(f.root);
+ assert.equal(journal.checkout_name, basename(f.root)); assert.ok(journal.journalKey);
+ const saved = join(f.root, '.rer/upgrade/backups', journal.backup, 'state/.rer/local');
  await cp(saved, join(f.directory, 'saved-local'), { recursive: true });
  await writeFile(record, 'live owner bytes\n'); await rm(saved, { recursive: true });
  const journalBytes = await readFile(join(f.root, '.rer/upgrade/journal.json'));

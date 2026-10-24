@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Validate saved-state completeness before restore, retain failed rollback journals until repair, and expose bound local recovery facts with safely quoted recovery commands.
 - Add `rer dev <repo> --release <tag|commit>` to verify a publisher-signed release before installation, preserve existing owner commits and state, and record its release identity locally. `--anchors FILE` supports community publishers.
 - Add global `rer upgrade` with signed release verification, owner-change integration, local backups, migration and prior-data checks, rollback, `--check`, `--to`, `--continue`, `--restore`, `--json` and TTY-only `--allow-data-change TABLE`. `rer update` continues to update rer itself.
 - Export signed local setup and upgrade APIs at `@runeditrun/rer/local-run`, with closed phase events, and bundle production publisher anchors.

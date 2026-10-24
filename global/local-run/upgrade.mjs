@@ -91,10 +91,15 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   }
   if (restore) {
    preserveJournal = true;
+   const repairPreparation = journal.stage === 'rollback_failed' ? journal.prepared : undefined;
    const { metadata } = await backup(checkout, restore);
    journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: metadata.wasRunning };
    restoring = true;
    await rollback(checkout, journal, operation);
+   if (repairPreparation) {
+    const ref = await git(checkout, ['show-ref', '--verify', '--quiet', `refs/heads/${repairPreparation.branch}`], { allow: [1] });
+    if (!ref.code) await cleanupMerge(checkout, repairPreparation);
+   }
    const result = output('rolled_back', journal, started);
    journal.result = result; await writeJournal(checkout, journal); await phase('ready');
    return result;

@@ -183,6 +183,13 @@ health and prior table counts. A failure after switching restores the previous
 commit and state. The last two backups stay on this computer. A previously
 stopped app is stopped again after verification.
 
+A failed rollback keeps its journal and backup for manual repair. Retrying an
+upgrade refuses until `rer upgrade --restore BACKUP` completes the restore.
+Restore checks the saved components and their contents before removing live
+state; an incomplete or older unverifiable backup is refused. Recovery commands
+appear only for a verified backup and a safe checkout basename, with a guarded
+folder change so a failed `cd` cannot reset the caller's checkout.
+
 The checkout's dispatcher must support local-operation ownership handoff. Older
 pins (including rer 0.2.72 and 0.2.79) are refused before any stop, snapshot or
 source change; a running app keeps serving. Updating the global rer alone does
@@ -359,9 +366,16 @@ line that still names it. A later refresh is a version bump:
 
 ### Exports
 
+`recoveryInfo({checkout, journalKey, repository, fromCommit, toCommit})` reads a
+failed rollback's local journal and completed backup. It returns either
+`{status: 'available', previous_head, checkout_name, backup_name}` or
+`{status: 'unavailable', reason}`. The task key, repository, exact pins and actual
+checkout basename must agree with the saved records. Older unbound journals are
+unavailable. The setup and upgrade result objects retain their v1 shape.
+
 | Import | What it gives | Vendored path it replaces |
 | --- | --- | --- |
-| `@runeditrun/rer/local-run` | `setupRelease`, `upgrade`: signed local setup and upgrade APIs with closed phase events | Global CLI API |
+| `@runeditrun/rer/local-run` | `setupRelease`, `upgrade`: signed local APIs with closed phase events; `recoveryInfo`: local repair facts | Global CLI API |
 | `@runeditrun/rer/modules/release/anchors/production.json` | Bundled production publisher trust anchors | Global release trust |
 | `@runeditrun/rer/adapter` | `commandAdapter` | `scripts/base-cli/cli/adapter.mjs` |
 | `@runeditrun/rer/deploy` | `ownerDeploy` | `scripts/base-cli/cli/deploy.mjs` |

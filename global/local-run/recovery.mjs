@@ -29,15 +29,18 @@ export async function recoveryInfo(options = {}) {
   const checkoutName = basename(checkout);
   const journal = await readJournal(checkout);
   if (journal === null) return unavailable('journal_missing');
-  if (!CHECKOUT_NAME.test(checkoutName)) return unavailable('checkout_name_unsafe');
   if (!object(journal) || journal.version !== 1 || journal.stage !== 'rollback_failed'
     || !matches(JOURNAL_KEY, journalKey) || journal.journalKey !== journalKey
     || !matches(REPOSITORY, repository) || !matches(SHA, fromCommit) || !matches(SHA, toCommit)
-    || journal.checkout_name !== checkoutName || !matches(SHA, journal.head)
+    || typeof journal.checkout_name !== 'string' || !matches(SHA, journal.head)
     || !releaseMatches(journal.from, repository, fromCommit)
     || !releaseMatches(journal.target, repository, toCommit)) return unavailable('journal_invalid');
+  if (!CHECKOUT_NAME.test(checkoutName)) return unavailable('checkout_name_unsafe');
+  if (journal.checkout_name !== checkoutName) return unavailable('journal_invalid');
   const origins = (await text(checkout, ['config', '--get-all', 'remote.origin.url'])).split('\n');
   if (origins.length !== 1 || githubRepository(origins[0]) !== repository) return unavailable('journal_invalid');
+  if (await text(checkout, ['cat-file', '-t', journal.head]) !== 'commit') return unavailable('journal_invalid');
+  await text(checkout, ['merge-base', '--is-ancestor', fromCommit, journal.head]);
   if (journal.backup === undefined || journal.backup === null) return unavailable('backup_missing');
   if (!validBackupName(journal.backup)) return unavailable('journal_invalid');
   let metadata;
