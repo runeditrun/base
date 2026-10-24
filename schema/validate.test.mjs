@@ -197,9 +197,27 @@ const sensitiveSetupNames = [
   'OAUTHCREDENTIAL', 'PAYMENTAPIKEY', 'SSHPRIVATEKEY', 'AWSACCESSKEY', 'JWTSIGNINGKEY',
   'sessionToken', 'clientSECRET', 'databasePassword', 'serviceCredential',
   'servicetoken', 'clientsecret', 'accountcredential', 'serviceApiKey',
-  'mailPrivateKey', 'cloudAccessKey', 'jwtSigningKey', 'serverKey2', 'clientAuth2'
+  'mailPrivateKey', 'cloudAccessKey', 'jwtSigningKey', 'serverKey2', 'clientAuth2',
+  'ENCRYPTIONKEY', 'SSHKEY', 'BACKUPKEY', 'GITHUBPAT', 'SMTPPASS',
+  'ENCRYPTION_KEY', 'SSH_KEY', 'BACKUP_KEY', 'GITHUB_PAT', 'SMTP_PASS',
+  'encryptionKey', 'sshKey', 'backupKey', 'githubPat', 'smtpPass',
+  'encryptionkey', 'sshkey', 'backupkey', 'githubpat', 'smtppass',
+  'ENCRYPTION2KEY', 'SSH2KEY', 'BACKUP2KEY', 'GITHUB2PAT', 'SMTP2PASS',
+  'ACME_ENCRYPTIONKEY', 'ACME_SSHKEY', 'ACME_BACKUPKEY', 'ACME_GITHUBPAT', 'ACME_SMTPPASS',
+];
+const benignSetupNames = [
+  'TOKENIZER_LANG', 'SECRETARY_NAME',
+  'GOODS_NAME','KIDS_NURSERY_NAME','BRAND_SNIPPET','ADS_NETWORK_NAME',
+   'PASSENGER_NAME','DESIGN_STUDIO_NAME','MONKEY_BUSINESS_NAME','KEYSTONE_LEGAL_NAME',
+   'PATIO_NAME','SPASS_NAME','AUTHORITY_NAME','SIGMA_NAME','DSNETWORK_NAME','PWDRY_NAME',
+   'KEYNOTE_TITLE','PASSAGE_NAME','PATCHWORK_NAME','SIGNAGE_NAME','COOKIECUTTER_NAME'
 ];
 const setupProbes = [
+  ...benignSetupNames.map(name => [
+    `a public business hint on ordinary input ${name}`,
+    [{ name, label: 'Business value', kind: 'text', businessField: 'display_name' }],
+    null
+  ]),
   ...sensitiveSetupNames.map(name => [
     `a public business hint on sensitive input ${name}`,
     [{ name, label: 'Profile value', kind: 'text', businessField: 'legal_name' }],
@@ -216,10 +234,11 @@ const setupProbes = [
 ];
 
 for (const [name, fields, message] of setupProbes) {
-  test(`the setup manifest rejects ${name}`, () => {
+  test(`the setup manifest ${message ? 'rejects' : 'accepts'} ${name}`, () => {
     const manifest = { schema: 1, title: 'Settings', groups: [], fields, steps: [{ type: 'extension', id: 'workspace' }] };
     const errors = validateSetupManifest(setupSchema, manifest);
-    assert.ok(errors.some(error => message.test(error)), `expected ${message}, got ${JSON.stringify(errors)}`);
+    if (message) assert.ok(errors.some(error => message.test(error)), `expected ${message}, got ${JSON.stringify(errors)}`);
+    else assert.deepEqual(errors, []);
   });
 }
 
