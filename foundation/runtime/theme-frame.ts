@@ -1,4 +1,4 @@
-import { iconHead } from './icon-head'
+import { iconHead } from './icon-head.ts'
 // Base's no-JavaScript documents (first-run /setup, the foundation sign-in)
 // wear a seed's theme by linking its served rer-theme.css, whose --rer-* tokens
 // this frame style maps onto the document; each token falls back to a readable

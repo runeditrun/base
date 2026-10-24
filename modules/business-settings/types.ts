@@ -39,7 +39,13 @@ export interface Options {
   mail?: unknown;
 }
 export class SettingsError extends Error {
-  constructor(public code: string, public status = 403) { super(code); }
+  code: string;
+  status: number;
+  constructor(code: string, status = 403) {
+    super(code);
+    this.code = code;
+    this.status = status;
+  }
 }
 
 /** Structural D1 contract; custom adapters need no operator-auth dependency. */
