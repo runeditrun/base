@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gf4643d7b",
+  "cliVersion": "0.2.79-dev.gadb9be9f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -265,15 +265,15 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "2fb04ae911a5e6f8cf3781a29cfc64ba049990522e0a78f80cb99879d36af848"
+      "sha256": "56a77c2149626eaa3a69764f25b21421ce0be22ce8a11540350ee9f391e77e1a"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
       "sha256": "2aa43379cfd4bb29b3b5ee42cff9d938085560c68be2a12f3883408987641195"
     },
-    "schema/credential-names.mjs": {
-      "source": "onboarding/schema/credential-names.mjs",
-      "sha256": "2a1b59972f65eb15c0a40e02dd218d891bdc2ad2f2f5cf346704967fc27740c9"
+    "schema/business-field-inputs.mjs": {
+      "source": "onboarding/schema/business-field-inputs.mjs",
+      "sha256": "02ec0a4f21bfff9008c306b7a2fa6dea9fe0ea6584f13da7978e5ef45a054e60"
     },
     "schema/dependencies.mjs": {
       "source": "onboarding/schema/dependencies.mjs",
@@ -285,7 +285,7 @@
     },
     "schema/setup-validation.mjs": {
       "source": "onboarding/schema/setup-validation.mjs",
-      "sha256": "a3f2e47f68d1c8821c62adea43a84eb4205bd91013e6185c67f7a066bc4fb8a0"
+      "sha256": "339797a913d8bf0899ae8a5d0ce861a370101a2349b2bbfbee301db658d14ca7"
     },
     "secrets.mjs": {
       "source": "onboarding/secrets.mjs",
@@ -293,11 +293,11 @@
     },
     "server.mjs": {
       "source": "onboarding/server.mjs",
-      "sha256": "3cc7c5203fb40e95e97e8ed812e9156c6d1b931c9ae2ce79c18c46817ebcaf3c"
+      "sha256": "fdc84158170d44c4ff9c87301c7209468c0ffbaab9c086d6be722be0e74c229f"
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
-      "sha256": "b7b283b93496596b07835d7d3b6966258f8123d2b695a2d1c36da859bf1356b8"
+      "sha256": "46cd56ab6ff6d36e2c045334ce48521f682812d359f97d7e34b9243eb70d16de"
     },
     "start-origin-diagnostic.mjs": {
       "source": "onboarding/start-origin-diagnostic.mjs",

@@ -1,7 +1,7 @@
 import { dependencyErrors } from './dependencies.mjs';
 export { validateDependencyGraph } from './dependencies.mjs';
 import {checkSchema, validate} from './json-schema.mjs';
-import {setupFieldIsSecret} from './credential-names.mjs';
+import {businessFieldInputError} from './business-field-inputs.mjs';
 
 export const SETUP_SCHEMA_ID = 'urn:rer:setup:1';
 
@@ -104,14 +104,14 @@ function rejectDuplicateObjectKeys(text) {
   visit();
 }
 
-// These checks also run for structurally invalid declarations, so a sensitive
-// input receives its plain refusal even when its spelling is not upper snake case.
+// Run before grammar diagnostics too, so off-list names receive a useful next step.
 function businessFieldErrors(data) {
   const errors = [], claims = new Map();
   for (const [index, field] of (Array.isArray(data?.fields) ? data.fields : []).entries()) {
     if (!field || typeof field.name !== 'string' || !Object.hasOwn(field, 'businessField')) continue;
     const path = `$.fields[${index}].businessField`;
-    if (setupFieldIsSecret(field)) errors.push(`${path}: ${field.name} cannot claim a Business field because it is secret or vault-bound`);
+    const refusal = businessFieldInputError(field);
+    if (refusal) errors.push(`${path}: ${refusal}`);
     if (typeof field.businessField !== 'string') continue;
     const previous = claims.get(field.businessField);
     if (previous !== undefined) errors.push(`${path}: ${previous} and ${field.name} both claim Business field ${field.businessField}; each Business field needs a single input`);

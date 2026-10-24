@@ -5,8 +5,9 @@ import {tmpdir} from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {BUSINESS_FIELD_INPUTS} from './business-field-inputs.mjs';
 const root=new URL('../',import.meta.url);
-test('setup CLI and installer accept public business hints and developer audiences, inherit groups and retain owner defaults',async t=>{
+test('setup doors share the Business input table and retain developer audiences and owner defaults',async t=>{
  const destination=await mkdtemp(join(tmpdir(),'setup-audience-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));
  const manifest={schema:1,title:'Workspace settings',groups:[{id:'technical',label:'Technical settings',audience:'developer'}],fields:[
@@ -14,11 +15,11 @@ test('setup CLI and installer accept public business hints and developer audienc
   {name:'PROFILE',label:'Profile',kind:'text',audience:'developer'},
   {name:'SERVICE_URL',label:'Service address',kind:'url',group:'technical'},
  ],steps:[{type:'extension',id:'workspace'}]};
- const businessFields=['owner_email','legal_name','timezone','currency','jurisdiction','mail_sender','display_name','owner_name','brand_color','logo_ref','entity_type','state_of_organization','fiscal_year_start','books_start_date','tax_method','country','state'];
+ const businessFields=Object.keys(BUSINESS_FIELD_INPUTS);
  const publicKinds=['text','email','url','select','colour','timezone'];
  for(const [index,businessField] of businessFields.entries()){
   const kind=publicKinds[index%publicKinds.length];
-  manifest.fields.push({name:`SYNTHETIC_SETUP_${index}`,label:`Synthetic setup ${index}`,kind,businessField,...(kind==='select'?{options:[{value:'synthetic-base-1',label:'Synthetic option'}]}:{})});
+  manifest.fields.push({name:BUSINESS_FIELD_INPUTS[businessField][0],label:'Business value',kind,businessField,...(kind==='select'?{options:[{value:'synthetic-base-1',label:'Synthetic option'}]}:{})});
  }
  const file=join(destination,'rer-setup.json');
  await writeFile(file,JSON.stringify(manifest));
@@ -30,23 +31,21 @@ test('setup CLI and installer accept public business hints and developer audienc
  assert.equal(model.fieldDefinition('PROFILE',{}).audience,'developer');
  assert.equal(model.fieldDefinition('SERVICE_URL',{}).audience,'developer');
  assert.equal(model.groupDefinition(model.setupGroups.find(group=>group.id==='technical'),{}).audience,'developer');
- for(const [index,businessField] of businessFields.entries())assert.equal(model.fieldDefinition(`SYNTHETIC_SETUP_${index}`,{}).businessField,businessField);
+ for(const businessField of businessFields)assert.equal(model.fieldDefinition(BUSINESS_FIELD_INPUTS[businessField][0],{}).businessField,businessField);
  const input={WORKSPACE_TITLE:'synthetic-base-1',PROFILE:'local',SERVICE_URL:'https://service.example.test'};
  for(const name of Object.keys(input))assert.equal(model.fieldVisible(name,input),true);
  assert.equal(model.validateInput(input).SERVICE_URL,input.SERVICE_URL);
- // Similar letters in ordinary Business names must not trigger the refusal.
- for(const name of ['DISPLAY_NAME','SUPPORT_EMAIL','TIMEZONE','BUSINESS_NAME','LEGAL_NAME','WEBSITE','KEYBOARD_LAYOUT','MONKEY_NAME','TOKENIZER_LANG','AUTHOR_NAME','PASSPORT_COUNTRY','PATCH_POLICY','SIGNAL_REGION','SECRETARY_NAME','TOKENIZATION_LANGUAGE',
-   'GOODS_NAME','KIDS_NURSERY_NAME','BRAND_SNIPPET','ADS_NETWORK_NAME',
-   'PASSENGER_NAME','DESIGN_STUDIO_NAME','MONKEY_BUSINESS_NAME','KEYSTONE_LEGAL_NAME',
-   'PATIO_NAME','SPASS_NAME','AUTHORITY_NAME','SIGMA_NAME','DSNETWORK_NAME','PWDRY_NAME',
-   'KEYNOTE_TITLE','PASSAGE_NAME','PATCHWORK_NAME','SIGNAGE_NAME','COOKIECUTTER_NAME']){
-  const candidate={...manifest,fields:[{name,label:'Business value',kind:'text',businessField:'display_name'}]};
+ // Every declared name/field pair crosses the CLI and both loader doors.
+ for(const [businessField,names] of Object.entries(BUSINESS_FIELD_INPUTS))for(const name of names){
+  const candidate={...manifest,fields:[{name,label:'Business value',kind:'text',businessField}]};
   await writeFile(file,JSON.stringify(candidate));
-  assert.equal(spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'}).status,0,name);
+  const result=spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
   for(const path of ['../onboarding/setup-manifest.mjs','../default-seed/scripts/base-onboarding/setup-manifest.mjs']){
    const {loadInstallerSeed:load}=await import(path);
    const {model:publicModel}=await load(destination,{product:'Business',setup:{manifestFile:'rer-setup.json'}});
-   assert.equal(publicModel.validateInput({[name]:'A business value'})[name],'A business value',name);
+   assert.equal(publicModel.fieldDefinition(name,{}).businessField,businessField);
+   assert.equal(publicModel.validateInput({[name]:'A business value'})[name],'A business value');
   }
  }
  manifest.fields[0].audience='owner';
@@ -54,7 +53,7 @@ test('setup CLI and installer accept public business hints and developer audienc
  await writeFile(file,JSON.stringify(manifest));
  assert.equal((await loadInstallerSeed(destination,{product:'Workspace',setup:{manifestFile:'rer-setup.json'}})).model.fieldDefinition('WORKSPACE_TITLE',{}).audience,'owner');
 });
-test('setup CLI and installer consumers refuse invalid business hints, sensitive inputs, duplicate claims, audiences and owner overrides',async t=>{
+test('setup doors refuse off-list and invalid hints, structural secrets, duplicate claims and invalid audiences',async t=>{
  const destination=await mkdtemp(join(tmpdir(),'invalid-setup-audience-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));
  const base={schema:1,title:'Settings',groups:[{id:'technical',label:'Technical settings'}],fields:[
@@ -68,30 +67,10 @@ test('setup CLI and installer consumers refuse invalid business hints, sensitive
   [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:true,input:'entered',businessField:'owner_email'});},/kind is "secret".*excluded schema/],
   [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,input:'managed',businessField:'legal_name'});},/kind is "secret".*excluded schema/],
   [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,generate:'hex',businessField:'mail_sender'});},/kind is "secret".*excluded schema/],
-  ...[
-   'SESSION_SECRET','API_KEY','MAIL_API_KEY','STRIPE_SECRET_KEY',
-   'RER_IDENTITY_PRIVATE_KEY','OPAQUE_CREDENTIAL','SETUP_TOKEN','DATABASE_PASSWORD',
-   'ACCESSKEY','apikey','privateKey','dbPassword','clientSecret',
-   'AUTH_TOKEN','SIGNING_KEY','RER_PROFILE','rer_profile','CREDENTIALS',
-   'APITOKEN','CLIENTSECRET','DATABASEPASSWORD','SERVICECREDENTIAL',
-   'GITHUBTOKEN','WEBHOOKSECRET','SMTPPASSWORD','DBPASSWD','BACKUPPASSPHRASE',
-   'OAUTHCREDENTIAL','PAYMENTAPIKEY','SSHPRIVATEKEY','AWSACCESSKEY','JWTSIGNINGKEY',
-   'sessionToken','clientSECRET','databasePassword','serviceCredential',
-   'servicetoken','clientsecret','accountcredential','serviceApiKey',
-   'mailPrivateKey','cloudAccessKey','jwtSigningKey','serverKey2','clientAuth2',
-  'ENCRYPTIONKEY', 'SSHKEY', 'BACKUPKEY', 'GITHUBPAT', 'SMTPPASS',
-  'ENCRYPTION_KEY', 'SSH_KEY', 'BACKUP_KEY', 'GITHUB_PAT', 'SMTP_PASS',
-  'encryptionKey', 'sshKey', 'backupKey', 'githubPat', 'smtpPass',
-  'encryptionkey', 'sshkey', 'backupkey', 'githubpat', 'smtppass',
-  'ENCRYPTION2KEY', 'SSH2KEY', 'BACKUP2KEY', 'GITHUB2PAT', 'SMTP2PASS',
-  'ACME_ENCRYPTIONKEY', 'ACME_SSHKEY', 'ACME_BACKUPKEY', 'ACME_GITHUBPAT', 'ACME_SMTPPASS',
-  ].map(name=>[
-   data=>{Object.assign(data.fields[0],{name,businessField:'legal_name'});},
-   new RegExp(`(?=.*${name})(?=.*(?:secret|vault))`,'i'),
-  ]),
+  [data=>{Object.assign(data.fields[0],{name:'APP_CLIENTSECRET',businessField:'display_name'});}],
   ...[
    ['LEGAL_NAME','TRADING_NAME','legal_name'],
-   ['OWNER_EMAIL','CONTACT_EMAIL','owner_email'],
+   ['OWNER_EMAIL','SUPPORT_EMAIL','owner_email'],
   ].map(([first,second,businessField])=>[
    data=>{data.fields=[first,second].map(name=>({name,label:'Profile value',kind:'text',businessField}));},
    new RegExp(`(?=.*${first})(?=.*${second})(?=.*${businessField})`),
@@ -104,23 +83,23 @@ test('setup CLI and installer consumers refuse invalid business hints, sensitive
   const candidate=structuredClone(base);mutate(candidate);
   const file=join(destination,'rer-setup.json');await writeFile(file,JSON.stringify(candidate));
   const result=spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'});
-  assert.equal(result.status,1);assert.match(result.stderr,message);
+  assert.equal(result.status,1);if(message)assert.match(result.stderr,message);
   await assert.rejects(loadInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
   await assert.rejects(loadShippedInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
  }
 });
 test('onboarding vendors the exact portable Base schema and validators',async()=>{
- for(const name of ['SETUP.schema.json','json-schema.mjs','setup-validation.mjs','credential-names.mjs']){
+ for(const name of ['SETUP.schema.json','json-schema.mjs','setup-validation.mjs','business-field-inputs.mjs']){
   assert.deepEqual(await readFile(new URL('onboarding/schema/'+name,root)),await readFile(new URL('schema/'+name,root)));
  }
- for(const name of ['json-schema.mjs','setup-validation.mjs','credential-names.mjs'])assert.doesNotMatch(await readFile(new URL('schema/'+name,root),'utf8'),/node:/);
+ for(const name of ['json-schema.mjs','setup-validation.mjs','business-field-inputs.mjs'])assert.doesNotMatch(await readFile(new URL('schema/'+name,root),'utf8'),/node:/);
 });
 test('a standalone installer copy reads the manifest and validates its declared answers', async t=>{
  const destination=await mkdtemp(join(tmpdir(),'copied-setup-reader-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));
  await cp(new URL('onboarding/',root),join(destination,'kit'),{recursive:true});
  const publicDefaults={SESSION_SECRET:'session label',APITOKEN:'API label',ENCRYPTIONKEY:'encryption label'};
- const hintedPublicFields={GOODS_NAME:'display_name',KIDS_NURSERY_NAME:'legal_name',MONKEY_BUSINESS_NAME:'owner_name',KEYSTONE_LEGAL_NAME:'jurisdiction',BRAND_SNIPPET:'entity_type'};
+ const hintedPublicFields=Object.fromEntries(Object.entries(BUSINESS_FIELD_INPUTS).slice(0,5).map(([field,names])=>[names[0],field]));
  const manifest={schema:1,title:'Independent setup',groups:[],fields:[
   {name:'WORKSPACE_TITLE',label:'Workspace title',kind:'text',required:true},
   {name:'CONNECTION_PASSWORD',label:'Connection password',kind:'secret',input:'entered',ownerVisible:true,required:true},
