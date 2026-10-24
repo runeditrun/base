@@ -1,3 +1,4 @@
+import { visitorSecrets } from './secrets.mjs';
 import { DurableObject } from 'cloudflare:workers';
 import { claimKeys, signClaim } from '../claim.mjs';
 import { migrate } from '../../container/migrations.mjs';
@@ -25,8 +26,17 @@ export class NativeDemo extends DurableObject {
       return { phase: 'failed', correlation: options.correlation };
     }
   }
+  failure(message) {
+    // A failed seed may include a runtime value in its error or claim response.
+    // Keep declared generated keys out of both logs and operator diagnostics.
+    for (const { name } of bundle.generatedSecrets ?? []) {
+      const value = this.state?.runtime?.[name];
+      if (value && typeof message === 'string') message = message.replaceAll(value, '[redacted]');
+    }
+    return message;
+  }
   async diagnostic(correlation, error) {
-    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('diagnostics')).record(correlation, { failure: String(error.message).slice(0, 1000) });
+    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('diagnostics')).record(correlation, { failure: String(this.failure(error.message)).slice(0, 1000) });
   }
   async start({ origin, originVar, ends, endsLocal, settings, correlation, clientIp }) {
     if (this.state) return this.status();
@@ -36,7 +46,7 @@ export class NativeDemo extends DurableObject {
     const runtime = { ...bundle.vars, ...settings, RER_DEMO: '1', [originVar]: origin,
       RER_NATIVE_KEY: random(), SESSION_SECRET: random(), INSTALLATION_KEY: random(), SETUP_TOKEN: random(), OWNER_EMAIL: this.env.DEMO_OWNER_EMAIL || 'owner@demo.invalid',
       RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
-      RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal };
+      RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal, ...visitorSecrets(bundle.generatedSecrets ?? []) };
     this.state = { phase: 'starting', runtime, ends, seen: started, savedSeen: started, lastCron: Math.floor(started / 60_000), correlation };
     await this.save();
     await this.ctx.storage.setAlarm(Math.min(ends, started + IDLE));
@@ -65,7 +75,7 @@ export class NativeDemo extends DurableObject {
       await this.schedule(await nextQueue(this));
       return this.status();
     } catch (error) {
-      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: error.message }));
+      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: this.failure(error.message) }));
       await this.diagnostic(correlation, error);
       await this.end();
       return { phase: 'failed', correlation };
@@ -161,7 +171,7 @@ export class NativeDemo extends DurableObject {
     await this.ctx.storage.setAlarm(Date.now() + 10_000);
     await this.capacity().release(this.ctx.id.toString());
     this.erasing = this.erase()
-      .catch(error => console.error(JSON.stringify({ event: 'native-demo-erase-failed', message: error.message })))
+      .catch(error => console.error(JSON.stringify({ event: 'native-demo-erase-failed', message: this.failure(error.message) })))
       .finally(() => { this.erasing = undefined; });
   }
   async erase() {

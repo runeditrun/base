@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { assert, hash, resourceName } from '../deploy-kit/validation.mjs';
 import { ownerWorkerName } from '../deploy-kit/owner.mjs';
 import { siteDeclaration } from '../deploy-kit/site.mjs';
+import { generatedSecrets } from './native/secrets.mjs';
 import { demoRunUrl } from '../demo/run-url.mjs';
 
 // Native Loader front, admission and visitor session support.
@@ -9,7 +10,7 @@ export const DEMO_FILES = ['worker.mjs', 'capacity.mjs', 'claim.mjs', 'pages.mjs
 const FRONT_SET = /^(?:RER_.*|SESSION_SECRET|SETUP_TOKEN|OWNER_EMAIL)$/;
 const SECRET = /SECRET|TOKEN|PASSWORD|_KEY$/;
 export function demoDeclaration(value, originVar) {
-  assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'ownerEmail', 'settings', 'runUrl'].includes(key)), 'invalid-demo-declaration');
+  assert(value && typeof value === 'object' && !Array.isArray(value) && value.version === 1 && Object.keys(value).every(key => ['version', 'domain', 'name', 'maxInstances', 'ownerEmail', 'settings', 'runUrl', 'generatedSecrets'].includes(key)), 'invalid-demo-declaration');
   siteDeclaration({ version: 1, domain: value.domain });
   assert(typeof value.name === 'string' && value.name.trim() === value.name && value.name.length > 0 && value.name.length <= 60 && !/[\p{Cc}\p{Cf}]/u.test(value.name), 'invalid-demo-name');
   const runUrl = demoRunUrl(value.runUrl === undefined ? `https://${value.domain}/run` : value.runUrl);
@@ -20,13 +21,13 @@ export function demoDeclaration(value, originVar) {
   const settings = value.settings ?? {};
   assert(settings && typeof settings === 'object' && !Array.isArray(settings) && Object.entries(settings).every(([name, setting]) =>
     /^[A-Z][A-Z0-9_]{0,63}$/.test(name) && !FRONT_SET.test(name) && !SECRET.test(name) && name !== originVar && typeof setting === 'string' && setting.length <= 1024), 'invalid-demo-settings');
-  return { domain: value.domain, name: value.name, runUrl, maxInstances, ownerEmail, settings };
+  return { domain: value.domain, name: value.name, runUrl, maxInstances, ownerEmail, settings, generatedSecrets: generatedSecrets(value.generatedSecrets, [originVar, ...Object.keys(settings)]) };
 }
 
 /** The demo Worker's name and its Wrangler configuration; no provider request. */
 export function demoPlan({ project, environment, compatibilityDate, originVar, hostVariables = [], declaration, turnstileSiteKey }) {
   assert(/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate ?? '') && /^[A-Z][A-Z0-9_]{0,63}$/.test(originVar ?? ''), 'invalid-plan');
-  const { domain, name, runUrl, maxInstances, ownerEmail, settings } = demoDeclaration(declaration, originVar);
+  const { domain, name, runUrl, maxInstances, ownerEmail, settings, generatedSecrets } = demoDeclaration(declaration, originVar);
   // Keep the historical container name in the ownership hash for released hosts.
   const worker = `${ownerWorkerName(project, environment)}--demo`, hostname = `demo.${domain}`, container = worker.replace(/-+/g, '-');
   assert(resourceName(worker), 'owner-name-too-long');
@@ -52,7 +53,7 @@ export function demoPlan({ project, environment, compatibilityDate, originVar, h
     migrations: [{ tag: 'native-v2', new_sqlite_classes: ['NativeDemo', 'DemoCapacity'] }],
     ratelimits: [{ name: 'STARTS', namespace_id: namespace, simple: { limit: 3, period: 60 } }],
   };
-  return { worker, hostname, hostnames, container, record: demoRecord({ worker, hostname, hostnames, container }), origin: `https://${hostname}`, maxInstances, settings: Object.keys(settings), wrangler };
+  return { worker, hostname, hostnames, container, record: demoRecord({ worker, hostname, hostnames, container }), origin: `https://${hostname}`, maxInstances, settings: Object.keys(settings), generatedSecrets, wrangler };
 }
 
 /** The demo's record of what `rer deploy --demo` creates, kept on the provider so a

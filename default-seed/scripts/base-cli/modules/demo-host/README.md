@@ -5,6 +5,9 @@ host. See [adoption and deployment](https://github.com/runeditrun/base/blob/main
 
 - `build.mjs`: ordinary Vite output, declared SQL and public configuration,
   using the shared container migration-inventory and image-variable checks.
+- `native/secrets.mjs`: closed hosted `generatedSecrets` declarations using
+  SETUP's 32-byte hex/base64 encodings. Values are created only in the visitor
+  and saved/erased with its runtime, so restarts preserve encrypted data.
 - `native/`: bundle preparation, per-visitor D1/seed-DO facets, R2 in the
   visitor's own storage (`r2.mjs` semantics, `r2-store.mjs` rows and chunks),
   durable queue delivery, seed-DO alarms and declared UTC crons.

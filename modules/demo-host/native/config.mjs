@@ -1,6 +1,6 @@
 import { parseCron } from './cron.mjs';
 
-export const RUNTIME_FILES = ['config', 'worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'r2-store', 'queues', 'resources', 'cron', 'bridge', 'alarms'];
+export const RUNTIME_FILES = ['config', 'secrets', 'worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'r2-store', 'queues', 'resources', 'cron', 'bridge', 'alarms'];
 // Hashed build output: served immutable, and what the start page may prefetch.
 export const hashedAsset = (assetsDir = 'assets') => new RegExp(`^/${assetsDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/.*-[\\w-]{8,}\\.[\\w]+$`);
 export const HASHED_ASSET = hashedAsset();

@@ -32,7 +32,7 @@ export async function buildDemo(root, output, declaration) {
   const bindings = nativeBindings(workerConfig);
   for (const binding of bindings.objects) if (!entryExports.get(entry)?.has(binding.class_name)) throw new Error(`Loader demo cannot bind ${binding.name}: missing Durable Object export ${binding.class_name}`);
   if (!emitted.has(entry)) throw new Error('Demo Worker entry was not emitted by this build');
-  await checkBuildVariables(root, workerConfig.vars ?? {}, declaration.secrets ?? []);
+  await checkBuildVariables(root, workerConfig.vars ?? {}, [...(declaration.secrets ?? []), ...(declaration.generatedSecrets ?? []).map(({ name }) => ({ binding: name, environment: name }))]);
   const { unstable_splitSqlQuery: split } = require('wrangler');
   const migrations = Object.fromEntries((workerConfig.d1_databases ?? []).map(db => [db.binding, []]));
   const inventory = withRewrites(await demoMigrationInventory(root, { config: workerConfig, configFile: 'dist/server/wrangler.json' }), await readMigrationRewrites(root));
@@ -42,7 +42,7 @@ export async function buildDemo(root, output, declaration) {
   await cp(join(root, 'dist'), join(output, 'app/dist'), { recursive: true });
   // Where the console is mounted orders what the start page prefetches, and the build's assetsDir says where its chunks are (native/warm.mjs).
   const { operatorPath } = JSON.parse(await readFile(join(root, 'seed.json'), 'utf8').catch(() => '{}')).deploy ?? {};
-  await writeFile(join(output, 'app/demo.json'), JSON.stringify({ config: workerConfig, migrations, operatorPath, assetsDir: loaded.config.build?.assetsDir }) + '\n');
+  await writeFile(join(output, 'app/demo.json'), JSON.stringify({ config: workerConfig, migrations, operatorPath, assetsDir: loaded.config.build?.assetsDir, generatedSecrets: declaration.generatedSecrets }) + '\n');
 }
 
 if (process.argv[1] === import.meta.filename) {

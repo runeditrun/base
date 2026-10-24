@@ -14,7 +14,7 @@ export async function demoBundle(project, operation, declaration, output, store,
   await withoutLocalVariables(root, async () => {
     const builder = fileURLToPath(new URL('../modules/demo-host/build.mjs', import.meta.url));
     await store.run(label, process.execPath, [builder, root, output, JSON.stringify(declaration)], {
-      cwd: root, signal, phase: 'build', env: buildEnvironment([...declared, ...(declaration.secrets ?? []).flatMap(item => [item.binding, item.environment])]),
+      cwd: root, signal, phase: 'build', env: buildEnvironment([...declared, ...(declaration.generatedSecrets ?? []).map(item => item.name), ...(declaration.secrets ?? []).flatMap(item => [item.binding, item.environment])]),
     });
   }, { nested: operation.token, settings: [...(project.adapter?.settings ?? []), ...(project.privateInputs ?? [])] });
 }
