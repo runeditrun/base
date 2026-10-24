@@ -74,14 +74,16 @@ Owner history and undo must include jobs from either authority.
    after an adapter upgrade or a different mount setting. Adding the method
    never upgrades an earlier strict job. Removing it from an adapter needed by
    an existing preserving job refuses active apply/undo before that batch's
-   effects; restore a compatible adapter to continue. Keep adapter ownership
+   effects. Restore a compatible adapter for undo; an apply refusal marks the
+   accepted plan failed and requires a new plan and approval. Keep adapter ownership
    projections compatible with previously recorded undo evidence.
 
    Before publishing each preserving apply batch, the kit validates the
    adapter's preparation for that batch's prospective effects and fences its
-   observations before any native writes. Invalid preparation on the first
-   batch answers 409 `import_door_apply_failed`, with a failed job at checkpoint
-   zero and no imported native rows; a new plan and approval are required.
+   observations before any native writes. Invalid preparation structure on the
+   first batch answers 409 `import_door_apply_failed`; a false SQL fence answers
+   `import_door_apply_constraint`. Both leave a failed job at checkpoint zero
+   and no imported native rows; a new plan and approval are required.
    A later failed batch leaves earlier committed progress available to undo.
 
    Preserving undo reverses unchanged independent rows and leaves native edits,
