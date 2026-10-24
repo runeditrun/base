@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { checkSchema, validate } from './json-schema.mjs';
+import { validateSetupManifest } from './setup-validation.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (name) => JSON.parse(readFileSync(join(here, name), 'utf8'));
@@ -185,6 +186,62 @@ for (const [name, text, expected] of seedProbes) {
   });
 }
 
+const setupSchema = read('SETUP.schema.json');
+const sensitiveSetupNames = [
+  'SESSION_SECRET', 'API_KEY', 'MAIL_API_KEY', 'STRIPE_SECRET_KEY',
+  'RER_IDENTITY_PRIVATE_KEY', 'OPAQUE_CREDENTIAL', 'SETUP_TOKEN', 'DATABASE_PASSWORD',
+  'ACCESSKEY', 'apikey', 'privateKey', 'dbPassword', 'clientSecret',
+  'AUTH_TOKEN', 'SIGNING_KEY', 'RER_PROFILE', 'rer_profile', 'CREDENTIALS',
+  'APITOKEN', 'CLIENTSECRET', 'DATABASEPASSWORD', 'SERVICECREDENTIAL',
+  'GITHUBTOKEN', 'WEBHOOKSECRET', 'SMTPPASSWORD', 'DBPASSWD', 'BACKUPPASSPHRASE',
+  'OAUTHCREDENTIAL', 'PAYMENTAPIKEY', 'SSHPRIVATEKEY', 'AWSACCESSKEY', 'JWTSIGNINGKEY',
+  'sessionToken', 'clientSECRET', 'databasePassword', 'serviceCredential',
+  'servicetoken', 'clientsecret', 'accountcredential', 'serviceApiKey',
+  'mailPrivateKey', 'cloudAccessKey', 'jwtSigningKey', 'serverKey2', 'clientAuth2',
+  'ENCRYPTIONKEY', 'SSHKEY', 'BACKUPKEY', 'GITHUBPAT', 'SMTPPASS',
+  'ENCRYPTION_KEY', 'SSH_KEY', 'BACKUP_KEY', 'GITHUB_PAT', 'SMTP_PASS',
+  'encryptionKey', 'sshKey', 'backupKey', 'githubPat', 'smtpPass',
+  'encryptionkey', 'sshkey', 'backupkey', 'githubpat', 'smtppass',
+  'ENCRYPTION2KEY', 'SSH2KEY', 'BACKUP2KEY', 'GITHUB2PAT', 'SMTP2PASS',
+  'ACME_ENCRYPTIONKEY', 'ACME_SSHKEY', 'ACME_BACKUPKEY', 'ACME_GITHUBPAT', 'ACME_SMTPPASS',
+];
+const benignSetupNames = [
+  'TOKENIZER_LANG', 'SECRETARY_NAME',
+  'GOODS_NAME','KIDS_NURSERY_NAME','BRAND_SNIPPET','ADS_NETWORK_NAME',
+   'PASSENGER_NAME','DESIGN_STUDIO_NAME','MONKEY_BUSINESS_NAME','KEYSTONE_LEGAL_NAME',
+   'PATIO_NAME','SPASS_NAME','AUTHORITY_NAME','SIGMA_NAME','DSNETWORK_NAME','PWDRY_NAME',
+   'KEYNOTE_TITLE','PASSAGE_NAME','PATCHWORK_NAME','SIGNAGE_NAME','COOKIECUTTER_NAME'
+];
+const setupProbes = [
+  ...benignSetupNames.map(name => [
+    `a public business hint on ordinary input ${name}`,
+    [{ name, label: 'Business value', kind: 'text', businessField: 'display_name' }],
+    null
+  ]),
+  ...sensitiveSetupNames.map(name => [
+    `a public business hint on sensitive input ${name}`,
+    [{ name, label: 'Profile value', kind: 'text', businessField: 'legal_name' }],
+    new RegExp(`(?=.*${name})(?=.*(?:secret|vault))`, 'i')
+  ]),
+  ...[
+    ['LEGAL_NAME', 'TRADING_NAME', 'legal_name'],
+    ['OWNER_EMAIL', 'CONTACT_EMAIL', 'owner_email']
+  ].map(([first, second, businessField]) => [
+    `two inputs claiming ${businessField}`,
+    [first, second].map(name => ({ name, label: 'Profile value', kind: 'text', businessField })),
+    new RegExp(`(?=.*${first})(?=.*${second})(?=.*${businessField})`)
+  ])
+];
+
+for (const [name, fields, message] of setupProbes) {
+  test(`the setup manifest ${message ? 'rejects' : 'accepts'} ${name}`, () => {
+    const manifest = { schema: 1, title: 'Settings', groups: [], fields, steps: [{ type: 'extension', id: 'workspace' }] };
+    const errors = validateSetupManifest(setupSchema, manifest);
+    if (message) assert.ok(errors.some(error => message.test(error)), `expected ${message}, got ${JSON.stringify(errors)}`);
+    else assert.deepEqual(errors, []);
+  });
+}
+
 test('required is satisfied only by own properties', () => {
   const own = { type: 'object', required: ['constructor'], properties: {}, additionalProperties: false };
   assert.deepEqual(validate(own, JSON.parse('{}')), ['$: missing required property "constructor"']);
@@ -219,6 +276,7 @@ test('an unsupported keyword in an untaken conditional branch throws', () => {
   };
   assert.deepEqual(validate(probe, { kind: 'b' }), [], 'validate cannot see a branch the document does not take');
   assert.throws(() => checkSchema(probe), /unsupported schema keyword "minProperties"/);
+  assert.throws(() => checkSchema({not: {minProperties: 1}}), /unsupported schema keyword "minProperties" at #\/not/);
 });
 
 test('an unsupported format anywhere in the schema throws', () => {

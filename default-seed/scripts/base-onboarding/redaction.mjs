@@ -1,17 +1,11 @@
 import { StringDecoder } from 'node:string_decoder';
 import { jwtRanges, jwtHold } from './redaction-jwt.mjs';
+import { credentialName } from './schema/credential-names.mjs';
+export { credentialName } from './schema/credential-names.mjs';
 
 const MASK = '[REDACTED]';
 const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]{0,64}PRIVATE KEY(?: BLOCK)?-----/g;
 const PEM_END = /-----END [A-Z0-9 ]{0,64}PRIVATE KEY(?: BLOCK)?-----/g;
-// A credential variable name has a credential word as a whole word part:
-// GITHUB_TOKEN, db-password, apiKey or TOKEN, never PATH, DESIGN_MODE,
-// SIGNAL_NAME, KEYBOARD_LAYOUT, COMPASS_DIR or AUTHOR_NAME.
-const CREDENTIAL_WORD = 'token|secret|credential|key|pat|dsn|auth|pass|passwd|password|pwd|signature|sig|cookie|apikey|accesskey|privatekey|secretkey|authtoken|accesstoken';
-const CREDENTIAL_NAME = new RegExp(`(?:^|[_.-])(?:${CREDENTIAL_WORD})s?(?:$|[_.-])`, 'i');
-// Keep camelCase matching separate: inline flag modifiers are unavailable in
-// Base's maintained Node 22 runtime. These names require a real case boundary.
-const CAMEL_CREDENTIAL_NAME = /[A-Za-z0-9](?:Token|Secret|Credential|Key|Pat|Dsn|Auth|Pass|Passwd|Password|Pwd|Signature|Sig|Cookie)s?(?:$|[_.-]|[A-Z0-9])/;
 const FIELD_NAME = '(?:api[_-]?key|access[_-]?token|auth[_-]?token|token|password|secret|signature|sig|key|pat|dsn|auth|pass)';
 // A field name may follow `_` or `-` (DB_PASSWORD, client_secret, x-api-key),
 // but not a letter or digit inside an ordinary word.
@@ -293,7 +287,6 @@ export function createRedaction({mask = MASK} = {}) {
 }
 
 // A variable whose name marks a credential, or whose value is a URL carrying one.
-export const credentialName = key => CREDENTIAL_NAME.test(key) || CAMEL_CREDENTIAL_NAME.test(key);
 export const credentialUrl = value => CREDENTIAL_URL.test(value);
 // A value that carries a credential whatever its variable is called: a known
 // provider token of at least 16 characters, a JWT, or a URL with userinfo or a

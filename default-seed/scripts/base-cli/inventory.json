@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc957441a",
+  "cliVersion": "0.2.79-dev.gf4643d7b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -265,11 +265,15 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "56a77c2149626eaa3a69764f25b21421ce0be22ce8a11540350ee9f391e77e1a"
+      "sha256": "2fb04ae911a5e6f8cf3781a29cfc64ba049990522e0a78f80cb99879d36af848"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
-      "sha256": "946adc2e484ace3dfee960a58a6215fa55a600079aa7e2cf52264704ece74998"
+      "sha256": "2aa43379cfd4bb29b3b5ee42cff9d938085560c68be2a12f3883408987641195"
+    },
+    "schema/credential-names.mjs": {
+      "source": "onboarding/schema/credential-names.mjs",
+      "sha256": "2a1b59972f65eb15c0a40e02dd218d891bdc2ad2f2f5cf346704967fc27740c9"
     },
     "schema/dependencies.mjs": {
       "source": "onboarding/schema/dependencies.mjs",
@@ -277,11 +281,11 @@
     },
     "schema/json-schema.mjs": {
       "source": "onboarding/schema/json-schema.mjs",
-      "sha256": "243b8808b3a6540c8ccec586b69dc16c09d53c965863e5478d5dc1fbd229a5ae"
+      "sha256": "f964a1f8bab23bfad0c8b6552d8e717091619fa438e0d6e65a9801e1d97782bc"
     },
     "schema/setup-validation.mjs": {
       "source": "onboarding/schema/setup-validation.mjs",
-      "sha256": "7ee1a46a742570cd5d3df605732c0777473f419f7b63b6c5ad1c238406a1625f"
+      "sha256": "a3f2e47f68d1c8821c62adea43a84eb4205bd91013e6185c67f7a066bc4fb8a0"
     },
     "secrets.mjs": {
       "source": "onboarding/secrets.mjs",
@@ -289,11 +293,11 @@
     },
     "server.mjs": {
       "source": "onboarding/server.mjs",
-      "sha256": "307ea35fa6791bc6359ace47d81debd09813183190b470744c54719a479324c4"
+      "sha256": "3cc7c5203fb40e95e97e8ed812e9156c6d1b931c9ae2ce79c18c46817ebcaf3c"
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
-      "sha256": "ef2c2e358e3913ba4fc176051496d01d544ba17febc143b1a94089f2e9c7de0c"
+      "sha256": "b7b283b93496596b07835d7d3b6966258f8123d2b695a2d1c36da859bf1356b8"
     },
     "start-origin-diagnostic.mjs": {
       "source": "onboarding/start-origin-diagnostic.mjs",
