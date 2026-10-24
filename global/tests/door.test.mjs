@@ -102,10 +102,10 @@ test('the front door serves two checkouts by name, starting them on a visit and 
 
  // The door never starts while another process holds its port on [::1]
  // (where browsers try first); a host without IPv6 loopback holds 127.0.0.1.
- const held = await freePort();
  squatter = net.createServer();
- const sixOnly = await new Promise(resolveListen => { squatter.once('error', () => resolveListen(false)); squatter.listen({ port: held, host: '::1', ipv6Only: true }, () => resolveListen(true)); });
- if (!sixOnly) { squatter = net.createServer(); await new Promise(resolveListen => squatter.listen(held, '127.0.0.1', resolveListen)); }
+ const sixOnly = await new Promise((resolveListen, reject) => { squatter.once('error', error => ['EADDRNOTAVAIL', 'EAFNOSUPPORT'].includes(error.code) ? resolveListen(false) : reject(error)); squatter.listen({ port: 0, host: '::1', ipv6Only: true }, () => resolveListen(true)); });
+ if (!sixOnly) { squatter = net.createServer(); await new Promise((resolveListen, reject) => { squatter.once('error', reject); squatter.listen(0, '127.0.0.1', resolveListen); }); }
+ const held = squatter.address().port;
  t.diagnostic(`squatter on ${sixOnly ? '[::1]' : '127.0.0.1'}:${held}`);
  const refused = await run(['door', 'enable', '--port', String(held)], { cwd: directory, env: { ...env, RER_DOOR_DIR: join(directory, 'door-refused') } });
  assert.equal(refused.code, 4, refused.stderr + refused.stdout);

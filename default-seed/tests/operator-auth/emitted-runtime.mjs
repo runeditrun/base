@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { testProvider } from './oidc-provider.mjs'
-import { startOnFreePort } from '../ports.mjs'
 
 export const root = fileURLToPath(new URL('../../', import.meta.url))
 const reactRequire = createRequire(await realpath(join(root, 'node_modules/@tanstack/react-start/package.json')))
@@ -24,29 +23,32 @@ export async function migrate(db, filename) {
   // connections per start, which exhausts the ephemeral port range under load.
   await db.batch(splitSql(sql).map((statement) => db.prepare(statement)))
 }
-export const emittedRuntime = (options = {}) => startOnFreePort((port) => startEmittedRuntime(port, options))
-async function startEmittedRuntime(port, { prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, hostname = '127.0.0.1', bindings = {}, files = false }) {
+export async function emittedRuntime({ prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, hostname = '127.0.0.1', bindings = {}, files = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
   const production = !noMail
-  const origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://${hostname}:${port}`
+  let origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://${hostname}`
   const forwardHost = demoHost || hostname !== '127.0.0.1'
   const mails = []
   const networkRequests = []
-  const provider = oidc ? await testProvider(origin, owner) : undefined
+  let provider
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter((file) => file.endsWith('.js')).map((file) => `assets/${file}`)]
     .map((file) => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
   // Preserve the requested URL and Host through Miniflare's loopback proxy, as the
   // demo front does when forwarding into this visitor's container.
-  if (forwardHost) modules.unshift({ type: 'ESModule', path: join(root, 'dist/server/test-demo-entry.mjs'),
+  modules.unshift({ type: 'ESModule', path: join(root, 'dist/server/test-demo-entry.mjs'),
     contents: `import worker from ${JSON.stringify('./' + config.main)};
       export default { ...worker, async fetch(envelope, env, execution) {
-        const { url, ...init } = await envelope.json();
-        return worker.fetch(new Request(url, init), env, execution);
+        const request = ${forwardHost ? 'await envelope.json().then(({ url, ...init }) => new Request(url, init))' : 'envelope'};
+        // workerd does not synthesize Host for in-process dispatch. Preserve an
+        // explicit Host so origin-admission tests still exercise hostile hosts.
+        const headers = new Headers(request.headers);
+        if (!headers.has('host')) headers.set('host', new URL(request.url).host);
+        return worker.fetch(new Request(request, { headers }), env, execution);
       } };` })
   const legacyOptions = {
-    host: '127.0.0.1', port, https: production, modulesRoot: join(root, 'dist/server'),
+    host: '127.0.0.1', port: 0, https: production, modulesRoot: join(root, 'dist/server'),
     modules,
     compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
     assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
@@ -79,7 +81,15 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
   const options = convertV4MiniflareOptions(legacyOptions)
   const mf = new Miniflare({ ...options, resourcePersistencePath: join(directory, 'state') })
   try {
-    await mf.ready
+    const address = await mf.ready
+    if (!demoHost) origin = `${production ? 'https' : 'http'}://${hostname}:${address.port}`
+    provider = oidc ? await testProvider(origin, owner) : undefined
+    legacyOptions.bindings = { ...legacyOptions.bindings, AUTH_ORIGIN: origin, ...provider?.configuration, ...bindings }
+    // Keep port:0 unchanged: only Worker bindings change, while the runtime
+    // retains its listening socket throughout configuration and redeploys.
+    await mf.setOptions({ ...convertV4MiniflareOptions(legacyOptions), resourcePersistencePath: join(directory, 'state') })
+    if ((await mf.ready).origin !== address.origin) throw new Error('Binding update changed the Worker listener')
+    const port = address.port
     let db = await mf.getD1Database('DB')
     await migrate(db, '0001_reference.sql')
     if (prior) {
@@ -105,7 +115,7 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
         const changed = await Promise.all(modules.map(async module => ({ ...module,
           contents: transform(module.contents ?? await readFile(module.path, 'utf8'), module.path) })))
         await mf.setOptions({ ...convertV4MiniflareOptions({ ...legacyOptions, modules: changed }), resourcePersistencePath: join(directory, 'state') })
-        await mf.ready
+        if ((await mf.ready).origin !== address.origin) throw new Error('Redeploy changed the Worker listener')
         db = await mf.getD1Database('DB')
       }, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
   } catch (error) { await Promise.allSettled([mf.dispose(), rm(directory, { recursive: true, force: true })]); throw error }

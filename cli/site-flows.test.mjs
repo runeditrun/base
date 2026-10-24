@@ -8,7 +8,6 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
-import { freePort } from '../global/tests/harness.mjs';
 import { codeChipBreaksWord, commandBlocks, runLayoutTheme } from './fixtures/run-page.mjs';
 import { headerLayout, splitCardLayout } from './fixtures/contract-page.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
@@ -58,7 +57,7 @@ test('built run-site uses US dates and keeps the one-line command start together
  await writeFile(join(f.root, 'public/favicon.svg'), await readFile(join(f.root, 'public/brand/mark.svg')));
  const result = await f.build({TZ:'America/Los_Angeles'});
  assert.equal(result.code, 0, result.stdout + result.stderr);
- const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const context = await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/Los_Angeles',permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
   await page.goto(preview.url + '/contract');
@@ -169,7 +168,7 @@ test('site build bundles declared client islands and their imports for the brows
  assert.equal(result.code, 0, result.stdout + result.stderr);
  const home = await readFile(join(f.root,'dist/site/index.html'),'utf8'), source = /src="([^"]+)"/.exec(home)?.[1];
  assert.ok(source?.startsWith('/site-assets/'), 'page receives the emitted client URL');
- const preview = await sitePreview(join(f.root,'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ const preview = await sitePreview(join(f.root,'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const page = await browser.newPage();
   await page.goto(preview.url);

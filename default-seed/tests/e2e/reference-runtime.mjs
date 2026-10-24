@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
-import { freePort } from '../ports.mjs'
+import { advertisedOrigin, listenerConfig } from '../worker-listener.mjs'
 import { readableActivity, refreshSafeCreate } from './people-page.mjs'
 import { freshSeedImportDoor } from './import-door.mjs'
 
@@ -33,12 +33,15 @@ function command(name, args, options = {}) {
   })
 }
 
-async function waitForHealth(baseUrl, child, output) {
+async function waitForHealth(child, output) {
+  let baseUrl
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (child.exitCode !== null) throw new Error(`wrangler dev exited early\n${output()}`)
+    baseUrl ??= advertisedOrigin(output())
     try {
+      if (!baseUrl) throw new Error('Waiting for listener')
       const response = await fetch(`${baseUrl}/health`)
-      if (response.ok) return
+      if (response.ok) return baseUrl
     } catch {
       // The local workerd listener is still starting.
     }
@@ -121,8 +124,6 @@ async function main() {
   assert.equal(clientSource.join('\n').includes('drizzle-orm/d1'), false)
 
   const persistPath = await mkdtemp(join(tmpdir(), 'default-seed-reference-'))
-  const port = await freePort()
-  const baseUrl = `http://127.0.0.1:${port}`
   const config = join(root, 'dist/server/wrangler.json')
   let worker
   let workerOutput = ''
@@ -137,15 +138,17 @@ async function main() {
       '--local', '--persist-to', persistPath, '--config', config,
       '--file', join(root, 'tests/e2e/fixtures.sql'),
     ])
+    const servingConfig = await listenerConfig(config, persistPath)
     worker = spawnOwnedProcess('pnpm', [
-      'exec', 'wrangler', 'dev', '--inspector-port', '0', '--config', config, '--local', '--persist-to', persistPath,
-      '--show-interactive-dev-session=false', '--ip', '127.0.0.1', '--port', String(port),
+      'exec', 'wrangler', 'dev', '--inspector-port', '0', '--config', servingConfig, '--local', '--persist-to', persistPath,
+      '--show-interactive-dev-session=false', '--ip', '127.0.0.1', '--port', '0',
       '--var', `OWNER_EMAIL:${email}`, '--var', `SETUP_TOKEN:${setupToken}`,
-      '--var', `SESSION_SECRET:${sessionSecret}`, '--var', `AUTH_ORIGIN:${baseUrl}`, '--var', 'AUTH_LOCAL:true',
+      '--var', `SESSION_SECRET:${sessionSecret}`, '--var', 'AUTH_ORIGIN:http://127.0.0.1:0', '--var', 'AUTH_LOCAL:true',
     ], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
     worker.stdout.on('data', (chunk) => { workerOutput += chunk })
     worker.stderr.on('data', (chunk) => { workerOutput += chunk })
-    await waitForHealth(baseUrl, worker, () => workerOutput)
+    const baseUrl = await waitForHealth(worker, () => workerOutput)
+    const port = new URL(baseUrl).port
 
     const health = await fetch(`${baseUrl}/health`)
     assert.equal(health.status, 200)
