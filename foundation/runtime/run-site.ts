@@ -1,6 +1,6 @@
 import { iconHead } from './icon-head'
-// The run site's shared pages: the Run page (Direction A: centred headline, two
-// stacked step cards, the facts under them), a small composed homepage for
+// The run site's shared pages: the Run page (Direction A: centred headline, one
+// command card, the facts under it), a small composed homepage for
 // seeds without an approved one (Base's references), and the not-found page.
 // /contract is in contract-page.ts, built from the same document and header.
 // They are static HTML strings for `rer build --site`; the seed's site entry
@@ -20,15 +20,12 @@ export interface RunData {
   repository: string
   /**
    * The start line for someone who already has Node 22 or later:
-   * "npx -y @runeditrun/rer dev just-every/cradle". The Run page's step 2 is the
-   * same command without npx ("rer dev just-every/cradle"), which runs on what
-   * the installer in step 1 gives and nothing else.
+   * "npx -y @runeditrun/rer dev just-every/cradle". The Run page's one line is
+   * the same `dev just-every/cradle` handed to the installer (startLine).
    */
   clone: string
   /** The folder the start line clones into, where `rer dev` restarts it: "cradle". */
   folder: string
-  /** Platforms and tools: "Runs on macOS, Linux or Windows with WSL2, with git. The installer brings Node when it is missing, and rer brings pnpm." */
-  requirements: string
   /** "MIT". */
   licence: string
   /** Whether the run site carries /docs. */
@@ -38,16 +35,20 @@ export interface RunData {
 }
 export interface HostedOption { title: string; body: string; href: string; action: string }
 
-/** Step 1 of every Run page: the installer, which brings its own Node when there is none. */
-export const installRer = 'curl -fsSL https://runeditrun.com/install.sh | sh'
 const npxStart = 'npx -y @runeditrun/rer '
-/** Step 2: the clone line run by the rer the installer put in ~/.local/bin, not by npx. */
-const rerStart = (run: RunData) => `rer ${run.clone.slice(npxStart.length)}`
+/**
+ * The one line on every Run page, homepage snippet and getting-started page: the
+ * installer (which brings its own Node when there is none) installs rer, then
+ * runs `rer dev <owner>/<repo>` in the same line.
+ */
+export const startLine = (run: RunData) => `curl -fsSL https://runeditrun.com/install.sh | sh -s -- ${run.clone.slice(npxStart.length)}`
+/** The one requirements sentence: rer clones with git; the installer brings Node and rer the pinned pnpm. */
+export const runRequirements = 'git is required; rer brings Node and pnpm.'
 
 export const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))
 
 export function checkRunData(run: RunData): RunData {
-  for (const key of ['name', 'clone', 'folder', 'requirements', 'licence'] as const) if (typeof run[key] !== 'string' || !run[key].trim()) throw new Error(`Run data needs ${key}.`)
+  for (const key of ['name', 'clone', 'folder', 'licence'] as const) if (typeof run[key] !== 'string' || !run[key].trim()) throw new Error(`Run data needs ${key}.`)
   if (!run.clone.startsWith(`${npxStart}dev `)) throw new Error(`Run data clone is the npx start line: ${npxStart}dev <owner>/<repo>.`)
   if (!/^https:\/\/[^\s"<>]+$/.test(run.repository)) throw new Error('Run data repository is an https URL.')
   if (!/^[A-Za-z0-9._/-]+$/.test(run.folder) || run.folder.split('/').some(part => !part || part === '..')) throw new Error('Run data folder is a relative folder.')
@@ -87,10 +88,9 @@ const HOME = 'main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art)
 // bar and nav reflow in BASE when a seed's wordmark and links need more room.
 const RUN = 'body{--art:max(20vh,150px);overflow-x:visible}main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art) + 40px)}.intro{text-align:center;padding-top:36px}.intro h1{font-size:58px}.intro .sub{margin-inline:auto;max-width:760px;margin-top:20px}'
   + '.steps{max-width:990px;margin:34px auto 0;display:grid;gap:18px}'
-  + '.step{position:relative;display:grid;grid-template-columns:62px 1fr;gap:0 32px;padding:24px 30px 24px 28px;border-radius:24px;background:color-mix(in srgb,var(--rer-surface,#fff) 86%,transparent);border:1px solid var(--site-line);box-shadow:0 24px 48px -36px color-mix(in srgb,var(--site-ink) 45%,transparent);backdrop-filter:blur(6px)}'
-  + '.step.option{grid-template-columns:1fr;padding-left:124px}.body{min-width:0}'
-  + '.num{display:grid;place-items:center;width:62px;height:62px;border-radius:50%;background:var(--site-accent);color:var(--site-accent-ink);font:600 28px/1 var(--rer-font-heading,var(--rer-font-body,inherit))}'
-  + '.step h2{margin-top:10px;font:600 26px/1.25 var(--rer-font-heading,var(--rer-font-body,inherit));letter-spacing:-.02em;color:var(--site-ink)}.step.option h2{margin-top:0}'
+  + '.step{position:relative;display:block;padding:24px 30px 24px 28px;border-radius:24px;background:color-mix(in srgb,var(--rer-surface,#fff) 86%,transparent);border:1px solid var(--site-line);box-shadow:0 24px 48px -36px color-mix(in srgb,var(--site-ink) 45%,transparent);backdrop-filter:blur(6px)}'
+  + '.body{min-width:0}'
+  + '.step h2{margin-top:0;font:600 26px/1.25 var(--rer-font-heading,var(--rer-font-body,inherit));letter-spacing:-.02em;color:var(--site-ink)}'
   + '.body>p{color:var(--site-body);font-size:18px;margin-top:6px}.body>p.alt{margin-top:14px;font-size:16px}.body>p.note{margin-top:14px;font-size:17px}.body>p.go{margin-top:14px}.go a{font-weight:600;text-decoration:underline;text-underline-offset:4px}'
   + 'code{font-family:var(--site-mono);font-size:.92em;color:var(--site-ink)}.code-word{white-space:nowrap}.alt code{margin-left:.2em}.note code{margin-right:.1em}'
   + '.code{position:relative;container-type:inline-size;margin-top:16px;border-radius:12px;background:var(--rer-code-background,var(--site-ink));color:var(--rer-code-text,var(--rer-page,#f3f5f8))}'
@@ -99,8 +99,8 @@ const RUN = 'body{--art:max(20vh,150px);overflow-x:visible}main{max-width:1360px
   + '.copy:hover{background:color-mix(in srgb,currentColor 12%,transparent)}.copy svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4}'
   + '.facts{margin-top:32px;color:var(--site-body);font-size:14px;display:grid;gap:6px;text-align:center}.facts a{text-decoration:underline;text-underline-offset:3px}'
   + '@media(max-width:760px){body{--art:180px}main{padding:0 16px calc(var(--art) + 40px)}.intro{padding-top:34px}.intro h1{font-size:38px}.steps{margin-top:28px}'
-  + '.step,.step.option{padding:20px 18px;border-radius:18px;grid-template-columns:1fr;gap:0}.num{position:absolute;top:18px;left:18px;width:34px;height:34px;font-size:16px}'
-  + '.step h2{margin:3px 0 0 46px;min-height:30px;font-size:20px}.step.option h2{margin-left:0}.body>p,.body>p.note{font-size:15.5px}.body>p.alt{font-size:14.5px}'
+  + '.step{padding:20px 18px;border-radius:18px}'
+  + '.step h2{margin:3px 0 0;min-height:30px;font-size:20px}.body>p,.body>p.note{font-size:15.5px}.body>p.alt{font-size:14.5px}'
   + '.code{margin-top:12px}.facts{font-size:13px;margin-top:28px}}'
   // The command keeps its own room: beside the Copy button while the block is wide enough for both, and under it
   // (button on a row of its own above the text) as soon as it is not, whatever the page width or command length.
@@ -117,77 +117,7 @@ const ARROW = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke
  */
 export interface HomepageHeader { html: string; styles: string[] }
 
-export function document(identity: EditionIdentity, title: string, description: string, style: string, body: string, script = '', styles: string[] = []): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title><meta name="description" content="${escape(description)}">`
+export function document(identity: EditionIdentity, title: string, description: string, style: string, body: string, script = '', styles: string[] = [], head = ''): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${head}<title>${escape(title)}</title><meta name="description" content="${escape(description)}">`
     + `${iconHead}${identity.fonts ? `<link rel="stylesheet" href="${escape(identity.fonts)}">` : ''}<link rel="stylesheet" href="${escape(identity.theme)}"><style>${identity.accentColor ? `:root{--rer-brand-accent:${identity.accentColor};--rer-brand-accent-text:${ink(identity.accentColor)}}` : ''}${BASE}${style}</style>`
     + `${styles.map(href => `<link rel="stylesheet" href="${escape(href)}">`).join('')}</head>`
-    + `<body>${identity.band ? `<div class="art" aria-hidden="true"><img src="${escape(identity.band)}" alt=""></div>` : ''}${body}${script ? `<script>${script}</script>` : ''}</body></html>`
-}
-/** Docs, Contract and Source: Docs when the site has /docs, Contract when the seed has a CONTRACT.md. */
-export function siteLinks(run: RunData, contract: SeedContract | undefined, current?: 'contract'): string {
-  return `${run.docs ? '<a href="/docs">Docs</a>' : ''}${contract ? `<a href="/contract"${current === 'contract' ? ' aria-current="page"' : ''}>Contract</a>` : ''}<a href="${escape(run.repository)}">Source</a>`
-}
-/** Base's header: the same on its homepage, Run, Contract and not-found pages. */
-export function header(identity: EditionIdentity, run: RunData, contract?: SeedContract, current?: 'contract'): string {
-  return `<header class="bar"><a class="brand" href="/"><img src="${escape(identity.mark)}" alt="" width="40" height="40"><span>${escape(identity.product)}</span></a>`
-    + `<nav aria-label="Site">${siteLinks(run, contract, current)}</nav></header>`
-}
-// Keep each word/path whole, leaving the original whitespace between words so
-// inline commands can wrap at spaces and selection copies the same text.
-const inlineCode = (value: string) => `<code>${escape(value).replace(/\S+/g, word => `<span class="code-word">${word}</span>`)}</code>`
-// The one-line alternative can break only before the repository; keep plain spaces for copying.
-const inlineStart = (run: RunData) => `<code><span class="code-word">${escape(npxStart)}dev</span> <span class="code-word">${escape(run.clone.slice(npxStart.length + 'dev '.length))}</span></code>`
-// A command line never wraps beside a shell pipe: `install.sh | sh` stays whole,
-// so a narrow block breaks before the URL or after its last slash instead.
-const pipelines = (line: string) => escape(line).replace(/[^\s/]+(?: \| \S+)+/g, words => `<span class="code-word">${words}</span>`)
-const codeBlock = (lines: string[], label: string) => `<div class="code"><pre aria-label="${escape(label)}"><code>${lines.map(pipelines).join('\n')}</code></pre>`
-  + `<button class="copy" type="button" data-copy="${escape(lines.join('\n'))}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="2"/><path d="M3 10.5V4a1.5 1.5 0 0 1 1.5-1.5H10"/></svg><span>Copy</span></button></div>`
-
-/** The Run page at /run. `contract`, the seed's parsed CONTRACT.md, links /contract from Base's header; `homepage` replaces that header. */
-export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: SeedContract, homepage?: HomepageHeader): string {
-  checkIdentity(identity); checkRunData(run)
-  const name = escape(run.name), source = escape(run.repository.replace(/^https:\/\//, ''))
-  const hosted = run.hosted.map(option => `<li class="step option"><div class="body"><h2>${escape(option.title)}</h2><p>${escape(option.body)}</p><p class="go"><a href="${escape(option.href)}">${escape(option.action)}</a></p></div></li>`).join('')
-  const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>Run ${name} on your computer.</h1><p class="sub">100% free and open source. Two lines, and ${name} opens in your browser.</p></div>`
-    + `<ol class="steps"><li class="step"><span class="num" aria-hidden="true">1</span><div class="body"><h2>Install rer</h2>${codeBlock([installRer], 'Install rer')}`
-    + `<p class="note">It installs rer for you alone, with its own Node if you have no Node 22 or later. The installer does not edit your shell files itself. If it ends with a line to run, run it before step 2: it puts rer on your PATH now and appends the same setting to your shell's startup file (for example ~/.zshrc) for new terminals.</p></div></li>`
-    + `<li class="step"><span class="num" aria-hidden="true">2</span><div class="body"><h2>Start ${name}</h2>${codeBlock([rerStart(run)], `Start ${run.name}`)}`
-    + `<p class="note">rer gets ${name}, installs everything, makes you the owner and prints a link that opens ${name} signed in. To start it again later: ${inlineCode(`cd ${run.folder} && rer dev`)}</p>`
-    + `<p class="alt">Already have Node 22 or later? ${inlineStart(run)} does both steps in one line.</p></div></li>${hosted}</ol>`
-    + `<footer class="facts"><p>${escape(run.requirements)}</p><p>Source: <a href="${escape(run.repository)}">${source}</a> · ${escape(run.licence)} license</p></footer></main>`
-  return document(identity, `Run ${run.name}`, `Run ${run.name} on your computer. 100% free and open source.`, RUN, body, COPY_SCRIPT, homepage?.styles)
-}
-
-/** Base's composed homepage for a seed without an approved one: its primary action is Run <Seed>. */
-export function siteHomeHtml(identity: EditionIdentity, run: RunData, contract?: SeedContract): string {
-  checkIdentity(identity); checkRunData(run)
-  const body = `${header(identity, run, contract)}<main><div class="hero"><h1>${escape(identity.tagline)}</h1><p class="sub">100% free and open source.</p>`
-    + `<div class="actions"><a class="btn" href="/run">Run ${escape(identity.product)}${ARROW}</a>${run.docs ? '<a class="link" href="/docs">Read the docs</a>' : ''}</div></div></main>`
-  return document(identity, identity.product, identity.tagline, HOME, body)
-}
-
-/** 404.html: the static host serves it for every path the site does not have. */
-export function siteNotFoundHtml(identity: EditionIdentity, run: RunData, contract?: SeedContract, homepage?: HomepageHeader): string {
-  checkIdentity(identity); checkRunData(run)
-  const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="hero"><h1>Page not found</h1><p class="sub">This page is not part of the ${escape(identity.product)} site.</p><div class="actions"><a class="link" href="/">Go to the homepage</a></div></div></main>`
-  return document(identity, `Not found · ${identity.product}`, identity.tagline, HOME, body, '', homepage?.styles)
-}
-
-/** What a seed's site entry returns: each page by path, and the public files they use. */
-export interface SiteBuild {
- pages: { path: string; html: string }[]; assets: string[];
- /** Sections from the same render, using its published heading ids. */
- searchPages?: { href: string; searchSections: { anchor: string; titlePath: string[]; text: string }[] }[];
-}
-
-/**
- * What `rer build --site` passes to sitePages(): `styles`, the site paths of the
- * stylesheets the entry's CSS imports compiled to (empty when it imports none).
- * A page whose components import CSS links them in its head. `clients` maps
- * each declared island name to its bundled module URL; `styles` also includes
- * the client entries' compiled stylesheets. `contract` is the seed's
- * CONTRACT.md as parseContract reads it, absent when the seed has none; rer
- * stops the build, naming the line, when it does not parse. The entry renders
- * it at /contract with contractPageHtml and passes it to the other pages.
- */
-export interface SiteContext { styles: string[]; clients: Record<string, string>; contract?: SeedContract }

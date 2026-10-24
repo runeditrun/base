@@ -45,14 +45,28 @@ function stacked(counts: Counts, labelled: boolean): string {
 const split = (counts: Counts) => order.map(status => `<span class="ink-${status}">${counts[status]} ${status}</span>`).join('<span class="sep"> · </span>')
 const plainCounts = (counts: Counts) => order.map(status => `${counts[status]} ${status}`).join(' · ')
 const areaCount = (n: number) => `${n} ${n === 1 ? 'area' : 'areas'}`
-const pathHtml = (path: string) => escape(path).replaceAll('/', '/<wbr>')
 const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'push further' : clause.kind
+
+// Source citations stay in CONTRACT.md. Public evidence and gaps describe the
+// product without repository paths or build commit identifiers.
+const publicText = (value: string) => value
+  .replace(/\bin audited\s+`?src\/`?\s+and\s+`?tests\/`?/gi, '')
+  .replace(/`?(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|foundation|cli|migrations|schema|public)\/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?`?|`?\b[\w@.-]+(?:\/[\w@.*?[\]-]+)*\.(?:[cm]?[jt]sx?|sql|json|md|ya?ml|sh|css|html)(?::\d+(?::\d+)?)?`?/gi, '')
+  .replace(/\b[0-9a-f]{7,40}\b/gi, '')
+  .replace(/\(\s*\)|\[\s*\]/g, '')
+  .replace(/\s+([,.;:])/g, '$1').replace(/([,;:])(?:\s*[,;:])+/g, '$1')
+  .replace(/\s+/g, ' ').replace(/^[\s,;:.]+|[\s,;:]+$/g, '').trim()
 
 function clauseRow(clause: ContractClause, contractUrl: string): string {
   const line = `${contractUrl}?plain=1#L${clause.line}`
-  const find = [clause.id, clause.title, clause.area, ...clause.evidence, clause.gap].join(' ').toLowerCase()
-  const evidence = clause.status === 'missing' ? '' : clause.evidence.map(path => `<code class="path">${pathHtml(path)}</code>`).join('')
-  const gap = clause.status === 'done' || !clause.gap ? '' : `<span class="gap">Gap: ${clause.gap === 'see the clause' ? `<a href="${escape(line)}">see the clause</a>` : escape(clause.gap)}</span>`
+  const evidenceText = clause.status === 'missing' ? [] : clause.evidence.map(publicText).filter(Boolean)
+  const gapText = clause.status === 'done' ? '' : publicText(clause.gap)
+  const find = [clause.id, clause.title, clause.area, ...evidenceText, gapText].join(' ').toLowerCase()
+  const evidence = evidenceText.map(text => `<span class="evidence">${escape(text)}</span>`).join('')
+  const gapBody = gapText === 'see the clause' ? `<a href="${escape(line)}">see the clause</a>` : escape(gapText)
+  const gap = !gapText ? '' : gapText.length > 160
+    ? `<details class="gap"><summary>Still to build</summary><p>${gapBody}</p></details>`
+    : `<span class="gap">Still to build: ${gapBody}</span>`
   return `<tr class="clause" data-id="${escape(clause.id)}" data-status="${clause.status}" data-kind="${clause.kind}" data-area="${escape(clause.area)}" data-find="${escape(find)}">`
     + `<td class="id"><a href="${escape(line)}">${escape(clause.id)}</a><span class="kind">${kindWord(clause)}</span></td><td class="title">${escape(clause.title)}</td>`
     + `<td class="status"><span class="st ink-${clause.status}">${glyph(clause.status, 16)}${word[clause.status]}</span></td><td class="ev">${evidence}${gap}</td></tr>`
@@ -63,16 +77,16 @@ export function contractPageHtml(identity: EditionIdentity, run: RunData, contra
   checkIdentity(identity); checkRunData(run)
   const product = escape(identity.product), { counts, target } = contract
   const repository = run.repository.replace(/\/+$/, ''), contractUrl = `${repository}/blob/main/CONTRACT.md`
-  const short = contract.commit.slice(0, 7), date = dateFormat.format(new Date(`${contract.date}T00:00:00Z`))
+  const date = dateFormat.format(new Date(`${contract.date}T00:00:00Z`))
   const areaOrder = new Map(contract.areas.map((area, index) => [area.name, index]))
   const clauses = [...contract.clauses].sort((a, b) => areaOrder.get(a.area)! - areaOrder.get(b.area)! || a.line - b.line)
   const published = tally(clauses.filter(clause => clause.kind === 'published')), targeted = tally(clauses.filter(clause => clause.kind !== 'published'))
 
-  const progress = `<section id="progress" class="hero" aria-label="Progress" data-done="${counts.done}" data-partial="${counts.partial}" data-missing="${counts.missing}" data-total="${counts.total}" data-commit="${escape(short)}" data-date="${contract.date}">`
+  const progress = `<section id="progress" class="hero" aria-label="Progress" data-done="${counts.done}" data-partial="${counts.partial}" data-missing="${counts.missing}" data-total="${counts.total}" data-date="${contract.date}">`
     + `<p class="figure"><span class="big">${counts.done}</span> <span class="of"><span>of ${counts.total}</span> <span>clauses done</span></span></p>`
     + `<div class="hero-side"><div class="meter" role="img" aria-label="${counts.done} done, ${counts.partial} partial, ${counts.missing} missing, of ${counts.total} clauses">${stacked(counts, true)}</div>`
     + `<div class="hero-foot"><ul class="legend">${order.map(status => `<li>${glyph(status, 24)}<span>${counts[status]} ${status}</span></li>`).join('')}</ul>`
-    + `<div class="judged"><p>Judged at commit <a class="sha" href="${escape(`${repository}/commit/${contract.commit}`)}">${escape(short)}</a> · <time datetime="${contract.date}">${date}</time></p><p><a href="#how-judged">How statuses are judged</a></p></div></div></div></section>`
+    + `<div class="judged"><p>Judged on <time datetime="${contract.date}">${date}</time></p><p><a href="#how-judged">How statuses are judged</a></p></div></div></div></section>`
 
   const kinds = `<section class="card split" aria-label="Clauses by kind"><div><h2>Published clauses</h2><p class="line">${split(published)}</p><p class="of-n">of ${published.total}</p></div>`
     + `<div><h2>Target and push further</h2>${targeted.total ? `<p class="line">${split(targeted)}</p><p class="of-n">of ${targeted.total}</p>` : '<p class="line none">No target clauses</p>'}</div></section>`
@@ -111,9 +125,8 @@ export function contractPageHtml(identity: EditionIdentity, run: RunData, contra
   const footer = `<footer class="foot"><div class="foot-brand"><a class="brand" href="/"><img src="${escape(identity.mark)}" alt="" width="28" height="28"><span>${product}</span></a><p>${escape(identity.tagline)}</p></div>`
     + `<nav aria-label="Footer">${siteLinks(run, contract)}</nav><p class="licence">${escape(run.licence)} licensed</p></footer>`
 
-  const body = `${SYMBOLS}${homepage?.html ?? header(identity, run, contract, 'contract')}<main><p class="eyebrow">Contract</p><h1>What ${product} is being built to do</h1>`
+  const body = `${SYMBOLS}${homepage?.html ?? header(identity, run, contract, 'contract')}<main><p class="eyebrow">Roadmap</p><h1>What ${product} is being built to do</h1>`
     + `<p class="lead">Every clause of the product ${product} is building toward, and how much of it the code does today. Judged from the code and tests, not from plans.</p>`
     + `${progress}<div class="layout">${kinds}${productTarget}${areaCard}${clauseCard}</div>${judging}${footer}</main>`
-  const description = `What ${identity.product} is being built to do, and how much of it the code does today: ${counts.done} of ${counts.total} clauses done, judged at ${short} on ${date}.`
-  return document({ ...identity, band: undefined }, `Contract · ${identity.product}`, description, CONTRACT_STYLE, body, CONTRACT_FILTER, homepage?.styles)
-}
+  const description = `What ${identity.product} is being built to do, and how much of it the code does today: ${counts.done} of ${counts.total} clauses done, judged on ${date}.`
+  return document({ ...identity, band: undefined }, `Roadmap · ${identity.product}`, description, CONTRACT_STYLE, body, CONTRACT_FILTER, homepage?.styles)
