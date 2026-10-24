@@ -54,7 +54,7 @@ const PAGE = 'main{max-width:1440px;margin:0 auto;padding:0 56px}'
   // All clauses: search, chips, the live line and the table.
   + '.search{position:relative;display:block;width:min(300px,100%)}.search svg{position:absolute;left:14px;top:50%;width:16px;height:16px;transform:translateY(-50%);fill:none;stroke:var(--site-body);stroke-width:1.8;stroke-linecap:round}'
   + '.search input{width:100%;min-height:40px;padding:0 16px 0 38px;border:1px solid var(--site-line);border-radius:999px;background:var(--rer-surface,#fff);color:var(--site-ink);font:400 15px var(--rer-font-body,inherit)}'
-  + '.search input::placeholder{color:var(--site-body)}.search input:focus{outline:none;border-color:color-mix(in srgb,var(--rer-focus,var(--site-ink)) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--rer-focus,var(--site-ink)) 28%,transparent)}'
+  + '.search input::placeholder{color:var(--site-body)}.search input:focus-visible{outline:3px solid var(--rer-focus,var(--site-ink));outline-offset:3px}'
   + '.chips{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}'
   + '.chips button,.clear{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:0 14px;border:1px solid var(--site-line);border-radius:999px;background:var(--rer-surface,#fff);color:var(--site-ink);font:500 14px/1 var(--rer-font-body,inherit);cursor:pointer}'
   + '.chips b{font-weight:600;font-variant-numeric:tabular-nums}.chips button[aria-pressed=true]{background:var(--site-accent);color:var(--site-accent-ink);border-color:var(--site-accent)}'
