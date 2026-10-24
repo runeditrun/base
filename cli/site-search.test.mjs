@@ -11,7 +11,6 @@ import { pathToFileURL } from 'node:url';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { siteProvider } from '../modules/deploy-kit/tests/site-provider.mjs';
 import { sitePreview } from './site-preview.mjs';
-import { freePort } from '../global/tests/harness.mjs';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
@@ -89,7 +88,7 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  const moduleBytes = provider.state.content.get(provider.state.version.id).files[0].bytes;
  const workerPath = join(directory,'published.mjs'); await writeFile(workerPath,moduleBytes);
  const {default:worker} = await import(pathToFileURL(workerPath));
- const preview = await sitePreview(join(root,'dist/site'),{ports:[await freePort()]});
+ const preview = await sitePreview(join(root,'dist/site'),{ports:[0]});
  t.after(()=>preview.close());
  const assetOrigin = `http://127.0.0.1:${preview.port}`;
  const runtime = createServer(async (req,res) => {

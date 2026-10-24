@@ -15,4 +15,11 @@ const withPublicFiles = worker => ({
   },
 });
 
-export default withDevIdentity(withPublicFiles(app), { config });
+const local = withDevIdentity(withPublicFiles(app), { config });
+export default {
+  async fetch(request, env, execution) {
+    const row = await env.DB.prepare('SELECT value FROM browser_config').first();
+    const settings = JSON.parse(row.value);
+    return local.fetch(request, { ...env, TEST_CONFIG: row.value, AUTH_ORIGIN: settings.origin }, execution);
+  },
+};

@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 
-const [mode, port, origin] = process.argv.slice(2);
+const [mode, port] = process.argv.slice(2);
+let origin;
 if (mode === 'exit') process.exit(23);
 if (mode === 'wait') {
   process.on('SIGTERM', () => {});
@@ -23,6 +24,8 @@ if (mode === 'wait') {
     else res.end('health');
   });
   server.listen(Number(port), mode === 'wide' ? '0.0.0.0' : '127.0.0.1', () => {
+    origin = `http://127.0.0.1:${server.address().port}`;
+    console.log(`RER_READY ${origin}`);
     if (mode === 'log') {
       process.stdout.write('synthetic-runtime-');
       setTimeout(() => process.stdout.write('credential token=synthetic-query-credential\n'), 20);

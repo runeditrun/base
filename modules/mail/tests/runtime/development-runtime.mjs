@@ -1,7 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Miniflare } from 'miniflare';
-import { createServer } from 'node:net';
 import { request as httpRequest } from 'node:http';
 
 const root = new URL('../../', import.meta.url);
@@ -15,14 +14,10 @@ export async function createDevelopmentRuntime(path) {
     }
   }
   await directory('src'); await add('index.mjs'); await add('tests/runtime/development-worker.mjs');
-  const probe = createServer();
-  await new Promise((resolve, reject) => { probe.once('error', reject); probe.listen(0, '127.0.0.1', resolve); });
-  const port = probe.address().port;
-  await new Promise((resolve, reject) => probe.close(error => error ? reject(error) : resolve()));
-  return new Miniflare({ host: '127.0.0.1', port, cf: false, telemetry: { enabled: false }, resourcePersistencePath: path, workers: [{ config: {
+  return new Miniflare({ host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false }, resourcePersistencePath: path, workers: [{ config: {
     type: 'worker', name: 'mail-development', compatibilityDate: '2026-09-01',
     manifest: { mainModule: 'tests/runtime/development-worker.mjs', modulesRoot: fileURLToPath(root), modules },
-    env: { DB: { type: 'd1', id: 'mail-development-outbox' }, LOCAL_ORIGIN: { type: 'text', value: `http://127.0.0.1:${port}` } },
+    env: { DB: { type: 'd1', id: 'mail-development-outbox' } },
   } }] });
 }
 

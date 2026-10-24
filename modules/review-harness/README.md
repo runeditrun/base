@@ -27,9 +27,8 @@ Chromium is launched; no fallback browser or version range is selected.
 import { startRuntime, journey, signIn } from './vendor/base/modules/review-harness/index.mjs';
 
 const runtime = await startRuntime({
-  cwd: process.cwd(), command: 'pnpm',
-  args: ['exec', 'wrangler', 'dev', '--config', 'dist/server/wrangler.json',
-    '--local', '--persist-to', '.wrangler/review', '--ip', '127.0.0.1', '--port', '{PORT}'],
+  cwd: process.cwd(), command: 'node',
+  args: ['review-server.mjs', '--port', '{PORT}'],
   logDir: '.review-logs',
   fixtures: async origin => { /* Seed-owned synthetic data, after health. */ },
 });
@@ -53,10 +52,13 @@ try {
 ```
 
 `startRuntime({cwd,command,args,env?,healthPath?,readyTimeoutMs?,logDir?,secrets?,fixtures?,signal?})`
-reserves a port on `127.0.0.1`, substitutes `{PORT}` and `{ORIGIN}` in arguments,
-and waits up to 120 seconds for a 200 health response (default `/health`). The port
-reservation closes before spawn; a competing bind fails readiness rather than
-silently selecting another origin. Pass explicit runtime bindings and synthetic
+substitutes `{PORT}` with `0`. The seed-owned launcher binds its final listener
+to port 0 on `127.0.0.1`, then prints `RER_READY http://127.0.0.1:<actual-port>`
+as a complete stdout line after reading its listening address. The harness reads
+that receipt and waits up to 120 seconds for a 200 health response (default
+`/health`), including the time spent waiting for the receipt. It never probes and
+releases a port for another process to bind. `{ORIGIN}` is no longer accepted in
+arguments: the actual origin is available to `fixtures` after readiness. Pass explicit runtime bindings and synthetic
 secrets; do not inherit production credentials. The child environment contains
 only `PATH`, `HOME`, `CI`, a private `TMPDIR`, explicit `env` extras, and the three
 enforced flags `WRANGLER_SEND_METRICS=false`, `CLOUDFLARE_INCLUDE_PROCESS_ENV=false`
@@ -69,6 +71,23 @@ An optional `AbortSignal` cancels health checks and fixtures and stops the owned
 group. Fixtures receive `(origin, signal)` so seed-owned work can cooperate.
 Readiness also probes the host's non-loopback IPv4 interfaces and refuses a
 command that exposes the selected port there; the host must permit that check.
+
+A Node HTTP launcher emits the receipt in its `listen` callback:
+
+```js
+server.listen(0, '127.0.0.1', () => {
+  console.log(`RER_READY http://127.0.0.1:${server.address().port}`);
+});
+```
+
+For Miniflare, set `host: '127.0.0.1', port: 0` and print the origin from
+`await runtime.ready`. A Wrangler launcher must obtain the final address from
+Wrangler's readiness output and emit the same receipt. Configure test-only origin
+bindings after allocation without restarting ingress; a fixture can store its
+explicit origin in test D1 configuration. If the Worker needs a stable logical
+origin, its test transport can set an explicit `Host` header while workerd owns
+an independent port-0 listener. Do not pass an address from a closed probe or
+restart an ephemeral listener on its earlier port.
 
 `signIn(page,{origin,open,timeoutMs?,signal?})` opens the seed's oneclick URL.
 `open` can be a same-origin URL string or `URL`, or a callback `(page, signal)`
@@ -198,13 +217,15 @@ directory used by the Worker, with the seed's actual database name:
 
 ```sh
 pnpm exec wrangler d1 migrations apply DB --config dist/server/wrangler.json --local --persist-to .wrangler/review
-pnpm exec wrangler dev --config dist/server/wrangler.json --local --persist-to .wrangler/review --ip 127.0.0.1 --port PORT
 ```
 
-In launcher arguments use `{PORT}` instead of `PORT`. Configure local auth and
-dev identity explicitly, for example Wrangler `--var AUTH_ORIGIN:{ORIGIN}`
-and `--var AUTH_LOCAL:true`, plus the seed's
-own required synthetic owner/session bindings. The harness intentionally disables
+Start the Worker through a seed-owned launcher that binds port 0 on
+`127.0.0.1` and emits the `RER_READY` receipt described above. In launcher
+arguments use `{PORT}` for the allocation request. Configure local auth and
+dev identity explicitly, including the seed's synthetic owner/session bindings.
+When auth requires the browser origin, store the receipt's actual origin through
+the seed's test configuration after allocation, without restarting ingress.
+The harness intentionally disables
 implicit `.env` binding loads. Fixtures run against the healthy Worker; they never
 enter a product build. Build and migrations are preparation steps, not fixtures.
 
@@ -251,10 +272,8 @@ Create the seed-owned `review.config.mjs` (named exports also work):
 ```js
 export default {
   start: {
-    cwd: '.', command: 'pnpm',
-    args: ['exec', 'wrangler', 'dev', '--config', 'dist/server/wrangler.json',
-      '--local', '--persist-to', '.wrangler/review', '--ip', '127.0.0.1', '--port', '{PORT}',
-      '--var', 'AUTH_ORIGIN:{ORIGIN}', '--var', 'AUTH_LOCAL:true'],
+    cwd: '.', command: 'node',
+    args: ['review-server.mjs', '--port', '{PORT}'],
     // Add this seed's explicit synthetic bindings before running.
   },
   fixtures: async origin => { /* Seed-owned synthetic setup. */ },
