@@ -1,11 +1,10 @@
 import { createServer } from 'node:net'
 
-// A port the OS hands out and the test releases can be taken before the runtime
-// binds it: by a parallel test file, or by any process's outgoing connection in
-// the ephemeral range. So a port is never handed out twice in this process, and
-// a start that still loses the race is retried on a fresh port.
+// Only the documented rer setup/dev journey still needs an explicit port:
+// its public startup contract does not accept zero. This availability snapshot
+// is not a reservation. Standalone runtimes must bind zero themselves instead;
+// see worker-listener.mjs. Remove this with the ephemeral CLI contract change.
 const handedOut = new Set()
-
 export async function freePort() {
   for (;;) {
     const server = createServer()
@@ -13,17 +12,6 @@ export async function freePort() {
     const { port } = server.address()
     await new Promise((resolve) => server.close(resolve))
     if (!handedOut.has(port)) { handedOut.add(port); return port }
-  }
-}
-
-export const addressInUse = (error) => [error, error?.cause].some((value) =>
-  value?.code === 'ERR_ADDRESS_IN_USE' || value?.code === 'EADDRINUSE' || /ERR_ADDRESS_IN_USE|EADDRINUSE|address already in use/i.test(value?.message ?? ''))
-
-// Runs start(port) on a free port; if the port was taken before the runtime bound
-// it, runs it again on a fresh one. Any other failure surfaces at once.
-export async function startOnFreePort(start, attempts = 8) {
-  for (let attempt = 1; ; attempt++) {
-    try { return await start(await freePort()) } catch (error) { if (!addressInUse(error) || attempt >= attempts) throw error }
   }
 }
 

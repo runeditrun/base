@@ -101,20 +101,19 @@ export const json = async response => ({ status: response.status, body: await re
 // A real HTTP listener for browser journeys: the same app on a loopback origin.
 export async function browserRuntime(t, makeSetup) {
   const directory = await mkdtemp(join(tmpdir(), 'oidc-browser-'));
-  const options = (port, setup) => ({ ...convertV4MiniflareOptions({ host: '127.0.0.1', port, modules: true, cf: false, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01',
+  const options = setup => ({ ...convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, modules: true, cf: false, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01',
     d1Databases: { DB: 'fake-provider-browser-db' }, bindings: { TEST_SETUP: JSON.stringify({ ...setup, keys: JSON.parse(KEY_JSON) }) } }), resourcePersistencePath: join(directory, 'state') });
-  let mf = new Miniflare(options(0, makeSetup('http://127.0.0.1')));
+  const mf = new Miniflare(options(makeSetup('http://127.0.0.1')));
   t.after(async () => { await mf.dispose(); await rm(directory, { recursive: true, force: true }); });
   const address = await mf.ready;
   const origin = address.origin;
-  // Bind the app to its actual listener before any request.
-  await mf.setOptions(options(Number(address.port), makeSetup(origin)));
-  await mf.ready;
   const db = await mf.getD1Database('DB');
   await applySql(db, await read('../../../accounts/schema/operator-auth.sql'));
   await applySql(db, await read('../schema/oidc.sql'));
   await db.prepare('INSERT INTO oa_auth_settings(singleton,idp_sign_in) VALUES(1,1)').run();
   for (const sql of ['CREATE TABLE fixture_grants(code TEXT PRIMARY KEY, issuer TEXT NOT NULL, payload TEXT NOT NULL)', 'CREATE TABLE fixture_state(key TEXT PRIMARY KEY, value TEXT NOT NULL)', 'CREATE TABLE test_mail(id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL)', 'CREATE TABLE fixture_hook_calls(session_id TEXT NOT NULL, method TEXT NOT NULL)', 'CREATE TABLE fixture_requests(id INTEGER PRIMARY KEY AUTOINCREMENT, issuer TEXT NOT NULL, uri TEXT NOT NULL)']) await db.prepare(sql).run();
+  // Store the explicitly chosen fixture origin after ingress binds, without a restart.
+  await db.prepare('INSERT INTO fixture_state(key,value) VALUES(?,?)').bind('browserSetup', JSON.stringify({ ...makeSetup(origin), keys: JSON.parse(KEY_JSON) })).run();
   const post = async (path, input) => { const response = await fetch(`${origin}${path}`, { method: 'POST', redirect: 'manual', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(input) }); return response; };
   return { origin, db, post,
     async link() { const row = await db.prepare('SELECT message FROM test_mail ORDER BY id DESC LIMIT 1').first(); return new URL(JSON.parse(row.message).text.match(/https?:\/\/\S+/)[0]); },

@@ -22,19 +22,20 @@ export async function browserRuntime(branding = { productName: 'Gate Test', them
   const directory = await mkdtemp(join(tmpdir(), 'operator-auth-dev-browser-'));
   const config = { origin: 'http://127.0.0.1', local: true, OWNER_EMAIL: OWNER, SESSION_SECRET: SECRET,
     MAIL_FROM: 'auth@example.com', ipLimit: 1000, emailLimit: 1000, branding };
-  const options = (port = 0) => ({
-    ...convertV4MiniflareOptions({ host: '127.0.0.1', port, modules: true, script: output.outputFiles[0].text,
+  const options = {
+    ...convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, modules: true, script: output.outputFiles[0].text,
       compatibilityDate: '2026-09-01', d1Databases: { DB: 'dev-browser-auth' },
       bindings: { TEST_CONFIG: JSON.stringify(config), RER_DEV_KEY: DEV_KEY, AUTH_ORIGIN: config.origin, AUTH_LOCAL: 'true' } }),
     resourcePersistencePath: join(directory, 'state'),
-  });
-  const mf = new Miniflare(options());
+  };
+  const mf = new Miniflare(options);
   try {
     const address = await mf.ready;
     config.origin = address.origin;
-    await mf.setOptions(options(Number(address.port)));
-    await mf.ready;
+    // Publish trusted fixture configuration through D1 without restarting ingress.
     const db = await mf.getD1Database('DB');
+    await db.exec('CREATE TABLE browser_config (value TEXT NOT NULL);');
+    await db.prepare('INSERT INTO browser_config(value) VALUES(?)').bind(JSON.stringify(config)).run();
     await applySql(db, await read('../accounts/schema/operator-auth.sql'));
     await db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('owner',?,'Owner','owner','active',1)").bind(OWNER).run();
     return { origin: config.origin, db,
