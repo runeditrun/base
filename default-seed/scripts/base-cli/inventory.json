@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5d1d2024",
+  "cliVersion": "0.2.79-dev.gfa8fedef",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -991,7 +991,7 @@
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "7867534bb22d02615d6c361e27a1e99ff3aa6a2a112da557ff787bab45fa2dbe"
+      "sha256": "a6a76c05fe5d0bb3e1c203aa293e514d9bc47e19bfea4a1c5819dec8a6e3ad3f"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",

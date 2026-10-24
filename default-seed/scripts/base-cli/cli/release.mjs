@@ -2,15 +2,14 @@ import { releaseVerb } from './contract.mjs';
 import { parseTimeoutSeconds, timeoutBounds } from '../scripts/publish-check/timeout.mjs';
 
 // Preserve release's accepted parser, producer, receipt and validation exits.
-const releaseHelp = `Usage: rer release --repo DIR --project PUBLISHER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
+const releaseHelp = `Usage: rer release --repo DIR --project OWNER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
 
 Produce local artifacts using the exact source commit's green GitHub Verify,
 frozen installation, local build and publication checks.
 Without --tag, write a preview. This command never pushes, uploads or deploys.
 
   --repo DIR             Source Git repository.
-  --project PUBLISHER/NAME
-                         Publishing identity.
+  --project OWNER/NAME   Project identity recorded by the edition.
   --repository GITHUB_URL
                          Credential-free https://github.com/<owner>/<repository> destination.
   --output NEW_DIR       New output directory outside the source repository.
@@ -47,6 +46,7 @@ Signing and receipt commands:
     [--unsigned-through PROJECT:VERSION ...]
 
 Signing scope defaults to rer; receipt environment defaults to production.
+Signing publisher defaults to the project prefix; use --publisher for a different publisher.
 Key generation requires non-terminal stdout; --key-stdin requires non-terminal stdin.
 `;
 
