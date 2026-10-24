@@ -65,7 +65,21 @@ for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real W
  if(kind==='foundation'){assert.ok(settings.includes(Buffer.from('WORKSPACE_TITLE="Manifest workspace"')),'declared public answer saved');assert.ok(settings.includes(Buffer.from('CONNECTION_PASSWORD=fixture-connection-passphrase')),'entered manifest secret saved privately');}
 assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const description=JSON.parse((await f.run(['describe','--json'])).stdoutText);assert.ok(description.verbs.dev.flags.includes('--port'));
- await f.run(['doctor','--json'],3);assert.ok(settings.equals(await readFile(join(f.root,'.dev.vars'))),'inspection preserves settings');
+ // Setup is locally healthy without the optional Cloudflare deployment inputs.
+ const healthyDoctor=events(await f.run(['doctor','--json'])).at(-1);
+ assert.equal(healthyDoctor.diagnostics.ok,true);
+ assert.deepEqual(healthyDoctor.diagnostics.missingInputs,[]);
+ assert.ok(settings.equals(await readFile(join(f.root,'.dev.vars'))),'inspection preserves settings');
+ // A missing local owner remains a real failure, including after a real install.
+ const incompleteSettings=Buffer.from(settings.toString().replace(/^OWNER_EMAIL=.*(?:\r?\n|$)/m,''));
+ assert.ok(!incompleteSettings.equals(settings),'remove the saved owner from the fixture');
+ try {
+  await writeFile(join(f.root,'.dev.vars'),incompleteSettings,{mode:0o600});
+  const missingOwner=events(await f.run(['doctor','--json'],3)).at(-1);
+  assert.equal(missingOwner.diagnostics.ok,false);
+  assert.ok(missingOwner.diagnostics.missingInputs.includes('OWNER_EMAIL'));
+  assert.ok(incompleteSettings.equals(await readFile(join(f.root,'.dev.vars'))),'failed inspection preserves settings');
+ } finally {await writeFile(join(f.root,'.dev.vars'),settings,{mode:0o600});}
  await f.run(['setup','--owner-email','other-owner@example.test','--non-interactive','--json'],4);
  await f.data('CREATE TABLE cli_reset_probe (value TEXT); INSERT INTO cli_reset_probe VALUES (\'prior owner content\');');
  const repeatedSetup=f.launch(['scripts/rer.mjs','setup','--non-interactive'],process.execPath,{CI:'false'});
