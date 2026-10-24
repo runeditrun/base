@@ -22,7 +22,8 @@ const HEADER = new Set([...CONTROL, 'switch', 'catch']);
 // What a slash after the closing brace means, by what the brace opened.
 const BODY_SLASH = {'{': 'either', block: 'regex', object: 'div', 'body-expression': 'div', 'body-statement': 'regex', 'body-unknown': 'either'};
 const BRACES = new Set(Object.keys(BODY_SLASH));
-const OPERAND_WORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'void', 'delete', 'throw', 'new', 'case', 'extends', 'await', 'yield']);
+// Words after which an expression, not a statement, must follow.
+const OPERAND_WORDS = new Set([...BEFORE_EXPRESSION].filter(word => !['do', 'else', 'default', 'try', 'finally'].includes(word)).concat('await', 'yield'));
 const BLOCK_WORDS = new Set(['else', 'try', 'finally', 'do', 'with', 'catch', 'export']);
 // Whether a `function` or `class` after this token is an expression, a statement,
 // or cannot be told apart from the token alone.

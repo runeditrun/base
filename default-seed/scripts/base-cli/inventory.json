@@ -1187,7 +1187,7 @@
     },
     "edition-authoring/js-tokens.mjs": {
       "source": "edition-authoring/js-tokens.mjs",
-      "sha256": "addbff754755e4b9816895fd9ea4292c6a281fbcbc13a8846078e5845307372a"
+      "sha256": "05203e1e1702961f7ffcf3263efb22e0aab162d126d05cf8698b18d3b64f43dc"
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
