@@ -7,7 +7,7 @@ import { checkoutRepository } from '../cli/repository.mjs';
 import { ownManifest, ownRoot } from '../package-info.mjs';
 import { prepare } from '../launch/prepare.mjs';
 import { launchDirectory } from '../launch/state.mjs';
-import { failure } from './error.mjs';
+import { failure, errorCodes } from './error.mjs';
 import { run } from './process.mjs';
 
 export async function setupRelease({ repository, commit, dir, ownerEmail, onPhase, anchors } = {}) {
@@ -68,7 +68,7 @@ export async function setupRelease({ repository, commit, dir, ownerEmail, onPhas
   await emit('ready', 4);
   return { outcome: 'ready', release_commit: release.commit, release_tag: release.tag, rer_version: ownManifest().version };
  } catch (error) {
-  const code = typeof error.error_code === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(error.error_code)
+  const code = errorCodes.has(error?.error_code)
    ? error.error_code : phase === 'install' ? 'install_failed' : phase === 'database' ? (error.exitCode === 3 ? 'needs_input' : 'database_failed') : phase === 'start' ? 'start_failed' : 'get_failed';
   await emit('failed', step, code);
   throw failure(code);
