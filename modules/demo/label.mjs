@@ -30,6 +30,6 @@ export async function decorateLabel(response, mode, exit = import.meta.rerDemo) 
     const base = title.replace(/\s*(?:Demo|Dev)$/, '');
     return `${open}${base ? `${base} ` : ''}${suffix}${close}`;
   });
-  const body = /<\/head\s*>/i.test(titled) ? titled.replace(/<\/head\s*>/i, `${addition}</head>`) : addition + titled;
+  const body = /<\/head\s*>/i.test(titled) ? titled.replace(/<\/head\s*>/i, () => `${addition}</head>`) : addition + titled;
   return new Response(body, { status: response.status, statusText: response.statusText, headers });
 }
