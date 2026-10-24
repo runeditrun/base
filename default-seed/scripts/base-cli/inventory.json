@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gf7638307",
+  "cliVersion": "0.2.79-dev.g02c33ae1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -651,7 +651,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "063e5511842e0a9ffa759a20df73751097adb23bcf555b0be6b8ce99a19eb282"
+      "sha256": "9b1b0dbd375a311a07d60b6cde973c4a3e1584ff26da4655008ae23977959624"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -803,7 +803,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "bef71c95e729809500e8d539565c1838f009080a85aa3ff0fb03e12690b28797"
+      "sha256": "bfc18610482e9a8811c287cc7880255d8eb11b81cf683b378513c2c309a877fc"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1155,7 +1155,7 @@
     },
     "edition-authoring/adopt.mjs": {
       "source": "edition-authoring/adopt.mjs",
-      "sha256": "22a9fb159e15f44832b5a5efc0d4aba67d5ea14db3d17f6f19bd7a7cf910200e"
+      "sha256": "c9cf80207b5f14164ce18cce63e08e0fcbb254d93b66263911ba74cdd4079c8f"
     },
     "edition-authoring/base-acknowledgements.mjs": {
       "source": "edition-authoring/base-acknowledgements.mjs",
@@ -1163,15 +1163,19 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "96989b9f55878fa2d6f4f92d9b499f1a4998d7a0bf1083f8279d554e39e05442"
+      "sha256": "bcd240ebbe52adfdd58255b34ee27ab3ff118bc24bdfe7b1803c1a883ce85279"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
       "sha256": "ea39cb9b8c101a446d6fdf023866bb2c86965926f316f6030a0394f1cffeaf17"
     },
+    "edition-authoring/copy-checkout.mjs": {
+      "source": "edition-authoring/copy-checkout.mjs",
+      "sha256": "7b7fff83e2cc90f4b7a1f83673ea1d77d02704377ada4e13164d9ec74e83ba00"
+    },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
-      "sha256": "eb0b8a0b9958c4ed84735d85f5298f3d1307ef60ddee1c2a3329c6ed7af0902e"
+      "sha256": "9dfb5940c9b793cca5ddf9556b756c81046a371a16a10c5b869487172a6c25ae"
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
@@ -1180,6 +1184,10 @@
     "edition-authoring/manifest.mjs": {
       "source": "edition-authoring/manifest.mjs",
       "sha256": "0c93bd39b1dd869b23a9d2727671fe8f9c933a9d56c7a3df1ba83c4a6f816e7b"
+    },
+    "edition-authoring/offline-git.mjs": {
+      "source": "edition-authoring/offline-git.mjs",
+      "sha256": "ef86d89a1c7df9fef306b24032629c2e8e60b589376ccddbe9b4e3c91d11543c"
     },
     "edition-authoring/parent-comparison.mjs": {
       "source": "edition-authoring/parent-comparison.mjs",

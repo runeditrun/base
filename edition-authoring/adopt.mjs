@@ -27,12 +27,13 @@ export function adoptEdition(root) {
     const put = (name, value) => { writeTree(root, {[name]: {data: Buffer.from(json(value)).toString('base64'), executable: false}}); created.push(name); };
     put('edition.json', recipe);
     if (!hasRecord) put('base-copies.json', {schemaVersion: 1, copies: []});
-    const additional = !hasRecord ? {'base-copies.json': {data: fs.readFileSync(path.join(root, 'base-copies.json')).toString('base64'), executable: false}} : {};
+    const record = path.join(root, 'base-copies.json');
+    const additional = {'base-copies.json': {data: fs.readFileSync(record).toString('base64'), executable: !!(fs.statSync(record).mode & 0o111)}};
     put('sources.lock.json', resolveSources(root, false, false, additional));
   } catch (error) {
     for (const name of created) fs.rmSync(path.join(root, name));
     throw error;
   }
   return {adopted: id, created, record: 'base-copies.json', preservedCopyRecord: hasRecord,
-    next: 'Review git diff and git status; stage edition.json, sources.lock.json and any new base-copies.json. Existing copy and composition provenance is preserved. An empty copy record claims no Base copies; record known copies before refreshing. Run the edition tests before committing.'};
+    next: 'Review git diff and git status; stage edition.json, sources.lock.json and any untracked base-copies.json. Existing copy and composition provenance is preserved. An empty copy record claims no Base copies; record known copies before refreshing. Run the edition tests before committing.'};
 }
