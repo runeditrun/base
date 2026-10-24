@@ -11,9 +11,9 @@ test('demo decoration keeps singular titles and its run exit through client navi
   const server = createServer(async (request, response) => {
     const url = new URL(request.url!, 'http://localhost');
     const title = url.searchParams.has('title') ? `<title>${url.searchParams.get('title')}</title>` : '';
-    const decorated = await decorateLabel(new Response(`<head>${title}</head><body><nav><a href="/app" data-rer-name>Workspace</a></nav></body>`, {
-      headers: { 'content-type': 'text/html', 'content-security-policy': "default-src 'none'; script-src 'none'; style-src 'none'" },
-    }), url.searchParams.get('mode'), { name: 'Example', url: 'https://run-example.test/run' });
+    const decorated = await decorateLabel(new Response(`<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width">${title}</head><body><nav><a href="/app" data-rer-name>Workspace</a></nav></body></html>`, {
+      headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'none'; style-src 'none'" },
+    }), url.searchParams.get('mode'), { name: url.searchParams.get('name') ?? 'Example', url: 'https://run-example.test/run' });
     response.writeHead(decorated.status, Object.fromEntries(decorated.headers));
     response.end(await decorated.text());
   });
@@ -23,6 +23,17 @@ test('demo decoration keeps singular titles and its run exit through client navi
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const origin = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`;
+    for (const name of ['Revenue $&', "Revenue $'", 'Revenue $`', 'Revenue $$', '<img src=x onerror="window.__G16=1">', 'Revenue "quoted"', "Revenue 'quoted'", '収益 café 🧭']) {
+      await page.goto(`${origin}/?${new URLSearchParams({ mode: 'Demo', name })}`);
+      const exits = page.locator('[data-rer-demo-exit]');
+      await exits.waitFor();
+      assert.equal(await exits.count(), 1);
+      assert.ok((await exits.textContent())?.endsWith(name), 'accepted product names remain literal text');
+      assert.equal(await exits.getAttribute('href'), 'https://run-example.test/run');
+      assert.equal(await page.locator('style[data-rer-label]').getAttribute('data-rer-product'), name);
+      assert.equal(await page.locator('img, [onerror]').count(), 0, 'names cannot create markup or event handlers');
+      assert.equal(await page.evaluate(() => (window as any).__G16), undefined);
+    }
     const cases: [string | null, string][] = [[null, ''], ['', ''], ['Demo', ''], ['Dev', ''], [' Demo', ''], ['\tDev', ''], ['Workspace', 'Workspace'], ['Workspace\tDemo', 'Workspace'], ['Workspace\nDev', 'Workspace']];
     for (const mode of ['Demo', 'Dev']) {
       for (const [input, base] of cases) {

@@ -80,7 +80,10 @@ Production build/deploy refuses `RER_DEMO` in declarations or settings.
    also adds a Run link beside that label, using the existing link and theme tokens.
    `demoSockets()` supplies its public name and URL from `deploy-demo.json`
    (`name` and optional `runUrl`), plus the existing run-site declaration's domain
-   (`deploy-site.json` in Vite), in local demos and hosted builds.
+   (the command adapter's `site.declaration`, normally `deploy-site.json`),
+   in local demos and hosted builds. Both refuse invalid `runUrl` destinations
+   before rendering; only HTTPS `/run` URLs without credentials, queries or
+   fragments are accepted.
    Local-only demos use the same declaration; no hosting credentials are needed.
 
 Add `.rer/demo/` to `.gitignore`. Run `rer demo`, open `RER_OPEN`, and try a
