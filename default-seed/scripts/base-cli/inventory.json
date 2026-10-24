@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g8f846a3e",
+  "cliVersion": "0.2.79-dev.g69ea5653",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2631,7 +2631,7 @@
     },
     "modules/job-queue/processes.mjs": {
       "source": "modules/job-queue/processes.mjs",
-      "sha256": "a04150fccd446df8874c119aa4f66e8f23c4fc02d2ac5a30ddfb923e249d0d62"
+      "sha256": "eb6f558999435d58488f40f697f49a56a1ba092a00693129fbbf355d7153bd52"
     },
     "modules/job-queue/resources.mjs": {
       "source": "modules/job-queue/resources.mjs",

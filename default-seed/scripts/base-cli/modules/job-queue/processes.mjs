@@ -11,7 +11,7 @@ export async function processInfo(pid, { bound } = {}) {
   if (!bound) return lookUp(pid);
   let timer;
   try {
-    return await Promise.race([lookUp(pid, bound), new Promise((resolve, reject) => {
+    return await Promise.race([lookUp(pid, bound), new Promise((_resolve, reject) => {
       timer = setTimeout(() => reject(Object.assign(Error(`Process inspection did not answer within ${bound} ms`), { code: 'ETIMEDOUT' })), bound + 250);
     })]);
   } finally { clearTimeout(timer); }
