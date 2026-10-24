@@ -46,7 +46,9 @@ recorded dependencies must remain present. Unrecorded imports outside that origi
 missing, deleted or kept-out dependencies, adapted importers with missing
 dependencies, and destination collisions refuse before any writes and name exact
 `record-base` commands for explicit reconciliation. Existing adapted files are
-retained unchanged.
+retained unchanged. Import text inside strings, templates, regular expressions
+and comments is not an import. A file whose imports cannot be established, such
+as one with JSX or an ambiguous slash, refuses instead of being guessed.
 
 Use the immutable full commit behind the release tag. Base-checkout form:
 

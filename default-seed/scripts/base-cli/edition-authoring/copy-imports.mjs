@@ -3,48 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {safe, noLinks} from './files.mjs';
+import {staticImports} from './static-imports.mjs';
 
 const within = (name, directory) => directory === '.' || name.startsWith(directory + '/');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 const javascript = name => /\.(?:mjs|cjs|js)$/.test(name);
-
-// Consume comments, literals (including regular expressions) and punctuation so
-// import-looking text in documentation or strings is not treated as a module.
-function specifiers(bytes) {
-  const tokens = [], text = bytes.toString('utf8');
-  let expression = true;
-  for (let i = 0; i < text.length;) {
-    const rest = text.slice(i);
-    const trivia = /^(?:\s+|\/\/[^\n]*|\/\*[\s\S]*?\*\/)/.exec(rest);
-    if (trivia) { i += trivia[0].length; continue; }
-    const literal = /^(["'`])(?:\\[\s\S]|(?!\1)[^\\])*?\1/.exec(rest);
-    if (literal) { tokens.push(literal[0]); i += literal[0].length; expression = false; continue; }
-    // A division operator must not consume an import later on the same line.
-    const regex = expression && /^\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n])+\/[a-z]*/.exec(rest);
-    if (regex) { tokens.push(regex[0]); i += regex[0].length; expression = false; continue; }
-    const token = /^[\w$]+|^[^\s]/.exec(rest)[0];
-    tokens.push(token); i += token.length;
-    expression = /^(?:return|throw|case|delete|void|typeof|yield|await|new)$/.test(token) || !/^(?:[\w$]+|[)\]])$/.test(token);
-  }
-  const imports = [];
-  const string = token => token && /^["']/.test(token);
-  for (let i = 0; i < tokens.length; i++) {
-    if (!['import', 'export'].includes(tokens[i]) || tokens[i - 1] === '.') continue;
-    if (tokens[i] === 'export' && !['*', '{'].includes(tokens[i + 1])) continue;
-    let literal;
-    if (tokens[i] === 'import' && string(tokens[i + 1])) literal = tokens[i + 1];
-    else if (tokens[i + 1] !== '(' && tokens[i + 1] !== '.') {
-      for (let j = i + 1; j < tokens.length && ![';', 'import', 'export'].includes(tokens[j]); j++) {
-        if (tokens[j] === 'from' && string(tokens[j + 1])) { literal = tokens[j + 1]; break; }
-      }
-    }
-    if (!literal) continue;
-    const value = literal.slice(1, -1).replace(/\\(?:u\{([a-f\d]+)\}|u([a-f\d]{4})|x([a-f\d]{2})|(\r?\n)|([\s\S]))/gi,
-      (_, point, unicode, hex, newline, character) => point || unicode || hex ? String.fromCodePoint(parseInt(point || unicode || hex, 16)) : newline ? '' : ({n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', '0': '\0'}[character] ?? character));
-    if (value.startsWith('./') || value.startsWith('../')) imports.push(value);
-  }
-  return imports;
-}
 
 export function closeImports({root, record, recordPath, plans, next, read, revision, local, files}) {
   const adopted = [], problems = new Set(), queue = [], scheduled = new Map();
@@ -68,7 +31,10 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
   }
   for (let i = 0; i < queue.length; i++) {
     const importer = queue[i];
-    for (const specifier of specifiers(importer.bytes)) {
+    let specifiers;
+    try { specifiers = staticImports(importer.bytes.toString('utf8')).filter(value => value.startsWith('./') || value.startsWith('../')); }
+    catch (error) { problems.add(`${importer.name}: cannot establish its static imports (${error.message}); refresh will not guess. Simplify the construct in Base, or adopt the edition with rer adopt-edition.`); continue; }
+    for (const specifier of specifiers) {
       let source, name;
       try {
         source = path.posix.relative('/repository', fileURLToPath(new URL(specifier, pathToFileURL('/repository/' + importer.source))));

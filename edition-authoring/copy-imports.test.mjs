@@ -27,7 +27,8 @@ function fixture(t) {
 
 test('per-file refresh records a transitive runnable module set and repeats without drift', t => {
   const {base, seed, run} = fixture(t);
-  write(base, 'tools/main.mjs', "import './side.mjs'; import {value} from './lib/helper.mjs'; console.log(value);\n");
+  // Lexical traps around real imports: postfix operators before a slash, a regular expression and nested templates holding import text.
+  write(base, 'tools/main.mjs', "let n = 2; n++ / 2; if (n) /import '.\\/ghost.mjs'/.test('x');\nconst text = `outer ${`inner import './ghost.mjs'`}`;\nimport './side.mjs'; import {value} from './lib/helper.mjs'; console.log(value, text.length > 0);\n");
   write(base, 'tools/lib/helper.mjs', "export {value} from './value.mjs';\n");
   write(base, 'tools/lib/value.mjs', 'export const value = 42;\n');
   write(base, 'tools/side.mjs', 'globalThis.authoringReady = true;\n');
@@ -36,7 +37,7 @@ test('per-file refresh records a transitive runnable module set and repeats with
   assert.equal(JSON.parse(refresh.stdout).adopted.length, 3);
   const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
   assert.equal(execution.status, 0, execution.stderr);
-  assert.equal(execution.stdout.trim(), '42');
+  assert.equal(execution.stdout.trim(), '42 true');
   assert.equal(run('verify-base').status, 0);
   const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
   assert.equal(run('refresh-base', revision).status, 0);

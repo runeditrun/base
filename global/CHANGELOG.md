@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep per-file vendored authoring scripts runnable across `refresh-base`: refresh follows each recorded script's static relative imports, adopts missing helpers inside the copied origin directory (reported as `adopted`), and refuses before any write for unresolvable imports. Imports are read with a complete JavaScript tokenizer, so a postfix operator before a division or import text inside nested templates, regular expressions and comments is never mistaken for an import, and a file whose imports cannot be established refuses instead of being guessed.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.
