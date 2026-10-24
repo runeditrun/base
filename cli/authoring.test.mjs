@@ -48,34 +48,40 @@ async function fixture(t) {
 }
 
 test('a package-pinned seed adopts authoring and refreshes through the packed public commands', async t => {
- const {seed, source, revision, result, old} = await fixture(t);
- const record = fs.readFileSync(path.join(seed, 'base-copies.json')), historical = fs.readFileSync(path.join(seed, 'composition.lock.json'));
- const adopted = result('adopt-edition');
- assert.equal(adopted.adopted, 'example/seed');
- assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
- assert.deepEqual(fs.readFileSync(path.join(seed, 'composition.lock.json')), historical);
- git(seed, 'add', 'edition.json', 'sources.lock.json');
- assert.equal(old('check').ok, true, 'the shipped authoring CLI accepts the adoption lock');
- const description = result('describe');
- // describe returns one document, rather than the event protocol.
- assert.ok(description.verbs['adopt-edition']); assert.ok(description.verbs['refresh-base']);
- assert.equal(checkoutBootstrap(['adopt-edition']), 'before');
- assert.equal(checkoutBootstrap(['refresh-base']), 'before');
- assert.equal(checkoutBootstrap(['adopt-edition', '--help']), 'never');
- fs.rmSync(path.join(seed, 'one.mjs'));
- fs.rmSync(path.join(seed, 'vendor/two.mjs'));
- write(source, 'module/one.mjs', 'export const one = 2;\n');
- const next = commit(source), refreshed = result('refresh-base', '--ref', next);
- assert.deepEqual(refreshed.retired, ['one.mjs']);
- assert.ok(refreshed.copies.find(c => c.path === 'one.mjs').removed.includes('one.mjs'));
- assert.equal(fs.existsSync(path.join(seed, 'one.mjs')), false);
- assert.equal(fs.existsSync(path.join(seed, 'vendor/two.mjs')), false);
- assert.equal(fs.readFileSync(path.join(seed, 'vendor/one.mjs'), 'utf8'), 'export const one = 2;\n');
- assert.equal(old('verify-base', '--base', source).ok, true);
- const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
- assert.deepEqual(result('refresh-base', '--ref', next, '--base', source, '--offline').retired, []);
- assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
- assert.notEqual(revision, next);
+ for (const untrackedRecord of [false, true]) {
+  const {seed, source, revision, result, old} = await fixture(t);
+  if (untrackedRecord) {
+   git(seed, 'rm', '--cached', 'base-copies.json');
+   fs.chmodSync(path.join(seed, 'base-copies.json'), 0o755);
+  }
+  const record = fs.readFileSync(path.join(seed, 'base-copies.json')), historical = fs.readFileSync(path.join(seed, 'composition.lock.json'));
+  const adopted = result('adopt-edition');
+  assert.equal(adopted.adopted, 'example/seed');
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'composition.lock.json')), historical);
+  git(seed, 'add', 'edition.json', 'sources.lock.json', 'base-copies.json');
+  assert.equal(old('check').ok, true, 'the shipped authoring CLI accepts the adoption lock');
+  const description = result('describe');
+  // describe returns one document, rather than the event protocol.
+  assert.ok(description.verbs['adopt-edition']); assert.ok(description.verbs['refresh-base']);
+  assert.equal(checkoutBootstrap(['adopt-edition']), 'before');
+  assert.equal(checkoutBootstrap(['refresh-base']), 'before');
+  assert.equal(checkoutBootstrap(['adopt-edition', '--help']), 'never');
+  fs.rmSync(path.join(seed, 'one.mjs'));
+  fs.rmSync(path.join(seed, 'vendor/two.mjs'));
+  write(source, 'module/one.mjs', 'export const one = 2;\n');
+  const next = commit(source), refreshed = result('refresh-base', '--ref', next);
+  assert.deepEqual(refreshed.retired, ['one.mjs']);
+  assert.ok(refreshed.copies.find(c => c.path === 'one.mjs').removed.includes('one.mjs'));
+  assert.equal(fs.existsSync(path.join(seed, 'one.mjs')), false);
+  assert.equal(fs.existsSync(path.join(seed, 'vendor/two.mjs')), false);
+  assert.equal(fs.readFileSync(path.join(seed, 'vendor/one.mjs'), 'utf8'), 'export const one = 2;\n');
+  assert.equal(old('verify-base', '--base', source).ok, true);
+  const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  assert.deepEqual(result('refresh-base', '--ref', next, '--base', source, '--offline').retired, []);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+  assert.notEqual(revision, next);
+ }
 });
 
 test('packed authoring preserves source and provenance on invalid adoption and refresh refusal', async t => {

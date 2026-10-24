@@ -9,9 +9,9 @@ export function git(root, ...args) {
   return execFileSync('git', ['-C', root, ...args], {env: environment, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
 }
 // Raw Git output, for committed source bytes. The limit fails explicitly rather than truncating.
-function output(root, args, input) {
+function output(root, args, input, offline = false) {
   try {
-    return execFileSync('git', ['-C', root, ...args], {env: environment, input, maxBuffer: 64 * 1024 * 1024, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe']});
+    return execFileSync('git', ['-C', root, ...(offline ? ['--no-lazy-fetch', '-c', 'fetch.negotiationAlgorithm=noop'] : []), ...args], {env: offline ? {...environment, GIT_NO_LAZY_FETCH: '1'} : environment, input, maxBuffer: 64 * 1024 * 1024, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe']});
   } catch (error) {
     if (error.code === 'ENOBUFS') throw Error('Git source output exceeds the 64 MiB acquisition limit');
     throw error;
@@ -19,6 +19,18 @@ function output(root, args, input) {
 }
 export const raw = (root, ...args) => output(root, args);
 export const batch = (root, input, ...args) => output(root, args, input);
+// Scope offline object access to this repository reader, never global state.
+// Git versions without --no-lazy-fetch fail before attempting any acquisition.
+export function gitReader(root, offline = false) {
+  const read = (args, input) => {
+    try { return output(root, args, input, offline); }
+    catch (error) {
+      if (offline) throw Error('Cannot read local Base objects offline. Offline reads require Git supporting --no-lazy-fetch. When online, run rer refresh-base --ref <commit> --base <base-checkout> without --offline to acquire missing objects, then retry offline. No copy record was changed.');
+      throw error;
+    }
+  };
+  return {git: (...args) => read(args).toString('utf8').trim(), raw: (...args) => read(args), batch: (input, ...args) => read(args, input)};
+}
 export function safe(name) {
   if (typeof name !== 'string' || !name || name.includes('\\') || /[\x00-\x1f\x7f]/.test(name) || path.posix.isAbsolute(name) || name.split('/').some(p => !p || p === '.' || p === '..' || p === '.git')) {
     throw Error(`Unsafe path: ${name}`);

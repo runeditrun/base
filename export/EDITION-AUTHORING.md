@@ -11,14 +11,17 @@ rer refresh-base --ref FULL_40_HEX_BASE_COMMIT
 ```
 
 `adopt-edition` creates `edition.json` describing the existing tracked local
-source and `sources.lock.json` binding its bytes and authoring tools. It uses
+source and `sources.lock.json` binding its working-tree bytes and authoring tools.
+The initial lock also binds the generated recipe and the preserved or new copy
+record, including an existing record that has not yet been staged. It uses
 `rer-project.json`'s `projectId`, or the declared OPERATIONS project when no
 project ID exists. It preserves an existing `base-copies.json` byte for byte;
 without one it creates an empty record, which claims no Base copies. Existing
 composition records remain historical evidence. It does not invent a
 composition, infer copy mappings, regenerate source, stage files or commit.
 Existing edition inputs cause a refusal; review them with their authoring tools.
-Review and stage the new files, and run the seed's tests before committing.
+Review and stage `edition.json`, `sources.lock.json` and any untracked
+`base-copies.json`, and run the seed's tests before committing.
 
 Refresh itself needs a Git root and a valid `base-copies.json`; the optional
 edition recipe and source lock are not prerequisites. It updates recorded
@@ -27,9 +30,12 @@ edits or rewriting existing migrations. Review those seed-side differences
 explicitly. An absent, unadapted singleton is retired and named in `retired` and
 its copy's `removed` list; repeating the same refresh does not recreate it.
 Ordinary local absence is the removal signal, including an accidental deletion.
-A file still tracked with Git's `skip-worktree` flag is a distinguishable sparse
-exclusion: refresh refuses before writes and names `git sparse-checkout disable`
-as the next step. A deleted declared adaptation also refuses.
+Absent files marked `skip-worktree`, `assume-unchanged` or `fsmonitor-valid`
+are incomplete checkout evidence: refresh refuses before writes and names the
+Git repair command. A recorded child beneath an uninitialized submodule refuses
+with `git submodule update --init`; after initialization, refresh reads the
+child's own index and bytes. Unreadable index evidence and deleted declared
+adaptations also refuse.
 
 Use the immutable full commit behind the release tag. Base-checkout form:
 
@@ -49,7 +55,10 @@ scripts run, and the temporary clone is removed. `--base` is relative to the
 seed root; it must contain both the recorded and target commits.
 
 For offline use, supply `--offline --base CHECKOUT`. Without a checkout refresh
-refuses plainly; it cannot refresh from hashes alone. Acquisition failures name
+refuses plainly; it cannot refresh from hashes alone. Offline Git reads disable
+promisor lazy fetching and require Git supporting `--no-lazy-fetch`. If a partial
+checkout lacks a required object, refresh preserves the record and names the
+online refresh command to acquire it; retry offline after that command succeeds. Acquisition failures name
 the public clone command and `--base`; an unavailable or malformed ref names how
 to resolve/fetch an immutable release commit. Refusals preserve copy records.
 `--record PATH` selects another contained copy record.

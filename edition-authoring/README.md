@@ -232,9 +232,12 @@ export removed, keeps out files the copy had left out, and re-records each copy.
 An absent unadapted singleton is retired from the record entirely and named in
 the `retired` output. As with absent files in directory copies, local absence is
 the removal signal; refresh does not distinguish accidental deletion from an
-intentional removal. Sparse-excluded files still marked `skip-worktree` in the
-Git index cause a refusal before any writes; run `git sparse-checkout disable`
-and repeat the refresh. Unreadable index evidence also refuses safely.
+intentional removal. Absent files marked `skip-worktree`, `assume-unchanged`
+or `fsmonitor-valid`, and recorded children beneath uninitialized submodules,
+refuse before writes with the corresponding Git repair command. After submodule
+initialization, the child index and recorded bytes are read. Unreadable index
+evidence also refuses safely. Offline refresh suppresses promisor lazy fetching;
+a missing local object names an online refresh command, preserving the record.
 Verify before refreshing to inspect missing copies. Deleted
 adaptations still block refresh, and a singleton still present locally whose
 Base source disappeared still reports an error.
