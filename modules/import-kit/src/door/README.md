@@ -37,7 +37,7 @@ Construct the handler with these seed-owned options:
 | `format`, `parse` | `'json'` or `'ndjson'`, and the product's parser of source records. |
 | `source` | Instead of `parse`/`mapping`, for several sources: `source(namespace)` returns that namespace's `{parse, mapping, ownerPrincipalId?}` from the seed's server-owned allow-list, or `null`. It runs after grant verification and before any write; `null` is refused with 403 `unknown_import_source`. |
 | `limits` | Optional reader limits; grant quotas still apply. |
-| `reversalPolicy` | Optional undo policy for new door jobs: `'strict'` (the default) or `'preserve-conflicts'`, which keeps the owner's native edits on undo, as a seed's own preserving imports do, and needs the adapter's `preparePreservedUndo`. Existing jobs keep their policy. See ADOPTING.md. |
+| `reversalPolicy` | Optional override for new jobs. Without it, declaring `targets.preparePreservedUndo` selects `'preserve-conflicts'`; adapters without that method stay `'strict'`. Preserve keeps native edits on undo and requires that method. Existing jobs keep their creation policy. See ADOPTING.md. |
 
 A fresh installation applies the statements in `importDoorSchema: string[]`
 in a new product-owned numbered migration after the D1 import-kit schemas.
@@ -380,6 +380,23 @@ for a different mapping. Undo snapshots newest first, including undo from the
 seed's ordinary owner history. Undoing a snapshot while a newer one still holds
 its records answers 409 `import_superseded`; a strict undo after an owner edit
 answers 409 `native_edit_conflict`. Each has a `details.reason`.
+
+With an adapter declaring `preparePreservedUndo`, new jobs instead preserve
+conflicts by default: undo reverses untouched imported rows, keeps native edits
+and deletions (and required dependencies), and completes with `job.state:
+'undone'`, even if every row was retained. Its durable
+`readD1ImportUndoReport` has outcome `compensated` when any disposition is
+`retained`, identifies each preserved effect and reason, and reports `undone`
+when everything reversed. Native owner history can page that report with its
+normal kit authorization. A second door undo is idempotent. The policy is saved
+with the job, never inferred again during resume, undo or replay. Adding the
+method later leaves old strict jobs strict; removing it refuses active work on
+preserving jobs until a compatible adapter is restored. Explicit
+`reversalPolicy` settings still override the automatic choice for new jobs.
+For example, Orbit's native preserving adapter needs only this shared door
+update, with no Orbit-specific vendored changes. Preserving apply validates and
+fences the preparation before each batch's native writes; an invalid first
+preparation fails with no native rows applied. See [ADOPTING.md](ADOPTING.md).
 
 When an erasure withdrew the live import's snapshot, nothing can be compared
 with it: an owner-session `plan` retires it as the baseline and plans a new

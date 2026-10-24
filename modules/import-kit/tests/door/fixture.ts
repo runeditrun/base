@@ -12,7 +12,7 @@ import { createImportDoorHandler, importDoorSchema, writeImportDoorSettings } fr
 import { sha256 } from '../../src/provenance/identity.ts';
 import type { DoorAction, DoorGrant } from '../../src/door/grants.ts';
 import type { Json } from '../../src/types.ts';
-import type { D1Database } from '../../src/d1/types.ts';
+import type { D1Database, D1TargetAdapter } from '../../src/d1/types.ts';
 import { doorTransport } from './transport.ts';
 import { finishJob } from './progress.ts';
 
@@ -65,7 +65,7 @@ export async function door(t: TestContext, mode: 'grant' | 'operator' = 'grant')
   await ready;
   const address = server.address(); if (!address || typeof address==='string') throw new Error('no_address');
   origin = `http://127.0.0.1:${address.port}`;
-  const options = {database,targets:sqliteTargets,claim:{issuer:'https://business.example.test',installationId:'test-installation',appOrigin:origin,expectedEmail:'owner@example.test',publicKeys:{test:publicKey}},
+  const options = {database,targets:{...sqliteTargets,preparePreservedUndo:undefined} as D1TargetAdapter,claim:{issuer:'https://business.example.test',installationId:'test-installation',appOrigin:origin,expectedEmail:'owner@example.test',publicKeys:{test:publicKey}},
     ownerPrincipalId:'owner',destination:'workspace',format:'json' as const,
     parse(value:Json) {const record=value as {id:string;title:string};return {kind:'document',sourceId:record.id,payload:value};},
     mapping:{version:'v1',map:(record:any)=>record.payload.reject?{effects:[],rejection:'Unsupported source record'}:{effects:[{targetKind:'record',targetId:record.sourceId,value:record.payload}]}},

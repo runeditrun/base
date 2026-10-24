@@ -60,21 +60,41 @@ Owner history and undo must include jobs from either authority.
    already-imported target for catch-up, `list` must read the native set in a
    fixed number of queries, and large imports need a compact `matchesMany`
    (see Pitfalls).
-   **Undo policy.** Door jobs use the kit's `strict` undo unless the runtime
-   options set `reversalPolicy`. A seed whose own imports preserve the owner's
-   edits on undo passes `reversalPolicy: 'preserve-conflicts'` to every door
-   mount (operator and grant), and its adapter implements `preparePreservedUndo`
-   (a mount refuses construction with 503 `invalid_configuration` otherwise).
-   Door jobs are then created with that policy: the seed's ordinary history,
-   which reads each import job with its own policy, lists them, and door undo
-   after an owner edit keeps the owner's change and reverses the rest, as the
-   seed's local imports do. Only new door jobs take the option; earlier ones keep
-   the policy they were created with, even when an apply in flight resumes
-   after the seed remounts with another policy. Strict remains the default,
-   unchanged. With preserve, undoing a catch-up that kept an owner's edit
-   releases the layer beneath it, so the baseline then undoes too. A
-   seed that adapted `door/types.ts` and `door/authority.ts` to pass a policy
-   (Lamp) drops that change, re-vendors the door verbatim and passes the option.
+   **Undo policy.** An adapter declaring `preparePreservedUndo` automatically
+   selects `preserve-conflicts` for each new door job, on both operator and
+   grant mounts. An adapter without that method keeps the kit's `strict`
+   policy. `reversalPolicy` remains an explicit override; requesting preserve
+   without the method refuses construction with 503 `invalid_configuration`.
+   No seed-specific change to the vendored door is needed. For example, Orbit's
+   native adapter declaring the method makes new door imports preserve native
+   edits after re-vendoring this door; this does not change earlier strict jobs.
+
+   The selected policy is persisted and integrity-bound at job creation.
+   Apply resume, status, undo and request replay use that stored policy, even
+   after an adapter upgrade or a different mount setting. Adding the method
+   never upgrades an earlier strict job. Removing it from an adapter needed by
+   an existing preserving job refuses active apply/undo before that batch's
+   effects; restore a compatible adapter to continue. Keep adapter ownership
+   projections compatible with previously recorded undo evidence.
+
+   Before publishing each preserving apply batch, the kit validates the
+   adapter's preparation for that batch's prospective effects and fences its
+   observations before any native writes. Invalid preparation on the first
+   batch answers 409 `import_door_apply_failed`, with a failed job at checkpoint
+   zero and no imported native rows; a new plan and approval are required.
+   A later failed batch leaves earlier committed progress available to undo.
+
+   Preserving undo reverses unchanged independent rows and leaves native edits,
+   native deletions and their required dependencies untouched. The door returns
+   `job.state: 'undone'` when finished, including when every effect was retained;
+   it does not answer a strict native-edit 409 for those conflicts. The durable
+   kit `readD1ImportUndoReport` reports `outcome: 'compensated'` when anything
+   was retained, with `retained` dispositions and `edited`, `dependency` or
+   `superseded` reasons; otherwise its outcome is `undone`. Read report pages
+   through the seed's owner-authorized kit context for native history details.
+   Repeated undo is idempotent. Undoing a catch-up that kept an owner's edit
+   releases the layer beneath it, so the baseline can then undo too.
+
 3. **Operator mount.** Import `createImportOperatorHandler` from
    `modules/import-kit/src/door/operator.ts`. Supply the runtime options in
    `types.ts`, plus server-owned `installationId`, `appOrigin`, `ownerEmail`,

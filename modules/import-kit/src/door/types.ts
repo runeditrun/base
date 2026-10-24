@@ -17,10 +17,9 @@ export interface ImportDoorRuntimeOptions extends ImportDoorSource {
   destination: string;
   format: 'json' | 'ndjson';
   limits?: ReaderLimits;
-  /** The undo policy each new door job is created with: 'strict' (the default)
-   * refuses undo after a native edit; 'preserve-conflicts' keeps the owner's
-   * edits, as the seed's own imports do, and needs the adapter's
-   * `preparePreservedUndo`. Existing jobs keep the policy they were created with. */
+  /** Override the undo policy for new jobs. By default an adapter declaring
+   * `preparePreservedUndo` selects 'preserve-conflicts'; other adapters select
+   * 'strict'. Existing jobs always keep the policy they were created with. */
   reversalPolicy?: D1ReversalPolicy;
 }
 /** Structurally identical to owner-claim's server-owned trust configuration. */
