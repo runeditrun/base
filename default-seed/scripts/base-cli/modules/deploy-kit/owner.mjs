@@ -134,6 +134,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   const queues = entries(declaration,'queues');
   for (const item of queues) assert(item.deadLetterQueue === undefined || queues.some(other => other.binding === item.deadLetterQueue), 'invalid-dead-letter-queue');
   const vars = {...(declaration.vars ?? {})};
+  if (env.RER_BUSINESS_TRUST !== undefined) vars.RER_BUSINESS_TRUST = env.RER_BUSINESS_TRUST;
   const origin = publicOrigin(declaration, env);
   if (declaration.originVar !== undefined) {
     assert(identifier(declaration.originVar) && !Object.hasOwn(vars,declaration.originVar), 'invalid-owner-origin-variable');
