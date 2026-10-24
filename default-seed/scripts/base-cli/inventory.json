@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gb74ead97",
+  "cliVersion": "0.2.79-dev.g098cf7a9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3119,7 +3119,7 @@
     },
     "modules/operator-auth/accounts/status.mjs": {
       "source": "modules/operator-auth/accounts/status.mjs",
-      "sha256": "81773914176da13e752ac690e56a1a3e07408c5f6a837ceb9582399bc9cb57e7"
+      "sha256": "fb9ee41353b49eb41009a9de00e2ed530df8564b9aaec85641f840bfceba2152"
     },
     "modules/operator-auth/accounts/store.mjs": {
       "source": "modules/operator-auth/accounts/store.mjs",
