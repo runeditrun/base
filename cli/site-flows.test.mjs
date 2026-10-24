@@ -319,7 +319,7 @@ test('built Run command accepts one repository argument and refuses shell syntax
  const command = /data-copy="([^"]+)"/.exec(html)[1].replaceAll('&#39;', "'").replaceAll('&quot;', '"').replaceAll('&amp;', '&');
  const result = await run('/bin/sh', ['-c', `curl() { :; }; sh() { printf '%s\\n' "$@"; }; ${command}`]);
  assert.deepEqual(result.stdout.trim().split('\n'), ['-s', '--', 'dev', valid]);
- for (const repo of ['owner/r; printf INJECTED', 'owner/r$(printf INJECTED)', 'owner/r`printf INJECTED`', 'owner/with space', "owner/r'quote", 'owner/repo\ntrue', '-owner/repo', 'owner/../repo']) {
+ for (const repo of ['owner/r; printf INJECTED', 'owner/r$(printf INJECTED)', 'owner/r`printf INJECTED`', 'owner/with space', "owner/r'quote", 'owner/repo\ntrue', 'owner/repo\n', '-owner/repo', 'owner/../repo']) {
   await writeFile(data, original.replace(/clone: '[^']*'/, `clone: ${JSON.stringify('npx -y @runeditrun/rer dev ' + repo)}`));
   const failed = await f.build();
   assert.notEqual(failed.code, 0, repo);

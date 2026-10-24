@@ -41,7 +41,7 @@ const repoStart = `${npxStart}dev `
 // hyphens, and up to 100 repository characters (excluding dot directories).
 const repositoryId = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}\/(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/
 // Escape independently of validation; repository ids need no escaping in POSIX shells.
-const shellArgument = (value: string) => /^[A-Za-z0-9_./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\"'\"'")}'`
+const shellArgument = (value: string) => /[^A-Za-z0-9_./-]/.test(value) ? `'${value.replaceAll("'", "'\"'\"'")}'` : value
 /**
  * The one line on every Run page, homepage snippet and getting-started page: the
  * installer (which brings its own Node when there is none) installs rer, then
@@ -58,7 +58,8 @@ export const escape = (value: string) => value.replace(/[&<>"']/g, character => 
 
 export function checkRunData(run: RunData): RunData {
   for (const key of ['name', 'clone', 'folder', 'licence'] as const) if (typeof run[key] !== 'string' || !run[key].trim()) throw new Error(`Run data needs ${key}.`)
-  if (!run.clone.startsWith(repoStart) || !repositoryId.test(run.clone.slice(repoStart.length))) throw new Error(`Run data clone must be ${repoStart}<owner>/<repo> with a valid repository id.`)
+  const repo = run.clone.slice(repoStart.length)
+  if (!run.clone.startsWith(repoStart) || repositoryId.exec(repo)?.[0] !== repo) throw new Error(`Run data clone must be ${repoStart}<owner>/<repo> with a valid repository id.`)
   if (!/^https:\/\/[^\s"<>]+$/.test(run.repository)) throw new Error('Run data repository is an https URL.')
   if (!/^[A-Za-z0-9._/-]+$/.test(run.folder) || run.folder.split('/').some(part => !part || part === '..')) throw new Error('Run data folder is a relative folder.')
   if (typeof run.docs !== 'boolean' || !Array.isArray(run.hosted)) throw new Error('Run data declares docs and hosted.')
