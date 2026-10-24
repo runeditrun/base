@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g5b790bd8",
+  "cliVersion": "0.2.79-dev.g06e73170",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2683,11 +2683,11 @@
     },
     "modules/mail/package.json": {
       "source": "modules/mail/package.json",
-      "sha256": "887d3c7dbbeba0a38c924a17b396966245140642602d047e309cec29645c089f"
+      "sha256": "b6e2d1e285c44deffbec6ae94ab67599d8dda0aaa548066c415ec94418ffbd30"
     },
     "modules/mail/pnpm-lock.yaml": {
       "source": "modules/mail/pnpm-lock.yaml",
-      "sha256": "d522fc5e028ac3daeecb7ef2a83bebb69141a367516c4365b85339eb1a1e35b0"
+      "sha256": "4b8846fd11bb799afabcb07e44e9a3297086144ef18521fcfc458718233941e6"
     },
     "modules/mail/src/adapters/cloudflare/README.md": {
       "source": "modules/mail/src/adapters/cloudflare/README.md",

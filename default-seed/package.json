@@ -68,7 +68,7 @@
       "@esbuild-kit/core-utils>esbuild": "0.28.2",
       "drizzle-kit>esbuild": "0.28.2",
       "sharp": "0.35.5",
-      "undici": "7.30.1",
+      "undici": "7.29.1",
       "source-map-js": "1.2.2"
     },
     "onlyBuiltDependencies": [

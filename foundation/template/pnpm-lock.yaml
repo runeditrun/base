@@ -6,7 +6,7 @@ settings:
 
 overrides:
   sharp: 0.35.5
-  undici: 7.30.1
+  undici: 7.29.1
   source-map-js: 1.2.2
 
 importers:
@@ -1173,8 +1173,8 @@ packages:
   ufo@1.6.4:
     resolution: {integrity: sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA==}
 
-  undici@7.30.1:
-    resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
+  undici@7.29.1:
+    resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
     engines: {node: '>=20.18.1'}
 
   unenv@2.0.0-rc.24:
@@ -2173,7 +2173,7 @@ snapshots:
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5
-      undici: 7.30.1
+      undici: 7.29.1
       workerd: 1.20260907.1
       ws: 8.21.0
       youch: 4.1.0-beta.10
@@ -2306,7 +2306,7 @@ snapshots:
 
   ufo@1.6.4: {}
 
-  undici@7.30.1: {}
+  undici@7.29.1: {}
 
   unenv@2.0.0-rc.24:
     dependencies:
