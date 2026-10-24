@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc10a13c5",
+  "cliVersion": "0.2.79-dev.gadb60ab9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -57,7 +57,7 @@
     },
     "command-custody.mjs": {
       "source": "onboarding/command-custody.mjs",
-      "sha256": "60c2be80991054feb4c9d56205e65ed0c8d01cfbe10dec698eb312bf90faecf6"
+      "sha256": "7028c770ebd5ed54097bbe58feaafe5ef76a7750567471dda272ca7e18f69975"
     },
     "command-recovery.mjs": {
       "source": "onboarding/command-recovery.mjs",
@@ -209,11 +209,11 @@
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
-      "sha256": "d33ba3b90be242e7b6bd0c734fbff793f0ae84df2cffad5834f41062c98a3b72"
+      "sha256": "1a5aba4f85e42728b2da9df645e940688d174a8899d89a7b73e9b6bf4ed46712"
     },
     "process-table.mjs": {
       "source": "onboarding/process-table.mjs",
-      "sha256": "6ce0568487c59076c891c8c6ab16f3eebee30bfeedfdaad7e44838b66ab4c813"
+      "sha256": "1f812fb7cac6b924912fee442cdcea88975a699e2906805e154a46d14237c42f"
     },
     "process-tree.mjs": {
       "source": "onboarding/process-tree.mjs",
