@@ -76,6 +76,8 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
       const request = publication(job, entries.length, statements, scope), done = job.checkpoint + entries.length === job.total;
       await atomic(context, 'apply', request.statements, returnReads, request.scope);
       current = await stored(id, context, 'apply'); published = current.job;
+      // Preserving admission spends a variable number of reads; let the exact
+      // next-batch budget check decide whether more work fits.
       if (done || (!undoEffects && remaining(context) < 200)) return published;
     }
   } catch (error) {

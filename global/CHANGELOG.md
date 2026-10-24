@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo. Restore exact retained-value and complete catch-up undo report checks.
+- Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo without an unjournaled failure fence. Restore exact retained-value and complete catch-up undo report checks.
 
 ## 0.2.80
 
