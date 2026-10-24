@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { chmod, cp, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, lstat, mkdir, open, readdir, readFile, rename, rm } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { privateDirectory } from '../../onboarding/local/files.mjs';
 import { resolveProject } from '../../cli/project.mjs';
@@ -21,8 +21,17 @@ export async function readJSON(path) {
 export async function writeJSON(checkout, path, value) {
  await secureDirectory(checkout, join(path, '..'));
  const temporary = `${path}.${process.pid}.tmp`;
- await writeFile(temporary, JSON.stringify(value, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
- await rename(temporary, path);
+ const file = await open(temporary, 'wx', 0o600);
+ try {
+  try {
+   await file.writeFile(JSON.stringify(value, null, 2) + '\n');
+   await file.sync();
+  } finally { await file.close(); }
+  await rename(temporary, path);
+  const parent = await open(join(path, '..'), 'r');
+  try { await parent.sync(); } finally { await parent.close(); }
+ }
+ finally { await rm(temporary, { force: true }); }
 }
 async function safeParents(checkout, directory) {
  let current = checkout;
@@ -86,9 +95,28 @@ export function checkPriorData(before, after, allowed = []) {
  }
 }
 export async function snapshot(checkout, metadata) {
- const name = new Date().toISOString().replace(/[^0-9TZ]/g, '') + `-${process.pid}`;
- const directory = join(upgradeDirectory(checkout), 'backups', name);
- await secureDirectory(checkout, directory);
+ const parent = join(upgradeDirectory(checkout), 'backups');
+ await secureDirectory(checkout, parent);
+ const journal = await readJournal(checkout), backups = [];
+ for (const entry of await readdir(parent, { withFileTypes: true })) {
+  const { name } = entry;
+  // Unrecognised names are not ours to inspect or prune.
+  if (!entry.isDirectory() || !validBackupName(name)) continue;
+  await safeParents(checkout, join(parent, name));
+  const saved = await readJSON(join(parent, name, 'backup.json'));
+  if (saved?.name === name) backups.push({ name, sequence: Number.isSafeInteger(saved.sequence) && saved.sequence >= 0 ? saved.sequence : 0 });
+ }
+ const sequence = backups.reduce((latest, backup) => Math.max(latest, backup.sequence), 0) + 1;
+ if (!Number.isSafeInteger(sequence)) throw failure('database_failed');
+ // Reserve a new directory even when a process takes two snapshots in the
+ // same millisecond. Names remain valid recovery names; ordering uses sequence.
+ let name, directory, instant = Date.now();
+ for (;;) {
+  name = new Date(instant++).toISOString().replace(/[^0-9TZ]/g, '') + `-${process.pid}`;
+  directory = join(parent, name);
+  try { await mkdir(directory, { mode: 0o700 }); break; }
+  catch (error) { if (error.code !== 'EEXIST') throw error; }
+ }
  const paths = await localPaths(checkout), components = {};
  for (const path of paths) {
   components[path] = await stateManifest(join(checkout, path));
@@ -97,12 +125,14 @@ export async function snapshot(checkout, metadata) {
   await cp(join(checkout, path), join(directory, 'state', path), { recursive: true, mode: constants.COPYFILE_FICLONE, preserveTimestamps: true });
  }
  for (const path of paths) if (JSON.stringify(await stateManifest(join(directory, 'state', path))) !== JSON.stringify(components[path])) throw failure('database_failed');
- await writeJSON(checkout, join(directory, 'backup.json'), { ...metadata, paths, name, components });
+ await writeJSON(checkout, join(directory, 'backup.json'), { ...metadata, paths, name, components, sequence });
  // Publish metadata only after every state byte has arrived. Incomplete copies
  // are never restore candidates and never displace a completed backup.
- const backups = [];
- for (const entry of await readdir(join(directory, '..'))) if (await readJSON(join(directory, '..', entry, 'backup.json'))) backups.push(entry);
- for (const old of backups.sort().slice(0, -2)) await rm(join(directory, '..', old), { recursive: true });
+ const keep = new Set([name, ...backups.filter(saved => saved.name === journal?.backup).map(saved => saved.name)]);
+ for (const saved of backups.sort((a, b) => b.sequence - a.sequence || a.name.localeCompare(b.name))) {
+  if (keep.size < 2) keep.add(saved.name);
+  if (!keep.has(saved.name)) await rm(join(parent, saved.name), { recursive: true });
+ }
  return name;
 }
 export async function backup(checkout, name) {
@@ -137,7 +167,5 @@ export async function restoreState(checkout, name) {
   await mkdir(join(checkout, path, '..'), { recursive: true, mode: 0o700 });
   await cp(saved, join(checkout, path), { recursive: true, mode: constants.COPYFILE_FICLONE, preserveTimestamps: true });
  }
- if (metadata.release) await writeJSON(checkout, join(checkout, '.rer/release.json'), metadata.release);
- else await rm(join(checkout, '.rer/release.json'), { force: true });
  return metadata;
 }

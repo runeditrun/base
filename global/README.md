@@ -57,8 +57,8 @@ rer dev just-every/run-slate --release FULL_COMMIT --dir slate
 The release must have a signed `rer-release.dsse.json` asset on GitHub. Rer
 checks its repository, tag and commit against the production publisher anchors
 bundled in the package before installing or running project code. A new clone's
-default branch starts at that commit, and `.rer/release.json` records the
-verified release. An existing checkout of that release is reused without
+default branch starts with that release and a local commit recording its
+verified identity in `rer-upstream.json`. An existing checkout of that release is reused without
 resetting its owner commits or private state; a different existing checkout is
 refused. `--anchors FILE` selects trusted anchors for a community publisher.
 
@@ -177,13 +177,43 @@ preserves existing migration history. Conflicts leave the original checkout
 unchanged and an update branch for your agent to integrate before
 `rer upgrade --continue`.
 
+The base release is the committed `rer-upstream.json` in the checkout's HEAD
+tree. It travels with the repository, including owner commits, reverts and
+restores. Its canonical format has exactly four keys in this order, two-space
+indentation, LF line endings and a trailing newline:
+
+```json
+{
+  "schema": 1,
+  "repository": "just-every/run-slate",
+  "tag": "v0.4.0",
+  "commit": "635df53b1d055f31998b7a5dd448ce467dab07d2"
+}
+```
+
+The version comes from the stable release tag; there is no `version` field.
+Rer refuses malformed, duplicate-key, extra-key or unsupported-schema records,
+naming the file. It verifies both the recorded base and target as signed
+releases, requires a strictly newer target version and retains the ancestry
+check. The upgrade commit writes the target's canonical record. Rollback
+restores the prior committed bytes with the prior HEAD.
+
+A legacy checkout without this file keeps the unsigned-legacy refusal
+`release_not_found`. Rer does not infer a release from `RELEASE.json`, commit
+trailers or the old private release marker. Acquire a known signed release
+explicitly to establish its record; existing owner work is never reset by
+repeated acquisition.
+
 Before installing, rer stops the app and snapshots its local state. It installs
 through the checkout's dispatcher, applies migrations, starts the app and checks
 health and prior table counts. A failure after switching restores the previous
-commit and state. The last two backups stay on this computer. A previously
+commit and state. Two completed backups stay on this computer; retention uses
+a sequence and protects the new snapshot and any journal-referenced backup,
+including when the clock moves backward. A previously
 stopped app is stopped again after verification.
 
-A failed rollback keeps its journal and backup for manual repair. Retrying an
+A rollback records durable `rolling_back` intent before stopping, resetting or
+restoring anything. An interrupted or failed rollback keeps its journal and backup for manual repair. Retrying an
 upgrade refuses until `rer upgrade --restore BACKUP` completes the restore.
 Restore checks the saved components and their contents before removing live
 state; an incomplete or older unverifiable backup is refused. Recovery commands

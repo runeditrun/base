@@ -1,12 +1,12 @@
 // Local release identity comes from Git custody, never a server-supplied URL.
 import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
-import { join } from 'node:path';
 import { loadAnchors, verifyRelease, compareVersion, LIMITS } from '../../modules/release/signature.mjs';
 import { ownManifest } from '../package-info.mjs';
 import { update } from '../update/command.mjs';
 import { git, run, text } from './process.mjs';
 import { failure } from './error.mjs';
+import { readRecord } from './upstream-record.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -52,50 +52,18 @@ async function readBytes(path, limit) {
  } finally { await file.close(); }
 }
 
-async function installedRecord(checkout) {
- let value;
- try { value = JSON.parse(await readBytes(join(checkout, '.rer/release.json'), 65536)); }
- catch (error) { if (error.code === 'ENOENT') return null; refuse('refused'); }
- if (!object(value) || !SHA.test(value.commit) || (value.tag !== undefined && !TAG.test(value.tag))) refuse('refused');
- return { repository: repositoryIdentity(value.repository), commit: value.commit, ...(value.tag ? { tag: value.tag } : {}) };
-}
-
 async function descends(checkout, ancestor, descendant, code) {
  const result = await git(checkout, ['merge-base', '--is-ancestor', ancestor, descendant], { allow: [1, 128] });
  if (result.code !== 0) refuse(code);
 }
 
 export async function recordedRelease(checkout) {
- try {
-  const repository = await originRepository(checkout);
-  const recorded = await installedRecord(checkout);
-  if (recorded && recorded.repository !== repository) refuse('refused');
-  // NUL separates full messages: commit bodies may contain arbitrary newlines.
-  const history = await text(checkout, ['log', '--first-parent', '--format=%H%x00%B%x00', 'HEAD']);
-  const entries = history.split('\0');
-  let selected;
-  for (let i = 1; i < entries.length; i += 2) {
-   const message = entries[i].replace(/\n+$/, '');
-   const candidates = message.split('\n').filter(line => /RER-Upstream-Release/i.test(line));
-   if (!candidates.length) continue;
-   if (candidates.length !== 1) refuse('refused');
-   const match = /^RER-Upstream-Release: ([^\s@]+)@([a-f0-9]{40})$/.exec(candidates[0]);
-   // A release marker must be a real final trailer, not quoted body text.
-   const separator = message.lastIndexOf('\n\n');
-   const block = message.slice(separator < 0 ? 0 : separator + 2).split('\n');
-   if (!match || !block.includes(candidates[0]) || block.some(line => !/^[A-Za-z][A-Za-z0-9-]*: [^\r\n]+$/.test(line))) refuse('refused');
-   selected = { repository: repositoryIdentity(match[1]), commit: match[2] };
-   break;
-  }
-  selected ??= recorded;
-  if (!selected) refuse('release_not_found');
-  if (selected.repository !== repository) refuse('refused');
-  await descends(checkout, selected.commit, 'HEAD', 'refused');
-  return selected;
- } catch (error) {
-  if (error.error_code) throw error;
-  refuse('refused');
- }
+ const selected = await readRecord(checkout);
+ if (!selected) refuse('release_not_found');
+ const repository = await originRepository(checkout);
+ if (repositoryIdentity(selected.repository) !== repository) throw failure('refused', 'rer-upstream.json names a different repository.');
+ await descends(checkout, selected.commit, 'HEAD', 'refused');
+ return { ...selected, repository };
 }
 
 async function github(checkout, endpoint, { asset = false } = {}) {
@@ -149,13 +117,11 @@ export async function resolveRelease({ checkout, repository: supplied, to, ancho
  try {
   const repository = await originRepository(checkout);
   if (supplied !== undefined && repositoryIdentity(supplied) !== repository) refuse('refused');
-  const recorded = await installedRecord(checkout);
-  if (recorded && recorded.repository !== repository) refuse('refused');
   // Publisher main can record a newer release than the requested initial one.
   // Only existing installations have an owner baseline to enforce here.
   let base;
   try { if (!fresh) base = await recordedRelease(checkout); }
-  catch (error) { if (recorded || error.error_code !== 'release_not_found') throw error; }
+  catch (error) { if (error.error_code !== 'release_not_found') throw error; }
   let tag;
   if (to !== undefined) {
    if (typeof to !== 'string' || (!TAG.test(to) && !SHA.test(to))) refuse('release_not_found');

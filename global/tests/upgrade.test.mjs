@@ -16,10 +16,10 @@ test('rer upgrades a signed release while preserving owner source and existing d
  assert.equal(await f.git(f.root, 'merge-base', '--is-ancestor', owner.commit, 'HEAD'), '');
  assert.deepEqual((await f.sql('SELECT id, body, edition FROM upgrade_records'))[0].results,
   [{ ...ownerRow, edition: 'upgraded' }], 'prior data survives the actual new migration');
- const history = await f.git(f.root, 'log', '--format=%B', '-8');
- assert.ok(history.includes(`RER-Upstream-Release: ${f.repository}@${f.v2.commit}`));
+ const committed = await f.git(f.root, 'show', 'HEAD:rer-upstream.json');
  assert.equal(JSON.parse(await readFile(join(f.root, 'RELEASE.json'), 'utf8')).version, '2.0.0');
- const installed = JSON.parse(await readFile(join(f.root, '.rer/release.json'), 'utf8'));
+ const installed = JSON.parse(committed);
+ assert.deepEqual(JSON.parse(await readFile(join(f.root, 'rer-upstream.json'), 'utf8')), installed);
  assert.equal(installed.tag, f.v2.tag);
  assert.equal(installed.commit, f.v2.commit);
  assert.equal((await fetch(f.url + '/health')).status, 200);

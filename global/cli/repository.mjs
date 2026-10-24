@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
-import { appendFile, lstat, mkdir, readdir, realpath, writeFile } from 'node:fs/promises';
+import { appendFile, lstat, mkdir, readdir, realpath } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -92,8 +92,8 @@ export async function checkoutRepository({ url, root, directory, release, anchor
 // Only a clone acquired by this invocation can move its branch. Repeated
 // setup preserves the owner's branch, commits and working files.
 async function selectRelease({ root, release, anchors, fresh }) {
- const [{ resolveRelease, recordedRelease }, { text, git: command }, { failure }] = await Promise.all([
-  import('../local-run/release.mjs'), import('../local-run/process.mjs'), import('../local-run/error.mjs'),
+ const [{ resolveRelease, recordedRelease }, { text, git: command }, { failure }, { recordTree }] = await Promise.all([
+  import('../local-run/release.mjs'), import('../local-run/process.mjs'), import('../local-run/error.mjs'), import('../local-run/upstream-record.mjs'),
  ]);
  const verified = await resolveRelease({ checkout: root, to: release, anchors, fresh });
  if (fresh) {
@@ -109,12 +109,8 @@ async function selectRelease({ root, release, anchors, fresh }) {
   const descends = await command(root, ['merge-base', '--is-ancestor', verified.commit, head], { allow: [1, 128] });
   if (head !== verified.commit && (!same || descends.code !== 0)) throw failure('refused');
  }
- const tracked = await text(root, ['ls-files', '--', '.rer/release.json']);
- if (tracked) throw failure('refused');
- for (const path of [resolve(root, '.rer'), resolve(root, '.rer/release.json')]) {
-  try { if ((await lstat(path)).isSymbolicLink()) throw failure('refused'); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; }
- }
+ try { if ((await lstat(resolve(root, '.rer'))).isSymbolicLink()) throw failure('refused'); }
+ catch (error) { if (error.code !== 'ENOENT') throw error; }
  const ignored = await command(root, ['check-ignore', '--quiet', '.rer/'], { allow: [1] });
  if (ignored.code !== 0) {
   const exclude = resolve(root, await text(root, ['rev-parse', '--git-path', 'info/exclude']));
@@ -122,9 +118,16 @@ async function selectRelease({ root, release, anchors, fresh }) {
   await appendFile(exclude, '\n/.rer/\n');
   if ((await command(root, ['check-ignore', '--quiet', '.rer/'], { allow: [1] })).code !== 0) throw failure('refused');
  }
- await mkdir(resolve(root, '.rer'), { recursive: true, mode: 0o700 });
- const record = { repository: verified.repository, tag: verified.tag, commit: verified.commit, verified_at: verified.verified_at };
- await writeFile(resolve(root, '.rer/release.json'), JSON.stringify(record, null, 2) + '\n', { mode: 0o600 });
+ // A verified acquisition records exactly the signed release selected, in a
+ // local commit. The record then travels with the checkout and its owner work.
+ const head = await text(root, ['rev-parse', 'HEAD']);
+ const tree = await recordTree(root, head, verified);
+ if (tree !== await text(root, ['rev-parse', 'HEAD^{tree}'])) {
+  if (await text(root, ['status', '--porcelain', '--untracked-files=all'])) throw failure('worktree_dirty');
+  const candidate = await text(root, ['-c', 'user.name=Run Edit Run', '-c', 'user.email=rer@localhost',
+   'commit-tree', tree, '-p', head, '-m', `Record installed upstream ${verified.tag}`]);
+  await command(root, ['merge', '--ff-only', '--no-edit', candidate]);
+ }
  return verified;
 }
 

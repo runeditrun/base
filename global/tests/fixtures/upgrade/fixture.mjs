@@ -12,6 +12,7 @@ import { localD1 } from '../../../../cli/fixtures/local-d1.mjs';
 import { isolatedQueue } from '../../../../cli/fixtures/queue.mjs';
 import { run as execute, freePort } from '../../harness.mjs';
 import { stopOwnedApp } from './owned-app.mjs';
+import { recordBytes } from '../../../local-run/upstream-record.mjs';
 import { releaseNetwork, repository, repositoryURL } from './releases.mjs';
 
 const base = resolve(import.meta.dirname, '../../../..');
@@ -46,8 +47,8 @@ export async function upgradeFixture(t, { keep = false, checkoutName = 'owner ch
  await command('tar', ['-xzf', await buildPackage(base, join(directory, 'package')), '-C', packaged]);
  const rer = join(packaged, 'package/global/rer.mjs');
  const run = (args, options = {}) => execute(process.execPath, [rer, ...args], { cwd: root, env, detached: true, ...options });
- function start(args, options = {}) {
-  const child = spawn(process.execPath, [rer, ...args], { cwd: root, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'], ...options });
+ function start(args, { nodeArgs = [], ...options } = {}) {
+  const child = spawn(process.execPath, [...nodeArgs, rer, ...args], { cwd: root, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'], ...options });
   children.add(child); child.stdoutText = ''; child.stderrText = '';
   child.stdout.on('data', bytes => { child.stdoutText += bytes; });
   child.stderr.on('data', bytes => { child.stderrText += bytes; });
@@ -79,7 +80,9 @@ export async function upgradeFixture(t, { keep = false, checkoutName = 'owner ch
  const v2 = await network.publish(source, '2.0.0');
  // Publisher main may record a newer release than the one being acquired.
  // That history is not an installed owner's baseline in a fresh clone.
- await git(source, 'commit', '--allow-empty', '-qm', 'Record current publisher release', '-m', `RER-Upstream-Release: ${repository}@${v2.commit}`);
+ await writeFile(join(source, 'rer-upstream.json'), recordBytes({ repository, ...v2 }));
+ await git(source, 'add', 'rer-upstream.json');
+ await git(source, 'commit', '-qm', 'Record current publisher release');
  await git(directory, 'clone', '--bare', source, remote);
  const port = await freePort(), url = `http://127.0.0.1:${port}`;
  async function launch(release = v1.tag) {

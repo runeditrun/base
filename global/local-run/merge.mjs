@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {lstat, mkdir, readFile, realpath} from 'node:fs/promises';
 import {basename, join, resolve} from 'node:path';
 import {text as checkoutText} from './process.mjs';
+import {recordPath, recordTree} from './upstream-record.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const fail = (error_code, message = error_code, prepared) => Object.assign(new Error(message), {error_code, ...(prepared ? {prepared, result: prepared} : {})});
@@ -104,7 +105,7 @@ async function regenerateLock(worktree, expected) {
 
 async function noMarkers(worktree, tree) {
   if (!tree && await text(worktree, ['ls-files', '--unmerged'])) throw fail('needs_integration');
-  const found = await git(worktree, ['grep', '-I', '-l', '-E', '^(<<<<<<<( |$)|=======$|>>>>>>>( |$)|[|]{7}( |$))', ...(tree ? [tree] : []), '--'], {allow: [1]});
+  const found = await git(worktree, ['grep', '-I', '-l', '-E', '^(<<<<<<<( |$)|=======$|>>>>>>>( |$)|[|]{7}( |$))', ...(tree ? [tree] : []), '--', '.', ':(exclude)rer-upstream.json'], {allow: [1]});
   if (found.code === 0) throw fail('needs_integration');
 }
 
@@ -119,6 +120,7 @@ const fingerprint = async worktree => sha(Buffer.concat(await Promise.all([
 ])));
 
 async function candidateCommit(checkout, prepared, tree) {
+  tree = await recordTree(checkout, tree, {repository: prepared.repository, tag: prepared.tag, commit: prepared.target});
   await noMarkers(checkout, tree);
   const migrations_applied = await migrations(checkout, prepared.head, tree);
   const ancestor = await git(checkout, ['merge-base', '--is-ancestor', prepared.target, prepared.head], {allow: [1]});
@@ -128,7 +130,7 @@ async function candidateCommit(checkout, prepared, tree) {
   const configured = /^(.*) <([^<>\r\n]+)> \d+ [+-]\d{4}$/.exec(await checkoutText(checkout, ['var', 'GIT_AUTHOR_IDENT']));
   if (!configured) throw fail('needs_input', 'Configure a Git author before integrating the release');
   const env = {GIT_AUTHOR_NAME: configured[1], GIT_AUTHOR_EMAIL: configured[2], GIT_COMMITTER_NAME: configured[1], GIT_COMMITTER_EMAIL: configured[2]};
-  const candidate = await text(checkout, ['commit-tree', tree, ...parents, '-m', `Update to ${prepared.tag}`, '-m', `RER-Upstream-Release: ${prepared.repository}@${prepared.target}`], {env});
+  const candidate = await text(checkout, ['commit-tree', tree, ...parents, '-m', `Update to ${prepared.tag}`], {env});
   await originalUnchanged(checkout, prepared);
   return {...prepared, status: 'prepared', candidate, migrations_applied, conflicts: {public_paths: [], other_count: 0}};
 }
@@ -140,7 +142,7 @@ export async function prepareMerge({checkout, base, head, target, tag, repositor
   const original_branch = await text(checkout, ['symbolic-ref', '--quiet', 'HEAD']);
   const branch = `rer/update-${tag}`;
   await git(checkout, ['check-ref-format', '--branch', branch]);
-  const prepared = {head, base, target, tag, repository, branch, original_branch, owner_changes_kept: (await paths(checkout, base, head)).length, migrations_applied: [], conflicts: {public_paths: [], other_count: 0}};
+  const prepared = {head, base, target, tag, repository, branch, original_branch, owner_changes_kept: (await paths(checkout, base, head)).filter(path => path !== recordPath).length, migrations_applied: [], conflicts: {public_paths: [], other_count: 0}};
   await originalUnchanged(checkout, prepared);
   for (const descendant of [head, target]) if ((await git(checkout, ['merge-base', '--is-ancestor', base, descendant], {allow: [1]})).code) throw fail('refused');
   if (!(await git(checkout, ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], {allow: [1]})).code) throw fail('refused', 'An update branch already exists');
@@ -151,7 +153,7 @@ export async function prepareMerge({checkout, base, head, target, tag, repositor
   const targetFiles = await entries(checkout, target);
   let lock = null;
   try { lock = sourceLockCommand((await jsonAt(checkout, targetFiles, 'package.json')).scripts); } catch { /* Invalid target manifests cannot authorize lock resolution. */ }
-  const remaining = allConflicts.filter(path => path !== 'sources.lock.json' || !lock);
+  const remaining = allConflicts.filter(path => path !== recordPath && (path !== 'sources.lock.json' || !lock));
   const publicPaths = remaining.filter(path => targetFiles.has(path)).sort();
   prepared.conflicts = {public_paths: publicPaths.slice(0, 50), other_count: remaining.length - Math.min(publicPaths.length, 50)};
   prepared.source_lock_command = lock;
