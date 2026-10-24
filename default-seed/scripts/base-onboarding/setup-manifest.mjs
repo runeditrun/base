@@ -1,6 +1,7 @@
 import {parseSetupManifestBytes, validateSetupManifest, setupConditionMatches, validateSetupValue, setupFieldAudience} from './schema/setup-validation.mjs';
 import {createModel} from './ui/model-core.mjs';
 import {installerInputs} from './installer-inputs.mjs';
+import {setupFieldIsSecret} from './schema/credential-names.mjs';
 
 const legacy=['fields','safeKeys','setupGroups','requiredKeys','secretScopes','summaryDefaults','initialValues','installInput'];
 export function refuseLegacySetup(value) {
@@ -26,6 +27,7 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  for(const field of manifest.fields)if(field.kind==='secret'&&field.input!=='entered'&&!field.generate&&
   (field.required||field.presentations?.some(item=>item.required))&&!supplied.includes(field.name))throw Error(`rer-setup.json: required managed secret ${field.name} needs adapter supplied declaration.`);
  const own=installerInputs({...presentation.features,ownerBootstrap});
+ for(const field of manifest.fields)if(Object.hasOwn(field,'businessField')&&setupFieldIsSecret(field,own.secretScopes))throw Error(`rer-setup.json: ${field.name} cannot claim a Business field because it is secret or vault-bound`);
  // Compile browser roles once from the manifest, preserving its input names.
  // The first required text field names the workspace; URL/colour fields provide
  // artwork context. Installer-owned hosting inputs are outside that context.
