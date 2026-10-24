@@ -17,7 +17,7 @@ const copied = ['modules/operator-auth', 'modules/mail', 'modules/deploy-kit', '
 // public. A test-only gh answers from this reviewed list of public repositories
 // cited by the copied folders, without network access; any other reference
 // stays unresolved and keeps the report from passing until it is reviewed.
-const publicRepositories = ['cloudflare/cloudflare-typescript', 'dequelabs/axe-core', 'just-every/happytohelp', 'just-every/run-spool', 'octocat/hello-world', 'octocat/spoon-knife', 'publisher/app', 'resend/resend-openapi', 'runeditrun/base', 'rust-lang/crates.io-index', 'simple-icons/simple-icons', 'sqlite/sqlite', 'zloirock/core-js']
+const publicRepositories = ['cloudflare/cloudflare-typescript', 'dequelabs/axe-core', 'just-every/happytohelp', 'just-every/run-auth', 'just-every/run-spool', 'octocat/hello-world', 'octocat/spoon-knife', 'publisher/app', 'resend/resend-openapi', 'runeditrun/base', 'rust-lang/crates.io-index', 'simple-icons/simple-icons', 'sqlite/sqlite', 'zloirock/core-js']
 
 // Fictional examples only: exact normalized identities, never an owner namespace.
 // These are not public dependencies or exceptions in the production publisher.
