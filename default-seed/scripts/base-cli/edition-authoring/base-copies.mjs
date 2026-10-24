@@ -111,7 +111,10 @@ export function validate(record) {
 
 // Every tracked and nonignored untracked file, as Git and the next commit see it.
 function seedFiles(root) {
-  if (fs.realpathSync(git(root, 'rev-parse', '--show-toplevel')) !== fs.realpathSync(root)) throw Error('Run at the edition repository root');
+  let top;
+  try { top = git(root, 'rev-parse', '--show-toplevel'); }
+  catch { throw Error('Cannot read the Git checkout/index. Ensure Git is available and run git status to repair the checkout before working with Base copies; no copy record was changed.'); }
+  if (fs.realpathSync(top) !== fs.realpathSync(root)) throw Error('Run at the edition repository root');
   const files = new Map();
   let names;
   try { names = raw(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').toString('utf8').split('\0').filter(Boolean); }
