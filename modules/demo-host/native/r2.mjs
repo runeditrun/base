@@ -171,7 +171,7 @@ function abort(db, binding, key, id) {
 const methods = { put, get, head: (db, binding, key) => { const row = db.object(binding, key); return row && metadata(row); },
   delete: remove, list, createMultipartUpload, uploadPart, complete, abort };
 export function r2Call(db, binding, method, args) {
-  if (!Object.hasOwn(methods, method)) throw new Error(`Unsupported R2 method: ${method}`);
+  if (!Object.hasOwn(methods, method)) throw new Error('Unsupported R2 method');
   const [key, ...rest] = args;
   return methods[method](db, binding, method === 'list' ? key : method === 'delete' ? key : String(key), ...rest);
 }

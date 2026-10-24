@@ -8,16 +8,17 @@ import { DEMO_FILES } from '../plan.mjs';
 
 export const declarations = [{ name: 'ENVELOPE_RECORD_KEY', generate: 'base64' }, { name: 'RECORD_AUDIT_KEY', generate: 'hex' }];
 export const origin = 'https://demo.example.test';
-export async function secretHost(folder, { baselineVisitor, generatedSecrets = declarations, log, handleStructuredLogs, persist } = {}) {
+export async function secretHost(folder, { baselineVisitor, generatedSecrets = declarations, log, handleStructuredLogs, persist, entry = 'secret-app.mjs', settings = {} } = {}) {
   const base = resolve(import.meta.dirname, '../../..');
   await cp(join(base, 'modules'), join(folder, 'modules'), { recursive: true });
   if (baselineVisitor) await writeFile(join(folder, 'modules/demo-host/native/visitor.mjs'), baselineVisitor);
   const app = join(folder, 'bundle/app'), server = join(app, 'dist/server');
-  for (const file of ['modules/demo-host/tests/secret-app.mjs', 'modules/owner-claim/verify.mjs', 'modules/operator-auth/loopback.mjs']) await cp(join(base, file), join(server, file));
+  for (const file of ['modules/demo-host/tests/secret-app.mjs', 'modules/demo-host/tests/secret-failure-app.mjs', 'modules/owner-claim/verify.mjs', 'modules/operator-auth/loopback.mjs']) await cp(join(base, file), join(server, file));
   await mkdir(join(app, 'dist/client'), { recursive: true });
   const sql = 'CREATE TABLE company(id INTEGER PRIMARY KEY, iv TEXT, data TEXT);';
-  const config = { main: 'modules/demo-host/tests/secret-app.mjs', compatibility_date: '2026-09-08', no_bundle: true,
-    rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }], d1_databases: [{ binding: 'DB' }] };
+  const config = { main: `modules/demo-host/tests/${entry}`, compatibility_date: '2026-09-08', no_bundle: true,
+    rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }], d1_databases: [{ binding: 'DB' }],
+    ...(entry === 'secret-failure-app.mjs' ? { durable_objects: { bindings: [{ name: 'FAILURES', class_name: 'FailureAlarm' }] } } : {}) };
   const migrations = { DB: [{ name: '0001.sql', sql, sha256: createHash('sha256').update(sql).digest('hex'), statements: [sql] }] };
   await writeFile(join(app, 'demo.json'), JSON.stringify({ config, migrations, generatedSecrets }));
   await prepareNative(folder);
@@ -29,7 +30,7 @@ export async function secretHost(folder, { baselineVisitor, generatedSecrets = d
     compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
     durableObjects: { DEMO: { className: 'NativeDemo', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
     ratelimits: { STARTS: { namespace_id: '1002', simple: { limit: 3, period: 60 } } },
-    bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_NAME: 'Payroll', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}',
+    bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_NAME: 'Payroll', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: JSON.stringify(settings),
       TURNSTILE_SITE_KEY: 'fixture-site-key', TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA', RER_DEMO_MEASUREMENT_TOKEN: 'fixture-measurement-token-1234567890123456' },
     serviceBindings: { ASSETS: () => new Response('asset') },
     outboundService: request => { if (request.url !== 'https://challenges.cloudflare.com/turnstile/v0/siteverify') throw new Error('Unexpected network request'); return Response.json({ success: true }); },

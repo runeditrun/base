@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g81e1ccdf",
+  "cliVersion": "0.2.80",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1463,7 +1463,7 @@
     },
     "modules/demo-host/native/alarms.mjs": {
       "source": "modules/demo-host/native/alarms.mjs",
-      "sha256": "3e7efe3cbc143983c36e155d4f4169d5489d785d06cf856b40c41b8350287a35"
+      "sha256": "c934f0a0866397b00d18a5314fd6732d00cc93ad59494f6ac7942c10a480bce4"
     },
     "modules/demo-host/native/bindings.mjs": {
       "source": "modules/demo-host/native/bindings.mjs",
@@ -1475,7 +1475,7 @@
     },
     "modules/demo-host/native/config.mjs": {
       "source": "modules/demo-host/native/config.mjs",
-      "sha256": "b69c8c69fe97cadb9f972197412aede4f9dace1fce5ac5beff895dd5ff772eeb"
+      "sha256": "827d6054cbb916208949bbdc2ee8bac30fa4b0e234df8732d47a7a01067c8fae"
     },
     "modules/demo-host/native/cron.mjs": {
       "source": "modules/demo-host/native/cron.mjs",
@@ -1483,15 +1483,19 @@
     },
     "modules/demo-host/native/d1.mjs": {
       "source": "modules/demo-host/native/d1.mjs",
-      "sha256": "429042a6a2daa11957c6b7d977bde2dc88c5f8df1bd7e3e2874fba587e154780"
+      "sha256": "4d7b801a5f295a019801bfd8e615dfc6f9ceb243744f8cc0e141cd972145f34c"
     },
     "modules/demo-host/native/deploy-r2.mjs": {
       "source": "modules/demo-host/native/deploy-r2.mjs",
       "sha256": "03ad38fe4dc75962b1b43e67bca435b5018b236c86cfbe51eb94d59a16af8a61"
     },
+    "modules/demo-host/native/failure.mjs": {
+      "source": "modules/demo-host/native/failure.mjs",
+      "sha256": "d1b40bb8173568f276314ce9752d298bc1f3b6e83e4921e9698fd422e58c26cf"
+    },
     "modules/demo-host/native/isolate.mjs": {
       "source": "modules/demo-host/native/isolate.mjs",
-      "sha256": "36a0b806ad58b5ad73e68f91506d8de960486d2f107640459c7347d4ecfa298e"
+      "sha256": "6351176d3db0865e40de50a9896ac1e0f018cafb65752903f68dedfb7e38bbf5"
     },
     "modules/demo-host/native/loader.mjs": {
       "source": "modules/demo-host/native/loader.mjs",
@@ -1507,7 +1511,7 @@
     },
     "modules/demo-host/native/queues.mjs": {
       "source": "modules/demo-host/native/queues.mjs",
-      "sha256": "81f15c25f48407069591a70e2e47efd9635e4d2c7858daeaf0f2f35dfc1b9bd7"
+      "sha256": "f8de4ebf4264972549e65a28aebd5f5a56ef2ea91cd24d403a319ae0a78a9414"
     },
     "modules/demo-host/native/r2-client.mjs": {
       "source": "modules/demo-host/native/r2-client.mjs",
@@ -1515,15 +1519,15 @@
     },
     "modules/demo-host/native/r2-store.mjs": {
       "source": "modules/demo-host/native/r2-store.mjs",
-      "sha256": "73aeeaabbf1b8bfcb84df3ac7e70952a4becfafcd389c0a82ae9427079c2395e"
+      "sha256": "f2da9751e8f1ef4757dd7787d2e81f6c5eb720acdc13f5b7ecbff8a458242429"
     },
     "modules/demo-host/native/r2.mjs": {
       "source": "modules/demo-host/native/r2.mjs",
-      "sha256": "97b4b9976e74b351c04a758f4dfd4161d5a6a0bec0ae12813b3ab7af34ef79d9"
+      "sha256": "e204e1ed3801385e16aa01c8c6c3eb5e41fa67e063ff22945cb78c248ecceb7d"
     },
     "modules/demo-host/native/resources.mjs": {
       "source": "modules/demo-host/native/resources.mjs",
-      "sha256": "31c699ee952b486f0354fe84a50d5f5756dfc6f44c2b0de464b11b938579bbf9"
+      "sha256": "b9ce1caa84ff2a43fd2187978da5bccdde9040365195b8d6406d4531d111e795"
     },
     "modules/demo-host/native/secrets.mjs": {
       "source": "modules/demo-host/native/secrets.mjs",
@@ -1531,7 +1535,7 @@
     },
     "modules/demo-host/native/seed-object.mjs": {
       "source": "modules/demo-host/native/seed-object.mjs",
-      "sha256": "e42f9df5d10698564d1bc20d6c16537e02d013fa670247d7e7db6685bfff332b"
+      "sha256": "e76da5c12def7b4a7072d35d4434bf6841e2817098da3aa042490451e5d28a3e"
     },
     "modules/demo-host/native/sql.mjs": {
       "source": "modules/demo-host/native/sql.mjs",
@@ -1539,7 +1543,7 @@
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",
-      "sha256": "cf29fc7d92d8940e8319aaec5d2673c33bdf664bbc5002594ed278c92f130c85"
+      "sha256": "9c6434ba6b8f7e28e50a397f4ac33c6f2f5608a83be4f5f53393c502a854089a"
     },
     "modules/demo-host/native/warm.mjs": {
       "source": "modules/demo-host/native/warm.mjs",

@@ -174,8 +174,15 @@ Values first exist at visitor creation, in that visitor's runtime bindings and
 Durable Object storage. They are absent from the build, host configuration and
 CLI output. A runtime restart reloads the same saved keys with its encrypted
 data; newly added declarations apply to fresh visitors, without rotating a
-live copy's keys. Host startup errors redact these values before logging or
-retaining operator diagnostics. Ending, cancelling, signing out or expiring the copy erases the keys and
+live copy's keys. Host-owned error sinks retain only a fixed failure category,
+never seed error text, stacks, causes, aggregate members or refused owner-claim
+response bodies. Claim bodies are discarded before any formatting or truncation.
+This content-free rule discards every secret and fragment, including values
+shorter than eight characters and JSON/URL/percent-encoded text. It does not rely
+on matching full keys: a base64 key without its fixed padding, or a hex prefix,
+can still carry recoverable key material. Fetch, sign-out, scheduled work,
+alarms, RPC and background rejections use the same boundary; D1 warnings and
+resource validation errors omit seed-controlled names and values. Ending, cancelling, signing out or expiring the copy erases the keys and
 data together; a fresh visitor gets new independent keys. The four existing
 host-generated keys retain their existing formats and lifetime. Never log or
 return secret values from the seed; compare fingerprints when diagnosing keys.

@@ -2,7 +2,7 @@ import { bundle } from './loader.mjs';
 
 export async function seedAlarm(host, binding, id, method, at) {
   await host.active();
-  if (!bundle.bindings.objects.some(item => item.name === binding) || !/^[a-f0-9]{64}$/.test(id)) throw new Error(`Unknown Durable Object binding or id: ${binding}`);
+  if (!bundle.bindings.objects.some(item => item.name === binding) || !/^[a-f0-9]{64}$/.test(id)) throw new Error('Unknown Durable Object binding or id');
   const key = `alarm:${binding}:${id}`;
   if (method === 'get') {
     const record = await host.ctx.storage.get(key);
@@ -37,9 +37,9 @@ export async function deliverSeedAlarms(host, now) {
       } })]);
       if (response.status !== 204) throw new Error(`Seed alarm refused: ${response.status}`);
     }
-    catch (error) {
+    catch {
       failed = true;
-      console.error(JSON.stringify({ event: 'native-demo-seed-alarm-failed', binding: record.binding, message: String(error.message) }));
+      console.error(JSON.stringify({ event: 'native-demo-seed-alarm-failed', binding: record.binding, message: host.failure() }));
     }
     await host.ctx.storage.transaction(async txn => {
       const current = await txn.get(key);

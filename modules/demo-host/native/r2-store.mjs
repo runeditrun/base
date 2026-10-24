@@ -1,3 +1,4 @@
+import { seedOperation } from './failure.mjs';
 import { createHash } from 'node:crypto';
 
 // Demo R2 objects live in the visitor's own SQLite storage, beside the app,
@@ -39,7 +40,7 @@ async function* pieces(body) {
   const reader = body.getReader();
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      const { done, value } = await seedOperation(() => reader.read());
       if (done) return;
       yield bytesOf(value) ?? (() => { throw new TypeError('put: The body stream must contain bytes.'); })();
     }

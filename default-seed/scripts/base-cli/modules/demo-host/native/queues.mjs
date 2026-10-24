@@ -2,7 +2,7 @@ import { application, bundle } from './loader.mjs';
 const consumerFor = queue => bundle.bindings.queues.consumers.find(item => item.queue === queue);
 export async function enqueue(host, queue, messages) {
   await host.active();
-  if (!bundle.bindings.queues.producers.some(item => item.queue === queue)) throw new Error(`Unknown queue: ${queue}`);
+  if (!bundle.bindings.queues.producers.some(item => item.queue === queue)) throw new Error('Unknown queue');
   if (!Array.isArray(messages) || !messages.length || messages.length > 100) throw new Error('Queue batch must contain 1–100 messages');
   const now = Date.now(), records = {};
   for (const message of messages) {
@@ -54,7 +54,7 @@ export async function nextQueue(host) {
 
 export async function queueMetrics(host, queue) {
   await host.active();
-  if (!bundle.bindings.queues.producers.some(item => item.queue === queue)) throw new Error(`Unknown queue: ${queue}`);
+  if (!bundle.bindings.queues.producers.some(item => item.queue === queue)) throw new Error('Unknown queue');
   const messages = [...(await host.ctx.storage.list({ prefix: 'queue:' })).values()].filter(item => item.queue === queue);
   const bytes = body => body instanceof ArrayBuffer || ArrayBuffer.isView(body) ? body.byteLength : new TextEncoder().encode(typeof body === 'string' ? body : JSON.stringify(body)).byteLength;
   return { backlogCount: messages.length, backlogBytes: messages.reduce((sum, item) => sum + bytes(item.body), 0),

@@ -1,3 +1,4 @@
+import { seedOperation } from './failure.js';
 import { env } from 'cloudflare:workers';
 
 // Facets have SQLite and WebSockets but no native alarms. Keep the seed's
@@ -13,10 +14,10 @@ export function seedObject(Original, binding) {
     }
     async fetch(request) {
       if (request.headers.get('x-rer-native-alarm-key') === env.RER_NATIVE_KEY) {
-        await super.alarm(JSON.parse(request.headers.get('x-rer-native-alarm-info')));
+        await seedOperation(() => super.alarm(JSON.parse(request.headers.get('x-rer-native-alarm-info'))));
         return new Response(null, { status: 204 });
       }
-      return super.fetch(request);
+      return seedOperation(() => super.fetch(request));
     }
   };
 }
