@@ -5,29 +5,11 @@ import { tmpdir } from "node:os";
 import { resolve, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { commit, familyManifest, select, git } from "./git-source.mjs";
-const [edition, ...args] = process.argv.slice(2);
-const usage =
-  "pnpm edition <edition> --family-repo <checkout> --base-repo <checkout> --output <new-directory> [--ref <commit>] [--install] [--verify] [--setup] [--deploy] [--dry-run] [--dev]";
-if (!edition || edition === "--help") {
+import { parseCompositionArgs, usage } from "./arguments.mjs";
+const options = parseCompositionArgs(process.argv.slice(2));
+if (!options) {
   console.log(usage);
   process.exit(0);
-}
-const options = { edition };
-for (let i = 0; i < args.length; i++) {
-  const name = args[i].slice(2);
-  if (["family-repo", "base-repo", "output", "ref"].includes(name)) {
-    if (!args[i + 1] || args[i + 1].startsWith("--"))
-      throw new Error(`${args[i]} needs a value`);
-    options[name] = args[++i];
-  } else if (
-    ["install", "verify", "setup", "deploy", "dry-run", "dev"].includes(name)
-  )
-    options[name] = true;
-  else throw new Error(`Unknown argument ${args[i]}`);
-}
-for (const key of ["family-repo", "base-repo", "output"]) {
-  if (!options[key]) throw new Error(usage);
-  options[key] = resolve(options[key]);
 }
 if (
   !options.ref &&
