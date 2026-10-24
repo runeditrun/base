@@ -14,9 +14,12 @@ here, not installation `.rer` archives. Editions adopt this same door
 with their own supported readers and native adapters.
 
 The import kit plans and applies reviewed, inert data imports. It preserves the
-source records, exact available source bytes, and the provenance needed to inspect,
-resume, reconcile, or reverse an import. It does not send messages, enqueue work,
-activate access, or run application lifecycle hooks.
+source records, available custody bytes, and the provenance needed to inspect,
+resume, reconcile, or reverse an import. Without an intake declaration, custody
+keeps the exact available source bytes. A door source that declares an intake
+allowlist drops other fields before any persistent write and keeps the sanitized
+NDJSON as its original custody; it never stores the raw export. It does not send
+messages, enqueue work, activate access, or run application lifecycle hooks.
 
 ## Adopt the shared door
 
@@ -25,6 +28,31 @@ The signed-in screen, RER and Business share upload, plan, reviewed fingerprint,
 apply, reconcile and undo. Keep product readers, mappings and native adapters;
 remove separate importer routes and their job creation/apply callers. Owner
 history and Undo include jobs from either authority.
+
+Use the door's optional static `intake: {formats, allow}` declaration when a
+seed's source contract prohibits retaining fields outside an allowlist, including
+in uploads and originals. CSV lists exact case-sensitive decoded headers; JSON
+and NDJSON list exact RFC 6901 pointers to scalar leaves. The door streams the
+raw request through that drop-only declaration into NDJSON before storage;
+parsers and mappings still run during planning with `credentials: 'remove'`.
+No sanitizer callback or client-supplied sanitizer/hash is accepted. See the
+[intake protocol](src/door/README.md#optional-intake-before-custody) and the
+[Auth adoption example](src/door/ADOPTING.md#example-auth-source-contract).
+
+The declaration belongs to the source returned to both door mounts:
+
+```ts
+const source: ImportDoorSource = {
+  parse, mapping,
+  intake: {
+    formats: ['csv', 'ndjson'],
+    allow: {
+      csv: ['user_id', 'email', 'name', 'blocked'],
+      ndjson: ['/user_id', '/email', '/name', '/blocked'],
+    },
+  },
+};
+```
 
 ## Engine primitives
 

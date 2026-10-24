@@ -50,6 +50,10 @@ Owner history and undo must include jobs from either authority.
      `importDoorScopesMigration`. Until both are applied, the door answers 503
      `import_door_schema_outdated`. Then `importDoorArchiveMigration`; until it
      is applied, only `archive` and `restore-check` answer that 503.
+   - only when an installed adapter declares `intake`:
+     `importDoorIntakeMigration`, which adds nullable `intake_json` to
+     `ik_door_uploads`. Fresh `importDoorSchema` includes the column. Existing
+     undeclared installations need no intake migration or upload changes.
 2. **Native adapter.** Supply the seed's real `D1TargetAdapter`, parser,
    `ImportMapping`, destination and actual owner principal. Read/write/remove
    guards must protect native revisions and values in the same D1 transaction.
@@ -91,13 +95,18 @@ Owner history and undo must include jobs from either authority.
 
    **Several import sources.** One namespace per source (for example one per
    vendor). Keep **one** server-owned allow-list, `importSource(name)`, that
-   returns a fresh `{parse, mapping, ownerPrincipalId?}` for a listed name and
-   `null` otherwise; step 4 passes the same function to the grant mount. Build
+   returns a fresh `{parse, mapping, ownerPrincipalId?, intake?}` for a listed
+   name and `null` otherwise; step 4 passes the same function to the grant mount. Build
    the owner handler per request from it and refuse anything else before the
    door runs. An entry may supply a mapping that needs that request's whole
    parsed bundle, or a per-request owner principal. Construction is cheap and
    stateless; plans and uploads are reachable only in their own namespace. The
-   move-in screen sends the source on every call. Answer `/api/rer/import/*`
+   optional `intake` is a static declaration of formats and fields per source, shared
+   unchanged with both mounts. Declare it when the source contract forbids
+   retaining other fields, so the door drops them before any persistent write,
+   rather than dropping them later in the product parser. See the
+   [Auth example below](#example-auth-source-contract).
+   The move-in screen sends the source on every call. Answer `/api/rer/import/*`
    with 404 here: a configured grant mount (step 4) runs before this handler.
    ```ts
    const sources = {pagerduty: pagerDutyImport, opsgenie: opsgenieImport}; // server-owned factories
@@ -156,8 +165,13 @@ Owner history and undo must include jobs from either authority.
    reconcile,undo}` with the current owner cookie, exact `Origin` and normal
    seed CSRF headers. Show the **Business imports** setting here (step 4): it
    starts off, and the owner's switch is what opens the door to Business
-   grants. Bodies and results are in [README.md](README.md). Upload
-   original bytes, show the returned counts, rejections, differences and each
+   grants. Bodies and results are in [README.md](README.md). Without declared
+   intake, upload original bytes through the existing JSON chunk protocol.
+   With intake, POST the full raw stream to the same uploads route with
+   `Content-Type: application/octet-stream`, `X-Import-Format` and `X-Import-Name`;
+   custody and response hashes then describe sanitized NDJSON. Do not send
+   JSON chunk envelopes or a client sanitizer/hash for that source. Show the
+   returned counts, rejections, differences and each
    `CREDENTIAL_REMOVED` diagnostic (a credential value the door removed from that
    record), and each named source refusal's `details.reason`, then
    require the owner's review before posting `{planId, reviewedFingerprint}`.
@@ -172,9 +186,11 @@ Owner history and undo must include jobs from either authority.
    facts (`ik_door_apply_failures`) and grant metadata in the seed's
    erasure/custody inventory,
    alongside ordinary kit originals/provenance. Withdraw an indivisible bundle
-   when erasing any contained subject; preserve unrelated native records. Keep
-   installation settings and permanent revoked keys. Exercise **every erase
-   path with door rows present** (see Pitfalls), even with grants disabled.
+   when erasing any contained subject; preserve unrelated native records. Include
+   partial sanitized uploads left by interrupted or invalid intake streams;
+   forbidden raw fields were never stored. Keep installation settings and
+   permanent revoked keys. Exercise **every erase path with door rows present**
+   (see Pitfalls), even with grants disabled.
    Do not omit tables from retirement tallies to hide retained personal data.
 7. **Tests.** Extend existing HTTP journeys within the seed's 200-test cap. Use
    its actual migrated Worker, real sign-in, synthetic exports and public native
@@ -205,6 +221,42 @@ opt in. Earlier owner imports then stay in history, and Business catches up on
 their lineage instead of re-creating them. The existing grant signature, nonce,
 scope, expiry and approval rules do not change.
 
+## Example: Auth source contract
+
+Auth's [MOVE-IN contract at commit 35c2080](https://github.com/just-every/run-auth/blob/35c2080c07c0c17fc7fd1315f0899bd953f0fa2e/MOVE-IN.md)
+keeps email, name, disabled state, provider id and review context. Credentials,
+MFA, roles, sessions and policies do not move. Its Auth0 and Okta sources can
+declare separate intake lists:
+
+```ts
+const auth0Intake = {
+  formats: ['csv', 'ndjson'],
+  allow: {
+    csv: ['user_id', 'email', 'name', 'blocked'],
+    ndjson: ['/user_id', '/email', '/name', '/blocked'],
+  },
+} as const;
+const oktaIntake = {
+  formats: ['json'],
+  allow: {
+    json: ['/id', '/status', '/profile/email', '/profile/login',
+      '/profile/displayName', '/profile/firstName', '/profile/lastName',
+      '/profile/department'],
+  },
+} as const;
+```
+
+Auth0's CSV and NDJSON lists contain only those four fields. Okta's Users API
+JSON array retains email with login as fallback, displayName with firstName
+plus lastName as fallback, and department for review only. Those choices stay
+in the product parser/mapping; intake only drops fields and preserves values.
+
+Return each declaration with its source's `{parse, mapping, ownerPrincipalId?,
+intake?}`. The operator mount spreads that source entry and the grant mount
+uses the same `importSource` resolver, so both enforce the same list before
+custody. This is a documentation example, not an Auth seed change. See the
+[streaming protocol and scalar-leaf rules](README.md#optional-intake-before-custody).
+
 ## Pitfalls found in adoptions
 
 - **Credential fields in exports.** Vendor exports carry credential-named
@@ -229,7 +281,8 @@ scope, expiry and approval rules do not change.
 
 - **Export custody.** A seed whose export policy excludes import custody
   (`excludeTables`) must also exclude `ik_door_%`; door uploads and plans hold
-  original source bytes.
+  original source bytes for undeclared sources, or sanitized NDJSON custody
+  for declared intake sources.
 - **Catch-up writes.** Catch-up replaces imported targets; the kit guards each
   replacement with `expectedRevision` from the import's provenance and the full
   before-image. `write` must upsert the target, replace the child rows it owns
@@ -253,10 +306,12 @@ scope, expiry and approval rules do not change.
 - **Erasure.** Run every erase path (each public erasure route, account,
   project or workspace deletion, retirement) with door rows present (an applied
   import's uploads, plans and approvals), not only with the tables installed.
-- **Door migrations.** Apply every door migration Base ships, each once, in
+- **Door migrations.** Apply every mandatory door migration Base ships, each once, in
   order, in its own new numbered seed migration: today
   `importDoorApplyFailureMigration` (one atomic batch, foreign keys on), then
-  `importDoorScopesMigration`, then `importDoorArchiveMigration`. Never re-apply an updated `importDoorSchema` to
+  `importDoorScopesMigration`, then `importDoorArchiveMigration`. Apply optional
+  `importDoorIntakeMigration` only for installed adapters declaring intake.
+  Never re-apply an updated `importDoorSchema` to
   an installed door: its `CREATE TABLE IF NOT EXISTS` statements would skip
   changed tables, so its first statement refuses an earlier door's plan table
   and the deploy fails.
@@ -290,6 +345,15 @@ excluding import bookkeeping. Supply nonempty synthetic source bytes plus
 real field values and the seed's undo policy. Those hooks must use public reads,
 not SQL, mocks or precomputed results. The existing seed journey separately
 covers settings, revocation, native edits and erasure as above.
+
+The chunk-upload portion below is for a source **without** an intake
+declaration. For declared intake, replace it with one authenticated streaming
+upload using the headers in [README.md](README.md#optional-intake-before-custody).
+Take `bundleSha256` and received sizes from that response/inventory and compare
+those custody hashes across plan and reconcile; do not assert the raw input's
+hash or size. Assert `intake.sanitized`, `inputFormat`, `custodyFormat` and the
+server-derived `allowlistSha256`, and exercise forbidden-field exclusion,
+invalid-row refusal and partial-upload erasure in that source's HTTP journey.
 
 ```js
 import assert from 'node:assert/strict';

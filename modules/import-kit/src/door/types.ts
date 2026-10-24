@@ -2,12 +2,16 @@ import type { D1Database, D1Sql, D1TargetAdapter } from '../d1/types.ts';
 import type { D1ReversalPolicy } from '../d1/undo-types.ts';
 import type { ImportMapping, ImportPlan, Json, ParsedRecord, ReaderLimits } from '../types.ts';
 import type { DoorGrant } from './protocol.ts';
+import type { ImportDoorIntake } from './intake/types.ts';
+export type { ImportDoorIntake, IntakeFormat } from './intake/types.ts';
 
 /** One import source: its parser and mapping, and optionally its own owner principal. */
 export interface ImportDoorSource {
   mapping: ImportMapping;
   parse(value: Json, index: number): ParsedRecord | ParsedRecord[];
   ownerPrincipalId?: string;
+  /** Project declared fields before the first persistent byte. Shared by both mounts. */
+  intake?: ImportDoorIntake;
 }
 export interface ImportDoorRuntimeOptions extends ImportDoorSource {
   database: D1Database;
