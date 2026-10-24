@@ -49,9 +49,27 @@ Signing and receipt commands:
 Signing scope defaults to rer; receipt environment defaults to production.
 Key generation requires non-terminal stdout; --key-stdin requires non-terminal stdin.
 `;
+const signingHelp = {
+ sign: `Usage: rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer]
+
+Write a detached signature for a produced release artifact and print, without
+running it, the GitHub upload command. Signing scope defaults to rer;
+--key-stdin requires non-terminal stdin.`,
+ receipt: `Usage: rer release receipt --artifact DIR --anchors FILE [--environment test] [--after VERSION:SHA256]
+
+Verify a signed release artifact against local anchors, offline. The receipt
+environment defaults to production.`,
+ keygen: `Usage: rer release keygen --scope test|rer --publisher NAMESPACE --github-owner LOGIN --github-owner-id ID --anchor-out FILE
+  [--not-before YYYY-MM-DDTHH:MM:SSZ] [--not-after YYYY-MM-DDTHH:MM:SSZ]
+  [--unsigned-through PROJECT:VERSION ...]
+
+Write a public anchor to --anchor-out and, on success, its private key to
+stdout, which must not be a terminal.`,
+};
 
 export async function dispatchRelease(args) {
- if (args.length === 1 && args[0] === '--help') { console.log(releaseHelp); return 0; }
+ // --help never performs release work, wherever it appears.
+ if (args.includes('--help')) { console.log(signingHelp[args[0]] ?? releaseHelp); return 0; }
  if (Object.hasOwn(releaseVerb.subcommands, args[0])) return (await import('../modules/release/signing-cli.mjs')).dispatchSigning(args[0], args.slice(1));
  try {
   const options = {};

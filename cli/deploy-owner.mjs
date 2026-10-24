@@ -1,5 +1,5 @@
 import { ownerClaimRequest } from './deploy-claim-request.mjs';
-import { retireOwnerClaimSession } from './deploy-claim-session.mjs';
+import { retireOwnerClaimSession, unretiredNotice } from './deploy-claim-session.mjs';
 import { observeOwner, ownerExchangeFailure } from './deploy-observation.mjs';
 import { randomBytes } from 'node:crypto';
 
@@ -57,7 +57,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
   let observed, exchanges = [];
   try {
    if (deployed.observedOwner) await hook(context);
-   else await observeOwner({ paths: ['/auth/bootstrap', claim?.path].filter(Boolean), inspect, addSecret, deployed: () => deployed, tokenKey }, async claims => { exchanges = claims; await hook(context); observed = claims.at(-1)?.outcome; });
+   else await observeOwner({ paths: ['/auth/bootstrap', claim?.path].filter(Boolean), inspect, addSecret, deployed: () => deployed, tokenKey, report: line => store?.report?.(line) }, async claims => { exchanges = claims; await hook(context); observed = claims.at(-1)?.outcome; });
   } catch (cause) {
    const exchange = exchanges.lastExchange ?? exchanges.at(-1);
    const error = cause.message === 'owner-claim-failed' ? cause : ownerFailure(cause.message);
@@ -77,7 +77,7 @@ export async function claimHostedOwner({ hook, setupManifest, declaration, deplo
    headers: { Origin: deployed.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token, displayName, returnTo: hook.returnTo ?? '/' }) }, {deployed, tokenKey, signal});
  } catch (error) { throw ownerFailure(`POST ${new URL(hook.path ?? '/auth/bootstrap',deployed.origin).pathname}: ` + (['owner-claim-origin-mismatch','owner-claim-redirected','owner-claim-readiness-timeout'].includes(error.message) ? error.message : 'the hosted application did not answer')); }
  if (response.status !== 303) { try { const body = await response.json(); if (typeof body?.error === 'string' && /^[a-z_]{1,64}$/.test(body.error)) code = body.error; } catch {} }
- else { await retireOwnerClaimSession(fetch, response, deployed.origin); await response.body?.cancel(); }
+ else { const retired = await retireOwnerClaimSession(fetch, response, deployed.origin); if (retired?.retired === false) store?.report?.(unretiredNotice(retired)); await response.body?.cancel(); }
  const outcome = response.status === 303 ? 'claimed' : response.status === 409 && code === 'already_initialized' ? 'kept' : undefined;
  const advice = code !== 'invalid_setup_token' ? '' : !secret ? `; the Worker holds another setup token: have the deploy hook return the one it deployed as setupToken, or set it as ${item.environment} with --env-file` : given ? `; the ${item.environment} you supplied is not the deployed setup token: leave it unset and rer issues a fresh one` : '';
  if (!outcome) throw ownerFailure(`POST ${new URL(hook.path ?? '/auth/bootstrap',deployed.origin).pathname} returned HTTP ${response.status} (${code})${advice}`);

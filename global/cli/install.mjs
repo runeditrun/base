@@ -7,6 +7,7 @@ import { basename, join, resolve } from 'node:path';
 import { ownManifest, ownRoot, packageDigest, packageFileList } from '../package-info.mjs';
 import { installRecord, launcherOwner, launcherScript, layout } from './layout.mjs';
 import { pathAdvice } from './path-link.mjs';
+import { rerWord } from './invocation.mjs';
 import { runningDoor } from '../../cli/door.mjs';
 import { channelOf } from './status.mjs';
 
@@ -40,12 +41,13 @@ async function writeLauncher(paths) {
  await rename(temporary, paths.launcher);
 }
 
-// The next step, then (when needed) the exact line that puts rer on PATH, last.
-// install.sh running a command itself, and rer update, set RER_INSTALL_NO_NEXT.
-// Business connect also suppresses PATH advice: it uses the launcher directly.
+// The next step, as this shell can run it now, then (when needed) the exact
+// line that puts rer on PATH, last. install.sh running a command itself, and
+// rer update, set RER_INSTALL_NO_NEXT. Business connect also suppresses PATH
+// advice: it uses the launcher directly.
 async function closing(paths) {
  const advice = process.env.RER_INSTALL_NO_PATH ? '' : await pathAdvice(paths);
- return `${process.env.RER_INSTALL_NO_NEXT ? '' : 'Next, start an app: rer dev <owner>/<repo>\n'}${advice ? advice + '\n' : ''}`;
+ return `${process.env.RER_INSTALL_NO_NEXT ? '' : `Next, start an app: ${rerWord()} dev <owner>/<repo>\n`}${advice ? advice + '\n' : ''}`;
 }
 
 export async function install({ quiet = false } = {}) {

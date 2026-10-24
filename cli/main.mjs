@@ -17,9 +17,10 @@ export async function main(argv = process.argv.slice(2)) {
  try {
   options = parse(argv,process.cwd(),{deferTail:true}); out = output(options);
   if (options.help) return showHelp(options,out);
-  if (options.verb === 'archive') return (await import('./archive.mjs')).archiveCommand(options.archiveArgs,out);
-  if (options.verb === 'listing') return (await import('./listing.mjs')).dispatchListing(options.listingArgs);
-  if (options.verb === 'release') return (await import('./release.mjs')).dispatchRelease(options.releaseArgs);
+  // Awaited here, so their failures reach the classified output below.
+  if (options.verb === 'archive') return await (await import('./archive.mjs')).archiveCommand(options.archiveArgs,out);
+  if (options.verb === 'listing') return await (await import('./listing.mjs')).dispatchListing(options.listingArgs);
+  if (options.verb === 'release') return await (await import('./release.mjs')).dispatchRelease(options.releaseArgs);
   const independent = await parsingProfile(options.cwd)==='independent'&&!['describe','check','doctor'].includes(options.verb);
   options=parse(argv,process.cwd(),{independent});out=output(options);
   if (options.help) return showHelp(options,out);
@@ -47,6 +48,8 @@ export async function main(argv = process.argv.slice(2)) {
    const result = await check(project, options.profile);
    (await import('./placeholder-mark.mjs')).warnPlaceholderMarks(out, options, result.placeholderMarks);
    if (!options.json) for (const clause of result.clauses.filter(c => !c.ok)) out.human(`${clause.id}: ${clause.message}`);
+   // Check reads declarations; doctor and verify are the steps that look further.
+   if (!options.json && result.ok) out.human(`Structural checks passed (${result.clauses.length} declarations checked; nothing was run). Run rer doctor to check this computer's prerequisites.`);
    out.result(result.ok, result.ok ? 0 : 1, { clauses: result.clauses }); return result.ok ? 0 : 1;
   }
   if (options.verb === 'doctor') {

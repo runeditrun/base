@@ -285,7 +285,7 @@ test('declared minimal hook keeps an established owner and refuses provider repl
  assert.equal(f.provider.state.writes.length, writes);
 });
 
-test('first custom deploy exits zero for late health, and wrong-commit health fails with the exact rerun', async t => {
+test('first custom deploy exits zero for late health and for an app that signs out elsewhere, and wrong-commit health fails with the exact rerun', async t => {
  const f = await finalizingDeploy(t);
  const result = await f.run('late'), output = result.stdout + result.stderr;
  assert.equal(result.code, 0, output);
@@ -301,6 +301,15 @@ test('first custom deploy exits zero for late health, and wrong-commit health fa
  assert.match(failure, /still answers for commit 0123456789ab/);
  assert.match(failure, /90-second finalization wait/);
  assert.ok(failure.includes(f.again), failure);
+ // Slate signs out at its own route and answers 404 at Base's POST
+ // /auth/signout: its first deploy still ends claimed at exit 0, with the setup
+ // token removed, and names the session rer could not sign out.
+ await rm(join(f.root, '.rer'), { recursive: true, force: true });
+ const elsewhere = await f.run('late', { signout: 404 }), said = elsewhere.stdout + elsewhere.stderr;
+ assert.equal(elsewhere.code, 0, said);
+ assert.equal(JSON.parse(elsewhere.stdout.trim().split('\n').at(-1)).owner, 'claimed');
+ assert.ok(JSON.parse(await readFile(join(f.root, '.rer/deploy/review.json'))).retiredSecrets.includes('SETUP_TOKEN'));
+ assert.match(said, /\/auth\/signout/);
 });
 
 test('claim and retirement failures fail the command with deployment state and same-input recovery', async t => {

@@ -29,7 +29,8 @@ function own(children, child, signal) {
 }
 
 // One bounded verb, never prompting: no stdin, --non-interactive, --json.
-export async function runVerb(entry, args, { root, env, note, log, children, signal }) {
+// `step` sees each line the verb prints on stderr, where its steps are named.
+export async function runVerb(entry, args, { root, env, note, step = () => {}, log, children, signal }) {
  signal?.throwIfAborted();
  const child = spawn(process.execPath, [entry, ...args, '--json', '--non-interactive'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
  own(children, child, signal);
@@ -37,6 +38,7 @@ export async function runVerb(entry, args, { root, env, note, log, children, sig
  const lines = createInterface({ input: child.stdout });
  lines.on('line', line => { const event = events(line); if (event?.event === 'error') error = event; const text = event && waitingNote(event); if (text) note(text); log(line); });
  child.stderr.on('data', data => { output = (output + data).slice(-8192); log(String(data).trimEnd()); });
+ createInterface({ input: child.stderr }).on('line', line => step(line.trim()));
  const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', (exit, signal) => resolve(exit ?? (signal ? 128 : 1))); });
  children.delete(child);
  if (code !== 0) throw failureFrom(code, error, output);

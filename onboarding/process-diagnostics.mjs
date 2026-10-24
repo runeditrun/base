@@ -18,6 +18,9 @@ export const inspectionContext=({budgetMs=15000,...details}={})=>({deadline:perf
 // times. The search itself is bounded by its candidate count, not by this.
 export const searchContext=(details={})=>inspectionContext({budgetMs:Math.round(15000*Math.min(4,Math.max(1,loadavg()[0]/availableParallelism()))),...details});
 export const uncheckedInspection=error=>approvedFailure(error)?.ownershipUnchecked===true;
+// A timed-out probe is killed outright (SIGKILL), and its look ends at the
+// bound even when the process cannot be ended, so the budget is a real one.
+const bounded=(promise,timeout)=>{let timer;return Promise.race([promise,new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Object.assign(Error('probe did not end'),{killed:true})),timeout+250);})]).finally(()=>clearTimeout(timer));};
 const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,noMatch=false,positiveResult}={})=>{
  const invocation=[command,...args].join(' ').replaceAll(homedir(),'~');
  let failure;
@@ -25,7 +28,7 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
   const remaining=Math.floor(context.deadline-performance.now());
   if(remaining<=0)break;
   const timeout=attempt===0?Math.min(3000,remaining):remaining;
-  try{return (await exec(command,args,{timeout,maxBuffer,signal:context.signal})).stdout;}
+  try{return (await bounded(exec(command,args,{timeout,maxBuffer,signal:context.signal,killSignal:'SIGKILL'}),timeout)).stdout;}
   catch(error){
    // A cancelled caller stops inspecting: the abort is never an ownership verdict.
    if(context.signal?.aborted)throw context.signal.reason;
@@ -198,11 +201,16 @@ async function callerLineage(context){
  return lineage;
 }
 export async function localProcessConflict(root,savedOrigin,context=inspectionContext()){
- root=await realpath(root);const lineage=await callerLineage(context);
+ root=await realpath(root);
  // Inspect canonical state before optional socket diagnostics spend the shared
  // budget. This is file custody, not a claim that another process owns a port.
  const state=join(root,'.wrangler/state');
  let hasState=true;try{await lstat(state);}catch(error){if(error.code==='ENOENT')hasState=false;else throw error;}
+ // A checkout with no local state and no saved origin (a fresh clone) has
+ // nothing another process could hold: no state files and no port of its own,
+ // so no process table or socket scan is spent on it.
+ if(!hasState&&!savedOrigin)return;
+ const lineage=await callerLineage(context);
  let held;
  if(hasState){
   if(process.platform==='linux'){for(const pid of await linuxPids())if(!lineage.has(pid)&&(await descriptors(pid)).some(path=>path.startsWith(state+'/'))){held={pid};break;}}

@@ -4,7 +4,20 @@ import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 const execute = promisify(execFile);
 
-export async function processInfo(pid) {
+// `bound` (ms), when given, is the most a look may take: ps is killed then,
+// and the look fails with code ETIMEDOUT even if ps cannot be ended, so a
+// caller with a fallback never waits on a process table that does not answer.
+export async function processInfo(pid, { bound } = {}) {
+  if (!bound) return lookUp(pid);
+  let timer;
+  try {
+    return await Promise.race([lookUp(pid, bound), new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(Object.assign(Error(`Process inspection did not answer within ${bound} ms`), { code: 'ETIMEDOUT' })), bound + 250);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
+async function lookUp(pid, bound) {
   if (!Number.isInteger(pid) || pid < 1) throw Error('Invalid process PID');
   if (process.platform === 'linux') {
     try {
@@ -18,7 +31,7 @@ export async function processInfo(pid) {
   if (process.platform !== 'darwin') throw Error('Job queue supports macOS and Linux');
   try {
     const { stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'stat=', '-o', 'command='],
-      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' } });
+      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, ...(bound ? { timeout: bound, killSignal: 'SIGKILL' } : {}) });
     const match = stdout.trim().match(/^(.{24})\s+(\S+)\s+(.*)$/);
     if (!match) throw Error(`Cannot inspect process ${pid}`);
     return { pid, start: match[1], zombie: match[2].startsWith('Z'), title: match[3] };

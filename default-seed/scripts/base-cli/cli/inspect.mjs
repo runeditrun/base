@@ -253,10 +253,18 @@ export async function doctor(project, store, signal) {
 
 export function doctorSummary(result) {
  const lines = [result.ok ? 'Local checks passed.' : 'Local checks need attention.'];
- if (result.node.expected) lines.push(`Node: ${result.node.actual} (expected ${result.node.expected}).`);
+ const { actual: node, expected: nodePin } = result.node;
+ if (nodePin === node) lines.push(`Node: ${node} (expected ${nodePin}).`);
+ // rer's own commands switch to the pinned Node unless RER_NODE_AUTO=0; only this shell's tools need a change.
+ else if (nodePin) lines.push(`Node: this shell has ${node}; the project needs ${nodePin}.`, process.env.RER_NODE_AUTO !== '0'
+  ? `  rer runs this checkout's commands with Node ${nodePin} by itself, downloading it once if needed. To run tools directly in this shell, switch it to Node ${nodePin}.`
+  : `  Automatic Node selection is off (RER_NODE_AUTO=0): unset RER_NODE_AUTO so rer runs this checkout's commands with Node ${nodePin}, or switch this shell to Node ${nodePin}.`);
  if (result.pnpm) {
-  lines.push(`pnpm: ${result.pnpm.actual ?? 'unavailable'} (expected ${result.pnpm.expected ?? 'an exact project pin'}).`);
-  if (result.pnpm.issue) lines.push(result.pnpm.issue);
+  const { actual: pnpm, expected: pnpmPin, issue } = result.pnpm;
+  lines.push(`pnpm: ${pnpm ?? 'unavailable'} (expected ${pnpmPin ?? 'an exact project pin'}).`);
+  if (issue) lines.push(issue);
+  // Doctor uses a pinned pnpm already in rer's cache; the lifecycle commands fetch it.
+  if (pnpmPin && pnpm !== pnpmPin) lines.push(`  rer keeps its own pnpm ${pnpmPin} for this checkout and never changes the pnpm on your PATH: run rer install to fetch it, then rer doctor again.`);
  }
  if (result.missingInputs.length) {
   lines.push('Missing local inputs:');
