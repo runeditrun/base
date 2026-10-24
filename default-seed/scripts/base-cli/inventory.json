@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc957441a",
+  "cliVersion": "0.2.79-dev.gf7638307",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -393,6 +393,10 @@
       "source": "cli/auth-copy.mjs",
       "sha256": "43df34d7bbcb4cea69f9af499189e9844fb9fe6dece0e6925a27bb7b07352f23"
     },
+    "cli/authoring.mjs": {
+      "source": "cli/authoring.mjs",
+      "sha256": "a758c3678f7a126374107b061662f5dd2e4eac31ac45169b1da3d79c841e9a7b"
+    },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
       "sha256": "17b4fb00aef63e77b5fb8c8efb3b103682daafd7aeaaa2b00c8781d28da4200a"
@@ -647,7 +651,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "758c82f2f68daaea1809930c78cfb53c17177603e6e0b862fdcb339fca836643"
+      "sha256": "063e5511842e0a9ffa759a20df73751097adb23bcf555b0be6b8ce99a19eb282"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -799,7 +803,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "9065d3fb6aa0a7e70e566e5f0b2ba3bf3fb00dfe7d976783d6e21dd4baf41c02"
+      "sha256": "bef71c95e729809500e8d539565c1838f009080a85aa3ff0fb03e12690b28797"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -859,7 +863,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "2e033aac9b0b71debcb7bb3e2e43d27192ae0d1738c6d380f6dfd9fb39793296"
+      "sha256": "c2f6889ae9ff06168877f8b23b331c5150fabf7a95d0048ce6b63c2a7532d04d"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -887,7 +891,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "52cd09325481f58c4c01763731cf5b546e4c640bcc18e0ec18bf7375d994c94c"
+      "sha256": "5a0c1a005d051031c539d4bae486bce0091268a47799d00d094aa0674831b66f"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -923,7 +927,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "33a78df26a1a2e03036aaaab55a748d73b5ec846bfdcb9c547af26c6003c2a23"
+      "sha256": "e0461513266d44d5763ce3c9aa1fa76e54d6a61a3e226c9f7d0f7f09fbe281e5"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -1149,13 +1153,53 @@
       "source": "default-seed/public/rer-theme.css",
       "sha256": "670e280580f073bee9236f2bf2ab3165ccf5ccc3499f79ac077c4388105a491f"
     },
+    "edition-authoring/adopt.mjs": {
+      "source": "edition-authoring/adopt.mjs",
+      "sha256": "22a9fb159e15f44832b5a5efc0d4aba67d5ea14db3d17f6f19bd7a7cf910200e"
+    },
+    "edition-authoring/base-acknowledgements.mjs": {
+      "source": "edition-authoring/base-acknowledgements.mjs",
+      "sha256": "fd486d607c019f2ff162830149ef717063bcae9ba995ec7f18f14fd3f2cb4b32"
+    },
+    "edition-authoring/base-copies.mjs": {
+      "source": "edition-authoring/base-copies.mjs",
+      "sha256": "96989b9f55878fa2d6f4f92d9b499f1a4998d7a0bf1083f8279d554e39e05442"
+    },
+    "edition-authoring/cli.mjs": {
+      "source": "edition-authoring/cli.mjs",
+      "sha256": "ea39cb9b8c101a446d6fdf023866bb2c86965926f316f6030a0394f1cffeaf17"
+    },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
       "sha256": "eb0b8a0b9958c4ed84735d85f5298f3d1307ef60ddee1c2a3329c6ed7af0902e"
     },
+    "edition-authoring/lock.mjs": {
+      "source": "edition-authoring/lock.mjs",
+      "sha256": "255b570052a8e3cd785043c82e2088445d8e181a92c35c397444eafebe2ec1e4"
+    },
     "edition-authoring/manifest.mjs": {
       "source": "edition-authoring/manifest.mjs",
       "sha256": "0c93bd39b1dd869b23a9d2727671fe8f9c933a9d56c7a3df1ba83c4a6f816e7b"
+    },
+    "edition-authoring/parent-comparison.mjs": {
+      "source": "edition-authoring/parent-comparison.mjs",
+      "sha256": "fba6c894e2fe5a48c2f8706ab74b09d1935bd7fa38049a264d3d91ff6d336003"
+    },
+    "edition-authoring/projection-lock.mjs": {
+      "source": "edition-authoring/projection-lock.mjs",
+      "sha256": "bbb939b4e5bc6b5db8bf51156ec770fa30fc5df7a8fbb21a751c8ede69b1444b"
+    },
+    "edition-authoring/release.mjs": {
+      "source": "edition-authoring/release.mjs",
+      "sha256": "40acdb670edbde2eafa731f535bbe7403360a3327b576ed47355936bcc4a543a"
+    },
+    "edition-authoring/sources.mjs": {
+      "source": "edition-authoring/sources.mjs",
+      "sha256": "1033adaaa5f1f52053c34552c0979b6f868907f00cc1005d39fd8f845df4be09"
+    },
+    "edition-authoring/updates.mjs": {
+      "source": "edition-authoring/updates.mjs",
+      "sha256": "54e7246025a618ed16ee042c22dc9a8dc27b06175c30f81c4c6568992ed04799"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",

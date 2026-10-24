@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { exportCLI, inventory } from './export.mjs';
 import { parse } from './parse.mjs';
-import { verbs, commonFlags } from './contract.mjs';
+import { authoringVerbs, verbs, commonFlags } from './contract.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 const base = resolve(import.meta.dirname, '..'), cli = join(base, 'bin/rer.mjs');
 const environment = () => ({ PATH: process.env.PATH, HOME: process.env.HOME, TZ: 'UTC' });
@@ -26,7 +26,7 @@ const events = result => result.stdout.trim().split('\n').map(line => JSON.parse
 
 test('every command help is effect-free outside a checkout, before adapters and tools', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-help-')); t.after(() => rm(root, { recursive: true, force: true }));
- for (const verb of Object.keys(verbs)) {
+ for (const verb of Object.keys({...verbs, ...authoringVerbs})) {
   const result = run(root, [verb, '--help']);
   assert.equal(result.status, 0, `${verb}: ${result.stderr}`); assert.match(result.stdout, /Usage:/);
   const json = run(root, [verb, '--help', '--json']); assert.equal(json.status, 0); assert.equal(events(json).at(-1).event, 'result');
@@ -34,12 +34,12 @@ test('every command help is effect-free outside a checkout, before adapters and 
  for (const argv of [['dev','--foreground','--help'], ['preview','--detach','--help']]) assert.equal(run(root,argv).status,0);
  assert.deepEqual(await readdir(root), []);
  await writeFile(join(root,'OPERATIONS.json'),'{invalid configuration');
- for(const verb of Object.keys(verbs))assert.equal(run(root,[verb,'--','--help','--json']).status,0,'package-forwarded help precedes configuration validation');
+ for(const verb of Object.keys({...verbs, ...authoringVerbs}))assert.equal(run(root,[verb,'--','--help','--json']).status,0,'package-forwarded help precedes configuration validation');
  assert.deepEqual(await readdir(root),['OPERATIONS.json']);
 });
 
 test('parsing rejects every unsupported flag, missing value, invalid host/port and duplicate before effects', () => {
- for (const verb of Object.keys(verbs)) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
+ for (const verb of Object.keys({...verbs, ...authoringVerbs})) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
  for (const argv of [['dev', '--port'], ['dev', '--port', '0'], ['dev', '--port', '65536'], ['dev', '--port', '1.5'], ['setup', '--owner-email', 'owner name <a@b.test>'], ['check', '--profile', 'independent'], ['dev', '--json', '--json']]) assert.throws(() => parse(argv), error => error.exitCode === 2);
  for (const host of ['0.0.0.0', '::', 'example.test', '[::1]']) assert.throws(() => parse(['dev', '--host', host]), error => error.exitCode === 4);
  assert.equal(parse(['dev', '--', '--port', '08787']).port, 8787);
