@@ -15,9 +15,12 @@ export async function repoCommand(request) {
  const { verb, directory, args } = request;
  parse([verb, ...args]); // Refuse invalid options before installation or cloning.
  const paths = layout(), launcher = await launcherOwner(paths.launcher);
+ // Signed acquisition verifies the release before installing or running it.
+ // The global-only flags have already been removed by repoArguments.
+ if (request.release) await checkoutRepository(request);
  const installed = await install({ quiet: true });
  if (installed !== 0) return installed;
- await checkoutRepository(request);
+ if (!request.release) await checkoutRepository(request);
  const root = await realpath(request.root);
  if (launcher.state === 'absent') {
   const advice = await pathAdvice(paths);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g4336f57c",
+  "cliVersion": "0.2.80-dev.g31ec4edc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -133,7 +133,7 @@
     },
     "local/operation.mjs": {
       "source": "onboarding/local/operation.mjs",
-      "sha256": "879f2b1068afeb8e9340c317b6156faec7099ceeabf3b1e310489c79e9fa048c"
+      "sha256": "0ac43ad973a99d9f77e6210407d42f5599447714aa842817c7ba8495f34f66cd"
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
@@ -899,7 +899,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
+      "sha256": "c0ca2bafaecfa494f7fa705abaf3577fee4e24bd4382cb18a17edc123174193d"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -3648,6 +3648,10 @@
     "modules/release/README.md": {
       "source": "modules/release/README.md",
       "sha256": "0e52ddd20da16f02342a75c69bf548496f4fc73c9bc0ad264dc9c0920793afe0"
+    },
+    "modules/release/anchors/production.json": {
+      "source": "modules/release/anchors/production.json",
+      "sha256": "2e25900cd052b035d25abff52d11a8f426589bb33d365baaead4ea96e3f73a5e"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
