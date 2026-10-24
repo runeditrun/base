@@ -53,8 +53,12 @@ const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'p
 // bare README.md) identify repository files. Dots inside kept words, leading
 // dots and sentence punctuation are not cleanup characters.
 const fileName = String.raw`[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b`
-const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public|config|secrets|deploy|operations|evidence|\.github)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b[\w@.-]+\.(?:[cm]?[jt]sx?|sql|jsonc?|toml|md|ya?ml|sh|css|html):\d+(?::\d+)?\b`, 'gi')
-const bareSourceFile = /\b[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b/gi
+const roots = String.raw`(?:scripts|docs|modules|packages|foundation|cli|migrations|schema|public|config|deploy|operations|evidence)`
+// A source root or explicit directory marker identifies an extensionless path.
+// Generic slash-separated product terms (public/private, CLI/MCP, Docs/Sheets)
+// supply neither marker and remain prose.
+const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests|secrets|\.github)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])${roots}/[\w@.*?/[\]-]*/(?![\w@./-])|(?<![\w/])${roots}/[\w@.*?/[\]-]*\.(?:[cm]?[jt]sx?|sql|jsonc?|toml|md|ya?ml|sh|css|html|py|png|svg|pdf|ppt|csv|exs)\b(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b[\w@.-]+\.(?:[cm]?[jt]sx?|sql|jsonc?|toml|md|ya?ml|sh|css|html):\d+(?::\d+)?\b`, 'gi')
+const bareSourceFile = /(?<![\w/\\.-])[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b(?![\w./\\-])/gi
 // Config names are repository citations even when their .js suffix is ambiguous.
 const configFile = /(?<![\w.])(?:rer-theme\.css|[\w@.-]+\.config\.[cm]?[jt]s|\.env(?:\.[\w-]+)*)(?![\w-]|\.[\w-])/gi
 const windowsPath = /(?<![\w])(?:[a-z]:\\|(?:src|tests?|scripts?|modules?|packages?|config|secrets)\\)[\w@.*?\\[\]-]*(?::\d+(?::\d+)?)?/gi
@@ -62,13 +66,26 @@ const removePath = (citation: string) => /[.,;:!?]+$/.exec(citation)?.[0] ?? ''
 
 /** Public clause prose, shared by display and search. Only citation spans go;
  * whitespace is normalized without trimming or rewriting any kept token. */
-export const publicText = (value: string) => value
+const redactCitations = (value: string) => value
   .replace(windowsPath, removePath).replace(sourcePath, removePath)
   .replace(configFile, '').replace(bareSourceFile, '')
   // A short hash needs an explicit citation label and a digit, so ordinary
   // words such as "revision defaced" remain prose. Full SHA digests stand alone.
   .replace(/(\b(?:commit|revision|changeset|sha(?:-?(?:1|256))?)(?:\s+|\s*[:=#]\s*))([0-9a-f]{7,64})\b/gi, (citation, label: string, hash: string) => /[0-9]/.test(hash) ? label : citation)
   .replace(/\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b/gi, '')
+
+const sourceUrl = /^https?:\/\/(?:github\.com\/[^/]+\/[^/]+\/blob\/[^/]+\/.+|raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\/.+)/i
+const publicUrl = (token: string) => {
+  const citation = token.replace(/[.,;:!?()[\]{}]+$/, '')
+  return sourceUrl.test(citation) ? token.slice(citation.length) : token
+}
+
+// URLs are whole tokens: a public document/feed URL is product prose, whereas
+// a GitHub blob/raw URL explicitly identifies a repository file. Never run a
+// filename recognizer inside a kept URL or reconstruct it from placeholders.
+export const publicText = (value: string) => value
+  .split(/(https?:\/\/[^\s<>"'`]+)/gi)
+  .map((part, index) => index % 2 ? publicUrl(part) : redactCitations(part)).join('')
   .replace(/\s+/g, ' ').trim()
 
 function clauseRow(clause: ContractClause, contractUrl: string): string {

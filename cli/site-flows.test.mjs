@@ -329,7 +329,7 @@ test('built Run command accepts one repository argument and refuses shell syntax
 test('built Roadmap preserves product prose while removing explicit source citations', async t => {
  const f = await seed(t);
  const source = (await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md'), 'utf8'));
- const prose = '.NET Next.js Normalize.css Animate.css ASP.NET v1.2.3 e.g. 3.14 example.com defaced React.js Node.js Socket.io Vue.js D3.js Nuxt.js three.js decimal deadheaded decade feedback';
+ const prose = '.NET public/private CLI/MCP Docs/Sheets/Slides package/revision Claim.MD/Availity https://www.ssa.gov/oact/cola/cbb.html https://status.cloud.google.com/incidents.json Next.js Normalize.css Animate.css ASP.NET v1.2.3 e.g. 3.14 example.com defaced React.js Node.js Socket.io Vue.js D3.js Nuxt.js three.js decimal deadheaded decade feedback';
  const input = source.replace(/^(\| `COLLAB-001`[^\n]*?)\| see the clause \|/m, (_, row) => `${row}| ${prose}; inspect \`src/private.ts\`, tests/private.test.mjs, README.md and commit a1234567890b. |`);
  assert.notEqual(input, source);
  await writeFile(join(f.root, 'CONTRACT.md'), input);
