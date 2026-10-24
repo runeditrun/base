@@ -51,7 +51,7 @@ refuses archives with absolute paths, `..` entries, links or devices, then runs
 the package's own `rer cli install`. A failed or refused download leaves the
 version you had selected.
 
-With no Node 22 or later on PATH, the script installs Node 22.23.4 from
+With no Node 22 or later on PATH, the script installs Node 22.20.0 from
 `nodejs.org` into `~/.local/share/rer/runtimes` (under `XDG_DATA_HOME` when set),
 verifies the tarball against that release's published `SHASUMS256.txt`, and
 prints its location. The launcher uses this private runtime on later runs.

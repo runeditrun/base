@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g3d1d696d",
+  "cliVersion": "0.2.79-dev.g5b790bd8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -169,7 +169,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "0d599fab94fde761bb2cd94c05babef1fee47e80c7226280a85efdf4e45387b4"
+      "sha256": "d734f6a805bf95b2614e90b409cf36cfb7fbd1330e7a01ad5a4c96f750522454"
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
@@ -647,7 +647,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "3ade7d48be1ee285f4a162ae6269686ae582f5f39e913cda5124b8b56e3636ab"
+      "sha256": "d7eb60c79e80a88a768f7dd9d57cffbb1a935f1e15fed5bfd47afcadd1900f4e"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
