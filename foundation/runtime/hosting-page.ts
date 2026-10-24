@@ -129,7 +129,7 @@ export function hostingPageHtml(identity: EditionIdentity, run: RunData, hosting
     'CLOUDFLARE_API_TOKEN=the token',
     ...(mail?.provider ? [`${mail.provider}=${choices[0] ?? 'your provider'}`] : []),
     ...(mail ? [`${mail.key}=your mail provider's API key`] : []),
-    ...(mail?.from ? [`${mail.from}=hello@yourdomain.com`] : []),
+    ...(mail?.from ? [`${mail.from}=hello@example.com`] : []),
     ...hosting.required.map(item => `${item.name}=`),
   ]
   const notes = [
