@@ -10,8 +10,9 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {hash, json, git, raw, batch, safe, noLinks, testSource} from './files.mjs';
+import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
+import {requireMaterializedCopies} from './copy-checkout.mjs';
 
 export const RECORD = 'base-copies.json';
 const commit = /^[a-f0-9]{40}$/, sha256 = /^[a-f0-9]{64}$/;
@@ -34,19 +35,19 @@ function baseRepository(root) {
 }
 
 // An explicit checkout, else the record's legacy repository, else the seed's declaration.
-function open(record, base, root) {
+function open(record, base, root, offline = false) {
   if (base) {
     const repository = fs.realpathSync(base);
-    return {repository, head: git(repository, 'rev-parse', 'HEAD'), close() {}};
+    return {repository, head: gitReader(repository, offline).git('rev-parse', 'HEAD'), offline, close() {}};
   }
-  const source = record.repository ?? baseRepository(root);
-  if (source === 'runeditrun/base') throw Error('Base has a publisher-qualified identity only; pass --base <checkout> or --offline');
+  const declared = record.repository ?? baseRepository(root);
+  const source = declared === 'runeditrun/base' ? 'https://github.com/runeditrun/base.git' : declared;
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-'));
   try {
     execFileSync('git', ['clone', '--bare', '--quiet', '--', source, temporary], {env: {...process.env, GIT_NO_REPLACE_OBJECTS: '1'}, stdio: 'pipe'});
   } catch {
     fs.rmSync(temporary, {recursive: true, force: true});
-    throw Error(`Cannot read Base repository ${source}; pass --base <checkout> or --offline`);
+    throw Error('Cannot acquire Base source. Clone https://github.com/runeditrun/base.git when online, then repeat with --base <checkout>.');
   }
   return {repository: temporary, head: null, close: () => fs.rmSync(temporary, {recursive: true, force: true})};
 }
@@ -111,9 +112,14 @@ export function validate(record) {
 
 // Every tracked and nonignored untracked file, as Git and the next commit see it.
 function seedFiles(root) {
-  if (fs.realpathSync(git(root, 'rev-parse', '--show-toplevel')) !== fs.realpathSync(root)) throw Error('Run at the edition repository root');
+  let top;
+  try { top = git(root, 'rev-parse', '--show-toplevel'); }
+  catch { throw Error('Cannot read the Git checkout/index. Ensure Git is available and run git status to repair the checkout before working with Base copies; no copy record was changed.'); }
+  if (fs.realpathSync(top) !== fs.realpathSync(root)) throw Error('Run at the edition repository root');
   const files = new Map();
-  const names = raw(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').toString('utf8').split('\0').filter(Boolean);
+  let names;
+  try { names = raw(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').toString('utf8').split('\0').filter(Boolean); }
+  catch { throw Error('Cannot read the Git index. Run git status and repair the checkout before working with Base copies; no copy record was changed.'); }
   for (const name of [...new Set(names)].sort()) {
     safe(name);
     let stat;
@@ -125,7 +131,8 @@ function seedFiles(root) {
 }
 
 function reader(origin) {
-  const format = git(origin.repository, 'rev-parse', '--show-object-format');
+  const source = gitReader(origin.repository, origin.offline);
+  const format = source.git('rev-parse', '--show-object-format');
   const trees = new Map();
   return {
     // Git object identity of local bytes, to find copies by content without reading Base blobs.
@@ -133,10 +140,10 @@ function reader(origin) {
     tree(revision) {
       if (!trees.has(revision)) {
         let resolved;
-        try { resolved = git(origin.repository, 'rev-parse', '--verify', '--quiet', `${revision}^{commit}`); } catch { resolved = ''; }
-        if (resolved !== revision) throw Error(`Base commit ${revision} is not available`);
+        try { resolved = source.git('rev-parse', '--verify', '--quiet', `${revision}^{commit}`); } catch (error) { if (origin.offline) throw error; resolved = ''; }
+        if (resolved !== revision) throw Error(`Base commit ${revision} is not available. Check the full commit with git -C <base-checkout> rev-parse <tag>^{commit}, fetch it, then repeat with --base <base-checkout>`);
         const entries = new Map();
-        for (const entry of raw(origin.repository, 'ls-tree', '-rz', '--full-tree', revision).toString('utf8').split('\0').filter(Boolean)) {
+        for (const entry of source.raw('ls-tree', '-rz', '--full-tree', revision).toString('utf8').split('\0').filter(Boolean)) {
           const tab = entry.indexOf('\t');
           const [mode, type, object] = entry.slice(0, tab).split(' ');
           if (type === 'blob' && FILE_MODES.includes(mode)) entries.set(entry.slice(tab + 1), {object, mode});
@@ -151,11 +158,12 @@ function reader(origin) {
       const unique = [...new Set(objects)];
       for (let i = 0; i < unique.length; i += 100) {
         const chunk = unique.slice(i, i + 100);
-        const output = batch(origin.repository, chunk.join('\n') + '\n', 'cat-file', '--batch');
+        const output = source.batch(chunk.join('\n') + '\n', 'cat-file', '--batch');
         let offset = 0;
         for (const object of chunk) {
           const newline = output.indexOf(10, offset);
           const [, type, size] = output.subarray(offset, newline).toString('utf8').split(' ');
+          if (type === 'missing' && origin.offline) throw Error(`Base object ${object} is missing locally. Repeat rer refresh-base --ref <commit> --base <base-checkout> without --offline while online to acquire it, then retry offline. No copy record was changed.`);
           if (type !== 'blob') throw Error(`Base object ${object} is not a file`);
           result.set(object, Buffer.from(output.subarray(newline + 1, newline + 1 + Number(size))));
           offset = newline + 1 + Number(size) + 1;
@@ -308,15 +316,19 @@ export function adaptCopy(root, {positional: [name], record: recordPath}) {
 // its files. Recorded files and files already equal to Base at that commit are
 // kept current; files Base added under a copied path since the copy's pin are
 // adopted (tests only into copies that carry tests); recorded files that Base or
-// the export removed are dropped. Local edits are refused, never overwritten, and
-// so is any change to an existing file under a migrations folder.
-export function refreshCopies(root, {positional: [revision], record: recordPath, base}) {
-  if (!commit.test(revision)) throw Error('Refresh to an immutable full Base commit');
+// the export removed are dropped. Absent unadapted singleton copies are retired
+// entirely, just as absent files are dropped from directory copies. Local edits
+// are refused, never overwritten, as is any change to an existing file under a
+// migrations folder.
+export function refreshCopies(root, {positional: [revision], record: recordPath, base, offline}) {
+  if (!commit.test(revision)) throw Error('Refresh requires an immutable full 40-character Base commit. Resolve the release tag with git -C <base-checkout> rev-parse <tag>^{commit}, then repeat with --ref <commit> --base <base-checkout>.');
+  if (offline && !base) throw Error('Offline refresh needs a Base checkout. Repeat rer refresh-base --ref <commit> --offline --base <checkout> containing that commit.');
   const filename = recordFile(root, recordPath);
   if (!filename) throw Error(`No ${recordPath} found; run record-base <path> <origin-path> <commit> first`);
   const record = validate(JSON.parse(fs.readFileSync(filename, 'utf8')));
   const files = seedFiles(root);
-  const origin = open(record, base, root);
+  requireMaterializedCopies(root, record, files);
+  const origin = open(record, base, root, offline);
   try {
     const read = reader(origin);
     const next = read.tree(revision);
@@ -346,7 +358,14 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
           diffHint: `git -C <base> diff ${baseline} ${revision} -- ${JSON.stringify(originPath)}`} : {})};
     }));
     const plans = record.copies.map(copy => {
+      // Absence is the existing directory-copy removal signal; there is no
+      // separate deletion-intent marker. Only an absent, unadapted singleton
+      // may retire its whole copy. Non-files and declared adaptations are not
+      // removals, and a still-present singleton must retain a Base source.
+      const retired = Object.keys(copy.files).length === 1 && Object.hasOwn(copy.files, copy.path) &&
+        !files.has(copy.path) && !fs.existsSync(path.join(root, copy.path)) && !Object.hasOwn(copy.adapted || {}, copy.path);
       const pinned = read.tree(copy.revision);
+      if (retired) return {copy, sources: [], retired, removed: [copy.path]};
       const tests = Object.keys(copy.files).some(name => testSource(mapped(name, copy.path, copy.originPath)));
       const sources = [...next].filter(([name, {object}]) => {
         if (!within(name, copy.originPath)) return false;
@@ -359,7 +378,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         return !pinned.has(name) && (tests || !testSource(name));
       });
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
-      return {copy, sources, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
+      return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
     // A migration a database may already have applied is never rewritten in place:
     // the schema change it brings belongs in a new migration of the seed's own.
@@ -388,9 +407,10 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       changes.push({path: copy.path, from: copy.revision, files: sources.length, added, removed});
       Object.assign(copy, {revision, files: recorded, modes});
     }
+    record.copies = plans.filter(plan => !plan.retired).map(plan => plan.copy);
     delete record.repository;
     validate(record);
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }
 }

@@ -48,7 +48,9 @@ Base or an independent repository. Placement is a maintenance choice.
 Lily, Orbit, Lamp, Ferry, Beacon and HappyToHelp own their complete source,
 component graph, integration and releases in their edition repositories.
 First-party authors, owner forks and community publishers use the same
-[edition authoring protocol](edition-authoring/README.md). Keep each edition's
+[edition authoring protocol](edition-authoring/README.md). Existing seeds adopt with
+`rer adopt-edition` and refresh recorded copies with `rer refresh-base --ref FULL_COMMIT`;
+see [the source authoring guide](export/EDITION-AUTHORING.md). Keep each edition's
 source and release ownership explicit; do not regenerate an owner's existing
 product from shared authoring input.
 
