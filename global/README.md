@@ -244,8 +244,11 @@ which inside `pnpm run` is the pinned copy in `node_modules/.bin`, so
 `pnpm install --frozen-lockfile && pnpm run build` needs no global `rer`. A global
 `rer` hands every verb to the pinned package, launching included. Until
 `node_modules` holds the pinned version (a fresh clone, or a pulled pin change),
-every verb installs it first (the frozen `pnpm install`), then runs it; verbs
-started at once share that one install.
+commands that run project code install it first (the frozen `pnpm install`),
+then run it; commands started at once share that one install. Help, version,
+read-only `doctor`, and `release sign`, `release receipt` and `release keygen`
+do not install dependencies. The release producer still bootstraps before it
+runs project build or verification scripts.
 Every dependency install, `rer release`'s included, receives an allowlisted
 environment: the shell, locale, terminal and temporary-folder variables, `CI`,
 `TZ`, `SSH_AUTH_SOCK`, `NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `XDG_*`, proxy
@@ -514,7 +517,7 @@ The current MCP `next_question` filters out owner items. When an owner summary
 is supplied, the CLI displays its browser link and refuses to answer it.
 
 The four deterministic adapter implementations and their native output formats
-are described in [the adapter guide](cli/business/vendors/README.md). Their
+are described in [the adapter guide](https://github.com/runeditrun/base/blob/main/cli/business/vendors/README.md). Their
 presence does not enable export until the seed import authority and remaining
 transport contracts are connected.
 

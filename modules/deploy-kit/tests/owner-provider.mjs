@@ -12,6 +12,7 @@ export function ownerProvider({creationDates = true} = {}) {
   const {state} = fixture;
   state.kv = [];
   const failures = [];
+  let settingsBarrier, uploaded = false;
   let lag = null;
   const prefix = `/client/v4/accounts/${fixture.accountId}`;
   const ok = (result, result_info) => Response.json({success:true,errors:[],result,...(result_info ? {result_info} : {})});
@@ -20,8 +21,15 @@ export function ownerProvider({creationDates = true} = {}) {
     const method = init.method ?? 'GET';
     const rawPath = String(input).slice(url.origin.length).split('?')[0];
     const path = rawPath.startsWith(prefix) ? rawPath.slice(prefix.length) : null;
+    if (uploaded && method === 'GET' && path?.endsWith('/settings') && settingsBarrier) {
+      return settingsBarrier.wait(init.signal);
+    }
     const index = failures.findIndex(x => x.method === method && path !== null && x.path.test(path));
-    if (index < 0) return handle(input, init);
+    if (index < 0) {
+      const response = await handle(input, init);
+      if (method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') uploaded = true;
+      return response;
+    }
     const [failure] = failures.splice(index,1);
     state.calls.push({method,path,search:url.search,failed:true});
     // A lost response or gateway error after the provider already applied the request.
@@ -91,6 +99,22 @@ export function ownerProvider({creationDates = true} = {}) {
     return fixture.fetch(input,init);
   };
   return {...fixture, fetch, objectDelete:(path, options) => fetch(`https://api.cloudflare.com${path}`, {...options,method:'DELETE'}),
+    /** Hold the post-upload settings read until its caller aborts it. */
+    holdSettingsAfterUpload() {
+      const entered = Promise.withResolvers(), aborted = Promise.withResolvers();
+      let reads = 0, pending = 0;
+      settingsBarrier = {async wait(signal) {
+        reads++; pending++;
+        const stopped = Promise.withResolvers();
+        const abort = () => { aborted.resolve(); stopped.reject(signal.reason); };
+        try {
+          if (signal.aborted) abort(); else signal.addEventListener('abort',abort,{once:true});
+          entered.resolve();
+          return await stopped.promise;
+        } finally { signal.removeEventListener('abort',abort); pending--; }
+      }};
+      return {entered:entered.promise,aborted:aborted.promise,get reads() { return reads; },get pending() { return pending; }};
+    },
     fail(method, path, options = {status:500}) { failures.push({method,path,...options}); },
     /** For its next `reads` listings, the D1 list does not yet show a database created after this call. */
     lagD1(reads, shape = 'count') { lag = {reads,shape,known:state.databases.length}; },

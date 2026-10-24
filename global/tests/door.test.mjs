@@ -167,3 +167,81 @@ test('the front door serves two checkouts by name, starting them on a visit and 
  await until(async () => await state('alpha') === 'running', 'alpha to start again');
  assert.match((await request(port, door('alpha'), '/records', navigation)).body, /Edited behind the door/);
 });
+
+test('the front door management commands preserve registrations and control the listening daemon', { timeout: 120_000 }, async t => {
+ const directory = await mkdtemp(join(tmpdir(), 'rer-door-management-')), alpha = join(directory, 'alpha'), beta = join(directory, 'beta');
+ const env = await isolatedQueue(t, { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', RER_SERVERS_DIR: join(directory, 'servers'), RER_DOOR_DIR: join(directory, 'door') });
+ const manage = (...args) => run(['door', ...args], { cwd: directory, env });
+ t.after(async () => {
+  await manage('disable').catch(() => {});
+  await rm(directory, { recursive: true, force: true });
+ });
+
+ // Registration only needs the real reference's exported dispatcher and describe
+ // command. No app is installed, set up or started for door management.
+ await Promise.all([alpha, beta].map(root => exportReference(base, root)));
+ const port = await freePort(), door = name => `${name}.localhost:${port}`;
+ const enabled = await manage('enable', '--port', String(port));
+ assert.equal(enabled.code, 0, enabled.stderr + enabled.stdout);
+ const added = await manage('add', alpha, beta);
+ assert.equal(added.code, 0, added.stderr + added.stdout);
+ const status = async () => {
+  const result = await manage('status', '--json');
+  assert.equal(result.code, 0, result.stderr + result.stdout);
+  return JSON.parse(result.stdout);
+ };
+ // Managing the door itself: stop, start, restart, remove, add and disable each change
+ // what is routed, what is registered and what is listening, and repeat safely.
+ const registered = async () => (await status()).sites.map(site => site.name).sort();
+ const first = await status();
+ assert.deepEqual([first.running, first.enabled, first.port], [true, true, port]);
+ assert.ok(Number.isInteger(first.pid) && first.pid > 0, 'the running door has a process');
+ assert.deepEqual(first.sites.map(site => [site.name, site.state]).sort(), [['alpha', 'stopped'], ['beta', 'stopped']]);
+ await until(async () => (await request(port, door('beta'), '/favicon.ico', image)).status === 503, 'the registered checkout to be routed without starting it', 15_000);
+
+ assert.equal((await manage('stop')).code, 0);
+ const stopped = await status();
+ assert.deepEqual([stopped.running, stopped.enabled], [false, true], 'stopped, still enabled');
+ await assert.rejects(request(port, door('alpha'), '/health'), { code: 'ECONNREFUSED' }, 'nothing answers while the door is stopped');
+ assert.equal((await manage('stop')).code, 0, 'stopping a stopped door is not an error');
+ assert.deepEqual(await registered(), ['alpha', 'beta'], 'stopping keeps every checkout registered');
+
+ const started = await manage('start');
+ assert.equal(started.code, 0, started.stderr + started.stdout);
+ const running = await status();
+ assert.equal(running.running, true);
+ assert.equal((await request(port, door('nobody'), '/')).status, 404, 'the door answers again');
+ const repeatedStart = await manage('start');
+ assert.equal(repeatedStart.code, 0, repeatedStart.stderr + repeatedStart.stdout);
+ const reused = await status();
+ assert.deepEqual([reused.running, reused.enabled, reused.pid], [true, true, running.pid], 'starting a running door reuses its process');
+ assert.equal((await request(port, door('nobody'), '/')).status, 404, 'the reused process still answers');
+
+ const restarted = await manage('restart');
+ assert.equal(restarted.code, 0, restarted.stderr + restarted.stdout);
+ const replaced = await status();
+ assert.equal(replaced.running, true);
+ assert.notEqual(replaced.pid, running.pid, 'restart replaces the door process');
+ assert.equal((await request(port, door('nobody'), '/')).status, 404);
+ assert.deepEqual(await registered(), ['alpha', 'beta']);
+
+ const removed = await manage('remove', 'beta');
+ assert.equal(removed.code, 0, removed.stderr + removed.stdout);
+ assert.deepEqual(await registered(), ['alpha'], 'a removed checkout is no longer registered');
+ // An image request never starts a site, so polling cannot register the name again.
+ await until(async () => (await request(port, door('beta'), '/favicon.ico', image)).status === 404, 'the removed name to stop being served (the door re-reads its registry every second)', 15_000);
+ assert.equal((await manage('remove', 'beta')).code, 3, 'removing it again names nothing to remove');
+ const readded = await manage('add', beta);
+ assert.equal(readded.code, 0, readded.stderr + readded.stdout);
+ assert.deepEqual(await registered(), ['alpha', 'beta'], 'adding it registers the same name again');
+ await until(async () => (await request(port, door('beta'), '/favicon.ico', image)).status === 503, 'the readded checkout to be routed without starting it', 15_000);
+ assert.equal((await manage('add', join(directory, 'missing'))).code, 3, 'a folder that is not a checkout is skipped and reported');
+
+ const disabled = await manage('disable');
+ assert.equal(disabled.code, 0, disabled.stderr + disabled.stdout);
+ const off = await status();
+ assert.deepEqual([off.running, off.enabled], [false, false]);
+ await assert.rejects(request(port, door('alpha'), '/health'), { code: 'ECONNREFUSED' }, 'nothing answers once the door is disabled');
+ assert.equal((await manage('start')).code, 3, 'a disabled door does not start until it is enabled again');
+ assert.deepEqual(await registered(), ['alpha', 'beta'], 'disabling keeps the registered checkouts');
+});

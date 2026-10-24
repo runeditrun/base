@@ -8,6 +8,8 @@ import { RerError, refuse } from './errors.mjs';
 import { policyModuleURL, serializablePolicy } from './portability-policy.mjs';
 import { shared } from './shared.mjs';
 
+const reExport = 'Re-export from the original installation with rer export --output exports/recovered.rer (add --target remote for a hosted installation), then retry rer import --input exports/recovered.rer --yes. Keep the original archive until recovery succeeds.';
+
 // Seeds declare their real bindings and data policy. The shared module owns the
 // archive format and atomic restore; the shared runner owns its native children.
 export function localPortability({ database, binding = 'DB', buckets = {}, policy, policyModule, transient = [], platformMigrations }) {
@@ -24,11 +26,11 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
     if(journal)for await(const record of fileRecords(journal)) {}
    }
    catch (error) {
-    if (error.message === 'archive_json') throw new RerError('invalid_archive', 'Restore refused (archive_json): archive JSON is invalid.', 2);
+    if (error.message === 'archive_json') throw new RerError('invalid_archive', `Restore refused: the archive is damaged or incomplete. ${reExport}`, 2);
     if (!(error instanceof PortabilityError)) throw error;
     const message = error.code === 'legacy_archive_unverifiable'
      ? 'Restore refused (legacy_archive_unverifiable): version 1 metadata cannot be authenticated. Upgrade the original installation and re-export, or use rer import --legacy-v1 --input FILE --yes --acknowledge-unverified-metadata --output exports/recovered-v2.rer in an empty installation. See modules/portability/README.md#backup-only-v1-recovery.'
-     : `Restore refused (${error.code}): archive verification failed.`;
+     : `Restore refused (${error.code}): archive verification failed. ${reExport}`;
     const refused = error.status === 409;
     throw new RerError(refused ? 'restore_refused' : 'transfer_failed', message, refused ? 4 : 1);
    }
@@ -83,6 +85,8 @@ async function nativeWorker(store,direction,input,signal) {
   if (!receipt || typeof receipt !== 'object') throw new RerError('transfer_failed', `Local portability ended before it finished (${status.signal ? `signal ${status.signal}` : `exit code ${status.code}`}). Run the same command again; it starts over${direction === 'import' ? ' and first cleans up anything this attempt staged' : ''}.`, 1);
   if (status.code !== 0 || !receipt.ok) throw new RerError(receipt.code ?? 'transfer_failed', receipt.reason==='legacy_restored_export_failed'
    ? 'Legacy data was restored and audited, but its v2 export failed. Preserve this installation, resolve the output problem, then run rer export --output FILE. Do not reset it to retry recovery.'
+   : receipt.reason === 'archive_json' ? `Restore refused: the archive is damaged or incomplete. ${reExport}`
+   : receipt.reExport ? `Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. ${reExport}`
    : receipt.safety ? `Restore refused (${receipt.reason}): safety normalization for ${receipt.safety} violates the declared import policy.`
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`
    : receipt.occupied ? `Restore refused (${receipt.reason}): ${receipt.reason === 'bucket_not_empty' ? `storage bucket ${receipt.occupied} in this installation already holds files` : `table ${receipt.occupied} in this installation already holds rows its migrations did not insert`}, and a restore only goes into an empty installation. To replace this installation's data with the archive, keep a copy with rer export --output exports/before-restore.rer, then run rer reset --yes and rer import --input ${relative(input.root, input.path)} --yes again.`

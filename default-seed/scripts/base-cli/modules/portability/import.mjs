@@ -17,6 +17,7 @@ import { additiveBridge, sameSchemaMigrations, appliedMigrations } from './bridg
 import { replayStatements } from './backfills.mjs';
 import { checkArchivedLedgers, archivedHistory } from './ledgers.mjs';
 import { legacyEmptyGuards, legacyAuditStatements, requireLegacyEmpty } from './legacy-safety.mjs';
+import { checkReferences } from './references.mjs';
 // ledgers: the rows of each migration ledger table the archive carries, as the
 // caller read them from it ({table:rows}); uploadPart binds them to its parts.
 export async function createImport(context,manifest,actor='direct',legacyRecovery,ledgers) {
@@ -27,8 +28,15 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   const original=manifest;manifest=await restorableManifest(original);
   const skippedTables=original.tables.filter(table=>platformTable(table.name)).map(table=>table.name);
   const cat=await catalogue(db,config),upgrade=config.acceptedSchemas[original.schema];
+  // Table SQL and migration names cannot establish missing trigger/view/index
+  // definitions. Never infer that an old archive's absent inventory is empty.
+  insist(manifest.schemaObjects!==undefined || legacyRecovery,'schema_mismatch:legacy_schema',409);
   const same=manifest.schema===cat.identity,history=()=>archivedHistory(original,ledgers);
   const {replays,...bridge}=upgrade?{}:same?(await sameSchemaMigrations(db,manifest,cat,context.migrations,history)??{}):await additiveBridge(db,manifest,cat,context.migrations,history);
+  // Finalize checks object references on the staged rows; a later migration
+  // replayed into a reference table would publish rows that check never saw.
+  const referenced=replays?.find(r=>Object.values(config.buckets).some(spec=>spec.objectReferences?.table===r.table));
+  insist(!referenced,'schema_mismatch:migration_data:'+referenced?.migration);
   if(!bridge.fromSchema)insist(canonicalJson(manifest.tables.map(x=>x.name))===canonicalJson(cat.tables.map(x=>x.name)),'table_inventory');
   if(!upgrade && !bridge.fromSchema)for(const table of manifest.tables) {
     const target=cat.tables.find(t=>t.name===table.name);
@@ -181,6 +189,8 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
   await refusePolicyApprovals(db,row.metadata.copies);
   await normalizeStaged(context,row);
   await refusePolicyApprovals(db,row.metadata.copies);
+  // The rows publication restores may name only this archive's objects, in their namespace.
+  await checkReferences(context,row.metadata.copies,manifest.objects);
   if(config.validateStaged) {
     const read=async table=>{insist(row.metadata.copies[table],'staged_table:'+table);const target=row.metadata.targets.find(t=>t.name===table);return (await readCopy(db,target,row.metadata.copies[table],0,row.metadata.manifest.tables.find(t=>t.name===table)?.count??0)).map(x=>x.row);};
     insist(await config.validateStaged({db,tables:{...row.metadata.copies},read,manifest})!==false,'staged_validation');

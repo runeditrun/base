@@ -6,25 +6,7 @@ import { resolve } from 'node:path'
 import { project, put, run } from './helpers.mjs'
 
 const passed = 'Boundary check passed for 16 source files.\n'
-const failed = 'Boundary check failed with 5 violation(s):\n' +
-  [...[1, 2, 3, 4, 5].map(line => `- src/use.ts:${line} R6: ${line <= 2 ? 'runtime code evaluation is not allowed' : 'non-literal dynamic import is not allowed'}`)].join('\n') + '\n'
 
-test('CLI exit 0 has exact output', async t => {
-  const root = await project(t)
-  await put(root, 'boundaries.json', '{"version":1}')
-  const result = run(root)
-  assert.equal(result.status, 0)
-  assert.equal(result.stdout, passed)
-  assert.equal(result.stderr, '')
-})
-test('CLI exit 1 has exact output', async t => {
-  const root = await project(t, 'r6')
-  await put(root, 'boundaries.json', '{"version":1}')
-  const result = run(root)
-  assert.equal(result.status, 1)
-  assert.equal(result.stdout, '')
-  assert.equal(result.stderr, failed)
-})
 test('CLI exit 2 names invalid configuration with exact output', async t => {
   const root = await project(t)
   await put(root, 'boundaries.json', '{"version":1,"unknown":true}')

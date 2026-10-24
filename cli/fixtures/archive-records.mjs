@@ -7,8 +7,8 @@ export const archiveRows = (records, table) => archiveItems(records).filter(item
 
 // Keep deliberately changed archives internally valid so refusal reaches the
 // public import policy rather than failing on an unrelated checksum.
-export async function remakeArchive(records, { tables = records[0].tables, items = archiveItems(records) } = {}) {
- const manifest = { ...records[0], tables, schema: await sha256(canonicalJson(tables.map(({ name, sql }) => ({ name, sql })))), partCount: Math.ceil(items.length / 100) };
+export async function remakeArchive(records, { tables = records[0].tables, items = archiveItems(records), schema } = {}) {
+ const manifest = { ...records[0], tables, schema: schema ?? await sha256(canonicalJson(tables.map(({ name, sql }) => ({ name, sql })))), partCount: Math.ceil(items.length / 100) };
  const parts = [];
  for (let index = 0; index < items.length; index += 100) parts.push(await makePart(parts.length, items.slice(index, index + 100)));
  const verifier = new ContentVerifier(manifest);

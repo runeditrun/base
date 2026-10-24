@@ -21,7 +21,7 @@ on:
 permissions:
   contents: read
 
-# Main needs evidence for every pushed SHA, including repeated runs of a SHA.
+# Keep each main run; a green push of the same SHA to a branch or tag can satisfy it.
 # A distinct run key also avoids GitHub replacing a pending main run.
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
@@ -29,9 +29,13 @@ concurrency:
 
 jobs:
   plan:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.stages.outputs.matrix }}
+      skip: ${{ steps.duplicate.outputs.skip }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -39,6 +43,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.20.0'
+      - name: Reuse successful branch verification on main
+        id: duplicate
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node export/verify-ci.mjs --main-skip
       - id: stages
         name: Assign every full-verify stage exactly once
         env:
@@ -48,6 +58,8 @@ jobs:
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
   companion-macos:
+    needs: plan
+    if: ${{ needs.plan.outputs.skip != 'true' }}
     name: Verify (companion macOS)
     runs-on: macos-latest
     timeout-minutes: 10
@@ -66,6 +78,7 @@ jobs:
   verify:
     name: Verify (${{ matrix.group }}${{ matrix.shard && format(' {0}/{1}', matrix.shard, matrix.total) || '' }})
     needs: plan
+    if: ${{ needs.plan.outputs.skip != 'true' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}

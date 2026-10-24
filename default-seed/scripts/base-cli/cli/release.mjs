@@ -1,3 +1,4 @@
+import { releaseVerb } from './contract.mjs';
 import { parseTimeoutSeconds, timeoutBounds } from '../scripts/publish-check/timeout.mjs';
 
 // Preserve release's accepted parser, producer, receipt and validation exits.
@@ -69,7 +70,7 @@ stdout, which must not be a terminal.`,
 export async function dispatchRelease(args) {
  // --help never performs release work, wherever it appears.
  if (args.includes('--help')) { console.log(signingHelp[args[0]] ?? releaseHelp); return 0; }
- if (['sign', 'receipt', 'keygen'].includes(args[0])) return (await import('../modules/release/signing-cli.mjs')).dispatchSigning(args[0], args.slice(1));
+ if (Object.hasOwn(releaseVerb.subcommands, args[0])) return (await import('../modules/release/signing-cli.mjs')).dispatchSigning(args[0], args.slice(1));
  try {
   const options = {};
   for (let index = 0; index < args.length; index++) {

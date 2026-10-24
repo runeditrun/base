@@ -31,7 +31,8 @@ payload consumers, and prove the integrated round trip.
 ## Policy
 
 `await createPortability({db, buckets, policy})` validates policy and the current
-schema at construction. Apply the bookkeeping migration first. Policy fields:
+schema at construction. Apply the bookkeeping migration first. Export refuses
+with HTTP 409 `import_applying` while an import is applying. Policy fields:
 
 | Field | Meaning |
 | --- | --- |
@@ -47,7 +48,7 @@ schema at construction. Apply the bookkeeping migration first. Policy fields:
 | `requiredConfiguration` | Setting names returned after restore for the owner to re-enter. |
 | `validateStaged({db,tables,read,manifest})` | Read-only product validation before any object write; false or a thrown error refuses restore. `tables` names the staging tables for bounded SQL queries; `read` is a convenience for small tables. |
 | `acceptedSchemas` | Map from an earlier full schema hash to `{upgradeRow(table,row)}`. Upgrade functions are pure and synchronous. No older schema is accepted by default. |
-| `buckets` | Binding names mapped to `{prefix?,objectReferences?:{table,keyColumn}}`. Prefixes isolate an object namespace. References require exactly the distinct referenced keys. |
+| `buckets` | Binding names mapped to `{prefix?,objectReferences?:{table,keyColumn}}`. Prefixes isolate an object namespace. References require exactly the distinct referenced keys: export checks its snapshot, and restore its staged rows (after `importRow`, before any object write), that each key is nonempty, under the prefix, not absolute and without `.` or `..` segments, and that the keys are exactly the bucket's archived objects, none missing and none extra; otherwise `object_references:<binding>`. |
 | `extraPayloads` | Named `{produce,consume}` pairs. Producers return bytes or a byte stream. Consumers receive a verified byte stream and descriptor before D1 commit. |
 | `partBytes` | Maximum part size, default 16 MiB, configurable from 1 KiB to 16 MiB. |
 
@@ -107,7 +108,8 @@ and declaring both `policy` and `policyModule` fail closed. Serializable object
 schema-upgrade and payload callbacks) are refused instead of being dropped by
 JSON transport. Container transfer currently refuses `policyModule` explicitly;
 it continues to accept serializable object policies. Malformed primary or later
-journal JSON is reported once as `archive_json` with exit 2, before local data
+journal JSON is reported once as `invalid_archive` with exit 2 and a re-export
+recovery command, before local data
 migrations, without echoing archive content or parser diagnostics.
 
 An installation migrated by Platform has `rer_migrations(name, sha256,
@@ -207,7 +209,7 @@ RER's native `localPortability` invokes this same entry point in its
 history again for transfer.
 
 The implementation ships in the RER CLI, not the Worker portability module.
-Package-mode seeds need a future `@runeditrun/rer` release containing this
+Package-mode seeds need a pinned `@runeditrun/rer` release containing this
 export and an exact pin/lock update; version 0.2.77 does not expose it.
 Vendored seeds need a reviewed Base CLI-copy refresh with
 `node scripts/export-cli.mjs SEED_ROOT` from the selected Base source and their
@@ -256,7 +258,7 @@ secret base cells become NULL before generated snapshots are normalized. A
 generated column cannot itself be redacted: exclude the table or change the
 product schema/policy if its computed value must be secret. Ordinary-column
 metadata and row encoding are unchanged. Ordinary-table archives using the
-authenticated format continue to import into the same schema; see the version
+v2 integrity-checked format continue to import into the same schema; see the version
 1 refusal below.
 
 An archived INTEGER-affinity base cell outside JavaScript's safe integer range fails before
@@ -329,6 +331,59 @@ object metadata/hashes, payload hashes and required configuration. Keyless row
 parts also preserve the original rowid, including gaps, for restoration and
 erasure matching. Export time,
 source identity, job ids and boundaries do not affect equivalence.
+
+Schema identity covers table definitions (including constraints and generated
+expressions), explicit indexes (including uniqueness and partial predicates),
+views and triggers. Indexes and triggers on excluded tables are excluded with
+their tables, including platform bookkeeping tables. The complete additional
+definitions travel in `schemaObjects`. A single SQLite lexer reads the original
+SQL before removing trivia. Identity records each token's class and canonical
+value, plus a deterministic spelling: a single space separates neighbours
+exactly when concatenating them would change their tokenization. The complete
+joined stream is tokenized again and must reproduce those same tokens.
+Comments and harmless inter-token whitespace therefore compare equally, while
+`x '31'` and `x'31'`, separated minus signs, numbers and combined operators stay
+distinct. No regular expression rewrites SQL.
+
+Quoted identifiers (double quotes, backticks, brackets, or a single-quoted string
+used as a name), strings, blobs, numbers, variables and ordinary identifiers keep
+their exact spelling. Only unambiguous reserved keywords fold ASCII case.
+Fallback/JOIN/window keywords retain their spelling: for example, SQLite can
+interpret `DEFAULT ABORT` and `DEFAULT abort` as different string defaults.
+Unicode case and quote styles are never normalized. The lexer follows SQLite's
+[`sqlite3GetToken`](https://github.com/sqlite/sqlite/blob/master/src/tokenize.c)
+and the keyword fallback rules in
+[`parse.y`](https://github.com/sqlite/sqlite/blob/master/src/parse.y).
+The original DDL is authenticated by `archiveHash`.
+
+Unsupported or ambiguous SQL refuses with `schema_mismatch:unsupported_sql` and
+the existing original-installation re-export/recovery instructions; it never
+receives a shared or empty identity. This includes NUL and ill-formed Unicode,
+BOM at token start, vertical-tab whitespace, unterminated quotes/brackets/block
+comments (including bare `/*`), malformed/odd-length blobs, invalid numeric
+separators or numeric identifier suffixes, malformed named/Tcl variables, and
+unknown ASCII punctuation. Valid decimal/hex/exponent/underscore numbers,
+SQLite's longest operators, question-mark and named/Tcl variables, LF/EOF line
+comments, and terminated block comments are recognized. SQLite may accept some
+of the refused whitespace or EOF-comment forms; re-export with supported DDL
+rather than silently discarding their bytes. Virtual tables remain unsupported.
+
+Older version 2 archives first verify their original raw-DDL, table-token, or
+complete-object-token schema checksum and complete archive proof. A read-only
+historical checksum codec projects the real lexer's tokens into those old wire
+encodings. Its lossy result never decides compatibility: complete definitions
+are always compared through the new typed token identity. Compatibility then uses
+any complete `schemaObjects` inventory the archive carries, without rewriting
+its authenticated manifest or parts. Without that inventory, the original
+presence or absence of indexes, views and triggers cannot be established from
+table SQL or migration names alone, even when the destination has no such
+objects. Normal restore refuses `schema_mismatch` and the CLI gives the existing
+re-export recovery instructions. This also catches removal of an old object's
+definition rather than assuming missing evidence means the objects match.
+Re-export from the original installation to carry the complete definitions.
+A new archive explicitly records even an empty object inventory, so later
+additive migrations can still be placed normally. The separate acknowledged
+v1 recovery path remains an explicitly unverified recovery, as documented below.
 
 New exports use archive version 2. The closing `archiveHash` is SHA-256 of
 canonical JSON `{manifest,parts}`, where `manifest` is the complete manifest
@@ -468,7 +523,9 @@ a view resolved from applied migration history), selects `*` or
 a secret column, when a trigger on it or a foreign key action from it reaches a
 catalogue table, when any other later statement writes it (directly or through
 a trigger) or changes its columns other than by `ADD COLUMN` (allowed only when
-every replay names its columns), or when the statement cannot be bounded.
+every replay names its columns), when the statement cannot be bounded, or when
+it writes a table that a bucket's `objectReferences` names: references are
+checked on the staged rows, before any object write.
 A failed or interrupted apply leaves no replayed row; finalizing again replays
 from the start.
 Read-only trigger bodies, including RAISE-only guards, add no write dependency.
@@ -612,8 +669,8 @@ part; different content returns 409. Reassembled bytes pass the part checksum
 before completion advances. Staged data stays private until finalization.
 Finalize requires the closing `archiveHash` and verifies all
 parts, semantic contents, destination
-emptiness, erasure and product invariants. R2 ownership is recorded after the
-empty-namespace check. Verified object writes precede one atomic D1 batch, with
+emptiness, erasure, object references and product invariants. R2 ownership
+is recorded after the empty-namespace check. Verified object writes precede one atomic D1 batch, with
 deferred FKs, trigger suppression/recreation, replaceable rows, staged inserts,
 journal adoption and completion. FK cycles and self-references restore together.
 An unsuccessful commit removes only owned objects. A lost commit acknowledgement
@@ -640,7 +697,10 @@ by every upload/finalize request, then every 30 seconds while that request is
 working (including verification, R2 transfers and product callbacks). This is a
 recovery window, not a total restore limit: the measured 20,000-row round trip
 below already takes 171 seconds, and callbacks have no wall-time bound. A fresh
-import returns `409 import_running` with `jobId` and ISO `abortableAt`. The owner
+import returns `409 import_running`. Only a validated internal lease refusal,
+after authorization and for the actor who owns that import, includes `jobId`
+and ISO `abortableAt`. Authorization failures and other actors receive no job or
+lease metadata, even if an error carries the same code or fields. The owner
 can find its active job with `GET /api/portability/imports` (`{active:status}`
 or `{active:null}`), and inspect `GET .../imports/:id`: `abortableAt` and `stale` describe
 its lease. The existing authenticated `POST .../imports/:id/abort` (or CLI
@@ -671,6 +731,17 @@ returns an async dispatcher, or null for foreign paths. Default base path is
 an actor id or null. Jobs belong to their creating actor. Unsafe methods require
 the exact configured Origin. Responses have `Cache-Control: no-store` and errors
 are `{error:code}`. Request bodies are bounded; `maxBodyBytes` can lower the bound.
+Typed authorization errors retain their HTTP status, directly or through a
+bounded, cycle-safe `cause` chain. Codes come from the existing fixed public
+vocabulary (for example `403 step_up_required`); unknown codes become
+`operation_failed`. Portability diagnostics expose the known code prefix only,
+never caller-supplied suffixes. Aggregate error collections are not authority
+wrappers. Native diagnostics remain private:
+transient D1 availability failures use `503 operation_failed`, transport timeouts
+use `504 operation_failed`, and unexpected faults remain `500 operation_failed`.
+The hosted CLI aborts a completed export after saving and verifying the local
+archive, releasing its snapshots and parts. Interrupted downloads retain their
+job for resume.
 
 | Method / relative path | Action |
 | --- | --- |
@@ -749,13 +820,14 @@ product erasure or remove product objects; the product handles attachments and
 any extra state. Do not retain a previously downloaded archive as erasure proof;
 supply the owner's later journal when restoring old offline data.
 
-## Measured capacity
+## Historical measured capacity
 
-One local Miniflare D1/R2 run exported, restored and exported 20,000 rows across
-five tables in 171.169 seconds, with 625 parts at a configured 4 KiB bound and a
+An unverified historical local Miniflare D1/R2 report recorded export, restore
+and export of 20,000 rows across five tables in 171.169 seconds, with 625 parts at a configured 4 KiB bound and a
 1,979,471-byte archive. Restore used one atomic D1 commit. The verification run
-reports the measurements again. These measurements are test evidence, not a production
-capacity claim. Real D1 CPU, query, statement and storage limits, object mutation,
+can produce fresh measurements; no corresponding historical benchmark receipt
+is retained in this repository. These figures do not establish current production
+capacity. Real D1 CPU, query, statement and storage limits, object mutation,
 destination writers and extra-payload recovery need product-level verification.
 
 ## Adopting
@@ -772,7 +844,11 @@ modules/portability/index.d.mts
 modules/portability/lines.mjs
 modules/portability/hash.mjs
 modules/portability/format.mjs
+modules/portability/references.mjs
 modules/portability/catalogue.mjs
+modules/portability/schema-identity.mjs
+modules/portability/schema-legacy.mjs
+modules/portability/sqlite-tokens.mjs
 modules/portability/bookkeeping.mjs
 modules/portability/storage.mjs
 modules/portability/copies.mjs
@@ -798,6 +874,7 @@ modules/portability/import-safety.mjs
 modules/portability/payloads.mjs
 modules/portability/journal.mjs
 modules/portability/http.mjs
+modules/portability/http-errors.mjs
 modules/portability/http-client.mjs
 modules/portability/cli.mjs
 modules/portability/cli-options.mjs

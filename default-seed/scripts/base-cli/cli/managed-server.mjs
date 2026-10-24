@@ -29,7 +29,7 @@ export function ready(out,url,dev,json=false,siteUrl,demo){
   out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
  }
  if(siteUrl)out.human(`RER_SITE ${siteUrl}`);
- if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real; external writes are simulated. This checkout's own data is untouched.`);}
+ if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real. This checkout's own data is untouched.`);}
 }
 export async function managedServer(project,options,out,{clock={}}={}){
  const registry=await serverRegistry(project.root),controller=new AbortController();

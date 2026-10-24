@@ -1,6 +1,6 @@
 # Publication scan implementation
 
-See [setup, command and scope](../publish-check-README.md).
+See [setup, command and scope](https://github.com/runeditrun/base/blob/main/scripts/publish-check-README.md).
 
 `git_history.py` delegates revision resolution, traversal, tree inventory and
 blob reads to system Git (`rev-parse`, `rev-list`, `ls-tree`, `cat-file --batch`).
