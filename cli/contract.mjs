@@ -1,4 +1,4 @@
-export const pins = Object.freeze({ node: '22.23.4', pnpm: '10.34.7' });
+export const pins = Object.freeze({ node: '22.20.0', pnpm: '10.34.7' });
 // What a server start applies when the person sets nothing (RER_SERVER_LIMIT,
 // RER_SERVER_IDLE_SECONDS or --idle-timeout). describe reports them.
 export const serverDefaults = Object.freeze({ serverLimit: 10, idleSeconds: 43200 });

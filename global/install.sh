@@ -160,7 +160,7 @@ NODE
 }
 
 install_node() {
- node_version=22.23.4
+ node_version=22.20.0
  case "$(uname -s)" in Darwin) node_os=darwin ;; Linux) node_os=linux ;; esac
  case "$(uname -m)" in x86_64 | amd64) node_arch=x64 ;; arm64 | aarch64) node_arch=arm64 ;; esac
  node_name="node-v$node_version-$node_os-$node_arch"

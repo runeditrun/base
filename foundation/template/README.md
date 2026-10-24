@@ -120,7 +120,7 @@ prove its sections hydrate as separate units (`src/base/hydration/README.md`); r
 
 Reset is destructive local cleanup. Archive restore requires an empty destination and
 explicit confirmation. Use `rer describe` to inspect the
-checkout's actual commands and flags. The maintained pins are Node 22.23.4 and
+checkout's actual commands and flags. The maintained pins are Node 22.20.0 and
 pnpm 10.34.7. Read `RUN-LOCALLY.md` for data custody, deploy requirements and
 remote-transfer support.
 
