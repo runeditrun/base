@@ -124,7 +124,7 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
     // Fleet inspection is passive. In particular --stop never recovers an
     // abandoned runtime, nor grants custody to a replacement at a recycled PID.
     // Only a new start in the owning checkout may recover its dead owner's scope.
-    if(recover&&record.checkout===checkout&&record.owner?.checkout===checkout&&current===null&&record.runtime) {
+    if(recover&&record.checkout===checkout&&record.owner?.checkout===checkout&&(current===null||current?.zombie&&current.start===record.owner.start)&&record.runtime) {
      const { shared }=await import('./shared.mjs');
      const { recoverCommand }=await shared('command-recovery.mjs');
      await recoverCommand(record.runtime);

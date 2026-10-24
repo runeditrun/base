@@ -212,6 +212,22 @@ explicit recovery rather than adopted, moved or deleted silently. Reset uses
 the adapter's declared removal inventory and preserves source, dependencies,
 exports and deployment receipts.
 
+Cleanup counts only live owned processes. Zombie or dead states (`Z`/`X`) have
+already exited: they receive no signals, do not block parent escalation, and
+cannot cause a remaining-process failure. Node reaps its direct children before
+the command store finishes closing. Inspections have a three-second read bound;
+an unreadable table is marked unchecked and grants no signalling authority.
+Live children retain birth-identity checks and TERM-to-KILL escalation.
+Group discovery precedes the final identity check for every TERM and KILL.
+A same-birth zombie supervisor's erased title does not hide live descendants;
+birth mismatches still reject cleanup. Unavailable owner metadata preserves
+an existing operation lock, including a legacy lock without a birth stamp.
+Missing boot or command metadata is unchecked, rather than evidence that a queue
+supervisor has exited. After SIGKILL, queue cleanup observes live membership for
+up to three seconds and retains the reservation if the group survives or cannot
+be inspected. Failed resume inspections keep the approved unchecked diagnostic.
+
+
 ## Data, deployment and verification
 
 To back up and restore this installation, use the local archive runner. This
