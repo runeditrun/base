@@ -1,10 +1,16 @@
-// A credential word is a whole delimited part, or a real camelCase suffix.
-// Ordinary names such as AUTHOR_NAME and KEYBOARD_LAYOUT stay public.
+// Short aliases need word boundaries: AUTHOR_NAME, MONKEY_NAME and
+// KEYBOARD_LAYOUT are ordinary public names. Long credential stems also match
+// run-together identifiers, independent of case or separators. Lexical
+// derivatives (tokenizer/tokenization and secretary/secretariat) aren't secrets.
 const CREDENTIAL_WORD = 'token|secret|credential|key|pat|dsn|auth|pass|passwd|password|pwd|signature|sig|cookie|apikey|accesskey|privatekey|secretkey|authtoken|accesstoken';
 const CREDENTIAL_NAME = new RegExp(`(?:^|[_.-])(?:${CREDENTIAL_WORD})s?(?:$|[_.-])`, 'i');
-const CAMEL_CREDENTIAL_NAME = /[A-Za-z0-9](?:Token|Secret|Credential|Key|Pat|Dsn|Auth|Pass|Passwd|Password|Pwd|Signature|Sig|Cookie)s?(?:$|[_.-]|[A-Z0-9])/;
+const CREDENTIAL_STEM = /token(?!iz)|secret(?!ar)|credential|password|passwd|passphrase|(?:api|access|private|signing)key|signature|cookie|pwd|dsn/;
 
-export const credentialName = key => CREDENTIAL_NAME.test(key) || CAMEL_CREDENTIAL_NAME.test(key);
+export function credentialName(key) {
+  const words = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z])([A-Z][a-z])/g, '$1_$2').replace(/([A-Za-z])([0-9])/g, '$1_$2');
+  const normalized = key.toLowerCase().replace(/[_.-]/g, '');
+  return CREDENTIAL_NAME.test(words) || CREDENTIAL_STEM.test(normalized);
+}
 
 /** Shared public-input boundary, including installer-owned vault bindings. */
 export function setupFieldIsSecret(field, secretScopes = {}) {
