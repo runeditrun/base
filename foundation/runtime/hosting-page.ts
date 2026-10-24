@@ -7,7 +7,7 @@
 // adds only Base's wording. This file is copied unchanged to src/base by both
 // maintained exporters.
 import { checkIdentity, type EditionIdentity } from './identity'
-import { checkRunData, document, escape, header, type HomepageHeader, type RunData } from './run-site'
+import { PATHS, checkRunData, document, escape, header, type HomepageHeader, type RunData } from './run-site'
 import type { SeedContract } from './seed-contract.mjs'
 
 /** What `rer build --site` reads for this page from the seed's declarations: names and permissions, never values. */
@@ -39,12 +39,6 @@ export interface SiteHosting {
   /** The seed's own deploy guide (deploy.json deployGuide), when it names one. */
   guide?: string
 }
-
-/** Where Run Edit Run's sign-ups stand: 'request' while new accounts are by request (the site's signupMode), 'app' once they open. */
-export const SIGNUPS: 'request' | 'app' = 'request'
-const ENTRY = 'https://app.runeditrun.com/'
-/** The Assisted entry link: the listing id when the seed has one, else the run-<seed> id the app accepts for any published seed. */
-export const assistedEntry = (product: string | undefined) => `${ENTRY}?${new URLSearchParams({ ...(product ? { product } : {}), plan: 'assisted' })}`
 
 const npxDev = 'npx -y @runeditrun/rer dev '
 const envName = /^[A-Z][A-Z0-9_]*$/
@@ -108,16 +102,17 @@ function resources({ d1, r2, kv, queues, durableObjects, crons }: SiteHosting['r
  * sitePages receives: null when the seed does not deploy to Workers from its declarations, which leaves
  * Assisted alone. `run.paths.product` is the listing id the chooser's entry links carry.
  */
-export function hostingPageHtml(identity: EditionIdentity, run: RunData & { paths?: { product: string | null } }, hosting: SiteHosting | null, contract?: SeedContract, homepage?: HomepageHeader): string {
+export function hostingPageHtml(identity: EditionIdentity, run: RunData, hosting: SiteHosting | null, contract?: SeedContract, homepage?: HomepageHeader): string {
   checkIdentity(identity); checkRunData(run)
   if (hosting) checkHosting(hosting)
   const name = escape(run.name), repo = run.clone.slice(npxDev.length), folder = repo.split('/').at(-1)!, slug = folder.replace(/^run-/, '')
-  const product = run.paths?.product ?? (/^just-every\/run-[a-z0-9][a-z0-9-]*$/.test(repo) ? folder : undefined)
+  const product = run.paths.product ?? `run-${slug}`
+  const closed = PATHS.signups === 'request' || run.paths.product === null || run.paths.assisted?.open === false
   const assisted = `<section class="assisted" aria-labelledby="assisted"><h2 id="assisted">Let Run Edit Run do it</h2>`
     + '<p class="lead">We set it up with you and keep it updated. It stays yours, on your computer or your own cloud.</p>'
     + `<h3>What stays yours</h3><ul><li>The code: ${name} is ${escape(run.licence)} licensed, so you can change it and run it without us.</li><li>The data: it stays on your computer or in your own Cloudflare account.</li><li>If you stop, your repository and your Cloudflare account stay yours.</li></ul>`
-    + `<div class="go"><a class="btn" href="${escape(assistedEntry(product))}">${SIGNUPS === 'request' ? 'Request access' : 'Set it up with us'}</a>`
-    + (SIGNUPS === 'request' ? `<p>For now, sign-ups are by request. The link asks for access with ${name} and Assisted already chosen, and we email you about the next steps.</p>` : '')
+    + `<div class="go"><a class="btn" href="${escape(PATHS.entry('assisted', product))}">${closed ? 'Request access' : 'Set it up with us'}</a>`
+    + (closed ? `<p>For now, sign-ups are by request. The link asks for access with ${name} and Assisted already chosen, and we email you about the next steps.</p>` : '')
     + '</div></section>'
   const body = (sections: string) => `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>Put ${name} online</h1><p class="sub">${name} runs on your own computer first. To use it from anywhere, put it online: ${hosting ? 'Run Edit Run can do it with you, or you can do it yourself on your own Cloudflare account.' : 'Run Edit Run can do it with you.'}</p></div>${sections}</main>`
   const page = (sections: string) => document(identity, `Put ${run.name} online`, `Put ${run.name} online${hosting ? ': let Run Edit Run do it, or deploy it yourself to your own Cloudflare account' : ' with Run Edit Run'}.`, STYLE, body(sections), COPY, homepage?.styles)

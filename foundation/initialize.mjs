@@ -92,7 +92,7 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     // instructions name the edition's product repository by convention.
     const run = JSON.parse(files.find(f => f.relative === 'src/site/run.json').bytes)
     const publicRepository = `just-every/run-${edition}`
-    Object.assign(run, { name: edition, repository: `https://github.com/${publicRepository}`, clone: `npx -y @runeditrun/rer dev ${publicRepository}`, folder: `run-${edition}` })
+    Object.assign(run, { name: edition, repository: `https://github.com/${publicRepository}`, clone: `npx -y @runeditrun/rer dev ${publicRepository}` })
     await json(`editions/${edition}/src/site/run.json`, run)
     await json(`editions/${edition}/deploy-site.json`, { version: 1, domain: siteDomain })
     const browserSeed = files.find(f => f.relative === 'scripts/installer/ui/seed.mjs')

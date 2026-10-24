@@ -402,3 +402,32 @@ test('built Roadmap preserves product prose while removing explicit source citat
   }
  } finally { await browser.close(); await preview.close(); }
 });
+
+test('built chooser keeps self first and carries each paid plan through the shared entry', async t => {
+ const f = await seed(t), data = join(f.root, 'src/site/run.ts'), renderer = join(f.root, 'src/base/run-site.ts');
+ const original = await readFile(data, 'utf8'), source = await readFile(renderer, 'utf8');
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const page = await browser.newPage();
+  for (const [mode, product, managed] of [['request', 'errors-workbench', true], ['app', 'errors-workbench', true], ['app', 'errors-workbench', false], ['app', null, true]]) {
+   await writeFile(data, original.replace("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`));
+   await writeFile(renderer, source.replace("signups: 'request' as", `signups: '${mode}' as`));
+   const result = await f.build();
+   assert.equal(result.code, 0, result.stdout + result.stderr);
+   await page.goto(preview.url + '/run');
+   assert.deepEqual(await page.locator('.chooser section[aria-labelledby]').evaluateAll(sections => sections.filter(s => !s.closest('.paste-panel')).map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', 'managed']);
+   assert.equal(await page.locator('button').count(), 1);
+   const closed = mode === 'request' || product === null;
+   assert.equal(await page.locator('.assisted .chip').count(), Number(closed));
+   assert.equal(await page.locator('.managed .chip').count(), Number(closed || !managed));
+   for (const plan of ['assisted', 'managed']) {
+    const href = new URL(await page.locator(`.${plan} a`).getAttribute('href'));
+    assert.deepEqual([href.origin, href.searchParams.get('product'), href.searchParams.get('plan')], ['https://app.runeditrun.com', product ?? 'run-spool', plan]);
+   }
+   const entry = await page.locator('.assisted a').getAttribute('href');
+   await page.goto(preview.url + '/docs/hosting');
+   assert.equal(await page.locator('.assisted a').getAttribute('href'), entry);
+   assert.equal(await page.locator('.assisted .go p').count(), Number(closed), 'hosting follows the same sign-ups and listing state');
+  }
+ } finally { await browser.close(); await preview.close(); }
+});
