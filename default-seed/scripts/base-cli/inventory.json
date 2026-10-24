@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g2aca6c53",
+  "cliVersion": "0.2.80-dev.g72511c61",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1995,11 +1995,11 @@
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
-      "sha256": "e45365177fd53756f1d696f62efe197fafd20bf01bbe5d96f178b887f2b67b18"
+      "sha256": "4d384011459557e64530728be72fc309e1c6f8e2419ae04b9cb1af29923dd553"
     },
     "modules/import-kit/src/d1/apply.ts": {
       "source": "modules/import-kit/src/d1/apply.ts",
-      "sha256": "fe38fa377499127bd37dda3b396908e010b76baff8e1b18b780192a37b8e7d28"
+      "sha256": "1e2d7f1aee40ab180f4577be7b431d04c9a25cf2f9ff29cde0cacb825354785c"
     },
     "modules/import-kit/src/d1/atomic-prefix.ts": {
       "source": "modules/import-kit/src/d1/atomic-prefix.ts",

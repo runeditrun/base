@@ -16,7 +16,7 @@ export function prospectiveEffect(id: string, entry: PlanEntry, index: number, b
 /** Small-batch callers can admit consecutive pending effects together, before
  * any of them publish. This avoids repeatedly listing the growing native set
  * for each one-record publication. Admission never survives a public request. */
-export async function admissionWindow(job: ImportJob, entries: PlanEntry[], effects: D1UndoEffect[], plan: { entries: PlanEntry[] }, context: D1ImportContext, batches: number, batchSize: number, publicationCost: number): Promise<number> {
+export async function admissionWindow(job: ImportJob, entries: PlanEntry[], effects: D1UndoEffect[], plan: { entries: PlanEntry[] }, context: D1ImportContext, batches: number, batchSize: number, publicationCost: number): Promise<void> {
   let end = job.checkpoint + entries.length;
   const limit = Math.min(job.total, job.checkpoint + batchSize * Math.min(batches, Math.ceil(20 / batchSize)));
   for (const entry of plan.entries.slice(end, limit)) {
@@ -30,5 +30,4 @@ export async function admissionWindow(job: ImportJob, entries: PlanEntry[], effe
     }
     end++;
   }
-  return end;
 }

@@ -21,7 +21,7 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
   const id = typeof jobOrId === 'string' ? jobOrId : jobOrId.id, { batchSize, maxBatches } = limits(context);
   await authorize(context, 'apply');
   let current = await stored(id, context, 'apply'), published: ImportJob | undefined;
-  let admittedThrough = current.job.checkpoint;
+  const admitted = new Map<string, string>();
   let preparing = context.storage.targets.preparePreservedUndo;
   try {
     for (let count = 0; count < maxBatches; count++) {
@@ -61,15 +61,17 @@ export async function applyD1ImportBatches(jobOrId: ImportJob | string, context:
       // effects. Apply still fences its own exact before-images atomically.
       // Do not copy this potentially large native snapshot into staging's
       // compact baseline, which must fit every private publication batch.
-      if (undoEffects && (job.checkpoint >= admittedThrough || preparing !== context.storage.targets.preparePreservedUndo)) {
+      if (undoEffects && (!admitted.size || undoEffects.some(effect => admitted.get(effect.provenance.id) !== sha256(canonicalJson(effect))) || preparing !== context.storage.targets.preparePreservedUndo)) {
         const { classifyUndo } = await import('./undo-snapshot.ts');
         const { database, targets } = context.storage;
         if (typeof targets.preparePreservedUndo !== 'function') throw new Error('IMPORT_PRESERVED_UNDO_ADAPTER_REQUIRED');
-        const end = await admissionWindow(job, entries, undoEffects, plan, context, maxBatches - count, batchSize, planned);
+        await admissionWindow(job, entries, undoEffects, plan, context, maxBatches - count, batchSize, planned);
         const snapshot = await targets.preparePreservedUndo(database, context.destination, structuredClone(undoEffects));
         const admission = classifyUndo(undoEffects, snapshot, context);
         await readAtomic(context, admission.guards, nativeStagingScope(job, plan), 'apply');
-        admittedThrough = end; preparing = targets.preparePreservedUndo;
+        admitted.clear();
+        for (const effect of undoEffects) admitted.set(effect.provenance.id, sha256(canonicalJson(effect)));
+        preparing = targets.preparePreservedUndo;
       }
       const request = publication(job, entries.length, statements, scope), done = job.checkpoint + entries.length === job.total;
       await atomic(context, 'apply', request.statements, returnReads, request.scope);
