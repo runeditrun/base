@@ -26,8 +26,10 @@ export async function createExport(context,actor='direct') {
   const migrations=await appliedMigrations(db);
   const manifest={kind:'manifest',format:FORMAT,version:2,product:config.product,exportedAt:new Date().toISOString(),sourceIdentity:s.source_identity,schema:cat.identity,tables:cat.tables,schemaObjects:cat.schemaObjects,objects,payloads:[],excludedTables:cat.excludedTables,excludedColumns:config.secretColumns,requiredConfiguration:config.requiredConfiguration,partCount:0,epoch:s.epoch,journal:await journal(db,s.source_identity),...(migrations?{migrations}:{})};
   const row={id,kind:'export',actor,phase:'building',completed:0,metadata:{manifest,copies,cursor:{table:0,row:0,binary:0,offset:0},partBytes:config.partBytes}};
+  const audit=context.onExport?context.onExport({id,actor:actor==='direct'?null:actor,scope:'installation'}):[];
   await db.batch([guard(db,'EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND applying=0 AND source_identity=? AND epoch=?)',s.source_identity,s.epoch),
-    ...cat.tables.flatMap(t=>createCopy(db,t,copies[t.name],true)),statement(db,'INSERT INTO rer_portability_jobs(id,kind,actor,phase,metadata) VALUES(?,?,?,?,?)',id,'export',actor,row.phase,canonicalJson(row.metadata)),db.prepare('DELETE FROM rer_portability_guard')]);
+    ...cat.tables.flatMap(t=>createCopy(db,t,copies[t.name],true)),statement(db,'INSERT INTO rer_portability_jobs(id,kind,actor,phase,metadata) VALUES(?,?,?,?,?)',id,'export',actor,row.phase,canonicalJson(row.metadata)),db.prepare('DELETE FROM rer_portability_guard'),
+    ...audit.map(([sql,args])=>statement(db,sql,...args))]);
   try {
     await dropDevData(db,cat.tables,copies);
     await dropProviderData(db,cat.tables,copies);

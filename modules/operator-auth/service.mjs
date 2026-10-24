@@ -29,7 +29,7 @@ export function createOperatorAuth(options) {
   const { db, config: input, mailSender, clientIp, rolePolicy = defaultRolePolicy, clock = Date.now, hooks = {}, fetch, waitUntil, accounts: nativeAccounts, proofs } = options;
   const config = configure(input);
   if (typeof clientIp !== 'function') throw new AuthError('client_ip_required', 503);
-  if (!hooks || typeof hooks !== 'object' || ['beforeMagicLink', 'afterConfirm'].some(name => hooks[name] !== undefined && typeof hooks[name] !== 'function')) throw new AuthError('invalid_configuration', 503);
+  if (!hooks || typeof hooks !== 'object' || ['beforeMagicLink', 'afterConfirm', 'audit'].some(name => hooks[name] !== undefined && typeof hooks[name] !== 'function')) throw new AuthError('invalid_configuration', 503);
   if (Object.hasOwn(options, 'accounts') || Object.hasOwn(options, 'proofs')) return createNativeAuth({ db, config, accounts: nativeAccounts, proofs, mailSender, clientIp, clock, hooks, fetch, waitUntil });
   const store = new AuthStore(db);
   const sessions = oaSessions({ config, store, clock });
@@ -73,7 +73,7 @@ export function createOperatorAuth(options) {
       },
     } });
   const { limit, newToken, sendLink, requireFreshProof } = email;
-  const admin = administration({ config, store, clock, authorize: rolePolicy, authenticate, newToken, sendLink, limit, requireFreshProof, providers });
+  const admin = administration({ config, store, clock, authorize: rolePolicy, authenticate, newToken, sendLink, limit, requireFreshProof, providers, audit: hooks.audit });
   const external = legacyAdmission({ admission, config });
   return Object.freeze({
     ...admin,

@@ -418,6 +418,57 @@ Two hooks on `createOperatorAuth({hooks})` keep a seed's own sign-in work in pla
   (Pencil's audit mail), or throw an `AuthError` to refuse: the session it was
   about to get is revoked first (Cradle's forgery check).
 
+## Administrative audit hook
+
+`createOperatorAuth({hooks: {audit}})` optionally accepts
+`audit({action, actorId, subjectId, detail, now})`, returning `[sql, args][]` or a
+Promise of those pairs. The callback must be pure: return SQL for the module to
+append to the administrative mutation's own D1 batch, with no external writes. A raced
+request may generate statements and then be refused by its transaction fence.
+Authorization, actor/version fences, the mutation and audit statements retain
+their transaction guards. A refused or rolled-back mutation leaves no audit row;
+a thrown hook or failed audit SQL fails the action closed. With no hook,
+administrative behavior is unchanged. This hook covers the OA-backed
+administrative methods below; it does not cover native accounts adapters or
+other write paths.
+
+`actorId` is the authenticated actor's opaque `oa_operators.id`. `subjectId` is
+the target operator's opaque id, including the operator owning a revoked
+session; domain and provider actions use `null`. `now` is the action's clock
+time in milliseconds since the Unix epoch. The event has only these fields:
+
+| `action` | `subjectId` | `detail` |
+| --- | --- | --- |
+| `operators.invite` | Invited operator id | New role |
+| `operators.cancel-invite` | Cancelled operator id | `inactive` |
+| `operators.deactivate` | Target operator id | `inactive` |
+| `operators.reactivate` | Target operator id | `active` |
+| `operators.role` | Target operator id | New role |
+| `sessions.revoke` | Session owner's operator id | `null` |
+| `domains.rule.set` | `null` | Normalized domain |
+| `domains.rule.lift` | `null` | Normalized domain |
+| `providers.unlink` | `null` | Provider id |
+| `providers.relink` | `null` | Provider id |
+
+`detail` is a string or `null`. Never add names, email addresses, IdP issuers or
+subjects, tokens, record data or file paths. The seed owns audit storage,
+migrations, retention and erasure; Base creates no audit table. For example,
+Cradle can return an insert into its `company_identity_audit` table after its
+seed migration adds nullable `detail` and supports nullable `operator_id` for
+domain/provider events:
+
+```js
+hooks: {
+  audit: ({action, actorId, subjectId, detail, now}) => [[
+    'INSERT INTO company_identity_audit(actor_id,operator_id,action,detail,created_at) VALUES(?,?,?,?,?)',
+    [actorId, subjectId, action, detail, now],
+  ]],
+}
+```
+
+Use the seed's actor and subject erasure rules for this table. `oa_auth_audit`
+is not a substitute for seed-owned administrative audit storage.
+
 ## Domain rules and step-up
 
 An owner can require a provider for an email domain (`POST /auth/domain-rules`

@@ -7,7 +7,9 @@ const policy:ArchivePolicy={
   importRow:(_table,row):Row=>({...row,status:'inactive',token:null}),
   validateStaged:async staged=>(await staged.read('connections')).every(row=>row.status==='inactive'&&row.token===null),
 };
-const service=await createPortability({db,buckets:{FILES:bucket},policy});
+const service=await createPortability({db,buckets:{FILES:bucket},policy,onExport:({id,actor,scope})=>[
+  ['INSERT INTO operation_audit(id,actor_id,scope) VALUES(?,?,?)',[id,actor,scope]],
+]});
 const id:string=await service.exports.create();
 const statements:D1PreparedStatement[]=await service.erasureStatements('notes',{id:'one'});
 const handler:(request:Request)=>Promise<Response|null>=await createPortabilityHandler({db,buckets:{FILES:bucket},policy,appOrigin:'https://example.test',authorize:async()=> 'owner'});

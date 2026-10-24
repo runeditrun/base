@@ -1,3 +1,5 @@
+import { auditDomainRule } from './domain-audit.mjs';
+import { auditMutation } from './audit.mjs';
 import { policyActorFence } from '../scheduled/fence.mjs';
 import { providerPinFence, recordProviderPin } from './provider-pin.mjs';
 // D1 batches are transactions. All decisions that grant a session or mutate
@@ -59,7 +61,7 @@ export class AuthStore {
     [input.id, input.hash, input.kind, input.returnTo, input.now, input.expiresAt, input.operatorId, ...fence.args]);
     return result?.id === input.id;
   }
-  async invite({ operatorId, expectedVersion, reinviting = false, email, displayName, role, token, now }, actor) {
+  async invite({ operatorId, expectedVersion, reinviting = false, email, displayName, role, token, now }, actor, audit) {
     const fence = this.actorFence(actor, now);
     // Only a witnessed cancellation may reopen an inactive identity. Keep its
     // durable admission guard until confirmation, including through pruning.
@@ -69,11 +71,16 @@ export class AuthStore {
         [displayName, operatorId, email, role, expectedVersion, operatorId, ...fence.args]]
       : [`INSERT INTO oa_operators(id,email,display_name,role,status,created_at)
           SELECT ?,?,?,?,'invited',? WHERE ${fence.sql} ON CONFLICT(email) DO NOTHING`, [operatorId, email, displayName, role, now, ...fence.args]];
-    const results = await this.batch([
+    const previousToken = audit ? await this.first('SELECT id FROM oa_tokens WHERE operator_id=? ORDER BY rowid DESC LIMIT 1', [operatorId]) : null;
+    const results = await auditMutation(this, { audit,
+      event: { action: 'operators.invite', actorId: actor.operator.id, subjectId: operatorId, detail: role, now },
+      before: { sql: `${fence.sql} AND (NOT EXISTS(SELECT 1 FROM oa_operators WHERE id=?) OR EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=?)) AND COALESCE((SELECT id FROM oa_tokens WHERE operator_id=? ORDER BY rowid DESC LIMIT 1),'')=?`, args: [...fence.args, operatorId, operatorId, expectedVersion, operatorId, previousToken?.id ?? ''] },
+      after: { sql: 'EXISTS(SELECT 1 FROM oa_tokens WHERE id=? AND operator_id=? AND operator_version=?)', args: [token.id, operatorId, expectedVersion + (reinviting ? 1 : 0)] },
+      statements: [
       prepare,
       [`INSERT INTO oa_tokens(id,token_hash,kind,operator_id,operator_version,issuer_id,issuer_version,return_to,created_at,expires_at)
         SELECT ?,?,'invite',id,version,?,?,?,?,? FROM oa_operators WHERE id=? AND status='invited' AND role=? AND version=?
-        ${reinviting ? 'AND changes()=1' : ''} AND ${fence.sql} RETURNING id`,
+        ${reinviting && !audit ? 'AND changes()=1' : ''} AND ${fence.sql} RETURNING id`,
       [token.id, token.hash, actor.operator.id, actor.operator.version, token.returnTo, now, token.expiresAt, operatorId, role, expectedVersion + (reinviting ? 1 : 0), ...fence.args]],
       // Bind revocation to this transaction's successful issuance, so a stale
       // reissue cannot invalidate the winner's link or send another credential.
@@ -82,7 +89,7 @@ export class AuthStore {
       // A link minted while using a dev session stays a dev credential.
       ...(actor.kind === 'dev' ? [[`INSERT INTO oa_dev_credentials(credential,id,created_at)
         SELECT 'oa_tokens',id,? FROM oa_tokens WHERE id=?`, [now, token.id]]] : []),
-    ]);
+    ] });
     return results[1].results.some(row => row.id === token.id);
   }
   async preview(hash, now) {
@@ -211,7 +218,8 @@ export class AuthStore {
   }
   domainRule(domain) { return this.first('SELECT domain,provider_id AS providerId FROM oa_domain_rules WHERE domain=?', [domain]); }
   async domainRules() { return (await this.statement('SELECT domain,provider_id AS providerId,created_at AS createdAt FROM oa_domain_rules ORDER BY domain').all()).results; }
-  async setDomainRule({ domain, providerId, now }, actor) {
+  async setDomainRule({ domain, providerId, now }, actor, audit) {
+    if (audit) return auditDomainRule(this, { domain, providerId, now }, actor, audit);
     const fence = this.actorFence(actor, now);
     const result = providerId === null
       ? await this.run(`DELETE FROM oa_domain_rules WHERE domain=? AND ${fence.sql}`, [domain, ...fence.args])
