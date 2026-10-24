@@ -18,6 +18,8 @@ import { demoGuarded,demoPreflight } from './demo.mjs';
 import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openUrl } from './dev-identity.mjs';
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
 
+export const operationHandoff = 1;
+
 // Dev opens through the local identity exchange. Preview serves production output.
 export function ready(out,url,dev,json=false,siteUrl,demo){
  if(json){out.event('ready',{url,...(dev?{signedInAs:dev.signedInAs??null,openUrl:dev.openUrl}:{}),...(siteUrl?{siteUrl}:{}),...(demo?{demo}:{})});return;}
@@ -35,7 +37,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
  const registry=await serverRegistry(project.root),controller=new AbortController();
  // A demo registers as its own mode: `rer dev --stop` never stops it by accident.
  const mode=options.demo?'demo':options.verb;
- let store,operation,proxy,activity,app,termination,reason,cleanupPromise,finished,selected,cleaned,site,demo,demoEnd;
+ let store,operation,operationWatch,proxy,activity,app,termination,reason,cleanupPromise,finished,selected,cleaned,site,demo,demoEnd;
  const scheduling=new AbortController();
  let activityWrites=Promise.resolve(),pendingActivity,activityWriting=false,infrastructureFailure;
  function recordActivity(fields){
@@ -44,7 +46,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
  }
  const stopped=new Promise(resolve=>{finished=resolve;});
  const cleanupDone=new Promise(resolve=>{cleaned=resolve;});
- const cleanup=()=>cleanupPromise??=(async()=>{scheduling.abort();clearTimeout(demoEnd);activity?.close();await site?.close();await store?.closeCommands();if(demo)await rm(demo.state,{recursive:true,force:true});await proxy?.close();await operation?.release();})();
+ const cleanup=()=>cleanupPromise??=(async()=>{scheduling.abort();clearTimeout(demoEnd);clearInterval(operationWatch);activity?.close();await site?.close();await store?.closeCommands();if(demo)await rm(demo.state,{recursive:true,force:true});await proxy?.close();await operation?.release();})();
  const stop=async why=>{reason??=why;controller.abort();finished();await cleanupDone;return {};};
  const handlers=new Map(['SIGINT','SIGTERM'].map(name=>[name,()=>{termination=name;void stop(name);} ]));
  for(const [name,handler]of handlers)process.on(name,handler);
@@ -80,13 +82,24 @@ export async function managedServer(project,options,out,{clock={}}={}){
    await emitReady(out,options,project.root,running.url,dev,running.siteUrl,running.demo);return {reused:true};
   }
   await registry.serve(async action=>{
-   if(action==='status')return {...activity?.snapshot(),url:selected?.url,probe:proxy?.probe,siteUrl:site?.url,demo};
+   if(action==='status')return {...activity?.snapshot(),url:selected?.url,probe:proxy?.probe,siteUrl:site?.url,demo,operationHandoff:operation?.handoff?1:undefined};
+   if(action.startsWith('operation-handoff:')){
+    if(reason||!operation?.handoff)throw Error('Local operation handoff is unavailable.');
+    const target=JSON.parse(Buffer.from(action.slice('operation-handoff:'.length),'base64url').toString());
+    return {operationToken:await operation.handoff(target)};
+   }
    if(action==='stop')return stop('explicit stop');
    throw Error('Unknown management operation');
   });
   await stateSafety(project);
   const {localOperation}=await shared('local/operation.mjs');
-  try{operation=await localOperation(project.root);}catch(error){throw refuse(error.message);}
+  try{operation=await localOperation(project.root,process.env.RER_LOCAL_OPERATION);}catch(error){throw refuse(error.message);}
+  // A borrowed startup remains under the updater until verification. If that
+  // updater dies, stop rather than serving indefinitely with a dead custodian.
+  if(operation.assertActive){let checking=false;operationWatch=setInterval(async()=>{
+   if(checking)return;checking=true;
+   try{await operation.assertActive();}catch{void stop('local operation owner stopped');}finally{checking=false;}
+  },1000);operationWatch.unref();}
   const ownership=await refuseLegacyProcess(project,{verb:options.verb,operation,isolated:options.demo});
   if(ownership?.lockProof)out.progress('Local process inspection did not answer; continuing with the exclusive checkout launch lock.\n');
   const {recoverInterrupted}=await shared('local/recovery.mjs');await recoverInterrupted(project.root,operation);

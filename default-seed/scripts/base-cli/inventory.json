@@ -133,7 +133,7 @@
     },
     "local/operation.mjs": {
       "source": "onboarding/local/operation.mjs",
-      "sha256": "879f2b1068afeb8e9340c317b6156faec7099ceeabf3b1e310489c79e9fa048c"
+      "sha256": "0ac43ad973a99d9f77e6210407d42f5599447714aa842817c7ba8495f34f66cd"
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
@@ -899,7 +899,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
+      "sha256": "c0ca2bafaecfa494f7fa705abaf3577fee4e24bd4382cb18a17edc123174193d"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",

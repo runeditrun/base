@@ -19,7 +19,7 @@ const graceMs = 10000
 // separate build/setup cannot restore credentials into another active build.
 // The lock and every takeover guard record the owner's PID and start time, so a
 // PID reused by an unrelated process never keeps a dead owner's lock alive.
-export async function localOperation(root, inheritedToken) {
+export async function localOperation(root, inheritedToken, { adopt = false } = {}) {
   const directory = join(root, '.wrangler/local-operation')
   await privateDirectory(root, directory)
   const path = join(directory, 'active.json')
@@ -30,7 +30,10 @@ export async function localOperation(root, inheritedToken) {
       throw new Error('The parent local setup operation is no longer active. Run the command again.')
     }
     if (!await ownerAlive(owner)) throw new Error('The parent local setup process has stopped. Run the command again.')
-    return { token: inheritedToken, release: async () => {} }
+    const self = await currentProcess()
+    // Nested builds can borrow in the very same process as setup. Their release
+    // remains a no-op; only an explicit incoming handoff may adopt that record.
+    return custody(path, inheritedToken, self, adopt || owner.pid !== self.pid)
   }
   const self = await currentProcess()
   let file
@@ -45,10 +48,57 @@ export async function localOperation(root, inheritedToken) {
   }
   const token = randomUUID()
   try { await file.writeFile(JSON.stringify({ ...self, token })) } finally { await file.close() }
-  const acquired = await identity(path)
-  return { token, release: async () => {
-    if (await identity(path) === acquired) await unlink(path).catch(missing)
-  } }
+  return custody(path, token, self)
+}
+
+// Ownership changes by atomic replacement, never by unlink/create. Borrowers
+// keep the same capability, but only the recorded PID/start may transfer or
+// release it. A former owner cannot release its successor's lock. The stale
+// owner takeover protocol below is unchanged.
+function custody(path, token, self, releasable = true) {
+  let pending = Promise.resolve()
+  const exclusive = action => {
+    const result = pending.then(action)
+    pending = result.catch(() => {})
+    return result
+  }
+  async function readOwner() {
+    const file = await open(path, 'r')
+    try { return { owner: JSON.parse(await file.readFile('utf8')), id: key(await file.stat({ bigint: true })) } }
+    finally { await file.close() }
+  }
+  const mine = owner => owner.token === token && owner.pid === self.pid && owner.start === self.start
+  return {
+    token,
+    assertActive: async () => {
+      const { owner } = await readOwner()
+      if (owner.token !== token || !await ownerAlive(owner)) throw new Error('The local operation owner has stopped.')
+    },
+    handoff: target => exclusive(async () => {
+      if (!Number.isSafeInteger(target?.pid) || target.pid <= 0 || typeof target.start !== 'string' || !await ownerAlive(target)) throw new Error('The receiving local operation process has stopped.')
+      const { owner, id } = await readOwner()
+      if (!releasable || !mine(owner)) throw await busy(path)
+      const temporary = `${path}.handoff-${randomUUID()}`
+      const file = await open(temporary, 'wx', 0o600)
+      try {
+        await file.writeFile(JSON.stringify({ pid: target.pid, start: target.start, token }))
+        await file.sync()
+      } finally { await file.close() }
+      try {
+        if (await identity(path) !== id) throw await busy(path)
+        await rename(temporary, path)
+        const directory = await open(join(path, '..'), 'r')
+        try { await directory.sync() } finally { await directory.close() }
+      } finally { await unlink(temporary).catch(missing) }
+      return token
+    }),
+    release: () => exclusive(async () => {
+      if (!releasable) return
+      let current
+      try { current = await readOwner() } catch (error) { if (error.code === 'ENOENT') return; throw error }
+      if (mine(current.owner) && await identity(path) === current.id) await unlink(path).catch(missing)
+    }),
+  }
 }
 
 async function currentProcess() {

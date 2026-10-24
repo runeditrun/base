@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { upgradeFixture, ownerRow } from './fixtures/upgrade/fixture.mjs';
+import { localOperation } from '../../onboarding/local/operation.mjs';
 
 test('rer upgrades a signed release while preserving owner source and existing data', { timeout: 20 * 60_000 }, async t => {
  const f = await upgradeFixture(t);
@@ -22,4 +23,6 @@ test('rer upgrades a signed release while preserving owner source and existing d
  assert.equal(installed.tag, f.v2.tag);
  assert.equal(installed.commit, f.v2.commit);
  assert.equal((await fetch(f.url + '/health')).status, 200);
+ await assert.rejects(() => localOperation(f.root), { code: 'LOCAL_OPERATION_BUSY' }, 'the detached app owns its lock after upgrade exits');
+ assert.equal((await f.run(['dev', '--detach', '--json'])).code, 0, 'the checkout can reuse the upgraded app');
 });

@@ -183,6 +183,14 @@ health and prior table counts. A failure after switching restores the previous
 commit and state. The last two backups stay on this computer. A previously
 stopped app is stopped again after verification.
 
+The checkout's dispatcher must support local-operation ownership handoff. Older
+pins (including rer 0.2.72 and 0.2.79) are refused before any stop, snapshot or
+source change; a running app keeps serving. Updating the global rer alone does
+not replace that checkout's pin. Adopt a rer release with handoff support in the
+checkout before upgrading its app. A supported server lends custody to upgrade
+and receives independent ownership after verification; a killed updater's
+borrowed server stops, and the next upgrade resumes from the journal.
+
 `--allow-data-change TABLE` permits a reviewed table-count decrease only from a
 TTY; background supervisors cannot pass it. JSON events contain safe phase and
 result fields, without private settings, paths or sign-in links. Keep anchor

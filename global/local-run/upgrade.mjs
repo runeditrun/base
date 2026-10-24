@@ -1,13 +1,12 @@
 import { realpath, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { localOperation } from '../../onboarding/local/operation.mjs';
 import { serverResources } from '../../cli/server-resources.mjs';
 import { git, text } from './process.mjs';
 import { failure, phases, errorCodes } from './error.mjs';
 import { recordedRelease, resolveRelease } from './release.mjs';
 import { prepareMerge, continueMerge, cleanupMerge } from './merge.mjs';
 import { backup, readJSON, readJournal, writeJournal, writeJSON, snapshot, rowCounts, checkPriorData, restoreState } from './state.mjs';
-import { runningApp, stopApp, startApp, health, verb } from './runtime.mjs';
+import { acquireOperation, returnOperation, runningApp, stopApp, startApp, health, verb } from './runtime.mjs';
 
 const emptyConflicts = () => ({ public_paths: [], other_count: 0 });
 function output(outcome, journal, started, error_code) {
@@ -64,7 +63,7 @@ async function apply(checkout, journal, operation, phase, allowed) {
 
 /** Local signed updates. All private paths, database names/counts and subprocess
  * output stay in the local journal; only the design's closed outputs escape. */
-export async function upgrade({ checkout, to, journalKey, anchors, onPhase, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
+export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDiagnostic, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
  const started = Date.now(), phase = phases(onPhase);
  let journal = {}, operation, installed, switched = false;
  try {
@@ -73,7 +72,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, chec
   installed = await recordedRelease(checkout).catch(() => undefined);
   journal.from = installed;
   const current = await preflight(checkout);
-  operation = await localOperation(checkout);
+  operation = await acquireOperation(checkout);
   try { await serverResources(checkout, { env: { ...process.env, RER_SERVERS_LOAD_THRESHOLD: undefined } }); }
   catch { throw failure('disk_low'); }
   // Ensure private upgrade records never turn an otherwise clean seed dirty.
@@ -154,6 +153,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, chec
   await phase('ready');
   return result;
  } catch (error) {
+  if (error.diagnostic) onDiagnostic?.(error.diagnostic);
   journal.from ??= installed;
   const code = errorCodes.has(error.error_code) ? error.error_code : 'refused';
   if (switched) {
@@ -174,5 +174,10 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, chec
   }
   await phase('failed', code);
   return output(code === 'needs_integration' ? 'needs_integration' : 'refused', journal, started, code);
- } finally { await operation?.release(); }
+ } finally {
+  if (operation) {
+   try { await returnOperation(checkout, operation); }
+   finally { await operation.release(); }
+  }
+ }
 }

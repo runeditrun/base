@@ -31,7 +31,7 @@ export async function upgradeCommand(args) {
  }
  if ([options.check, options.continue, Boolean(options.restore)].filter(Boolean).length > 1 || options.restore && options.to) { process.stderr.write(help); return 2; }
  const checkout = locate(['upgrade', ...(options.cwd ? ['--cwd', options.cwd] : [])]).root;
- const result = await upgrade({ checkout, ...options, allowDataChange: allowed, onPhase: event => {
+ const result = await upgrade({ checkout, ...options, allowDataChange: allowed, onDiagnostic: message => process.stderr.write(message + '\n'), onPhase: event => {
   if (options.json) process.stdout.write(JSON.stringify({ event: 'phase', ...event }) + '\n');
   else process.stderr.write(`rer upgrade: ${event.phase}${event.error_code ? ` (${event.error_code})` : ''}\n`);
  } });
