@@ -53,6 +53,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  }
  if (options.help) return options;
  if (deferTail) { options.cwd=resolve(cwd,options.cwd);return options; }
+ if (verb === 'refresh-base' && !independent && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run rer refresh-base --help.');
  if (options.detach && options.foreground) throw invalid('Choose one of --detach and --foreground.');
  if(options.stop && ['--port','--host','--idle-timeout','--detach','--foreground','--no-queue','--as','--login','--models','--models-service','--door','--direct'].some(flag=>options.supplied.has(flag)))throw invalid('--stop cannot be combined with start-only flags.');
  // --port and --host always mean direct mode; --door and --direct pick a mode.
