@@ -19,6 +19,7 @@ if (process.argv[2] === 'descendant') {
     }
   });
   await new Promise(resolve => server.listen(Number(port), '127.0.0.1', resolve));
-  await writeFile(receipt + '.tmp', JSON.stringify({ runtime: process.pid, grandchild: descendant.pid, port: Number(port) }));
+  console.log(`RER_READY http://127.0.0.1:${server.address().port}`);
+  await writeFile(receipt + '.tmp', JSON.stringify({ runtime: process.pid, grandchild: descendant.pid, port: server.address().port }));
   await rename(receipt + '.tmp', receipt);
 }

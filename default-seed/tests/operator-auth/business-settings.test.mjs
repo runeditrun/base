@@ -58,7 +58,7 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
 
     const trust = testTrust(), ownerCookie = await boot({ RER_BUSINESS_TRUST: JSON.stringify(trust) })
     const beforeHomepage = await capture('/', 'homepage-before')
-    const logoBytes = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#245943"/><path d="M55 22C24 20 20 40 27 55c22 5 34-10 28-33Z" fill="#fff"/></svg>')
+    const logoBytes = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><defs><path id="leaf" d="M55 22C24 20 20 40 27 55c22 5 34-10 28-33Z"/></defs><rect width="80" height="80" rx="16" fill="#245943"/><use href="#leaf" fill="#fff"/></svg>')
     const logo = { sha256: digest(logoBytes), type: 'image/svg+xml', bytes: logoBytes.length }
     const member = { email: 'sam@example.test', name: 'Sam Chen', role: 'member', invite: 0 }
     let document = testDocument({ logo, team: [member] })

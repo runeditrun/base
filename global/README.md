@@ -4,6 +4,17 @@
 Run Edit Run checkout: every verb runs that checkout's own pinned copy, so a
 checkout always gets the behaviour it was built and tested with.
 
+For source authors, `rer adopt-edition` adds a recipe and lock to existing tracked
+seed source while preserving copy/composition provenance. `rer refresh-base
+--ref FULL_COMMIT` refreshes recorded Base copies with the seed's pinned package;
+no vendored authoring CLI is needed. Base source comes from a temporary clone of
+`https://github.com/runeditrun/base.git` unless the seed declares another source
+or you pass `--base CHECKOUT`. Offline refresh requires `--offline --base CHECKOUT`.
+Both verbs have effect-free `--help` and newline-delimited `--json` events.
+Review source changes and run edition tests before committing. See the
+[edition authoring guide](https://github.com/runeditrun/base/blob/main/export/EDITION-AUTHORING.md)
+for adoption, refusal behavior, JSON fields and the original Base-checkout form.
+
 ## Install
 
 Start a seed from an empty folder, with or without Node:

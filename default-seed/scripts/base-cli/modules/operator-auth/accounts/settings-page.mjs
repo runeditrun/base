@@ -27,5 +27,5 @@ function businessSection(value) {
  return '<h2>Business</h2>' + details
   + '<p>The owner can stop receiving settings and team updates from Business. Confirm your identity first.</p>'
   + '<div class="stack"><form method="post" action="/auth/step-up"><input type="hidden" name="action" value="business:stop"><input type="hidden" name="returnTo" value="/auth/settings/identity"><button class="secondary">Confirm identity</button></form>'
-  + '<form method="post" action="/auth/settings/business"><button class="secondary">Stop Business settings</button></form></div>';
+  + '<form method="post" action="/auth/settings/business"><button class="secondary">Stop taking settings from Business</button></form></div>';
 }

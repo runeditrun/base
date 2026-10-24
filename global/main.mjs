@@ -1,4 +1,4 @@
-import { checkoutBootstrap } from '../cli/contract.mjs';
+import { checkoutBootstrap, checkoutVerbs } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
 import { localDefaults } from './launch/local-defaults.mjs';
@@ -45,8 +45,7 @@ else its vendored scripts/rer.mjs.
                        Run COMMAND once this computer's job queue admits it (heavy package scripts
                        of a checkout that pins the rer package use it).
 
-Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy, signin, export,
-import, doctor, describe, check, release, listing. Run rer VERB --help in a checkout for its flags.
+Checkout verbs: ${Object.keys(checkoutVerbs).join(', ')}, listing. Run rer VERB --help in a checkout for its flags.
 `;
 
 export async function main(argv) {

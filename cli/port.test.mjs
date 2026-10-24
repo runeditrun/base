@@ -71,7 +71,6 @@ function busyComputer(t,busy){
   return this;
  });
 }
-const freeSeen=async()=>{const server=createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});const {port}=server.address();await new Promise(resolve=>server.close(resolve));return port;};
 
 test('at load 30, with binds slower than any time allowance, setup and rer dev still find the one free port late in their range',async t=>{
  const from=20000,last=from+searchCandidates-1;
@@ -89,9 +88,10 @@ test('when every port in the range is in use, setup and rer dev refuse naming th
 });
 
 test('on a quiet computer the search takes the first free port, and skips one a server holds and one rer dev already holds',async t=>{
- const first=await freeSeen(),holder=createServer();
- await new Promise((resolve,reject)=>{holder.once('error',reject);holder.listen(first,'127.0.0.1',resolve);});
+ const holder=createServer();
+ await new Promise((resolve,reject)=>{holder.once('error',reject);holder.listen(0,'127.0.0.1',resolve);});
  t.after(()=>new Promise(resolve=>holder.close(resolve)));
+ const first=holder.address().port;
  const setup=await firstFreePort('127.0.0.1',first);
  assert.ok(setup>first&&setup<first+searchCandidates);
  const held=await devPort([first+1],async port=>({port}),{RER_DEV_PORT_FROM:String(first)});

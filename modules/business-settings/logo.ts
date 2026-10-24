@@ -11,8 +11,12 @@ export function imageType(bytes: Uint8Array): string {
   if (start(82, 73, 70, 70) && new TextDecoder().decode(bytes.slice(8, 12)) === 'WEBP') return 'image/webp';
   try {
     const svg = new TextDecoder('utf-8', { fatal: true }).decode(bytes).trim();
-    if (!/^(?:<\?xml[^?]*\?>\s*)?<svg(?:\s|>)/i.test(svg) || !/<\/svg>\s*$/i.test(svg)
-      || /<!|<\s*(?:script|foreignObject|iframe|object|embed|a|image|use|style|animate|set)\b|\bon[a-z]+\s*=|\b(?:href|src)\s*=|url\s*\(|&(?:#|[a-z])/i.test(svg)) return invalid();
+    if (!/^(?:<\?xml[^?]*\?>\s*)?<svg(?:\s|>)/i.test(svg) || !/(?:<\/svg>|\/>)\s*$/i.test(svg)
+      || /<!\s*(?:DOCTYPE|ENTITY)|<\s*(?:script|foreignObject|iframe|object|embed)\b|\bon[a-z]+\s*=/i.test(svg)) return invalid();
+    // Common exported logos use local gradients, styles and <use> references.
+    // Keep those; the upload must not introduce a remote or executable URL.
+    for (const match of svg.matchAll(/\b(?:href|src)\s*=\s*(["'])(.*?)\1/gi)) if (!/^#[\w:.-]+$/.test(match[2])) return invalid();
+    for (const match of svg.matchAll(/url\s*\(\s*([^)]*)\)/gi)) if (!/^#[\w:.-]+$/.test(match[1].trim().replace(/^["']|["']$/g, ''))) return invalid();
     return 'image/svg+xml';
   } catch { return invalid(); }
 }

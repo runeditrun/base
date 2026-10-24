@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { testProvider } from './oidc-provider.mjs'
-import { startOnFreePort } from '../ports.mjs'
+import { drainingResponse, emittedListener } from './emitted-listener.mjs'
 
 export const root = fileURLToPath(new URL('../../', import.meta.url))
 const reactRequire = createRequire(await realpath(join(root, 'node_modules/@tanstack/react-start/package.json')))
@@ -24,29 +24,53 @@ export async function migrate(db, filename) {
   // connections per start, which exhausts the ephemeral port range under load.
   await db.batch(splitSql(sql).map((statement) => db.prepare(statement)))
 }
-export const emittedRuntime = (options = {}) => startOnFreePort((port) => startEmittedRuntime(port, options))
-async function startEmittedRuntime(port, { prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, hostname = '127.0.0.1', bindings = {}, files = false }) {
+export async function emittedRuntime({ prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, hostname = '127.0.0.1', bindings = {}, files = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
   const production = !noMail
-  const origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://${hostname}:${port}`
+  let origin = demoHost ? 'https://demo.example.test' : `${production ? 'https' : 'http'}://${hostname}`
   const forwardHost = demoHost || hostname !== '127.0.0.1'
   const mails = []
   const networkRequests = []
-  const provider = oidc ? await testProvider(origin, owner) : undefined
+  const active = new Set()
+  let provider, mf, deploying
+  const listener = emittedListener(Miniflare, convertV4MiniflareOptions, {
+    https: production, compatibilityDate: config.compatibility_date,
+    async fetch(request) {
+      // A request arriving during redeploy waits for the new generation. The
+      // ingress listener remains owned while D1 changes hands between workers.
+      while (deploying) await deploying
+      let finish
+      const done = new Promise(resolve => { finish = resolve })
+      active.add(done)
+      const finished = () => { active.delete(done); finish() }
+      try { return drainingResponse(await mf.dispatchFetch(request, { redirect: 'manual' }), finished) }
+      catch (error) { finished(); throw error }
+    },
+  })
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter((file) => file.endsWith('.js')).map((file) => `assets/${file}`)]
     .map((file) => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
   // Preserve the requested URL and Host through Miniflare's loopback proxy, as the
   // demo front does when forwarding into this visitor's container.
-  if (forwardHost) modules.unshift({ type: 'ESModule', path: join(root, 'dist/server/test-demo-entry.mjs'),
+  modules.unshift({ type: 'ESModule', path: join(root, 'dist/server/test-demo-entry.mjs'),
     contents: `import worker from ${JSON.stringify('./' + config.main)};
       export default { ...worker, async fetch(envelope, env, execution) {
-        const { url, ...init } = await envelope.json();
-        return worker.fetch(new Request(url, init), env, execution);
+        const forwarded = new Headers(envelope.headers);
+        const url = forwarded.get('x-base-test-url');
+        forwarded.set('host', forwarded.get('x-base-test-host'));
+        forwarded.delete('x-base-test-url');
+        forwarded.delete('x-base-test-host');
+        const received = new Request(url, new Request(envelope, { headers: forwarded }));
+        const request = ${forwardHost ? 'await received.json().then(({ url, ...init }) => new Request(url, init))' : 'received'};
+        // workerd does not synthesize Host for in-process dispatch. Preserve an
+        // explicit Host so origin-admission tests still exercise hostile hosts.
+        const headers = new Headers(request.headers);
+        if (!headers.has('host')) headers.set('host', new URL(request.url).host);
+        return worker.fetch(new Request(request, { headers }), env, execution);
       } };` })
   const legacyOptions = {
-    host: '127.0.0.1', port, https: production, modulesRoot: join(root, 'dist/server'),
+    host: '127.0.0.1', port: 0, https: production, modulesRoot: join(root, 'dist/server'),
     modules,
     compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
     assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
@@ -76,10 +100,17 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
       return Response.json({ id: `test-receipt-${mails.length}` })
     },
   }
-  const options = convertV4MiniflareOptions(legacyOptions)
-  const mf = new Miniflare({ ...options, resourcePersistencePath: join(directory, 'state') })
+  const start = (modules) => new Miniflare({ ...convertV4MiniflareOptions({ ...legacyOptions, modules }), resourcePersistencePath: join(directory, 'state') })
   try {
+    const address = await listener.ready
+    if (!demoHost) origin = `${production ? 'https' : 'http'}://${hostname}:${address.port}`
+    provider = oidc ? await testProvider(origin, owner) : undefined
+    legacyOptions.bindings = { ...legacyOptions.bindings, AUTH_ORIGIN: origin, ...provider?.configuration, ...bindings }
+    // The application starts with the already-bound ingress origin. Neither
+    // runtime is reconfigured to publish bindings after it has started.
+    mf = start(modules)
     await mf.ready
+    const port = address.port
     let db = await mf.getD1Database('DB')
     await migrate(db, '0001_reference.sql')
     if (prior) {
@@ -94,19 +125,27 @@ async function startEmittedRuntime(port, { prior = false, noMail = false, oidc =
         ...(method === 'POST' ? { origin, 'content-type': 'application/json' } : {}),
         ...(cookie ? { cookie } : {}), ...headers,
       }, ...(body !== undefined ? { body } : input === undefined ? {} : { body: JSON.stringify(input) }) }
-      return forwardHost ? mf.dispatchFetch(`${production ? 'https' : 'http'}://127.0.0.1:${port}/test-dispatch`, {
+      return forwardHost ? listener.dispatchFetch(`${production ? 'https' : 'http'}://127.0.0.1:${port}/test-dispatch`, {
         method: 'POST', redirect: 'manual', body: JSON.stringify({ url: origin + path, ...init }),
-      }) : mf.dispatchFetch(origin + path, { ...init, redirect: 'manual' })
+      }) : listener.dispatchFetch(origin + path, { ...init, redirect: 'manual' })
     }
-    return { origin, call, get db() { return db }, mails, mf, provider, networkRequests,
+    return { origin, call, get db() { return db }, mails, get mf() { return mf }, provider, networkRequests,
       // Deploy changed real Worker source against the same persisted D1. This
       // models policy edits without an application-only test endpoint/binding.
       async redeploy(transform = source => source) {
         const changed = await Promise.all(modules.map(async module => ({ ...module,
           contents: transform(module.contents ?? await readFile(module.path, 'utf8'), module.path) })))
-        await mf.setOptions({ ...convertV4MiniflareOptions({ ...legacyOptions, modules: changed }), resourcePersistencePath: join(directory, 'state') })
-        await mf.ready
-        db = await mf.getD1Database('DB')
-      }, async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }) } }
-  } catch (error) { await Promise.allSettled([mf.dispose(), rm(directory, { recursive: true, force: true })]); throw error }
+        deploying = (async () => {
+          await Promise.all(active)
+          await mf.dispose()
+          mf = start(changed)
+          await mf.ready
+          db = await mf.getD1Database('DB')
+        })()
+        try { await deploying } finally { deploying = undefined }
+      }, async close() {
+        await listener.dispose()
+        try { await deploying } finally { await mf.dispose(); await rm(directory, { recursive: true, force: true }) }
+      } }
+  } catch (error) { await Promise.allSettled([listener.dispose(), mf?.dispose()]); await rm(directory, { recursive: true, force: true }); throw error }
 }

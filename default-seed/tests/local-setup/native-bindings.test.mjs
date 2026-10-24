@@ -2,24 +2,13 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { cp, mkdir, mkdtemp, open, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
+import { advertisedOrigin } from '../worker-listener.mjs'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
-
-async function availablePort() {
-  const server = createServer()
-  await new Promise((resolve, reject) => {
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', resolve)
-  })
-  const port = server.address().port
-  await new Promise((resolve) => server.close(resolve))
-  return port
-}
 
 async function stop(child, closed) {
   if (!child.pid) return
@@ -59,7 +48,7 @@ test('native Wrangler receives only explicit private file bindings despite inher
           session: typeof env.SESSION_SECRET === 'string' && env.SESSION_SECRET === request.headers.get('x-expected-session'),
           setup: typeof env.SETUP_TOKEN === 'string' && env.SETUP_TOKEN === request.headers.get('x-expected-setup'),
           local: env.AUTH_LOCAL === 'true',
-          origin: env.AUTH_ORIGIN === new URL(request.url).origin,
+          origin: env.AUTH_ORIGIN === request.headers.get('x-expected-origin'),
           owner: env.OWNER_EMAIL === 'owner@example.test',
           provider: env.MAIL_PROVIDER === 'development',
           from: env.MAIL_FROM === 'auth@localhost.test',
@@ -68,11 +57,10 @@ test('native Wrangler receives only explicit private file bindings despite inher
         })
       }
     }`)
-    const port = await availablePort()
-    const origin = `http://127.0.0.1:${port}`
+    const configuredOrigin = 'http://127.0.0.1:0'
     const session = randomBytes(32).toString('hex')
     const setup = randomBytes(32).toString('hex')
-    const vars = `AUTH_LOCAL=true\nAUTH_ORIGIN=${origin}\nOWNER_EMAIL=owner@example.test\nMAIL_PROVIDER=development\nMAIL_FROM=auth@localhost.test\nSESSION_SECRET=${session}\nSETUP_TOKEN=${setup}\n`
+    const vars = `AUTH_LOCAL=true\nAUTH_ORIGIN=${configuredOrigin}\nOWNER_EMAIL=owner@example.test\nMAIL_PROVIDER=development\nMAIL_FROM=auth@localhost.test\nSESSION_SECRET=${session}\nSETUP_TOKEN=${setup}\n`
     const varsPath = join(dir, '.dev.vars')
     await writeFile(varsPath, vars, { mode: 0o600 })
     await writeFile(join(dir, '.env'), 'LOCAL_SETUP_DOTENV_SENTINEL=must-not-be-bound\n', { mode: 0o600 })
@@ -93,12 +81,14 @@ test('native Wrangler receives only explicit private file bindings despite inher
       child.once('error', () => { exited = true; resolve() })
       child.once('close', () => { exited = true; resolve() })
     })
-    let response
+    let response, origin
     const deadline = Date.now() + 40000
     while (!exited && Date.now() < deadline) {
       try {
+        origin ??= advertisedOrigin(await readFile(join(dir, 'launcher.log'), 'utf8'))
+        if (!origin) { await delay(200); continue }
         response = await fetch(origin, {
-          headers: { 'x-expected-session': session, 'x-expected-setup': setup },
+          headers: { 'x-expected-session': session, 'x-expected-setup': setup, 'x-expected-origin': configuredOrigin },
           signal: AbortSignal.timeout(1000),
         })
         break

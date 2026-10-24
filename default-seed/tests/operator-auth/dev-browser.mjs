@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { writeFile, rm, mkdtemp } from 'node:fs/promises'
+import { readFile, writeFile, rm, mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { chromium } from '@playwright/test'
 import { owner, setupToken } from './emitted-runtime.mjs'
-import { freePort } from '../ports.mjs'
+import { listenerEntry } from '../worker-listener.mjs'
 import { copyProject } from '../local-journey/copy.mjs'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
 import { BODY_SUCCEEDED, finishWithCleanup } from '../cleanup-errors.mjs'
@@ -24,8 +24,7 @@ function startupDiagnostic(redaction, child, lastHealth, output) {
 export async function devBrowserProof() {
   const directory = await mkdtemp(join(tmpdir(),'default-auth-vite-'))
   const root = join(directory,'seed')
-  const port = await freePort()
-  const origin = `http://127.0.0.1:${port}`
+  let origin
   const vars = join(root, '.dev.vars')
   let child, bodyError = BODY_SUCCEEDED, output = ''
   const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: '' }
@@ -36,16 +35,21 @@ export async function devBrowserProof() {
     await copyProject(root)
     await promisify(execFile)('pnpm', ['install','--frozen-lockfile'], { cwd: root, env })
     // Exclusive disposable checkout: never overwrite the operator's settings.
-    await writeFile(vars, `AUTH_ORIGIN=${origin}\nAUTH_LOCAL=true\nOWNER_EMAIL=${owner}\nSESSION_SECRET=${sessionSecret}\nSETUP_TOKEN=${setupToken}\n`, { flag: 'wx', mode: 0o600 })
+    await writeFile(vars, `AUTH_ORIGIN=http://127.0.0.1:0\nAUTH_LOCAL=true\nOWNER_EMAIL=${owner}\nSESSION_SECRET=${sessionSecret}\nSETUP_TOKEN=${setupToken}\n`, { flag: 'wx', mode: 0o600 })
     await promisify(execFile)('pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', 'default-seed-reference', '--local', '--persist-to','.wrangler/state','--config', 'wrangler.jsonc'], { cwd: root, env })
-    child = spawnOwnedProcess('pnpm', ['exec','vite','dev', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
+    // Wrap only this disposable checkout's dev entry; Vite and its HMR client
+    // still use the actual listener selected by Vite itself.
+    const entry = join(root, 'src/server.dev.ts')
+    await writeFile(join(root, 'src/server.dev.native.ts'), await readFile(entry))
+    await writeFile(entry, listenerEntry('./server.dev.native'))
+    child = spawnOwnedProcess('pnpm', ['exec','vite','dev', '--host', '127.0.0.1', '--port', '0', '--strictPort'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stdout.on('data', (value) => { output += value })
     child.stderr.on('data', (value) => { output += value })
     child.on('error', (error) => { output += `\nChild spawn error: ${error.message}\n` })
     let lastHealth = 'No health response yet'
     const startupSignal = AbortSignal.timeout(12000)
     try {
-      await viteListening(child, origin, { signal: startupSignal })
+      origin = await viteListening(child, { signal: startupSignal })
       const response = await fetch(`${origin}/health`, { signal: startupSignal })
       lastHealth = `HTTP ${response.status}`
       assert.equal(response.status, 200)

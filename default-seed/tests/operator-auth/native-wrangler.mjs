@@ -6,14 +6,14 @@ import { mkdtemp, rm, readdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { root, owner, setupToken } from './emitted-runtime.mjs'
-import { freePort } from '../ports.mjs'
+import { advertisedOrigin, listenerConfig } from '../worker-listener.mjs'
 import { chromium } from '@playwright/test'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
 
 export async function nativeWranglerProof() {
   const state = await mkdtemp(join(tmpdir(), 'default-auth-wrangler-'))
   const config = join(root, 'dist/server/wrangler.json')
-  const origin = `http://127.0.0.1:${await freePort()}`
+  let origin
   let worker, output = ''
   const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: '' }
   const command = (args) => new Promise((resolve, reject) => {
@@ -26,13 +26,15 @@ export async function nativeWranglerProof() {
   })
   try {
     await command(['exec', 'wrangler', 'd1', 'migrations', 'apply', 'default-seed-reference', '--local', '--persist-to', state, '--config', config])
-    worker = spawnOwnedProcess('pnpm', ['exec', 'wrangler', 'dev', '--inspector-port', '0', '--config', config, '--local', '--persist-to', state, '--ip', '127.0.0.1', '--port', new URL(origin).port, '--show-interactive-dev-session=false', '--var', `OWNER_EMAIL:${owner}`, '--var', `SESSION_SECRET:disposable-native-test-secret-32-bytes`, '--var', `SETUP_TOKEN:${setupToken}`, '--var', `AUTH_ORIGIN:${origin}`, '--var', 'AUTH_LOCAL:true'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
+    const servingConfig = await listenerConfig(config, state)
+    worker = spawnOwnedProcess('pnpm', ['exec', 'wrangler', 'dev', '--inspector-port', '0', '--config', servingConfig, '--local', '--persist-to', state, '--ip', '127.0.0.1', '--port', '0', '--show-interactive-dev-session=false', '--var', `OWNER_EMAIL:${owner}`, '--var', `SESSION_SECRET:disposable-native-test-secret-32-bytes`, '--var', `SETUP_TOKEN:${setupToken}`, '--var', 'AUTH_ORIGIN:http://127.0.0.1:0', '--var', 'AUTH_LOCAL:true'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
     worker.stdout.on('data', (value) => { output += value })
     worker.stderr.on('data', (value) => { output += value })
     let ready = false
     for (let i = 0; i < 150; i++) {
       if (worker.exitCode !== null) throw new Error('Wrangler exited during startup')
-      try { if ((await fetch(`${origin}/health`)).status === 200) { ready = true; break } } catch {}
+      origin ??= advertisedOrigin(output)
+      try { if (origin && (await fetch(`${origin}/health`)).status === 200) { ready = true; break } } catch {}
       await new Promise((resolve) => setTimeout(resolve, 100))
     }
     assert.ok(ready, 'emitted Wrangler became healthy')
