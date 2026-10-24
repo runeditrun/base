@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g577950b5",
+  "cliVersion": "0.2.79-dev.gbff90315",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1175,7 +1175,7 @@
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
-      "sha256": "50111ea042ad7ab4ed6154a29bc3d0cf68c25688ed03daae5f5070bafcf177c4"
+      "sha256": "255b570052a8e3cd785043c82e2088445d8e181a92c35c397444eafebe2ec1e4"
     },
     "edition-authoring/manifest.mjs": {
       "source": "edition-authoring/manifest.mjs",
