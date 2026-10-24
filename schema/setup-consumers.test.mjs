@@ -35,7 +35,11 @@ test('setup CLI and installer accept public business hints and developer audienc
  for(const name of Object.keys(input))assert.equal(model.fieldVisible(name,input),true);
  assert.equal(model.validateInput(input).SERVICE_URL,input.SERVICE_URL);
  // Similar letters in ordinary Business names must not trigger the refusal.
- for(const name of ['DISPLAY_NAME','SUPPORT_EMAIL','TIMEZONE','BUSINESS_NAME','LEGAL_NAME','WEBSITE','KEYBOARD_LAYOUT','MONKEY_NAME','TOKENIZER_LANG','AUTHOR_NAME','PASSPORT_COUNTRY','PATCH_POLICY','SIGNAL_REGION','SECRETARY_NAME','TOKENIZATION_LANGUAGE']){
+ for(const name of ['DISPLAY_NAME','SUPPORT_EMAIL','TIMEZONE','BUSINESS_NAME','LEGAL_NAME','WEBSITE','KEYBOARD_LAYOUT','MONKEY_NAME','TOKENIZER_LANG','AUTHOR_NAME','PASSPORT_COUNTRY','PATCH_POLICY','SIGNAL_REGION','SECRETARY_NAME','TOKENIZATION_LANGUAGE',
+   'GOODS_NAME','KIDS_NURSERY_NAME','BRAND_SNIPPET','ADS_NETWORK_NAME',
+   'PASSENGER_NAME','DESIGN_STUDIO_NAME','MONKEY_BUSINESS_NAME','KEYSTONE_LEGAL_NAME',
+   'PATIO_NAME','SPASS_NAME','AUTHORITY_NAME','SIGMA_NAME','DSNETWORK_NAME','PWDRY_NAME',
+   'KEYNOTE_TITLE','PASSAGE_NAME','PATCHWORK_NAME','SIGNAGE_NAME','COOKIECUTTER_NAME']){
   const candidate={...manifest,fields:[{name,label:'Business value',kind:'text',businessField:'display_name'}]};
   await writeFile(file,JSON.stringify(candidate));
   assert.equal(spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'}).status,0,name);
@@ -75,6 +79,12 @@ test('setup CLI and installer consumers refuse invalid business hints, sensitive
    'sessionToken','clientSECRET','databasePassword','serviceCredential',
    'servicetoken','clientsecret','accountcredential','serviceApiKey',
    'mailPrivateKey','cloudAccessKey','jwtSigningKey','serverKey2','clientAuth2',
+  'ENCRYPTIONKEY', 'SSHKEY', 'BACKUPKEY', 'GITHUBPAT', 'SMTPPASS',
+  'ENCRYPTION_KEY', 'SSH_KEY', 'BACKUP_KEY', 'GITHUB_PAT', 'SMTP_PASS',
+  'encryptionKey', 'sshKey', 'backupKey', 'githubPat', 'smtpPass',
+  'encryptionkey', 'sshkey', 'backupkey', 'githubpat', 'smtppass',
+  'ENCRYPTION2KEY', 'SSH2KEY', 'BACKUP2KEY', 'GITHUB2PAT', 'SMTP2PASS',
+  'ACME_ENCRYPTIONKEY', 'ACME_SSHKEY', 'ACME_BACKUPKEY', 'ACME_GITHUBPAT', 'ACME_SMTPPASS',
   ].map(name=>[
    data=>{Object.assign(data.fields[0],{name,businessField:'legal_name'});},
    new RegExp(`(?=.*${name})(?=.*(?:secret|vault))`,'i'),
@@ -109,11 +119,15 @@ test('a standalone installer copy reads the manifest and validates its declared 
  const destination=await mkdtemp(join(tmpdir(),'copied-setup-reader-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));
  await cp(new URL('onboarding/',root),join(destination,'kit'),{recursive:true});
+ const publicDefaults={SESSION_SECRET:'session label',APITOKEN:'API label',ENCRYPTIONKEY:'encryption label'};
+ const hintedPublicFields={GOODS_NAME:'display_name',KIDS_NURSERY_NAME:'legal_name',MONKEY_BUSINESS_NAME:'owner_name',KEYSTONE_LEGAL_NAME:'jurisdiction',BRAND_SNIPPET:'entity_type'};
  const manifest={schema:1,title:'Independent setup',groups:[],fields:[
   {name:'WORKSPACE_TITLE',label:'Workspace title',kind:'text',required:true},
   {name:'CONNECTION_PASSWORD',label:'Connection password',kind:'secret',input:'entered',ownerVisible:true,required:true},
   {name:'AUTH_MODE',label:'Authentication mode',kind:'select',required:true,default:'local',options:[{value:'local',label:'Local'},{value:'oidc',label:'OIDC'}]},
   {name:'COOKIE_CONSENT',label:'Cookie consent',kind:'text',required:true,default:'essential'},
+  ...Object.entries(publicDefaults).map(([name,value])=>({name,label:'Public label',kind:'text',required:true,default:value})),
+  ...Object.entries(hintedPublicFields).map(([name,businessField])=>({name,label:'Business value',kind:'text',businessField,default:'A business default'})),
  ],steps:[{type:'extension',id:'workspace'}]};
  await writeFile(join(destination,'rer-setup.json'),JSON.stringify(manifest));
  for(const path of [pathToFileURL(join(destination,'kit/setup-manifest.mjs')).href,new URL('../onboarding/setup-manifest.mjs',import.meta.url).href,new URL('../default-seed/scripts/base-onboarding/setup-manifest.mjs',import.meta.url).href]){
@@ -123,12 +137,24 @@ test('a standalone installer copy reads the manifest and validates its declared 
   assert.equal(seed.model.initialDraft({}).COOKIE_CONSENT,'essential');
   assert.ok(seed.model.safeKeys.includes('AUTH_MODE'));
   assert.ok(seed.model.safeKeys.includes('COOKIE_CONSENT'));
+  for(const [name,value] of Object.entries(publicDefaults)){
+   assert.equal(seed.model.fieldDefinition(name,{}).kind,'text',name);
+   assert.equal(seed.model.initialDraft({})[name],value,name);
+   assert.ok(seed.model.safeKeys.includes(name),name);
+  }
+  for(const [name,businessField] of Object.entries(hintedPublicFields)){
+   assert.equal(seed.model.fieldDefinition(name,{}).businessField,businessField,name);
+   assert.equal(seed.model.initialDraft({})[name],'A business default',name);
+   assert.ok(seed.model.safeKeys.includes(name),name);
+  }
   assert.throws(()=>seed.model.validateInput({WORKSPACE_TITLE:'A workspace'}),/required setup inputs/);
-  const answers=seed.model.validateInput({WORKSPACE_TITLE:'A workspace',CONNECTION_PASSWORD:'fixture-passphrase',AUTH_MODE:'oidc',COOKIE_CONSENT:'essential only'});
+  const answers=seed.model.validateInput({WORKSPACE_TITLE:'A workspace',CONNECTION_PASSWORD:'fixture-passphrase',AUTH_MODE:'oidc',COOKIE_CONSENT:'essential only',...Object.fromEntries(Object.keys(publicDefaults).map(name=>[name,`Public answer for ${name}`])),...Object.fromEntries(Object.keys(hintedPublicFields).map(name=>[name,`Business answer for ${name}`]))});
   assert.equal(answers.WORKSPACE_TITLE,'A workspace');
   assert.ok(answers.CONNECTION_PASSWORD==='fixture-passphrase','entered secret remains in installation input');
   assert.equal(answers.AUTH_MODE,'oidc');
   assert.equal(answers.COOKIE_CONSENT,'essential only');
+  for(const name of Object.keys(publicDefaults))assert.equal(answers[name],`Public answer for ${name}`,name);
+  for(const name of Object.keys(hintedPublicFields))assert.equal(answers[name],`Business answer for ${name}`,name);
   assert.throws(()=>seed.model.validateInput({...answers,UNDECLARED:'value'}),/Undeclared setup input/);
  }
 });

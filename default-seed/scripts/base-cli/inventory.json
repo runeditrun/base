@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.g0b07aa9c",
+  "cliVersion": "0.2.79-dev.gf4643d7b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -273,7 +273,7 @@
     },
     "schema/credential-names.mjs": {
       "source": "onboarding/schema/credential-names.mjs",
-      "sha256": "480c446ff369f851df34c0c191af0b864a4d4c7cea43b11b98af13c5c06afab5"
+      "sha256": "2a1b59972f65eb15c0a40e02dd218d891bdc2ad2f2f5cf346704967fc27740c9"
     },
     "schema/dependencies.mjs": {
       "source": "onboarding/schema/dependencies.mjs",
