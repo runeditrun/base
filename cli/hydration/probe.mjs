@@ -48,8 +48,10 @@ export function probe(config) {
  const lone = n => n.nodeValue.trim().length >= 2 && n.parentNode.childNodes.length === 1;
  const split = n => { const rest = n.splitText(Math.max(1, Math.floor(n.nodeValue.length / 2))), span = document.createElement('span'); inserted.add(span); span.textContent = rest.nodeValue; rest.replaceWith(span); };
  const anyFiber = () => fiber(document.body) || [...document.body.querySelectorAll('*')].some(fiber);
- // An element React has not hydrated yet: no fiber, under a parent React owns that does not set its HTML.
- const pending = () => [...document.body.querySelectorAll('*')].filter(el => counted(el) && !el.closest('svg') && !fiber(el) && el.parentElement && fiber(el.parentElement) && !own(el.parentElement, '__reactProps$')?.dangerouslySetInnerHTML).length;
+ // Track server elements still in the body, or the same-tag occupant of a
+ // detached element's structural key. New effect children outside those keys
+ // need no fiber; an unadopted replacement at a server key still does.
+ const pending = () => snapshot.map(([el, key]) => document.body.contains(el) ? el : resolveKey(key)).filter(el => el && counted(el) && !el.closest('svg') && !fiber(el) && el.parentElement && fiber(el.parentElement) && !own(el.parentElement, '__reactProps$')?.dangerouslySetInnerHTML).length;
  const oneShot = () => document.getAnimations().filter(a => {
   if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) return false;
   const timing = a.effect && a.effect.getComputedTiming();

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Wait for server snapshot elements still in the body and same-tag replacements at their structural keys to be adopted by React, while allowing removed server nodes and effect-created tooltips, portals and other widgets outside those keys to settle.
+
 ## 0.2.80
 
 - Healthy doctor now exits 0 when local settings are present.
