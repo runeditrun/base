@@ -362,7 +362,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
       return {copy, sources, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
-    completeRuntimeCopies(plans, {tree: next, read, local, upstream, revision, recordPath, checkTarget(name) {
+    completeRuntimeCopies(plans, {tree: next, read, local, upstream, revision, checkTarget(name) {
       safe(name); noLinks(root, name);
       const target = path.join(root, name);
       if (fs.existsSync(target) && !fs.lstatSync(target).isFile()) throw Error(`Runtime dependency is not a regular file: ${name}`);
