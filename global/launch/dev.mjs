@@ -130,11 +130,14 @@ export async function handOver(target, closing, { openApp, shellDirectory, json,
  starting();
  const output = watchReady({ ...closing, json, foreground, piped,
   onOutput: () => progress.activity(), onReady: () => clearInterval(heartbeat) });
- if (!piped) return delegateDev(target);
  // Run the prepared pin's verbs directly; its global launcher would prepare
  // again and add a second closing line. Keep its foreground lifetime explicit.
  const args = target.args.filter(arg => !['--door-start', '--detach', '--foreground'].includes(arg));
  if (foreground) args.push('--foreground');
+ if (!piped) {
+  try { return await delegate(target, args, { entryOnly: true }); }
+  finally { clearInterval(heartbeat); }
+ }
  try { return await pipedHandoff(entry, args, target.root, output); }
  finally { clearInterval(heartbeat); }
 }

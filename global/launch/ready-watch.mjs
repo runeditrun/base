@@ -29,7 +29,10 @@ export function watchReady({ keyless, json, name, openHint, stopHint, opener, fo
   else if (ready && !finished && tag === 'RER_SIGNED_IN') ready.signedInAs = value.join(' ');
   else if (ready && !finished && tag === 'RER_OPEN') ready.openUrl = value.join(' ');
   if (keyless && (tag === 'RER_OPEN' || text.startsWith(keySentence))) return undefined;
-  return stopHint ? text.replace(/rer dev --stop(?: --cwd (?:'[^']*'|"[^"]*"|\S+))?/g, () => stopHint) : text;
+  if (!stopHint) return text;
+  const invocation = stopHint.slice(0, stopHint.indexOf(' dev --stop'));
+  return text.replace(/rer dev --stop(?: --cwd (?:'[^']*'|"[^"]*"|\S+))?/g, () => stopHint)
+   .replace(/\brer (?=(?:dev|preview) --cwd (?:'[^']*'|"[^"]*"|\S+) --stop\b)/g, () => invocation + ' ');
  };
  const stream = output => {
   const decoder = new StringDecoder('utf8');
