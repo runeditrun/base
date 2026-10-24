@@ -47,28 +47,41 @@ const plainCounts = (counts: Counts) => order.map(status => `${counts[status]} $
 const areaCount = (n: number) => `${n} ${n === 1 ? 'area' : 'areas'}`
 const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'push further' : clause.kind
 
-// Source citations stay in CONTRACT.md. Public evidence and gaps describe the
-// product without repository paths or build commit identifiers.
-const publicText = (value: string) => value
+// Source citations stay in CONTRACT.md. A dotted product name is not a file
+// citation, and a word made of a-f is not a commit. Recognize repository roots,
+// source extensions, path separators and line locators instead. Bare .js/.jsx
+// names are ambiguous (product names use them too), so need a path or locator.
+// The parser has already removed Gap/title backticks, so code delimiters alone
+// cannot distinguish citations from ordinary words consistently across fields.
+const fileName = String.raw`[\w@.-]+\.(?:[cm]?[jt]sx?|sql|json|md|ya?ml|sh|css|html)`
+const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b${fileName}:\d+(?::\d+)?\b`, 'gi')
+const bareSourceFile = /\b[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|json|md|ya?ml|sh|css|html)\b/gi
+function publicText(value: string): string {
+  return value
   .replace(/\bin audited\s+`?src\/`?\s+and\s+`?tests\/`?/gi, '')
-  .replace(/`?(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|foundation|cli|migrations|schema|public)\/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?`?|`?\b[\w@.-]+(?:\/[\w@.*?[\]-]+)*\.(?:[cm]?[jt]sx?|sql|json|md|ya?ml|sh|css|html)(?::\d+(?::\d+)?)?`?/gi, '')
-  .replace(/\b[0-9a-f]{7,40}\b/gi, '')
+  .replace(sourcePath, '').replace(bareSourceFile, '')
+  .replace(/(\b(?:commit|revision|changeset|sha(?:-?(?:1|256))?)(?:\s+|\s*[:=#]\s*))[0-9a-f]{7,64}\b/gi, '$1')
+  .replace(/\bat\s+[0-9a-f]{7,40}\b/gi, match => /\d/.test(match) ? '' : match)
+  .replace(/\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b/gi, '')
+  .replace(/`+/g, '')
   .replace(/\(\s*\)|\[\s*\]/g, '')
   .replace(/\s+([,.;:])/g, '$1').replace(/([,;:])(?:\s*[,;:])+/g, '$1')
   .replace(/\s+/g, ' ').replace(/^[\s,;:.]+|[\s,;:]+$/g, '').trim()
+}
 
 function clauseRow(clause: ContractClause, contractUrl: string): string {
   const line = `${contractUrl}?plain=1#L${clause.line}`
+  const title = publicText(clause.title)
   const evidenceText = clause.status === 'missing' ? [] : clause.evidence.map(publicText).filter(Boolean)
   const gapText = clause.status === 'done' ? '' : publicText(clause.gap)
-  const find = [clause.id, clause.title, clause.area, ...evidenceText, gapText].join(' ').toLowerCase()
+  const find = [clause.id, title, clause.area, ...evidenceText, gapText].join(' ').toLowerCase()
   const evidence = evidenceText.map(text => `<span class="evidence">${escape(text)}</span>`).join('')
   const gapBody = gapText === 'see the clause' ? `<a href="${escape(line)}">see the clause</a>` : escape(gapText)
   const gap = !gapText ? '' : gapText.length > 160
     ? `<details class="gap"><summary>Still to build</summary><p>${gapBody}</p></details>`
     : `<span class="gap">Still to build: ${gapBody}</span>`
   return `<tr class="clause" data-id="${escape(clause.id)}" data-status="${clause.status}" data-kind="${clause.kind}" data-area="${escape(clause.area)}" data-find="${escape(find)}">`
-    + `<td class="id"><a href="${escape(line)}">${escape(clause.id)}</a><span class="kind">${kindWord(clause)}</span></td><td class="title">${escape(clause.title)}</td>`
+    + `<td class="id"><a href="${escape(line)}">${escape(clause.id)}</a><span class="kind">${kindWord(clause)}</span></td><td class="title">${escape(title)}</td>`
     + `<td class="status"><span class="st ink-${clause.status}">${glyph(clause.status, 16)}${word[clause.status]}</span></td><td class="ev">${evidence}${gap}</td></tr>`
 }
 

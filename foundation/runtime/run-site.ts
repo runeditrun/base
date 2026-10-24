@@ -36,12 +36,21 @@ export interface RunData {
 export interface HostedOption { title: string; body: string; href: string; action: string }
 
 const npxStart = 'npx -y @runeditrun/rer '
+const repoStart = `${npxStart}dev `
+// GitHub repository ids: an alphanumeric owner (hyphens inside) and a
+// repository name made of letters, digits, dots, underscores and hyphens.
+const repositoryId = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$/
+// Escape independently of validation; repository ids need no escaping in POSIX shells.
+const shellArgument = (value: string) => /^[A-Za-z0-9_./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\"'\"'")}'`
 /**
  * The one line on every Run page, homepage snippet and getting-started page: the
  * installer (which brings its own Node when there is none) installs rer, then
  * runs `rer dev <owner>/<repo>` in the same line.
  */
-export const startLine = (run: RunData) => `curl -fsSL https://runeditrun.com/install.sh | sh -s -- ${run.clone.slice(npxStart.length)}`
+export const startLine = (run: RunData) => {
+  checkRunData(run)
+  return `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev ${shellArgument(run.clone.slice(repoStart.length))}`
+}
 /** The one requirements sentence: rer clones with git; the installer brings Node and rer the pinned pnpm. */
 export const runRequirements = 'git is required; rer brings Node and pnpm.'
 
@@ -49,7 +58,7 @@ export const escape = (value: string) => value.replace(/[&<>"']/g, character => 
 
 export function checkRunData(run: RunData): RunData {
   for (const key of ['name', 'clone', 'folder', 'licence'] as const) if (typeof run[key] !== 'string' || !run[key].trim()) throw new Error(`Run data needs ${key}.`)
-  if (!run.clone.startsWith(`${npxStart}dev `)) throw new Error(`Run data clone is the npx start line: ${npxStart}dev <owner>/<repo>.`)
+  if (!run.clone.startsWith(repoStart) || !repositoryId.test(run.clone.slice(repoStart.length))) throw new Error(`Run data clone must be ${repoStart}<owner>/<repo> with a valid repository id.`)
   if (!/^https:\/\/[^\s"<>]+$/.test(run.repository)) throw new Error('Run data repository is an https URL.')
   if (!/^[A-Za-z0-9._/-]+$/.test(run.folder) || run.folder.split('/').some(part => !part || part === '..')) throw new Error('Run data folder is a relative folder.')
   if (typeof run.docs !== 'boolean' || !Array.isArray(run.hosted)) throw new Error('Run data declares docs and hosted.')
@@ -63,7 +72,7 @@ export function checkRunData(run: RunData): RunData {
 const BASE = '*,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-adjust:100%}'
   + 'body{--art:max(26vh,150px);--site-ink:var(--rer-text,#172033);--site-body:var(--rer-muted,#475569);--site-accent:var(--rer-accent,var(--rer-brand-accent,var(--rer-text,#172033)));--site-accent-ink:var(--rer-accent-text,var(--rer-brand-accent-text,var(--rer-surface,#fff)));'
   + '--site-line:color-mix(in srgb,var(--rer-border,#64748b) 28%,transparent);--site-mono:var(--rer-font-mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);'
-  + 'margin:0;min-height:100vh;min-height:100dvh;position:relative;overflow-x:clip;background:radial-gradient(120% 80% at 18% -12%,rgba(255,255,255,.75),transparent 58%),var(--rer-page,#f3f5f8);color:var(--site-ink);font:400 17px/1.55 var(--rer-font-body,system-ui,sans-serif);-webkit-font-smoothing:antialiased}'
+  + 'margin:0;min-height:100vh;min-height:100dvh;position:relative;overflow-x:clip;background:var(--rer-page,#f3f5f8);color:var(--site-ink);font:400 17px/1.55 var(--rer-font-body,system-ui,sans-serif);-webkit-font-smoothing:antialiased}'
   + 'h1,h2,p,ol{margin:0;padding:0}ol{list-style:none}a{color:inherit;text-decoration:none}'
   + 'a:focus-visible,button:focus-visible{outline:3px solid var(--rer-focus,var(--site-ink));outline-offset:3px;border-radius:8px}'
   + '.art{position:absolute;left:0;right:0;bottom:0;height:var(--art);pointer-events:none;z-index:0}.art img{width:100%;height:100%;display:block;object-fit:cover;object-position:center bottom}'
@@ -88,15 +97,15 @@ const HOME = 'main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art)
 // bar and nav reflow in BASE when a seed's wordmark and links need more room.
 const RUN = 'body{--art:max(20vh,150px);overflow-x:visible}main{max-width:1360px;margin:0 auto;padding:0 56px calc(var(--art) + 40px)}.intro{text-align:center;padding-top:36px}.intro h1{font-size:58px}.intro .sub{margin-inline:auto;max-width:760px;margin-top:20px}'
   + '.steps{max-width:990px;margin:34px auto 0;display:grid;gap:18px}'
-  + '.step{position:relative;display:block;padding:24px 30px 24px 28px;border-radius:24px;background:color-mix(in srgb,var(--rer-surface,#fff) 86%,transparent);border:1px solid var(--site-line);box-shadow:0 24px 48px -36px color-mix(in srgb,var(--site-ink) 45%,transparent);backdrop-filter:blur(6px)}'
+  + '.step{position:relative;display:block;min-width:0;padding:24px 30px 24px 28px;border-radius:24px;background:color-mix(in srgb,var(--rer-surface,#fff) 86%,transparent);border:1px solid var(--site-line);box-shadow:0 24px 48px -36px color-mix(in srgb,var(--site-ink) 45%,transparent);backdrop-filter:blur(6px)}'
   + '.body{min-width:0}'
   + '.step h2{margin-top:0;font:600 26px/1.25 var(--rer-font-heading,var(--rer-font-body,inherit));letter-spacing:-.02em;color:var(--site-ink)}'
   + '.body>p{color:var(--site-body);font-size:18px;margin-top:6px}.body>p.alt{margin-top:14px;font-size:16px}.body>p.note{margin-top:14px;font-size:17px}.body>p.go{margin-top:14px}.go a{font-weight:600;text-decoration:underline;text-underline-offset:4px}'
-  + 'code{font-family:var(--site-mono);font-size:.92em;color:var(--site-ink)}.code-word{white-space:nowrap}.alt code{margin-left:.2em}.note code{margin-right:.1em}'
+  + 'code{font-family:var(--site-mono);font-size:.92em;color:var(--site-ink)}.code-word{white-space:nowrap}.alt code{margin-left:.2em;max-width:100%;overflow-x:auto}.note code{margin-right:.1em}'
   + '.code{position:relative;container-type:inline-size;margin-top:16px;border-radius:12px;background:var(--rer-code-background,var(--site-ink));color:var(--rer-code-text,var(--rer-page,#f3f5f8))}'
   + '.code pre{margin:0;padding:18px 108px 18px 22px;font:500 16px/1.75 var(--site-mono);white-space:pre-wrap;overflow-wrap:anywhere}.code pre code{color:inherit;font-size:inherit}'
   + '.copy{position:absolute;top:50%;right:14px;transform:translateY(-50%);display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 14px;border:1px solid color-mix(in srgb,currentColor 35%,transparent);border-radius:999px;background:transparent;color:inherit;font:500 14px/1 var(--rer-font-body,inherit);cursor:pointer}'
-  + '.copy:hover{background:color-mix(in srgb,currentColor 12%,transparent)}.copy svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4}'
+  + '.copy:focus-visible{outline-color:var(--rer-code-text,var(--rer-page,#f3f5f8))}.copy:hover{background:color-mix(in srgb,currentColor 12%,transparent)}.copy svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4}'
   + '.facts{margin-top:32px;color:var(--site-body);font-size:14px;display:grid;gap:6px;text-align:center}.facts a{text-decoration:underline;text-underline-offset:3px}'
   + '@media(max-width:760px){body{--art:180px}main{padding:0 16px calc(var(--art) + 40px)}.intro{padding-top:34px}.intro h1{font-size:38px}.steps{margin-top:28px}'
   + '.step{padding:20px 18px;border-radius:18px}'

@@ -306,3 +306,45 @@ test('site build renders /contract from CONTRACT.md, links it only when it exist
  assert.match(result.stdout + result.stderr, new RegExp(`CONTRACT\\.md:${line}: A Status row has 6 cells`));
  assert.match(await page('contract.html'), /0 of 3 clauses done/);
 });
+
+test('built Run command accepts one repository argument and refuses shell syntax', async t => {
+ const f = await seed(t), data = join(f.root, 'src/site/run.ts');
+ const original = await readFile(data, 'utf8');
+ const valid = 'owner/run-repo_2.js';
+ await writeFile(data, original.replace('npx -y @runeditrun/rer dev runeditrun/base', `npx -y @runeditrun/rer dev ${valid}`));
+ const built = await f.build();
+ assert.equal(built.code, 0, built.stdout + built.stderr);
+ const html = await readFile(join(f.root, 'dist/site/run.html'), 'utf8');
+ const command = /data-copy="([^"]+)"/.exec(html)[1].replaceAll('&#39;', "'").replaceAll('&quot;', '"').replaceAll('&amp;', '&');
+ const result = await run('/bin/sh', ['-c', `curl() { :; }; sh() { printf '%s\\n' "$@"; }; ${command}`]);
+ assert.deepEqual(result.stdout.trim().split('\n'), ['-s', '--', 'dev', valid]);
+ for (const repo of ['owner/r; printf INJECTED', 'owner/r$(printf INJECTED)', 'owner/r`printf INJECTED`', 'owner/with space', "owner/r'quote", 'owner/repo\ntrue', '-owner/repo', 'owner/../repo']) {
+  await writeFile(data, original.replace(/clone: '[^']*'/, `clone: ${JSON.stringify('npx -y @runeditrun/rer dev ' + repo)}`));
+  const failed = await f.build();
+  assert.notEqual(failed.code, 0, repo);
+  assert.match(failed.stdout + failed.stderr, /valid repository id/, repo);
+ }
+});
+
+test('built Roadmap preserves product prose while removing explicit source citations', async t => {
+ const f = await seed(t);
+ const source = (await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md'), 'utf8'));
+ const prose = 'Next.js defaced React.js Node.js Socket.io Vue.js D3.js Nuxt.js three.js decimal deadheaded decade feedback';
+ const input = source.replace(/^(\| `COLLAB-001`[^\n]*?)\| see the clause \|/m, (_, row) => `${row}| ${prose}; inspect \`src/private.ts\`, tests/private.test.mjs and commit a1234567890b. |`);
+ assert.notEqual(input, source);
+ await writeFile(join(f.root, 'CONTRACT.md'), input);
+ const built = await f.build();
+ assert.equal(built.code, 0, built.stdout + built.stderr);
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const page = await browser.newPage(); await page.goto(preview.url + '/contract');
+  const clause = page.locator('tr.clause[data-id="COLLAB-001"]');
+  const text = await clause.textContent();
+  for (const word of prose.split(' ')) assert.ok(text.includes(word), word);
+  assert.doesNotMatch(text, /src\/private|tests\/private|a1234567890b/);
+  for (const word of prose.split(' ')) {
+   await page.locator('input[type="search"]').fill(word);
+   assert.equal(await clause.isVisible(), true, `search finds ${word}`);
+  }
+ } finally { await browser.close(); await preview.close(); }
+});
