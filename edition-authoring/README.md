@@ -182,8 +182,12 @@ sees no private address. To read Base, `record-base`, `refresh-base` and
 runeditrun/base: `source.repository` for Git source or `source.origin.repository`
 for local source. Without either, `runeditrun/base` resolves to the public
 `https://github.com/runeditrun/base.git` repository. Pass `--offline` to verify
-local bytes without acquisition; offline refresh requires `--base <checkout>`. Older records with a `repository` field are still read and
-verified from it; recording or refreshing drops the field.
+local bytes without acquisition; offline refresh requires `--base <checkout>`.
+Offline source reads use a temporary repository sharing only the checkout’s
+object store and HEAD, with no remotes or inherited Git configuration. This
+prevents lazy fetches on Git 2.43 as well as newer Git. Missing objects require
+an online refresh without `--offline`; corrupt objects require checkout repair.
+Older records with a `repository` field are still read and verified from it; recording or refreshing drops the field.
 `modes` records each file's Git mode in Base, `100644` or `100755`, using the
 owner executable bit; a record
 without `modes` still verifies, but without mode checks until it is re-recorded.
@@ -232,9 +236,12 @@ export removed, keeps out files the copy had left out, and re-records each copy.
 An absent unadapted singleton is retired from the record entirely and named in
 the `retired` output. As with absent files in directory copies, local absence is
 the removal signal; refresh does not distinguish accidental deletion from an
-intentional removal. Sparse-excluded files still marked `skip-worktree` in the
-Git index cause a refusal before any writes; run `git sparse-checkout disable`
-and repeat the refresh. Unreadable index evidence also refuses safely.
+intentional removal. Absent files marked `skip-worktree`, `assume-unchanged`
+or `fsmonitor-valid`, and recorded children beneath uninitialized submodules,
+refuse before writes with the corresponding Git repair command. After submodule
+initialization, the child index and recorded bytes are read. Unreadable index
+evidence also refuses safely. Offline refresh suppresses promisor lazy fetching;
+a missing local object names an online refresh command, preserving the record.
 Verify before refreshing to inspect missing copies. Deleted
 adaptations still block refresh, and a singleton still present locally whose
 Base source disappeared still reports an error.

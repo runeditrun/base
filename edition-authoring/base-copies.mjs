@@ -10,8 +10,9 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {hash, json, git, raw, batch, safe, noLinks, testSource} from './files.mjs';
+import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
+import {requireMaterializedCopies} from './copy-checkout.mjs';
 
 export const RECORD = 'base-copies.json';
 const commit = /^[a-f0-9]{40}$/, sha256 = /^[a-f0-9]{64}$/;
@@ -34,10 +35,12 @@ function baseRepository(root) {
 }
 
 // An explicit checkout, else the record's legacy repository, else the seed's declaration.
-function open(record, base, root) {
+function open(record, base, root, offline = false) {
   if (base) {
     const repository = fs.realpathSync(base);
-    return {repository, head: git(repository, 'rev-parse', 'HEAD'), close() {}};
+    const source = gitReader(repository, offline);
+    try { return {repository, source, head: source.git('rev-parse', 'HEAD'), offline, close: source.close}; }
+    catch (error) { source.close(); throw error; }
   }
   const declared = record.repository ?? baseRepository(root);
   const source = declared === 'runeditrun/base' ? 'https://github.com/runeditrun/base.git' : declared;
@@ -130,7 +133,8 @@ function seedFiles(root) {
 }
 
 function reader(origin) {
-  const format = git(origin.repository, 'rev-parse', '--show-object-format');
+  const source = origin.source ?? gitReader(origin.repository);
+  const format = source.git('rev-parse', '--show-object-format');
   const trees = new Map();
   return {
     // Git object identity of local bytes, to find copies by content without reading Base blobs.
@@ -138,10 +142,10 @@ function reader(origin) {
     tree(revision) {
       if (!trees.has(revision)) {
         let resolved;
-        try { resolved = git(origin.repository, 'rev-parse', '--verify', '--quiet', `${revision}^{commit}`); } catch { resolved = ''; }
+        try { resolved = source.git('rev-parse', '--verify', '--quiet', `${revision}^{commit}`); } catch (error) { if (origin.offline) throw error; resolved = ''; }
         if (resolved !== revision) throw Error(`Base commit ${revision} is not available. Check the full commit with git -C <base-checkout> rev-parse <tag>^{commit}, fetch it, then repeat with --base <base-checkout>`);
         const entries = new Map();
-        for (const entry of raw(origin.repository, 'ls-tree', '-rz', '--full-tree', revision).toString('utf8').split('\0').filter(Boolean)) {
+        for (const entry of source.raw('ls-tree', '-rz', '--full-tree', revision).toString('utf8').split('\0').filter(Boolean)) {
           const tab = entry.indexOf('\t');
           const [mode, type, object] = entry.slice(0, tab).split(' ');
           if (type === 'blob' && FILE_MODES.includes(mode)) entries.set(entry.slice(tab + 1), {object, mode});
@@ -156,11 +160,12 @@ function reader(origin) {
       const unique = [...new Set(objects)];
       for (let i = 0; i < unique.length; i += 100) {
         const chunk = unique.slice(i, i + 100);
-        const output = batch(origin.repository, chunk.join('\n') + '\n', 'cat-file', '--batch');
+        const output = source.batch(chunk.join('\n') + '\n', 'cat-file', '--batch');
         let offset = 0;
         for (const object of chunk) {
           const newline = output.indexOf(10, offset);
           const [, type, size] = output.subarray(offset, newline).toString('utf8').split(' ');
+          if (type === 'missing' && origin.offline) throw Error(`Base object ${object} is missing locally. Repeat rer refresh-base --ref <commit> --base <base-checkout> without --offline while online to acquire it, then retry offline. No copy record was changed.`);
           if (type !== 'blob') throw Error(`Base object ${object} is not a file`);
           result.set(object, Buffer.from(output.subarray(newline + 1, newline + 1 + Number(size))));
           offset = newline + 1 + Number(size) + 1;
@@ -309,22 +314,6 @@ export function adaptCopy(root, {positional: [name], record: recordPath}) {
   return {adapted: name, revision: copy.adapted[name], sha256: copy.files[name], acknowledged: copy.acknowledged[name], record: recordPath};
 }
 
-// A missing working file can still be deliberately excluded by Git. Read the
-// actual index (including expanded sparse-index entries), never infer deletion
-// intent from worktree absence alone. Refuse before any record or source write.
-function requireMaterializedCopies(root, record, files) {
-  let entries;
-  try { entries = raw(root, 'ls-files', '-t', '-z').toString('utf8').split('\0').filter(Boolean); }
-  catch { throw Error('Cannot read the Git index to distinguish removed copies from sparse exclusions. Repair the checkout with git status, then repeat refresh-base; no copy record was changed.'); }
-  const excluded = new Set();
-  for (const entry of entries) {
-    if (!/^[A-Z] /.test(entry)) throw Error('Cannot interpret the Git index checkout state; run git status and repair the index before refresh-base. No copy record was changed.');
-    if (entry.startsWith('S ')) excluded.add(entry.slice(2));
-  }
-  const missing = record.copies.flatMap(copy => Object.keys(copy.files)).filter(name => !files.has(name) && excluded.has(name));
-  if (missing.length) throw Error(`Base copies are excluded by the Git sparse checkout, not removed: ${missing.join(', ')}. Run git sparse-checkout disable, then repeat refresh-base. No copy record was changed.`);
-}
-
 // Move every recorded copy to one Base commit, after any export tool has written
 // its files. Recorded files and files already equal to Base at that commit are
 // kept current; files Base added under a copied path since the copy's pin are
@@ -341,7 +330,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
   const record = validate(JSON.parse(fs.readFileSync(filename, 'utf8')));
   const files = seedFiles(root);
   requireMaterializedCopies(root, record, files);
-  const origin = open(record, base, root);
+  const origin = open(record, base, root, offline);
   try {
     const read = reader(origin);
     const next = read.tree(revision);
