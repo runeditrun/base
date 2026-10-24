@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '22.20.0'
+          node-version: '22.23.4'
 
       - name: Release or dry run
         id: mode
@@ -153,7 +153,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           df -h "$RUNNER_TEMP" /tmp
           # The seed's own package manager, as a person installs it.
-          npm install --global --no-audit --no-fund pnpm@10.12.4
+          npm install --global --no-audit --no-fund pnpm@10.34.7
           node scripts/rer-package/smoke.mjs "$TARBALL"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -201,7 +201,7 @@ jobs:
       - run: echo "DIST=$RUNNER_TEMP/rer-dist" >> "$GITHUB_ENV"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '22.20.0'
+          node-version: '22.23.4'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: rer-${{ needs.build.outputs.version }}

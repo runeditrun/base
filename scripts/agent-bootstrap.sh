@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Base's Vite/Cloudflare packages need >=22.12; its node --test *.ts commands
 # also need default type stripping (22.18+). Keep these pins in cache inputs.
-readonly NODE_VERSION=22.20.0
-readonly PNPM_VERSION=10.12.4
+readonly NODE_VERSION=22.23.4
+readonly PNPM_VERSION=10.34.7
 readonly WORKERD_VERSION=1.20260907.1
 readonly PLAYWRIGHT_VERSION=1.63.0
 readonly BIN_DIR=/usr/local/bin
@@ -26,10 +26,10 @@ fi
 case $(uname -m) in
   x86_64)
     arch=x64
-    checksum=eeaccb0378b79406f2208e8b37a62479c70595e20be6b659125eb77dd1ab2a29 ;;
+    checksum=b8492284c76a54baf58d61668dd0e41ee0fc98adabf9503d30f05d08f55b4406 ;;
   aarch64|arm64)
     arch=arm64
-    checksum=4181609e03dcb9880e7e5bf956061ecc0503c77a480c6631d868cb1f65a2c7dd ;;
+    checksum=f7a1e486dbc8b286847815b477d4fb5e9fb963ed4489c3e1588853d685f589f9 ;;
   *) fail 'supported Linux architectures are x86_64 and aarch64.' ;;
 esac
 readonly node_home="/opt/rer-agent-tools/node-v${NODE_VERSION}-linux-${arch}"

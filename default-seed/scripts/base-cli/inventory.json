@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc957441a",
+  "cliVersion": "0.2.79-dev.g3d1d696d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -169,7 +169,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "d734f6a805bf95b2614e90b409cf36cfb7fbd1330e7a01ad5a4c96f750522454"
+      "sha256": "0d599fab94fde761bb2cd94c05babef1fee47e80c7226280a85efdf4e45387b4"
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
@@ -647,7 +647,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "758c82f2f68daaea1809930c78cfb53c17177603e6e0b862fdcb339fca836643"
+      "sha256": "3ade7d48be1ee285f4a162ae6269686ae582f5f39e913cda5124b8b56e3636ab"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -1259,7 +1259,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "b3ab7174af977b3eb5e88bd0e0abf7b0f494211088b0ef483ecedd2baaa87f6a"
+      "sha256": "30b262a8259023a144a51dbda985b65930c5e2cd942e762f63aab96640f0e442"
     },
     "modules/container/demo-egress.mjs": {
       "source": "modules/container/demo-egress.mjs",
@@ -2683,11 +2683,11 @@
     },
     "modules/mail/package.json": {
       "source": "modules/mail/package.json",
-      "sha256": "b6e2d1e285c44deffbec6ae94ab67599d8dda0aaa548066c415ec94418ffbd30"
+      "sha256": "887d3c7dbbeba0a38c924a17b396966245140642602d047e309cec29645c089f"
     },
     "modules/mail/pnpm-lock.yaml": {
       "source": "modules/mail/pnpm-lock.yaml",
-      "sha256": "0a2e74e7c7f6e3a92636845c04f8c9a8cad9005fbbcc5f4cc9d772b4831c4372"
+      "sha256": "d522fc5e028ac3daeecb7ef2a83bebb69141a367516c4365b85339eb1a1e35b0"
     },
     "modules/mail/src/adapters/cloudflare/README.md": {
       "source": "modules/mail/src/adapters/cloudflare/README.md",
