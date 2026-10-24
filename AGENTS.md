@@ -98,7 +98,7 @@ The integration branch is `main`; target it with pull requests and rebase work
 onto it after shared changes land. On a clean Ubuntu/Debian Linux machine, run
 `bash scripts/agent-bootstrap.sh && pnpm verify` from the repository root. The
 bootstrap needs root or passwordless sudo and `/usr/local/bin` on the calling
-shell PATH; it installs Node 22.20.0 and pnpm 10.12.4 there for the parent shell,
+shell PATH; it installs Node 22.20.0 and pnpm 10.34.7 there for the parent shell,
 Python 3 for the operations checks, frozen dependencies in the default shared
 pnpm store, workerd from the lockfile, and Chromium in the default shared
 Playwright cache plus its system libraries.

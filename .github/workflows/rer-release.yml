@@ -153,7 +153,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           df -h "$RUNNER_TEMP" /tmp
           # The seed's own package manager, as a person installs it.
-          npm install --global --no-audit --no-fund pnpm@10.12.4
+          npm install --global --no-audit --no-fund pnpm@10.34.7
           node scripts/rer-package/smoke.mjs "$TARBALL"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

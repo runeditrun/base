@@ -79,7 +79,7 @@ root, inspect the live queue with
 
 ## Run it on your computer
 
-Use Node **22.20.0** and pnpm **10.12.4**. From this seed's root, the package
+Use Node **22.20.0** and pnpm **10.34.7**. From this seed's root, the package
 aliases below run the same verbs as `rer` with this seed's pinned copy:
 
 ```sh

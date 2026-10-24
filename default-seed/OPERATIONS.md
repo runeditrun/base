@@ -13,7 +13,7 @@ Reconcile checks the native records; the same history offers Undo. Business
 imports are disabled until the owner enables them, and owner imports work while
 Business is off. See [IMPORTING.md](IMPORTING.md) for the complete local journey.
 
-Use Node 22.20.0 and pnpm 10.12.4. Run public operations from this seed's
+Use Node 22.20.0 and pnpm 10.34.7. Run public operations from this seed's
 checkout root with `rer`; without it, install it once with
 `npx -y @runeditrun/rer cli install` or the installer script on the RER site
 (`curl -fsSL https://runeditrun.com/install.sh | sh`). `rer dev` alone launches

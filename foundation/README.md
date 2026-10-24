@@ -187,7 +187,7 @@ Owners may change source, schema, UI, framework, infrastructure and integration
 method. Place reusable code where it can be maintained and keep the complete
 product experience edition-owned.
 
-The template pins Node 22.20.0 and pnpm 10.12.4. Its package scripts route the
+The template pins Node 22.20.0 and pnpm 10.34.7. Its package scripts route the
 public operations through `node scripts/rer.mjs`; internal targets have separate
 names to prevent command recursion. `OPERATIONS.json` declares the first-party
 profile and command effects. `node scripts/rer.mjs describe` inspects the
