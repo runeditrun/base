@@ -18,7 +18,7 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   await mkdir(join(folder, 'modules/demo-host/native'), { recursive: true, mode: 0o700 });
   const label = 'Building the native demo Worker bundle and static assets';
   await store.step(label);
-  await demoBundle(project, operation, app, join(folder, 'bundle'), store, label, signal);
+  await demoBundle(project, operation, { ...app, generatedSecrets: plan.generatedSecrets }, join(folder, 'bundle'), store, label, signal);
   for (const file of DEMO_FILES) await cp(new URL(`../modules/demo-host/${file}`, import.meta.url), join(folder, 'modules/demo-host', file));
   for (const file of RUNTIME_FILES) await cp(new URL(`../modules/demo-host/native/${file}.mjs`, import.meta.url), join(folder, `modules/demo-host/native/${file}.mjs`));
   for (const directory of ['deploy-kit']) await cp(new URL(`../modules/${directory}/`, import.meta.url), join(folder, 'modules', directory), { recursive: true });

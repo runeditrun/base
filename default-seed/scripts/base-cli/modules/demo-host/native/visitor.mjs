@@ -1,3 +1,5 @@
+import { failure, failureResponse } from './failure.mjs';
+import { visitorSecrets } from './secrets.mjs';
 import { DurableObject } from 'cloudflare:workers';
 import { claimKeys, signClaim } from '../claim.mjs';
 import { migrate } from '../../container/migrations.mjs';
@@ -19,14 +21,15 @@ export class NativeDemo extends DurableObject {
   async save() { await this.ctx.storage.put('visitor', this.state); }
   async begin(options) {
     try { return await this.start(options); }
-    catch (error) {
-      await this.diagnostic(options.correlation, error);
+    catch {
+      await this.diagnostic(options.correlation);
       await this.end();
       return { phase: 'failed', correlation: options.correlation };
     }
   }
-  async diagnostic(correlation, error) {
-    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('diagnostics')).record(correlation, { failure: String(error.message).slice(0, 1000) });
+  failure() { return failure(); }
+  async diagnostic(correlation) {
+    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('diagnostics')).record(correlation, { failure: this.failure() });
   }
   async start({ origin, originVar, ends, endsLocal, settings, correlation, clientIp }) {
     if (this.state) return this.status();
@@ -36,7 +39,7 @@ export class NativeDemo extends DurableObject {
     const runtime = { ...bundle.vars, ...settings, RER_DEMO: '1', [originVar]: origin,
       RER_NATIVE_KEY: random(), SESSION_SECRET: random(), INSTALLATION_KEY: random(), SETUP_TOKEN: random(), OWNER_EMAIL: this.env.DEMO_OWNER_EMAIL || 'owner@demo.invalid',
       RER_OWNER_CLAIM_ISSUER: origin, RER_OWNER_CLAIM_INSTALLATION_ID: id,
-      RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal };
+      RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys.publicKeys), RER_DEMO_EXPIRES: endsLocal, ...visitorSecrets(bundle.generatedSecrets ?? []) };
     this.state = { phase: 'starting', runtime, ends, seen: started, savedSeen: started, lastCron: Math.floor(started / 60_000), correlation };
     await this.save();
     await this.ctx.storage.setAlarm(Math.min(ends, started + IDLE));
@@ -50,7 +53,8 @@ export class NativeDemo extends DurableObject {
       const migrated = Date.now();
       const token = await signClaim(keys, { origin, installationId: id, email: runtime.OWNER_EMAIL, now: Date.now() });
       const claimed = await app.fetch(new Request(origin + '/auth/owner-claim', { method: 'POST', redirect: 'manual', headers: { origin, 'cf-connecting-ip': clientIp, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }));
-      if (claimed.status !== 303) throw new Error(`owner-claim-${claimed.status}: ${(await claimed.text()).slice(0, 500)}`);
+      // Discard a refused claim's body in full, before any formatting or truncation.
+      if (claimed.status !== 303) { await claimed.body?.cancel(); throw new Error(failure()); }
       await claimed.body?.cancel();
       const cookies = claimed.headers.getSetCookie();
       const seeded = await app.fetch(new Request(origin + '/health', { headers: { 'cf-connecting-ip': clientIp, cookie: cookies.map(cookie => cookie.split(';')[0]).join('; ') } }));
@@ -64,9 +68,9 @@ export class NativeDemo extends DurableObject {
       await this.save();
       await this.schedule(await nextQueue(this));
       return this.status();
-    } catch (error) {
-      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: error.message }));
-      await this.diagnostic(correlation, error);
+    } catch {
+      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: this.failure() }));
+      await this.diagnostic(correlation);
       await this.end();
       return { phase: 'failed', correlation };
     }
@@ -99,12 +103,17 @@ export class NativeDemo extends DurableObject {
     }
     const runtime = await this.session();
     if (!runtime) return endedPage({ ...this.env, DEMO_THEME: bundle.theme, DEMO_ICON_HEAD: bundle.iconHead }, { headers: { 'set-cookie': clearCookie(this.env) } });
-    return application(this.env, this.ctx, this.ctx.id.toString(), runtime).fetch(request);
+    return application(this.env, this.ctx, this.ctx.id.toString(), runtime).fetch(request)
+      .catch(() => failureResponse());
   }
   // The seed signs the visitor out, then the copy ends as an expired one does.
   // A form navigation gets the ended page; a script gets the seed's answer and
   // its next page load finds the ended page.
   async signOut(request) {
+    try { return await this.finishSignOut(request); }
+    catch { return failureResponse(); }
+  }
+  async finishSignOut(request) {
     const runtime = await this.session();
     if (!runtime) return endedPage({ ...this.env, DEMO_THEME: bundle.theme, DEMO_ICON_HEAD: bundle.iconHead }, { headers: { 'set-cookie': clearCookie(this.env) } });
     const response = await application(this.env, this.ctx, this.ctx.id.toString(), runtime).fetch(request);
@@ -144,6 +153,8 @@ export class NativeDemo extends DurableObject {
         await deliverSeedAlarms(this, now);
         await deliverQueues(this, now);
       }
+    } catch {
+      console.error(JSON.stringify({ event: 'native-demo-alarm-failed', correlation: this.state?.correlation, message: this.failure() }));
     } finally { await this.schedule(await nextQueue(this)); }
   }
   // Cancel, sign-out, expiry and a failed start all end here. The copy stops
@@ -161,7 +172,7 @@ export class NativeDemo extends DurableObject {
     await this.ctx.storage.setAlarm(Date.now() + 10_000);
     await this.capacity().release(this.ctx.id.toString());
     this.erasing = this.erase()
-      .catch(error => console.error(JSON.stringify({ event: 'native-demo-erase-failed', message: error.message })))
+      .catch(() => console.error(JSON.stringify({ event: 'native-demo-erase-failed', message: this.failure() })))
       .finally(() => { this.erasing = undefined; });
   }
   async erase() {

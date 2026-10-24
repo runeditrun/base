@@ -54,7 +54,7 @@ export default {
       let unknown;
       try { unknown = [env.DB.notD1, env.DB.notD1, session.notD1]; } finally { console.warn = warn; }
       return Response.json({ names: items.results.map(row => row.name), bookmark: typeof session.getBookmark(), unknown: unknown.every(value => value === undefined),
-        warnings: warnings.filter(line => /^D1_UNSUPPORTED: D1Database\.notD1\b/.test(line)).length });
+        warnings: warnings.filter(line => /^D1_UNSUPPORTED: D1Database property\b/.test(line)).length });
     }
     if (path === '/modules') return Response.json({ sum: new WebAssembly.Instance(add).exports.add(2, 3), data: [...new Uint8Array(data)] });
     if (path === '/legacy-alarm') return env.LEGACY.getByName('same-name').fetch('https://legacy/alarm-status');

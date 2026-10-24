@@ -20,6 +20,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  const app = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', originVar: 'APP_ORIGIN',
   platforms: ['workers'], container: { hostVariables: ['STATUS_HOST', 'APP_HOST', 'PAGE_HOST', 'PAGE_ALIAS'] } };
  const declaration = { version: 1, domain: 'test.run-fixture.test', name: 'Fixture', instanceType: 'standard-1', runUrl: 'https://run-fixture.test/run',
+  generatedSecrets: [{ name: 'ENVELOPE_RECORD_KEY', generate: 'base64' }],
   settings: { APP_HOST: primary, PAGE_HOST: page, PAGE_ALIAS: page, STATUS_HOST: status, UNROUTED_HOST: 'outside.example.test' } };
  const configure = async (demo = declaration, deploy = app) => {
   await writeFile(join(root, 'owner-deployment.json'), JSON.stringify(deploy));
@@ -71,6 +72,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  assert.equal(config.containers, undefined);
  assert.equal(config.durable_objects.bindings.find(row => row.name === 'DEMO').class_name, 'NativeDemo');
  const manifest = JSON.parse(await readFile(join(root, '.rer/demo-host/bundle/app/demo.json'), 'utf8'));
+ assert.deepEqual(manifest.generatedSecrets, declaration.generatedSecrets);
  assert.ok(manifest.migrations.DB.length, 'declared SQL is included in the native bundle');
  assert.ok((await readFile(join(root, '.rer/demo-host/modules/demo-host/native/bundle.mjs'), 'utf8')).includes('app/'), 'the real build emitted the packaged Worker entry');
  const summary = built.stdout.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line)).find(value => value.event === 'demo');
@@ -126,6 +128,14 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  assert.match(missingClass.stdout + missingClass.stderr, /cannot bind COUNTER:.*MissingCounter/);
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify(workerConfig));
 
+ for (const generatedSecrets of [{}, null, ['KEY'], [{ name: 'ENVELOPE_RECORD_KEY', generate: 'unknown' }],
+  [{ name: 'SESSION_SECRET', generate: 'hex' }], [{ name: 'RER_NATIVE_KEY', generate: 'hex' }],
+  [{ name: 'ENVELOPE_RECORD_KEY', generate: 'base64' }, { name: 'ENVELOPE_RECORD_KEY', generate: 'hex' }]]) {
+  await configure({ ...declaration, generatedSecrets });
+  const refused = await rer();
+  assert.equal(refused.code, 2);
+  assert.match(refused.stdout + refused.stderr, /invalid-demo-generated-secrets/);
+ }
  for (const runUrl of ['http://run-fixture.test/run', 'https://run-fixture.test/', 'javascript:alert(1)', 'data:text/html,unsafe', '//outside.test/run', {}, 42, null, true, ['https://run-fixture.test/run'], 'https://user:password@run-fixture.test/run', 'https://run-\nfixture.test/run']) {
   await configure({ ...declaration, runUrl });
   await assert.rejects(() => localExit(), /invalid-demo-run-url/);

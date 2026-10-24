@@ -30,7 +30,7 @@ class Statement {
       if (typeof value === 'boolean') return Number(value);
       if (value === null || typeof value === 'string' || typeof value === 'number' || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) return value;
       if (Array.isArray(value) && value.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255)) return new Uint8Array(value);
-      throw failure('D1_TYPE_ERROR', `Type '${typeof value}' not supported for value '${value}'`);
+      throw failure('D1_TYPE_ERROR', 'Unsupported bound value type');
     }));
   }
   execute() { return d1(() => this.db.sql.query(this.query, this.args)); }
@@ -40,7 +40,7 @@ class Statement {
     const row = (await this.execute()).results[0];
     if (!row) return null;
     if (column === undefined) return row;
-    if (!Object.hasOwn(row, column)) throw new Error(`D1_COLUMN_NOTFOUND: Column not found (${column})`, { cause: new Error('Column not found') });
+    if (!Object.hasOwn(row, column)) throw new Error('D1_COLUMN_NOTFOUND: Column not found', { cause: new Error('Column not found') });
     return row[column];
   }
   async raw({ columnNames = false } = {}) {
@@ -48,15 +48,12 @@ class Statement {
     return columnNames ? [columns, ...rows] : rows;
   }
 }
-// Errors read as D1's do ("D1_ERROR: UNIQUE constraint failed: ...: SQLITE_CONSTRAINT"),
-// with the unprefixed error as their cause.
+// SQL/platform errors may contain seed values. Keep the D1 category only;
+// never attach the original exception or its cause to a host-created error.
 const failure = (code, message, cause = new Error(message)) => new Error(`${code}: ${message}`, { cause });
 async function d1(operation, code = 'D1_ERROR') {
   try { return await operation(); }
-  catch (error) {
-    const message = String(error?.message ?? error);
-    throw /^D1_[A-Z_]+:/.test(message) ? error : failure(code, message, error);
-  }
+  catch { throw failure(code, 'seed-operation-failed [redacted]'); }
 }
 // An unknown property reads undefined, as on real D1, so feature detection
 // takes its fallback. The first read of each unknown name per isolate warns in
@@ -68,7 +65,7 @@ function strict(target, kind) {
     const name = `${kind}.${String(key)}`;
     if (typeof key === 'string' && !(key in object) && key !== 'then' && key !== 'toJSON' && !warned.has(name)) {
       warned.add(name);
-      console.warn(`D1_UNSUPPORTED: ${name} is not available in hosted demos`);
+      console.warn(`D1_UNSUPPORTED: ${kind} property is not available in hosted demos`);
     }
     return Reflect.get(object, key, receiver);
   } });

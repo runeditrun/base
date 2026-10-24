@@ -1,10 +1,10 @@
 import { parseCron } from './cron.mjs';
 
-export const RUNTIME_FILES = ['config', 'worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'r2-store', 'queues', 'resources', 'cron', 'bridge', 'alarms'];
+export const RUNTIME_FILES = ['config', 'secrets', 'failure', 'worker', 'visitor', 'loader', 'd1', 'sql', 'r2', 'r2-store', 'queues', 'resources', 'cron', 'bridge', 'alarms'];
 // Hashed build output: served immutable, and what the start page may prefetch.
 export const hashedAsset = (assetsDir = 'assets') => new RegExp(`^/${assetsDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/.*-[\\w-]{8,}\\.[\\w]+$`);
 export const HASHED_ASSET = hashedAsset();
-export const ISOLATE_FILES = ['bindings', 'namespace', 'r2-client', 'd1', 'sql', 'seed-object'];
+export const ISOLATE_FILES = ['failure', 'bindings', 'namespace', 'r2-client', 'd1', 'sql', 'seed-object'];
 export function nativeBindings(config) {
   for (const kind of ['kv_namespaces', 'services', 'workflows', 'ai', 'vectorize', 'hyperdrive', 'analytics_engine_datasets', 'browser', 'images', 'send_email', 'dispatch_namespaces', 'mtls_certificates', 'pipelines', 'secrets_store_secrets', 'unsafe', 'vpc_services', 'vpc_networks', 'ratelimits', 'worker_loaders', 'containers', 'ai_search_namespaces', 'ai_search', 'agent_memory', 'connect', 'artifacts', 'unsafe_hello_world', 'flagship', 'logfwdr', 'version_metadata']) {
     const value = config[kind];

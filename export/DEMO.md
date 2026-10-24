@@ -113,7 +113,8 @@ ended page with "Start a new demo".
    sets the demo owner (default owner@demo.invalid), `runUrl` sets the canonical
    HTTPS `/run` chooser (default the declared run-site domain, then the demo
    domain), and `settings` contains plain
-   demo settings. Secrets and front-owned settings cannot be supplied there.
+   demo settings. Secret values and front-owned settings cannot be supplied there.
+   Optional `generatedSecrets` declares additional per-visitor keys (see below).
 3. Copy `run-demo.yml` to `.github/workflows/run-demo.yml`. It installs the seed's
    locked dependencies and invokes `rer deploy --demo`; Docker is unnecessary.
    Set `RUN_DEMO_DEPLOY=true` to deploy on pushes to main. The manual `test_only`
@@ -137,6 +138,54 @@ ended page with "Start a new demo".
 `rer deploy --demo --dry-run` builds `.rer/demo-host/` with no provider requests.
 The bundle excludes private local settings. Deploy waits for the custom-domain
 certificate; the workflow also waits for DNS and the public start page.
+
+### Generated secrets for hosted visitors
+
+A seed needing its own encryption or signing key opts in explicitly in
+`deploy-demo.json`, using the existing setup generator encodings:
+
+```json
+{
+  "version": 1,
+  "domain": "run-example.com",
+  "name": "Example",
+  "generatedSecrets": [
+    { "name": "ENVELOPE_RECORD_KEY", "generate": "base64" }
+  ]
+}
+```
+
+Each entry contains exactly `name` and `generate`. Names match
+`[A-Z][A-Z0-9_]{0,63}`; `generate` is `hex` or `base64`. Both independently
+sample 32 cryptographically random bytes per secret and per visitor: hex
+produces 64 lowercase characters; base64 produces 44 characters with padding.
+`name` is the application's runtime binding, even if `deploy.json` maps that
+binding to a differently named deployment environment input.
+
+Malformed entries, duplicates, `RER_*`, `SESSION_SECRET`, `INSTALLATION_KEY`,
+`SETUP_TOKEN`, `OWNER_EMAIL`, the origin variable and collisions with public
+settings or built resource bindings/vars are refused before deployment. Do not
+put generated keys in Wrangler vars or plain demo settings. Only the declared
+names receive keys: `rer-setup.json` generators and ordinary `deploy.json`
+secret mappings do not implicitly opt a hosted demo in. Local setup and normal
+production deployment keep their own existing generation rules.
+
+Values first exist at visitor creation, in that visitor's runtime bindings and
+Durable Object storage. They are absent from the build, host configuration and
+CLI output. A runtime restart reloads the same saved keys with its encrypted
+data; newly added declarations apply to fresh visitors, without rotating a
+live copy's keys. Host-owned error sinks retain only a fixed failure category,
+never seed error text, stacks, causes, aggregate members or refused owner-claim
+response bodies. Claim bodies are discarded before any formatting or truncation.
+This content-free rule discards every secret and fragment, including values
+shorter than eight characters and JSON/URL/percent-encoded text. It does not rely
+on matching full keys: a base64 key without its fixed padding, or a hex prefix,
+can still carry recoverable key material. Fetch, sign-out, scheduled work,
+alarms, RPC and background rejections use the same boundary; D1 warnings and
+resource validation errors omit seed-controlled names and values. Ending, cancelling, signing out or expiring the copy erases the keys and
+data together; a fresh visitor gets new independent keys. The four existing
+host-generated keys retain their existing formats and lifetime. Never log or
+return secret values from the seed; compare fingerprints when diagnosing keys.
 
 ### Upgrading an existing hosted demo
 

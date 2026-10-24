@@ -6,6 +6,7 @@ import { collectBuildModules } from '../../deploy-kit/build-modules.mjs';
 import { collectFiles, moduleType } from '../../deploy-kit/artifact.mjs';
 import { nativeBindings, ISOLATE_FILES, objectExports } from './config.mjs';
 import { warmList, builtChunks } from './warm.mjs';
+import { generatedSecrets } from './secrets.mjs';
 import { prepareTheme } from '../theme.mjs';
 
 // The Worker Loader module kind for each upload type deploy-kit gives a build
@@ -25,6 +26,7 @@ export async function prepareNative(folder) {
   const manifest = JSON.parse(await readFile(join(app, 'demo.json'), 'utf8'));
   const config = manifest.config, root = join(app, 'dist/server');
   const bindings = nativeBindings(config);
+  const secrets = generatedSecrets(manifest.generatedSecrets, [...bindings.databases, ...bindings.buckets, ...bindings.objects.map(item => item.name), ...bindings.queues.producers.map(item => item.binding), bindings.assets, ...Object.keys(config.vars ?? {})]);
   const main = relative(root, resolve(root, config.main));
   const modules = {};
   for (const file of await collectBuildModules(root, config, main)) modules[`app/${file.path}`] = loaderModule(file.path, Buffer.from(file.base64, 'base64'));
@@ -38,7 +40,7 @@ export async function prepareNative(folder) {
   const { readIconFiles } = await shared('icon-files.mjs');
   const { links: iconHead } = await readIconFiles(join(app, 'dist/client'));
   const bundle = { iconHead, compatibilityDate: config.compatibility_date, compatibilityFlags: [...new Set([...(config.compatibility_flags ?? []), 'nodejs_compat'])], modules,
-    bindings, migrations: manifest.migrations, vars: config.vars ?? {}, crons: config.triggers?.crons ?? [],
+    generatedSecrets: secrets, bindings, migrations: manifest.migrations, vars: config.vars ?? {}, crons: config.triggers?.crons ?? [],
     assetPaths: [...assets.filter(file => !file.path.split('/').some(part => part.startsWith('.'))).map(file => '/' + file.path), ...theme.paths],
     theme: theme.css,
     immutable: [...builtChunks(assets, manifest.assetsDir)].sort(),

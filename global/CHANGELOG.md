@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hosted demo failures retain only a fixed category: refused claim bodies, seed alarm exceptions, background work and host-generated resource errors cannot put generated visitor keys or fragments into logs, responses or operator diagnostics.
+
+- Hosted demos provision explicitly declared generated secrets independently for each visitor, preserve them across runtime restarts, and erase them with the visitor's data. `deploy-demo.json` accepts a validated `generatedSecrets` list using the existing 32-byte hex/base64 encodings.
 - Add signed runtime Business settings, same-origin logos, app accent fills, local overrides and owner-scoped team reconciliation. The reference seed adopts the module; owners can stop settings with fresh sign-in proof.
 
 ## 0.2.80

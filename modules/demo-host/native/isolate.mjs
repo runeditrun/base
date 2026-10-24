@@ -3,6 +3,7 @@ import { localSQL } from './bindings.js';
 import { env, DurableObject } from 'cloudflare:workers';
 import * as application from '__RER_APP_ENTRY__';
 import { sqlite } from './sql.js';
+import { seedOperation, seedContext } from './failure.js';
 
 export class DemoDatabase extends DurableObject {
   constructor(ctx, bindings) { super(ctx, bindings); this.sql = sqlite(ctx.storage); }
@@ -11,9 +12,9 @@ export class DemoDatabase extends DurableObject {
   exec(query) { return this.sql.exec(query); }
 }
 export class DemoApp extends DemoDatabase {
-  async fetch(request) { return localSQL.run(this.sql, () => application.default.fetch(request, env, this.ctx)); }
+  async fetch(request) { return localSQL.run(this.sql, () => seedOperation(() => application.default.fetch(request, env, seedContext(this.ctx)))); }
   async runScheduled(scheduledTime, cron) {
-    if (application.default.scheduled) await localSQL.run(this.sql, () => application.default.scheduled({ scheduledTime, cron, noRetry() {} }, env, this.ctx));
+    if (application.default.scheduled) await localSQL.run(this.sql, () => seedOperation(() => application.default.scheduled({ scheduledTime, cron, noRetry() {} }, env, seedContext(this.ctx))));
   }
   async runQueue(queue, messages) {
     if (!application.default.queue) throw new Error(`Seed has no queue() handler for ${queue}`);
