@@ -219,6 +219,7 @@ test('an unsupported keyword in an untaken conditional branch throws', () => {
   };
   assert.deepEqual(validate(probe, { kind: 'b' }), [], 'validate cannot see a branch the document does not take');
   assert.throws(() => checkSchema(probe), /unsupported schema keyword "minProperties"/);
+  assert.throws(() => checkSchema({not: {minProperties: 1}}), /unsupported schema keyword "minProperties" at #\/not/);
 });
 
 test('an unsupported format anywhere in the schema throws', () => {
