@@ -111,11 +111,19 @@ export async function stopGroup(owner, graceMs) {
   if (!owner?.pgid) return;
   if (!Number.isInteger(owner.pgid) || owner.pgid < 2 || owner.pgid !== owner.pid)
     throw Error('Invalid lease process group');
-  const verify = async (timeout) => {
+  const verify = async (timeout = inspectionMs) => inspected(async () => {
+    if (process.platform === 'linux') {
+      // An absent leader anchors surviving members only in the recorded boot.
+      // Check this before the final PID inspection, never after it: metadata
+      // discovery must not open another reuse window before signal delivery.
+      const boot = (await readFile('/proc/sys/kernel/random/boot_id', { encoding: 'utf8', signal: AbortSignal.timeout(timeout) })).trim();
+      if (!boot) throw Error('Invalid boot identity');
+      if (!owner.start.startsWith(`${boot}:`)) return false;
+    }
     const current = await processInfoWithin(owner.pid, timeout);
     return !current || (current.start === owner.start
       && (current.zombie || !owner.marker || current.title.includes(owner.marker)));
-  };
+  }, timeout);
   if (await deliverGroupSignal(owner.pgid, 'SIGTERM', { verify })) {
     await delay(graceMs);
     if (await deliverGroupSignal(owner.pgid, 'SIGKILL', { verify })) {
