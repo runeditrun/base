@@ -17,7 +17,8 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
     if (previous && previous.source !== source) throw Error(`Conflicting Base import mappings for ${name}`);
     if (previous) return;
     scheduled.set(name, {source, plan});
-    if (javascript(source)) queue.push({plan, source, name, bytes, boundary, depth, adapted, pin});
+    // Runtime source has its own TS resolution and seed-sibling policy.
+    if (!source.startsWith('foundation/runtime/') && javascript(source)) queue.push({plan, source, name, bytes, boundary, depth, adapted, pin});
   };
   const initial = plans.flatMap(plan => plan.sources.map(([source, entry]) => ({plan, source, entry})));
   const bytes = read.blobs(initial.map(({entry}) => entry.object));

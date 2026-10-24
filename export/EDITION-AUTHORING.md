@@ -37,7 +37,8 @@ with `git submodule update --init`; after initialization, refresh reads the
 child's own index and bytes. Unreadable index evidence and deleted declared
 adaptations also refuse.
 
-Per-file vendored JavaScript copies remain supported. Refresh follows static
+Per-file vendored JavaScript copies outside `foundation/runtime` remain supported.
+Refresh follows static
 relative imports and exports, including side-effect imports, transitively up to
 64 levels inside the original copied origin directory tree. It copies missing
 helpers and reports them under `adopted`, recording separate file entries in
@@ -56,6 +57,14 @@ templates, regular expressions, comments, dynamic `import()` and `import.meta`
 do not add static dependencies. Invalid or unsupported ECMAScript module syntax,
 including JSX, refuses the entire refresh before writes, naming the importing
 file and parser error.
+
+Copies from `foundation/runtime` retain their runtime-specific dependency policy:
+refresh resolves JS/TS runtime dependencies and companion declarations, recovers
+omitted old-pin siblings, advances copies matching their old baseline, and
+preserves differing seed-owned siblings. Runtime additions appear in each copy's
+`added` list; `adopted` reports the non-runtime JavaScript closure above. Both
+graphs are planned before any writes; deleted recorded runtime dependencies
+refuse without resurrection.
 
 Use the immutable full commit behind the release tag. Base-checkout form:
 
