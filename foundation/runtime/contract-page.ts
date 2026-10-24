@@ -53,21 +53,19 @@ const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'p
 // names are ambiguous (product names use them too), so need a path or locator.
 // The parser has already removed Gap/title backticks, so code delimiters alone
 // cannot distinguish citations from ordinary words consistently across fields.
-const fileName = String.raw`[\w@.-]+\.(?:[cm]?[jt]sx?|sql|json|md|ya?ml|sh|css|html)`
+const fileName = String.raw`[\w@.-]+\.(?:[cm]?[jt]sx?|sql|json|md|ya?ml|sh|css|html)\b`
 const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b${fileName}:\d+(?::\d+)?\b`, 'gi')
 const bareSourceFile = /\b[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|json|md|ya?ml|sh|css|html)\b/gi
-function publicText(value: string): string {
-  return value
+const publicText = (value: string) => value
   .replace(/\bin audited\s+`?src\/`?\s+and\s+`?tests\/`?/gi, '')
   .replace(sourcePath, '').replace(bareSourceFile, '')
   .replace(/(\b(?:commit|revision|changeset|sha(?:-?(?:1|256))?)(?:\s+|\s*[:=#]\s*))[0-9a-f]{7,64}\b/gi, '$1')
-  .replace(/\bat\s+[0-9a-f]{7,40}\b/gi, match => /\d/.test(match) ? '' : match)
+  .replace(/\bat\s+([0-9][0-9a-f]{6,39})\b/gi, (reference, hash: string) => /[a-f]/i.test(hash) ? '' : reference)
   .replace(/\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b/gi, '')
   .replace(/`+/g, '')
   .replace(/\(\s*\)|\[\s*\]/g, '')
   .replace(/\s+([,.;:])/g, '$1').replace(/([,;:])(?:\s*[,;:])+/g, '$1')
   .replace(/\s+/g, ' ').replace(/^[\s,;:.]+|[\s,;:]+$/g, '').trim()
-}
 
 function clauseRow(clause: ContractClause, contractUrl: string): string {
   const line = `${contractUrl}?plain=1#L${clause.line}`
