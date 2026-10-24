@@ -10,7 +10,7 @@ import { join, delimiter } from 'node:path';
 
 export function operatorInstaller({ database, features, prepare, prepareData }) {
  const lifecycle=localInstaller({
-  features, node: '22.20.0',
+  features, node: '22.23.4',
   failure: (error,{store})=>error instanceof LocalStateSafetyError ? store.redact(error.message) : undefined,
   async prepare(context) { context.localState = await selectLocalState(context.root); await privateDirectory(context.root, ['.wrangler', 'state']); await prepare?.(context); },
   prepareData,

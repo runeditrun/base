@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22.16.0'
+          node-version: '22.23.4'
       - name: Validate immutable source against fresh allowed refs
         id: source
         env:
@@ -70,7 +70,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22.16.0'
+          node-version: '22.23.4'
       - name: Execute registered operation with provider credentials only
         id: execute
         env:
@@ -97,7 +97,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22.16.0'
+          node-version: '22.23.4'
       - name: Persist fixed-schema receipt to private evidence store
         env:
           EVIDENCE_WRITE_TOKEN: ${{ secrets.EVIDENCE_WRITE_TOKEN }}

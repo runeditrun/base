@@ -5,11 +5,11 @@
     "requirements": [
       {
         "name": "node",
-        "version": "22.20.0"
+        "version": "22.23.4"
       },
       {
         "name": "pnpm",
-        "version": "10.12.4"
+        "version": "10.34.7"
       }
     ]
   },
