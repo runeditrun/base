@@ -77,8 +77,8 @@ export async function readArtifact(directory) {
   return { root, receipt, subject, files, entries };
 }
 
-export function statementFor(artifact, keyId, issuedAt) {
+export function statementFor(artifact, keyId, issuedAt, anchorsVersion = 1) {
   const statement = { schemaVersion: 1, ...artifact.subject, files: artifact.entries, issuedAt, keyId };
-  validateStatement(statement);
+  validateStatement(statement, anchorsVersion);
   return statement;
 }

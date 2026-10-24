@@ -55,3 +55,30 @@ test('release CLI signs produced bytes, verifies offline, and refuses changed si
   assert.equal(refused.status, 1, 'A changed document is refused');
   assert.equal(resultIs(refused, { verdict: 'REFUSED', code: 'DIGEST_MISMATCH' }), true, 'The changed document reports a digest mismatch');
 });
+
+test('release CLI signs and verifies an external project only in its signing key project list', async t => {
+  const f = fixture(t);
+  const produced = cli(['--repo', f.repo, '--project', 'learning/beam', '--repository',
+    'https://github.com/just-every/run-beam', '--output', f.options.output, '--local-verify', '--tag']);
+  assert.equal(produced.status, 0, produced.stderr);
+  const entryPath = resolve(f.temporary, 'entry.json'), anchorsPath = resolve(f.temporary, 'anchors.json');
+  const generated = cli(['keygen', '--scope', 'test', '--publisher', 'just-every', '--github-owner',
+    'just-every', '--github-owner-id', '1', '--anchor-out', entryPath]);
+  assert.equal(generated.status, 0, 'Test key generation succeeds');
+  const signed = cli(['sign', '--artifact', f.options.output, '--key-stdin', '--scope', 'test',
+    '--publisher', 'just-every'], generated.stdout);
+  assert.equal(signed.status, 0, 'External project signing succeeds');
+  const entry = JSON.parse(readFileSync(entryPath));
+  const anchors = { schemaVersion: 2, environment: 'test', serial: 1, legacyUnsigned: {},
+    keys: [{ ...entry, projects: ['learning/beam'] }] };
+  const verify = () => cli(['receipt', '--artifact', f.options.output, '--anchors', anchorsPath, '--environment', 'test']);
+  writeFileSync(anchorsPath, JSON.stringify(anchors));
+  const accepted = verify();
+  assert.equal(accepted.status, 0, 'Receipt accepts the explicitly listed external project');
+  assert.deepEqual(JSON.parse(accepted.stdout), { verdict: 'VERIFIED' });
+  anchors.keys[0].projects = ['learning/not-listed'];
+  writeFileSync(anchorsPath, JSON.stringify(anchors));
+  const refused = verify();
+  assert.equal(refused.status, 1);
+  assert.deepEqual(JSON.parse(refused.stdout), { verdict: 'REFUSED', code: 'PUBLISHER_MISMATCH' });
+});
