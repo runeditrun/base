@@ -8,14 +8,18 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { setTimeout as delay } from 'node:timers/promises';
 import { join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
 import { tarball } from '../../scripts/rer-package/tarball.mjs';
 import { integrity, localRegistry } from '../../scripts/rer-package/registry.mjs';
 import { aliases, pins, verbs } from '../../cli/contract.mjs';
 import { readPackage } from '../update/archive.mjs';
-import { freePort, run } from './harness.mjs';
-import { devModes } from './dev-mode.mjs';
+import { devModes, devSeed } from './dev-mode.mjs';
+import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
+import { freePort, processesIn, run } from './harness.mjs';
+import { liveServers } from '../registry.mjs';
+import { recorder } from './guide-recorder.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 const launcher = join(base, 'global/rer.mjs');
@@ -213,4 +217,40 @@ test('a failed install step names its step, command, exit code, last 20 lines an
  assert.deepEqual([event.step.name, event.step.command, event.step.exitCode], ['Installing frozen dependencies', 'pnpm install --frozen-lockfile', 1]);
  assert.ok(event.step.output.some(line => line.includes('ERR_PNPM_OUTDATED_LOCKFILE')) && event.step.output.length <= 20);
  assert.match(await readFile(join(root, event.step.log), 'utf8'), /ERR_PNPM_OUTDATED_LOCKFILE/);
+});
+
+test('rer dev --guide CODE reports only the contract keys, phase by phase, and a guide that nobody answers never stops the launch', { timeout: 300_000 }, async t => {
+ const code = 'AbCdEfGhIjKlMnOpQrStUvWx', keys = ['elapsed_ms', 'os', 'phase', 'rer_version', 'step', 'total', 'v'];
+ // Each launch is a fresh fixture checkout started the way an agent's shell starts it (no terminal).
+ const launch = async (name, origin) => {
+  const { root } = await seed(name, versions.first);
+  await devSeed(root);
+  const env = await isolatedQueue(t, { ...environment(), CI: 'true', RER_SERVERS_DIR: join(directory, `${name}-servers`), RER_GUIDE_ORIGIN: origin });
+  const port = await freePort();
+  // Only the server this launch registered in its own registry is ended, and the checkout is left before it is deleted.
+  t.after(async () => {
+   for (const record of await liveServers(env)) try { process.kill(record.owner.pid, 'SIGTERM'); } catch {}
+   for (let waited = 0; waited < 100 && (await processesIn(root)).length; waited++) await delay(100);
+  });
+  const started = await run(process.execPath, [launcher, 'dev', '--guide', code, '--port', String(port), '--json'], { cwd: root, env });
+  assert.equal(started.code, 0, started.stderr + started.stdout);
+  assert.ok(started.stdout.includes('"event":"ready"'), 'the launch reached ready');
+ };
+
+ const guide = await recorder('ok');
+ t.after(guide.close);
+ await launch('guided', guide.origin);
+ const events = guide.requests.map(request => {
+  assert.equal(`${request.method} ${request.url}`, `POST /api/run-guides/${code}/events`);
+  return JSON.parse(request.body);
+ });
+ assert.deepEqual(events.map(event => event.phase), ['get', 'install', 'database', 'start', 'ready']);
+ for (const event of events) assert.deepEqual(Object.keys(event).sort(), keys);
+
+ // Nothing listens at the origin, then the route is not live yet: each launch still ends ready.
+ await launch('unreachable', `http://127.0.0.1:${await freePort()}`);
+ const missing = await recorder('404');
+ t.after(missing.close);
+ await launch('missing', missing.origin);
+ assert.equal(missing.requests.length, 1, 'the first refusal ends the posting: no retries');
 });

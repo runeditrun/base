@@ -25,6 +25,8 @@ export const demoVerb = Object.freeze({ bootstrap: 'before', flags: [...commonFl
 // `rer signin` is rer's own, not a seed operation: any seed rer deploys, it can
 // sign the owner in to, so no seed declares it and check does not ask for it.
 export const signinVerb = Object.freeze({ bootstrap: 'before', flags: [...commonFlags, '--environment', '--env-file'], effects: 'A one-time sign-in link for the hosted owner, without mail. Uses the Cloudflare credentials that deployed --environment (default production; from the environment or --env-file) to write a single-use grant for the recorded owner into that deployment\'s auth database, then prints the link once to this terminal; it is never saved. The link works once, only for that owner, expires within 15 minutes, and its use is recorded in the owner\'s audit log. Signed in this way, the owner can correct a wrong email in settings.' });
+// `rer prompt` is rer's own too: it prints text from its arguments, so it never installs a pin and needs no checkout or network, and no seed declares it.
+export const promptVerb = Object.freeze({ bootstrap: 'never', flags: ['--help', '--guide'], effects: 'Prints the one block to paste into Claude Code or Codex so it runs the app: the install-and-start command line (with --guide CODE when given: the code the Run guide page shows, so the page can follow along), the app\'s repository, and the rules (never print or paste the RER_OPEN link, open the app with rer open, never put credentials in chat, report the phase and error_code on failure). It reads and writes nothing.' });
 export const aliases = Object.fromEntries([...Object.keys(verbs).filter(v => v !== 'install'), 'release', 'deps', 'rer'].map(name => [name, name === 'deps' ? 'install' : name === 'rer' ? null : name]));
 export const releaseFlags = ['--repo', '--project', '--repository', '--output', '--ref', '--public-base', '--dry-run', '--local-verify', '--verify-workflow', '--scan-timeout-seconds', '--tag', '--clean-history', '--onto', '--env-file', '--allow-placeholder-mark', '--no-queue'];
 export const releaseVerb = Object.freeze({
@@ -35,7 +37,7 @@ export const releaseVerb = Object.freeze({
 // All checkout commands, including those supplied by rer rather than declared
 // as seed operations. Bootstrap belongs to the selected command: before
 // dispatch, during launch, or never. A subcommand inherits its verb's policy.
-export const checkoutVerbs = Object.freeze({ ...verbs, demo: demoVerb, signin: signinVerb, release: releaseVerb });
+export const checkoutVerbs = Object.freeze({ ...verbs, demo: demoVerb, signin: signinVerb, release: releaseVerb, prompt: promptVerb });
 export function checkoutBootstrap([verb, ...args]) {
  if (args.includes('--help')) return 'never';
  const command = checkoutVerbs[verb];

@@ -5,10 +5,12 @@ import { localDefaults } from './launch/local-defaults.mjs';
 import { handleBrokenPipes } from './output.mjs';
 import { repositoryCommands, repositoryHelp } from './cli/repository-contract.mjs';
 import { repoArguments } from './cli/repository.mjs';
+import { takeGuide } from './guide/code.mjs';
 
 const help = `Usage: rer VERB [FLAGS]
 
   rer dev <repo> [--dir DIR]      Clone, install, set up a local owner and start the app.
+                                  --guide CODE shows its progress on the Run guide page that gave the code.
   rer setup <repo> [--dir DIR]    Clone, install and set up, then stop.
   rer install <repo> [--dir DIR]  Clone and install dependencies, then stop.
 ${repositoryHelp}
@@ -41,6 +43,8 @@ else its vendored scripts/rer.mjs.
   rer update           Move to the latest published rer (--version X for an exact one), the way it
                        was installed: npx and install.sh installs switch atomically, npm installs run npm.
   rer --version        Print this rer's version; inside a checkout, also the version the checkout pins.
+  rer prompt <repo> [--guide CODE]
+                       Print the one block to paste into Claude Code or Codex so it runs the app.
   rer queue NAME -- COMMAND [ARGS]
                        Run COMMAND once this computer's job queue admits it (heavy package scripts
                        of a checkout that pins the rer package use it).
@@ -49,7 +53,19 @@ Checkout verbs: install, setup, dev, demo, preview, build, verify, reset, deploy
 import, doctor, describe, check, release, listing. Run rer VERB --help in a checkout for its flags.
 `;
 
+// --guide CODE (rer dev only) reports phase-only progress to the Run guide page;
+// no pinned dispatcher sees the flag. See guide/.
 export async function main(argv) {
+ let taken;
+ try { taken = takeGuide(argv); } catch (error) { process.stderr.write(error.message + '\n'); return error.exitCode ?? 2; }
+ if (!taken.code) return dispatch(argv);
+ const { launchGuide } = await import('./guide/session.mjs'), guide = launchGuide(taken.code);
+ let code, threw = true;
+ try { code = await dispatch(taken.argv, guide); threw = false; return code; }
+ finally { await guide.finish(threw ? 1 : code ?? process.exitCode ?? 0, threw); }
+}
+
+async function dispatch(argv, guide) {
  handleBrokenPipes();
  const [verb] = argv;
  const installsFirst = checkoutBootstrap(argv) === 'before';
@@ -63,6 +79,7 @@ export async function main(argv) {
  delete process.env[localDefaults];
  if (verb === 'update') return (await import('./update/command.mjs')).update(argv.slice(1));
  if (verb === 'listing') return (await import('../cli/listing.mjs')).dispatchListing(argv.slice(1));
+ if (verb === 'prompt') return (await import('./guide/prompt.mjs')).promptCommand(argv.slice(1));
  if (verb === 'business') return (await import('../cli/business/command.mjs')).businessCommand(argv.slice(1));
  if (verb === 'companion') return (await import('../cli/companion/command.mjs')).companionCommand(argv.slice(1));
  const notice = await import('./update/notice.mjs');
@@ -79,7 +96,7 @@ export async function main(argv) {
  }
  try {
   const repository = repoArguments(argv);
-  if (repository) return await (await import('./cli/repo-command.mjs')).repoCommand(repository);
+  if (repository) return await (await import('./cli/repo-command.mjs')).repoCommand({ ...repository, guide });
  } catch (error) {
   process.stderr.write(error.message + '\n');
   return typeof error.exitCode === 'number' ? error.exitCode : 1;
@@ -111,6 +128,7 @@ export async function main(argv) {
    catch (error) { process.stderr.write(error.message + '\n'); return error.exitCode ?? 2; }
    const { ensureProjectPnpm } = await import('../cli/project-pnpm.mjs');
    const { RerError } = await import('../cli/errors.mjs');
+   guide?.phase('install');
    try { await ensureProjectPnpm(target.root, { report: text => process.stderr.write(text + '\n') }); }
    catch (error) { if (!(error instanceof RerError)) throw error; process.stderr.write(error.message + '\n'); return error.exitCode; }
   }
@@ -146,12 +164,13 @@ export async function main(argv) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
   if (code !== undefined) return code;
  }
- if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target);
+ if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target, guide);
  // Every other server start or queued job on a vendored pin gets the person
  // defaults too (a pinned package applies its own).
  if (mode === 'vendored') {
   const { personEnvironment, personVerbs, pinPolicy } = await import('./launch/capacity.mjs');
   if (personVerbs.has(verb)) Object.assign(process.env, personEnvironment(process.env, target.args, await pinPolicy(target.root, mode)));
  }
+ if (guide && verb === 'dev' && !argv.includes('--help')) return guide.handOff(() => delegate(target, target.args));
  await delegate(target, target.args);
 }

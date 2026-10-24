@@ -19,7 +19,7 @@ async function until(condition, message, timeout = 30_000) {
  assert.fail(typeof message === 'function' ? message() : message);
 }
 
-async function devSeed(root) {
+export async function devSeed(root) {
  await writeFile(join(root, 'app.mjs'), `import { createServer } from 'node:http';
 createServer((request, response) => response.end(JSON.stringify({ status: 'ok' }))).listen(Number(process.argv[2]), '127.0.0.1');
 `);

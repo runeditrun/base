@@ -12,8 +12,9 @@ import { prepare } from '../launch/prepare.mjs';
 import { launchDirectory } from '../launch/state.mjs';
 
 export async function repoCommand(request) {
- const { verb, directory, args } = request;
+ const { verb, directory, args, guide } = request;
  parse([verb, ...args]); // Refuse invalid options before installation or cloning.
+ guide?.phase('get');
  const paths = layout(), launcher = await launcherOwner(paths.launcher);
  const installed = await install({ quiet: true });
  if (installed !== 0) return installed;
@@ -40,7 +41,8 @@ export async function repoCommand(request) {
  } else {
   if (verb === 'dev' && !args.includes('--json')) process.stdout.write(`Restart: ${next('dev')}\n`);
   const entry = join(ownRoot, 'global/rer.mjs');
-  const code = await runCommand(process.execPath, [entry, verb, ...args], { cwd: root,
+  const guided = guide?.delegate();
+  const code = await runCommand(process.execPath, [entry, verb, ...args, ...guided?.args ?? []], { cwd: root, ...guided && { env: guided.env },
    ...(verb === 'dev' ? { onInterrupt: () => runCommand(process.execPath, [entry, 'dev', '--stop'], { cwd: root }) } : {}),
   });
   if (code !== 0) return code;

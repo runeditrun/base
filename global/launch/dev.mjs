@@ -16,13 +16,14 @@ import { ownRoot } from '../package-info.mjs';
 import { LaunchFailure } from './failure.mjs';
 import { describeCheckout } from './facts.mjs';
 import { prepare } from './prepare.mjs';
+import { guidedPrinter } from '../guide/session.mjs';
 import { printer } from './render.mjs';
 import { stopLaunch } from './stop.mjs';
 import { launchDirectory, liveWorker } from './state.mjs';
 
 const workerPath = fileURLToPath(new URL('./worker.mjs', import.meta.url));
 
-export async function launchDev(target) {
+export async function launchDev(target, guide) {
  const args = target.args.slice(1);
  if (args.includes('--detach') && args.includes('--foreground')) { process.stderr.write('Choose one of --detach and --foreground.\n'); return 2; }
  // --door-start: the front door is starting this checkout (internal).
@@ -42,7 +43,8 @@ export async function launchDev(target) {
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
  }
  const here = await realpath(process.cwd()).catch(() => undefined);
- const out = printer({ json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
+ const shown = printer({ json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
+ const out = guide ? guidedPrinter(shown, guide) : shown;
  const detach = args.includes('--detach') || (!args.includes('--foreground') && !process.stdout.isTTY);
  return detach ? detached(target, devArgs, directory, out, doorStart) : foreground(target, devArgs, directory, out, doorStart);
 }
@@ -80,7 +82,7 @@ async function foreground(target, devArgs, directory, out, doorStart) {
  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; out.failure(failure); return failure.exitCode; }
  finally { clearInterval(heartbeat); log.end(); }
  Object.assign(process.env, prepared.added);
- return delegateDev(target);
+ return out.guide ? out.guide.handOff(() => delegateDev(target)) : delegateDev(target);
 }
 
 async function detached(target, devArgs, directory, out, doorStart) {
