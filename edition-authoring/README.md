@@ -245,6 +245,9 @@ a missing local object names an online refresh command, preserving the record.
 Verify before refreshing to inspect missing copies. Deleted
 adaptations still block refresh, and a singleton still present locally whose
 Base source disappeared still reports an error.
+If a retained runtime module still imports a deleted recorded dependency, refresh
+refuses before writes; restore the dependency or adapt the importing module
+before refreshing. Required unrecorded siblings are discovered as described below.
 Runtime copies also include the recursive relative imports and re-exports of
 their selected `foundation/runtime` modules, plus companion declarations. This
 recovers required siblings even when they existed before the old pin or each

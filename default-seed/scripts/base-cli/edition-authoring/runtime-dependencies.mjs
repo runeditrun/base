@@ -61,6 +61,10 @@ export function completeRuntimeCopies(plans, {tree, read, local, upstream, revis
     checkTarget(target);
     let plan = plans.find(plan => inside(target, plan.copy.path));
     if (plan && mapped(target, plan.copy.path, plan.copy.originPath) !== source) throw Error(`Runtime dependency ${target} conflicts with its Base copy mapping`);
+    // A missing recorded file is a removal, not an omitted sibling. Restoring
+    // it here would bypass refresh's retirement/removal plan and could leave
+    // the recreated source outside its record. Refuse before any writes.
+    if (plan?.removed.includes(target)) throw Error(`Runtime dependency ${target} was removed locally but is still imported; no files were refreshed. Restore it or adapt the importing module before refreshing.`);
     if (plan?.copy.adapted?.[target]) {
       queue.push({source, target, baseline});
       return; // Keep seed bytes while supplying the shipped module's dependencies.

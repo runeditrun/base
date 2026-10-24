@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.79-dev.gc4f12823",
+  "cliVersion": "0.2.79-dev.gfe80580e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1207,7 +1207,7 @@
     },
     "edition-authoring/runtime-dependencies.mjs": {
       "source": "edition-authoring/runtime-dependencies.mjs",
-      "sha256": "cd1098d1c1dc907c72e0e15a85ece7c2b3f2ee78059a12df7f229c5a6167052c"
+      "sha256": "1b56cb344febdb0213eda8585960ae417822244e5d061592f4374626ecf7fe4f"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",
