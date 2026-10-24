@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Count only server snapshot elements still in the body when waiting for hydration, so effect-created tooltips, portals and other widgets do not cause false timeouts.
+- Wait for server snapshot elements still in the body and same-tag replacements at their structural keys to be adopted by React, while allowing removed server nodes and effect-created tooltips, portals and other widgets outside those keys to settle.
 
 ## 0.2.80
 
