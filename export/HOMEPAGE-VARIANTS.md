@@ -159,11 +159,11 @@ Run page string and command in one `RunData` value (`src/site/run.ts` or
 The Run page then reads, exactly: "Run <Seed> on your computer."; "100% free and
 open source. One line, and <Seed> opens in your browser."; **Start <Seed>**,
 `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` for
-the seed's own repository (preserving any `--dir <folder>` from `clone`);
+the seed's own repository ;
 "Git is required; rer brings Node and pnpm. Already have Node 22 or later?
 `npx -y @runeditrun/rer dev <owner/repo>` does the same."; then "rer gets <Seed>,
 installs everything, makes you the owner and prints a link that opens <Seed>
-signed in. To start it again later: `cd <folder> && rer dev`", the requirements
+signed in. To start it again later, run the same line from the same folder.", the requirements
 line and "Source: <repository> · MIT license". Use the repository and directory
 from `clone` for both commands. A README's "Run locally" shows the same single
 installer command and Node alternative, so the Run page and the README agree.

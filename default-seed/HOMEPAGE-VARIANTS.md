@@ -4,7 +4,7 @@ Every seed has two versions of its homepage (owner, 12 October 2026):
 
 1. **The run site**, `run-<seed>.com`: the seed's owner-approved marketing
    homepage, whose primary action reads **Run <Seed>** and opens `/run`, a page
-   with the two commands that run the seed for free on your own computer. It is
+   with one command that runs the seed for free on your own computer. It is
    static, built by `rer build --site`.
 2. **The installed instance**, the app someone runs or deploys: its `/` is the
    **Lobby**, a minimal page whose one action is **Sign in**, or **Finish
@@ -157,19 +157,18 @@ Run page string and command in one `RunData` value (`src/site/run.ts` or
 | `hosted` | `[]` | `[]` |
 
 The Run page then reads, exactly: "Run <Seed> on your computer."; "100% free and
-open source. Two lines, and <Seed> opens in your browser."; step 1 **Install rer**,
-`curl -fsSL https://runeditrun.com/install.sh | sh`, "It installs rer for you
-alone, with its own Node if you have no Node 22 or later. It changes no shell
-settings: if its last line puts rer on your PATH, run that line before step 2.";
-step 2 **Start <Seed>**, the `clone` line without `npx -y @runeditrun/` (`rer dev
-just-every/cradle`), "rer gets <Seed>, installs everything, makes you the owner
-and prints a link that opens <Seed> signed in. To start it again later: `cd
-<folder> && rer dev`", and "Already have Node 22 or later? <clone> does both steps
-in one line."; then the requirements line and "Source: <repository> · MIT
-license". Step 2 runs on what the installer put on PATH alone, without npx. A
-README's "Run locally" shows the same two lines, so the Run page and the README
-agree. `hosted` is the slot for hosted options, shown as cards under step 2
-when RER hosting opens; leave it empty until then.
+open source. One line, and <Seed> opens in your browser."; **Start <Seed>**,
+`curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` for
+the seed's own repository ;
+"Git is required; rer brings Node and pnpm. Already have Node 22 or later?
+`npx -y @runeditrun/rer dev <owner/repo>` does the same."; then "rer gets <Seed>,
+installs everything, makes you the owner and prints a link that opens <Seed>
+signed in. To start it again later, run the same line from the same folder.", the requirements
+line and "Source: <repository> · MIT license". Use the repository and directory
+from `clone` for both commands. A README's "Run locally" shows the same single
+installer command and Node alternative, so the Run page and the README agree.
+`hosted` is the slot for hosted options, shown as cards under the command when
+RER hosting opens; leave it empty until then.
 
 `src/site/pages.tsx` exports `sitePages({ styles })`. Every CSS file your
 components import (Landing's `import './styles'`, the docs styles) compiles into

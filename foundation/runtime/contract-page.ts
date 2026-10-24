@@ -49,17 +49,21 @@ const kindWord = (clause: ContractClause) => clause.kind === 'push-further' ? 'p
 
 // Source citations stay in CONTRACT.md. A dotted product name is not a file
 // citation, and a word made of a-f is not a commit. Recognize repository roots,
-// source extensions, path separators and line locators instead. Bare .js/.jsx
+// source extensions, path separators and line locators instead. Bare .js/.jsx/.css
 // names are ambiguous (product names use them too), so need a path or locator.
 // The parser has already removed Gap/title backticks, so code delimiters alone
 // cannot distinguish citations from ordinary words consistently across fields.
-const fileName = String.raw`[\w@.-]+\.(?:[cm]?[jt]sx?|sql|json|md|ya?ml|sh|css|html)\b`
-const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b${fileName}:\d+(?::\d+)?\b`, 'gi')
-const bareSourceFile = /\b[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|json|md|ya?ml|sh|css|html)\b/gi
+const fileName = String.raw`[\w@.-]+\.(?:[cm]?[jt]sx?|sql|jsonc?|toml|md|ya?ml|sh|css|html|csv|py|png|svg)\b`
+const sourcePath = new RegExp(String.raw`(?<![\w/])(?:src|tests?|scripts?|docs?|modules?|packages?|foundation|cli|migrations|schema|public|config|secrets|deploy|operations|evidence|\.github)/[\w@.*?/[\]-]*(?::\d+(?::\d+)?)?|(?<![\w/])(?:~?/|\.{1,2}/)?(?:[\w@.-]+/)+${fileName}(?::\d+(?::\d+)?)?|\b${fileName}:\d+(?::\d+)?\b`, 'gi')
+const bareSourceFile = /\b[\w@.-]+\.(?:[cm]js|[cm]?tsx?|sql|jsonc?|toml|md|ya?ml|sh|html)\b/gi
+// Config names are repository citations even when their .js suffix is ambiguous.
+const configFile = /(?<![\w.])(?:[\w@.-]+\.config\.[cm]?[jt]s|\.env(?:\.[\w-]+)*)(?![\w-]|\.[\w-])/gi
+const windowsPath = /(?<![\w])(?:[a-z]:\\|(?:src|tests?|scripts?|modules?|packages?|config|secrets)\\)[\w@.*?\\[\]-]*(?::\d+(?::\d+)?)?/gi
 const publicText = (value: string) => value
   .replace(/\bin audited\s+`?src\/`?\s+and\s+`?tests\/`?/gi, '')
-  .replace(sourcePath, '').replace(bareSourceFile, '')
-  .replace(/(\b(?:commit|revision|changeset|sha(?:-?(?:1|256))?)(?:\s+|\s*[:=#]\s*))[0-9a-f]{7,64}\b/gi, '$1')
+  .replace(windowsPath, '').replace(sourcePath, '').replace(configFile, '').replace(bareSourceFile, '')
+  .replace(/(\b(?:commit|revision|changeset|sha(?:-?(?:1|256))?)(?:\s+|\s*[:=#]\s*))([0-9a-f]{7,64})\b/gi, (citation, label: string, hash: string) => /[0-9]/.test(hash) ? label : citation)
+  .replace(/\bat\s+(?:commit|revision|changeset)\s+[a-f]{7,40}\b(?=\s*[,.;:]|$)/gi, '')
   .replace(/\bat\s+([0-9][0-9a-f]{6,39})\b/gi, (reference, hash: string) => /[a-f]/i.test(hash) ? '' : reference)
   .replace(/\b(?:[0-9a-f]{40}|[0-9a-f]{64})\b/gi, '')
   .replace(/`+/g, '')
@@ -141,3 +145,5 @@ export function contractPageHtml(identity: EditionIdentity, run: RunData, contra
     + `${progress}<div class="layout">${kinds}${productTarget}${areaCard}${clauseCard}</div>${judging}${footer}</main>`
   const description = `What ${identity.product} is being built to do, and how much of it the code does today: ${counts.done} of ${counts.total} clauses done, judged on ${date}.`
   return document({ ...identity, band: undefined }, `Roadmap · ${identity.product}`, description, CONTRACT_STYLE, body, CONTRACT_FILTER, homepage?.styles)
+
+}
