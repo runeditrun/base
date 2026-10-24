@@ -5,7 +5,25 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {checkHydration} from './hydration/check.mjs';
+import {hydrationSeed} from './fixtures/hydration.mjs';
 const run=promisify(execFile);
+
+test('the built hydration check accepts an effect-created body child', async t => {
+ const result = await checkHydration(await hydrationSeed(t), { pages: ['/'] });
+ assert.ok(result.loads > 1, 'the baseline and reduced-motion load both complete');
+ assert.ok(result.pages.every(page => !page.skipped), 'React hydrated the built page');
+});
+
+test('the built hydration check rejects a server element that never hydrates', async t => {
+ await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true }), { pages: ['/'] }), error => {
+  assert.equal(error.code, 'hydration_units_failed');
+  assert.equal(error.exitCode, 1);
+  assert.ok(error.failures.length > 0);
+  assert.ok(error.hydration.pages.every(page => !page.skipped));
+  return true;
+ });
+});
 
 // A built seed whose Worker only routes app paths, the way Start entries did before
 // serving assets; `adopted` serves built files and the deploy identity as Base asks.
