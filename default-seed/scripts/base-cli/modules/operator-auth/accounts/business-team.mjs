@@ -50,10 +50,14 @@ export function businessTeam(context) {
       };
       for (const email of new Set([...desired.keys(), ...previous.keys()])) {
         const member = desired.get(email), prior = previous.get(email);
-        let target = await store.byEmail(email);
+        // The roster address is a durable Business key, not the operator's
+        // current sign-in address. Self-service email changes keep this ID.
+        let target = prior ? await store.operator(prior.operatorId) : await store.byEmail(email);
         const oldRole = target?.role;
-        if (email === owner.email || target?.role === 'owner' || target && target.id !== prior?.operatorId || prior && !target) {
-          if (member) rows.push({ email, operatorId: null, invite: member.invite, state: 'conflict' });
+        if (target?.role === 'owner' || !prior && (email === owner.email || target) || prior && !target) {
+          // Never adopt an unrelated account, or discard a recorded identity
+          // because its old address now belongs to another account.
+          if (member || prior) rows.push({ email, operatorId: prior?.operatorId ?? null, invite: member?.invite ?? prior.invite, state: 'conflict' });
           continue;
         }
         if (!member) {
@@ -72,7 +76,7 @@ export function businessTeam(context) {
           // A preceding role write is represented in the read snapshot only;
           // the exact expected version is repeated in its invitation SQL.
           const plan = await administration({ ...context, authenticate: async () => actor })
-            .prepareInvitation(request, { email, displayName: name, role }, { operator: target });
+            .prepareInvitation(request, { email: target?.email ?? email, displayName: name, role }, { operator: target });
           statements.push(...plan.statements);
           audit('operators:invite', plan.mutation.operatorId, 'EXISTS(SELECT 1 FROM oa_tokens WHERE id=?)', [plan.mutation.token.id]);
           pending.push(plan.afterCommit);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g2c72dfae",
+  "cliVersion": "0.2.80-dev.g6f06022a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -269,7 +269,7 @@
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
-      "sha256": "5a6cc8d5895c2996fdaafb3a8ebaf49e8c082ac4a55de3449c08008983a805d2"
+      "sha256": "ac52bac39e7e7e4dace1c22dce370f76df52e7f5bb167730ecfd96b0b7961c86"
     },
     "schema/business-field-inputs.mjs": {
       "source": "onboarding/schema/business-field-inputs.mjs",
@@ -1155,7 +1155,7 @@
     },
     "default-seed/public/rer-theme.css": {
       "source": "default-seed/public/rer-theme.css",
-      "sha256": "670e280580f073bee9236f2bf2ab3165ccf5ccc3499f79ac077c4388105a491f"
+      "sha256": "42eec70939b6361b17927cdcefe025195ad6f7ede8105a00d4d1773d8bdf938a"
     },
     "edition-authoring/adopt.mjs": {
       "source": "edition-authoring/adopt.mjs",
@@ -3003,7 +3003,7 @@
     },
     "modules/operator-auth/accounts/business-team.mjs": {
       "source": "modules/operator-auth/accounts/business-team.mjs",
-      "sha256": "5633b291c3ef4596b95ed70390004a5233a062cdce34498dfe70cce04fa16095"
+      "sha256": "2074b728bc0856a4fb4bc87199944e0f1f30b10da1cf217fef1a456456527ebc"
     },
     "modules/operator-auth/accounts/credentials.mjs": {
       "source": "modules/operator-auth/accounts/credentials.mjs",

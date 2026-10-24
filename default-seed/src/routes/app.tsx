@@ -18,7 +18,6 @@ function AppLayout() {
       <p>Times shown in {business.timezone}</p>
       <a className="business-primary" href="/app/people">Open people</a>
     </section>
-    <style>{`.business-workspace{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin:1rem 0}.business-workspace img{object-fit:contain}.business-workspace h2,.business-workspace p{margin:0}.business-primary{display:inline-block;padding:.6rem 1rem;border-radius:var(--rer-radius,12px);background:var(--rer-business-accent,var(--rer-accent,#334155));color:var(--rer-business-accent-text,var(--rer-accent-text,#fff));font-weight:600}`}</style>
     <Outlet />
   </>
 }

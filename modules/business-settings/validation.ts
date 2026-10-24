@@ -1,5 +1,6 @@
 import { fields, SettingsError } from './types.ts';
 import type { BusinessManifest, SettingsDocument, Trust } from './types.ts';
+import { isBusinessTeamRole } from './role-domain.mjs';
 
 export const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 function fail(): never { throw new SettingsError('invalid_settings'); }
@@ -24,7 +25,7 @@ export function manifest(value: BusinessManifest): BusinessManifest {
   if (block.settings !== 1 || !Array.isArray(block.values) || !block.values.includes('display_name') || new Set(block.values).size !== block.values.length || block.values.some(v => !fields.includes(v))) fail();
   if (block.team !== undefined) {
     const roles = closed(closed(block.team, ['roles']).roles, ['admin', 'member']);
-    if (Object.values(roles).some(role => !text(role, 64) || role.toLowerCase() === 'owner')) fail();
+    if (Object.values(roles).some(role => !isBusinessTeamRole(role))) fail();
   }
   return value;
 }
