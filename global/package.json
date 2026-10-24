@@ -8,6 +8,7 @@
     "rer": "global/rer.mjs"
   },
   "exports": {
+    "./local-run": "./global/local-run/index.mjs",
     "./adapter": "./cli/adapter.mjs",
     "./deploy": "./cli/deploy.mjs",
     "./portability": "./cli/portability.mjs",
@@ -82,6 +83,7 @@
     "./modules/release/publication-scan": "./modules/release/publication-scan.mjs",
     "./modules/release/source": "./modules/release/source.mjs",
     "./modules/release/signature": "./modules/release/signature.mjs",
+    "./modules/release/anchors/production.json": "./modules/release/anchors/production.json",
     "./modules/operator-auth": "./modules/operator-auth/index.mjs",
     "./modules/operator-auth/accounts/native": "./modules/operator-auth/accounts/native.mjs",
     "./modules/operator-auth/dev": "./modules/operator-auth/dev/index.mjs",

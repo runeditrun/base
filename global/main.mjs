@@ -9,6 +9,7 @@ import { repoArguments } from './cli/repository.mjs';
 const help = `Usage: rer VERB [FLAGS]
 
   rer dev <repo> [--dir DIR]      Clone, install, set up a local owner and start the app.
+                                --release TAG|COMMIT selects a verified signed release.
   rer setup <repo> [--dir DIR]    Clone, install and set up, then stop.
   rer install <repo> [--dir DIR]  Clone and install dependencies, then stop.
 ${repositoryHelp}
@@ -40,6 +41,8 @@ else its vendored scripts/rer.mjs.
   rer cli uninstall    Remove the launcher and the install root; ~/.rer is untouched.
   rer update           Move to the latest published rer (--version X for an exact one), the way it
                        was installed: npx and install.sh installs switch atomically, npm installs run npm.
+  rer upgrade          Update this local app to a signed release, keeping owner changes and data.
+                       rer update updates rer itself; rer upgrade updates the app. See --help.
   rer --version        Print this rer's version; inside a checkout, also the version the checkout pins.
   rer queue NAME -- COMMAND [ARGS]
                        Run COMMAND once this computer's job queue admits it (heavy package scripts
@@ -61,6 +64,7 @@ export async function main(argv) {
  // verb never inherits it.
  delete process.env[localDefaults];
  if (verb === 'update') return (await import('./update/command.mjs')).update(argv.slice(1));
+ if (verb === 'upgrade') return (await import('./local-run/command.mjs')).upgradeCommand(argv.slice(1));
  if (verb === 'listing') return (await import('../cli/listing.mjs')).dispatchListing(argv.slice(1));
  if (verb === 'business') return (await import('../cli/business/command.mjs')).businessCommand(argv.slice(1));
  if (verb === 'companion') return (await import('../cli/companion/command.mjs')).companionCommand(argv.slice(1));
@@ -74,6 +78,7 @@ export async function main(argv) {
  if (repositoryCommands[verb] && argv.includes('--help')) {
   const { help } = await import('../cli/parse.mjs');
   process.stdout.write(`${help(verb)}\n${repositoryCommands[verb].usage}\n${repositoryCommands[verb].effects}\n${repositoryHelp}`);
+  if (verb === 'dev') process.stdout.write('Repository flags: --release TAG|COMMIT selects a verified signed release; --anchors FILE supplies community/test publisher anchors.\n');
   return 0;
  }
  try {
