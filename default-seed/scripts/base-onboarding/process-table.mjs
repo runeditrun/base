@@ -2,37 +2,29 @@ import { execFile } from 'node:child_process'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
+import { commandFailure } from './failures.mjs'
 
 const execute = promisify(execFile)
-// One bounded wait for any process inspection; a loaded machine can take over a
-// second to list processes, which must not abort an otherwise healthy cleanup.
-export const inspectionMs = 5000
-// A snapshot taken while processes start or exit can hold a row ps has not yet
-// finished, or ps itself can fail for an instant. Such a read says nothing
-// about ownership; it is repeated within the same bound rather than ending a
-// launch whose own processes are accounted for.
-const transient = (message) => Object.assign(new Error(message), { transient: true })
+// An unreadable inspection is unchecked, never evidence of a live owner or of
+// absence. No individual read may hold a successful command for 30 seconds.
+export const inspectionMs = 3000
+export const isExited = member => /^[ZX]/i.test(member?.state ?? '')
+const transient = message => Object.assign(new Error(message), { transient: true })
 const retryMs = 10
-// A busy machine can starve ps, or this process, past the ordinary bound while
-// the read itself is healthy; its finished output can even be queued behind
-// the deadline timer. Such a read is not a failure of the caller's work: the
-// same in-flight read is awaited for a bounded extension, with a warning, and
-// only an inspection that also outlives the extension fails.
-export const extensionMs = 25000
-async function withinBound(timeout, attempt, extension = extensionMs) {
-  const deadline = Date.now() + timeout + extension
-  const slow = setTimeout(() => process.emitWarning(
-    `Process inspection is taking longer than ${timeout} ms on a busy machine; waiting up to ${extension} ms more.`,
-    { code: 'RER_PROCESS_INSPECTION_SLOW' }), timeout)
-  slow.unref()
+async function withinBound(timeout, attempt) {
+  const deadline = Date.now() + Math.min(timeout, inspectionMs)
+  let timer
+  const unchecked = () => commandFailure('Process inspection is unchecked: the process table could not be read within its bound. No unverified process was signalled.', { ownershipUnchecked: true })
   try {
-    for (;;) {
-      try { return await attempt(Math.max(1, deadline - Date.now())) } catch (error) {
-        if (!error.transient || Date.now() + retryMs >= deadline) throw error
-        await delay(retryMs)
+    return await Promise.race([(async () => {
+      for (;;) {
+        try { return await attempt(Math.max(1, deadline - Date.now())) } catch (error) {
+          if (!error.transient || Date.now() + retryMs >= deadline) throw unchecked()
+          await delay(retryMs)
+        }
       }
-    }
-  } finally { clearTimeout(slow) }
+    })(), new Promise((_, reject) => { timer = setTimeout(() => reject(unchecked()), Math.max(1, deadline - Date.now())) })])
+  } finally { clearTimeout(timer) }
 }
 export const validPid = (pid) => Number.isSafeInteger(pid) && pid > 0 && pid <= 0x7fffffff
 
@@ -137,7 +129,7 @@ async function psIdentity(pid, timeout) {
 
 // `read` is the process edge: it returns the table or throws; tests supply a
 // failing one.
-export async function readProcessTable(timeout = inspectionMs, pgid, read = processGroup, extension = extensionMs) {
+export async function readProcessTable(timeout = inspectionMs, pgid, read = processGroup) {
   if (!(timeout > 0)) throw new Error('Process inspection deadline expired.')
   return withinBound(timeout, async (remaining) => {
     const controller = new AbortController()
@@ -150,7 +142,7 @@ export async function readProcessTable(timeout = inspectionMs, pgid, read = proc
         }, remaining)
       })])
     } finally { clearTimeout(timer) }
-  }, extension)
+  })
 }
 
 // Custody follows a process lifetime: exec changes its executable name without

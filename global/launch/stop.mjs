@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { rm } from 'node:fs/promises';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
-import { readProcessTable, sameBirth } from '../../onboarding/process-table.mjs';
+import { isExited, readProcessTable, sameBirth } from '../../onboarding/process-table.mjs';
 import { delegate } from '../delegate.mjs';
 import { liveServers } from '../registry.mjs';
 import { serverStatus } from '../../cli/server-registry.mjs';
@@ -90,7 +90,7 @@ async function exited(processes, within) {
  const deadline = Date.now() + within;
  for (;;) {
   const table = processes.length ? await readProcessTable() : [];
-  const left = processes.filter(item => table.some(entry => sameBirth(item, entry) && !entry.state.startsWith('Z')));
+  const left = processes.filter(item => table.some(entry => sameBirth(item, entry) && !isExited(entry)));
   if (!left.length || Date.now() >= deadline) return left;
   await delay(250);
  }
