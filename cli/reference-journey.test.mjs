@@ -232,7 +232,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const second=events(await f.run(['export','--output','exports/second.rer','--json'])).at(-1);
  assert.equal(restored.contentHash,first.contentHash);
  const secondArchive=archiveRecords(await readFile(join(f.root,'exports/second.rer'),'utf8'));
- const expectedSecond=await remakeArchive(firstArchive,{items:archiveItems(firstArchive).map(item=>item.table==='oa_auth_settings'?{...item,row:{...item.row,generation:item.row.generation+1}}:item)});
+ const expectedSecond=await remakeArchive(firstArchive,{schema:firstArchive[0].schema,items:archiveItems(firstArchive).map(item=>item.table==='oa_auth_settings'?{...item,row:{...item.row,generation:item.row.generation+1}}:item)});
  assert.deepEqual(archiveItems(secondArchive),archiveItems(expectedSecond),'re-export changes only the provider authority generation');
  assert.equal(second.contentHash,expectedSecond.at(-1).contentHash);
  assert.deepEqual(second.tables,first.tables);assert.equal(second.objects,first.objects);assert.equal(second.payloads,first.payloads);
