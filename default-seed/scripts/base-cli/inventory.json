@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.82-dev.g54a58698",
+  "cliVersion": "0.2.82-dev.ged378e1b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1175,7 +1175,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "00c4fe983f68e14bba929736bc5076c2dfaba92f7f2333bb5195d73aaacfe108"
+      "sha256": "418e4d85c68ad8b3f48f2d3ac1c9ac7d740ba7c899fb90d6aeff70da5c42b198"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1183,11 +1183,11 @@
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
-      "sha256": "13c496ca83782e35e9d3cfd5efba88446779e544e920137defb7b051ec937190"
+      "sha256": "2d6b485155154f68d1f27c57bd3f78a140dd052ab2abbccdd6ffa029032f2329"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
-      "sha256": "9dfb5940c9b793cca5ddf9556b756c81046a371a16a10c5b869487172a6c25ae"
+      "sha256": "1371f01fe2686c8d21cf0f0e4654666d58b5416b63c2f0c988a0636062899761"
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",

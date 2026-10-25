@@ -95,3 +95,60 @@ export function completeAuthoringCopies(root, plans, {tree, revision}) {
     plan.sources.push([source, entry]);
   }
 }
+
+// Inspect the completed plan without creating, truncating, chmodding or removing
+// anything. This catches known filesystem obstructions, not failures that arise
+// after preflight (concurrent changes, exhausted space or I/O failures).
+export function preflightRefresh(root, plans, recordPath) {
+  const writes = new Set([recordPath, ...plans.flatMap(({copy, sources}) =>
+    sources.map(([source]) => copy.path + source.slice(copy.originPath.length)))]);
+  // Acknowledgements live in the copy record. An existing source lock must also
+  // remain writable, although refresh does not regenerate it.
+  if (fs.existsSync(path.join(root, 'sources.lock.json'))) writes.add('sources.lock.json');
+  const removals = plans.flatMap(plan => plan.removed).filter(name => !writes.has(name));
+  const uid = process.geteuid?.(), entries = new Map();
+  const writable = (target, stat, directory = false) => {
+    // Root's DAC bypass must not turn explicitly read-only inputs into writes.
+    if (uid === 0 && !(stat.mode & 0o222)) throw Error('no write permission bits');
+    fs.accessSync(target, fs.constants.W_OK | (directory ? fs.constants.X_OK : 0));
+  };
+  const inspect = name => {
+    safe(name);
+    let parent = root, parentStat = fs.lstatSync(root);
+    const parts = name.split('/');
+    for (const [index, part] of parts.entries()) {
+      if (!entries.has(parent)) entries.set(parent, fs.readdirSync(parent));
+      const variant = entries.get(parent).find(entry => entry !== part && entry.toLowerCase() === part.toLowerCase());
+      if (variant) throw Error(`case-variant destination exists: ${path.relative(root, path.join(parent, variant))}`);
+      const target = path.join(parent, part);
+      let stat;
+      try { stat = fs.lstatSync(target); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+      if (stat?.isSymbolicLink()) throw Error(`symlink in destination path: ${path.relative(root, target)}`);
+      if (!stat || index === parts.length - 1) return {target, stat, parent, parentStat};
+      if (!stat.isDirectory()) throw Error(`directory required at ${path.relative(root, target)}`);
+      parent = target; parentStat = stat;
+    }
+  };
+  for (const name of new Set([...writes, ...removals])) {
+    try {
+      const {target, stat, parent, parentStat} = inspect(name);
+      if (!writes.has(name) && !stat) continue;
+      if (stat && !stat.isFile()) throw Error('destination is not a regular file');
+      // This is also the nearest existing ancestor of any missing directories.
+      writable(parent, parentStat, true);
+      if (stat && uid !== undefined && uid !== 0 && (parentStat.mode & 0o1000) && uid !== parentStat.uid && uid !== stat.uid) {
+        throw Error('sticky directory prevents replacing the directory entry');
+      }
+      if (stat && writes.has(name)) {
+        writable(target, stat);
+        // The write loop sets the delivered mode as well as the bytes.
+        if (uid !== undefined && uid !== 0 && uid !== stat.uid) throw Error('file is owned by another user; cannot set its mode');
+        const fd = fs.openSync(target, fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW ?? 0));
+        fs.closeSync(fd);
+      }
+    } catch (error) {
+      throw Error(`Cannot refresh ${name}: ${error.message}. Fix the named path and its parent permissions before refreshing; no files were refreshed.`);
+    }
+  }
+}
