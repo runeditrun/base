@@ -17,7 +17,8 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
   const locate = name => plans.find(({copy}) => Object.hasOwn(copy.files, name) || copy.path === name || name.startsWith(copy.path + '/'));
   const enqueue = (plan, source, name, bytes, boundary, depth, adapted = false, pin = plan.copy.revision, imported = false) => {
     const previous = scheduled.get(name);
-    const item = previous || {plan, source, name, bytes, boundary, depth, adapted, pin};
+    const item = previous || {plan, source, name, bytes, boundary, depth, adapted, pin,
+      newlyAdopted: !adapted && !local(name) && !Object.hasOwn(plan.copy.files, name)};
     scheduled.set(name, item);
     // Runtime source has its own TS resolution and seed-sibling policy.
     const kind = isCode(item.source, item.bytes, imported);
@@ -62,12 +63,12 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
     }
     for (const specifier of specifiers) {
       let source, name;
+      const fail = reason => problems.add(`${importer.name} imports ${specifier}: ${reason} (${source ?? specifier}). Review and materialize the dependency, then run record-base ${quote(name ?? specifier)} ${quote(source ?? specifier)} ${revision}${recordPath === 'base-copies.json' ? '' : ' --record ' + quote(recordPath)}.`);
       try {
         source = path.posix.relative('/repository', fileURLToPath(new URL(specifier, pathToFileURL('/repository/' + importer.source))));
         name = path.posix.relative('/repository', fileURLToPath(new URL(specifier, pathToFileURL('/repository/' + importer.name))));
         safe(source); safe(name);
-      } catch { throw Error(`Cannot resolve relative Base import ${specifier} in ${importer.name}; no files were changed.`); }
-      const fail = reason => problems.add(`${importer.name} imports ${specifier}: ${reason} (${source}). Review and materialize the dependency, then run record-base ${quote(name)} ${quote(source)} ${revision}${recordPath === 'base-copies.json' ? '' : ' --record ' + quote(recordPath)}.`);
+      } catch { fail(`Cannot resolve relative Base import ${specifier} in ${importer.name}`); continue; }
       const existing = scheduled.get(name);
       if (existing) {
         // The destination's own copy mapping is authoritative. A seed may
@@ -77,10 +78,16 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
       }
       const entry = next.get(source), owner = locate(name);
       if (owner && Object.hasOwn(owner.copy.files, name)) { fail('recorded file was removed or kept out; it will not be restored'); continue; }
-      if (!within(source, importer.boundary)) { fail('outside the copied origin directory'); continue; }
-      noLinks(root, name);
+      const outside = !within(source, importer.boundary);
+      // Only source this refresh newly adopts can bring previously unselected
+      // Base helpers across its origin boundary. Existing seed source retains
+      // that boundary, and each new helper gets the same guarded permission.
+      if (outside && !importer.newlyAdopted) { fail('outside the copied origin directory'); continue; }
+      try { noLinks(root, name); }
+      catch (error) { fail(error.message); continue; }
       if (fs.existsSync(path.join(root, name)) && !files.get(name)?.regular) { fail('destination is not a regular seed file'); continue; }
       if (local(name) && (!entry || local(name) !== read.digests([entry.object]).get(entry.object))) {
+        if (outside) { fail('destination contains seed-owned bytes'); continue; }
         // Preserve seed-owned bytes, but parse their actual graph so presence
         // cannot conceal a missing dependency. They cannot adopt new Base files.
         const content = files.get(name).read();
@@ -96,7 +103,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
       // A file excluded at the pin, deleted locally, ignored, or owned by the
       // seed is never silently adopted, even if a new importer requires it.
       const pinned = read.tree(owner ? owner.copy.revision : importer.pin);
-      if (pinned.has(source) && !local(name)) { fail('file was kept out at the copy pin'); continue; }
+      if ((!outside || owner) && pinned.has(source) && !local(name)) { fail('file was kept out at the copy pin'); continue; }
       if ((record.ignore || []).some(prefix => name === prefix || name.startsWith(prefix + '/'))) { fail('file is explicitly ignored'); continue; }
       const content = read.blobs([entry.object]).get(entry.object);
       if (fs.existsSync(path.join(root, name)) && !local(name)) { fail('destination is outside the seed file inventory'); continue; }
