@@ -17,6 +17,7 @@
 
 - For a Base-equal untracked, ignored or excluded authoring helper, the suggested `git add -f` followed by refresh can leave `verify-base` reporting `unrecordedCopies`; from the seed root, run `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base LOCAL_PATH ORIGIN_PATH FULL_40_HEX_COMMIT --base /absolute/base-checkout`, then the same entry's `verify-base --base /absolute/base-checkout`. Corrected refusal text ships in 0.2.83.
 - On case-insensitive APFS, the suggested `mv -i` for a Base-equal committed `Copy-Checkout.mjs` can leave the old Git index spelling, so refresh succeeds but verification fails; move its `.refresh-backup` outside the checkout, run `git rm --cached -- PATH/Copy-Checkout.mjs` and `git add -- PATH/copy-checkout.mjs base-copies.json`, then verify again. This preserves both the backup and delivered bytes; corrected refusal text ships in 0.2.83.
+- Show Assisted at US$10/month and Managed at US$100/month, labelled early access, with global billing on the Run chooser.
 
 ## 0.2.81
 

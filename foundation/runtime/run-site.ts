@@ -79,14 +79,14 @@ export const PATHS = {
     pasteTitle: 'Now paste it into your terminal.', note: 'A first start takes a few minutes.',
   },
   assisted: { title: 'Assisted', lead: 'We set it up with you and keep it updated.',
-    rest: 'It stays yours, on your computer or your own cloud.', price: 'US$11 a month, GST included', action: 'Set it up with us' },
+    rest: 'It stays yours, on your computer or your own cloud.', price: 'US$10/month', action: 'Set it up with us' },
   managed: { title: 'Managed', lead: 'We run it for you.',
-    rest: 'Nothing to install.', price: 'US$110 a month, GST included', action: 'Have us run it' },
+    rest: 'Nothing to install.', price: 'US$100/month', action: 'Have us run it' },
   entry: (plan: 'assisted' | 'managed', product: string) =>
     `https://app.runeditrun.com/?${new URLSearchParams({ product, plan })}`,
   closed: { chip: 'By request', line: 'For now, sign-ups are by request.', action: 'Request access' },
   signups: 'request' as 'request' | 'app',
-  paidNote: 'Paid plans need an Australian billing address for now.',
+  priceNote: 'early access',
   business: { lead: 'Setting up several tools?', action: 'Set up your business once',
     href: (seed: string, hosting?: 'free' | 'assisted' | 'managed') =>
       `https://app.runeditrun.com/business/new?${new URLSearchParams({ seed, ...(hosting ? { hosting } : {}) })}` },
@@ -188,7 +188,7 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
   const doors = (['assisted', 'managed'] as const).map(id => {
     const path = PATHS[id], closed = PATHS.signups === 'request' || run.paths.product === null || run.paths[id]?.open === false
     return `<section class="door ${id}" aria-labelledby="${id}"><div class="door-heading"><h2 id="${id}">${escape(path.title)}</h2>${closed ? `<span class="chip">${escape(PATHS.closed.chip)}</span>` : ''}</div>`
-      + `<p class="door-body">${escape(path.lead + ' ' + (closed ? PATHS.closed.line : path.rest))}</p><p class="price">${escape(path.price)}</p><p class="door-action">${action(PATHS.entry(id, product), closed ? PATHS.closed.action : path.action)}</p></section>`
+      + `<p class="door-body">${escape(path.lead + ' ' + (closed ? PATHS.closed.line : path.rest))}</p><p class="price">${escape(path.price)} · ${escape(PATHS.priceNote)}</p><p class="door-action">${action(PATHS.entry(id, product), closed ? PATHS.closed.action : path.action)}</p></section>`
   }).join('')
   const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>${escape(PATHS.heading(run.name))}</h1></div><div class="chooser">`
     + `<section class="self" aria-labelledby="self"><div class="self-heading"><span class="badge">${escape(self.badge)}</span><h2 id="self">${escape(self.title)}</h2><p class="self-body">${escape(self.body(run.name))}</p></div>`
@@ -197,7 +197,7 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
     + `<p class="alt"><span>${escape(self.alt)}</span>${inlineStart(run)}</p><p class="requirements">${escape(self.requirements)}${run.paths.requirementsExtra ? ' ' + escape(run.paths.requirementsExtra) : ''}</p><p class="email-note">${escape(self.email)}</p>`
     + `<div class="timeline">${stops([self.start, ...steps])}<span class="track-divider" aria-hidden="true"></span><p class="track-note">${escape(self.note)}</p></div>`
     + (run.docs ? `<p class="guide">${action(self.guide.href(slug), self.guide.label)}</p>` : '')
-    + `</section><div class="doors">${doors}</div><div class="quiet"><p>${escape(PATHS.paidNote)}</p><p>${escape(PATHS.business.lead)} ${action(PATHS.business.href(product), PATHS.business.action)}</p></div>`
+    + `</section><div class="doors">${doors}</div><div class="quiet"><p>${escape(PATHS.business.lead)} ${action(PATHS.business.href(product), PATHS.business.action)}</p></div>`
     + `<footer class="facts"><p>${escape(PATHS.facts.source)} <a href="${escape(run.repository)}">${escape(run.repository.replace(/^https:\/\//, ''))}</a> · ${escape(run.licence)} ${escape(PATHS.facts.licence)}</p></footer></div></main>`
   return document(identity, PATHS.title(run.name), PATHS.meta(run.name), RUN_CHOOSER, body, COPY_SCRIPT, homepage?.styles)
 }
