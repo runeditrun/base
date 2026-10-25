@@ -10,14 +10,18 @@ const usage = `Usage: rer business VERB
   connect [--code CODE] [--origin URL]
                                  Pair this computer, waiting until the owner approves in the browser
                                  (up to the code's 10 minutes); run it again to resume
-  run [--once]                   Run consented local discovery; vendor upload integration pending
-  next                           Return one templated question or nothing yet within 60 seconds
+  run [--once]                   Work this computer's tasks: the folder scan the owner allows, then
+                                 later tasks (vendor exports are not available yet). Says what it is
+                                 doing and waiting for; applies the owner's choices at each check-in
+  next                           Apply the owner's choices, then return one templated question or
+                                 nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
                                  Catalog vendor or none; uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
-  disconnect                     Revoke this computer, then remove local credentials and additions
+  disconnect                     Revoke this computer, then remove local credentials and additions;
+                                 inside an agent sandbox it names the one command that finishes
 Vendors: sentry, uptimerobot, pagerduty, calendly. Owner approvals stay in the browser.
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".

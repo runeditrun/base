@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g8005fe10",
+  "cliVersion": "0.2.80-dev.g73b49bb8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -413,9 +413,13 @@
       "source": "cli/business/api.mjs",
       "sha256": "5848496a76ef1bf8b011bbeff66187ec75a5a7674a5860a91854acb489da47f9"
     },
+    "cli/business/choices.mjs": {
+      "source": "cli/business/choices.mjs",
+      "sha256": "f784b01a360db8f9201bfbec814becb7d7f6b9bc182c8a93d0c16fc4a471b01f"
+    },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "791897875d8d1c5b8159cd35e33ee556e45d8674bea3e7643ae7c7b79b3fffcf"
+      "sha256": "f9e98698b09d7d7ad2a5413804c55be96b4b5a1dcf8a7a32ab0ab8e74f8bd7cf"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -423,7 +427,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "9577b46cdf50a9415a58e791920b029193e019ff3e74c7eef60791fb17239e3f"
+      "sha256": "2fe4b5cf3fa42ac0e6fa7c755968ab4a8deb530d509f5fbcbd37dfd6c904ffa9"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -431,7 +435,7 @@
     },
     "cli/business/device.mjs": {
       "source": "cli/business/device.mjs",
-      "sha256": "addfc17f535398a40aa8dadc66ad3ac1311a9f314d7b6716ccbfffe6286fb857"
+      "sha256": "716f1c32cb9e3fb8834f626540078e9423c80a922283e220c4e80336fce8f1f6"
     },
     "cli/business/discovery-task.mjs": {
       "source": "cli/business/discovery-task.mjs",
@@ -447,11 +451,11 @@
     },
     "cli/business/invocation.mjs": {
       "source": "cli/business/invocation.mjs",
-      "sha256": "ce7843af8f88a4febcdfaf95705db4fbfc42b29383ec43599a2c97b54cc01865"
+      "sha256": "7e48ff9ba33927c3f86313b91b57d7fa2743503f192eedb9083c75a95eaffe9a"
     },
     "cli/business/keychain.mjs": {
       "source": "cli/business/keychain.mjs",
-      "sha256": "c4c4b5e9385cb87743bdb27dad60f3659dbae1877cebb589ef7acd71ee8bb21b"
+      "sha256": "ef631d78bc357fb8c8bfd96aa00994d5a01f23f43faed01fa47a0d6f2415a99c"
     },
     "cli/business/lease.mjs": {
       "source": "cli/business/lease.mjs",
@@ -459,11 +463,7 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "d11825b2f97efdd4fa806e82f79500ce1b2d77de34d0ae5c458028a6a74b8905"
-    },
-    "cli/business/opt-ins.mjs": {
-      "source": "cli/business/opt-ins.mjs",
-      "sha256": "c967f339730c8c9bb1d9b1a59ab7fb6d66486b73488596bd557ddc647b42f3b8"
+      "sha256": "0e1a2b551716cec800d850a9a87527cbc2483ed73184337b7896959f8a649a36"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -499,7 +499,7 @@
     },
     "cli/business/permissions.mjs": {
       "source": "cli/business/permissions.mjs",
-      "sha256": "11e51ec3be4318899e12a2b676d6721cc8336d68fb2bf14fbb7487b2cd481fd7"
+      "sha256": "cff198274fc3270c7c7f5995a1b07e1805c7dd17c98268819d1b3150631a42aa"
     },
     "cli/business/policy.mjs": {
       "source": "cli/business/policy.mjs",
@@ -511,7 +511,7 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "ff5e8055e3a2fc09c338539572528b615a182b0f0ab42564e3aec2251793484e"
+      "sha256": "0c20997aa9a1023c9732179636d7cf90086bf42de22aa63b83715168b633ff2e"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",
@@ -531,11 +531,11 @@
     },
     "cli/business/state.mjs": {
       "source": "cli/business/state.mjs",
-      "sha256": "8ef081cd97c3f1253703318974fed6e0013d5fee30fbda0d39eb2bf2febc1115"
+      "sha256": "4228137636dd0b6f3f7d2e6581524fe23c35045b2c0016edab4dc1c83feb1d9c"
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "aba5214e581d25e50bc25b6b6588ef4f6a575873c86e877e449ada53d69a892b"
+      "sha256": "72279a8eeebcf7d42773eb34c1af463d2132ae280f0ede18ecce8f315983a616"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

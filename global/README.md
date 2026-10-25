@@ -458,7 +458,12 @@ service). Connect reads them as `optIns` from device-authenticated
 `awakeConsent` and `installService`; the CLI prints only the sentences. Only
 `true` enables an option. Undecided (`null`) options are listed with a browser
 link; an older server without this route (it answers 403 or 404) leaves all
-options undecided. Run connect again after the owner decides. The first
+options undecided. Connect never has to run again after the owner decides:
+`rer business run` (at every check-in) and `rer business next` read the choices
+again, apply each one that changed (a `false` removes what an earlier `true`
+added) and print which choices they applied. A choice this session cannot apply,
+such as Claude Code rules in `~/.claude` from inside an agent sandbox, is named
+with its cause and tried again at the next check-in. The first
 device-authenticated request happens after both the credential and local
 pairing state are stored, so a storage failure cannot activate the computer.
 A service installed with `RER_BUSINESS_STATE_DIR` set keeps that folder. Background
@@ -474,7 +479,11 @@ run outside the sandbox (in Codex, approve running that command outside the
 sandbox when it asks); later commands
 only read the credential and run inside the sandbox. Do not install a
 background service or change user settings unless the owner enables those
-options and the sandbox permits their locations.
+options and the sandbox permits their locations. Inside that sandbox macOS also
+refuses to remove the Keychain item (`security` exits 161 and leaves it), so
+`disconnect` revokes on the server, exits 0, says "revoked on the server; the
+local credential is still stored" and names the one command that removes it when
+run outside the sandbox; until then `status` says revoked, never paired.
 
 `rer business vendor-key add sentry` requires hidden credential entry in a
 terminal, stores it in the OS keychain and prints only `sentry:read`.
@@ -500,7 +509,12 @@ device through device-authenticated `DELETE /api/business/executors/self` before
 removing its service, device and vendor credentials, state and introduced Claude
 rules, preserving preexisting settings and unrelated edits. It says "Device
 revoked" only after the server confirms (`{"revoked":true}`, or 401 for a device
-already revoked). A server without that route (403 or 404) leaves the computer
+already revoked). If this session may not remove the credential, a key, the
+service or the rules after the server revoked the computer, disconnect still
+exits 0: it names what is left and the one command (with
+`RER_BUSINESS_STATE_DIR` when set) that finishes outside the agent sandbox, and
+keeps only that record, so `status` and every other command say revoked. A
+server without that route (403 or 404) leaves the computer
 connected: disconnect says so, names the browser page to revoke it in and keeps
 everything for a later disconnect. Any other failure exits 1 and also keeps the
 credential for a retry. With no stored device credential, nothing is sent and
@@ -512,7 +526,13 @@ completion checks. Only the browser consent's paths are scanned. Names-only
 snapshots and page boundaries are saved privately so a killed supervisor can
 resume from its server checkpoint without rescanning a changed tree. Snapshots
 are removed after completion. A missing snapshot for an acknowledged page is
-an explicit error. Revocation stops the supervisor on its next 401.
+an explicit error. Revocation stops the supervisor on its next 401; it then
+removes the device credential if it may and `status` says revoked. While it
+waits, `run` says what for: the owner's permission to scan the folder connect
+ran in (with the Your tools link) until this computer's scan is done, then the
+owner's next step. It removes `run.lock` on every exit, including Ctrl-C,
+SIGTERM and a closed terminal (SIGHUP); a lock whose process is gone, or that
+has not been refreshed for two minutes, is cleared on the next start.
 
 **Remaining export blockers:** grants for linked, configured targets now resolve
 to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare
