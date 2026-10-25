@@ -31,21 +31,33 @@ async function processInfoWithin(pid, timeout = inspectionMs) {
 async function inspectProcess(pid, timeout) {
   if (process.platform === 'linux') {
     const signal = AbortSignal.timeout(timeout);
-    let stat;
-    try {
-      stat = await readFile(`/proc/${pid}/stat`, { encoding: 'utf8', signal });
-    } catch (error) { if (error.code === 'ENOENT' || error.code === 'ESRCH') return null; throw error; }
-    // Only an absent PID stat proves exit. Missing global boot metadata or a
-    // vanished/unreadable command is an unchecked identity, never group custody.
+    // The PID's own stat names its lifetime (start ticks); only that stat proves exit.
+    const lifetime = async () => {
+      let stat;
+      try {
+        stat = await readFile(`/proc/${pid}/stat`, { encoding: 'utf8', signal });
+      } catch (error) { if (error.code === 'ENOENT' || error.code === 'ESRCH') return null; throw error; }
+      const fields = stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/);
+      if (!stat.startsWith(`${pid} (`) || !stat.includes(') ') || !/^\d+$/.test(fields[19] ?? ''))
+        throw Error('Invalid process identity');
+      return { start: fields[19], zombie: /^[ZX]$/i.test(fields[0]) };
+    };
+    const born = await lifetime();
+    if (!born) return null;
+    // Missing global boot metadata, or an unreadable command of a process still
+    // present, is an unchecked identity, never group custody. An init (a
+    // container's --init reaps at once) may reap the process between these reads:
+    // it has exited only if its stat is now absent or names another lifetime.
     const [boot, command] = await Promise.all([
       readFile('/proc/sys/kernel/random/boot_id', { encoding: 'utf8', signal }),
-      readFile(`/proc/${pid}/cmdline`, { encoding: 'utf8', signal }),
+      readFile(`/proc/${pid}/cmdline`, { encoding: 'utf8', signal }).catch(async error => {
+        if (['ENOENT', 'ESRCH'].includes(error.code) && (await lifetime())?.start !== born.start) return null;
+        throw error;
+      }),
     ]);
-    const fields = stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/);
-    if (!stat.startsWith(`${pid} (`) || !stat.includes(') ') || !/^\d+$/.test(fields[19] ?? '') || !boot.trim())
-      throw Error('Invalid process identity');
-    return { pid, start: `${boot.trim()}:${fields[19]}`, zombie: /^[ZX]$/i.test(fields[0]),
-      title: command.replace(/\0/g, ' ').trim() };
+    if (command === null) return null;
+    if (!boot.trim()) throw Error('Invalid process identity');
+    return { pid, start: `${boot.trim()}:${born.start}`, zombie: born.zombie, title: command.replace(/\0/g, ' ').trim() };
   }
   if (process.platform !== 'darwin') throw Error('Job queue supports macOS and Linux');
   try {
