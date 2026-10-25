@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { credentialHandle } from './business/state.mjs';
+import { serverRegistry } from './server-registry.mjs';
 import { deployEnvironment } from './deploy-inputs.mjs';
 import { ownerPlan } from '../modules/deploy-kit/owner.mjs';
 import { renderConfig, bindingsFor } from '../modules/deploy-kit/render.mjs';
@@ -53,7 +54,7 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  const unpaired = await command();
  assert.equal(unpaired.code, 2); assert.match(unpaired.output, /rer business connect/);
  const requests = [], device = 'bz_device_' + randomUUID(), token = 'bz_task_' + randomUUID();
- let origin, rev = 1, adopted = true, tamper = false, apps = [{ app: 'notes-one', seed: 'notes', hosting: 'self_host' }];
+ let origin, rev = 1, adopted = true, platformShape = false, tamper = false, apps = [{ app: 'notes-one', seed: 'notes', hosting: 'self_host' }];
  const platform = createServer(async (req, res) => {
   let body = ''; for await (const chunk of req) body += chunk;
   requests.push({ path: req.url, scoped: req.headers.authorization === `Bearer ${token}` });
@@ -64,7 +65,7 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
   }
   assert.equal(req.headers.authorization, `Bearer ${token}`);
   if (req.url === '/api/business/executors/apps') return json(200, apps);
-  if (!adopted) return json(409, { error: 'business_settings_not_adopted' });
+  if (!adopted) return json(409, platformShape ? { error: 'This app has not adopted Business settings', code: 'business_settings_not_adopted', requestId: 'request-409' } : { error: 'business_settings_not_adopted' });
   const settings = await signSettings(testDocument({ rev, iss: origin, sub: 'business/notes-one', business: 'business', email: 'audit@example.test' }));
   json(200, { settings: tamper ? settings.slice(0, -8) + 'AAAAAAAA' : settings, logo: null,
    trust: { v: 1, issuer: origin, audience: 'self-host', subject: 'business/notes-one', email: 'audit@example.test', keys: fixtureKeys } });
@@ -109,8 +110,13 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  await assert.rejects(stat(join(root, '.rer/business.json')), { code: 'ENOENT' });
  await assert.rejects(stat(join(root, '.rer/business-runtime.json')), { code: 'ENOENT' });
  assert.equal(await readFile(join(root, '.dev.vars'), 'utf8'), privateFile); tamper = false;
+ // The listener on the saved port is not this checkout's running app until it is registered.
+ const stopped = await command(); assert.equal(stopped.code, 0, stopped.output); assert.equal(received, 0);
+ const registry = await serverRegistry(root, { env }); t.after(() => registry.close());
+ await registry.reserve('dev', {}); await registry.update({ url: `http://127.0.0.1:${app.address().port}` });
  const applied = await command(); assert.equal(applied.code, 0, applied.output); assert.equal(received, 1); assert.match(applied.output, /rev 1/);
  rev = 2; assert.equal((await command('--app', 'notes-one')).code, 0); assert.equal(received, 2);
+ await registry.close();
  const config = await readFile(join(root, '.rer/business-runtime.json'), 'utf8');
  const membership = await readFile(join(root, '.rer/business.json'), 'utf8');
  assert.equal((await stat(join(root, '.rer/business.json'))).mode & 0o777, 0o600);
@@ -133,6 +139,7 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  await writeFile(join(root, '.rer/business-runtime.json'), config, { mode: 0o600 });
  adopted = false;
  const notAdopted = await command(); assert.equal(notAdopted.code, 1);
+ platformShape = true; assert.equal((await command()).output, notAdopted.output); platformShape = false;
  assert.equal(await readFile(join(root, '.rer/business-runtime.json'), 'utf8'), config);
  assert.equal(await readFile(join(root, '.rer/business.json'), 'utf8'), membership);
  assert.ok(requests.filter(row => row.path !== '/api/business/executors/token').every(row => row.scoped));
@@ -147,7 +154,7 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  await assert.rejects(stat(join(root, '.rer/business-runtime.json')), { code: 'ENOENT' });
  assert.equal(await readFile(join(root, '.dev.vars'), 'utf8'), privateFile);
  assert.ok(!/audit@example|bz_device_|bz_task_|eyJhbGci|RER_OPEN/.test(transcript.join('') + config + membership));
- for (const [label, result] of [['unpaired', unpaired], ['multiple', multiple], ['none', none], ['not-adopted', notAdopted], ['wrong-app', wrongApp], ['invalid-signature', invalidDocument], ['different-business', connected], ['replace-without-terminal', noTerminal], ['applied', applied], ['leave', left]]) t.diagnostic(`${label} exit=${result.code}: ${result.output.trim()}`);
+ for (const [label, result] of [['unpaired', unpaired], ['multiple', multiple], ['none', none], ['not-adopted', notAdopted], ['wrong-app', wrongApp], ['invalid-signature', invalidDocument], ['different-business', connected], ['replace-without-terminal', noTerminal], ['app-stopped', stopped], ['applied', applied], ['leave', left]]) t.diagnostic(`${label} exit=${result.code}: ${result.output.trim()}`);
  t.diagnostic(`sync rev 1 and 2 acknowledged; ${requests.length} platform requests; scoped reads; trust before=false after=true in dev, plan and Worker bindings; private canary absent before/after; offline files unchanged; refusals and leave passed`);
 
  // Exercise the real maintained app and managed-server readiness hook offline.

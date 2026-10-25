@@ -12,25 +12,46 @@ export function originUrl(value = 'https://app.runeditrun.com') {
 }
 
 // The server's own reason travels with its status: platform errors answer
-// {error, requestId}. It is shown as one bounded line of text, never as markup.
+// {error: message, code, requestId}, older ones {error: code}. The message is
+// shown as one bounded line of text, never as markup; callers match the code.
 export class ApiError extends Error {
- constructor(status, reason = null, requestId = null) {
+ constructor(status, reason = null, requestId = null, code = null) {
   const said = reason ? ` The server said: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
   const reference = requestId ? ` Reference ${requestId}.` : '';
   super((status === 401 ? 'Business pairing was revoked or expired. Reconnect in your browser.' : `Business server refused the request (HTTP ${status}).`) + said + reference);
-  this.status = status; this.reason = reason; this.requestId = requestId;
+  this.status = status; this.reason = reason; this.requestId = requestId; this.code = code;
  }
 }
 
-async function refusal(response) {
+async function refusal(response, signal) {
  let text = '';
- try { text = (await response.text()).slice(0, 4096); } catch { /* The status alone is the reason. */ }
+ try { text = (await readBody(response, signal, 4096)).text; } catch { /* The status alone is the reason. */ }
  let body = null;
  try { body = JSON.parse(text); } catch { /* A plain-text reason is used as it is. */ }
  const line = value => typeof value === 'string' && value.trim() ? redact(value).replace(/\s+/g, ' ').trim().slice(0, 300) : null;
+ const closed = value => typeof value === 'string' && /^[a-z][a-z0-9_]{0,79}$/.test(value) ? value : null;
  const reason = body && typeof body === 'object' ? line(body.error) ?? line(body.message) : /^\s*</.test(text) ? null : line(text);
  const requestId = body && typeof body === 'object' && typeof body.requestId === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(body.requestId) ? body.requestId : null;
- return new ApiError(response.status, reason, requestId);
+ return new ApiError(response.status, reason, requestId, body && typeof body === 'object' ? closed(body.code) ?? closed(body.error) : null);
+}
+
+// Fetch links its abort signal to a response body only weakly: once the
+// request object is collected, an abort no longer reaches a stalled body. The
+// body is read through a reader that the caller's signal cancels directly.
+export async function readBody(response, signal, limit) {
+ if (!response.body) return { text: '', over: false };
+ const reader = response.body.getReader(), cancel = () => { reader.cancel(signal.reason).catch(() => {}); };
+ if (signal.aborted) cancel(); else signal.addEventListener('abort', cancel, { once: true });
+ try {
+  const chunks = []; let size = 0;
+  for (;;) {
+   const { done, value } = await reader.read();
+   signal.throwIfAborted();
+   if (done) return { text: new TextDecoder().decode(Buffer.concat(chunks)), over: false };
+   chunks.push(value); size += value.byteLength;
+   if (size > limit) { cancel(); return { text: new TextDecoder().decode(Buffer.concat(chunks).subarray(0, limit)), over: true }; }
+  }
+ } finally { signal.removeEventListener('abort', cancel); }
 }
 
 const network = {
@@ -69,23 +90,32 @@ export class Api {
  async delete(path) { return this.request('DELETE', path); }
  async request(method, path, body, { token = this.credential, signal, timeout = 30_000, headers = {} } = {}) {
   if (!path.startsWith('/api/business/') || path.includes('..') || path.includes('?') || path.includes('#')) throw Error('Invalid Business route.');
-  let response;
+  // One deadline covers the headers and the whole body. This request holds its
+  // controller and timer until it ends, and the caller's signal joins it.
+  const deadline = new AbortController(), follow = () => deadline.abort(signal.reason);
+  const timer = setTimeout(() => deadline.abort(new DOMException('The operation timed out.', 'TimeoutError')), timeout);
+  if (signal?.aborted) follow(); else signal?.addEventListener('abort', follow, { once: true });
+  const unanswered = error => signal?.aborted ? signal.reason : unreachable(this.origin, error);
   try {
-   response = await fetch(this.origin + path, {
-    method, redirect: 'error',
-    headers: { ...headers, 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
-   });
-  } catch (error) { if (signal?.aborted) throw signal.reason; throw unreachable(this.origin, error); }
-  if (!response.ok) throw await refusal(response);
-  // Successful bodies are untrusted: callers validate them and print only fields they template.
-  if (response.status === 202 && response.headers.get('content-length') === '0' || response.status === 204) return null;
-  const text = await response.text();
-  if (!text) return null;
-  if (text.length > 2_000_000) throw Error('Business response exceeded the limit.');
-  let result;
-  try { result = JSON.parse(text); } catch { throw Error('Business server returned an invalid response.'); }
-  return result && Object.hasOwn(result, 'data') ? result.data : result;
+   let response;
+   try {
+    response = await fetch(this.origin + path, {
+     method, redirect: 'error',
+     headers: { ...headers, 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: deadline.signal,
+    });
+   } catch (error) { throw unanswered(error); }
+   if (!response.ok) throw await refusal(response, deadline.signal);
+   // Successful bodies are untrusted: callers validate them and print only fields they template.
+   if (response.status === 202 && response.headers.get('content-length') === '0' || response.status === 204) return null;
+   let read;
+   try { read = await readBody(response, deadline.signal, 2_000_000); } catch (error) { throw unanswered(error); }
+   if (read.over) throw Error('Business response exceeded the limit.');
+   if (!read.text) return null;
+   let result;
+   try { result = JSON.parse(read.text); } catch { throw Error('Business server returned an invalid response.'); }
+   return result && Object.hasOwn(result, 'data') ? result.data : result;
+  } finally { clearTimeout(timer); signal?.removeEventListener('abort', follow); }
  }
 }
 

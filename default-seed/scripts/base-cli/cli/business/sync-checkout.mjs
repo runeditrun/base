@@ -25,21 +25,23 @@ export function sameSeed(remote, local) {
  return remote === local || remote === local.split('/').at(-1);
 }
 
+// On loopback the document goes only to this checkout's registered dev server,
+// at the origin it registered: once the app stops, an unrelated process may
+// hold its saved port.
 export async function appOrigins(project) {
  const origins = [];
- const local = await selectedOrigin(project, {});
  let running;
- if (local.savedOrigin) {
+ if ((await selectedOrigin(project, {})).savedOrigin) {
   const registry = await serverRegistry(project.root);
   try {
-   running = await registry.existing('dev', { supplied: new Set() });
-   if (local.door) await routeRunning(running);
+   const record = await registry.existing('dev', { supplied: new Set() });
+   if (record?.url) { await routeRunning(record); running = record.url; }
   }
   finally { await registry.close(); }
  }
- if (local.savedOrigin) origins.push(local.url);
+ if (running) origins.push(running);
  const deployed = await heldDeployments(project.root);
  const production = deployed.find(item => item.environment === 'production');
  if (production?.record.receipt?.origin) origins.push(originUrl(production.record.receipt.origin));
- return { origins: [...new Set(origins)], reloadOrigin: running?.url };
+ return { origins: [...new Set(origins)], running };
 }

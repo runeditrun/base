@@ -1,4 +1,4 @@
-import { Api, originUrl, identifier, pause } from './api.mjs';
+import { Api, originUrl, identifier, pause, readBody } from './api.mjs';
 import { paired } from './local-commands.mjs';
 import { loadState } from './state.mjs';
 import { publicTrust, trustKey, publicConfigPath, membershipPath, writePublicJson, removePublicJson } from './public-config.mjs';
@@ -9,9 +9,15 @@ import { verifySettings } from './sync-document.mjs';
 import { checkoutConnection, confirmConnection, connectionDiffers, connectionRefusal } from './sync-membership.mjs';
 
 const fields = new Set(['display_name', 'owner_name', 'brand_color', 'timezone', 'logo', 'team']);
+// A trust change restarts the default seed's dev Worker: requests are held for
+// about 5 s, then fail with 404 or 500, while health checks otherwise answer in
+// under 0.4 s (measured on win-runner). A hold this long marks a restart, and
+// one that went unseen has finished within restartMs.
+const heldMs = 2000, restartMs = 10_000;
 export const syncFailure = 'Business sync could not finish; the app keeps its current values. Run rer business sync when connected.';
+export const trustFailure = 'Business trust in .rer/business-runtime.json could not be read, so the app runs without it and keeps its current values. Run rer business sync --leave, then rer business sync.';
 const failed = (message, code = 'business_sync_failed') => Object.assign(Error(message), { businessSync: true, code });
-const refused = error => error.status === 409 && error.reason === 'business_settings_not_adopted'
+const refused = error => error.status === 409 && error.code === 'business_settings_not_adopted'
  ? 'This app does not take Business settings yet. Update the app, then run rer business sync.'
  : error.status === 404 ? 'This app is no longer available in Business. Check its app in Business, then run rer business sync --app ID.'
  : error.status === 401 ? 'Business pairing expired or was revoked. Run rer business connect --code CODE.'
@@ -62,35 +68,57 @@ function requestedRevision(settings) {
  catch { return undefined; }
 }
 
-async function post(origins, document, signal, reloadOrigin) {
+// After this run rewrote a running app's trust binding, Vite restarts its
+// Worker: health checks are held, fail or are refused meanwhile. Wait, sending
+// no document, until that restart was seen and health answers again; a restart
+// that went unseen has had its time once restartMs has passed.
+async function reloaded(origin, signal, appFetch) {
+ const until = performance.now() + restartMs;
+ let restarted = false;
+ for (;;) {
+  const started = performance.now();
+  let healthy = false;
+  try { const response = await appFetch(origin + '/health', { redirect: 'error', signal }); await response.body?.cancel(); healthy = response.ok; }
+  catch { /* No answer while the Worker restarts. */ }
+  if (signal.aborted) return false;
+  if (!healthy || performance.now() - started >= heldMs) restarted = true;
+  else if (restarted || performance.now() >= until) return true;
+  if (!await reloadPause(signal)) return false;
+ }
+}
+
+async function post({ origins, running }, document, signal, trustChanged) {
  const { appFetch } = await shared('app-fetch.mjs');
  for (const origin of origins) {
-  // Only an explicit command that changed a running managed app's bindings
-  // waits for its reload. Startup has no reloadOrigin: one POST, never a retry.
-  const reloading = origin === reloadOrigin;
+  // This checkout's registered dev server is waited for while its Worker
+  // reloads, within the same budget. A 403 just after this run rewrote its
+  // trust comes from the Worker that still holds the old trust: it is retried
+  // once, after the reload. Startup and a deployed origin get one POST.
+  const reloading = origin === running;
+  let stale = reloading && trustChanged;
   do {
   let response;
   try { response = await appFetch(origin + '/api/rer/business-settings', { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json' }, body: JSON.stringify(document), signal }); }
   catch {
-   if (reloading) { if (await reloadPause(signal)) continue; break; }
+   if (reloading) { if (await reloadPause(signal)) continue; throw failed('The app did not finish reloading Business settings. Run rer business sync again.'); }
    signal.throwIfAborted(); break;
   }
-  if (response.status === 404) {
-   await response.body?.cancel();
-   if (reloading && await reloadPause(signal)) continue;
-   break;
-  }
-  // Vite can answer a proxy error while the changed binding restarts its
-  // Worker. Wait only for this known managed reload, within the same budget.
-  if (reloading && [500, 502, 503, 504].includes(response.status)) {
+  // The running app answers 404 or a proxy error while its Worker restarts.
+  if (response.status === 404 || reloading && [500, 502, 503, 504].includes(response.status)) {
    const status = response.status;
    await response.body?.cancel();
+   if (!reloading) break;
    if (await reloadPause(signal)) continue;
    throw failed(`The app did not finish reloading Business settings (HTTP ${status}). Run rer business sync again.`);
   }
+  if (response.status === 403 && stale) {
+   stale = false;
+   await response.body?.cancel();
+   if (await reloaded(origin, signal, appFetch)) continue;
+  }
   if (![200, 409].includes(response.status)) throw failed(`The app refused Business settings (HTTP ${response.status}). Its current values were kept.`);
   let ack;
-  try { ack = await response.json(); } catch { throw failed('The app did not acknowledge Business settings.'); }
+  try { ack = JSON.parse((await readBody(response, signal, 1_000_000)).text); } catch { throw failed('The app did not acknowledge Business settings.'); }
   if (!Number.isSafeInteger(ack?.rev) || ack.rev < 1 || !Array.isArray(ack.applied) || !ack.applied.every(field => fields.has(field))) throw failed('The app returned an invalid Business acknowledgement.');
   // An equal-revision ack also covers a successful apply whose response was
   // lost during reload. The app verified the signature and remains authority.
@@ -117,8 +145,7 @@ export async function sync({ root = process.cwd(), app, leave = false, replace =
  await writePublicJson(root, publicConfigPath, { [trustKey]: result.trust });
  await writePublicJson(root, membershipPath, { v: 1, app: result.app, seed, businessId: result.state.businessId, issuer: result.trust.issuer });
  const targets = origin ? { origins: [origin] } : await appOrigins(project);
- const changed = await materializeBusinessTrust(project);
- return post(targets.origins, result.document, signal, changed ? targets.reloadOrigin : undefined);
+ return post(targets, result.document, signal, await materializeBusinessTrust(project));
 }
 
 // One attempt per ready invocation, after the readiness line. The entire pull

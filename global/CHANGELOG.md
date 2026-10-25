@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Add signed runtime Business settings, same-origin logos, app accent fills, local overrides and owner-scoped team reconciliation. The reference seed adopts the module; owners can stop settings with fresh sign-in proof.
-- Join existing local and self-hosted Base apps with `rer business sync` using the computer's Business pairing; verify and apply signed settings without rebuilding. Joined checkouts pull once after dev readiness with a three-second budget. Public trust under `.rer/` reaches both dev and deployment; `--replace` confirms connection changes in a terminal and `--leave` keeps the app's current values.
+- Join existing local and self-hosted Base apps with `rer business sync` using the computer's Business pairing; verify and apply signed settings without rebuilding. Joined checkouts pull once after dev readiness with a three-second budget. Public trust under `.rer/` reaches both dev and deployment; `--replace` confirms connection changes in a terminal and `--leave` keeps the app's current values. Settings go only to the checkout's registered dev server or its recorded deployment and wait out a Worker reload of changed trust; each platform request's budget covers its whole response, and an unreadable trust file never stops `rer dev`.
 
 ## 0.2.80
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g5b27448c",
+  "cliVersion": "0.2.80-dev.g56cfad65",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -411,7 +411,7 @@
     },
     "cli/business/api.mjs": {
       "source": "cli/business/api.mjs",
-      "sha256": "5848496a76ef1bf8b011bbeff66187ec75a5a7674a5860a91854acb489da47f9"
+      "sha256": "6a70b5572c69f03658b2dcfdcfd9b35cbeee54ea4c978a59222792fb6ea115b5"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
@@ -543,7 +543,7 @@
     },
     "cli/business/sync-checkout.mjs": {
       "source": "cli/business/sync-checkout.mjs",
-      "sha256": "d1262f39e4f8781412a06d259e53dae20db296b422dc48a23518bbd240353186"
+      "sha256": "fe034f478cdd697eab2812cbda90c912932e6a816eff93206f78df5b89ab47bf"
     },
     "cli/business/sync-document-json.mjs": {
       "source": "cli/business/sync-document-json.mjs",
@@ -559,7 +559,7 @@
     },
     "cli/business/sync.mjs": {
       "source": "cli/business/sync.mjs",
-      "sha256": "738f16bce8b495bf48b94e4c7d730100d06766c25ff7c713e5d264be90614721"
+      "sha256": "7b1d3c68fc8f02aef110a9a749fbe5a3a66c19d27ea937d861c5e10e5558ff8c"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
@@ -747,7 +747,7 @@
     },
     "cli/deploy-inputs.mjs": {
       "source": "cli/deploy-inputs.mjs",
-      "sha256": "feb3764a46ead9f0d7e0de8377210523ab3b5dd9cf07ee79daedb08f853944de"
+      "sha256": "4b3aadfce9130b855cf4351d62f8031ab78f2921bbeec6625429aeca2a7c7d2d"
     },
     "cli/deploy-installation-key.mjs": {
       "source": "cli/deploy-installation-key.mjs",
@@ -923,7 +923,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "585c3ca8be18edc446055305db7aede0c1d96481f48270312e5a09da48f08427"
+      "sha256": "26cae0389635852971a27d337564e0973796ff1c99dbe5a4ed117f206c7547c0"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
