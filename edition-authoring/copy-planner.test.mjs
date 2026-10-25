@@ -11,17 +11,6 @@ test('refresh rejects generated full-fold destination classes and removal aliase
   const {base, seed, revision} = fixture(t, {'left/old.json': '{}\n', 'right/old.json': '{}\n'}, [['initial-left', 'left'], ['initial-right', 'right']]);
   write(base, 'left/new.json', '1\n'); write(base, 'right/new.json', '2\n');
   const target = commit(base), classes = collisionClasses();
-  for (const {pair: [left, right]} of [...classes, {pair: ['Straße', 'Straẞe']}, {pair: ['ẞ', 'SS']}]) {
-    // Missing recorded directory members are deliberate removals. New files
-    // added at the target still require the complete destination preflight.
-    const copies = [left, right].map((part, i) => ({path: 'shared/' + part, originPath: i ? 'right' : 'left', revision, files: {['shared/' + part + '/old.json']: hash('{}\n')}}));
-    write(seed, 'base-copies.json', json({schemaVersion: 1, copies}));
-    const before = snapshot(seed);
-    assert.throws(() => refreshCopies(seed, {positional: [target], record: 'base-copies.json', base}), error =>
-      error.message.includes(left + '/new.json') && error.message.includes(right + '/new.json'), `${left} / ${right}`);
-    assert.deepEqual(snapshot(seed), before);
-  }
-  t.diagnostic(`${classes.reduce((sum, item) => sum + item.points.length, 0)} scalar values; ${classes.length} generated collision classes, all atomically refused`);
   // Two retired singleton removals must use that same destination identity.
   for (const pair of [['shared/ẞ.json', 'shared/SS.json'], ['shared/SS.json', 'shared/ẞ.json']]) {
     const copies = pair.map((name, i) => ({path: name, originPath: (i ? 'right' : 'left') + '/old.json', revision, files: {[name]: hash('{}\n')}}));
@@ -34,10 +23,21 @@ test('refresh rejects generated full-fold destination classes and removal aliase
     const f = fixture(t, {'left/left.mjs': 'export {};\n', 'right/Helper.mjs': 'export {};\n', 'right/keep.mjs': 'export {};\n'}, [['SHARED', 'left'], ['shared', 'right']]);
     const record = JSON.parse(fs.readFileSync(path.join(f.seed, 'base-copies.json')));
     record.copies.sort((a, b) => (a.path === 'SHARED' ? -1 : 1) * (reverse ? -1 : 1));
-    write(f.seed, 'base-copies.json', json(record)); git(f.seed, 'add', 'base-copies.json'); git(f.seed, 'commit', '-qm', 'record order');
+    write(f.seed, 'base-copies.json', json(record)); git(f.seed, 'add', 'base-copies.json'); git(f.seed, 'commit', '--allow-empty', '-qm', 'record order');
     write(f.base, 'left/helper.mjs', 'export const added = true;\n'); fs.unlinkSync(path.join(f.base, 'right/Helper.mjs'));
     refused(f.seed, () => f.refresh(commit(f.base)), ['SHARED/helper.mjs', 'shared/Helper.mjs']);
   }
+  for (const {pair: [left, right]} of [...classes, {pair: ['Straße', 'Straẞe']}, {pair: ['ẞ', 'SS']}]) {
+    // Missing recorded directory members are deliberate removals. New files
+    // added at the target still require the complete destination preflight.
+    const copies = [left, right].map((part, i) => ({path: 'shared/' + part, originPath: i ? 'right' : 'left', revision, files: {['shared/' + part + '/old.json']: hash('{}\n')}}));
+    write(seed, 'base-copies.json', json({schemaVersion: 1, copies}));
+    const before = snapshot(seed);
+    assert.throws(() => refreshCopies(seed, {positional: [target], record: 'base-copies.json', base}), error =>
+      error.message.includes(left + '/new.json') && error.message.includes(right + '/new.json'), `${left} / ${right}`);
+    assert.deepEqual(snapshot(seed), before);
+  }
+  t.diagnostic(`${classes.reduce((sum, item) => sum + item.points.length, 0)} scalar values; ${classes.length} generated collision classes, all atomically refused`);
 });
 
 test('refresh preflights removals, existing files and creation ancestors before any mutation', t => {
