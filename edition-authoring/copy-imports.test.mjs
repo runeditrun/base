@@ -129,3 +129,50 @@ test('public refresh accepts valid CommonJS wrapper bodies inside a module packa
   assert.equal(execution.status, 0, execution.stderr);
   assert.equal(execution.stdout, 'cjs\n2\n2\n');
 });
+
+
+test('public refresh copies ordinary documents and data without parsing them as JavaScript', t => {
+  const {base, seed, run, refresh} = fixture(t);
+  fs.rmSync(path.join(seed, 'base-copies.json'));
+  const original = git(base, 'rev-parse', 'HEAD');
+  assert.equal(run('record-base', 'scripts', 'tools', original).status, 0);
+  const files = {'.node-version': '22.20.0\n', LICENSE: 'A licence is not a JavaScript program.\n', '.gitignore': '*.cache\n', 'values.json': '{"n":42}\n', 'image.wasm': Buffer.from([0, 97, 115, 109]), 'notes.unknown': 'ordinary data with no entry point\n'};
+  for (const [name, bytes] of Object.entries(files)) write(base, 'tools/' + name, bytes);
+  write(base, 'tools/main.mjs', "import './helper'; console.log('ready');\n");
+  write(base, 'tools/helper', "import './leaf.mjs';\n");
+  write(base, 'tools/leaf.mjs', "console.log('leaf');\n");
+  write(base, 'package.json', '{"type":"module"}\n');
+  write(seed, 'package.json', '{"type":"module"}\n');
+  const result = refresh(commit(base));
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  for (const [name, bytes] of Object.entries(files)) assert.deepEqual(fs.readFileSync(path.join(seed, 'scripts', name)), Buffer.from(bytes));
+  const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout, 'leaf\nready\n');
+  assert.equal(run('verify-base').status, 0);
+});
+
+test('public refresh preserves a satisfied seed-owned dependency and follows its actual imports', t => {
+  const {base, seed, run, refresh} = fixture(t);
+  const owned = "import './local.mjs'; export const value = 19;\n";
+  write(seed, 'scripts/helper.mjs', owned);
+  write(seed, 'scripts/local.mjs', 'export const local = true;\n');
+  write(base, 'tools/main.mjs', "import {value} from './helper.mjs'; console.log(value);\n");
+  write(base, 'tools/helper.mjs', "import './upstream-only.mjs'; export const value = 2;\n");
+  write(base, 'tools/upstream-only.mjs', "throw new Error('not the adopted dependency');\n");
+  const revision = commit(base), result = refresh(revision);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), owned);
+  assert.equal(fs.existsSync(path.join(seed, 'scripts/upstream-only.mjs')), false);
+  const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout, '19\n');
+  assert.equal(run('verify-base').status, 0);
+  const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  fs.rmSync(path.join(seed, 'scripts/local.mjs'));
+  const refused = refresh(revision);
+  assert.notEqual(refused.status, 0);
+  assert.ok((refused.stdout + refused.stderr).includes(`record-base 'scripts/local.mjs' 'tools/local.mjs' ${revision}`));
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), owned);
+});

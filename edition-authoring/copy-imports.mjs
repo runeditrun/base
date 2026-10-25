@@ -5,21 +5,25 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {safe, noLinks} from './files.mjs';
 import {staticImports} from './static-imports.mjs';
 import {moduleFormats, javascript} from './module-format.mjs';
+import {copyEntrypoints} from './copy-entrypoints.mjs';
 
 const within = (name, directory) => directory === '.' || name.startsWith(directory + '/');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 
 export function closeImports({root, record, recordPath, plans, next, read, revision, local, files}) {
   const formatFor = moduleFormats(read, revision);
+  const isCode = copyEntrypoints(read, next);
   const adopted = [], problems = new Set(), queue = [], scheduled = new Map();
   const locate = name => plans.find(({copy}) => Object.hasOwn(copy.files, name) || copy.path === name || name.startsWith(copy.path + '/'));
-  const enqueue = (plan, source, name, bytes, boundary, depth, adapted = false, pin = plan.copy.revision) => {
+  const enqueue = (plan, source, name, bytes, boundary, depth, adapted = false, pin = plan.copy.revision, imported = false) => {
     const previous = scheduled.get(name);
-    if (previous && previous.source !== source) throw Error(`Conflicting Base import mappings for ${name}`);
-    if (previous) return;
-    scheduled.set(name, {source, plan});
+    const item = previous || {plan, source, name, bytes, boundary, depth, adapted, pin};
+    scheduled.set(name, item);
     // Runtime source has its own TS resolution and seed-sibling policy.
-    if (!source.startsWith('foundation/runtime/') && javascript(source)) queue.push({plan, source, name, bytes, boundary, depth, adapted, pin});
+    if (!item.queued && !source.startsWith('foundation/runtime/') && isCode(source, bytes, imported)) {
+      item.queued = true;
+      queue.push(item);
+    }
   };
   const initial = plans.flatMap(plan => plan.sources.map(([source, entry]) => ({plan, source, entry})));
   const bytes = read.blobs(initial.map(({entry}) => entry.object));
@@ -44,16 +48,29 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         safe(source); safe(name);
       } catch { throw Error(`Cannot resolve relative Base import ${specifier} in ${importer.name}; no files were changed.`); }
       const fail = reason => problems.add(`${importer.name} imports ${specifier}: ${reason} (${source}). Review and materialize the dependency, then run record-base ${quote(name)} ${quote(source)} ${revision}${recordPath === 'base-copies.json' ? '' : ' --record ' + quote(recordPath)}.`);
-      if (!javascript(source) && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       const existing = scheduled.get(name);
       if (existing) {
-        if (existing.source !== source) fail('recorded with a different Base origin');
+        // The destination's own copy mapping is authoritative. A seed may
+        // compose siblings from different Base directories or adapt one of them.
+        enqueue(existing.plan, existing.source, name, existing.bytes, existing.boundary, existing.depth, existing.adapted, existing.pin, true);
         continue;
       }
-      if (!within(source, importer.boundary)) { fail('outside the copied origin directory'); continue; }
       const entry = next.get(source), owner = locate(name);
-      if (!entry) { fail('no regular Base file at the target revision'); continue; }
       if (owner && Object.hasOwn(owner.copy.files, name)) { fail('recorded file was removed or kept out; it will not be restored'); continue; }
+      if (!within(source, importer.boundary)) { fail('outside the copied origin directory'); continue; }
+      noLinks(root, name);
+      if (fs.existsSync(path.join(root, name)) && !files.get(name)?.regular) { fail('destination is not a regular seed file'); continue; }
+      if (local(name) && (!entry || local(name) !== read.digests([entry.object]).get(entry.object))) {
+        // Preserve seed-owned bytes, but parse their actual graph so presence
+        // cannot conceal a missing dependency. They cannot adopt new Base files.
+        const content = files.get(name).read();
+        try { if (isCode(source, content, true)) staticImports(content, formatFor(source), source); }
+        catch (error) { fail(`destination contains seed-owned bytes with invalid static imports: ${error.message}`); continue; }
+        enqueue(importer.plan, source, name, content, importer.boundary, importer.depth + 1, true, importer.pin, true);
+        continue;
+      }
+      if (!entry) { fail('no regular Base file at the target revision'); continue; }
+      if (!javascript(source) && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       if (importer.adapted) { fail('seed-owned importer needs explicit dependency reconciliation'); continue; }
       if (importer.depth >= 64) { fail('relative import closure exceeds 64 levels'); continue; }
       // A file excluded at the pin, deleted locally, ignored, or owned by the
@@ -61,11 +78,8 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
       const pinned = read.tree(owner ? owner.copy.revision : importer.pin);
       if (pinned.has(source) && !local(name)) { fail('file was kept out at the copy pin'); continue; }
       if ((record.ignore || []).some(prefix => name === prefix || name.startsWith(prefix + '/'))) { fail('file is explicitly ignored'); continue; }
-      noLinks(root, name);
-      if (fs.existsSync(path.join(root, name)) && !files.get(name)?.regular) { fail('destination is not a regular seed file'); continue; }
       const content = read.blobs([entry.object]).get(entry.object);
       if (fs.existsSync(path.join(root, name)) && !local(name)) { fail('destination is outside the seed file inventory'); continue; }
-      if (local(name) && local(name) !== read.digests([entry.object]).get(entry.object)) { fail('destination contains seed-owned bytes'); continue; }
       let plan = owner;
       if (plan) {
         if (plan.retired || plan.copy.originPath + name.slice(plan.copy.path.length) !== source) { fail('destination belongs to a different copy'); continue; }
@@ -78,7 +92,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         plans.push(plan);
       }
       adopted.push({path: name, originPath: source});
-      enqueue(plan, source, name, content, importer.boundary, importer.depth + 1, false, importer.pin);
+      enqueue(plan, source, name, content, importer.boundary, importer.depth + 1, false, importer.pin, true);
     }
   }
   if (problems.size) throw Error(`Unresolvable relative Base imports; no files were changed:\n${[...problems].sort().join('\n')}`);
