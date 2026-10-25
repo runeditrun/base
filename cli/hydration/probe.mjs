@@ -19,7 +19,7 @@ export function probe(config, ownership) {
   replaced: [], starts: {}, opacity: {}, missing: [], frames: 0, oneShot: [], releasedAt: null, releaseNote: null, fiberAtRelease: null, hydratedAt: null, settledAt: null, settled: null, rer: null, error: null };
  const SECTION = new Set(['HEADER', 'NAV', 'SECTION', 'ARTICLE', 'ASIDE', 'FOOTER']), SKIP = new Set(['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE', 'NOSCRIPT']);
  const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/, ADDRESS = '.__cf_email__,a[href*="/cdn-cgi/l/email-protection"]';
- const inserted = new WeakSet(), tracked = new WeakMap(), watch = new Set();
+ const serverBoundaries = new WeakSet(), inserted = new WeakSet(), tracked = new WeakMap(), watch = new Set();
  const now = () => Math.round(performance.now() * 10) / 10;
  const fiber = el => Object.keys(el).some(key => key.startsWith('__reactFiber$'));
  const counted = el => !SKIP.has(el.tagName) && !inserted.has(el);
@@ -137,7 +137,7 @@ export function probe(config, ownership) {
    tryRelease();
    const t = now();
    if (S.releasedAt !== null) {
-    const current = ownership(snapshot, counted);
+    const current = ownership(snapshot, counted, serverBoundaries);
     S.error = current.error;
     if (current.pending === 0) { if (S.hydratedAt === null) S.hydratedAt = t; } else S.hydratedAt = null;
     const quiet = t - lastMutation > 300 && !oneShot().some(a => a.playState === 'running');

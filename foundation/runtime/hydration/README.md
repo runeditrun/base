@@ -113,21 +113,37 @@ and not as bare assets without `no-transform`.
 
 ## Completion and ownership
 
-The check requires every server Suspense boundary to finish hydration or leave
+The check requires every server Suspense or Activity boundary to finish hydration or leave
 React's committed tree through a React update. Deleting its DOM imperatively does
 not complete hydration: the legacy `removed` control and an `empty-unresolved`
 boundary time out. React removing an adopted node, including in a layout effect,
-is supported. A boundary still showing its client fallback after abandoning hydration is
-also incomplete, even though its dehydrated marker is gone. The probe's 20-second settlement and 30-second load deadlines are
+is supported. Removing an already adopted host imperatively, or clearing it with a
+second root, also passes: hydration completed before the removal. A server boundary
+still showing its client fallback after abandoning hydration is incomplete, even
+though its dehydrated marker is gone. Dehydration observed on the committed Fiber
+or its alternate establishes server provenance, retained only in a WeakSet. A
+boundary created only on the client never blocks completion. The probe's 20-second settlement and 30-second load deadlines are
 unchanged.
 
 At settlement, the check follows the body's `__reactFiber$` attachment to the
-root's current committed tree. It checks root and Suspense dehydration state,
+root's current committed tree. It checks root and server-boundary dehydration state,
 then matches host nodes by identity and their committed host parent. An attachment
 may name either current Fiber or its alternate; a key alone is insufficient.
 An adopted node moved by page code into an unrelated holder (`stale-owned-move`)
 stays pending because its actual parent disagrees with React's committed parent.
 Portals use their explicit container, including a shadow root, as the host parent.
+
+React 19 HostHoistable metadata (`title`, `meta`, icon links) and resources
+(precedence stylesheets, `style` with `href` and `precedence`, async scripts) use
+the committed Fiber's node or resource instance and their hoistable root, rather
+than body Fiber ancestry or ordinary host expandos. React deliberately omits the
+props attachment on hydrated metadata and both attachments on shared resources.
+A missing committed instance stays pending; connected instances must occupy the
+head or portal shadow root React hoists into. A server boundary that has not
+hydrated stays pending even if its metadata/resource was copied or removed.
+After adoption, removal and replacement outside the initial body snapshot cannot
+prove a hydration failure: as with adopted body hosts, removal does not undo
+completion. The probe does not certify resource fetch/execution or head contents.
 
 The initial body snapshot contains weak references. Connected snapshot elements
 must be owned by the committed tree, or descend through a validated
@@ -150,7 +166,8 @@ These checks diagnose hydration, not hostile scripts. Stale or fabricated expand
 keys alone do not establish ownership. Copying a real node's fiber and props keys
 onto a clone is rejected while the committed Fiber still points to the original.
 A page can fool the check by also rewriting React's committed `stateNode` and its
-alternate (`rewritten-fiber`), or by fabricating a consistent internal tree. That
+alternate (`rewritten-fiber`), by clearing the boundary state on both alternates
+(`forged-boundary-state`), or by fabricating a consistent internal tree. That
 is an accepted limit: a script controlling the page can overwrite the probe too.
 
 ## Adopting

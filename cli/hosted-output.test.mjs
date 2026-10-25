@@ -9,15 +9,17 @@ import {checkHydration} from './hydration/check.mjs';
 import {hydrationSeed} from './fixtures/hydration.mjs';
 const run=promisify(execFile);
 
-test('the built hydration check accepts an effect-created body child', async t => {
- const result = await checkHydration(await hydrationSeed(t), { pages: ['/'] });
- assert.ok(result.loads > 1, 'the baseline and reduced-motion load both complete');
- assert.ok(result.pages.every(page => !page.skipped), 'React hydrated the built page');
+test('the built hydration check accepts completed server hydration with metadata, widgets and client fallbacks', async t => {
+ for (const activity of [false, true]) {
+  const result = await checkHydration(await hydrationSeed(t, { activity }), { pages: ['/'] });
+  assert.ok(result.loads > 1, 'the baseline and reduced-motion load both complete');
+  assert.ok(result.pages.every(page => !page.skipped), 'React hydrated the built page');
+ }
 });
 
 test('the built hydration check rejects incomplete server boundaries after replacement or imperative removal', async t => {
- for (const change of [{}, { replaceServer: true }, { removeServer: true }]) {
-  await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true, ...change }), { pages: ['/'] }), error => {
+ for (const activity of [false, true]) for (const change of [{}, { replaceServer: true }, { removeServer: true }]) {
+  await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true, activity, ...change }), { pages: ['/'] }), error => {
    assert.equal(error.code, 'hydration_units_failed');
    assert.equal(error.exitCode, 1);
    assert.ok(error.failures.length > 0);
