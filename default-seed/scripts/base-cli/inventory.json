@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gfe4237bf",
+  "cliVersion": "0.2.80-dev.g47331156",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -547,7 +547,7 @@
     },
     "cli/business/sync-checkout.mjs": {
       "source": "cli/business/sync-checkout.mjs",
-      "sha256": "2f11fab98ed421c09adba4347310fcabdb8fa785c9764689c8b22f4e5a212c8d"
+      "sha256": "4e420c27865bf2fb02e76ddeb8e6fa671e7567bf446720f6343fa77e806a023a"
     },
     "cli/business/sync-document-json.mjs": {
       "source": "cli/business/sync-document-json.mjs",
@@ -567,7 +567,7 @@
     },
     "cli/business/sync.mjs": {
       "source": "cli/business/sync.mjs",
-      "sha256": "7f1d56bb6171cdb47970673d4573a5dc700eaba9696950faa142cfb261cd504c"
+      "sha256": "adbd47273e87e3c4fbe25023767578c406fd676444fa61e805aba3e37c3031b7"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

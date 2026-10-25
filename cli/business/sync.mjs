@@ -60,7 +60,7 @@ export async function sync({ root = process.cwd(), app, leave = false, replace =
   // Every change to .dev.vars restarts the running app's Worker: each one
   // waits out a restart in flight, and then for its own (sync-app.mjs).
   if (leave) {
-   const running = await runningApp(project);
+   const running = await runningApp(project, signal);
    await quiet(project, running, signal);
    await removePublicJson(root, membershipPath);
    await removePublicJson(root, publicConfigPath);
@@ -68,7 +68,7 @@ export async function sync({ root = process.cwd(), app, leave = false, replace =
    return 'Business settings disconnected; the app keeps its current values.';
   }
   // The startup pull (origin) posts once to its own server and never waits.
-  const targets = origin ? { origins: [origin], running: origin } : await appOrigins(project);
+  const targets = origin ? { origins: [origin], running: origin } : await appOrigins(project, signal);
   const running = origin ? undefined : targets.running;
   const connection = await checkoutConnection(root);
   const result = await pull({ app, seed, signal, connection, replace });
