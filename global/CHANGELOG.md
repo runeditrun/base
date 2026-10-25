@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add fenced same-owner reclaim for expired staged and D1-only imports, plus a seed-owned erasure hook before restore activation with scoped registry access and atomic live audit; include the hook in the documented portable runtime copy. Refuse reclaim after uncertain R2 or payload effects, including finalize errors; refusal cannot cancel an already-issued unfenced external operation.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.

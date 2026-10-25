@@ -24,6 +24,19 @@ export interface Staged {
   db: D1Database; tables: Record<string,string>; manifest: Manifest;
   read(table:string): Promise<Record<string,unknown>[]>;
 }
+export type RevocationKind = 'password'|'session'|'api_key'|'passkey'|'oauth_token'|'refresh_token'|'delegation_issued'|'delegation_held';
+export interface RestoreHook {
+  /** Seed-owned append-only registry; TEXT single-column primary key of opaque ids. Always excluded from restore. */
+  registry:{table:string;idColumn:string};
+  run(context:{
+    /** Reads see verified staging; await each buffered mutation. Deletes require a primary key. */
+    stagedDb:{read(table:string,page?:{offset?:number;limit?:number}):Promise<Record<string,unknown>[]>;
+      delete(table:string,where:Row):Promise<number>;update(table:string,where:Row,values:Row):Promise<number>};
+    /** No general live SQL. Audit commits with activation, keyed by restore job and opaque id. */
+    liveDb:{erasedIds():string[];audit(row:{opaqueId:string;revocations:Partial<Record<RevocationKind,number>>}):void};
+    archiveManifest:Manifest;
+  }):void|boolean|Promise<void|boolean>;
+}
 export interface ArchivePolicy {
   product: string; excludeTables?: string[]; includeTables?: string[]; derivedTables?: string[];
   secretColumns?: Record<string,string[]>; exportRow?: (table:string,row:Row)=>Row;
@@ -31,6 +44,7 @@ export interface ArchivePolicy {
   importSafety?: Record<string,Record<string,Cell[]>>;
   /** Pure, synchronous, deterministic and idempotent; called only for importSafety tables before validateStaged. */
   importRow?: (table:string,row:Row)=>Row;
+  restoreHook?:RestoreHook;
   replaceableTables?: string[]; requiredConfiguration?: string[]; validateStaged?: (staged:Staged)=>boolean|void|Promise<boolean|void>;
   acceptedSchemas?: Record<string,{upgradeRow:(table:string,row:Row)=>Row}>;
   buckets?: Record<string,{prefix?:string;objectReferences?:{table:string;keyColumn:string}}>;
@@ -53,7 +67,7 @@ export interface PortabilityOptions {
 }
 export interface Portability {
   exports: {create(actor?:string):Promise<string>;advance(id:string,options?:{expectedPart?:number;maxParts?:number}):Promise<Status>;status(id:string):Promise<Status>;download(id:string):Promise<ReadableStream<Uint8Array>>;abort(id:string):Promise<Status>};
-  imports: {active(actor?:string):Promise<Status|null>;/** ledgers: the rows of each migration ledger table an old archive carries, as read from it; they place it in the destination's history and must equal its parts. */create(manifest:Manifest,actor?:string,options?:{ledgers?:Record<string,Row[]>}):Promise<string>;uploadPart(id:string,index:number,part:Part):Promise<Status>;finalize(id:string,options:{archiveHash:string;contentHash?:string;laterJournal?:LaterJournal}):Promise<Status>;status(id:string):Promise<Status>;abort(id:string):Promise<Status>;/** Aborts the import left staged by a crashed restore and returns its id; call only as the destination's sole operator. */abortAbandoned():Promise<string|null>};
+  imports: {/** Claim an expired job as its authenticated owner; completed is the first incomplete part. */reclaim(id:string,actor?:string):Promise<Status>;active(actor?:string):Promise<Status|null>;/** ledgers: the rows of each migration ledger table an old archive carries, as read from it; they place it in the destination's history and must equal its parts. */create(manifest:Manifest,actor?:string,options?:{ledgers?:Record<string,Row[]>}):Promise<string>;uploadPart(id:string,index:number,part:Part):Promise<Status>;finalize(id:string,options:{archiveHash:string;contentHash?:string;laterJournal?:LaterJournal}):Promise<Status>;status(id:string):Promise<Status>;abort(id:string):Promise<Status>;/** Aborts the import left staged by a crashed restore and returns its id; call only as the destination's sole operator. */abortAbandoned():Promise<string|null>};
   status(id:string):Promise<Status>;actor(id:string):Promise<string>;
   erasureStatements(table:string,primaryKey:Record<string,Cell>):Promise<D1PreparedStatement[]>;
   redactionStatements():Promise<D1PreparedStatement[]>;
@@ -74,6 +88,6 @@ export const MAX_LINE_BYTES:number;
 /** Default exclusions (exact names, or prefixes ending in `%`); identity tables may be included. */
 export const excludedTables:readonly string[];
 /** True when no archive under this policy carries `table`. */
-export function excludedTable(table:string,policy?:Pick<ArchivePolicy,'excludeTables'|'includeTables'>):boolean;
+export function excludedTable(table:string,policy?:Pick<ArchivePolicy,'excludeTables'|'includeTables'|'restoreHook'>):boolean;
 export const MAX_PART_BYTES:number;
 export class PortabilityError extends Error {code:string;status:number;jobId?:string;abortableAt?:string|null;constructor(code:string,status?:number)}

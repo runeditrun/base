@@ -6,6 +6,16 @@ import { statement, guard, job, PortabilityError } from './storage.mjs';
 export const IMPORT_LEASE_MS=5*60*1000;
 const RENEW_MS=30*1000;
 const active=row=>['staging','applying'].includes(row.phase);
+// Once an external effect may have started, neither expiry nor a phase reset
+// attests that it stopped. Legacy applying jobs need the same conservative rule.
+const reclaimSafeSQL=`COALESCE(json_extract(metadata,'$.externalEffectsStarted'),0)=0
+  AND (phase='staging' OR (phase='applying' AND json_array_length(metadata,'$.manifest.objects')=0
+    AND json_array_length(metadata,'$.manifest.payloads')=0))`;
+export function requireSafeImportReclaim(row) {
+  if(row.metadata.externalEffectsStarted || row.phase==='applying'
+    && (row.metadata.manifest.objects.length || row.metadata.manifest.payloads.length))
+    throw new PortabilityError('import_reclaim_unsafe',409);
+}
 const runningMetadata=new WeakMap();
 // Only the lease constructor can approve these details. Mutable Error fields,
 // prototypes and diagnostic code suffixes cannot establish that provenance.
@@ -46,20 +56,25 @@ export async function importRunning(db,id) {
 // Upload, finalize and abort each claim one request. Renewal and takeover are
 // conditional writes on that claim; an expired request cannot revive itself.
 // Every mutating D1 batch is fenced by the same claim, including publication.
-export async function withImportLease(context,id,operation,{abort=false,staleOnly=false,soleOperator=false}={}) {
+export async function withImportLease(context,id,operation,{abort=false,reclaim=false,staleOnly=false,soleOperator=false}={}) {
   const db=context.db,holder=crypto.randomUUID(),now=Date.now(),lease=await leaseRow(db,id);
   if(!lease)throw new PortabilityError('import_lease_expired',409);
   if(staleOnly && lease.expires_at>now)throw await importRunning(db,id);
-  if(!abort && lease.expires_at<=now)throw new PortabilityError('import_lease_expired',409);
+  if(!abort && !reclaim && lease.expires_at<=now)throw new PortabilityError('import_lease_expired',409);
   if(!soleOperator && lease.holder && lease.expires_at>now)throw await importRunning(db,id);
   // Like staging/publication, claim by a transactional SQL guard. Transport
   // adapters need not expose provider-specific UPDATE result metadata.
   try {
     await db.batch([guard(db,`EXISTS(SELECT 1 FROM rer_portability_import_leases WHERE job=? AND expires_at=? AND holder IS ?)
-      AND EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND import_job=?)`,id,lease.expires_at,lease.holder,id),
+      AND EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND import_job=?)
+      ${reclaim?`AND EXISTS(SELECT 1 FROM rer_portability_jobs WHERE id=? AND (${reclaimSafeSQL}))`:''}`,
+      id,lease.expires_at,lease.holder,id,...(reclaim?[id]:[])),
       statement(db,'UPDATE rer_portability_import_leases SET holder=?,expires_at=? WHERE job=?',holder,now+IMPORT_LEASE_MS,id),
       db.prepare('DELETE FROM rer_portability_guard')]);
   }catch(error){
+    // A failed guard rolls back the whole claim, including holder and expiry.
+    // Diagnose against the current job without acquiring or releasing a lease.
+    if(reclaim)requireSafeImportReclaim(await job(db,id,'import'));
     const current=await leaseRow(db,id);
     if(current?.holder!==lease.holder || current?.expires_at!==lease.expires_at)throw await importRunning(db,id);
     throw error;
@@ -97,6 +112,15 @@ export async function withImportLease(context,id,operation,{abort=false,staleOnl
     const wrap=raw=>{const wrapped=new Proxy(raw,{get(target,key){
       if(key==='bind')return (...values)=>wrap(target.bind(...values));
       if(key==='run')return async()=> (await batch([target]))[0];
+      // D1 also executes mutating SQL through all/first/raw (including WITH
+      // and RETURNING). Only an ordinary SELECT can bypass the write fence.
+      if(!/^\s*SELECT\b/i.test(sql) && ['all','first','raw'].includes(key))return async option=>{
+        const result=(await batch([target]))[0],rows=result.results??[];
+        if(key==='all')return result;
+        if(key==='first')return option===undefined?(rows[0]??null):(rows[0]?.[option]??null);
+        const columns=Object.keys(rows[0]??{}),values=rows.map(row=>columns.map(column=>row[column]));
+        return option?.columnNames?[columns,...values]:values;
+      };
       const value=target[key];return typeof value==='function'?value.bind(target):value;
     }});native.set(wrapped,raw);return wrapped;};
     return wrap(db.prepare(sql));

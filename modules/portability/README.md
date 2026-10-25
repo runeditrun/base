@@ -47,6 +47,7 @@ with HTTP 409 `import_applying` while an import is applying. Policy fields:
 | `replaceableTables` | Bootstrap rows replaced in the atomic restore batch. Rows the destination's own migrations insert need no entry where the runner passes `migrations` (see "Migration-seeded rows"). Populated excluded dependents reachable through modifying FK actions refuse replacement. |
 | `requiredConfiguration` | Setting names returned after restore for the owner to re-enter. |
 | `validateStaged({db,tables,read,manifest})` | Read-only product validation before any object write; false or a thrown error refuses restore. `tables` names the staging tables for bounded SQL queries; `read` is a convenience for small tables. |
+| `restoreHook` | Seed-declared staged erasure hook with a read-only live registry and activation-atomic audit; see below. |
 | `acceptedSchemas` | Map from an earlier full schema hash to `{upgradeRow(table,row)}`. Upgrade functions are pure and synchronous. No older schema is accepted by default. |
 | `buckets` | Binding names mapped to `{prefix?,objectReferences?:{table,keyColumn}}`. Prefixes isolate an object namespace. References require exactly the distinct referenced keys: export checks its snapshot, and restore its staged rows (after `importRow`, before any object write), that each key is nonempty, under the prefix, not absolute and without `.` or `..` segments, and that the keys are exactly the bucket's archived objects, none missing and none extra; otherwise `object_references:<binding>`. |
 | `extraPayloads` | Named `{produce,consume}` pairs. Producers return bytes or a byte stream. Consumers receive a verified byte stream and descriptor before D1 commit. |
@@ -938,6 +939,7 @@ modules/portability/provider-data.mjs
 modules/portability/policy-data.mjs
 modules/portability/generated.mjs
 modules/portability/restore-safety.mjs
+modules/portability/restore-hook.mjs
 modules/portability/bridge.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
@@ -1009,3 +1011,109 @@ Base's default-seed and composed foundation CLI adapters adopt direct local D1
 bindings with explicit identity/configuration exclusions. Their CLI journeys
 exercise archive/reset/restore/archive equivalence. Remote transfer and deployed
 product acceptance remain outside this local adoption.
+
+### Reclaiming the same hosted import
+
+An authenticated owner calls `POST /api/portability/imports/:id/reclaim` after
+`abortableAt`, or a trusted adapter calls `service.imports.reclaim(id, actor)`
+with its authenticated actor (the sole local operator defaults to `direct`).
+Another actor gets `job_not_found`; a fresh lease gets `import_running` and
+terminal jobs get `import_phase`. The handler also requires the application
+Origin. This operation never transfers ownership.
+
+The winner takes a new random fenced holder generation. It verifies every
+acknowledged part against its stored digest and receipt, preserves staged rows,
+and returns `completed`, the first incomplete part index. Upload that part again
+with the same bytes; its durable mid-part cursor skips already committed chunks.
+When `completed === total`, retry finalize with the archive closing hashes.
+Two simultaneous reclaimers have one winner. Every later mutating D1 batch from
+the old request fails its holder guard. Explicit abort, automatic stale cleanup
+when creating another restore, and sole-operator CLI cleanup keep their behavior.
+
+Reclaim refuses `import_reclaim_unsafe` if the job reached `applying` and its
+archive has R2 objects or extra payload consumers. Before issuing those effects,
+finalize durably records that external effects started. A caught error retains
+that uncertainty even when owned-object cleanup resets the phase to staging;
+cleanup cannot cancel an already-issued effect. The safety precondition and new
+lease commit in one D1 batch, so an unsafe refusal cannot change the holder or
+expiry. D1 cannot fence a previously issued R2 multipart completion or arbitrary
+callback, and these systems have no
+shared transaction. Only staging and D1-only finishing can safely resume in
+place. Wait for the external request to stop, then use the existing abort/new
+restore recovery. Lease expiry alone does not prove an external request stopped.
+This is an explicit safety limit, not a guarantee of cross-resource atomicity.
+
+### Seed erasure hook before activation
+
+A seed can export `restoreHook` in the default policy object from the same
+seed-owned `policyModule` declared in its RER `localPortability` configuration.
+Hosted adapters import that same policy module and pass it to
+`createPortability` or `createPortabilityHandler`. Archive metadata never selects
+code. Container transport still refuses executable policy modules.
+
+```js
+export default {
+  product: 'my-product',
+  restoreHook: {
+    registry: {table: 'erased_accounts', idColumn: 'id'},
+    async run({stagedDb, liveDb, archiveManifest}) {
+      // Seed code owns account, credential and delegation semantics.
+      // Inspect staged accounts, revoke every credential kind and both
+      // delegation directions, preserve erased state, then record counts.
+    },
+  },
+};
+```
+
+The module receives this explicit minimal contract instead of raw database
+handles, so it cannot write arbitrary live tables:
+
+- `stagedDb.read(table, {offset = 0, limit = 100})` reads verified staged rows
+  in primary-key order; paginate until exhausted (maximum page size 1,000).
+- `await stagedDb.delete(table, where)` and
+  `await stagedDb.update(table, where, values)` buffer exact-equality mutations
+  and return affected row counts. `where` is a nonempty column/value record.
+  Deletes require a primary key; updates cannot change keys or generated cells.
+  Await each call. Reads see the pre-hook snapshot, including after buffered
+  mutations; select disjoint removals when counting delegations in both
+  directions. Overlapping operations whose counts change fail closed.
+- `liveDb.erasedIds()` returns only the live registry's opaque ids. The registry
+  must have a single TEXT primary key and remain append-only under the seed's
+  erasure implementation. Ids use 1–128 ASCII letters, digits, `_` or `-`.
+  The registry is automatically excluded from archives and restore, cannot be
+  included or replaced, and must share the activation D1 database.
+- `liveDb.audit({opaqueId, revocations})` queues one audit row per staged restore
+  and erased id. `revocations` holds nonnegative integer counts for `password`,
+  `session`, `api_key`, `passkey`, `oauth_token`, `refresh_token`,
+  `delegation_issued` and `delegation_held`. No name, email or credential values
+  enter this API. The seed must audit every staged account found in the registry.
+- `archiveManifest` is a detached copy of the verified archive manifest.
+
+The hook runs after archive integrity checks and row normalization, before
+read-only staged validation, object writes and activation. Its staged mutations,
+sidecar cleanup, counts and completion receipt commit in **one fenced D1 batch**.
+A hook exception, false result or failed mutation aborts the job without
+activation. An interrupted attempt before that batch can run the hook again;
+a durable receipt skips it on retry/reclaim. The seed hook must be deterministic,
+idempotent and free of external effects. It must handle all its account,
+session, API-key, passkey, OAuth-token, refresh-token and delegation tables.
+
+The append-only `rer_portability_restore_audit(job, opaque_id, revocations)`
+table is live installation bookkeeping, excluded from restore. Audit insertion,
+product activation and the complete-job receipt commit in the **same D1 batch**.
+An activation failure therefore leaves no live audit claiming a successful
+restore. Retrying a committed restore cannot duplicate audit rows. Existing
+registry and audit rows survive an old archive restore.
+
+Both batches compare the exact registry id set with the hook's snapshot. If
+another erasure arrives, publication refuses; abort and start a new restore so
+its hook sees the new registry. A changed registry declaration also refuses.
+The hook currently refuses restores with additive migration data replays:
+those writes occur at activation and would bypass staged sanitization. Batches
+that exceed D1 transport limits fail closed; they are never split to weaken
+atomicity. R2 objects and arbitrary payload effects remain outside D1's atomic
+boundary. A seed whose registry/audit lives in a different database needs a
+separate design; this API does not claim a distributed transaction.
+
+The synthetic hook in `tests/fixtures/erasure-hook.mjs` demonstrates the
+contract only. Base does not install it in a product or establish seed adoption.
