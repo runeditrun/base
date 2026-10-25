@@ -54,6 +54,18 @@ record repository or an edition's Base source URL is still honored. No source
 scripts run, and the temporary clone is removed. `--base` is relative to the
 seed root; it must contain both the recorded and target commits.
 
+
+Origin package-format selection refuses ambiguous `package.json` metadata instead
+of guessing Node's interpretation. Duplicate object keys and escaped key spellings
+are unsupported in every object, including nested unrelated metadata. Root
+`name` and `type`, when present, must be strings; unrelated nested values remain
+unrestricted JSON. Diagnostics name the offending package file and metadata
+location, or the malformed JSON syntax. These refusals belong to planning, before
+any copied file or copy record is written. Ordinary module/CommonJS packages,
+empty or default metadata, and typeless extensionless syntax detection retain
+their existing format rules. Discovery reads committed data without executing
+origin code.
+
 For offline use, supply `--offline --base CHECKOUT`. Without a checkout refresh
 refuses plainly; it cannot refresh from hashes alone. Offline Git reads use an isolated
 repository with the checkout’s object store and no remotes, including on Git 2.43.

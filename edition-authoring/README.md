@@ -265,6 +265,18 @@ Base removed, and run `record-base` with the new commit. Then run `verify-base`
 and the edition's own tests, and commit the copies with the record. To review
 what changed upstream first, read `git -C BASE diff OLD NEW -- modules/mail`.
 
+
+Origin package-format selection refuses ambiguous `package.json` metadata instead
+of guessing Node's interpretation. Duplicate object keys and escaped key spellings
+are unsupported in every object, including nested unrelated metadata. Root
+`name` and `type`, when present, must be strings; unrelated nested values remain
+unrestricted JSON. Diagnostics name the offending package file and metadata
+location, or the malformed JSON syntax. These refusals belong to planning, before
+any copied file or copy record is written. Ordinary module/CommonJS packages,
+empty or default metadata, and typeless extensionless syntax detection retain
+their existing format rules. Discovery reads committed data without executing
+origin code.
+
 **Keep seed adaptations.** Before refreshing, explicitly declare each adapted file:
 
 ```sh
