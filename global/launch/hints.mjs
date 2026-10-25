@@ -1,7 +1,7 @@
 // Preparation failures and legacy dispatcher output use the invocation that
 // the person's shell can run. Qualify before JSON serialization: a quoted
 // checkout is one literal shell word, even when it contains command words.
-import { readShellWords } from '../../cli/shell-word.mjs';
+import { readShellWord, readShellWords } from '../../cli/shell-word.mjs';
 
 const contains = (ranges, offset) => ranges.some(([start, end]) => start <= offset && offset < end);
 const escapePattern = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -19,7 +19,15 @@ function commandHints(text, invocation) {
    const word = words[index];
    if (word.value === '--cwd') {
     cwd = words[index + 1];
-    if (cwd?.value.startsWith('/')) paths.add(cwd.value);
+    // A quoted checkout holding a newline can still be open where this text
+    // ends. It remains the checkout argument; nothing inside it is a command.
+    if (!cwd) {
+     let next = word.end;
+     while (text[next] === ' ' || text[next] === '\t') next++;
+     const rest = readShellWord(text, next);
+     if (!rest.complete) cwd = { ...rest, start: next };
+    }
+    if (cwd?.complete && cwd.value.startsWith('/')) paths.add(cwd.value);
     break;
    }
    // After the options, an ordinary word is diagnostic prose, not argv.
@@ -39,12 +47,24 @@ function commandHints(text, invocation) {
  return outsideProse.filter(command => !contains(targets, command.start));
 }
 
-export function qualifyHints(value, stopHint) {
- if (!stopHint) return value;
- const words = readShellWords(stopHint);
+// The working invocation that starts a stop hint: its words before `dev --stop`.
+function parseStopHint(stopHint) {
+ const words = readShellWords(stopHint ?? '');
  const verbIndex = words.findIndex((word, index) => word.value === 'dev' && words[index + 1]?.value === '--stop');
- if (verbIndex < 1) return value;
- const invocation = stopHint.slice(0, words[verbIndex - 1].end);
+ return verbIndex < 1 ? undefined : { words, verbIndex, invocation: stopHint.slice(0, words[verbIndex - 1].end) };
+}
+
+// Output read a line at a time must wait while a command's quoted checkout is
+// still open at the end of `text`: its next lines belong to that one word.
+export function openCheckout(text, stopHint) {
+ const hint = parseStopHint(stopHint);
+ return Boolean(hint) && commandHints(text, hint.invocation).some(command => command.cwd?.complete === false);
+}
+
+export function qualifyHints(value, stopHint) {
+ const hint = parseStopHint(stopHint);
+ if (!hint) return value;
+ const { words, verbIndex, invocation } = hint;
  if (typeof value === 'string') {
   let result = '', cursor = 0;
   for (const command of commandHints(value, invocation)) {

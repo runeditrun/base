@@ -13,6 +13,7 @@ import {selectedOrigin} from './local.mjs';
 import {prepareSettings} from '../onboarding/adapter-settings.mjs';
 import {searchCandidates} from '../onboarding/port-probe.mjs';
 import {firstFreePort} from './port.mjs';
+import {shellQuote} from './shell-word.mjs';
 import {freePort as devPort} from '../global/launch/facts.mjs';
 
 // A separate process listening on every address, the way another checkout's server may.
@@ -120,13 +121,28 @@ test('a busy port held by another checkout names that checkout and the command t
   if(mode==='inconclusive')assert.doesNotMatch(message,/other-checkout|kill -TERM/);
   else {
    assert.ok(message.includes(checkout),message);
-   assert.ok(message.includes(`dev --cwd "${checkout}" --stop`),message);
+   assert.ok(message.includes(`dev --cwd ${shellQuote(checkout)} --stop`),message);
   }
   const port=Number(/rer setup --port (\d+)/.exec(message)[1]);
   assert.notEqual(port,holder.port);
   const socket=createServer();
   try{await new Promise((resolve,reject)=>{socket.once('error',reject);socket.listen(port,'127.0.0.1',resolve);});}
   finally{if(socket.listening)await new Promise(resolve=>socket.close(resolve));}
+ }
+});
+
+test('a busy port\'s stop instruction names its holder as the shell reads it',async t=>{
+ const holder=await wildcardListener(t,'127.0.0.1'),servers=await directory(t),root=await directory(t);
+ // A newline, $HOME, a backslash and both quotes in a directory name stay literal bytes.
+ const checkout="/work/other\nrer dev --stop\n$HOME\\it's \"here\"";
+ await writeFile(join(servers,'state.json'),JSON.stringify({version:1,sequence:0,queued:[],running:[{checkout,mode:'dev',port:holder.port,owner:{pid:holder.pid}}]}));
+ for(const entry of ['preflight','listen']){
+  const {stdout:message}=await promisify(execFile)(process.execPath,[join(import.meta.dirname,'fixtures/port-inspection.mjs'),'identified',entry,String(holder.pid),String(holder.port),root],{env:{...process.env,RER_SERVERS_DIR:servers},cwd:root,timeout:30000});
+  // The stop instruction ends the refusal; the shell only decodes its words.
+  const command=message.slice(message.lastIndexOf('rer dev --cwd ')).trimEnd();
+  const {stdout}=await promisify(execFile)('/bin/sh',['-c','set -- '+command+'; printf "%s\\0" "$@"'],{env:{PATH:process.env.PATH,HOME:root}});
+  const argv=stdout.split('\0').slice(0,-1);
+  assert.equal(argv[argv.indexOf('--cwd')+1],checkout,message);
  }
 });
 

@@ -56,3 +56,38 @@ test('capacity recovery uses the working launcher and the live holder in text an
   }
  }
 });
+
+test('a refused detached launch keeps credential values private and both recovery targets on the live holder', { timeout: 60000 }, async t => {
+ const directory = await realpath(await mkdtemp(join(tmpdir(), 'rer-holder-private-')));
+ const home = join(directory, 'home'), servers = join(directory, 'servers'), checkout = join(directory, 'hf_models_cache'), target = join(base, 'default-seed');
+ await Promise.all([mkdir(home), mkdir(servers), mkdir(checkout)]);
+ t.after(() => rm(directory, { recursive: true, force: true }));
+ const holder = spawn(process.execPath, ['-e', "require('node:net').createServer().listen(0,'127.0.0.1',function(){console.log(this.address().port)})"], { cwd: checkout, stdio: ['ignore', 'pipe', 'pipe'] });
+ try {
+  const port = Number(String((await once(holder.stdout, 'data'))[0]).trim());
+  await writeFile(join(servers, 'state.json'), JSON.stringify({ version: 1, sequence: 0, queued: [], running: [{ checkout, mode: 'dev', port, limit: 1, explicit: true, owner: { pid: holder.pid } }] }));
+  for (const json of [false, true]) {
+   // PWD_DATABASE names a password, and its value is the checkout this launch retries.
+   const child = spawn(process.execPath, [join(base, 'global/rer.mjs'), 'dev', '--detach', '--cwd', target, ...(json ? ['--json'] : [])], {
+    cwd: directory, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { PATH: process.env.PATH, HOME: home, PWD: directory, OLDPWD: directory, PWD_DATABASE: target, RER_SERVERS_DIR: servers, RER_SERVER_LIMIT: '10', RER_INVOKED_AS: '/working bin/rer', RER_NODE_AUTO: '0', RER_NO_UPDATE_CHECK: '1', CI: 'true' },
+   });
+   t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); });
+   let stdout = '', stderr = '';
+   child.stdout.on('data', data => { stdout += data; }); child.stderr.on('data', data => { stderr += data; });
+   const [code] = await once(child, 'close');
+   assert.equal(code, 4, stderr + stdout);
+   assert.ok(!(stdout + stderr).includes(target), 'the credential value never reaches the output');
+   const message = json ? stdout.trim().split('\n').map(line => JSON.parse(line)).find(event => event.event === 'error')?.message : stderr.trimEnd();
+   const targets = [];
+   for (const command of message.split('\n').filter(line => line.trimStart().startsWith("'/working bin/rer' dev") && line.includes('--cwd'))) {
+    const decoded = await run('/bin/sh', ['-c', 'set -- ' + command + '; printf "%s\\0" "$@"']);
+    const argv = decoded.stdout.split('\0').slice(0, -1);
+    if (argv[argv.indexOf('--cwd') + 1] === checkout) targets.push(argv);
+   }
+   assert.equal(targets.length, 2, 'the stop and restart commands both target the live holder');
+  }
+ } finally {
+  const closed = once(holder, 'exit'); holder.kill('SIGTERM'); await closed;
+ }
+});

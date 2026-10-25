@@ -2,9 +2,12 @@
 // re-exec. Hold whole lines so no credential prefix escapes into a pipe.
 import { StringDecoder } from 'node:string_decoder';
 import { closingLine } from './render.mjs';
-import { qualifyHints } from './hints.mjs';
+import { openCheckout, qualifyHints } from './hints.mjs';
 
 const keySentence = 'Open that link on this computer.';
+// A quoted path is far shorter; past this a record is shown as it stands.
+const heldLimit = 65536;
+const parses = text => { try { JSON.parse(text); return true; } catch { return false; } };
 
 export function watchReady({ keyless, json, name, openHint, stopHint, opener, foreground = true, piped = false, onOutput = () => {}, onReady = () => {} }) {
  const write = process.stdout.write.bind(process.stdout);
@@ -33,17 +36,26 @@ export function watchReady({ keyless, json, name, openHint, stopHint, opener, fo
   if (keyless && (tag === 'RER_OPEN' || text.startsWith(keySentence))) return undefined;
   return qualifyHints(text, stopHint);
  };
+ // A quoted checkout can hold newlines. Its lines stay one record until the
+ // quote closes, so no line inside it is read as a command of its own.
+ const continues = text => text.length <= heldLimit && openCheckout(text, stopHint) && !parses(text);
  const stream = output => {
   const decoder = new StringDecoder('utf8');
-  let pending = '';
+  let pending = '', held;
   const flush = chunk => {
    onOutput();
    const lines = (pending + chunk).split('\n'); pending = lines.pop();
-   let kept = lines.map(read).filter(line => line !== undefined).map(line => line + '\n').join('');
+   const records = [];
+   for (const line of lines) {
+    const text = held === undefined ? line : `${held}\n${line}`;
+    held = continues(text) ? text : undefined;
+    if (held === undefined) records.push(text);
+   }
+   let kept = records.map(read).filter(line => line !== undefined).map(line => line + '\n').join('');
    if (ready && !scheduled) { scheduled = true; setImmediate(() => { finish().catch(() => {}); }); }
    return kept ? output(kept) : true;
   };
-  return { write: chunk => flush(typeof chunk === 'string' ? chunk : decoder.write(chunk)), end: () => { const last = read(pending + decoder.end()); pending = ''; if (last) output(last); } };
+  return { write: chunk => flush(typeof chunk === 'string' ? chunk : decoder.write(chunk)), end: () => { const last = read((held === undefined ? '' : `${held}\n`) + pending + decoder.end()); held = undefined; pending = ''; if (last) output(last); } };
  };
  const stdout = stream(write), stderr = stream(process.stderr.write.bind(process.stderr));
  if (!piped) {

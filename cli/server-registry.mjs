@@ -10,13 +10,14 @@ import { refuse, invalid } from './errors.mjs';
 import { serverDefaults } from './contract.mjs';
 import { serverLimitFile } from './server-limit-file.mjs';
 import { availableMemory } from '../modules/job-queue/resources.mjs';
+import { shellQuote } from './shell-word.mjs';
 
 export function positive(value, name, fallback) {
  if(value===undefined)return fallback;
  if(!/^[1-9][0-9]*$/.test(String(value)) || !Number.isSafeInteger(Number(value)))throw invalid(`${name} must be positive integer seconds/count.`);
  return Number(value);
 }
-export const stopInstruction = record => `rer ${record.mode} --cwd ${JSON.stringify(record.checkout)} --stop`;
+export const stopInstruction = record => `rer ${record.mode} --cwd ${shellQuote(record.checkout)} --stop`;
 // Plain-words listing of one running server for the limit refusal.
 const listing = record => `  ${record.mode} on port ${record.port ?? '(starting)'} in ${record.checkout}\n    stop it with: ${stopInstruction(record)}`;
 export const description = record => `${record.mode} ${record.url ?? '(starting)'} for ${record.checkout}; stop it with: ${stopInstruction(record)}`;
