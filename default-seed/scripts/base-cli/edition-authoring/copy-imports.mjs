@@ -15,7 +15,7 @@ const outsidePath = value => path.posix.isAbsolute(value) || /^(?:file:|[a-z]:)/
 export function closeImports({root, record, recordPath, plans, next, read, revision, local, files}) {
   const formatFor = moduleFormats(read, revision);
   const isCode = copyEntrypoints(read, next);
-  const adopted = [], problems = new Set(), queue = [], scheduled = new Map();
+  const adopted = [], problems = new Set(), queue = [], scheduled = new Map(), traversals = new Map();
   // Snapshot original ownership before closure can synthesize helper records.
   const recorded = new Map(record.copies.flatMap(copy => Object.keys(copy.files).map(name => [name, copy])));
   const unchanged = item => {
@@ -35,9 +35,14 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
   };
   const locate = name => plans.find(({copy}) => Object.hasOwn(copy.files, name) || copy.path === name || name.startsWith(copy.path + '/'));
   const enqueue = (plan, source, name, bytes, boundary, depth, adapted = false, pin = plan.copy.revision, imported = false) => {
-    const previous = scheduled.get(name);
+    // A delivery has one destination, but every requesting origin has a graph.
+    // Deduplicate cycles by both identities so equal helper bytes never suppress
+    // traversal of an alternate origin and its descendants.
+    const key = JSON.stringify([name, source]);
+    const previous = traversals.get(key);
     const item = previous || {plan, source, name, bytes, boundary, depth, adapted, pin};
-    scheduled.set(name, item);
+    traversals.set(key, item);
+    if (!scheduled.has(name)) scheduled.set(name, item);
     // Runtime source has its own TS resolution and seed-sibling policy.
     const kind = isCode(item.source, item.bytes, imported);
     if (kind === true && !item.strict) { item.strict = true; item.queued = false; }
@@ -109,6 +114,8 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
           if (!requested || requested.mode !== supplied.mode || !read.blobs([requested.object]).get(requested.object).equals(existing.bytes)) {
             fail(`conflicting planned delivery to ${name} from ${existing.source} and ${source}`); continue;
           }
+          enqueue(existing.plan, source, name, existing.bytes, importer.boundary, importer.depth + 1, false, importer.pin, true);
+          continue;
         }
         // The destination's own copy mapping is authoritative. A seed may
         // compose siblings from different Base directories or adapt one of them.

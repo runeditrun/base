@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
-import {requireMaterializedCopies} from './copy-checkout.mjs';
+import {requireMaterializedCopies, preflightRefresh} from './copy-checkout.mjs';
 import {closeImports} from './copy-imports.mjs';
 import {checkCopyDestinations} from './copy-destinations.mjs';
 import {completeRuntimeCopies} from './runtime-dependencies.mjs';
@@ -398,6 +398,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     }});
     const adopted = closeImports({root, record, recordPath, plans, next, read, revision, local, files});
     checkCopyDestinations({root, plans, files, recordPath});
+    preflightRefresh(root, plans, recordPath);
     // Closure may add individually recorded siblings when the seed originally
     // selected runtime files one at a time instead of copying the directory.
     record.copies = plans.map(plan => plan.copy).sort((a, b) => a.path.localeCompare(b.path));

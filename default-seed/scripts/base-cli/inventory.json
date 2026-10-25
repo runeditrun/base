@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g4336f57c",
+  "cliVersion": "0.2.80-dev.ge4a4c6b3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "dcf5634e94dae2cdfa47ec56d0fa8a08350d09bf2e369bef7064cbc2644c5520"
+      "sha256": "0a6e5cc57c042fcf4f20c51167ad7dc5412e116c973cc90ca9331c13c9f59694"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1167,7 +1167,11 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "82fb49196afa39e684411532280a029cd914740f97cb412dbfc88a889d06a9fa"
+      "sha256": "8534fdca0139f804732f9130e8196ce74fefd749ba88bcdcbac2be3c45ce8f18"
+    },
+    "edition-authoring/case-folding.mjs": {
+      "source": "edition-authoring/case-folding.mjs",
+      "sha256": "f14bcedada78ec12ca195998f1b6e603ad16f43f3baf2c7d879172fce533d78f"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1175,11 +1179,11 @@
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
-      "sha256": "7b7fff83e2cc90f4b7a1f83673ea1d77d02704377ada4e13164d9ec74e83ba00"
+      "sha256": "c1437d7c6ae1f6a5d7c7051dffae2432a6ac71157e070ddb0454b70cf0eaadad"
     },
     "edition-authoring/copy-destinations.mjs": {
       "source": "edition-authoring/copy-destinations.mjs",
-      "sha256": "4c9b2dfca6d410dee4f90f534c4efa472a23e66efc52500d0a960325a4ff4c96"
+      "sha256": "faadd2f3ad6c391aa5ea859d6370447b460d6cb482ebe5249251ab97c5a2d427"
     },
     "edition-authoring/copy-entrypoints.mjs": {
       "source": "edition-authoring/copy-entrypoints.mjs",
@@ -1187,11 +1191,15 @@
     },
     "edition-authoring/copy-imports.mjs": {
       "source": "edition-authoring/copy-imports.mjs",
-      "sha256": "9587ba19835414b2d401b3ddf373f593db5509950e4e7d2787089481cb254b30"
+      "sha256": "a50d954a6fa096c39f3338fbaf69a9d6ee4372db4eebe4054bc55def7d0724ca"
+    },
+    "edition-authoring/copy-path-key.mjs": {
+      "source": "edition-authoring/copy-path-key.mjs",
+      "sha256": "7bd4073b169e7a13a205a4f5b3ff494eb7484faf744c5657b7ff7cef97df360a"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
-      "sha256": "9dfb5940c9b793cca5ddf9556b756c81046a371a16a10c5b869487172a6c25ae"
+      "sha256": "1371f01fe2686c8d21cf0f0e4654666d58b5416b63c2f0c988a0636062899761"
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
