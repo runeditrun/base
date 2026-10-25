@@ -45,7 +45,7 @@ export function noLinks(root, relative) {
     let stat;
     try { stat = fs.lstatSync(current); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
-    if (stat?.isSymbolicLink()) throw Error('Symlink in destination path');
+    if (stat?.isSymbolicLink()) throw Error(`Symlink in destination path: ${relative} (${path.relative(root, current)})`);
   }
 }
 export function tracked(root, allowMissing = false) {

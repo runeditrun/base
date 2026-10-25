@@ -252,10 +252,17 @@ import when no outside-origin Base helper would replace its different bytes;
 its actual static imports are checked and its missing dependencies require explicit
 reconciliation. An outside-origin Base helper whose destination holds different
 seed-owned bytes refuses, naming the file; those bytes are never overwritten.
-New helper mappings are checked against every requesting source; incompatible
-bytes cannot silently share a destination. Before any write, the complete plan
-rejects file/descendant conflicts and names that collide after case folding or
-Unicode normalization, on every platform, naming both sources. Existing
+New helper mappings are checked against every requesting source, including the
+bytes, modes and source origins of their entire transitive helper graphs. Equal
+immediate helpers cannot conceal incompatible descendants. Before any write, the
+complete plan compares writes and removals together, rejecting file/descendant
+conflicts and aliases under NFC normalization and Unicode 17.0 full case folding
+(including multi-character folds), on every platform, naming both paths and sources.
+Removals must be regular files. Existing write targets, the copy record and any
+source lock are checked with OS access checks and non-truncating opens; creation
+checks include the nearest existing ancestor of new directories. Known shape,
+ownership or permission obstructions refuse before any mutation. This preflight
+does not roll back a later race, crash or I/O failure. Existing
 equal-byte seed-owned dependencies are traversed without taking ownership.
 Missing source at the refreshed commit, recorded removals, files deliberately kept
 out or ignored, symlinks, seed-root escapes, absolute/file-URL/drive paths, depth
