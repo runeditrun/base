@@ -1,6 +1,6 @@
 import importersSchemaJson from '../../schema/importers.schema.json' with { type: 'json' };
 import receiptSchemaJson from '../../schema/importer-verification-receipt.schema.json' with { type: 'json' };
-import { canonicalJson } from './encoding.ts';
+import { canonicalReceiptJson as canonicalJson } from '../receipt/encoding.ts';
 import type { ImporterValidationIssue } from './types.ts';
 
 interface JsonSchema {

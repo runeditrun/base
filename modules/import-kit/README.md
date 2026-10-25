@@ -381,6 +381,90 @@ to resolve and verify the referenced evidence. A `documented format` row records
 `validation: "synthetic-only"` and `realExport: "not-supplied"`; only the required
 real-export evidence can establish `verified` status.
 
+### Signing receipts and supplying a trust policy
+
+The public API exports `canonicalReceiptJson`, `signImporterVerificationReceipt`,
+`verifyImporterVerificationReceipt` and `createReceiptEvidencePort`. The receipt
+and status entry points (`src/receipt/index.ts` and `src/status/index.ts`) use only
+WebCrypto and Web APIs and can run in a Worker or Node. The root entry also
+exports these APIs alongside the existing Node SQLite engine.
+
+The signer takes a caller-supplied Ed25519 private `CryptoKey` with `sign` usage
+and a payload satisfying
+[`importer-verification-receipt` v1](./schema/importer-verification-receipt.schema.json).
+It validates the schema, snapshots the payload and signs its canonical UTF-8
+bytes. Canonical JSON sorts every object's keys recursively by JavaScript's
+UTF-16 code-unit ordering, preserves array order, and uses `JSON.stringify`
+scalar escaping and number representation, without whitespace. Non-JSON values,
+non-finite numbers, sparse arrays and cycles are refused. The signature is padded
+base64. Only `payload` is signed, as required by v1; envelope key IDs select a
+public key and do not independently attest an issuer name. Reordering an object's
+keys before verification is harmless; signing insertion-order JSON instead of
+canonical JSON produces an invalid signature.
+
+The verifier returns `{ valid, issues }`. It checks the complete schema
+(including `source.sha256`, every dry-run/apply count and `byKind`), the signature,
+and the existing mapping, count, reconciliation, unmapped-manifest and safe-text
+rules. `synthetic: true` always fails. A policy maps each `keyId` to a public
+Ed25519 `CryptoKey` with `verify` usage or an SPKI PEM public key. Its `environment`
+is chosen by the consumer; a key's optional `environments` list restricts its use
+to those environments. An empty list refuses it everywhere; omitting the list
+permits every environment. Unknown IDs and keys outside these rules fail closed.
+The policy is trusted consumer configuration and must never come from the receipt
+or registry being checked.
+
+For example, given a real verification payload and its reviewed registry, this
+Node example signs with a temporary development key, then checks pinned artifacts:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import {
+  signImporterVerificationReceipt, verifyImporterVerificationReceipt,
+  createReceiptEvidencePort, validateImporters,
+} from './src/index.ts';
+
+const payload = JSON.parse(await readFile('verification-payload.json', 'utf8'));
+const registry = JSON.parse(await readFile('importers.json', 'utf8'));
+const keys = await crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']);
+const policy = {
+  environment: 'stage',
+  keys: { 'stage-development': { publicKey: keys.publicKey, environments: ['stage'] } },
+};
+const receipt = await signImporterVerificationReceipt(payload, 'stage-development', keys.privateKey);
+const verified = await verifyImporterVerificationReceipt(receipt, policy);
+if (!verified.valid) throw new Error(JSON.stringify(verified.issues));
+// Publish JSON.stringify(receipt) and the finished research artifact. Pin the
+// SHA-256 and byte size of those exact published bytes in registry evidence.
+const evidence = createReceiptEvidencePort({
+  trustedHosts: ['evidence.example.test'], // Use your controlled publisher host.
+  async resolve(link) {
+    const response = await fetch(link, { redirect: 'error' });
+    if (!response.ok) return undefined;
+    return { url: response.url, bytes: new Uint8Array(await response.arrayBuffer()) };
+  },
+}, policy);
+const result = await validateImporters(registry, evidence);
+if (!result.valid) throw new Error(JSON.stringify(result.issues));
+```
+
+`validateImporters` accepts that port directly. It additionally binds the receipt
+to the row's incumbent/product and the resolved research bytes, and retains URL,
+publisher-host, size and artifact hash checks. A valid result's
+`evidence.verifiedReceipts` counts only verified rows whose receipts pass every
+check. It does not promote or mutate registry rows; `documented format` keeps its
+synthetic-only meaning. Existing `receiptPublicKeys` PEM pins remain an unrestricted
+public-key policy when `receiptTrustPolicy` is absent; an explicit trust policy
+takes precedence and never falls back to those pins on refusal.
+
+Signing attests the caller's claims; it does not capture exports, recalculate the
+source digest, run an importer or perform the review. The caller must calculate
+those values from the actual export, preview, apply and reconciliation results.
+The signer never generates, stores or retrieves production keys. The consumer
+lists public keys only. Production private-key custody, issuer authorization and
+rotation are owner decisions outside this module; this contract chooses none of
+them. A stage-only key must be explicitly restricted to `['stage']` and cannot
+authorize a production receipt.
+
 Base keeps its edition registry and source-specific guides in its private
 authoring tree. They retain exact source identities and evidence pins and are
 not part of this reusable module. Review any consumer registry and its source
@@ -394,7 +478,8 @@ suites. The targeted crash and evidence-validation checks can be run with:
 ```sh
 TMPDIR="$PWD/../scratch" node --test \
   modules/import-kit/tests/core/crash.test.ts \
-  modules/import-kit/tests/status.test.ts
+  modules/import-kit/tests/status.test.ts \
+  modules/import-kit/tests/receipt.test.ts
 ```
 
 Set `TMPDIR` to an existing writable directory inside the work area before
