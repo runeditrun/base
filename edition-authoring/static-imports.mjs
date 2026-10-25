@@ -31,11 +31,20 @@ const parse = `
     nativeParsing = false;
     const requires = [];
     if (process.argv[3] === 'requires') {
-      const {parse} = require('internal/deps/acorn/acorn/dist/acorn');
+      const {Parser} = require('internal/deps/acorn/acorn/dist/acorn');
+      // Bundled Acorn leaves keyword expression context after optional-chain
+      // property names (o?.return / 2). An identifier ends that context, just
+      // as it does after a plain dot. V8 has already validated the source.
+      const EntryParser = Parser.extend(Base => class extends Base {
+        parseIdent(liberal) {
+          if (liberal) this.exprAllowed = false;
+          return super.parseIdent(liberal);
+        }
+      });
       const input = format === 'commonjs'
         ? '(function(exports,require,module,__filename,__dirname){\\n' + text.replace(/^#![^\\r\\n]*/, '') + '\\n})'
         : text;
-      const tree = parse(input, {ecmaVersion: 'latest', sourceType: format === 'module' ? 'module' : 'script'});
+      const tree = EntryParser.parse(input, {ecmaVersion: 'latest', sourceType: format === 'module' ? 'module' : 'script'});
       const pending = [tree];
       while (pending.length) {
         const node = pending.pop();
