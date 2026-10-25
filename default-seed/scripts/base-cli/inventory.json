@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gb162c89e",
+  "cliVersion": "0.2.80-dev.g277ff07e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -799,7 +799,7 @@
     },
     "cli/errors.mjs": {
       "source": "cli/errors.mjs",
-      "sha256": "aed5b5be4faab90d7901154d02d547685d2a5543788bfa7ca13fff38dddb31f1"
+      "sha256": "269db47fc1e743b3ab1967632f80d5775a1f3788c3e54c6687912de17967bdcc"
     },
     "cli/export-summary.mjs": {
       "source": "cli/export-summary.mjs",
@@ -899,7 +899,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "5a0c1a005d051031c539d4bae486bce0091268a47799d00d094aa0674831b66f"
+      "sha256": "365cebcf4b23cf714cd4969487868a22387ff9a83ea47d0c6b5d2d751444ac52"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
