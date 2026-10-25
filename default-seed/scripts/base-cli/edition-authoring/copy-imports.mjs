@@ -96,7 +96,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         // Preserve only a verified existing edge, including its original source
         // mapping and both endpoints. New/changed unsupported edges still fail
         // before the scheduled shortcut, even inside a directory copy.
-        if (!existing || existing.source !== source || !unchanged(importer) || !unchanged(existing)) {
+        if (!existing || !unchanged(importer) || !unchanged(existing)) {
           fail('unsupported static import format; only JavaScript and JSON are supported');
         }
         continue;

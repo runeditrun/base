@@ -1187,7 +1187,7 @@
     },
     "edition-authoring/copy-imports.mjs": {
       "source": "edition-authoring/copy-imports.mjs",
-      "sha256": "4007670c8e831b22721d441b70a25920f4ded3f1236bbb39c81a52129e59a83e"
+      "sha256": "9587ba19835414b2d401b3ddf373f593db5509950e4e7d2787089481cb254b30"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
