@@ -1,3 +1,4 @@
+import { applyRestoreHook, restoreHookPublication } from './restore-hook.mjs';
 import { all, statement, state, guard, job, save, partQueries, parts, readPart, dropCopyStatements, cleanCopyStatements, quote, stream, insist, run } from './storage.mjs';
 import { stagePart } from './import-staging.mjs';
 import { normalizeStaged } from './import-safety.mjs';
@@ -33,6 +34,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   insist(manifest.schemaObjects!==undefined || legacyRecovery,'schema_mismatch:legacy_schema',409);
   const same=manifest.schema===cat.identity,history=()=>archivedHistory(original,ledgers);
   const {replays,...bridge}=upgrade?{}:same?(await sameSchemaMigrations(db,manifest,cat,context.migrations,history)??{}):await additiveBridge(db,manifest,cat,context.migrations,history);
+  insist(!config.restoreHook || !replays?.length,'invalid_restore_hook',409);
   // Finalize checks object references on the staged rows; a later migration
   // replayed into a reference table would publish rows that check never saw.
   const referenced=replays?.find(r=>Object.values(config.buckets).some(spec=>spec.objectReferences?.table===r.table));
@@ -56,7 +58,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
     await abortImport(context,previous,{staleOnly:true});
   }
   const id=crypto.randomUUID(),copies=Object.fromEntries(targets.map((t,i)=>[t.name,'rer_portability_stage_'+id.replaceAll('-','')+'_'+i]));
-  const row={id,kind:'import',actor,phase:'staging',completed:0,metadata:{manifest:original,...(skippedTables.length?{restoreManifest:manifest,skippedTables}:{}),copies,targets,triggers:cat.triggers,...(bridge.fromSchema?{bridge}:{}),...(replays?{replays}:{}),...(legacyRecovery?{legacyRecovery}: {}),...(ledgers?{ledgers}:{})}};
+  const row={id,kind:'import',actor,phase:'staging',completed:0,metadata:{manifest:original,...(config.restoreHook?{restoreHookRegistry:config.restoreHook.registry}:{}),...(skippedTables.length?{restoreManifest:manifest,skippedTables}:{}),copies,targets,triggers:cat.triggers,...(bridge.fromSchema?{bridge}:{}),...(replays?{replays}:{}),...(legacyRecovery?{legacyRecovery}: {}),...(ledgers?{ledgers}:{})}};
   try {
     await db.batch([guard(db,'(SELECT import_job FROM rer_portability_state WHERE id=1) IS NULL'),
       statement(db,'UPDATE rer_portability_state SET import_job=? WHERE id=1',id),
@@ -161,6 +163,7 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
   const {db,config}=context,row=await job(db,id,'import');
   if(row.phase==='complete')return importStatus(context,id);
   insist(['staging','applying'].includes(row.phase),'import_phase',409);
+  insist(canonicalJson(row.metadata.restoreHookRegistry??null)===canonicalJson(config.restoreHook?.registry??null),'invalid_restore_hook',409);
   const manifest=row.metadata.manifest;insist(row.completed===manifest.partCount,'parts_missing');
   const verifier=new ContentVerifier(manifest),archive=new ArchiveVerifier(manifest),binaryIndexes=new Map();let index=0;
   // Rebuild from the fully verified parts on every finalize, including resume.
@@ -189,6 +192,13 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
   await refusePolicyApprovals(db,row.metadata.copies);
   await normalizeStaged(context,row);
   await refusePolicyApprovals(db,row.metadata.copies);
+  try {await applyRestoreHook(context,row);}
+  catch(error) {
+    // Hook failure cannot activate anything. A lost acknowledgement or changed
+    // registry remains recoverable/abortable; an actual hook refusal aborts.
+    if(error.code==='restore_hook_failed')await abortLeasedImport(context,row);
+    throw error;
+  }
   // The rows publication restores may name only this archive's objects, in their namespace.
   await checkReferences(context,row.metadata.copies,manifest.objects);
   if(config.validateStaged) {
@@ -209,7 +219,7 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
     }
     for(const payload of manifest.payloads)await config.extraPayloads[payload.name].consume(binaryStream(context,id,payload,binaryIndexes),payload);
     row.phase='complete';row.metadata.contentHash=digest;
-    await db.batch([db.prepare('PRAGMA defer_foreign_keys=ON'),...emptyGuards(context,row,seeded),...seeded.map(t=>guard(db,...seededCondition(t))),...dependentGuards,...legacyEmptyGuards(db,row),
+    await db.batch([db.prepare('PRAGMA defer_foreign_keys=ON'),...restoreHookPublication(context,row),...emptyGuards(context,row,seeded),...seeded.map(t=>guard(db,...seededCondition(t))),...dependentGuards,...legacyEmptyGuards(db,row),
       guard(db,'NOT EXISTS(SELECT 1 FROM rer_portability_epochs WHERE source=? AND epoch>?) AND NOT EXISTS(SELECT 1 FROM rer_portability_state WHERE source_identity=? AND epoch>?)',manifest.sourceIdentity,checked.epoch,manifest.sourceIdentity,checked.epoch),
       ...row.metadata.targets.map(t=>guard(db,`NOT EXISTS(SELECT 1 FROM ${quote(sidecar(row.metadata.copies[t.name]))} s JOIN rer_portability_journal j ON j.source=? AND j.tombstone=s.rer_portability_tombstone)`,manifest.sourceIdentity)),
       ...row.metadata.triggers.map(t=>db.prepare(`DROP TRIGGER ${quote(t.name)}`)),
@@ -236,6 +246,30 @@ export async function importStatus(context,id,{includeLease=true}={}) {
 export async function activeImport(context,actor='direct') {
   const id=(await state(context.db)).import_job;
   return id && (await job(context.db,id,'import')).actor===actor?importStatus(context,id):null;
+}
+// A reclaim is a new request generation, never a renewal by the expired holder.
+// The trusted service caller supplies its authenticated actor (direct for CLI).
+export async function reclaimImport(context,id,actor='direct') {
+  const row=await job(context.db,id,'import');
+  insist(row.actor===actor,'job_not_found',404);
+  insist(['staging','applying'].includes(row.phase),'import_phase',409);
+  if(!(await importLeaseStatus(context.db,row)).stale)throw await importRunning(context.db,id);
+  insist(row.phase!=='applying' || (!row.metadata.manifest.objects.length && !row.metadata.manifest.payloads.length),'import_reclaim_unsafe',409);
+  return withImportLease(context,id,async leased=>{
+    const current=await job(leased.db,id,'import'),manifest=current.metadata.manifest;
+    // R2 and arbitrary consumers have no D1 generation fence. Do not take over
+    // while a lost request could still complete one of those external effects.
+    insist(current.phase!=='applying' || (!manifest.objects.length && !manifest.payloads.length),'import_reclaim_unsafe',409);
+    for(let index=0;index<current.completed;index++) {
+      const part=await readPart(leased.db,id,index);
+      await checkPart(part,index,leased.config.partBytes);
+      const receipt=await statement(leased.db,'SELECT sha256 FROM rer_portability_parts WHERE job=? AND idx=?',id,index).first();
+      insist(receipt?.sha256===part.sha256,'part_checksum');
+    }
+    current.phase='staging';
+    await leased.db.batch([save(leased.db,current),leased.db.prepare('UPDATE rer_portability_state SET applying=0 WHERE id=1')]);
+    return importStatus(leased,id);
+  },{reclaim:true,staleOnly:true});
 }
 export async function abortImport(context,id,options={}) {
   const row=await job(context.db,id,'import');insist(row.phase!=='complete','import_complete',409);
