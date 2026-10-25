@@ -68,10 +68,10 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   preserveJournal = loaded !== null;
   const intent = await readIntent(checkout);
   await assertOperationAvailable(checkout);
+  const current = await preflight(checkout);
   try { installed = await recordedRelease(checkout); }
   catch (error) { if (!restore) throw error; }
   journal.from ??= installed;
-  const current = await preflight(checkout);
   const protectedJournal = needsRecovery(journal);
   if (protectedJournal && !restore) {
    if (current.branch !== journal.branch) throw failure('not_on_branch', 'The interrupted upgrade belongs to a different branch. Return to that branch before recovery.');
@@ -94,7 +94,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    wasRunning = protectedJournal ? journal.wasRunning : intendedRunning(intent ?? loaded, custody, await runningApp(checkout));
    if (!protectedJournal && !restore) await rememberIntent(checkout, current, wasRunning, custody);
   });
-  if (!protectedJournal) preserveJournal = false;
+  if (!protectedJournal) { preserveJournal = false; journal.wasRunning = wasRunning; }
   // Discardable attempts protect runtime intent only. Settle it at today's HEAD
   // even when the owner committed or selected a different target after the crash.
   if (!protectedJournal && !restore && wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));

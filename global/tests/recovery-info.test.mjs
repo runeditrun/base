@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { upgradeFixture } from './fixtures/upgrade/fixture.mjs';
 import { snapshot, writeJournal } from '../local-run/state.mjs';
@@ -9,7 +9,7 @@ import { run } from './harness.mjs';
 
 const result = r => r.stdout.split('\n').flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } }).findLast(e => e.event === 'result');
 
-test('recovery binds local task facts and emits guarded commands only for safe names', { timeout: 5 * 60_000 }, async t => {
+test('recovery binds local task facts and emits checkout-scoped commands only for safe names', { timeout: 5 * 60_000 }, async t => {
  const f = await upgradeFixture(t, { checkoutName: 'owner-app' });
  await f.git(f.directory, 'clone', '--quiet', f.source, f.root);
  await f.git(f.root, 'remote', 'set-url', 'origin', f.repositoryURL);
@@ -53,10 +53,15 @@ test('recovery binds local task facts and emits guarded commands only for safe n
  const missingBackup = { ...journal }; delete missingBackup.backup; await writeJournal(f.root, missingBackup);
  assert.deepEqual(await readRecovery(options), unavailable('backup_missing'));
  await writeJournal(f.root, journal);
+ const bin = join(f.directory, 'recovery-bin'); await mkdir(bin);
+ const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+ await writeFile(join(bin, 'rer'), `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(f.rer)} "$@"\n`);
+ await chmod(join(bin, 'rer'), 0o755); f.env.PATH = `${bin}:${f.env.PATH}`;
  const emitted = await f.run(['upgrade', '--json']);
  assert.equal(result(emitted).error_code, 'rollback_failed');
- const chain = emitted.stderr.slice(emitted.stderr.indexOf('cd -- ')).trim();
- assert.ok(chain.startsWith("cd -- 'owner-app' &&\n"));
+ const command = emitted.stderr.split('\n').find(line => line.startsWith('rer upgrade --cwd '));
+ assert.ok(command);
+ assert.doesNotMatch(emitted.stderr, /git\s+reset|rer\s+dev\s+--stop/);
  const wrong = join(f.directory, 'wrong-directory'); await mkdir(wrong);
  await f.git(wrong, 'init', '--quiet');
  await f.git(wrong, 'fetch', '--quiet', f.root, head);
@@ -64,8 +69,12 @@ test('recovery binds local task facts and emits guarded commands only for safe n
  await writeFile(join(wrong, 'keep'), 'keep caller checkout');
  await f.git(wrong, 'add', '.'); await f.git(wrong, 'commit', '--quiet', '-m', 'Caller state');
  const callerHead = await f.git(wrong, 'rev-parse', 'HEAD');
- const failedCd = await run('/bin/sh', ['-c', chain], { cwd: wrong, env: f.env });
- assert.notEqual(failedCd.code, 0); assert.equal(await f.git(wrong, 'rev-parse', 'HEAD'), callerHead);
+ const away = join(f.directory, 'temporarily-away');
+ await rename(f.root, away);
+ let failedCwd;
+ try { failedCwd = await run('/bin/sh', ['-c', command], { cwd: wrong, env: f.env }); }
+ finally { await rename(away, f.root); }
+ assert.notEqual(failedCwd.code, 0); assert.equal(await f.git(wrong, 'rev-parse', 'HEAD'), callerHead);
  assert.equal(await readFile(join(wrong, 'keep'), 'utf8'), 'keep caller checkout');
  for (const name of ['owner app', "owner'app", '$(printf gate-expanded)', '`printf gate-expanded`', 'owner\napp', '-owner', '日本語', 'a/b', '..', 'owner%2fapp']) {
   if (name.includes('/') || name === '..') continue; // Filesystem names only; API path-shaped identity is checked above.
@@ -80,5 +89,5 @@ test('recovery binds local task facts and emits guarded commands only for safe n
  const moved = join(f.directory, 'renamed-app'); await rename(f.root, moved);
  assert.deepEqual(await readRecovery({ ...options, checkout: moved }), unavailable('journal_invalid'));
  await rename(moved, f.root);
- t.diagnostic(JSON.stringify({ readerCases, recovery: expected, chain, failedCdExit: failedCd.code, callerCheckoutKept: true }));
+ t.diagnostic(JSON.stringify({ readerCases, recovery: expected, command, failedCwdExit: failedCwd.code, callerCheckoutKept: true }));
 });
