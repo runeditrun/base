@@ -11,6 +11,7 @@ import { sitePreview } from './site-preview.mjs';
 import { codeChipBreaksWord, commandBlocks, runLayoutTheme } from './fixtures/run-page.mjs';
 import { headerLayout, splitCardLayout } from './fixtures/contract-page.mjs';
 import { parseContract } from '../foundation/runtime/seed-contract.mjs';
+import { deployPermissions } from './deploy-needs.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -146,6 +147,60 @@ test('built run-site uses US dates and keeps the one-line command start together
    await page.setViewportSize({width:320,height:700});
    assert.deepEqual(await headerLayout(page), { sideways:false, links:3, offscreen:[], small:[], overlaps:[] }, `header at 320px on ${path}`);
   }
+  await context.close();
+ } finally { await browser.close(); await preview.close(); }
+});
+
+test('built run site writes /docs/hosting from the seed\'s own declarations, Run Edit Run first', async t => {
+ const f = await seed(t);
+ const runData = join(f.root, 'src/site/run.ts'), declaration = join(f.root, 'deploy.json'), theme = join(f.root, 'public/rer-theme.css');
+ await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy'));
+ // A seed theme can outrank the page's own rules for Base's command blocks, as Buoy's keeps a command on one line on phones.
+ await writeFile(theme, await readFile(theme, 'utf8') + 'body:has(> header.bar) .code pre { white-space: pre; overflow-x: auto; overflow-wrap: normal; }\n');
+ const declared = JSON.parse(await readFile(declaration, 'utf8'));
+ let result = await f.build();
+ assert.equal(result.code, 0, result.stdout + result.stderr);
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const context = await browser.newContext({viewport:{width:390,height:844},permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
+  const hosting = async () => {
+   await page.goto(preview.url + '/docs/hosting');
+   return page.evaluate(() => ({
+    sections: [...document.querySelectorAll('main > section')].map(section => section.getAttribute('aria-labelledby')),
+    request: document.querySelector('.assisted a')?.href,
+    token: document.querySelector('#token')?.closest('li')?.textContent ?? '',
+    deployFile: [...document.querySelectorAll('.code pre code')].map(code => code.textContent).find(text => text.includes('CLOUDFLARE_API_TOKEN=')) ?? '',
+   }));
+  };
+  const built = await hosting();
+  assert.deepEqual(built.sections, ['assisted', 'diy'], 'Run Edit Run comes before the do-it-yourself steps');
+  const request = new URL(built.request);
+  assert.deepEqual([request.origin, request.searchParams.get('product'), request.searchParams.get('plan')], ['https://app.runeditrun.com', 'run-buoy', 'assisted']);
+  for (const permission of deployPermissions(declared)) assert.ok(built.token.includes(permission), `the token step asks for ${permission}`);
+  assert.equal(built.token.includes('R2 Storage'), false, 'nothing the declaration does not use');
+  for (const width of [320, 390, 1440]) {
+   await page.setViewportSize({width,height:900});
+   assert.deepEqual((await commandBlocks(page)).filter(block => block.covered || block.clipped), [], `command blocks at ${width}px`);
+   assert.deepEqual(await codeChipBreaksWord(page), [], `inline code at ${width}px`);
+   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 0.5), false, `sideways overflow at ${width}px`);
+   assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('body *')].filter(element => [...element.childNodes].some(node => node.nodeType === 3 && node.textContent.trim())).map(element => parseFloat(getComputedStyle(element).fontSize)).filter(size => size < 13)), [], `text under 13px at ${width}px`);
+  }
+  for (const button of await page.locator('.copy').all()) {
+   const command = await button.getAttribute('data-copy');
+   assert.equal(command, await button.evaluate(element => element.closest('.code').querySelector('pre code').textContent), 'Copy holds the command shown');
+   await button.click();
+   await page.waitForFunction(async expected => await navigator.clipboard.readText() === expected, command);
+  }
+  // The page follows the declaration: an R2 binding adds its permission, and one rer deploy
+  // refuses leaves Run Edit Run's help alone while the run site still builds.
+  await writeFile(declaration, JSON.stringify({ ...declared, r2: [{ binding: 'FILES' }] }));
+  result = await f.build();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.ok((await hosting()).token.includes('Workers R2 Storage: Edit'));
+  await writeFile(declaration, JSON.stringify({ ...declared, platforms: ['cloudflare'] }));
+  result = await f.build();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.deepEqual((await hosting()).sections, ['assisted']);
   await context.close();
  } finally { await browser.close(); await preview.close(); }
 });
@@ -345,6 +400,35 @@ test('built Roadmap preserves product prose while removing explicit source citat
   for (const word of prose.split(' ')) {
    await page.locator('input[type="search"]').fill(word);
    assert.equal(await clause.isVisible(), true, `search finds ${word}`);
+  }
+ } finally { await browser.close(); await preview.close(); }
+});
+
+test('built chooser keeps self first and carries each paid plan through the shared entry', async t => {
+ const f = await seed(t), data = join(f.root, 'src/site/run.ts'), renderer = join(f.root, 'src/base/run-site.ts');
+ const original = await readFile(data, 'utf8'), source = await readFile(renderer, 'utf8');
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const page = await browser.newPage();
+  for (const [mode, product, managed] of [['request', 'errors-workbench', true], ['app', 'errors-workbench', true], ['app', 'errors-workbench', false], ['app', null, true]]) {
+   await writeFile(data, original.replaceAll("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`));
+   await writeFile(renderer, source.replace("signups: 'request' as", `signups: '${mode}' as`));
+   const result = await f.build();
+   assert.equal(result.code, 0, result.stdout + result.stderr);
+   await page.goto(preview.url + '/run');
+   assert.deepEqual(await page.locator('.chooser section[aria-labelledby]').evaluateAll(sections => sections.filter(s => !s.closest('.paste-panel')).map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', 'managed']);
+   assert.equal(await page.locator('button').count(), 1);
+   const closed = mode === 'request' || product === null;
+   assert.equal(await page.locator('.assisted .chip').count(), Number(closed));
+   assert.equal(await page.locator('.managed .chip').count(), Number(closed || !managed));
+   for (const plan of ['assisted', 'managed']) {
+    const href = new URL(await page.locator(`.${plan} a`).getAttribute('href'));
+    assert.deepEqual([href.origin, href.searchParams.get('product'), href.searchParams.get('plan')], ['https://app.runeditrun.com', product ?? 'run-spool', plan]);
+   }
+   const entry = await page.locator('.assisted a').getAttribute('href');
+   await page.goto(preview.url + '/docs/hosting');
+   assert.equal(await page.locator('.assisted a').getAttribute('href'), entry);
+   assert.equal(await page.locator('.assisted .go p').count(), Number(closed), 'hosting follows the same sign-ups and listing state');
   }
  } finally { await browser.close(); await preview.close(); }
 });

@@ -9,7 +9,8 @@
 // toolchain); the app's own Vite config is never loaded, because its Worker
 // plugins do not run in Node. It reads no installation data. A seed with a
 // CONTRACT.md gets it parsed as sitePages({ contract }), for its /contract
-// page; one that does not parse stops the build, naming its lines.
+// page; one that does not parse stops the build, naming its lines. `hosting`
+// (cli/site-hosting.mjs) is what its /docs/hosting page says.
 // Usage: node site-render.mjs ROOT ENTRY OUTPUT [CONFIG]
 import { shared } from './shared.mjs';
 const { seedIcons, readIconFiles } = await shared('icon-files.mjs');
@@ -68,7 +69,7 @@ try {
  const options = clientJSON ? JSON.parse(clientJSON) : {};
  const clientBuild = await buildClients(vite, root, output, options), clients = clientBuild.clients;
  styles = [...new Set([...styles,...clientBuild.styles])];
- const build = await module.sitePages({ styles, clients, ...(contract ? { contract } : {}) });
+ const build = await module.sitePages({ styles, clients, ...(contract ? { contract } : {}), hosting: options.hosting ?? null });
  if (!Array.isArray(build?.pages) || !Array.isArray(build.assets)) fail('sitePages() returns { pages, assets }.');
 
  const written = new Set();

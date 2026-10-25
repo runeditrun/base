@@ -489,13 +489,32 @@ site: {
 }
 ```
 
-`sitePages({ styles, clients })` receives each emitted module URL, for example
+`sitePages({ styles, clients, hosting })` receives each emitted module URL, for example
 `clients.hero`; link it with `<script type="module" src="…"></script>` on the
 pages that use it. Browser modules and their reachable imports/assets are
 bundled under `site-assets/`. `clientConfig` is optional, separate from the SSR
 page config, and names browser plugins such as React; an external import still
 reachable from an island refuses the build. No seed-specific client plugin is
 needed. The rendered page's appearance and copy stay seed-owned.
+
+`hosting` is the public context derived from the seed's deploy, setup and mail
+declarations, or `null` when those declarations do not support the shared
+walkthrough. When hosting context is provided, include `/docs/hosting` through
+Base's shared hosting page. It explains deployment using the actual declared
+resources and inputs; it does not store deployment credentials.
+
+Base's shared `/run` chooser reads `RunData.paths`: `product` is the app listing
+id or `null` while the seed has no listing; optional `requirementsExtra` adds
+one requirements sentence; optional `assisted.open` and `managed.open` can each
+hold a door closed with `false`. Reference data and newly initialized seeds
+start with `paths: { product: null }`. `RunData` no longer carries `hosted`,
+`requirements` or `folder`. Name, repository and clone command remain seed data.
+Keep the shared sign-up state and entry URL builder in the single `PATHS`
+constant in `run-site.ts`; seeds do not add their own plan links or sign-up
+state. Both doors close while sign-ups are by request, when the listing is
+null, or when that door's `open` is `false`. Entry links carry the plan and the
+listing id when available; an unlisted seed uses the shared repository-derived
+`run-<slug>` entry product until it has a listing.
 
 Known targets at browser resource operations, including fetches, imports, DOM
 URL writes and emitted CSS, are checked against the run-site boundary. Inert
