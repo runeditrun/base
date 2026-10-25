@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gf0849181",
+  "cliVersion": "0.2.80-dev.gbb705540",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3807,7 +3807,7 @@
     },
     "modules/site/docs-search/index-build.mjs": {
       "source": "modules/site/docs-search/index-build.mjs",
-      "sha256": "d2250641e14a52397741a7cf06231644d8ca0038edd78fe66df16603134f6aae"
+      "sha256": "1ddb2da91e9377934fbab61bde9ed9da6109718603b960aaac6a02e502adee97"
     },
     "modules/site/docs-search/lexical.mjs": {
       "source": "modules/site/docs-search/lexical.mjs",

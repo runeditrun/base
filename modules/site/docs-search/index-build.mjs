@@ -29,7 +29,7 @@ export function buildSearchIndex(pages, { previous } = {}) {
   const passages = documents.flatMap(doc => doc.text.split(/\n\s*\n/).filter(Boolean).flatMap(paragraph => {
     const parts = paragraph.match(/[\s\S]{1,900}(?:\s|$)|[\s\S]{1,900}/g) ?? [];
     return parts.map(text => ({ ...doc, text: text.trim() }));
-  }).map((doc, position) => ({ ...doc, id: String(position) })));
+  })).map((doc, position) => ({ ...doc, id: String(position) }));
   engine.addAll(passages);
   const index = { version: indexVersion, sourceHash, engine: engine.toJSON() };
   const bytes = JSON.stringify(index);
