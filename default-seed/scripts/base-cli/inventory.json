@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.ge4a4c6b3",
+  "cliVersion": "0.2.80-dev.gc10049bc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1183,7 +1183,7 @@
     },
     "edition-authoring/copy-destinations.mjs": {
       "source": "edition-authoring/copy-destinations.mjs",
-      "sha256": "faadd2f3ad6c391aa5ea859d6370447b460d6cb482ebe5249251ab97c5a2d427"
+      "sha256": "ccb2af2177388be4bfe15615bcb56ca0241749975ed0f30c17ba659bf595a516"
     },
     "edition-authoring/copy-entrypoints.mjs": {
       "source": "edition-authoring/copy-entrypoints.mjs",

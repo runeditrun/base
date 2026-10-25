@@ -25,6 +25,16 @@ export function checkCopyDestinations({plans, files, recordPath}) {
     if (previous) conflict(previous, item);
     destinations.set(key, {...item, planned: true});
   }
+  // Directory creation is part of the plan too: distinct leaves must not
+  // create two spellings of the same parent on a normalizing/caseless disk.
+  const directories = new Map();
+  for (const item of operations) {
+    for (let parent = path.posix.dirname(item.name); parent !== '.'; parent = path.posix.dirname(parent)) {
+      const key = destinationKey(parent), previous = directories.get(key);
+      if (previous && previous.name !== parent) conflict(previous.item, item);
+      if (!previous) directories.set(key, {name: parent, item});
+    }
+  }
   const removed = new Set(plans.flatMap(plan => plan.removed));
   for (const name of files.keys()) {
     if (removed.has(name)) continue;
