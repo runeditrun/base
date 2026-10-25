@@ -1227,7 +1227,7 @@
     },
     "edition-authoring/static-imports.mjs": {
       "source": "edition-authoring/static-imports.mjs",
-      "sha256": "9d4cd0e22e176f7a68970f552b285dcbf2e7af71c2ee0d1f2bdbc2328c7a2533"
+      "sha256": "c57833846c740c3bfb65e9c92a5192fac2047818b66feb0d23f8d84e33ea485f"
     },
     "edition-authoring/updates.mjs": {
       "source": "edition-authoring/updates.mjs",

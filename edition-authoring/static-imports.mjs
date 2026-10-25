@@ -33,11 +33,13 @@ const parse = `
     if (process.argv[3] === 'requires') {
       const {Parser} = require('internal/deps/acorn/acorn/dist/acorn');
       // Bundled Acorn leaves keyword expression context after optional-chain
-      // property names (o?.return / 2). An identifier ends that context, just
-      // as it does after a plain dot. V8 has already validated the source.
+      // property names (o?.return / 2), and its lexical function stack misses
+      // generator methods/async generators. Use the AST parser's actual scope
+      // for yield, and end property context only after ?. V8 validates first.
       const EntryParser = Parser.extend(Base => class extends Base {
+        inGeneratorContext() { return this.inGenerator; }
         parseIdent(liberal) {
-          if (liberal) this.exprAllowed = false;
+          if (liberal && this.input.slice(this.lastTokStart, this.lastTokEnd) === '?.') this.exprAllowed = false;
           return super.parseIdent(liberal);
         }
       });

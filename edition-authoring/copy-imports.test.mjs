@@ -66,7 +66,7 @@ test('unresolvable relative imports refuse the entire refresh before source or r
 
 test('public refresh parses nested superclasses and ASI without inventing regex imports', t => {
   const {base, seed, refresh} = fixture(t);
-  write(base, 'tools/main.mjs', String.raw`const o = {return: 12}; o?.return / 2; const c = class extends class {} {} / 1; import '.\x2fasi.mjs'; /x/;
+  write(base, 'tools/main.mjs', String.raw`const g = async function* () { yield /x/; }; const o = {return: 12}; o?.return / 2; const c = class extends class {} {} / 1; import '.\x2fasi.mjs'; /x/;
 `);
   write(base, 'tools/asi.mjs', String.raw`const async = 7; const a = async
 function f() {}
