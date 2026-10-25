@@ -103,7 +103,12 @@ copied as terminal data files, never parsed as JavaScript; Node still enforces
 JSON import attributes and validates JSON at execution. Native `.node` addons,
 `.wasm` (including extensionless Wasm binaries) and other unsupported static
 import extensions refuse before writes: their closure is not established by
-this JavaScript finder. They are never executed to inspect dependencies.
+this JavaScript finder. A recorded edge is preserved only when both endpoints
+remain regular files with verified recorded or acknowledged bytes and modes,
+unchanged origin bytes/modes, and the same origin mapping. This narrow exception
+does not establish closure for unsupported formats: every new or changed edge
+still refuses, including a target already selected by a directory copy. Files
+are never executed to inspect dependencies.
 Strings, templates, regular expressions, comments, dynamic `import()`,
 `import.meta` and CommonJS `require()` add no static dependencies. In particular,
 relative `require()` calls are dynamic and are not followed. JSX and other

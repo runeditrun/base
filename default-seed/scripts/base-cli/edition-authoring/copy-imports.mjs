@@ -16,6 +16,23 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
   const formatFor = moduleFormats(read, revision);
   const isCode = copyEntrypoints(read, next);
   const adopted = [], problems = new Set(), queue = [], scheduled = new Map();
+  // Snapshot original ownership before closure can synthesize helper records.
+  const recorded = new Map(record.copies.flatMap(copy => Object.keys(copy.files).map(name => [name, copy])));
+  const unchanged = item => {
+    const copy = recorded.get(item.name), file = files.get(item.name);
+    if (!copy || !file?.regular || item.source !== copy.originPath + item.name.slice(copy.path.length)) return false;
+    noLinks(root, item.name);
+    const prior = read.tree(copy.adapted?.[item.name] || copy.revision).get(item.source);
+    const target = next.get(item.source);
+    if (!prior || !target || prior.object !== target.object || prior.mode !== target.mode ||
+        read.digests([prior.object]).get(prior.object) !== copy.files[item.name] ||
+        (copy.modes?.[item.name] && copy.modes[item.name] !== prior.mode)) return false;
+    const acknowledgement = copy.acknowledged?.[item.name];
+    const digest = copy.adapted?.[item.name] ? acknowledgement?.sha256 : copy.files[item.name];
+    const mode = copy.adapted?.[item.name] ? acknowledgement?.mode : prior.mode;
+    return local(item.name) === digest && (file.executable ? '100755' : '100644') === mode &&
+      item.bytes.equals(file.read());
+  };
   const locate = name => plans.find(({copy}) => Object.hasOwn(copy.files, name) || copy.path === name || name.startsWith(copy.path + '/'));
   const enqueue = (plan, source, name, bytes, boundary, depth, adapted = false, pin = plan.copy.revision, imported = false) => {
     const previous = scheduled.get(name);
@@ -74,8 +91,16 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         name = path.posix.relative('/repository', fileURLToPath(new URL(specifier, pathToFileURL('/repository/' + importer.name))));
         safe(source); safe(name);
       } catch { fail(`Cannot resolve relative Base import ${specifier} in ${importer.name}`); continue; }
-      if (isCode(source, Buffer.alloc(0), true) === false && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       const existing = scheduled.get(name);
+      if (isCode(source, Buffer.alloc(0), true) === false && path.posix.extname(source) !== '.json') {
+        // Preserve only a verified existing edge, including its original source
+        // mapping and both endpoints. New/changed unsupported edges still fail
+        // before the scheduled shortcut, even inside a directory copy.
+        if (!existing || existing.source !== source || !unchanged(importer) || !unchanged(existing)) {
+          fail('unsupported static import format; only JavaScript and JSON are supported');
+        }
+        continue;
+      }
       if (existing) {
         // Only mappings that existed before this refresh are authoritative.
         // A synthesized helper must satisfy every request that shares it.
