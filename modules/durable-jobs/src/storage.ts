@@ -78,10 +78,11 @@ export class Context {
       else if (control?.mode !== 'running') Object.assign(job, { savedState: job.state, state: 'waiting', reasonCode: 'scheduler_unconfigured', recovery: 'Start the declared installation runtime to resume bounded native work.' });
       else if (job.state === 'waiting') {
         const exhausted = exhaustedReason(this, job);
-        if (exhausted) Object.assign(job, { savedState: job.state, state: 'failed', reasonCode: exhausted, recovery: exhaustedRecovery });
+        if (exhausted) Object.assign(job, { reasonCode: exhausted, recovery: exhaustedRecovery });
         else if (reconsiderable.has(job.reasonCode ?? '')) {
           const reason = await admissionReason(this, job);
-          Object.assign(job, { savedState: job.state, state: reason ? 'waiting' : 'queued', reasonCode: reason ?? null, recovery: reason === 'job_capacity_exhausted' ? capacityRecovery : reason ? holdRecovery : null });
+          if (!reason) Object.assign(job, { savedState: job.state, state: 'queued' });
+          Object.assign(job, { reasonCode: reason ?? null, recovery: reason === 'job_capacity_exhausted' ? capacityRecovery : reason ? holdRecovery : null });
         }
       }
     }
