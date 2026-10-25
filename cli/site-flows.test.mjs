@@ -151,7 +151,7 @@ test('built run-site uses US dates and keeps the one-line command start together
  } finally { await browser.close(); await preview.close(); }
 });
 
-test('built run site writes /docs/hosting from the seed\'s own declarations, Run Edit Run first', async t => {
+test('built run site writes /docs/hosting from the seed\'s own declarations, the one line first', async t => {
  const f = await seed(t);
  const runData = join(f.root, 'src/site/run.ts'), declaration = join(f.root, 'deploy.json'), theme = join(f.root, 'public/rer-theme.css');
  await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy'));
@@ -167,13 +167,17 @@ test('built run site writes /docs/hosting from the seed\'s own declarations, Run
    await page.goto(preview.url + '/docs/hosting');
    return page.evaluate(() => ({
     sections: [...document.querySelectorAll('main > section')].map(section => section.getAttribute('aria-labelledby')),
+    first: document.querySelector('main .copy')?.dataset.copy,
     request: document.querySelector('.assisted a')?.href,
     token: document.querySelector('#token')?.closest('li')?.textContent ?? '',
     deployFile: [...document.querySelectorAll('.code pre code')].map(code => code.textContent).find(text => text.includes('CLOUDFLARE_API_TOKEN=')) ?? '',
    }));
   };
+  await page.goto(preview.url + '/run');
+  const line = await page.locator('.copy').getAttribute('data-copy');
   const built = await hosting();
-  assert.deepEqual(built.sections, ['assisted', 'diy'], 'Run Edit Run comes before the do-it-yourself steps');
+  assert.deepEqual(built.sections, ['self', 'assisted', 'diy'], 'the one line, then Run Edit Run, then the do-it-yourself steps; no Managed without a listing');
+  assert.equal(built.first, line, 'the first command is the Run page\'s one line');
   const request = new URL(built.request);
   assert.deepEqual([request.origin, request.searchParams.get('product'), request.searchParams.get('plan')], ['https://app.runeditrun.com', 'run-buoy', 'assisted']);
   for (const permission of deployPermissions(declared)) assert.ok(built.token.includes(permission), `the token step asks for ${permission}`);
@@ -200,7 +204,7 @@ test('built run site writes /docs/hosting from the seed\'s own declarations, Run
   await writeFile(declaration, JSON.stringify({ ...declared, platforms: ['cloudflare'] }));
   result = await f.build();
   assert.equal(result.code, 0, result.stdout + result.stderr);
-  assert.deepEqual((await hosting()).sections, ['assisted']);
+  assert.deepEqual((await hosting()).sections, ['self', 'assisted']);
   await context.close();
  } finally { await browser.close(); await preview.close(); }
 });
@@ -425,10 +429,14 @@ test('built chooser keeps self first and carries each paid plan through the shar
     const href = new URL(await page.locator(`.${plan} a`).getAttribute('href'));
     assert.deepEqual([href.origin, href.searchParams.get('product'), href.searchParams.get('plan')], ['https://app.runeditrun.com', product ?? 'run-spool', plan]);
    }
-   const entry = await page.locator('.assisted a').getAttribute('href');
+   const entries = { assisted: await page.locator('.assisted a').getAttribute('href'), managed: await page.locator('.managed a').getAttribute('href') };
    await page.goto(preview.url + '/docs/hosting');
-   assert.equal(await page.locator('.assisted a').getAttribute('href'), entry);
-   assert.equal(await page.locator('.assisted .go p').count(), Number(closed), 'hosting follows the same sign-ups and listing state');
+   const offered = product !== null && managed;
+   assert.deepEqual(await page.locator('main > section').evaluateAll(sections => sections.map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', ...(offered ? ['managed'] : []), 'diy'], 'Managed only for a listing that offers it');
+   for (const plan of offered ? ['assisted', 'managed'] : ['assisted']) {
+    assert.equal(await page.locator(`.${plan} .btn`).getAttribute('href'), entries[plan]);
+    assert.equal(await page.locator(`.${plan} .go p`).count(), Number(closed), 'hosting follows the same sign-ups and listing state');
+   }
   }
  } finally { await browser.close(); await preview.close(); }
 });

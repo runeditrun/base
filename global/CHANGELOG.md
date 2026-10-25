@@ -9,6 +9,7 @@
 - Treat RER Platform's `rer_migrations` ledger as a first-class source when a Managed installation leaves for native: exports record `manifest.migrationLedger` (native file names with SHA-256, origin `rer_migrations`), imports map it by hash and refuse only a true mismatch with a named code and fix, and the ledger is never archived as product tables. Native-source archives, v1 recovery and existing refusals are unchanged.
 - Add `mapMigrationLedger` to `@runeditrun/rer/portability-migrations` for adapters with their own archive format, and name the unapplied checkout file in the preflight refusal.
 - Replace the shared Run page with a three-way chooser, exact one-line Copy, listing-aware Assisted and Managed links, and a shared sign-up switch for the hosting guide; keep the Run and hosting guide commands wrapping under adopted seed themes and document the supported paths migration.
+- Order the shared /docs/hosting page as the Run chooser does: the one line first, then Assisted, then Managed for a listing that offers it, then the do-it-yourself Cloudflare steps.
 
 ## 0.2.80
 
