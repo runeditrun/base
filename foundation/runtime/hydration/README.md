@@ -120,8 +120,10 @@ boundary time out. React removing an adopted node, including in a layout effect,
 is supported. Removing an already adopted host imperatively, or clearing it with a
 second root, also passes: hydration completed before the removal. A server boundary
 still showing its client fallback after abandoning hydration is incomplete, even
-though its dehydrated marker is gone. Dehydration observed on the committed Fiber
-or its alternate establishes server provenance, retained only in a WeakSet. A
+though its dehydrated marker is gone. Original SSR boundary comments are held weakly until their React attachment can
+establish server provenance; this also covers an urgent client retry before the
+first frame. Dehydration on the committed Fiber or its alternate establishes the
+same provenance, retained only in a WeakSet. A
 boundary created only on the client never blocks completion. The probe's 20-second settlement and 30-second load deadlines are
 unchanged.
 

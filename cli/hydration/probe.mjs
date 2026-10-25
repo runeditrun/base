@@ -19,7 +19,7 @@ export function probe(config, ownership) {
   replaced: [], starts: {}, opacity: {}, missing: [], frames: 0, oneShot: [], releasedAt: null, releaseNote: null, fiberAtRelease: null, hydratedAt: null, settledAt: null, settled: null, rer: null, error: null };
  const SECTION = new Set(['HEADER', 'NAV', 'SECTION', 'ARTICLE', 'ASIDE', 'FOOTER']), SKIP = new Set(['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE', 'NOSCRIPT']);
  const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/, ADDRESS = '.__cf_email__,a[href*="/cdn-cgi/l/email-protection"]';
- const serverBoundaries = new WeakSet(), inserted = new WeakSet(), tracked = new WeakMap(), watch = new Set();
+ const serverBoundaries = new WeakSet(), unreadMarkers = new WeakSet(), inserted = new WeakSet(), tracked = new WeakMap(), watch = new Set();
  const now = () => Math.round(performance.now() * 10) / 10;
  const fiber = el => Object.keys(el).some(key => key.startsWith('__reactFiber$'));
  const counted = el => !SKIP.has(el.tagName) && !inserted.has(el);
@@ -53,7 +53,7 @@ export function probe(config, ownership) {
   return timing && Number.isFinite(timing.endTime) && timing.activeDuration >= 50;
  });
  const outside = n => !outermost().some(section => section.contains(n));
- let snapshot = [], scope = null, editAt = null, lastMutation = 0, observer = null;
+ let snapshot = [], serverMarkers = [], scope = null, editAt = null, lastMutation = 0, observer = null;
 
  function begin() {
   const sections = outermost();
@@ -78,10 +78,39 @@ export function probe(config, ownership) {
    }
   }
   snapshot = walk(document.body, '', []).map(([el, key]) => [new WeakRef(el), key]);
+  // SSR boundary comments retain React's boundary attachment even when an
+  // urgent update abandons hydration before the first sampled frame.
+  const comments = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
+  for (let node = comments.nextNode(); node; node = comments.nextNode()) {
+   if (['$', '$?', '$~', '$!', '&'].includes(node.data)) { serverMarkers.push(new WeakRef(node)); unreadMarkers.add(node); }
+  }
   editAt = now();
-  observer = new MutationObserver(() => { lastMutation = now(); });
+  observer = new MutationObserver(records => {
+   lastMutation = now();
+   // Mutation records keep removed comments/subtrees alive until this callback.
+   // Read their React attachments now, before GC can clear a weak snapshot.
+   for (const record of records) for (const node of record.removedNodes) {
+    if (!serverMarkers.length) break;
+    rememberServer(node);
+    const comments = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT);
+    for (let comment = comments.nextNode(); comment; comment = comments.nextNode()) rememberServer(comment);
+   }
+  });
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   requestAnimationFrame(frame);
+ }
+
+ // Consume server provenance only once. Re-reading a completed boundary's
+ // surviving comment must not make a later client suspension reopen hydration.
+ function rememberServer(marker) {
+  if (!unreadMarkers.has(marker)) return true;
+  const key = Object.keys(marker).find(key => key.startsWith('__reactFiber$'));
+  const boundary = key && marker[key];
+  if (boundary?.tag !== 13 && boundary?.tag !== 31) return false;
+  unreadMarkers.delete(marker);
+  serverBoundaries.add(boundary);
+  if (boundary.alternate) serverBoundaries.add(boundary.alternate);
+  return true;
  }
 
  function release(note) {
@@ -137,6 +166,10 @@ export function probe(config, ownership) {
    tryRelease();
    const t = now();
    if (S.releasedAt !== null) {
+    for (let i = serverMarkers.length - 1; i >= 0; i--) {
+     const marker = serverMarkers[i].deref();
+     if (!marker || rememberServer(marker)) serverMarkers.splice(i, 1);
+    }
     const current = ownership(snapshot, counted, serverBoundaries);
     S.error = current.error;
     if (current.pending === 0) { if (S.hydratedAt === null) S.hydratedAt = t; } else S.hydratedAt = null;
@@ -153,7 +186,7 @@ export function probe(config, ownership) {
   observer?.disconnect();
   S.settled = state; S.settledAt = now();
   S.replaced = snapshot.filter(([ref]) => !ref.deref()?.isConnected).map(([, key]) => key);
-  snapshot = []; scope = null;
+  snapshot = []; serverMarkers = []; scope = null;
   S.rer = window.__rerHydration ? JSON.parse(JSON.stringify(window.__rerHydration)) : null;
  }
 
