@@ -259,6 +259,32 @@ test('refresh-base moves every copy to one Base commit and drops a legacy record
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 
+test('refresh-base refuses a read-only destination before updating any copy', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-readonly-'));
+  let directory;
+  try {
+    const {base, seed, revision} = fixture(temp);
+    ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+    ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+    write(base, 'modules/sample/index.mjs', 'export const sample = 2;\n');
+    write(base, 'tools/helper.mjs', 'export const helper = "updated";\n');
+    const next = commit(base);
+    directory = path.join(seed, 'vendor/sample');
+    fs.chmodSync(directory, 0o555);
+    const snapshot = () => Object.fromEntries(git(seed, 'ls-files', '--cached', '--others', '--exclude-standard').split('\n').map(name =>
+      [name, {bytes: fs.readFileSync(path.join(seed, name)).toString('hex'), mode: fs.statSync(path.join(seed, name)).mode}]));
+    const before = snapshot();
+    const refused = run(seed, 'refresh-base', next, '--base', base);
+    assert.equal(refused.status, 1);
+    assert.match(refused.error, /vendor\/sample\/index\.mjs/);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(fs.statSync(directory).mode & 0o777, 0o555);
+  } finally {
+    if (directory) fs.chmodSync(directory, 0o755);
+    fs.rmSync(temp, {recursive: true, force: true});
+  }
+});
+
 test('refresh-base refuses to rewrite an applied migration and leaves every file as it was', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-migration-'));
   try {

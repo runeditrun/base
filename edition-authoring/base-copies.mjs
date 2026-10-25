@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
-import {completeAuthoringCopies, requireMaterializedCopies} from './copy-checkout.mjs';
+import {completeAuthoringCopies, requireMaterializedCopies, preflightRefresh} from './copy-checkout.mjs';
 import {completeRuntimeCopies} from './runtime-dependencies.mjs';
 
 export const RECORD = 'base-copies.json';
@@ -398,6 +398,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       .filter(([name, object]) => name.split('/').slice(0, -1).includes('migrations') && local(name) && local(name) !== upstream.get(object)).map(([name]) => name));
     if (applied.length) throw Error(`Refusing to rewrite migrations that may already be applied: ${applied.join(', ')}. Base changed these files after they were copied; keep them as they are, drop them from ${recordPath}, and add a new migration for the change instead.`);
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
+    preflightRefresh(root, plans, recordPath);
     const changes = [];
     for (const {copy, sources, removed} of plans) {
       for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }

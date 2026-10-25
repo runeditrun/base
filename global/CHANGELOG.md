@@ -4,7 +4,7 @@
 
 - Deliver the accepted import-door intake implementation and its runtime and type dependencies at `@runeditrun/rer/modules/import-kit/door`, preserving the D1 entry.
 - Refresh legacy singleton authoring-tool copies with their maintained sibling helpers, recording the delivered source bytes so `verify-base` can run after refresh.
-- Refuse authoring refresh before writes when an unrecorded helper destination exists, including ignored files and files matching Base bytes; preserve acknowledged adaptations.
+- Preflight every refresh destination and its parent permissions before writes, including helpers, the record and existing lock; refuse unrecorded helper destinations (even ignored or matching Base bytes) and preserve acknowledged adaptations.
 - Check the packed door lifecycle and fresh seed refresh before package publication.
 
 ## 0.2.81
