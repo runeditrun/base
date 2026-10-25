@@ -568,10 +568,10 @@ releases the task as `paused` after an `owner_required` event and names the
 owner's command; a running supervisor picks the export up once the key is
 stored. A door that is not ready releases it as `paused` after a
 `connected_runner_required` event, naming the reason. UptimeRobot needs no
-other input. Sentry (its organization and window) and PagerDuty (its window)
-need inputs the executor task view does not carry yet, and Calendly's folder
-of files has no single-bundle door format yet: these release as `paused` after a
-`configuration_required` event. While an agent step waits (an export, or a
+other input. Sentry, PagerDuty and Sorry use the leased task's `export_inputs`;
+when those inputs are missing they release as `paused` after a
+`configuration_required` event. Calendly's folder of files has no single-bundle
+door format yet and releases with the same event. While an agent step waits (an export, or a
 question for `next`, or the lease an earlier run on this computer still holds),
 run says what it waits for instead of `Nothing yet`; otherwise it names a move's
 owner step with its link before `Nothing yet`.
