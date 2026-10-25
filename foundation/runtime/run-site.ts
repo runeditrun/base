@@ -233,6 +233,8 @@ export function siteNotFoundHtml(identity: EditionIdentity, run: RunData, contra
 /** What a seed's site entry returns: each page by path, and the public files they use. */
 export interface SiteBuild {
  pages: { path: string; html: string }[]; assets: string[];
+ /** Exact same-site docs paths; GET/HEAD keep the query and return a real 301. */
+ redirects?: { from: string; to: string; status: 301 }[];
  /** Sections from the same render, using its published heading ids. */
  searchPages?: { href: string; searchSections: { anchor: string; titlePath: string[]; text: string }[] }[];
 }

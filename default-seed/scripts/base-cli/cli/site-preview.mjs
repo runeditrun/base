@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
 import { readdir, readFile, lstat } from 'node:fs/promises';
 import { extname, join } from 'node:path';
-import { servedFile } from './site-check.mjs';
+import { servedFile, checkSiteRedirects } from './site-check.mjs';
+import { siteRedirectResponse } from '../modules/deploy-kit/site-redirects.mjs';
 
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.gif': 'image/gif', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml', '.webmanifest': 'application/manifest+json' };
 
@@ -27,6 +28,11 @@ export async function sitePreview(folder, { host = '127.0.0.1', ports }) {
   try {
    if (!['GET', 'HEAD'].includes(request.method)) { response.writeHead(405, { allow: 'GET, HEAD' }); return response.end(); }
    const url = new URL(request.url, 'http://site.invalid'), files = await names(folder);
+   // Reread build metadata so a rebuild replaces rules along with its pages.
+   const redirects = await readFile(`${folder}.redirects.json`, 'utf8').then(JSON.parse, error => { if (error.code === 'ENOENT') return []; throw error; });
+   const rules = checkSiteRedirects(files, redirects);
+   const moved = siteRedirectResponse(new Request(url, {method:request.method}), rules);
+   if (moved) { response.writeHead(moved.status, Object.fromEntries(moved.headers)); return response.end(); }
    let pathname; try { pathname = decodeURIComponent(url.pathname); } catch { pathname = '/'; }
    // A request for page.html is answered at its canonical path, as the host does.
    if (pathname.endsWith('.html') && files.has(pathname.slice(1))) {

@@ -432,3 +432,157 @@ test('built chooser keeps self first and carries each paid plan through the shar
   }
  } finally { await browser.close(); await preview.close(); }
 });
+
+test('declared docs redirects reach the uploaded Worker and built preview with safe, exact GET/HEAD semantics', {timeout:180_000}, async t => {
+ const f = await seed(t), rule = {from:'/docs/install',to:'/docs/getting-started',status:301};
+ const {createServer} = await import('node:http');
+ const {pathToFileURL} = await import('node:url');
+ const {siteProvider} = await import('../modules/deploy-kit/tests/site-provider.mjs');
+ const provider = siteProvider({domain:'run-redirect.example.test'});
+ t.after(()=>provider.close());
+ await writeFile(join(f.root,'deploy-site.json'), JSON.stringify({version:1,domain:'run-redirect.example.test'}));
+ const source = (redirects, legacy = true) => `import {docsMovedHtml} from '../base/run-site'; import {identity} from '../core/app/identity'; import {run} from './run';
+ export function sitePages() {
+  const html='<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><h1 id="start">Getting started</h1><p>Install the app.</p>';
+  return {pages:[{path:'/',html:'<a href="/run">Run</a><a href="/docs/install">Install</a>'},{path:'/run',html:'<h1>Run</h1>'},
+   ${legacy ? "{path:'/docs/install',html:docsMovedHtml(identity,run,'/docs/getting-started','Getting started')}," : ''}{path:'/docs/getting-started',html},{path:'/docs/other',html:'<h1>Other docs</h1>'},{path:'/404',html:'<h1>Not found</h1>'}],
+   assets:['rer-theme.css','fonts','brand'],redirects:${JSON.stringify(redirects)},
+   searchPages:[{href:'/docs/getting-started',searchSections:[{anchor:'start',titlePath:['Getting started'],text:'Install the app.'}]}]};
+ }`;
+ // The only fixture intercepts Cloudflare's network API, including paid embeddings.
+ const edge = createServer(async (req,res) => {
+  try {
+   const destination = req.headers['x-test-destination'], chunks=[];
+   for await (const chunk of req) chunks.push(chunk);
+   const body=Buffer.concat(chunks), headers=new Headers(req.headers);
+   headers.delete('host'); headers.delete('x-test-destination');
+   let response;
+   if (destination === 'https://run-redirect.example.test/docs-search-vectors.json') response=new Response(null,{status:404});
+   else if (destination.includes('/ai/run/')) {
+    const input=JSON.parse(body.toString()), vector=Array.from({length:768},(_,i)=>i===0?1:0);
+    response=Response.json({success:true,result:{shape:[input.text.length,768],data:input.text.map(()=>vector)}});
+   } else {
+    const request=new Request(destination,{method:req.method,headers,...(req.method!=='GET'?{body}:{})});
+    const init={method:req.method,headers:{...Object.fromEntries(headers),Authorization:headers.get('authorization')}};
+    if(req.method!=='GET')init.body=headers.get('content-type')?.includes('multipart/form-data')?await request.formData():body.toString();
+    response=await provider.fetch(destination,init);
+   }
+   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
+  } catch(error) {res.writeHead(500);res.end(error.message);}
+ });
+ await new Promise(resolve=>edge.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>{edge.closeAllConnections();edge.close(resolve);}));
+ const command = async (...argv) => {
+  try {return {code:0,...await run(process.execPath,['--import',join(base,'cli/fixtures/docs-search/network.mjs'),join(base,'bin/rer.mjs'),...argv,'--site','--json','--no-queue'],{
+   cwd:f.root,env:{PATH:process.env.PATH,HOME:resolve(f.root,'../home'),CI:'true',RER_NO_UPDATE_CHECK:'1',RER_TEST_NETWORK:`http://127.0.0.1:${edge.address().port}`,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token},timeout:45_000,maxBuffer:1024*1024})};}
+  catch(error){return {code:error.code,stdout:error.stdout,stderr:error.stderr};}
+ };
+ const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ t.after(()=>browser.close());
+ for(const search of [false,true]) {
+  if(search)await writeFile(f.adapter,f.original.replace('site: {',`site: { runtime: {type:'docs-search',module:'docs-search',bindings:['ASSETS','AI'],endpoint:'/docs/search',corpus:'.rer/docs-search/corpus.json'},`));
+  await writeFile(f.pages,source([rule],search));
+  const deployed=await command('deploy');
+  assert.equal(deployed.code,0,deployed.stdout+deployed.stderr);
+  assert.ok(JSON.parse(deployed.stdout.trim().split('\n').at(-1)).site.redirects.some(row=>row.from===rule.from&&row.to===rule.to&&row.status===301));
+  const content=provider.state.content.get(provider.state.version.id).files[0].bytes;
+  const workerPath=resolve(f.root,`../uploaded-${search}.mjs`);
+  await writeFile(workerPath,content);
+  const {default:worker}=await import(pathToFileURL(workerPath));
+  const preview=await sitePreview(join(f.root,'dist/site'),{ports:[0]});
+  // Asset requests use the actual maintained preview, with no redirect sidecar.
+  // This proves the uploaded Worker itself implements the redirect before ASSETS.
+  const assets=resolve(f.root,'dist/assets-proof');
+  const {cp}=await import('node:fs/promises');await cp(join(f.root,'dist/site'),assets,{recursive:true});
+  const assetServer=await sitePreview(assets,{ports:[0]});
+  const calls=[];
+  const env={ASSETS:{fetch:request=>{calls.push(new URL(request.url).pathname);return fetch(assetServer.url+new URL(request.url).pathname+new URL(request.url).search,{method:request.method,redirect:'manual'});}}};
+  const runtime=createServer(async(req,res)=>{
+   const response=await worker.fetch(new Request('https://run-redirect.example.test'+req.url,{method:req.method}),env);
+   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
+  });
+  await new Promise(resolve=>runtime.listen(0,'127.0.0.1',resolve));
+  const origin=`http://127.0.0.1:${runtime.address().port}`;
+  try {
+   for(const method of ['GET','HEAD']) for(const [path,status,location] of [
+    ['/docs/install',301,'/docs/getting-started'],['/docs/install?q=one%20two&x=%2F',301,'/docs/getting-started?q=one%20two&x=%2F'],
+    ['/docs/getting-started',200,null],['/docs/other',200,null],['/rer-theme.css',200,null],
+    ['/docs/install/',search?200:404,null],['/docs/install/child',404,null],['/docs/Install',404,null],['/docs/%69nstall',search?200:404,null],
+    ['/docs/getting-started.html?keep=yes',307,'/docs/getting-started?keep=yes'],['/docs/install.html?keep=yes',search?307:404,search?'/docs/install?keep=yes':null],
+   ]) {
+    const before=calls.length;
+    for(const server of [preview.url,origin]) {
+     const response=await fetch(server+path,{method,redirect:'manual'});
+     assert.equal(response.status,status,`${search?'search':'assets'} ${method} ${path}`);
+     assert.equal(response.headers.get('location'),location,path);
+     if(method==='HEAD')assert.equal(await response.text(),'');
+    }
+    if(status===301)assert.equal(calls.length,before,'matching Worker redirect does not fetch ASSETS');
+   }
+   assert.equal((await fetch(origin+'/docs/install',{method:'POST',redirect:'manual'})).status,405);
+   for(const method of ['GET','HEAD']) {
+    const canonical=await worker.fetch(new Request('https://www.run-redirect.example.test/docs/install?q=1',{method}),env);
+    assert.equal(canonical.status,301);assert.equal(canonical.headers.get('location'),'https://run-redirect.example.test/docs/install?q=1');
+   }
+   if(search) {
+    const results=await worker.fetch(new Request('https://run-redirect.example.test/docs/search?q=a'),env);
+    assert.deepEqual(await results.json(),{results:[]},'docs search still handles its own endpoint');
+    assert.equal((await worker.fetch(new Request('https://run-redirect.example.test/docs/search',{method:'HEAD'}),env)).status,405);
+   }
+   for(const server of [preview.url,origin]) {
+    const followed=await fetch(server+'/docs/install');assert.equal(followed.status,200);assert.match(await followed.text(),/Getting started/);
+    for(const width of [1440,390]) {
+     const page=await browser.newPage({viewport:{width,height:900}});
+     await page.goto(server);await page.getByRole('link',{name:'Install',exact:true}).click();
+     await page.waitForURL(server+'/docs/getting-started');
+     assert.equal(await page.getByRole('heading',{name:'Getting started'}).textContent(),'Getting started');
+     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+     await page.close();
+    }
+   }
+   t.diagnostic(`${search?'docs-search':'assets'}: 44 Worker/preview HTTP cases, followed docs, www GET/HEAD, browser 1440/390 passed`);
+  } finally {
+   await preview.close();await assetServer.close();await new Promise(resolve=>{runtime.closeAllConnections();runtime.close(resolve);});
+   await rm(assets,{recursive:true});
+  }
+ }
+ // Read the documented contract so this test does not pin a separate limit.
+ const contract=await readFile(join(base,'export/SEED-COMMAND-CONTRACT.md'),'utf8');
+ const limit=Number(/At most (\d+) rules are accepted/.exec(contract)[1]);
+ const {checkSite}=await import('./site-check.mjs');
+ const declaration=count=>Array.from({length:count},(_,i)=>({...rule,from:`/docs/old-${i}`}));
+ for(const count of [limit,limit+1,100001]) {
+  const redirects=declaration(count);
+  if(count===limit) {
+   await checkSite(join(f.root,'dist/site'),{redirects});
+  } else {
+   await assert.rejects(checkSite(join(f.root,'dist/site'),{redirects}),new RegExp(`at most ${limit} rules`));
+  }
+  t.diagnostic(`${count} redirects: ${count===limit?'accepted':'refused'}; serialized bytes=${Buffer.byteLength(JSON.stringify(redirects))}`);
+ }
+ const invalid = [
+  ['non-array',{}],['null',null],['malformed row',[null]],['extra field',[{...rule,query:'drop'}]],
+  ['external',[{...rule,to:'https://other.example.test/docs/page'}]],['protocol-relative',[{...rule,to:'//other.example.test/docs/page'}]],
+  ['instance',[{...rule,to:'/app'}]],['status',[{...rule,status:302}]],['string status',[{...rule,status:'301'}]],
+  ['query',[{...rule,to:'/docs/getting-started?next=evil'}]],['fragment',[{...rule,to:'/docs/getting-started#start'}]],
+  ['encoded',[{...rule,from:'/docs/%69nstall'}]],['traversal',[{...rule,to:'/docs/../run'}]],['backslash',[{...rule,to:'/docs/\\\\evil'}]],
+  ['html alias',[{...rule,from:'/docs/install.html'}]],['slash',[{...rule,from:'/docs/install/'}]],['case',[{...rule,from:'/docs/Install'}]],
+  ['search',[{...rule,from:'/docs/search'}]],['missing page',[{...rule,to:'/docs/missing'}]],
+  ['duplicate',[rule,rule]],['self',[{...rule,to:rule.from}]],['chain',[rule,{from:rule.to,to:'/docs/other',status:301}]],
+  ['cycle',[rule,{from:rule.to,to:rule.from,status:301}]],
+ ];
+ const writes=provider.state.writes.length;
+ for(const [name,redirects] of invalid) {
+  await writeFile(f.pages,source(redirects));
+  const result=await command('deploy');
+  assert.equal(result.code,4,`${name}: ${result.stdout}${result.stderr}`);
+  assert.match(result.stdout,/redirects/i,name);
+  assert.equal(provider.state.writes.length,writes,`${name} refused before publication`);
+ }
+ t.diagnostic(`${invalid.length} invalid declarations refused before provider writes`);
+ // Clearing the optional declaration replaces old metadata rather than retaining a stale rule.
+ await writeFile(f.adapter,f.original);await writeFile(f.pages,source([]).replace('href="/docs/install"','href="/docs/getting-started"'));
+ assert.equal((await f.build()).code,0);
+ const cleared=await sitePreview(join(f.root,'dist/site'),{ports:[0]});
+ try{const legacy=await fetch(cleared.url+'/docs/install',{redirect:'manual'});assert.equal(legacy.status,200);assert.match(await legacy.text(),/http-equiv="refresh"/);}finally{await cleared.close();}
+});

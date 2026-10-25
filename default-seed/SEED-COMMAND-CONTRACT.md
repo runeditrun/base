@@ -343,6 +343,39 @@ all other fetch or embedding failures stop before publication. The model and
 pooling belong to the selected module. See the deploy-kit Run site guidance for
 provider permissions and deployment ownership.
 
+**Moved documentation pages.** `SiteBuild` optionally returns
+`redirects: [{ from: '/docs/install', to: '/docs/getting-started', status: 301 }]`
+alongside `pages` and `assets`. At most 500 rules are accepted: enough for a
+docs-site reorganization while keeping the embedded Worker declaration small.
+The checker refuses larger lists before publication. Include a real `/docs/getting-started` HTML page
+in the same build. The checker refuses malformed rows, extra fields, statuses
+other than numeric 301, duplicate sources, self redirects, chains/cycles,
+missing or non-HTML targets, and sources that would replace an asset. Both paths
+must match `/docs/<segment>[/<segment>...]`, with lowercase ASCII letters, digits,
+hyphens or underscores (each segment starts with a letter or digit).
+`/docs/search` is reserved; schemes, hosts, queries, fragments, dots, percent
+escapes, backslashes and trailing slashes are not accepted in declarations.
+
+On the apex host, GET and HEAD match the exact URL pathname, case sensitively,
+and return an empty HTTP 301 with `Location` equal to `to` plus the request's
+unchanged query string. No prefix, trailing-slash, decoding or `.html` alias
+matching is added. URL parsing still applies its normal dot-segment
+normalization. Other methods and unmatched paths retain existing serving;
+`.html` asset canonicalization stays with the asset host. The www-to-apex 301
+runs first and keeps its original path and query. Docs search keeps its endpoint.
+A declaration may shadow an old docs HTML page; `docsMovedHtml` remains available
+for callers that need its 200/meta-refresh fallback.
+
+The build writes validated metadata beside the asset folder as
+`<output>.redirects.json` (keep it with the built folder for local preview).
+It is not a public asset. The maintained preview reads it, and `rer deploy --site`
+embeds the same validated rules in the delivered Worker, including the opt-in
+docs-search bundle, before any matching request reaches `ASSETS.fetch`. Links to
+redirect sources resolve through their validated destination. Omitting or emptying
+`redirects` clears the previous build's rules; older builds without the sidecar
+remain assets-only. A declaration is explicit adoption, not an automatic rewrite
+of existing moved-page HTML.
+
 **Deploying the run site from CI.** `rer deploy --site` keeps no state it depends on: it proves the site Worker and its Custom Domains are its own from the provider (the Worker's live version carries its `rer-site:` annotation; each domain's service is that Worker), so a fresh checkout, such as a GitHub Actions runner, deploys over the site it deployed before, and a Worker or domain of the same name it did not make is still refused. The www to apex 301 lives in the Base-generated site Worker. The run-site deploy token (the `run-site` environment's `CLOUDFLARE_API_TOKEN`) carries Workers Scripts: Edit on the account and Zone: Read and Workers Routes: Edit on the run site zones. A docs-search runtime additionally requires Workers AI: Read/Edit on the account for embeddings and its AI binding; assets-only sites need no Workers AI permission. A seed's `.github/workflows/run-site.yml` runs, after `pnpm install --frozen-lockfile`, `pnpm exec rer deploy --site` in the `run-site` environment with `CLOUDFLARE_ACCOUNT_ID` from `vars.CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from `secrets.CLOUDFLARE_API_TOKEN` (vendored mode: `node scripts/rer.mjs deploy --site`); `.rer/deploy/site-production.json` is a receipt for the person and needs no cache. The workflow runs on every push to `main` with no `paths` filter, so a push that changes only `CONTRACT.md` redeploys the site.
 
 ## Contract status
