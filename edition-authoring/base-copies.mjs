@@ -383,7 +383,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
       return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
-    completeAuthoringCopies(root, plans, {tree: next, local, upstream, revision});
+    completeAuthoringCopies(root, plans, {tree: next, revision});
     completeRuntimeCopies(plans, {tree: next, read, local, upstream, revision, checkTarget(name) {
       safe(name); noLinks(root, name);
       const target = path.join(root, name);
