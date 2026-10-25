@@ -89,7 +89,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   const current = await preflight(checkout);
   const terminalResume = ['complete', 'rolled_back'].includes(journal.stage) && journal.runtimeSettled === false;
   const unfinished = journal.version === 1 && (!['rolled_back', 'complete'].includes(journal.stage) || terminalResume);
-  if (terminalResume && !restore && (current.branch !== journal.branch ||
+  if (terminalResume && !restore && (journalKey && journal.journalKey && journalKey !== journal.journalKey || current.branch !== journal.branch ||
     current.head !== (journal.stage === 'complete' ? journal.prepared?.candidate : journal.head) ||
     installed?.commit !== (journal.stage === 'complete' ? journal.target?.commit : journal.from?.commit) ||
     to && ![journal.target?.commit, journal.target?.tag].includes(to))) throw failure('refused');
