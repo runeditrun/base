@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g4336f57c",
+  "cliVersion": "0.2.80-dev.gbeaa0bb2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "43f1daeb71d66dfd9d43c7b0f9ffdc90f98464bf7e3e6aafef7395af976e8e25"
+      "sha256": "968eec2c5bc74f14478678e132d359ca9bdca90b398c8e2e7675c0ec1725e11a"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1167,7 +1167,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "4861fd100521a0f9d129a6ab6b2482fce4dc14d01e6d4e63168e8f63fb59405f"
+      "sha256": "d400d02ff4d20e184bc075c1bf7780f9c9bb15b02e3d6b436f179a8034259498"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1179,7 +1179,7 @@
     },
     "edition-authoring/copy-imports.mjs": {
       "source": "edition-authoring/copy-imports.mjs",
-      "sha256": "7604b7a8fb575ea2da9705b6c020f50c7bb22026791ed80371cd6e138632d0d4"
+      "sha256": "7ab5d7a626e92881ab1790f02c35fb1ff2ec62e5312f629e99ff4d1179c1517d"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
@@ -1192,6 +1192,10 @@
     "edition-authoring/manifest.mjs": {
       "source": "edition-authoring/manifest.mjs",
       "sha256": "0c93bd39b1dd869b23a9d2727671fe8f9c933a9d56c7a3df1ba83c4a6f816e7b"
+    },
+    "edition-authoring/module-format.mjs": {
+      "source": "edition-authoring/module-format.mjs",
+      "sha256": "a85a1acc5f8feb6aeb56876442166644b6fda146fa0bae304a049796b443ea89"
     },
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
@@ -1219,7 +1223,7 @@
     },
     "edition-authoring/static-imports.mjs": {
       "source": "edition-authoring/static-imports.mjs",
-      "sha256": "0b8413504347d4d384a40c8386bc62ab59462953f64ebf457bd358bce5b24ae9"
+      "sha256": "9a2c908ab2a51721e9cee0543db242c82e2b8499ef65c71e44d488f627b108b2"
     },
     "edition-authoring/updates.mjs": {
       "source": "edition-authoring/updates.mjs",
