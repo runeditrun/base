@@ -263,6 +263,8 @@ configuration, and syntax invalid for the decided format refuse the entire
 refresh before writes, naming the file and error. No content regexes or grammar
 fallbacks choose a format. These rules use Node's ordinary default flags; custom
 loader hooks and experimental default-type overrides are outside this finder.
+The detector follows [Node's syntax-detection rules](https://nodejs.org/download/release/v22.20.0/docs/api/packages.html#syntax-detection)
+through its [native parse-only implementation](https://github.com/nodejs/node/blob/v22.20.0/src/node_contextify.cc).
 Relative ESM specifiers resolve exact URL paths (including query/fragment
 removal), without suffix or directory-index searching. JSON dependencies are
 copied as terminal data files, never parsed as JavaScript; Node still enforces
