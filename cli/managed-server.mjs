@@ -17,6 +17,7 @@ import { declaredCrons,runScheduled } from './scheduled.mjs';
 import { demoGuarded,demoPreflight } from './demo.mjs';
 import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openUrl } from './dev-identity.mjs';
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
+import { jobsLifecycle } from './jobs-lifecycle.mjs';
 
 // Dev opens through the local identity exchange. Preview serves production output.
 export function ready(out,url,dev,json=false,siteUrl,demo){
@@ -37,6 +38,11 @@ export async function managedServer(project,options,out,{clock={}}={}){
  const mode=options.demo?'demo':options.verb;
  let store,operation,proxy,activity,app,termination,reason,cleanupPromise,finished,selected,cleaned,site,demo,demoEnd;
  const scheduling=new AbortController();
+ let jobsStarted=false,jobsCustody,jobsStopFailure,jobsStopping;
+ const quiesceJobs=()=>{
+  scheduling.abort();
+  if(jobsStarted)return jobsStopping??=(async()=>{try{await jobsLifecycle(project.adapter.jobs,{root:project.root,phase:'stop',custody:jobsCustody});}catch(error){jobsStopFailure=error;}})();
+ };
  let activityWrites=Promise.resolve(),pendingActivity,activityWriting=false,infrastructureFailure;
  function recordActivity(fields){
   pendingActivity=fields;if(activityWriting)return;activityWriting=true;
@@ -44,8 +50,12 @@ export async function managedServer(project,options,out,{clock={}}={}){
  }
  const stopped=new Promise(resolve=>{finished=resolve;});
  const cleanupDone=new Promise(resolve=>{cleaned=resolve;});
- const cleanup=()=>cleanupPromise??=(async()=>{scheduling.abort();clearTimeout(demoEnd);activity?.close();await site?.close();await store?.closeCommands();if(demo)await rm(demo.state,{recursive:true,force:true});await proxy?.close();await operation?.release();})();
- const stop=async why=>{reason??=why;controller.abort();finished();await cleanupDone;return {};};
+ const cleanup=()=>cleanupPromise??=(async()=>{
+  await quiesceJobs();clearTimeout(demoEnd);activity?.close();await site?.close();
+  await store?.closeCommands();if(demo)await rm(demo.state,{recursive:true,force:true});
+  await proxy?.close();await operation?.release();
+ })();
+ const stop=async why=>{reason??=why;await quiesceJobs();controller.abort();finished();await cleanupDone;return {};};
  const handlers=new Map(['SIGINT','SIGTERM'].map(name=>[name,()=>{termination=name;void stop(name);} ]));
  for(const [name,handler]of handlers)process.on(name,handler);
  try{
@@ -129,6 +139,12 @@ export async function managedServer(project,options,out,{clock={}}={}){
    if(!identity)throw Error('Runtime exited before custody registration.');
    await registry.update({runtimeProcess:{pid:identity.pid,start:identity.start}});
   },controller.signal,{...adapterOptions,verb:options.verb,dev:project.adapter.dev,preview:project.adapter.preview});
+  if(typeof project.adapter.jobs?.lifecycle==='function'){
+   const identity=await processInfo(process.pid);
+   if(!identity)throw new RerError('jobs_lifecycle_failed','Native jobs process custody could not be established.',1);
+   jobsCustody={pid:identity.pid,start:identity.start};jobsStarted=true;
+   await jobsLifecycle(project.adapter.jobs,{root:project.root,phase:'start',custody:jobsCustody});
+  }
   // A key is sent (or printed) for a door origin only once the door proves it is ours.
   if(devKey)await verifyDoorFor(selected.url);
   if(demo)await demoGuarded(selected.url,demo.state,controller.signal);
@@ -154,7 +170,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   if(infrastructureFailure)throw new RerError('server_bookkeeping_failed','Server bookkeeping failed; owned serving was stopped.',1);
   if(result?.code)throw new RerError('app_exited','The application stopped unexpectedly.',result.code);
   out.progress(`Server stopped: ${reason}.\n`);return {};
- }catch(error){if(termination)throw new RerError('cancelled',`Stopped by ${termination} after owned children were stopped.`,termination==='SIGINT'?130:143);if(['idle timeout','explicit stop','demo ended'].includes(reason))return {};throw await lifecycleError(error,store);}finally{await cleanup();cleaned();while(activityWriting)await activityWrites;await registry.close();for(const [name,handler]of handlers)process.off(name,handler);}
+ }catch(error){if(termination)throw new RerError('cancelled',`Stopped by ${termination} after owned children were stopped.`,termination==='SIGINT'?130:143);if(['idle timeout','explicit stop','demo ended'].includes(reason))return {};throw await lifecycleError(error,store);}finally{try{await cleanup();}finally{cleaned();while(activityWriting)await activityWrites;await registry.close();for(const [name,handler]of handlers)process.off(name,handler);}if(jobsStopFailure)throw jobsStopFailure;}
 }
 function reportScheduled(out,options,run){
  const error=options.verb==='preview'&&run.status===404 ? 'The preview target does not expose /cdn-cgi/local/scheduled. Forward the adapter context scheduled flag to previewTarget, or set RER_RUNTIME_TRIGGERS=1 in a custom target using the shared production runtime. For another runtime, expose that internal trigger endpoint or declare scheduled:false.' : run.error;
