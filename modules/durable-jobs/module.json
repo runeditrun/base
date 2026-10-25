@@ -12,7 +12,8 @@
     "schema"
   ],
   "migrations": [
-    "schema/0001-durable-jobs.sql"
+    "schema/0001-durable-jobs.sql",
+    "schema/0002-admission.sql"
   ],
   "tables": {
     "portable": [

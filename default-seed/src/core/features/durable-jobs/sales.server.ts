@@ -12,6 +12,7 @@ export function createSalesKind(database: Database): JobKind {
   return {
     kind: SALES_KIND, version: 1, codecVersion: 1, capabilities: ['local'], consequential: false, dependencies: [],
     decodeInput: value => salesInput.parse(value),
+    decodeRevision: value => salesRevision.parse(value),
     sourceKey: value => salesInput.parse(value).sourceId,
     decodeCheckpoint(version, value) {
       if (version !== 1) throw new Error('sales_checkpoint_incompatible')

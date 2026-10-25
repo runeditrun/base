@@ -1,6 +1,7 @@
 import { bounded, canonical, digest, insist, JobError, safeCode, text } from './codec.ts';
 import { atomic, guard, one, sql } from './database.ts';
-import { activation, leaseGuard } from './leases.ts';
+import { activation, commitClock, leaseGuard } from './leases.ts';
+import { unitBudget } from './budget.ts';
 import { Context } from './storage.ts';
 import type { Claim, CommitUnit, Job, Json, Unit } from './types.ts';
 
@@ -10,7 +11,9 @@ async function live(context: Context, claim: Claim, action: 'commit' | 'publish'
   insist(await context.policy.authorize(action, claim.job), 'job_authority_revoked');
   return kind;
 }
-export async function commitUnit(context: Context, claim: Claim, unit: CommitUnit): Promise<Job> {
+export async function commitUnit(context: Context, claim: Claim, unit: CommitUnit, options: { signal?: AbortSignal; deadline?: number } = {}): Promise<Job> {
+  const deadline = Math.min(context.now() + context.limits.maxUnitMs, claim.expiresAt, claim.job.deadline, options.deadline ?? Infinity);
+  const budget = unitBudget(context, deadline, options.signal);
   await context.schema(); insist(claim.job.installationId === context.installationId, 'job_lease_stale');
   text(unit.unitKey, 'unit_key');
   insist(Number.isSafeInteger(unit.expectedCheckpointSequence) && unit.expectedCheckpointSequence === claim.job.checkpointSequence, 'job_checkpoint_conflict');
@@ -32,20 +35,25 @@ export async function commitUnit(context: Context, claim: Claim, unit: CommitUni
     insist(receipt.output_digest === outputDigest && receipt.input_digest === inputDigest, 'job_unit_conflict');
     const saved = await context.row(claim.job.id); insist(saved, 'job_not_found', 404); return context.job(saved);
   }
-  const lease = await leaseGuard(context, claim);
-  insist(await one(context.database, sql(`SELECT 1 WHERE ${lease.sql}`, ...(lease.params ?? []))), 'job_lease_stale');
+  const initialLease = await leaseGuard(context, claim);
+  insist(await one(context.database, sql(`SELECT 1 WHERE ${initialLease.sql}`, ...(initialLease.params ?? []))), 'job_lease_stale');
   if (unit.rows === 0 && !final) insist(checkpoint === canonical(claim.job.checkpoint), 'job_cursor_without_writes');
-  if (final) insist(await kind.verifyResult(claim.job, unit.resultRef!), 'job_result_unverified');
-  const predicates = context.predicates(final ? 'publish' : 'commit', claim.job), now = context.now();
+  if (final) insist(await budget.verify(kind.verifyResult(claim.job, unit.resultRef!)), 'job_result_unverified');
+  const resultHash = final ? await digest(result) : null, tokenHash = await digest(claim.token);
+  const predicates = context.predicates(final ? 'publish' : 'commit', claim.job);
+  // No pre-verification timestamp is reused in the committing guards.
+  const lease = await leaseGuard(context, claim), clock = commitClock(context), now = context.now();
+  const time = sql(`? > (${clock.sql})`, deadline, ...clock.params!);
+  budget.check();
   await atomic(context.database, [
-    guard(lease), guard(activation(context, claim.job, claim.epoch)), ...predicates.map(guard),
+    guard(lease), guard(time), guard(activation(context, claim.job, claim.epoch)), ...predicates.map(guard),
     ...unit.statements, ...unit.guards.map(guard),
     sql('INSERT INTO rer_job_units(installation_id,job_id,unit_key,input_digest,output_digest,checkpoint_sequence,committed_rows,committed_bytes,result_ref,committed_at) VALUES(?,?,?,?,?,?,?,?,?,?)', context.installationId, claim.job.id, unit.unitKey, inputDigest, outputDigest, claim.job.checkpointSequence + 1, unit.rows, unit.bytes, result, now),
-    sql("UPDATE rer_job_jobs SET state=?,reason_code=NULL,recovery=NULL,version=version+1,checkpoint=?,checkpoint_hash=?,checkpoint_sequence=checkpoint_sequence+1,progress_rows=progress_rows+?,progress_bytes=progress_bytes+?,progress_units=progress_units+1,result_ref=?,result_hash=?,updated_at=?,not_before=? WHERE installation_id=? AND id=? AND version=? AND fence=?", final ? 'succeeded' : 'queued', checkpoint, checkpointHash, unit.rows, unit.bytes, result, final ? await digest(result) : null, now, now, context.installationId, claim.job.id, claim.job.version, claim.job.fence),
+    sql("UPDATE rer_job_jobs SET state=?,reason_code=NULL,recovery=NULL,version=version+1,checkpoint=?,checkpoint_hash=?,checkpoint_sequence=checkpoint_sequence+1,progress_rows=progress_rows+?,progress_bytes=progress_bytes+?,progress_units=progress_units+1,result_ref=?,result_hash=?,updated_at=?,not_before=? WHERE installation_id=? AND id=? AND version=? AND fence=?", final ? 'succeeded' : 'queued', checkpoint, checkpointHash, unit.rows, unit.bytes, result, resultHash, now, now, context.installationId, claim.job.id, claim.job.version, claim.job.fence),
     sql("UPDATE rer_job_attempts SET ended_at=?,classification='committed',usage_rows=?,usage_bytes=? WHERE installation_id=? AND job_id=? AND fence=? AND ended_at IS NULL", now, unit.rows, unit.bytes, context.installationId, claim.job.id, claim.job.fence),
-    sql('DELETE FROM rer_job_leases WHERE installation_id=? AND job_id=? AND token_hash=? AND fence=?', context.installationId, claim.job.id, await digest(claim.token), claim.job.fence),
+    sql('DELETE FROM rer_job_leases WHERE installation_id=? AND job_id=? AND token_hash=? AND fence=?', context.installationId, claim.job.id, tokenHash, claim.job.fence),
     ...predicates.map(guard), ...unit.guards.map(guard), guard(activation(context, claim.job, claim.epoch)),
-    guard(sql('EXISTS(SELECT 1 FROM rer_job_jobs WHERE installation_id=? AND id=? AND version=? AND fence=? AND checkpoint_hash=? AND checkpoint_sequence=? AND state=?)', context.installationId, claim.job.id, claim.job.version + 1, claim.job.fence, checkpointHash, claim.job.checkpointSequence + 1, final ? 'succeeded' : 'queued')),
+    guard(sql('EXISTS(SELECT 1 FROM rer_job_jobs WHERE installation_id=? AND id=? AND version=? AND fence=? AND checkpoint_hash=? AND checkpoint_sequence=? AND state=?)', context.installationId, claim.job.id, claim.job.version + 1, claim.job.fence, checkpointHash, claim.job.checkpointSequence + 1, final ? 'succeeded' : 'queued')), guard(time),
   ], 'job_commit_refused');
   const saved = await context.row(claim.job.id); insist(saved, 'job_not_found', 404); return context.job(saved);
 }

@@ -18,7 +18,7 @@ handler, policy, database and limit contracts.
 
 The seed supplies registered versioned handlers, authenticated current scope,
 current-authority/revision/erasure predicates in the installation database,
-checkpoint decoding, bounded units and result verification. Every domain unit
+input/revision/checkpoint decoding, bounded units and result verification. Every domain unit
 and its receipt/checkpoint commit in one atomic database operation. A seed
 must declare a bounded native tick adapter or explicitly choose manual
 execution; inspection does not install a daemon. Client input never selects
@@ -29,12 +29,20 @@ payloads; `authorize` and nonempty `commitGuards` protect individual boundaries.
 `resultAvailable` can withdraw erased result data while retaining redacted job
 history. Defaults bound installation/tenant/kind/source concurrency, queued
 intent, starts/failure retries, units, rows/bytes/statements per unit, wall time,
-lease/deadline, metadata and list pages. Lifecycle requests retain at most 64
+lease/deadline, metadata and list pages. Ready admission has its own page;
+held work is reconsidered in bounded keyset pages with a local persistent cursor,
+without rewriting unchanged holds or spending attempts. Deadline expiry uses the
+same finite traversal. Lifecycle requests retain at most 64
 operation receipts per job and refuse further keys rather than forgetting an
-idempotency fence. No history or intent identity is automatically pruned.
+idempotency fence. Terminal resume is a read: it accepts the saved version and
+an operation key without a reason, returns the saved terminal state, and writes
+no receipt. Changed terminal-read content refuses `job_operation_conflict`.
+No history or intent identity is automatically pruned.
 
 Apply `schema/0001-durable-jobs.sql` before enabling the runtime. In Base's
-reference its exact bytes are `migrations/core/0034_durable_jobs.sql`; migration
+reference its exact bytes are `migrations/core/0034_durable_jobs.sql`. Then apply
+`schema/0002-admission.sql` (reference `migrations/core/0036_job_admission.sql`)
+for the excluded control cursor and waiting index; migration
 numbers belong to the adopting seed. Retain that source origin and checksum.
 Preserve applied migrations and released origins; later changes require a new
 migration. The runtime refuses unknown, partial or incompatible schema before
@@ -49,7 +57,7 @@ component, with source provenance rather than runtime settings in `edition.json`
   "role": "module",
   "source": {
     "kind": "local",
-    "paths": ["src/modules/durable-jobs", "migrations/core/0034_durable_jobs.sql"],
+    "paths": ["src/modules/durable-jobs", "migrations/core/0034_durable_jobs.sql", "migrations/core/0036_job_admission.sql"],
     "origin": {
       "repository": "runeditrun/base",
       "revision": "FULL_40_HEX_BASE_COMMIT",
@@ -57,7 +65,8 @@ component, with source provenance rather than runtime settings in `edition.json`
     },
     "mappings": [
       {"path": "src/modules/durable-jobs", "originPath": "modules/durable-jobs"},
-      {"path": "migrations/core/0034_durable_jobs.sql", "originPath": "modules/durable-jobs/schema/0001-durable-jobs.sql"}
+      {"path": "migrations/core/0034_durable_jobs.sql", "originPath": "modules/durable-jobs/schema/0001-durable-jobs.sql"},
+      {"path": "migrations/core/0036_job_admission.sql", "originPath": "modules/durable-jobs/schema/0002-admission.sql"}
     ]
   }
 }
@@ -74,8 +83,8 @@ configuration outside that recipe.
 
 Legacy family composition adds `durable-jobs` to the selected modules and
 copies `./modules/durable-jobs` to `src/modules/durable-jobs`, plus
-`./modules/durable-jobs/schema/0001-durable-jobs.sql` to the seed's next numbered
-migration. Both copies have `component: "durable-jobs"` and the same repository
+each numbered SQL origin in `./modules/durable-jobs/schema/` to the seed's next
+numbered migrations, in order. These copies have `component: "durable-jobs"` and the same repository
 origin. The ordinary `composition.lock.json` records committed source paths,
 full repository commits and hashes. Merely shipping CLI source does not enable
 job execution in the application.

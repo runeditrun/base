@@ -6,8 +6,8 @@ import type { Bindings } from '../../platform/bindings.server'
 import { referenceSalesAuthority } from './authority.server.ts'
 import { createReferenceSalesJobs } from './runtime.server.ts'
 
-export function referenceSalesEnabled(env: Pick<Bindings, 'DURABLE_JOBS_REFERENCE' | 'RER_INSTALLATION_ID'>) {
-  return env.DURABLE_JOBS_REFERENCE === 'true' && typeof env.RER_INSTALLATION_ID === 'string' && env.RER_INSTALLATION_ID.length > 0
+export function referenceSalesEnabled(env: Pick<Bindings, 'DURABLE_JOBS_REFERENCE' | 'RER_INSTALLATION_ID' | 'RER_DEMO'>) {
+  return env.RER_DEMO !== '1' && env.DURABLE_JOBS_REFERENCE === 'true' && typeof env.RER_INSTALLATION_ID === 'string' && env.RER_INSTALLATION_ID.length > 0
 }
 
 export async function durableJobsResponse(request: Request, env: Bindings): Promise<Response | null> {

@@ -3,6 +3,7 @@ import { atomic, guard, one, sql } from './database.ts';
 import { initializeControl } from './intent.ts';
 import { Context, type Row } from './storage.ts';
 import type { Claim, Job, Sql } from './types.ts';
+import { admissionPage } from './admission.ts';
 
 export function activation(context: Context, job: Job, epoch: string): Sql {
   return sql("EXISTS(SELECT 1 FROM rer_job_activations a JOIN rer_job_control c ON c.installation_id=a.installation_id AND c.epoch=a.epoch WHERE a.installation_id=? AND a.job_id=? AND a.epoch=? AND a.principal_id=? AND a.owner_id=? AND c.mode='running')", context.installationId, job.id, epoch, job.principalId, job.ownerId);
@@ -44,20 +45,21 @@ export async function claim(context: Context, options: { id?: string; holder?: s
   await context.schema(); await reconcile(context); const control = await context.control();
   if (!control || control.mode !== 'running') throw new JobError('scheduler_unconfigured', 503, 'Start the declared installation runtime.');
   const now = context.now(), holder = text(options.holder ?? control.holder ?? 'bounded-tick', 'holder');
-  const rows = await context.database.all<Row>(sql(`SELECT j.* FROM rer_job_jobs j JOIN rer_job_activations a ON a.job_id=j.id AND a.installation_id=j.installation_id AND a.epoch=? WHERE j.installation_id=? AND j.state IN ('queued','retry_wait','waiting') AND j.cancel_requested=0 AND j.not_before<=? ${options.id ? 'AND j.id=?' : ''} ORDER BY j.not_before,j.created_at,j.id LIMIT ?`, control.epoch, context.installationId, now, ...(options.id ? [options.id] : []), context.limits.maxList));
+  const ids = options.id ? [options.id] : await admissionPage(context, control);
+  const rows: Row[] = [];
+  for (const id of ids) rows.push(...await context.database.all<Row>(sql("SELECT j.* FROM rer_job_jobs j JOIN rer_job_activations a ON a.job_id=j.id AND a.installation_id=j.installation_id AND a.epoch=? WHERE j.installation_id=? AND j.id=? AND j.state IN ('queued','retry_wait','waiting') AND j.cancel_requested=0 AND j.not_before<=?", control.epoch, context.installationId, id, now)));
   for (const row of rows) {
     const job = await context.job(row, false);
     if (now >= job.deadline || job.failures >= context.limits.maxFailureAttempts || job.starts >= context.limits.maxUnits + context.limits.maxFailureAttempts || job.progress.units >= context.limits.maxUnits) {
       await hold(context, job, now >= job.deadline ? 'job_deadline_exhausted' : 'job_attempts_exhausted', 'Create a new reviewed intent after inspecting the partial committed outcome.', 'failed'); continue;
     }
-    if (job.state === 'waiting' && job.reasonCode !== 'job_capacity_exhausted') continue;
     try {
       const kind = await context.compatible(job);
       insist(await kind.validateRevision(job), 'job_revision_stale');
       insist(await context.policy.authorize('claim', job), 'job_authority_revoked');
       for (const dependency of kind.dependencies) insist(await context.options.dependencies?.[dependency]?.(), 'job_dependency_unavailable', 503);
     } catch (error) {
-      await hold(context, job, error instanceof JobError ? error.code : 'job_checkpoint_invalid', 'Restore current authority, exact revisions and compatible handler/checkpoint storage, then explicitly resume.'); continue;
+      await hold(context, job, error instanceof JobError ? error.code : 'job_checkpoint_invalid', 'Restore current authority, exact revisions and compatible handler/checkpoint storage; bounded ticks reconsider this hold.'); continue;
     }
     const token = identifier() + identifier(), tokenHash = await digest(token), fence = job.fence + 1, version = job.version + 1, expiresAt = now + context.limits.leaseMs;
     const capacity = sql(`(SELECT COUNT(*) FROM rer_job_leases WHERE installation_id=? AND expires_at>?)<? AND
@@ -87,5 +89,12 @@ export async function claim(context: Context, options: { id?: string; holder?: s
   return null;
 }
 export async function leaseGuard(context: Context, claim: Claim): Promise<Sql> {
-  return sql("EXISTS(SELECT 1 FROM rer_job_jobs j JOIN rer_job_leases l ON l.job_id=j.id AND l.installation_id=j.installation_id WHERE j.installation_id=? AND j.id=? AND j.state='running' AND j.cancel_requested=0 AND j.version=? AND j.fence=? AND l.token_hash=? AND l.fence=j.fence AND l.epoch=? AND l.expires_at>? AND j.deadline>?)", context.installationId, claim.job.id, claim.job.version, claim.job.fence, await digest(claim.token), claim.epoch, context.now(), context.now());
+  const tokenHash = await digest(claim.token), clock = commitClock(context);
+  return sql(`EXISTS(SELECT 1 FROM rer_job_jobs j JOIN rer_job_leases l ON l.job_id=j.id AND l.installation_id=j.installation_id WHERE j.installation_id=? AND j.id=? AND j.state='running' AND j.cancel_requested=0 AND j.version=? AND j.fence=? AND l.token_hash=? AND l.fence=j.fence AND l.epoch=? AND l.expires_at>(${clock.sql}) AND j.deadline>(${clock.sql}))`, context.installationId, claim.job.id, claim.job.version, claim.job.fence, tokenHash, claim.epoch, ...clock.params!, ...clock.params!);
+}
+
+// Retain the caller's clock (including supported skew), while accounting for
+// time spent awaiting/performing the actual SQLite transaction or D1 batch.
+export function commitClock(context: Context): Sql {
+  return sql("(? + MAX(0,CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)-?))", context.now(), Date.now());
 }

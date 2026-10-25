@@ -13,11 +13,11 @@ const columns = {
   rer_job_units: 'installation_id job_id unit_key input_digest output_digest checkpoint_sequence committed_rows committed_bytes result_ref committed_at',
   rer_job_attempts: 'id installation_id job_id unit_sequence fence started_at ended_at classification failure_code usage_rows usage_bytes',
   rer_job_leases: 'installation_id job_id token_hash holder epoch fence expires_at heartbeat',
-  rer_job_control: 'installation_id schema_version epoch mode scheduler holder heartbeat updated_at',
+  rer_job_control: 'installation_id schema_version epoch mode scheduler holder heartbeat updated_at admission_cursor',
   rer_job_activations: 'installation_id job_id epoch principal_id owner_id authorized_at',
 };
 export type Row = Record<string, string | number | null>;
-export interface Control { epoch: string; mode: string; holder: string | null; heartbeat: number; scheduler: string }
+export interface Control { epoch: string; mode: string; holder: string | null; heartbeat: number; scheduler: string; admission_cursor: string }
 export class Context {
   readonly database: Database; readonly limits: Limits; readonly kinds = new Map<string, JobKind>();
   readonly policy: Policy; readonly installationId: string; readonly now: () => number;
@@ -35,7 +35,7 @@ export class Context {
       text(kind.kind, 'kind');
       insist(kind.capabilities?.length === 1 && kind.capabilities[0] === 'local' && kind.consequential === false, 'job_effect_protocol_required', 503);
       insist(Number.isSafeInteger(kind.version) && kind.version > 0 && Number.isSafeInteger(kind.codecVersion) && kind.codecVersion > 0, 'job_invalid_handler');
-      for (const callback of ['decodeInput', 'sourceKey', 'decodeCheckpoint', 'validateRevision', 'runUnit', 'verifyResult'] as const) insist(typeof kind[callback] === 'function', 'job_invalid_handler');
+      for (const callback of ['decodeInput', 'decodeRevision', 'sourceKey', 'decodeCheckpoint', 'validateRevision', 'runUnit', 'verifyResult'] as const) insist(typeof kind[callback] === 'function', 'job_invalid_handler');
       insist(!this.kinds.has(kind.kind), 'job_duplicate_handler'); this.kinds.set(kind.kind, kind);
     }
   }
@@ -47,11 +47,11 @@ export class Context {
         const actual = await this.database.all<{ name: string }>(sql(`PRAGMA table_info(${table})`));
         insist(actual.map(column => column.name).join(' ') === required, 'job_schema_required', 503);
       }
-      const objects = await this.database.all<{ name: string }>(sql("SELECT name FROM sqlite_master WHERE name IN ('rer_job_intent_immutable','rer_job_due','rer_job_scope','rer_job_kind','rer_job_lease_expiry')"));
-      insist(objects.length === 5, 'job_schema_required', 503);
+      const objects = await this.database.all<{ name: string }>(sql("SELECT name FROM sqlite_master WHERE name IN ('rer_job_intent_immutable','rer_job_due','rer_job_scope','rer_job_kind','rer_job_lease_expiry','rer_job_waiting')"));
+      insist(objects.length === 6, 'job_schema_required', 503);
     } catch { throw new JobError('job_schema_required', 503, 'Apply the complete declared durable-jobs migration before starting installation work.'); }
   }
-  async control(): Promise<Control | undefined> { return one<Control>(this.database, sql('SELECT epoch,mode,holder,heartbeat,scheduler FROM rer_job_control WHERE installation_id=?', this.installationId)); }
+  async control(): Promise<Control | undefined> { return one<Control>(this.database, sql('SELECT epoch,mode,holder,heartbeat,scheduler,admission_cursor FROM rer_job_control WHERE installation_id=?', this.installationId)); }
   async row(id: string): Promise<Row | undefined> { return one<Row>(this.database, sql('SELECT * FROM rer_job_jobs WHERE installation_id=? AND id=?', this.installationId, id)); }
   scope(authority: Authority): void {
     insist(authority.installationId === this.installationId, 'job_not_found', 404);

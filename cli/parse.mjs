@@ -3,6 +3,7 @@ import { authoringVerbs, commonFlags, jobsVerb, serverDefaults, signinVerb, verb
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
+import { jobsTenant } from './jobs-http.mjs';
 const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo', '--offline']);
 export const mailbox = value => typeof value === 'string' && value.length <= 254 && /^[a-zA-Z0-9.!+_%\-]+@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+$/.test(value);
 export const validOwnerName = value => typeof value === 'string' && Boolean(value.trim()) && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value);
@@ -36,7 +37,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
    else throw invalid('Use rer jobs status or rer jobs inspect ID.');
    continue;
   }
-  if (flag === '--') { if (separator) throw invalid('Use only one -- separator.'); separator = true; if (independent || deferTail) { options.forwarded = args.slice(i + 1); break; } continue; }
+  if (flag === '--') { if (separator) throw invalid('Use only one -- separator.'); separator = true; if (verb !== 'jobs' && (independent || deferTail)) { options.forwarded = args.slice(i + 1); break; } continue; }
   if (separator && !flag.startsWith('--')) { options.forwarded.push(...args.slice(i)); break; }
   // pnpm run VERB -- FLAGS forwards the separator before wrapper flags.
   if (separator && !allowed.has(flag) && !flag.startsWith('--')) { options.forwarded.push(...args.slice(i)); break; }
@@ -64,6 +65,8 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   const remote = options.origin !== undefined || options.target === 'remote';
   if (remote !== (options.sessionFile !== undefined)) throw invalid('Hosted jobs inspection requires --origin or --target remote and --session-file FILE together.');
   if (options.environment !== undefined && !remote) throw invalid('--environment requires a hosted jobs target.');
+  if (options.tenant !== undefined && !remote) throw invalid('--tenant requires a hosted jobs target.');
+  jobsTenant(options.tenant);
  }
  if (deferTail) { options.cwd=resolve(cwd,options.cwd);return options; }
  if (verb === 'refresh-base' && !independent && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run rer refresh-base --help.');

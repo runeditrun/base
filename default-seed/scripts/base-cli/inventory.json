@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gd24b5f45",
+  "cliVersion": "0.2.80-dev.gd53c755d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -655,7 +655,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "133eadb7d77f9646bcf6807cea265edbf4eb2f16a5faaa6c48abd61e63b511ab"
+      "sha256": "99a97c4ec3188868d69cfdec5230549ce0adb9259263569005bf6f9ac09aa2ae"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -871,7 +871,7 @@
     },
     "cli/jobs-http.mjs": {
       "source": "cli/jobs-http.mjs",
-      "sha256": "48b50e0dfcfbf067576810bda1a5838ebde7a671ab12b205ffea81b5582fa547"
+      "sha256": "eb2625b884fe908ba9aee0ed937cb5254b92b0307e27007fbb35b14f96a8f6e3"
     },
     "cli/jobs-lifecycle.mjs": {
       "source": "cli/jobs-lifecycle.mjs",
@@ -911,7 +911,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "6a41a57bc567eeb024b2b98e81dd86c3c39db999d946cad321b9c3292b15fcb1"
+      "sha256": "19cf8f25d420d16812f07d26793606ba914695882ce6d6434afcc1082998ec5d"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -943,7 +943,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "cd6645a04e508c0672c9a021322fbe9aa178f86ab3f704c291231dfe6d270df6"
+      "sha256": "f9814ddab98551a660fc45ca0e0a317112ba3a8c3f9b54b74255bc61a5ba9f13"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",

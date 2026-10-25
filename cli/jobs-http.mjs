@@ -12,6 +12,11 @@ export function jobsOrigin(value) {
  return url.origin;
 }
 
+export function jobsTenant(value) {
+ if (value !== undefined && (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(value))) throw invalid('--tenant requires a tenant ID of 1–100 letters, digits, underscores, dots, colons or hyphens, starting with a letter or digit.');
+ return value;
+}
+
 export async function hostedJobs(project, options, signal) {
  let origin = options.origin;
  if (origin === undefined) {
@@ -26,18 +31,19 @@ export async function hostedJobs(project, options, signal) {
   if (info.nlink !== 1 || (info.mode & 0o077) !== 0 || process.getuid && info.uid !== process.getuid()) throw Error();
   cookie = await cookieFile(path);
  } catch { throw invalid('The session file must be an owned private regular file (0600) containing one session cookie.'); }
- return readJobsHttp({ origin, cookie, action: options.jobsAction, id: options.jobId, signal });
+ return readJobsHttp({ origin, cookie, tenant: options.tenant, action: options.jobsAction, id: options.jobId, signal });
 }
 
 // Shared by hosted inspection and an installation's declared native adapter.
 // The caller supplies authenticated transport; this helper never signs in,
 // starts a server, executes jobs, or follows a credential-bearing redirect.
-export async function readJobsHttp({ origin, cookie, action, id, signal, request = fetch }) {
+export async function readJobsHttp({ origin, cookie, tenant, action, id, signal, request = fetch }) {
  origin = jobsOrigin(origin);
+ tenant = jobsTenant(tenant);
  const path = action === 'status' ? '/status' : '/' + encodeURIComponent(id);
  let response;
  try {
-  response = await request(origin + '/api/rer/jobs' + path, { method: 'GET', redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(15000)].filter(Boolean)), headers: { Accept: 'application/json', Origin: origin, Cookie: cookie } });
+  response = await request(origin + '/api/rer/jobs' + path, { method: 'GET', redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(15000)].filter(Boolean)), headers: { Accept: 'application/json', Origin: origin, Cookie: cookie, ...(tenant === undefined ? {} : { 'x-rer-sales-tenant': tenant }) } });
  } catch { throw new RerError('jobs_unavailable', 'The jobs inspection door did not answer. Check that the selected installation is running.', 3); }
  let body;
  try { body = await boundedJson(response); } catch { if (response.ok) throw new RerError('invalid_jobs_response', `Jobs inspection returned invalid or oversized JSON (HTTP ${response.status}).`, 1); }

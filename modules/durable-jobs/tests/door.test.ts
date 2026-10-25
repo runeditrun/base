@@ -47,6 +47,14 @@ test('durable job door retains idempotent sales intent, unit receipts and exact 
   const inspected = await f.cli(['inspect', id]); assert.deepEqual(inspected.job, repeated.body.job);
   const status = await f.cli(['status']); assert.equal(status.status.counts.succeeded, 1);
   assert.equal((await f.call('/' + id + '/undo', { expectedVersion: done.body.job.version, operationKey: 'no-generic-inverse' })).body.error.code, 'undo_unsupported');
+  await f.populate(null, sales.slice(0, 100), 'restated-close');
+  const saved = await f.db.prepare('SELECT version,operations_json,checkpoint,result_ref FROM rer_job_jobs WHERE id=?').bind(id).first();
+  for (const operationKey of ['read-completed', 'read-completed', 'another-terminal-read']) {
+    const terminal = await f.call('/' + id + '/resume', { expectedVersion: done.body.job.version, operationKey });
+    assert.equal(terminal.status, 200); assert.deepEqual(terminal.body.job.resultRef, done.body.job.resultRef);
+  }
+  assert.deepEqual(await f.db.prepare('SELECT version,operations_json,checkpoint,result_ref FROM rer_job_jobs WHERE id=?').bind(id).first(), saved);
+  assert.equal((await f.call('/' + id + '/resume', { expectedVersion: done.body.job.version, operationKey: 'read-completed', reason: 'changed content' })).body.error.code, 'job_operation_conflict');
 });
 
 test('job authority, cancellation and admission boundaries refuse stale publication and expose scoped holds without spending attempts', async t => {
@@ -88,4 +96,32 @@ test('job authority, cancellation and admission boundaries refuse stale publicat
   assert.equal((await f.call('/' + held.id + '/resume', { expectedVersion: restored.body.job.version, operationKey: 'unsafe-restore' })).body.error.code, 'restored_requires_reauthorization');
   assert.equal((await f.call('', { ...input('own-owner-forged'), ownerId: hiddenOwner })).status, 400);
   assert.equal((await f.call('', input('cross-site'), { origin: 'https://foreign.example.test' })).status, 401);
+  // A revoked member holds only their work. The owner can inspect/cancel it,
+  // while ready work and restored authority are picked up by bounded ticks.
+  await f.repository().createTenant('admission', f.ownerId); await f.repository().setMembership('admission', f.ownerId, true);
+  await f.populate('admission', sales.slice(0, 20));
+  await f.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('member-east','member-east@example.test','East Member','member','active',?)").bind(Date.now()).run();
+  await f.repository().setMembership('admission', 'member-east', true);
+  const member = await f.authority('admission', 'member-east'), owner = await f.authority('admission');
+  const boundedJobs = f.jobs({ maxList: 3, installationConcurrency: 1 });
+  const old = [];
+  for (let i = 0; i < 3; i++) old.push((await boundedJobs.request(input('member-' + i), member)).job);
+  await f.repository().setMembership('admission', 'member-east', false);
+  for (const job of old) assert.equal(await boundedJobs.claim({ id: job.id }), null);
+  const headers = { 'x-rer-sales-tenant': 'admission' };
+  const heldRead = await f.call('/' + old[0].id, undefined, headers);
+  assert.equal(heldRead.status, 200);
+  assert.deepEqual((await f.cli(['inspect', old[0].id, '--tenant', 'admission'])).job, heldRead.body.job);
+  await assert.rejects(() => boundedJobs.get(old[0].id, member), { code: 'job_not_found' });
+  const heldVersions = await f.db.prepare("SELECT id,version,starts,failures FROM rer_job_jobs WHERE tenant_key='admission' ORDER BY id").all();
+  for (let i = 0; i < 3; i++) await boundedJobs.tick();
+  assert.deepEqual(await f.db.prepare("SELECT id,version,starts,failures FROM rer_job_jobs WHERE tenant_key='admission' ORDER BY id").all(), heldVersions);
+  const ownerCancelled = await f.call('/' + old[0].id + '/cancel', { expectedVersion: heldRead.body.job.version, operationKey: 'owner-cancels-revoked' }, headers);
+  assert.equal(ownerCancelled.body.job.state, 'cancelled');
+  const healthy = (await boundedJobs.request(input('healthy-owner'), owner)).job;
+  await boundedJobs.tick();
+  assert.ok((await boundedJobs.get(healthy.id, owner)).starts > 0);
+  await f.repository().setMembership('admission', 'member-east', true);
+  for (let i = 0; i < 8 && !(await boundedJobs.get(old[1].id, member)).starts; i++) await boundedJobs.tick();
+  assert.ok((await boundedJobs.get(old[1].id, member)).starts > 0);
 });

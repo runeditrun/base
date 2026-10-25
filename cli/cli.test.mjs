@@ -31,7 +31,7 @@ test('every command help is effect-free outside a checkout, before adapters and 
   assert.equal(result.status, 0, `${verb}: ${result.stderr}`); assert.match(result.stdout, /Usage:/);
   const json = run(root, [verb, '--help', '--json']); assert.equal(json.status, 0); assert.equal(events(json).at(-1).event, 'result');
  }
- for (const argv of [['dev','--foreground','--help'], ['preview','--detach','--help']]) assert.equal(run(root,argv).status,0);
+ for (const argv of [['dev','--foreground','--help'], ['preview','--detach','--help'], ['jobs','inspect','job-123','--tenant','gate-east','--help'], ['jobs','status','--','--help','--json']]) assert.equal(run(root,argv).status,0);
  assert.deepEqual(await readdir(root), []);
  await writeFile(join(root,'OPERATIONS.json'),'{invalid configuration');
  for(const verb of Object.keys({...verbs, ...authoringVerbs}))assert.equal(run(root,[verb,'--','--help','--json']).status,0,'package-forwarded help precedes configuration validation');
@@ -47,6 +47,13 @@ test('parsing rejects every unsupported flag, missing value, invalid host/port a
  assert.equal(parse(['jobs', 'status', '--json']).jobsAction, 'status');
  assert.equal(parse(['jobs', 'inspect', 'job-123', '--json']).jobId, 'job-123');
  assert.equal(parse(['jobs', 'status', '--target', 'remote', '--session-file', 'session.cookie']).target, 'remote');
+ for (const mode of [{}, { deferTail: true }, { independent: true }]) {
+  assert.equal(parse(['jobs','status','--','--json'], undefined, mode).json, true);
+  for (const action of [['status'], ['inspect','job-123']]) assert.equal(parse(['jobs',...action,'--origin','https://app.test','--session-file','session.cookie','--tenant','gate-east'], undefined, mode).tenant, 'gate-east');
+  assert.throws(() => parse(['jobs','status','--','--','--json'], undefined, mode), error => error.exitCode === 2);
+ }
+ for (const tenant of ['', ' gate-east', 'gate-east\r\nCookie: stolen', "gate-east' OR '1'='1", 'gate-east;DROP TABLE jobs', 'gate-east,other', '../gate-east', 'gate%2Deast', 'a'.repeat(101)]) assert.throws(() => parse(['jobs','status','--origin','https://app.test','--session-file','session.cookie','--tenant',tenant]), error => error.exitCode === 2 && !error.message.includes('stolen'));
+ assert.throws(() => parse(['jobs','status','--tenant','gate-east']), error => error.exitCode === 2);
  for (const argv of [['jobs'], ['jobs','run'], ['jobs','status','extra'], ['jobs','inspect'], ['jobs','inspect','../private'], ['jobs','status','--session-file','session.cookie'], ['jobs','status','--origin','https://app.test'], ['jobs','status','--target','local','--origin','https://app.test','--session-file','session.cookie']]) assert.throws(() => parse(argv), error => error.exitCode === 2);
 });
 

@@ -29,7 +29,8 @@ export function createSalesPolicy(database: Database, installationId: string): P
       && authority.tenantId === job.tenantId && authority.ownerId === job.ownerId
       && (authority.principalId === job.principalId || authority.operator === true)
   }
-  const guards = (action: Action, job: Job, authority?: Authority): Sql[] => [salesAuthorityGuard(job),
+  const guards = (action: Action, job: Job, authority?: Authority): Sql[] => [salesAuthorityGuard(
+    authority?.operator && ['read', 'cancel'].includes(action) ? authority : job),
     ...(['create', 'claim', 'commit', 'publish', 'resume'].includes(action) ? [salesRevisionGuard(job)] : []),
     ...(authority && authority.principalId !== job.principalId ? [{ sql: `EXISTS(SELECT 1 FROM oa_operators o
       JOIN reference_sales_memberships m ON m.principal_id=o.id WHERE o.id=? AND o.status='active' AND o.role IN ('owner','admin')

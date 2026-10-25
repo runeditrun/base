@@ -28,11 +28,23 @@ membership. Ownership fields cannot be supplied in the intent. Revision changes
 hold execution while authorized metadata inspection and cancellation remain
 available; erased output is marked unavailable.
 
+Hosted inspection uses the same selector: `rer jobs inspect ID --origin URL
+--session-file FILE --tenant TENANT` or `rer jobs status` with those same flags.
+The private session file contains one session cookie; it must be owned by the
+current user with mode 0600. `--tenant` is only for hosted inspection and sends
+the ID only in `x-rer-sales-tenant`. IDs start with a letter or digit and contain
+at most 100 letters, digits, underscores, dots, colons or hyphens; malformed IDs
+are refused before a request. Omitting the flag selects installation-wide work.
+A tenant outside the session's current membership returns 404 without metadata.
+
 `rer dev` and `rer preview` use the declared native lifecycle adapter. Startup
 records the CLI process custody, replacing an earlier holder only after its exact
 PID/start identity is proved absent or changed, then resumes one bounded safe
 unit. The existing scheduled trigger
 runs bounded ticks. Shutdown quiesces that exact holder and fences pending units.
+`rer demo` and `rer dev --demo` skip lifecycle startup and shutdown. The demo
+Worker also disables this registration and its scheduled tick, even with the
+reference opt-in enabled. The owner's job database is never opened for writing.
 Native inspection opens the existing canonical installation database read-only,
 resolves its current owner and memberships, and returns the shared safe projection.
 It never starts work. Native status refuses installations over its bounded scope

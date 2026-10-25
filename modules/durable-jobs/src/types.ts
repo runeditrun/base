@@ -47,6 +47,7 @@ export interface JobKind {
   kind: string; version: number; codecVersion: number; capabilities: ['local'];
   consequential: false; dependencies: string[];
   decodeInput(value: Json): Json;
+  decodeRevision(value: Json): Json;
   sourceKey(input: Json): string;
   decodeCheckpoint(codecVersion: number, value: Json): Json;
   validateRevision(job: Job): Promise<boolean>;

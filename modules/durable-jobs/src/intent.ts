@@ -13,7 +13,10 @@ export async function request(context: Context, intent: Intent, authority: Autho
   insist(kind, 'job_handler_unsupported', 503); text(intent.operationKey, 'operation_key');
   const input = bounded(intent.inputRef, context.limits.maxMetadataBytes), revision = bounded(intent.requestedRevision, context.limits.maxMetadataBytes);
   let decoded: Json;
-  try { decoded = kind.decodeInput(intent.inputRef); }
+  try {
+    decoded = kind.decodeInput(intent.inputRef);
+    insist(canonical(kind.decodeRevision(intent.requestedRevision)) === revision, 'job_invalid_input');
+  }
   catch { throw new JobError('job_invalid_input', 400, 'Supply the registered kind\'s bounded input reference.'); }
   insist(canonical(decoded) === input, 'job_invalid_input');
   const sourceKey = text(kind.sourceKey(intent.inputRef), 'source');
@@ -66,13 +69,18 @@ export async function mutate(context: Context, action: 'cancel' | 'resume', id: 
   const operations = JSON.parse(String(row.operations_json)) as { key: string; hash: string }[];
   const prior = operations.find(operation => operation.key === mutation.operationKey);
   if (prior) { insist(prior.hash === hash, 'job_operation_conflict'); return job; }
+  // Terminal resume is a version-bound read, with no new operation receipt or
+  // execution authorization. Only its canonical read content is admissible.
+  if (action === 'resume' && terminal(job.state)) {
+    insist(job.version === mutation.expectedVersion && mutation.reason === undefined, 'job_operation_conflict');
+    return job;
+  }
   insist(job.version === mutation.expectedVersion, 'job_version_conflict');
   insist(await context.policy.authorize(action, job, authority), 'job_forbidden', 403);
   if (terminal(job.state)) {
-    if (action === 'resume' && job.state === 'failed') throw new JobError('job_new_intent_required');
     insist(operations.length < 64, 'job_operation_limit');
     const encoded = bounded([...operations, { key: mutation.operationKey, hash }] as unknown as Json, context.limits.maxMetadataBytes);
-    const predicates = context.predicates(action === 'resume' ? 'read' : action, job, authority);
+    const predicates = context.predicates(action, job, authority);
     await atomic(context.database, [...predicates.map(guard),
       guard(sql('EXISTS(SELECT 1 FROM rer_job_jobs WHERE installation_id=? AND id=? AND version=? AND operations_json=?)', context.installationId, id, job.version, String(row.operations_json))),
       sql('UPDATE rer_job_jobs SET operations_json=? WHERE installation_id=? AND id=?', encoded, context.installationId, id), ...predicates.map(guard)]);

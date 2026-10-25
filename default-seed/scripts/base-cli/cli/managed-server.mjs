@@ -139,7 +139,8 @@ export async function managedServer(project,options,out,{clock={}}={}){
    if(!identity)throw Error('Runtime exited before custody registration.');
    await registry.update({runtimeProcess:{pid:identity.pid,start:identity.start}});
   },controller.signal,{...adapterOptions,verb:options.verb,dev:project.adapter.dev,preview:project.adapter.preview});
-  if(typeof project.adapter.jobs?.lifecycle==='function'){
+  // Native jobs own the checkout's data, which a throwaway demo must never open.
+  if(!options.demo&&typeof project.adapter.jobs?.lifecycle==='function'){
    const identity=await processInfo(process.pid);
    if(!identity)throw new RerError('jobs_lifecycle_failed','Native jobs process custody could not be established.',1);
    jobsCustody={pid:identity.pid,start:identity.start};jobsStarted=true;
