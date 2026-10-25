@@ -6,6 +6,8 @@
 - Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo without an unjournaled failure fence. Restore exact retained-value and complete catch-up undo report checks.
 - Keep demo Run exits out of the host layout; use spare label space, truncate the exit itself and reveal its full accessible link on keyboard focus without moving header controls.
 - Add seed-owned transactional audit hooks for native operator administration and direct installation export creation. Provider unlink audits require a new pin generation; already-unlinked requests keep HTTP 200 without another audit row. The export hook belongs to the direct `createPortability` service; the HTTP handler has no hook.
+- Treat RER Platform's `rer_migrations` ledger as a first-class source when a Managed installation leaves for native: exports record `manifest.migrationLedger` (native file names with SHA-256, origin `rer_migrations`), imports map it by hash and refuse only a true mismatch with a named code and fix, and the ledger is never archived as product tables. Native-source archives, v1 recovery and existing refusals are unchanged.
+- Add `mapMigrationLedger` to `@runeditrun/rer/portability-migrations` for adapters with their own archive format, and name the unapplied checkout file in the preflight refusal.
 
 ## 0.2.80
 
