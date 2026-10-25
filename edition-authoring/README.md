@@ -356,3 +356,11 @@ maps only exact original bytes to their projected identity; every other byte,
 mode, addition and removal stays visible. Incoming candidate source is always
 read as ordinary Git and never inherits the projection identity. Lamp's
 `scripts/public-projections/` is the reference producer.
+
+
+Legacy seeds that recorded `edition-authoring/cli.mjs` as a singleton receive
+Base's maintained authoring sibling modules during refresh, each with its own
+source record and digest. This delivery is limited to the authoring toolkit;
+it does not infer application dependencies. Existing local helper edits, removed
+recorded helpers, conflicting mappings and symlinks refuse before any writes.
+Package-mode seeds continue using the installed package's authoring entry.

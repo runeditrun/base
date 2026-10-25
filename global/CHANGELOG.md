@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.82
+
+- Deliver the accepted import-door intake implementation and its runtime and type dependencies at `@runeditrun/rer/modules/import-kit/door`, preserving the D1 entry.
+- Refresh legacy singleton authoring-tool copies with their maintained sibling helpers, recording the delivered source bytes so `verify-base` can run after refresh.
+- Check the packed door lifecycle and fresh seed refresh before package publication.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.

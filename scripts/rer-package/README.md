@@ -21,6 +21,31 @@ The build is reproducible (`tarball.mjs`): entries in sorted path order, owner
 `SOURCE_DATE_EPOCH` convention), and a gzip header with no time and a fixed OS
 byte. The same commit gives the same bytes from any clone path on any day.
 
+## Packed release surfaces
+
+Before publication, the release workflow installs the exact tarball in an isolated
+HOME and checks the surfaces below. The current 0.2.82 notes claim only these
+packaging repairs; older changelog sections describe earlier releases. Broader
+release groups still require their independent release proofs.
+
+| Surface | Delivered public entry | Check |
+| --- | --- | --- |
+| Import door and intake | `@runeditrun/rer/modules/import-kit/door` | Bundle actual runtime imports, compile public type imports; CSV, NDJSON and JSON projection, typed refusals, plan, apply, reconcile, replay and Undo against real SQLite. |
+| Existing D1 engine | `@runeditrun/rer/modules/import-kit/d1` | Bundle and initialize the packed engine used by the door; compile its public types. |
+| Base authoring refresh | `edition-authoring/cli.mjs` in the installed package | Refresh a fresh pinned public Pegboard checkout with its legacy singleton records; run both the refreshed local CLI and the package's `verify-base` against committed Base blobs, recorded SHA-256 values, modes and unrecorded copies; repeat refresh. |
+
+```sh
+node scripts/rer-package/artifact.mjs TARBALL --out EVIDENCE_DIR
+```
+
+The check installs its compiler tools from the reference's declared versions;
+application imports resolve only inside the isolated installed tarball. Base is
+used only as the explicit committed refresh source (`--base` / `--ref` can select
+it). It never supplies a missing runtime module from checkout source. The JSON
+report lists every checked surface and retains each authoring command's output.
+The two groups run independently, so one missing surface cannot mask the other.
+No global rer or seed dependency pin is changed.
+
 ## Smoke test
 
 ```sh

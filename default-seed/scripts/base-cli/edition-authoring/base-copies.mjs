@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
-import {requireMaterializedCopies} from './copy-checkout.mjs';
+import {completeAuthoringCopies, requireMaterializedCopies} from './copy-checkout.mjs';
 import {completeRuntimeCopies} from './runtime-dependencies.mjs';
 
 export const RECORD = 'base-copies.json';
@@ -383,6 +383,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
       return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
+    completeAuthoringCopies(root, plans, {tree: next, local, upstream, revision});
     completeRuntimeCopies(plans, {tree: next, read, local, upstream, revision, checkTarget(name) {
       safe(name); noLinks(root, name);
       const target = path.join(root, name);

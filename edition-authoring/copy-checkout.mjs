@@ -67,3 +67,29 @@ export function requireMaterializedCopies(root, record, files) {
     }
   }
 }
+
+// Legacy seeds recorded the authoring CLI one file at a time. Ship its maintained
+// source set as siblings too; this is deliberately limited to Base's own tools,
+// independent of the runtime dependency planner and edition application source.
+export function completeAuthoringCopies(root, plans, {tree, local, upstream, revision}) {
+  const mounts = new Set(plans.flatMap(plan => plan.sources
+    .filter(([source]) => source === 'edition-authoring/cli.mjs')
+    .map(([source]) => path.posix.dirname(plan.copy.path + source.slice(plan.copy.originPath.length)))));
+  const sources = [...tree].filter(([source]) => /^edition-authoring\/[^/]+\.mjs$/.test(source) && !source.endsWith('.test.mjs'));
+  for (const mount of mounts) for (const [source, entry] of sources) {
+    const target = safe(mount + '/' + path.posix.basename(source));
+    noLinks(root, target);
+    if (fs.existsSync(path.join(root, target)) && !fs.lstatSync(path.join(root, target)).isFile()) throw Error(`Authoring helper is not a regular file: ${target}`);
+    let plan = plans.find(plan => target === plan.copy.path || target.startsWith(plan.copy.path + '/'));
+    if (plan && plan.copy.originPath + target.slice(plan.copy.path.length) !== source) throw Error(`Authoring helper conflicts with Base copy mapping: ${target}`);
+    if (plan?.removed.includes(target)) throw Error(`Authoring helper was removed locally: ${target}. Restore it before refreshing; no files were refreshed.`);
+    if (plan?.sources.some(([name]) => name === source) || plan?.copy.adapted?.[target]) continue;
+    if (local(target) && local(target) !== upstream.get(entry.object)) throw Error(`Authoring helper has unrecorded local edits: ${target}. Record or adapt it before refreshing; no files were refreshed.`);
+    if (!plan) {
+      if (plans.some(plan => plan.copy.path.startsWith(target + '/'))) throw Error(`Authoring helper overlaps a Base copy: ${target}`);
+      plan = {copy: {path: target, originPath: source, revision, files: {}, modes: {}}, sources: [], removed: []};
+      plans.push(plan);
+    }
+    plan.sources.push([source, entry]);
+  }
+}

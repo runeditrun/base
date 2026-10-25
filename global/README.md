@@ -611,3 +611,14 @@ setup process is still running, `confirm-no-turn-started JOB_ID
 checkout changed or the provider recorded a session for it. It reads the
 checkout with Git inside the same boundary, because setup could have changed
 the checkout's Git configuration.
+
+
+## Import door for adopting Workers
+
+Bundle `@runeditrun/rer/modules/import-kit/door` to use the maintained
+`createImportOperatorHandler` or `createImportDoorHandler`, schema migrations,
+settings hooks and public option types. This TypeScript entry includes its real
+runtime and type dependencies. The existing
+`@runeditrun/rer/modules/import-kit/d1` entry remains available. See the
+[adoption guide](https://github.com/runeditrun/base/blob/main/modules/import-kit/src/door/ADOPTING.md)
+for native adapters, consent, declared intake projection and reviewed apply/Undo.
