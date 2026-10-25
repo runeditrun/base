@@ -97,7 +97,12 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   if (!protectedJournal) { preserveJournal = false; journal.wasRunning = wasRunning; }
   // Discardable attempts protect runtime intent only. Settle it at today's HEAD
   // even when the owner committed or selected a different target after the crash.
-  if (!protectedJournal && !restore && wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
+  if (!protectedJournal && !restore) {
+   // A borrowed server can still be exiting after its custodian died. Do not
+   // mistake that transient registry entry for independently settled custody.
+   if (operation.reclaimedIdentity) await stopApp(checkout, operation);
+   if (wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
+  }
   try { await serverResources(checkout, { env: { ...process.env, RER_SERVERS_LOAD_THRESHOLD: undefined } }); }
   catch { throw failure('disk_low'); }
   // Ensure private upgrade records never turn an otherwise clean seed dirty.

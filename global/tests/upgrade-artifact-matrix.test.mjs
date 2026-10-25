@@ -42,7 +42,7 @@ test('the packed upgrade door preserves owner work across the durable artifact m
      assert.equal(retained.snapshot, true, 'the real local-state snapshot must remain intact');
      if (code === 'rollback_failed') assert.equal(rollbackStages.has(stage), true, 'only an existing failed or interrupted rollback may report rollback_failed');
 
-     const invalidHead = ['detached', 'unborn'].includes(head) || head === 'other branch' && protectedStages.has(stage);
+     const invalidHead = ['detached', 'unborn'].includes(head) || head === 'other branch' && tree === 'clean' && protectedStages.has(stage);
      const prepare = lock === 'none' && !invalidHead && tree === 'clean' && !protectedStages.has(stage);
      if (lock === 'live second updater') {
       assert.equal(outcome, 'refused'); assert.equal(code, 'refused');
