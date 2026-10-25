@@ -16,7 +16,7 @@ const stable = value => JSON.stringify(value, (_, item) => item && typeof item =
 export function runArchive({ lease, task, grant, directory, say, ownerPage }) {
  const takenAt = new Date().toISOString();
  return withUploadedBundle({ lease, task, grant, directory, say,
-  doing: (name, origin) => `Archiving the final ${name} export through the shipped read-only adapter. The key stays on this computer; the archive goes only to the app's import door at ${origin} and stays in the app's own storage.` },
+  doing: (name, origin, keyed) => `Archiving the final ${name} export through the shipped read-only adapter. ${keyed ? 'The key stays on this computer; the archive' : 'The archive'} goes only to the app's import door at ${origin} and stays in the app's own storage.` },
  async ({ vendor, name, origin, uploadId, bundle, fresh }) => {
   const kept = await door(await fresh('archive'), { uploadId, tool: vendor, takenAt }, lease.signal);
   const [input, unique, rejected] = ['input', 'unique', 'rejected'].map(field => count(kept.counts?.[field]));

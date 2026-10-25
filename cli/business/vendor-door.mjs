@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { taskPath } from './api.mjs';
 import { assertChunk } from './outbound.mjs';
 import { createCredentialStore } from './keychain.mjs';
-import { exportVendor, VENDORS, VENDOR_CAPABILITIES, VendorExportError } from './vendors/index.mjs';
+import { exportVendor, VENDORS, KEYED_VENDORS, VENDOR_CAPABILITIES, VendorExportError } from './vendors/index.mjs';
+import { exportInputs, inputNeeds } from './export-inputs.mjs';
 import { businessCommand } from './invocation.mjs';
 
 // What every vendor task that writes into an app's import door shares
@@ -17,7 +18,9 @@ import { businessCommand } from './invocation.mjs';
 const CHUNK_BYTES = 65_536;
 const DOOR_RESPONSE_BYTES = 4 * 1024 * 1024;
 // The catalogue names the platform builds vendor task titles from.
-export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly' });
+export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry' });
+/** Whether a vendor's export needs the owner's read-only key (Sorry's public page does not). */
+export const keyed = vendor => KEYED_VENDORS.includes(vendor);
 export const vendorHandle = vendor => `vendor:${vendor}:read`;
 export const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const loopback = hostname => ['localhost', '127.0.0.1', '[::1]'].includes(hostname);
@@ -80,12 +83,14 @@ function destination(task, grant) {
  return { origin: url.origin, quota: grant.quota_bytes };
 }
 
-/** Inputs the shipped adapter needs beyond the key. Executor task views carry
- * no task inputs, so only vendors that need none can run from this computer. */
-function adapterInputs(vendor) {
- if (vendor === 'uptimerobot') return {};
- const needs = { sentry: 'its Sentry organization and time window', pagerduty: 'its time window', calendly: 'an import door that takes its folder of files' };
- throw new ExportWaiting(`Business vendor export for ${vendorNames[vendor]} needs ${needs[vendor]}, which this task does not carry yet. Task released as paused.`, 'configuration_required');
+/** Inputs the shipped adapter needs beyond the key: the leased task's own
+ * non-secret `export_inputs`. A task that does not carry them yet waits for
+ * Business (which asks the owner when its evidence is missing). */
+function adapterInputs(vendor, task) {
+ const inputs = exportInputs(vendor, task);
+ if (inputs) return inputs;
+ const needs = vendor === 'calendly' ? 'an import door that takes its folder of files' : `${inputNeeds[vendor]}, which this task does not carry yet`;
+ throw new ExportWaiting(`Business vendor export for ${vendorNames[vendor]} needs ${needs}. Task released as paused.`, 'configuration_required');
 }
 
 /** One RER-signed import grant for one door request. `review` asks for a
@@ -132,13 +137,13 @@ export async function door(grant, body, signal) {
 
 /** Run the shipped adapter into a private 0600 bundle file, checking every
  * item with the outbound detector before it is written. */
-async function exportBundle({ vendor, key, inputs, path, quota, signal }) {
+async function exportBundle({ vendor, key = null, inputs, path, quota, signal }) {
  await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
  const file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
  const digest = createHash('sha256'); let size = 0;
  try {
   for await (const item of exportVendor(vendor, { key, inputs, signal })) {
-   assertChunk(item.bytes, [key]);
+   assertChunk(item.bytes, key ? [key] : []);
    size += item.bytes.length;
    if (size > quota) throw Error(`Business vendor export is larger than the app's import door accepts (${quota} bytes). Nothing was uploaded.`);
    digest.update(item.bytes);
@@ -147,7 +152,7 @@ async function exportBundle({ vendor, key, inputs, path, quota, signal }) {
   await file.sync();
  } catch (error) {
   if (!(error instanceof VendorExportError)) throw error;
-  if (error.code === 'HTTP_REFUSED' && [401, 403].includes(error.status)) {
+  if (error.code === 'HTTP_REFUSED' && [401, 403].includes(error.status) && key) {
    throw new ExportWaiting(`${vendorNames[vendor]} refused the stored read-only key (HTTP ${error.status}). To replace it, ${keyStep(vendor)}`, 'owner_required');
   }
   throw Error(`${vendorNames[vendor]} export stopped (${error.code}${error.status ? `, HTTP ${error.status}` : ''}). Nothing was uploaded.`);
@@ -179,10 +184,11 @@ export function checkedPreview(preview, bundle) {
  * The shared start of a claimed vendor door task: the claimed grant's door, the
  * vendor its first grant names, the owner's key from the OS store, the shipped
  * adapter into a private 0600 bundle, then the bundle in 64 KiB chunks, each with
- * a fresh grant. `finish` gets the uploaded bundle and returns `{outputs, said}`:
+ * a fresh grant. A vendor that needs no key (a public status page) reads none.
+ * `finish` gets the uploaded bundle and returns `{outputs, said}`:
  * the task then completes with those outputs (identifiers only, which Business
  * checks against the door itself) and `said` is the line to say. The bundle file
- * is removed on every exit. `doing(name, origin)` is said first.
+ * is removed on every exit. `doing(name, origin, keyed)` is said first.
  */
 export async function withUploadedBundle({ lease, task, grant: claimedGrant, directory, say, doing }, finish) {
  const signal = lease.signal, { origin, quota } = destination(task, claimedGrant);
@@ -194,12 +200,12 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
   spare = null;
   return doorGrant(lease, action, origin, vendor, options);
  };
- const inputs = adapterInputs(vendor);
- let key = await createCredentialStore().get(vendorHandle(vendor));
- if (!key) throw new ExportWaiting(`Business vendor export needs the owner's read-only ${name} key on this computer: ${keyStep(vendor)}\nThen run ${businessCommand('run')} again.`, 'owner_required', { keyMissing: vendor });
+ const inputs = adapterInputs(vendor, task);
+ let key = keyed(vendor) ? await createCredentialStore().get(vendorHandle(vendor)) : null;
+ if (keyed(vendor) && !key) throw new ExportWaiting(`Business vendor export needs the owner's read-only ${name} key on this computer: ${keyStep(vendor)}\nThen run ${businessCommand('run')} again.`, 'owner_required', { keyMissing: vendor });
  const path = join(directory, `export-${hash(task.id).slice(0, 32)}.bundle`);
  try {
-  say(doing(name, origin));
+  say(doing(name, origin, keyed(vendor)));
   let bundle;
   try { bundle = await exportBundle({ vendor, key, inputs, path, quota, signal }); } finally { key = undefined; }
   const total = Math.ceil(bundle.size / CHUNK_BYTES);
