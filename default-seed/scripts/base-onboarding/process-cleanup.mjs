@@ -1,12 +1,13 @@
 import { setTimeout as delay } from 'node:timers/promises'
-import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
+import { inspectionMs, isExited, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
 import { readOwnedTree } from './process-tree.mjs'
+import { uncheckedInspection } from './process-diagnostics.mjs'
+import { commandFailure } from './failures.mjs'
 
 const graceMs = 1000
 const cleanupMs = 30000
 // macOS ps already spaces observations by tens of milliseconds.
 const pollMs = process.platform === 'darwin' ? 5 : 25
-const isZombie = (member) => member.state.startsWith('Z')
 const isStopped = (member) => /^[Tt]/.test(member.state)
 const key = (member) => `${member.pid}:${member.birth}`
 const isLeaf = (member, group) => !group.some((other) => other.ppid === member.pid)
@@ -32,9 +33,8 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const stopped = new Map()
   let lastGroup = []
 
-  // Every inspection gets its full bound (and process-table's extension): a
-  // slow but complete read is still a valid observation. The cleanup deadline
-  // ends the loop below, and only processes observed alive at it fail cleanup.
+  // Only live members hold cleanup or block a parent's leaf-first escalation.
+  // Direct ChildProcess exits are reaped by Node while we yield to its loop.
   const snapshot = async () => {
     const current = await inspect(inspectionMs)
     lastGroup = current
@@ -43,9 +43,9 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const send = async (member, name, requireLeaf = true) => {
     // Recheck both identity and children immediately before each numeric PID
     // signal. Never send a negative/group signal that can kill parents first.
-    const current = requireLeaf ? await readProcessTable(inspectionMs) : []
+    const current = requireLeaf ? (await readProcessTable(inspectionMs)).filter(member => !isExited(member)) : []
     const target = await readProcessIdentity(member.pid, inspectionMs)
-    if (!sameBirth(member, target) || isZombie(target)) return false
+    if (!sameBirth(member, target) || isExited(target)) return false
     if (requireLeaf && !isLeaf(target, current)) return false
     if (name === 'SIGKILL' && !isStopped(target)) return false
     if (requireLeaf && target.pid === pgid && current.some(other => other.pid !== pgid
@@ -66,13 +66,13 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const leader = ownership.find(member => member.pid === pgid)
   if (leader && child.exitCode == null && child.signalCode == null) {
     const live = await readProcessIdentity(pgid, inspectionMs)
-    if (sameBirth(leader, live) && live.ppid === process.pid && !isZombie(live)) {
+    if (sameBirth(leader, live) && live.ppid === process.pid && !isExited(live)) {
       try { process.kill(pgid, signal); signalled.set(key(live), Date.now()) }
       catch (error) { if (error.code !== 'ESRCH') throw new Error(`Could not send ${signal} to owned process ${pgid}.`) }
     }
   }
 
-  const unfinished = (cause) => new Error(`Owned processes remain after cancellation (last observed ${lastGroup.map((member) => `${member.pid}:${isZombie(member) ? 'zombie' : 'live'}`).join(', ')}).`, { cause })
+  const unfinished = (cause) => new Error(`Owned processes remain after cancellation (last observed ${lastGroup.map((member) => `${member.pid}:live`).join(', ')}).`, { cause })
   let cleanupError
   try {
     while (Date.now() < deadline) {
@@ -97,7 +97,7 @@ export async function stopOwnedGroup(child, signal, ownership) {
       for (const member of group) {
         if (Date.now() >= deadline) break
         const identity = key(member)
-        if (isZombie(member)) continue
+        if (isExited(member)) continue
         if (!signalled.has(identity)) {
           // A supervisor needs its shutdown signal before its worker disappears;
           // otherwise normal restart behavior can keep this tree alive forever.
@@ -115,9 +115,11 @@ export async function stopOwnedGroup(child, signal, ownership) {
       }
       await delay(pollMs)
     }
+    group = await snapshot()
+    if (!group.length && (child.exitCode !== null || child.signalCode !== null)) return
     throw unfinished()
   } catch (error) {
-    cleanupError = Date.now() >= deadline ? unfinished(error) : error
+    cleanupError = !uncheckedInspection(error) && Date.now() >= deadline ? unfinished(error) : error
     throw cleanupError
   } finally {
     // Inspection/signalling failures must not leave a process suspended.
@@ -125,9 +127,20 @@ export async function stopOwnedGroup(child, signal, ownership) {
     for (const member of stopped.values()) {
       try { await send(member, 'SIGCONT', false) } catch (error) { errors.push(error) }
     }
-    // Preserve the original failure while reporting a failure to resume an owned process.
-    // eslint-disable-next-line no-unsafe-finally
-    if (errors.length) throw new AggregateError([cleanupError, ...errors].filter(Boolean),
-      [cleanupError?.message, 'Could not resume every suspended owned process.', ...errors.map((error) => error.message)].filter(Boolean).join(' '))
+    if (errors.length) {
+      const causes = [cleanupError, ...errors].filter(Boolean)
+      const aggregate = new AggregateError(causes,
+        [cleanupError?.message, 'Could not resume every suspended owned process.', ...errors.map((error) => error.message)].filter(Boolean).join(' '))
+      // The CLI exposes only approved diagnostics. Preserve unchecked identity
+      // failures through aggregation without approving arbitrary cause messages.
+      if (causes.some(uncheckedInspection)) {
+        const failure = commandFailure('Process inspection is unchecked: cleanup could not verify every suspended process before resuming it. No unverified process was signalled.', { ownershipUnchecked: true })
+        failure.cause = aggregate
+        // eslint-disable-next-line no-unsafe-finally
+        throw failure
+      }
+      // eslint-disable-next-line no-unsafe-finally
+      throw aggregate
+    }
   }
 }

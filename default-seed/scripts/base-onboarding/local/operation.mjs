@@ -58,12 +58,10 @@ async function currentProcess() {
 // A recorded owner is alive only while its PID exists and, when the record
 // carries a start time, that PID still names the same process.
 export async function ownerAlive(owner) {
-  try { process.kill(owner.pid, 0) } catch (error) {
-    if (error.code === 'ESRCH') return false
-    if (error.code !== 'EPERM') throw error
-  }
-  if (typeof owner.start !== 'string') return true
-  return await processStart(owner.pid) === owner.start
+  // An existing PID can already be a zombie. Inspect state even for legacy
+  // records without a start stamp; unreadable metadata never proves absence.
+  const current = await processStart(owner.pid)
+  return current !== undefined && (typeof owner.start !== 'string' || current === owner.start)
 }
 
 // Removing a stale lock by name alone could remove a lock another starter has
@@ -108,10 +106,12 @@ async function staleIdentity(path) {
   try {
     const status = await handle.stat({ bigint: true })
     const id = key(status)
-    try {
-      const owner = JSON.parse(await handle.readFile('utf8'))
-      if (Number.isSafeInteger(owner.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
-    } catch { /* Half-written or unreadable: judged by age below. */ }
+    let owner
+    try { owner = JSON.parse(await handle.readFile('utf8')) }
+    catch (error) { if (!(error instanceof SyntaxError)) throw error }
+    // An unreadable owner is unchecked, regardless of the lock's age. Only
+    // malformed/unfinished records may use the grace-period rule below.
+    if (Number.isSafeInteger(owner?.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
     return Date.now() - Number(status.mtimeMs) > graceMs ? id : undefined
   } finally { await handle.close() }
 }

@@ -1,12 +1,12 @@
 import { scopedProcesses } from './process-scope.mjs'
-import { inspectionMs, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
+import { inspectionMs, isExited, readProcessIdentity, readProcessTable, sameBirth, validPid } from './process-table.mjs'
 
 // Retain PID/start identities across exec and after close. An inherited marker
 // recovers descendants after reparenting; group membership and cwd never grant
 // ownership. Inspect executable identity only for actual custody candidates.
 export async function readOwnedTree(child, previous = [], timeout = inspectionMs, scope = previous.scope) {
   if (!validPid(child.pid)) throw new Error('Invalid owned process tree.')
-  const table = await readProcessTable(timeout)
+  const table = (await readProcessTable(timeout)).filter(member => !isExited(member))
   const candidates = table.filter(member => previous.some(saved => sameBirth(member, saved)))
   let owned = (await Promise.all(candidates.map(member => readProcessIdentity(member.pid, timeout))))
     .filter(member => member && previous.some(saved => sameBirth(member, saved)))
@@ -31,6 +31,7 @@ export async function readOwnedTree(child, previous = [], timeout = inspectionMs
       if (sameBirth(member, live) && owned.some(parent => parent.pid === live.ppid)) { owned.push(live); changed = true }
     }
   } while (changed)
+  owned = owned.filter(member => !isExited(member))
   Object.defineProperty(owned, 'scope', { value: scope })
   return owned
 }
