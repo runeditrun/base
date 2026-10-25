@@ -132,23 +132,24 @@ function readLink(text: string): { scheme: string; userinfo?: string; host?: str
 function queryKeys(query: string): string[] {
   const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
   return query.split('&').filter(Boolean).map((pair) => {
-    const name = pair.split('=', 1)[0]!.replaceAll('+', ' ');
-    return name.includes('%') ? decoder.decode(percentDecode(name)) : name;
+    const name = pair.split('=', 1)[0]!;
+    return name.includes('%') || name.includes('+') ? decoder.decode(formDecode(name)) : name;
   });
 }
 
 /**
- * The URL Standard's percent-decode of the text's UTF-8 bytes, in one pass. A global replace with a callback lists
- * every match first, and V8 aborts the process when that list passes about 2^26 entries.
+ * The URL Standard's form decoding of the text's UTF-8 bytes in one pass: `+` becomes a space, `%` and two hex digits
+ * that byte. String replaces build their result from one piece per match: a global replace with a callback aborts V8
+ * past about 2^26 matches, and replaceAll('+', ' ') ended the workerd process at 75,000,000 characters.
  */
-function percentDecode(text: string): Uint8Array {
+function formDecode(text: string): Uint8Array {
   const bytes = new TextEncoder().encode(text);
   let length = 0;
   for (let index = 0; index < bytes.length; index += 1) {
     const high = bytes[index] === 0x25 ? hexValue(bytes[index + 1]) : -1;
     const low = high < 0 ? -1 : hexValue(bytes[index + 2]);
-    if (low < 0) bytes[length++] = bytes[index]!;
-    else { bytes[length++] = high * 16 + low; index += 2; }
+    if (low >= 0) { bytes[length++] = high * 16 + low; index += 2; }
+    else bytes[length++] = bytes[index] === 0x2b ? 0x20 : bytes[index]!;
   }
   return bytes.subarray(0, length);
 }
