@@ -2,6 +2,7 @@
 
 ## 0.2.81
 
+- Prove publication copy digests per file, including acknowledged adaptations whose baseline matches the exact pinned Base origin; keep unproved hashes and credentials as findings.
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.
 - Project declared import intake fields before storing chunks, keeping excluded values such as Auth0 password hashes and Okta credentials and factors out of custody.
 - Validate preserving import adapters before every apply batch, including resumed work; retain earlier admitted batches for Undo when later preparation is refused.

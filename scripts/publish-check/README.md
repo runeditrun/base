@@ -100,8 +100,22 @@ public report. Authoring's integrity checks remain unchanged.
 
 `copy_identities.py` proves the maintained `base-copies.json` and portable
 `base/PROVENANCE.json` copy-inventory SHA-256 values
-against every declared file's bytes and regular-file mode in the same scanned
-tree. Historical matches use only that commit's blobs; present files cannot
+per entry against that file's bytes and regular-file mode in the same scanned
+tree. An adapted entry must name a full commit and carry an acknowledgement:
+its acknowledgement hash and mode prove the local preimage independently of
+the baseline hash, which must match the regular file at the exact adapted pin
+and mapped origin path in Base. Only a locally matching acknowledgement admits
+an adaptation's baseline proof. Missing or invalid acknowledgements and unproved
+values remain findings; one bad entry does not invalidate other proved entries.
+`copy_origins.py` uses Git's normal fetch transport, like public-base acquisition,
+into a disposable bare repository from the fixed `runeditrun/base` remote. It
+fetches only full pinned revisions with depth one, no tags or submodules, no
+lazy fetching, a 30-second command deadline, and no retries. The ledger cannot
+select another remote. Each scan allows at most 32 origin revisions and 4,096
+origin file reads, cached including failures; each JSON copy proof considers at
+most 4,096 entries. Over-budget or unavailable preimages remain findings. The
+outer scanner deadline still applies and temporary origin objects are removed.
+Historical matches use only that commit's blobs; present files cannot
 rescue a historical mismatch. Working-tree preimages reject linked paths.
 Copy records use the same proof at custom JSON paths.
 The captured secret must occur unambiguously inside the exact proved JSON value;

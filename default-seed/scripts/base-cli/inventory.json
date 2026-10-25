@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.81-dev.g277ff07e",
+  "cliVersion": "0.2.81-dev.g631bb343",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3851,7 +3851,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "bd2edac07392d1b336f06ed67c4c8c5b87eb6494415b005ad8db18758d9ac4cb"
+      "sha256": "de1762f085bdbced77c940c4959036c74ebe49de1be144d3645761e84febb584"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -3883,7 +3883,7 @@
     },
     "scripts/publish-check/content_identities.py": {
       "source": "scripts/publish-check/content_identities.py",
-      "sha256": "208e548f63ebcca742c8dcb0f8cc2acf65706d1722eb4840cc1cbdd41b899b44"
+      "sha256": "cb40c4e9b3a6f8bb47d7b2e7e9525739778cdb8148fbffcf1c51ee76acdf3ae7"
     },
     "scripts/publish-check/controller_metadata.py": {
       "source": "scripts/publish-check/controller_metadata.py",
@@ -3891,7 +3891,11 @@
     },
     "scripts/publish-check/copy_identities.py": {
       "source": "scripts/publish-check/copy_identities.py",
-      "sha256": "9b2e620930bf9756939d0f013effb2eb3208dfcb8ad470d8face849359a40961"
+      "sha256": "1dd849f8648d53f02ce56e32d5340b7d68fdc9210957911454c4e089486f478f"
+    },
+    "scripts/publish-check/copy_origins.py": {
+      "source": "scripts/publish-check/copy_origins.py",
+      "sha256": "bfca4ee35e0ee3a1e2b1041bd3a4787f1b6455c2c250743db65a5e7f7920f8aa"
     },
     "scripts/publish-check/credential_assignments.mjs": {
       "source": "scripts/publish-check/credential_assignments.mjs",
@@ -3947,7 +3951,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "53ab77317b3a86a52d1a1bb86c1656b2dd0b5bb7497943a4dddddb06b544f510"
+      "sha256": "d3ede54272aeebac30ee2c68d0cf2d4bc68ffca588857370a3bc9b849f38f785"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",

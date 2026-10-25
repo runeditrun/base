@@ -4,11 +4,60 @@ import json
 import secrets
 import unittest
 from gitleaks import executable, inspect
-from test_repo import RepositoryFixture, generic_credential
+from test_repo import ROOT, RepositoryFixture, generic_credential
 from test_source_metadata import public_scan
 
 
 class CopyDigestTests(RepositoryFixture, unittest.TestCase):
+    def adapted_tree(self):
+        source = RepositoryFixture()
+        source.setUp()
+        self.addCleanup(source.tearDown)
+        original, local = b'export const label = "Base";\n', b'export const label = "Edition";\n'
+        source.write('runtime/api-key.mjs', original)
+        revision = source.commit()
+        name = 'vendor/base/api-key.mjs'
+        self.write(name, local)
+        self.write('vendor/base/unchanged.mjs', original)
+        copy = dict(path='vendor/base', originPath='runtime', revision=revision,
+            files={name: hashlib.sha256(original).hexdigest(),
+                   'vendor/base/unchanged.mjs': hashlib.sha256(original).hexdigest()},
+            modes={name: '100644', 'vendor/base/unchanged.mjs': '100644'},
+            adapted={name: revision}, acknowledged={name: dict(
+                sha256=hashlib.sha256(local).hexdigest(), mode='100644')})
+        return source, copy, name
+
+    def scan_adaptation(self, source, copy):
+        self.write('base-copies.json', json.dumps(dict(schemaVersion=1, copies=[copy]), indent=2))
+        self.commit()
+        return public_scan(self, base_origin=source.repo)
+
+    def assert_adaptation_finding(self, report):
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertTrue(any(f['path'] == 'base-copies.json' and f['rule'] == 'secret.assignment'
+                            for f in report['findings']))
+
+    def test_acknowledged_adapted_tree_passes(self):
+        source, copy, _ = self.adapted_tree()
+        self.assertEqual(self.scan_adaptation(source, copy)['status'], 'PASS')
+        self.assertEqual(public_scan(self, scanner=ROOT / 'default-seed/scripts/base-cli',
+                                     base_origin=source.repo)['status'], 'PASS')
+
+    def test_forged_adapted_baseline_fails(self):
+        source, copy, name = self.adapted_tree()
+        copy['files'][name] = hashlib.sha256(b'obviously fake baseline credential').hexdigest()
+        self.assert_adaptation_finding(self.scan_adaptation(source, copy))
+
+    def test_forged_adaptation_acknowledgement_fails(self):
+        source, copy, name = self.adapted_tree()
+        copy['acknowledged'][name]['sha256'] = hashlib.sha256(b'obviously fake acknowledgement').hexdigest()
+        self.assert_adaptation_finding(self.scan_adaptation(source, copy))
+
+    def test_missing_adaptation_origin_fails(self):
+        source, copy, name = self.adapted_tree()
+        copy['adapted'][name] = secrets.token_hex(20)
+        self.assert_adaptation_finding(self.scan_adaptation(source, copy))
+
     def test_multibyte_json_offsets_preserve_only_exact_identity_matches(self):
         files = {'vendor/base/api-key-one.mjs': b'export const first = true;\n',
                  'vendor/base/api-key-two.mjs': b'export const second = true;\n'}

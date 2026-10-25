@@ -11,7 +11,7 @@ def candidate(path):
 
 
 class ContentIdentities:
-    def __init__(self, files, read_regular=None):
+    def __init__(self, files, read_regular=None, read_origin=None):
         self.documents, self.allowed = {}, {}
         for path, data in files.items():
             if not candidate(path):
@@ -25,9 +25,10 @@ class ContentIdentities:
             pointers.update(source_pointers(path, document.value))
             pointers.update(controller_pointers(document.value))
             if read_regular is not None:
-                pointers.update(copy_pointers(document.value, read_regular))
+                pointers.update(copy_pointers(document.value, read_regular, read_origin))
             self.allowed[path] = pointers
 
     def matches(self, path, hit):
         document = self.documents.get(path)
-        return bool(document and document.matches(hit, self.allowed.get(path, ())))
+        pointers = self.allowed.get(path, ())
+        return bool(document and pointers and document.matches(hit, pointers))
