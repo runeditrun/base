@@ -1,5 +1,6 @@
 import { bounded, digest, insist, JobError, text } from './codec.ts';
 import { one, sql } from './database.ts';
+import { admissionReason, capacityRecovery, exhaustedReason, exhaustedRecovery, holdRecovery, reconsiderable } from './eligibility.ts';
 import type { Authority, Database, Job, JobKind, Limits, Options, Policy, Sql, State } from './types.ts';
 
 export const defaults: Limits = {
@@ -75,6 +76,14 @@ export class Context {
       const control = await this.control();
       if (!activation) Object.assign(job, { savedState: job.state, state: 'waiting', reasonCode: 'restored_requires_reauthorization', recovery: 'Review restored history and explicitly reauthorize through a supported destination policy; execution authority is not portable.' });
       else if (control?.mode !== 'running') Object.assign(job, { savedState: job.state, state: 'waiting', reasonCode: 'scheduler_unconfigured', recovery: 'Start the declared installation runtime to resume bounded native work.' });
+      else if (job.state === 'waiting') {
+        const exhausted = exhaustedReason(this, job);
+        if (exhausted) Object.assign(job, { savedState: job.state, state: 'failed', reasonCode: exhausted, recovery: exhaustedRecovery });
+        else if (reconsiderable.has(job.reasonCode ?? '')) {
+          const reason = await admissionReason(this, job);
+          Object.assign(job, { savedState: job.state, state: reason ? 'waiting' : 'queued', reasonCode: reason ?? null, recovery: reason === 'job_capacity_exhausted' ? capacityRecovery : reason ? holdRecovery : null });
+        }
+      }
     }
     return job;
   }

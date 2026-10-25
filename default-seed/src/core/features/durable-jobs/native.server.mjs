@@ -81,7 +81,7 @@ export const nativeReferenceJobs = {
       await jobs.start({ holder, ...(replaceHolder ? { replaceHolder } : {}) });
       // Resume one proven-safe persisted unit at startup; later work is woken
       // by the installation's declared cron, within the same process custody.
-      return jobs.tick({ maxJobs: 1, deadline: Date.now() + 1000, holder });
+      return jobs.tick({ maxJobs: 1, holder });
     });
   },
 };

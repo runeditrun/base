@@ -125,3 +125,51 @@ test('job authority, cancellation and admission boundaries refuse stale publicat
   for (let i = 0; i < 8 && !(await boundedJobs.get(old[1].id, member)).starts; i++) await boundedJobs.tick();
   assert.ok((await boundedJobs.get(old[1].id, member)).starts > 0);
 });
+
+test('bounded ticks share admission with ready work and reconsider every restored hold across full and partial pages', async t => {
+  for (const heldCount of [6, 7]) {
+    const f = await fixture(t); await f.populate();
+    await f.repository().createTenant('restored', f.ownerId);
+    await f.repository().setMembership('restored', f.ownerId, true);
+    await f.populate('restored', sales.slice(0, 40));
+    const jobs = f.jobs({ maxList: 3 }); await jobs.start({ holder: 'fair-runtime' });
+    const authority = await f.authority('restored'), holds = [];
+    for (let i = 0; i < heldCount; i++) holds.push((await jobs.request(input('hold-' + i), authority)).job.id);
+    await f.repository().setMembership('restored', f.ownerId, false);
+    for (let i = 0; i < Math.ceil(heldCount / 3); i++) await jobs.tick({ maxJobs: 2 });
+    const ready = [];
+    for (let i = 0; i < 6; i++) ready.push((await f.call('', input('long-ready-' + i))).body.job.id);
+    await f.repository().setMembership('restored', f.ownerId, true);
+    const inspected = await f.call('/' + holds[0], undefined, { 'x-rer-sales-tenant': 'restored' });
+    assert.equal(inspected.body.job.state, 'queued'); assert.equal(inspected.body.job.reasonCode, null);
+    const bound = Math.ceil(heldCount / 3) + heldCount + 1;
+    for (let i = 0; i < bound; i++) await jobs.tick({ maxJobs: 2 });
+    for (const id of holds) assert.ok((await jobs.get(id, authority)).starts > 0);
+    assert.ok((await Promise.all(ready.map(id => f.call('/' + id)))).some(r => r.body.job.state !== 'succeeded'));
+  }
+});
+
+test('a time-refused D1 batch rolls back whole and a later tick retries without charging an attempt or manual resume', async t => {
+  const f = await fixture(t); await f.populate(null, sales.slice(0, 40));
+  const { createReferenceSalesJobs } = await import('../../../default-seed/src/core/features/durable-jobs/runtime.server.ts');
+  const raw = f.database(); let delayed = true;
+  const database = { all: raw.all, atomic: async (statements: Parameters<typeof raw.atomic>[0]) => {
+    if (delayed && statements.some(s => /INSERT INTO rer_job_units/.test(s.sql))) {
+      delayed = false; await new Promise(resolve => setTimeout(resolve, 700));
+    }
+    return raw.atomic(statements);
+  } };
+  const jobs = createReferenceSalesJobs({ database, installationId, scheduler: 'native', limits: { maxUnitMs: 500, leaseMs: 5000 } });
+  await jobs.start({ holder: 'delayed-d1-runtime' });
+  const created = await f.call('', input('delayed-batch')), id = created.body.job.id;
+  await jobs.tick({ maxJobs: 1, deadline: Date.now() + 4000 });
+  const deferred = (await f.call('/' + id)).body.job;
+  assert.deepEqual([deferred.state, deferred.starts, deferred.failures, deferred.checkpoint.sequence], ['queued', 0, 0, 0]);
+  assert.equal((await f.db.prepare('SELECT count(*) n FROM reference_sales_published_rows WHERE job_id=?').bind(id).first()).n, 0);
+  assert.equal((await f.db.prepare('SELECT count(*) n FROM rer_job_units WHERE job_id=?').bind(id).first()).n, 0);
+  for (let i = 0; i < 6 && (await f.call('/' + id)).body.job.state !== 'succeeded'; i++) await jobs.tick({ maxJobs: 1, deadline: Date.now() + 4000 });
+  const done = (await f.call('/' + id)).body.job;
+  assert.equal(done.state, 'succeeded'); assert.equal(done.failures, 0);
+  assert.equal(done.starts, done.progress.units);
+  assert.deepEqual([done.resultRef.rows, done.resultRef.totalMinor], [40, sales.slice(0, 40).reduce((n, row) => n + row.amountMinor, 0)]);
+});

@@ -30,9 +30,29 @@ payloads; `authorize` and nonempty `commitGuards` protect individual boundaries.
 history. Defaults bound installation/tenant/kind/source concurrency, queued
 intent, starts/failure retries, units, rows/bytes/statements per unit, wall time,
 lease/deadline, metadata and list pages. Ready admission has its own page;
-held work is reconsidered in bounded keyset pages with a local persistent cursor,
-without rewriting unchanged holds or spending attempts. Deadline expiry uses the
-same finite traversal. Lifecycle requests retain at most 64
+held work has its own admission reservation and bounded keyset page. The local
+cursor advances only through examined entries, with a compare-and-swap nonce
+against concurrent cursor rewinds. Larger ticks reserve at least one ready slot;
+one-slot ticks alternate lanes durably. Invalid holds do not consume admission
+slots. Unchanged holds cause no job writes, version changes or attempts. For a
+stable cohort of N holds, R newly admissible holds, page limit L and ticks with
+enough time to examine their page or use their reservation, all R start within
+ceil(N/L) + R + 1 ticks (twice that for one-slot ticks), independent of ordinary
+ready backlog. Unavailable capacity and ticks too short to examine work cannot
+provide an admission guarantee. Deadline expiry uses the same finite traversal.
+Inspection revalidates active holds without writing them, so cleared or changed
+conditions do not retain an obsolete reason. Aggregate status revalidates only
+the live held cohort, never terminal history.
+
+A batch refused specifically by its transactional time guard rolls back and
+returns to due queued work automatically. It spends neither a failure retry nor
+a charged start; its deferred attempt remains in history. Authority, revision,
+domain-proof and fencing refusals retain their separate classifications. Unit
+verification also uses monotonic elapsed time, so moving the holder clock back
+cannot extend its original wall budget. The committing SQL guards account for
+subsequent lock waits or D1 delay; the database clock must itself advance during
+a batch. Native startup uses the configured unit budget rather than an extra
+one-second limit. Lifecycle requests retain at most 64
 operation receipts per job and refuse further keys rather than forgetting an
 idempotency fence. Terminal resume is a read: it accepts the saved version and
 an operation key without a reason, returns the saved terminal state, and writes
@@ -106,3 +126,7 @@ to a release with the destination-owned inactive job restore validator before
 restoring into a container. A native adopter supporting executable archive
 policy still owns complete staged custody validation and explicit reauthorization;
 this round does not qualify the round-3 restore or Managed leave contract.
+
+The admission migration occupies module slot `0002`. The planned round-2 effects
+migration must therefore be `0003-job-effects.sql`; round 3 must take the next
+unused slot after the effects migrations. Never rename an applied migration.

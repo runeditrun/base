@@ -5,7 +5,7 @@ import { Context, type Control, type Row } from './storage.ts';
 import type { Claim, Job, Sql } from './types.ts';
 import { admissionPage } from './admission.ts';
 
-const reconsiderable = new Set(['job_capacity_exhausted', 'job_revision_stale', 'job_authority_revoked', 'job_dependency_unavailable', 'job_handler_unsupported', 'job_checkpoint_corrupt', 'job_checkpoint_invalid', 'job_input_corrupt', 'job_revision_corrupt']);
+import { admissionReason, capacityGuard, capacityRecovery, exhaustedReason, exhaustedRecovery, holdRecovery, reconsiderable } from './eligibility.ts';
 
 export function activation(context: Context, job: Job, epoch: string): Sql {
   return sql("EXISTS(SELECT 1 FROM rer_job_activations a JOIN rer_job_control c ON c.installation_id=a.installation_id AND c.epoch=a.epoch WHERE a.installation_id=? AND a.job_id=? AND a.epoch=? AND a.principal_id=? AND a.owner_id=? AND c.mode='running')", context.installationId, job.id, epoch, job.principalId, job.ownerId);
@@ -40,7 +40,8 @@ export async function quiesce(context: Context, options: { holder: string }): Pr
   ], 'job_runtime_custody_conflict');
 }
 export async function hold(context: Context, job: Job, reason: string, recovery: string, state = 'waiting'): Promise<void> {
-  // Repeated wake-ups at a capacity or person hold do not append attempts or churn versions.
+  // Unchanged holds do not even open a write transaction.
+  if (job.state === state && job.reasonCode === reason && job.recovery === recovery) return;
   await context.database.atomic([sql("UPDATE rer_job_jobs SET state=?,reason_code=?,recovery=?,version=version+1,updated_at=? WHERE installation_id=? AND id=? AND version=? AND (state<>? OR reason_code IS NOT ? OR recovery IS NOT ?)", state, reason, recovery, context.now(), context.installationId, job.id, job.version, state, reason, recovery)]);
 }
 export async function claim(context: Context, options: { id?: string; holder?: string } = {}, admissionControl?: Control): Promise<Claim | null> {
@@ -48,32 +49,31 @@ export async function claim(context: Context, options: { id?: string; holder?: s
   const control = admissionControl ?? await context.control();
   if (!control || control.mode !== 'running') throw new JobError('scheduler_unconfigured', 503, 'Start the declared installation runtime.');
   const now = context.now(), holder = text(options.holder ?? control.holder ?? 'bounded-tick', 'holder');
-  const ids = options.id ? [options.id] : await admissionPage(context, control);
-  const rows: Row[] = [];
-  for (const id of ids) rows.push(...await context.database.all<Row>(sql("SELECT j.* FROM rer_job_jobs j JOIN rer_job_activations a ON a.job_id=j.id AND a.installation_id=j.installation_id AND a.epoch=? WHERE j.installation_id=? AND j.id=? AND j.state IN ('queued','retry_wait','waiting') AND j.cancel_requested=0 AND j.not_before<=?", control.epoch, context.installationId, id, now)));
+  if (!options.id) {
+    const page = await admissionPage(context, control);
+    try {
+      for (const lane of page.readyFirst ? [page.ready, page.held] : [page.held, page.ready]) {
+        for (const id of lane) {
+          const acquired = await claim(context, { ...options, id }, control);
+          if (lane === page.held) page.examined(id);
+          if (acquired) return acquired;
+        }
+      }
+      return null;
+    } finally { await page.finish(); }
+  }
+  const rows = await context.database.all<Row>(sql("SELECT j.* FROM rer_job_jobs j JOIN rer_job_activations a ON a.job_id=j.id AND a.installation_id=j.installation_id AND a.epoch=? WHERE j.installation_id=? AND j.id=? AND j.state IN ('queued','retry_wait','waiting') AND j.cancel_requested=0 AND j.not_before<=?", control.epoch, context.installationId, options.id, now));
   for (const row of rows) {
-    const job = await context.job(row, false);
-    if (now >= job.deadline || job.failures >= context.limits.maxFailureAttempts || job.starts >= context.limits.maxUnits + context.limits.maxFailureAttempts || job.progress.units >= context.limits.maxUnits) {
-      await hold(context, job, now >= job.deadline ? 'job_deadline_exhausted' : 'job_attempts_exhausted', 'Create a new reviewed intent after inspecting the partial committed outcome.', 'failed'); continue;
-    }
+    const job = await context.job(row, false), exhausted = exhaustedReason(context, job);
+    if (exhausted) { await hold(context, job, exhausted, exhaustedRecovery, 'failed'); continue; }
     // Only holds whose condition is checked below can wake automatically.
     // A handler's explicit wait or proof failure still needs repaired input and
     // an authorized resume, without probing it by spending another attempt.
     if (job.state === 'waiting' && !reconsiderable.has(job.reasonCode ?? '')) continue;
-    try {
-      const kind = await context.compatible(job);
-      insist(await kind.validateRevision(job), 'job_revision_stale');
-      insist(await context.policy.authorize('claim', job), 'job_authority_revoked');
-      for (const dependency of kind.dependencies) insist(await context.options.dependencies?.[dependency]?.(), 'job_dependency_unavailable', 503);
-    } catch (error) {
-      await hold(context, job, error instanceof JobError ? error.code : 'job_checkpoint_invalid', 'Restore current authority, exact revisions and compatible handler/checkpoint storage; bounded ticks reconsider this hold.'); continue;
-    }
+    const reason = await admissionReason(context, job);
+    if (reason) { await hold(context, job, reason, reason === 'job_capacity_exhausted' ? capacityRecovery : holdRecovery); continue; }
     const token = identifier() + identifier(), tokenHash = await digest(token), fence = job.fence + 1, version = job.version + 1, expiresAt = now + context.limits.leaseMs;
-    const capacity = sql(`(SELECT COUNT(*) FROM rer_job_leases WHERE installation_id=? AND expires_at>?)<? AND
-      (SELECT COUNT(*) FROM rer_job_leases l JOIN rer_job_jobs j ON j.id=l.job_id AND j.installation_id=l.installation_id WHERE l.installation_id=? AND l.expires_at>? AND j.tenant_key=?)<? AND
-      (SELECT COUNT(*) FROM rer_job_leases l JOIN rer_job_jobs j ON j.id=l.job_id AND j.installation_id=l.installation_id WHERE l.installation_id=? AND l.expires_at>? AND j.kind=?)<? AND
-      (SELECT COUNT(*) FROM rer_job_leases l JOIN rer_job_jobs j ON j.id=l.job_id AND j.installation_id=l.installation_id WHERE l.installation_id=? AND l.expires_at>? AND j.source_key=?)<?`,
-    context.installationId, now, context.limits.installationConcurrency, context.installationId, now, job.tenantId ?? '', context.limits.tenantConcurrency, context.installationId, now, job.kind, context.limits.kindConcurrency, context.installationId, now, job.sourceKey, context.limits.sourceConcurrency);
+    const capacity = capacityGuard(context, job);
     const predicates = context.predicates('claim', job);
     try {
       await atomic(context.database, [
@@ -88,7 +88,7 @@ export async function claim(context: Context, options: { id?: string; holder?: s
     } catch (error) {
       if (!(error instanceof JobError)) throw error;
       const current = await context.row(job.id);
-      if (current?.version === job.version && !(await one(context.database, sql(`SELECT 1 AS ok WHERE ${capacity.sql}`, ...(capacity.params ?? []))))) await hold(context, job, 'job_capacity_exhausted', 'Wait for a current unit to finish or cancel eligible work; no failure attempt was spent.');
+      if (current?.version === job.version && !(await one(context.database, sql(`SELECT 1 AS ok WHERE ${capacity.sql}`, ...(capacity.params ?? []))))) await hold(context, job, 'job_capacity_exhausted', capacityRecovery);
       continue;
     }
     return { job: { ...job, state: 'running', reasonCode: null, recovery: null, version, fence, starts: job.starts + 1 }, token, epoch: control.epoch, holder, expiresAt };

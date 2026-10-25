@@ -53,6 +53,18 @@ export async function status(context: Context, authority: Authority) {
     if (row.state === 'waiting' && row.reason) held[row.reason] = (held[row.reason] ?? 0) + Number(row.n);
     if (row.oldest !== null) oldest = oldest === null ? Number(row.oldest) : Math.min(oldest, Number(row.oldest));
   }
+  const waiting = await context.database.all<Row>(sql(`SELECT j.* FROM rer_job_jobs j JOIN rer_job_control c ON c.installation_id=j.installation_id AND c.mode='running'
+    JOIN rer_job_activations a ON a.installation_id=j.installation_id AND a.job_id=j.id AND a.epoch=c.epoch AND a.principal_id=j.principal_id AND a.owner_id=j.owner_id
+    WHERE j.installation_id=? AND j.namespace=? AND j.tenant_key=? ${authority.operator ? '' : 'AND j.principal_id=?'} AND j.state='waiting'`, context.installationId, authority.namespace, authority.tenantId ?? '', ...(authority.operator ? [] : [authority.principalId])));
+  for (const row of waiting) {
+    const job = await context.job(row);
+    counts.waiting--;
+    if (row.reason_code) { const reason = String(row.reason_code); if (--held[reason] === 0) delete held[reason]; }
+    counts[job.state] = (counts[job.state] ?? 0) + 1;
+    if (job.state === 'waiting' && job.reasonCode) held[job.reasonCode] = (held[job.reasonCode] ?? 0) + 1;
+    if (job.state === 'queued' && job.notBefore <= context.now()) oldest = oldest === null ? job.createdAt : Math.min(oldest, job.createdAt);
+  }
+  if (counts.waiting === 0) delete counts.waiting;
   const control = await context.control();
   const heartbeatAge = control ? Math.max(0, context.now() - control.heartbeat) : null;
   const schedulerState = control?.mode !== 'running' ? 'degraded' : heartbeatAge !== null && heartbeatAge <= context.limits.leaseMs ? 'ok' : 'unknown';

@@ -1,5 +1,5 @@
 import { bounded, canonical, digest, insist, JobError, safeCode, text } from './codec.ts';
-import { atomic, guard, one, sql } from './database.ts';
+import { atomic, guard, one, sql, timeGuard } from './database.ts';
 import { activation, commitClock, leaseGuard } from './leases.ts';
 import { unitBudget } from './budget.ts';
 import { Context } from './storage.ts';
@@ -43,17 +43,19 @@ export async function commitUnit(context: Context, claim: Claim, unit: CommitUni
   const predicates = context.predicates(final ? 'publish' : 'commit', claim.job);
   // No pre-verification timestamp is reused in the committing guards.
   const lease = await leaseGuard(context, claim), clock = commitClock(context), now = context.now();
-  const time = sql(`? > (${clock.sql})`, deadline, ...clock.params!);
-  budget.check();
+  // A backward holder-clock jump cannot recreate time already spent verifying.
+  const commitDeadline = Math.min(deadline, now + Math.floor(budget.remaining()));
+  const time = sql(`? > (${clock.sql})`, commitDeadline, ...clock.params!);
+  budget.check('job_commit_time_bound');
   await atomic(context.database, [
-    guard(lease), guard(time), guard(activation(context, claim.job, claim.epoch)), ...predicates.map(guard),
+    guard(lease), guard(activation(context, claim.job, claim.epoch)), ...predicates.map(guard), timeGuard(time),
     ...unit.statements, ...unit.guards.map(guard),
     sql('INSERT INTO rer_job_units(installation_id,job_id,unit_key,input_digest,output_digest,checkpoint_sequence,committed_rows,committed_bytes,result_ref,committed_at) VALUES(?,?,?,?,?,?,?,?,?,?)', context.installationId, claim.job.id, unit.unitKey, inputDigest, outputDigest, claim.job.checkpointSequence + 1, unit.rows, unit.bytes, result, now),
     sql("UPDATE rer_job_jobs SET state=?,reason_code=NULL,recovery=NULL,version=version+1,checkpoint=?,checkpoint_hash=?,checkpoint_sequence=checkpoint_sequence+1,progress_rows=progress_rows+?,progress_bytes=progress_bytes+?,progress_units=progress_units+1,result_ref=?,result_hash=?,updated_at=?,not_before=? WHERE installation_id=? AND id=? AND version=? AND fence=?", final ? 'succeeded' : 'queued', checkpoint, checkpointHash, unit.rows, unit.bytes, result, resultHash, now, now, context.installationId, claim.job.id, claim.job.version, claim.job.fence),
     sql("UPDATE rer_job_attempts SET ended_at=?,classification='committed',usage_rows=?,usage_bytes=? WHERE installation_id=? AND job_id=? AND fence=? AND ended_at IS NULL", now, unit.rows, unit.bytes, context.installationId, claim.job.id, claim.job.fence),
     sql('DELETE FROM rer_job_leases WHERE installation_id=? AND job_id=? AND token_hash=? AND fence=?', context.installationId, claim.job.id, tokenHash, claim.job.fence),
     ...predicates.map(guard), ...unit.guards.map(guard), guard(activation(context, claim.job, claim.epoch)),
-    guard(sql('EXISTS(SELECT 1 FROM rer_job_jobs WHERE installation_id=? AND id=? AND version=? AND fence=? AND checkpoint_hash=? AND checkpoint_sequence=? AND state=?)', context.installationId, claim.job.id, claim.job.version + 1, claim.job.fence, checkpointHash, claim.job.checkpointSequence + 1, final ? 'succeeded' : 'queued')), guard(time),
+    guard(sql('EXISTS(SELECT 1 FROM rer_job_jobs WHERE installation_id=? AND id=? AND version=? AND fence=? AND checkpoint_hash=? AND checkpoint_sequence=? AND state=?)', context.installationId, claim.job.id, claim.job.version + 1, claim.job.fence, checkpointHash, claim.job.checkpointSequence + 1, final ? 'succeeded' : 'queued')), timeGuard(time),
   ], 'job_commit_refused');
   const saved = await context.row(claim.job.id); insist(saved, 'job_not_found', 404); return context.job(saved);
 }
@@ -73,14 +75,15 @@ export async function settle(context: Context, claim: Claim, unit: Exclude<Unit,
 
 export async function failUnit(context: Context, claim: Claim, error: unknown): Promise<void> {
   const code = error instanceof JobError ? safeCode(error.code) : 'job_handler_failed';
+  const deferred = code === 'job_commit_time_bound';
   const held = ['job_authority_revoked', 'job_revision_stale', 'job_commit_refused', 'job_checkpoint_corrupt', 'job_checkpoint_invalid', 'job_result_unverified', 'job_domain_guards_required', 'job_cursor_without_writes'].includes(code);
   const exhausted = context.now() >= claim.job.deadline || claim.job.failures + 1 >= context.limits.maxFailureAttempts;
   const now = context.now(), next = Math.min(now + 1000 * (claim.job.failures + 1), claim.job.deadline);
   // Only local units are registered. A rolled-back SQLite/D1 transaction is proof of no committed unit.
   try {
     await atomic(context.database, [guard(await leaseGuard(context, claim)), guard(activation(context, claim.job, claim.epoch)),
-      sql('UPDATE rer_job_jobs SET state=?,reason_code=?,recovery=?,version=version+1,failures=failures+?,not_before=?,updated_at=? WHERE installation_id=? AND id=?', held ? 'waiting' : exhausted ? 'failed' : 'retry_wait', code, held ? 'Restore current authority/revision or compatible data and explicitly resume; inspect partial committed units.' : exhausted ? 'Inspect the unsuccessful outcome and create a new authorized intent.' : 'A local unit failed before commit; retry is bounded by its failure budget and deadline.', held ? 0 : 1, next, now, context.installationId, claim.job.id),
-      sql('UPDATE rer_job_attempts SET ended_at=?,classification=?,failure_code=? WHERE installation_id=? AND job_id=? AND fence=? AND ended_at IS NULL', now, held ? 'held' : 'failed', code, context.installationId, claim.job.id, claim.job.fence),
+      sql('UPDATE rer_job_jobs SET state=?,reason_code=?,recovery=?,version=version+1,failures=failures+?,starts=starts-?,not_before=?,updated_at=? WHERE installation_id=? AND id=?', deferred ? 'queued' : held ? 'waiting' : exhausted ? 'failed' : 'retry_wait', code, deferred ? 'The local batch exceeded its time bound and rolled back; a later bounded tick retries automatically without spending an attempt.' : held ? 'Restore current authority/revision or compatible data and explicitly resume; inspect partial committed units.' : exhausted ? 'Inspect the unsuccessful outcome and create a new authorized intent.' : 'A local unit failed before commit; retry is bounded by its failure budget and deadline.', held || deferred ? 0 : 1, deferred ? 1 : 0, deferred ? now : next, now, context.installationId, claim.job.id),
+      sql('UPDATE rer_job_attempts SET ended_at=?,classification=?,failure_code=? WHERE installation_id=? AND job_id=? AND fence=? AND ended_at IS NULL', now, deferred ? 'deferred' : held ? 'held' : 'failed', code, context.installationId, claim.job.id, claim.job.fence),
       sql('DELETE FROM rer_job_leases WHERE installation_id=? AND job_id=? AND token_hash=?', context.installationId, claim.job.id, await digest(claim.token)),
     ], 'job_lease_stale');
   } catch (failure) { if (!(failure instanceof JobError && failure.code === 'job_lease_stale')) throw failure; }
