@@ -22,6 +22,14 @@ test('refresh rejects generated full-fold destination classes and removal aliase
     assert.deepEqual(snapshot(seed), before);
   }
   t.diagnostic(`${classes.reduce((sum, item) => sum + item.points.length, 0)} scalar values; ${classes.length} generated collision classes, all atomically refused`);
+  // Two retired singleton removals must use that same destination identity.
+  for (const pair of [['shared/ẞ.json', 'shared/SS.json'], ['shared/SS.json', 'shared/ẞ.json']]) {
+    const copies = pair.map((name, i) => ({path: name, originPath: (i ? 'right' : 'left') + '/old.json', revision, files: {[name]: hash('{}\n')}}));
+    write(seed, 'base-copies.json', json({schemaVersion: 1, copies}));
+    const before = snapshot(seed);
+    assert.throws(() => refreshCopies(seed, {positional: [target], record: 'base-copies.json', base}), error => pair.every(name => error.message.includes(name)));
+    assert.deepEqual(snapshot(seed), before);
+  }
   for (const reverse of [false, true]) {
     const f = fixture(t, {'left/left.mjs': 'export {};\n', 'right/Helper.mjs': 'export {};\n', 'right/keep.mjs': 'export {};\n'}, [['SHARED', 'left'], ['shared', 'right']]);
     const record = JSON.parse(fs.readFileSync(path.join(f.seed, 'base-copies.json')));
