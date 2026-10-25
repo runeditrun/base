@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Track unadopted server markup and mutation-observed same-tag replacements by node identity through moves and further replacements; allow genuine removals and effect-created widgets without a detached counterpart to settle.
+- Track unadopted server markup and same-tag replacements by node identity and clone provenance through moves and further replacements; allow genuine removals and effect-created widgets without a detached counterpart to settle.
 
 ## 0.2.80
 
