@@ -25,7 +25,11 @@ export function ownership(snapshot, counted, serverBoundaries) {
    // boundary can abandon hydration for a client fallback; a boundary first
    // created on the client has no dehydration history and cannot block hydration.
    if (node.tag === 13 || node.tag === 31) {
-    if (node.memoizedState?.dehydrated || node.alternate?.memoizedState?.dehydrated) {
+    if (node.memoizedState === null) {
+     // Once hydration completed, a later client suspension cannot reopen it.
+     serverBoundaries.delete(node);
+     if (node.alternate) serverBoundaries.delete(node.alternate);
+    } else if (node.memoizedState?.dehydrated || node.alternate?.memoizedState?.dehydrated) {
      serverBoundaries.add(node);
      if (node.alternate) serverBoundaries.add(node.alternate);
     }
@@ -43,9 +47,11 @@ export function ownership(snapshot, counted, serverBoundaries) {
    } else if (node.tag === 26) { // HostHoistable: metadata and shared resources.
     // Hydrated metadata deliberately lacks a props attachment; resources can
     // lack both attachments. The committed Fiber/resource identifies the node.
-    const el = node.stateNode ?? node.memoizedState?.instance;
-    if (!el || el.nodeType !== 1) pending++;
-    else if (el.isConnected) {
+    // Resource updates can leave stateNode pointing to the previous resource.
+    const resource = node.memoizedState;
+    const el = resource === null ? node.stateNode : resource?.instance;
+    if ((!el || el.nodeType !== 1) && resource?.type !== 'void') pending++;
+    else if (el?.isConnected) {
      const container = parent?.getRootNode(), hoistableRoot = container?.nodeType === 11 ? container : el.ownerDocument.head;
      if (el.parentNode !== hoistableRoot) pending++;
      else owned.add(el);
