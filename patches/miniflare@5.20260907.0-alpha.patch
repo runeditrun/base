@@ -1,8 +1,19 @@
 diff --git a/dist/src/index.js b/dist/src/index.js
-index 432e2bae751f20e225804831d0830203f3ba055e..cd45d8c24922781d28b9151de0c032bfbd70096c 100644
 --- a/dist/src/index.js
 +++ b/dist/src/index.js
-@@ -67499,9 +67499,10 @@ var SynchronousFetcher = class {
+@@ -64094,7 +64094,10 @@
+       const headers = convertUndiciHeadersToStandard(options.headers ?? {});
+       this.addHeaders(headers, path74);
+       options.headers = headers;
+-      options.reset = true;
++      // Backport workers-sdk#15781: Worker handlers may have side effects even
++      // for GET/HEAD. Reuse completed connections without transport replay.
++      options.idempotent = false;
++      options.reset = false;
+       return this.runtimeDispatcher.dispatch(options, handler);
+     } else {
+       return this.globalDispatcher.dispatch(options, handler);
+@@ -67499,9 +67502,10 @@
        /* value */
        0
      );
@@ -16,3 +27,13 @@ index 432e2bae751f20e225804831d0830203f3ba055e..cd45d8c24922781d28b9151de0c032bf
      (0, import_node_assert13.default)(message?.id === id);
      if ("response" in message) {
        const { status: status2, headers: rawHeaders, body } = message.response;
+@@ -82921,6 +82925,9 @@
+       });
+       this.#runtimeDispatcher = new import_undici7.Pool(this.#runtimeEntryURL, {
+         connect: { rejectUnauthorized: false },
++        // Expire only idle sockets before workerd's 5s keep-alive timeout.
++        keepAliveTimeout: 1e3,
++        keepAliveMaxTimeout: 1e3,
+         // Disable timeouts for local dev — long-running responses (streaming,
+         // slow uploads, long-polling) should not be killed by undici defaults.
+         headersTimeout: 0,

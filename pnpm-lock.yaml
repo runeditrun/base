@@ -13,7 +13,7 @@ overrides:
 
 patchedDependencies:
   miniflare@5.20260907.0-alpha:
-    hash: 9751f9c5ed79171ed70eb94667e6bb26ba08a0d5392f86d09a6ae7ad4819ddeb
+    hash: 10c72fe354f7f696f09ad038765bc1994896057932c7e8182afadbbfd3e00f6a
     path: patches/miniflare@5.20260907.0-alpha.patch
 
 importers:
@@ -28,7 +28,7 @@ importers:
         version: 3.0.1(ajv@8.20.0)
       miniflare:
         specifier: 5.20260907.0-alpha
-        version: 5.20260907.0-alpha(patch_hash=9751f9c5ed79171ed70eb94667e6bb26ba08a0d5392f86d09a6ae7ad4819ddeb)(@types/node@24.19.2)
+        version: 5.20260907.0-alpha(patch_hash=10c72fe354f7f696f09ad038765bc1994896057932c7e8182afadbbfd3e00f6a)(@types/node@24.19.2)
       ws:
         specifier: 8.22.0
         version: 8.22.0
@@ -1824,7 +1824,7 @@ snapshots:
   '@cloudflare/vite-plugin@1.54.5(@types/node@24.19.2)(vite@8.2.2(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))(wrangler@4.129.1(@cloudflare/workers-types@5.20260908.1)(@types/node@24.19.2))':
     dependencies:
       '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260907.1)
-      miniflare: 5.20260907.0-alpha(patch_hash=9751f9c5ed79171ed70eb94667e6bb26ba08a0d5392f86d09a6ae7ad4819ddeb)(@types/node@24.19.2)
+      miniflare: 5.20260907.0-alpha(patch_hash=10c72fe354f7f696f09ad038765bc1994896057932c7e8182afadbbfd3e00f6a)(@types/node@24.19.2)
       unenv: 2.0.0-rc.24
       vite: 8.2.2(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)
       workerd: 1.20260907.1
@@ -2718,7 +2718,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  miniflare@5.20260907.0-alpha(patch_hash=9751f9c5ed79171ed70eb94667e6bb26ba08a0d5392f86d09a6ae7ad4819ddeb)(@types/node@24.19.2):
+  miniflare@5.20260907.0-alpha(patch_hash=10c72fe354f7f696f09ad038765bc1994896057932c7e8182afadbbfd3e00f6a)(@types/node@24.19.2):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@24.19.2)
@@ -2935,7 +2935,7 @@ snapshots:
       '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260907.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.1
-      miniflare: 5.20260907.0-alpha(patch_hash=9751f9c5ed79171ed70eb94667e6bb26ba08a0d5392f86d09a6ae7ad4819ddeb)(@types/node@24.19.2)
+      miniflare: 5.20260907.0-alpha(patch_hash=10c72fe354f7f696f09ad038765bc1994896057932c7e8182afadbbfd3e00f6a)(@types/node@24.19.2)
       path-to-regexp: 6.3.0
       unenv: 2.0.0-rc.24
       workerd: 1.20260907.1
