@@ -14,8 +14,8 @@ export function ownership(snapshot, counted, serverBoundaries) {
   }
   root = root.stateNode?.current;
   if (root?.tag !== 3 || !root.stateNode?.containerInfo || typeof root.memoizedState?.isDehydrated !== 'boolean') return { pending: 1, error: unavailable };
-  let pending = root.memoizedState.isDehydrated ? 1 : 0, bodyOwned = false;
-  const owned = new WeakSet(), raw = new WeakSet(), seen = new Set();
+  let pending = root.memoizedState.isDehydrated ? 1 : 0, bodyOwned = false, hasDetachedHost = false;
+  const owned = new WeakSet(), raw = new WeakSet(), detached = new WeakSet(), seen = new Set();
   const stack = [[root, root.stateNode.containerInfo, false]];
   while (stack.length) {
    const [node, parent, inBody] = stack.pop();
@@ -63,6 +63,7 @@ export function ownership(snapshot, counted, serverBoundaries) {
     // A committed host identity establishes that React adopted/created it.
     // Its later removal does not undo hydration (including a second root
     // clearing adopted children). Connected stale moves still fail below.
+    if (childInBody && !el.isConnected) { detached.add(el); hasDetachedHost = true; }
     if (childInBody && el.isConnected) {
      const attached = own(el, '__reactFiber$'), props = own(el, '__reactProps$');
      if (!attached || !props) return { pending: 1, error: unavailable };
@@ -80,6 +81,13 @@ export function ownership(snapshot, counted, serverBoundaries) {
    if (node.child) stack.push([node.child, childParent, childInBody]);
   }
   if (!bodyOwned) pending++;
+  // Removing an adopted host is complete; a connected node that claims its
+  // attachment while that Fiber still names the detached original is not owned.
+  // Unattached effect widgets make no such claim and remain outside the snapshot.
+  if (hasDetachedHost) for (const el of document.body.querySelectorAll('*')) {
+   const attached = own(el, '__reactFiber$');
+   if (attached && attached.stateNode !== el && detached.has(attached.stateNode)) pending++;
+  }
   // Snapshot order is parent before child. Propagate raw-HTML ownership through
   // every parsed descendant, not just the container's direct children. Newly
   // appended imperative widgets never enter this snapshot or this count.

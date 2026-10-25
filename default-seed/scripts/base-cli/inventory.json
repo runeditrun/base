@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gc43a790a",
+  "cliVersion": "0.2.80-dev.g5594b83c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -843,7 +843,7 @@
     },
     "cli/hydration/ownership.mjs": {
       "source": "cli/hydration/ownership.mjs",
-      "sha256": "65310209fab1b23f126953aaf3db42cbd9b8fe2a2320fa4bea9c8238a7c90b6f"
+      "sha256": "e7b461eed3bdbcbe054072a816f2c8f7b4ccb4ed0a96d13bdf0c3f1b6b1f481d"
     },
     "cli/hydration/probe.mjs": {
       "source": "cli/hydration/probe.mjs",
