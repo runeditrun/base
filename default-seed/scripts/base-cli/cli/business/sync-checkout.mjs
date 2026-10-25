@@ -47,7 +47,9 @@ async function devOrigin(record) {
  await routeRunning(record);
  return record.url;
 }
-export const runningApp = async project => devOrigin(await registeredServer(project));
+// --leave is also the recovery path: a saved origin, registry or server it
+// cannot check means no restart to wait for, not a refusal.
+export const runningApp = project => registeredServer(project).then(devOrigin).catch(error => { if (error.code !== 'safety_refusal') throw error; });
 
 // A preview or demo of this checkout takes no settings: that is said before
 // anything is written.
