@@ -21,7 +21,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (options.verb === 'archive') return (await import('./archive.mjs')).archiveCommand(options.archiveArgs,out);
   if (options.verb === 'listing') return (await import('./listing.mjs')).dispatchListing(options.listingArgs);
   if (options.verb === 'release') return (await import('./release.mjs')).dispatchRelease(options.releaseArgs);
-  const independent = await parsingProfile(options.cwd)==='independent'&&!['describe','check','doctor'].includes(options.verb);
+  const independent = await parsingProfile(options.cwd)==='independent'&&!['describe','check','doctor','jobs'].includes(options.verb);
   options=parse(argv,process.cwd(),{independent});out=output(options);
   if (options.help) return showHelp(options,out);
   if (!independent && options.forwarded.length) throw invalid('First-party commands accept only the documented flags, without forwarded arguments.');
@@ -44,11 +44,16 @@ export async function main(argv = process.argv.slice(2)) {
    out.result(true, 0, result); return 0;
   }
   project ??= await resolveProject(options.cwd);
-  if (project.profile === 'independent' && !['describe', 'check', 'doctor'].includes(options.verb)) options = parse(argv, process.cwd(), { independent: true });
+  if (project.profile === 'independent' && !['describe', 'check', 'doctor', 'jobs'].includes(options.verb)) options = parse(argv, process.cwd(), { independent: true });
   else if (options.forwarded.length) throw invalid('First-party commands accept only the documented flags, without forwarded arguments.');
   out = output(options);
   if (project.profile === 'first-party' && options.detach && ['dev','preview'].includes(options.verb)) return await (await import('./detached-server.mjs')).detachedServer(options, argv, out);
   if (options.verb === 'describe') { const result = await describe(project); out.human(options.json ? JSON.stringify(result) : JSON.stringify(result, null, 2)); return 0; }
+  if (options.verb === 'jobs') {
+   const result = await (await import('./jobs.mjs')).jobsCommand(project, options);
+   if (!options.json) out.human(JSON.stringify(result, null, 2));
+   out.result(true, 0, result); return 0;
+  }
   if (options.verb === 'check') {
    const result = await check(project, options.profile);
    (await import('./placeholder-mark.mjs')).warnPlaceholderMarks(out, options, result.placeholderMarks);

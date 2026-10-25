@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { authoringVerbs, commonFlags, serverDefaults, signinVerb, verbs } from './contract.mjs';
+import { authoringVerbs, commonFlags, jobsVerb, serverDefaults, signinVerb, verbs } from './contract.mjs';
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
@@ -26,10 +26,16 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  // Independent projects own verb names; only the common wrapper flags apply
  // to unknown names. Profile resolution rejects undeclared commands later.
  if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run rer --help.');
- const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
+ const allowed = new Set(verb === 'jobs' ? jobsVerb.flags : independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
  let separator = false;
  for (let i = 0; i < args.length; i++) {
   const flag = args[i];
+  if (verb === 'jobs' && flag !== '--' && !flag.startsWith('--')) {
+   if (options.jobsAction === undefined) options.jobsAction = flag;
+   else if (options.jobId === undefined) options.jobId = flag;
+   else throw invalid('Use rer jobs status or rer jobs inspect ID.');
+   continue;
+  }
   if (flag === '--') { if (separator) throw invalid('Use only one -- separator.'); separator = true; if (independent || deferTail) { options.forwarded = args.slice(i + 1); break; } continue; }
   if (separator && !flag.startsWith('--')) { options.forwarded.push(...args.slice(i)); break; }
   // pnpm run VERB -- FLAGS forwards the separator before wrapper flags.
@@ -52,6 +58,13 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   }
  }
  if (options.help) return options;
+ if (verb === 'jobs') {
+  if (!['status', 'inspect'].includes(options.jobsAction) || options.forwarded.length || (options.jobsAction === 'status' ? options.jobId !== undefined : !/^[A-Za-z0-9_-]{1,160}$/.test(options.jobId ?? ''))) throw invalid('Use rer jobs status or rer jobs inspect ID.');
+  if (options.origin !== undefined && options.target === 'local') throw invalid('--origin cannot be combined with --target local.');
+  const remote = options.origin !== undefined || options.target === 'remote';
+  if (remote !== (options.sessionFile !== undefined)) throw invalid('Hosted jobs inspection requires --origin or --target remote and --session-file FILE together.');
+  if (options.environment !== undefined && !remote) throw invalid('--environment requires a hosted jobs target.');
+ }
  if (deferTail) { options.cwd=resolve(cwd,options.cwd);return options; }
  if (verb === 'refresh-base' && !independent && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run rer refresh-base --help.');
  if (options.detach && options.foreground) throw invalid('Choose one of --detach and --foreground.');
@@ -108,7 +121,8 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n`;
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, jobs, signin, release, listing\nRun rer VERB --help for flags.\n`;
+ if (verb === 'jobs') return `Usage: rer jobs status [FLAGS]\n       rer jobs inspect ID [FLAGS]\nFlags: ${jobsVerb.flags.join(', ')}\n${jobsVerb.effects}\n`;
  const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
  return `${door}Usage: rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;

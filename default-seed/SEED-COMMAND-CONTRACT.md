@@ -68,6 +68,22 @@ product verification: full `rer verify` stays in trusted CI.
 
 ## Commands and flags
 
+Optional durable installation work is inspected with `rer jobs status [--json]`
+and `rer jobs inspect ID [--json]`. The current installation's declared `jobs`
+adapter resolves native authority and opens persistent storage read-only.
+`--origin URL`, or `--target remote --environment NAME` using a recorded
+deployment, selects the authenticated HTTP job door and requires a private
+`--session-file FILE`. Inspection never installs, starts a daemon, claims a unit
+or changes a job. `rer describe` and `rer jobs --help` expose the actual flags.
+The development-command admission door remains `rer queue`.
+
+Seeds adopting `modules/durable-jobs` mount `/api/rer/jobs`, register versioned
+local handlers and live database authority/revision/erasure guards, and declare
+native lifecycle custody plus bounded scheduled ticks. The optional reference
+sales adoption documents this path. Missing schema or scheduler fails visibly;
+external effects, qualified container job restore and Managed leave remain
+later-round capabilities. Archive authority tables never grant execution.
+
 Run from the project root, or use `--cwd PATH`. Every new verb accepts `--help`, `--cwd PATH`, `--non-interactive` and `--json`. Help exits before tools, configuration, adapters or effects run. Unknown flags, missing flag values and invalid values fail before effects. A single `--` separator is accepted for package-script forwarding. Flags belong only to the verbs listed below; there is no catch-all pass-through in the first-party profile.
 
 | Required verb | Additional flags | Successful end state |

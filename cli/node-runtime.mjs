@@ -12,7 +12,7 @@ function repair(version, options) {
 
 export async function selectNodeRuntime(options, argv, out) {
  // Inspection keeps its read-only contract, and stop works without tool setup.
- if (['describe', 'check', 'doctor'].includes(options.verb) || options.stop) return undefined;
+ if (['describe', 'check', 'doctor', 'jobs'].includes(options.verb) || options.stop) return undefined;
  const version = await projectNodePin(options.cwd);
  if (!version || process.versions.node === version) return undefined;
  const command = repair(version, options);

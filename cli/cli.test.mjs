@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { exportCLI, inventory } from './export.mjs';
 import { parse } from './parse.mjs';
-import { authoringVerbs, verbs, commonFlags } from './contract.mjs';
+import { authoringVerbs, jobsVerb, verbs, commonFlags } from './contract.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 const base = resolve(import.meta.dirname, '..'), cli = join(base, 'bin/rer.mjs');
 const environment = () => ({ PATH: process.env.PATH, HOME: process.env.HOME, TZ: 'UTC' });
@@ -26,7 +26,7 @@ const events = result => result.stdout.trim().split('\n').map(line => JSON.parse
 
 test('every command help is effect-free outside a checkout, before adapters and tools', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-help-')); t.after(() => rm(root, { recursive: true, force: true }));
- for (const verb of Object.keys({...verbs, ...authoringVerbs})) {
+ for (const verb of Object.keys({...verbs, ...authoringVerbs, jobs: jobsVerb})) {
   const result = run(root, [verb, '--help']);
   assert.equal(result.status, 0, `${verb}: ${result.stderr}`); assert.match(result.stdout, /Usage:/);
   const json = run(root, [verb, '--help', '--json']); assert.equal(json.status, 0); assert.equal(events(json).at(-1).event, 'result');
@@ -44,6 +44,10 @@ test('parsing rejects every unsupported flag, missing value, invalid host/port a
  for (const host of ['0.0.0.0', '::', 'example.test', '[::1]']) assert.throws(() => parse(['dev', '--host', host]), error => error.exitCode === 4);
  assert.equal(parse(['dev', '--', '--port', '08787']).port, 8787);
  assert.equal(parse(['dev', '--host', '::1']).host, '::1');
+ assert.equal(parse(['jobs', 'status', '--json']).jobsAction, 'status');
+ assert.equal(parse(['jobs', 'inspect', 'job-123', '--json']).jobId, 'job-123');
+ assert.equal(parse(['jobs', 'status', '--target', 'remote', '--session-file', 'session.cookie']).target, 'remote');
+ for (const argv of [['jobs'], ['jobs','run'], ['jobs','status','extra'], ['jobs','inspect'], ['jobs','inspect','../private'], ['jobs','status','--session-file','session.cookie'], ['jobs','status','--origin','https://app.test'], ['jobs','status','--target','local','--origin','https://app.test','--session-file','session.cookie']]) assert.throws(() => parse(argv), error => error.exitCode === 2);
 });
 
 test('independent execution needs no package, edition, pnpm, installer or Base runtime and preserves raw argv', async t => {

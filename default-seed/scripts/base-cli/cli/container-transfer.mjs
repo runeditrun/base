@@ -4,9 +4,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileRecords } from '../modules/portability/files.mjs';
+import { assertContainerArchiveRestorable } from '../modules/container/archive-policy.mjs';
+import { refuse } from './errors.mjs';
 const execute=promisify(execFile);
 export async function containerTransfer({root,path,journal,store,signal,direction,binding,buckets,policy,transient}) {
- if(direction==='import')for(const file of [path,journal].filter(Boolean))for await(const record of fileRecords(file)){}
+ if(direction==='import')for(const file of [path,journal].filter(Boolean))for await(const record of fileRecords(file))if(file===path&&record.kind==='manifest')try{assertContainerArchiveRestorable(record);}catch(error){throw refuse(error.message);}
  const spec={direction,binding,buckets,policy,transient,file:basename(path),journal:journal?'/private/later.rer':undefined};
  const encoded=JSON.stringify(spec,(_key,value)=>{if(typeof value==='function')throw new Error('Container local transfer needs a serializable archive policy; use native remote transport for this product');return value;});
  const configuration=join(root,'.rer/container/transfer.json');await mkdir(dirname(configuration),{recursive:true,mode:0o700});await mkdir(dirname(path),{recursive:true,mode:0o700});await writeFile(configuration,encoded,{mode:0o600});

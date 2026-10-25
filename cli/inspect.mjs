@@ -4,7 +4,7 @@ import { inventory } from './export.mjs';
 import { lstat, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { delimiter, dirname, resolve } from 'node:path';
-import { authoringVerbs, aliases, demoVerb, pins, requiredHooks, serverDefaults, signinVerb, verbs, releaseFlags } from './contract.mjs';
+import { authoringVerbs, aliases, demoVerb, jobsVerb, pins, requiredHooks, serverDefaults, signinVerb, verbs, releaseFlags } from './contract.mjs';
 import { runningVersion } from './version.mjs';
 import { contained, readPackage } from './project.mjs';
 import { shared } from './shared.mjs';
@@ -45,8 +45,8 @@ export async function describe(project) {
     ? adapterEffects
     : typeof operationsEffects === 'string' && operationsEffects.trim()
      ? operationsEffects
-     : verbs[verb]?.effects ?? 'Produce releases; keygen writes a public anchor and, on success, its private key to non-terminal stdout; sign writes a detached signature and prints (but does not execute) the GitHub upload command; receipt verifies against local anchors offline.';
-   return [verb, { flags: (verbs[verb]?.flags ?? releaseFlags).filter(flag => capability.flags?.includes(flag)), effects }];
+     : verbs[verb]?.effects ?? (verb === 'jobs' ? jobsVerb.effects : 'Produce releases; keygen writes a public anchor and, on success, its private key to non-terminal stdout; sign writes a detached signature and prints (but does not execute) the GitHub upload command; receipt verifies against local anchors offline.');
+   return [verb, { flags: (verbs[verb]?.flags ?? (verb === 'jobs' ? jobsVerb.flags : releaseFlags)).filter(flag => capability.flags?.includes(flag)), effects, ...(verb === 'jobs' ? { subcommands: jobsVerb.subcommands } : {}) }];
   }).concat(capabilities.dev?.flags?.includes('--demo') ? [['demo', { flags: demoVerb.flags.filter(flag => capabilities.dev.flags.includes(flag)), effects: demoVerb.effects }]] : [])
    // rer signin is rer's own: any seed it can deploy, it can sign the owner in to.
    .concat(Object.entries(authoringVerbs))
@@ -244,7 +244,8 @@ export async function doctor(project, store, signal) {
  const expectedNode = await projectNodePin(project.root);
  const inputs = project.profile === 'first-party' ? requiredLocalSettings(project, values) : [];
  const warnings = project.profile === 'first-party' ? await cacheWarnings(project.root) : [];
- return { dependencies, warnings, browser, operations: diagnostic, ok: browser?.ok !== false && !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
+ const jobs = await (await import('./jobs.mjs')).jobsDiagnostics(project, signal);
+ return { dependencies, warnings, browser, ...(jobs === undefined ? {} : { jobs }), operations: diagnostic, ok: jobs?.ok !== false && browser?.ok !== false && !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
   node: { actual: process.versions.node, expected: expectedNode },
   pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,
   ai: { issues: aiIssues },
@@ -273,6 +274,7 @@ export function doctorSummary(result) {
  else if (result.browser?.note) lines.push(result.browser.note);
  for (const issue of result.ai.issues) lines.push(`AI ${issue.feature}: ${issue.code}: ${issue.message}`);
  for (const dependency of result.dependencies) lines.push(`Dependency ${dependency.interface ?? 'local state'}: ${dependency.status}.`);
+ if (result.jobs) lines.push('Jobs: ' + JSON.stringify(result.jobs));
  for (const warning of result.warnings) lines.push(typeof warning === 'string' ? warning : warning.message);
  if (result.deploymentInputs.length) lines.push(`Optional for local use; needed to deploy: ${result.deploymentInputs.join(', ')}.`);
  lines.push('Remote deployment, provider credentials and permissions, and deployed health were not checked.');

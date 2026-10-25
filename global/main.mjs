@@ -44,6 +44,8 @@ else its vendored scripts/rer.mjs.
   rer queue NAME -- COMMAND [ARGS]
                        Run COMMAND once this computer's job queue admits it (heavy package scripts
                        of a checkout that pins the rer package use it).
+  rer jobs status      Read durable jobs in this installation; rer jobs inspect ID reads a job.
+                       --json for data; rer jobs --help for hosted authentication flags.
 
 Checkout verbs: ${Object.keys(checkoutVerbs).join(', ')}, listing. Run rer VERB --help in a checkout for its flags.
 `;
