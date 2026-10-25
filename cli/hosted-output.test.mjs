@@ -15,24 +15,16 @@ test('the built hydration check accepts an effect-created body child', async t =
  assert.ok(result.pages.every(page => !page.skipped), 'React hydrated the built page');
 });
 
-test('the built hydration check rejects a server element that never hydrates', async t => {
- await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true }), { pages: ['/'] }), error => {
-  assert.equal(error.code, 'hydration_units_failed');
-  assert.equal(error.exitCode, 1);
-  assert.ok(error.failures.length > 0);
-  assert.ok(error.hydration.pages.every(page => !page.skipped));
-  return true;
- });
-});
-
-test('the built hydration check rejects an unadopted same-tag replacement of a server element', async t => {
- await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true, replaceServer: true }), { pages: ['/'] }), error => {
-  assert.equal(error.code, 'hydration_units_failed');
-  assert.equal(error.exitCode, 1);
-  assert.ok(error.failures.length > 0);
-  assert.ok(error.hydration.pages.every(page => !page.skipped));
-  return true;
- });
+test('the built hydration check rejects unadopted server markup and same-tag replacements', async t => {
+ for (const replaceServer of [false, true]) {
+  await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true, replaceServer }), { pages: ['/'] }), error => {
+   assert.equal(error.code, 'hydration_units_failed');
+   assert.equal(error.exitCode, 1);
+   assert.ok(error.failures.length > 0);
+   assert.ok(error.hydration.pages.every(page => !page.skipped));
+   return true;
+  });
+ }
 });
 
 // A built seed whose Worker only routes app paths, the way Start entries did before

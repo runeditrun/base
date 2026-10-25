@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Wait for server snapshot elements still in the body and same-tag replacements at their structural keys to be adopted by React, while allowing removed server nodes and effect-created tooltips, portals and other widgets outside those keys to settle.
+- Track unadopted server markup and mutation-observed same-tag replacements by node identity through moves and further replacements; allow genuine removals and effect-created widgets without a detached counterpart to settle.
 
 ## 0.2.80
 

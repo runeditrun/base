@@ -11,7 +11,7 @@
 //    and which page sections are present;
 //  - once React owns the page and the DOM and animations are quiet, it records
 //    which snapshot elements were replaced and sets settledAt.
-// Elements are matched across a rebuild by a structural key (tag:index path from
+// Section and animation diagnostics use a structural key (tag:index path from
 // <body>) that ignores script, style, link, template and noscript elements and the
 // nodes the probe inserted.
 export function probe(config) {
@@ -48,17 +48,37 @@ export function probe(config) {
  const lone = n => n.nodeValue.trim().length >= 2 && n.parentNode.childNodes.length === 1;
  const split = n => { const rest = n.splitText(Math.max(1, Math.floor(n.nodeValue.length / 2))), span = document.createElement('span'); inserted.add(span); span.textContent = rest.nodeValue; rest.replaceWith(span); };
  const anyFiber = () => fiber(document.body) || [...document.body.querySelectorAll('*')].some(fiber);
- // Track server elements still in the body, or the same-tag occupant of a
- // detached element's structural key. New effect children outside those keys
- // need no fiber; an unadopted replacement at a server key still does.
- const pending = () => snapshot.map(([el, key]) => document.body.contains(el) ? el : resolveKey(key)).filter(el => el && counted(el) && !el.closest('svg') && !fiber(el) && el.parentElement && fiber(el.parentElement) && !own(el.parentElement, '__reactProps$')?.dangerouslySetInnerHTML).length;
+ // Server membership and added-node membership are identities. Once an unowned
+ // server element detaches, every observed new, unowned element of its tag is a
+ // pending candidate, including additions seen before the detachment. This never
+ // chooses an occupant by position or loses a candidate when it moves.
+ const server = new WeakSet(), added = new Set(), detachedTags = new Set();
+ const needsFiber = el => el.isConnected && el.ownerDocument === document && counted(el) && !el.closest('svg') && !fiber(el) && !(el.parentElement && own(el.parentElement, '__reactProps$')?.dangerouslySetInnerHTML);
+ const pending = () => snapshot.filter(([el]) => document.body.contains(el) && needsFiber(el) && el.parentElement && fiber(el.parentElement)).length + [...added].filter(el => detachedTags.has(el.tagName) && needsFiber(el)).length;
+ const visit = (node, fn) => {
+  if (node.nodeType !== Node.ELEMENT_NODE || !counted(node)) return;
+  fn(node);
+  for (const child of node.children) visit(child, fn);
+ };
+ const changed = records => {
+  lastMutation = now();
+  for (const record of records) {
+   for (const node of record.removedNodes) visit(node, el => {
+    if (server.has(el) && !document.body.contains(el) && !fiber(el)) detachedTags.add(el.tagName);
+   });
+   for (const node of record.addedNodes) visit(node, el => {
+    if (!server.has(el) && !fiber(el)) added.add(el);
+   });
+  }
+  for (const el of added) if (!el.isConnected || el.ownerDocument !== document || fiber(el)) added.delete(el);
+ };
  const oneShot = () => document.getAnimations().filter(a => {
   if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) return false;
   const timing = a.effect && a.effect.getComputedTiming();
   return timing && Number.isFinite(timing.endTime) && timing.activeDuration >= 50;
  });
  const outside = n => !outermost().some(section => section.contains(n));
- let snapshot = [], scope = null, editAt = null, lastMutation = 0;
+ let snapshot = [], scope = null, editAt = null, lastMutation = 0, observer = null;
 
  function begin() {
   const sections = outermost();
@@ -83,8 +103,10 @@ export function probe(config) {
    }
   }
   snapshot = walk(document.body, '', []);
+  for (const [el] of snapshot) server.add(el);
   editAt = now();
-  new MutationObserver(() => { lastMutation = now(); }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  observer = new MutationObserver(changed);
+  observer.observe(document, { childList: true, subtree: true, characterData: true });
   requestAnimationFrame(frame);
  }
 
@@ -141,7 +163,8 @@ export function probe(config) {
    tryRelease();
    const t = now();
    if (S.releasedAt !== null) {
-    if (S.hydratedAt === null && fiber(document.body) && pending() === 0) S.hydratedAt = t;
+    if (fiber(document.body) && pending() === 0) { if (S.hydratedAt === null) S.hydratedAt = t; }
+    else S.hydratedAt = null;
     const quiet = t - lastMutation > 300 && !oneShot().some(a => a.playState === 'running');
     if (S.hydratedAt !== null && t - S.hydratedAt > 300 && quiet) return settle('hydrated');
     if (S.hydratedAt === null && t - S.releasedAt > 8000 && !anyFiber()) return settle('not hydrated');
@@ -152,6 +175,7 @@ export function probe(config) {
  }
 
  function settle(state) {
+  observer?.disconnect();
   S.settled = state; S.settledAt = now();
   S.replaced = snapshot.filter(([el]) => !el.isConnected).map(([, key]) => key);
   S.rer = window.__rerHydration ? JSON.parse(JSON.stringify(window.__rerHydration)) : null;

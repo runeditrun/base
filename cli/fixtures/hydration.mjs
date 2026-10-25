@@ -35,7 +35,9 @@ export async function hydrationSeed(t, { neverHydrates = false, replaceServer = 
    useEffect(() => {
     if (${replaceServer}) {
      const server = document.getElementById('server');
-     server.replaceWith(server.cloneNode(true));
+     const replacement = server.cloneNode(true);
+     server.replaceWith(replacement);
+     document.body.append(replacement);
     }
     if (${neverHydrates}) return;
     const tooltip = document.createElement('div');
