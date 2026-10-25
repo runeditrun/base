@@ -6,6 +6,16 @@ import { statement, guard, job, PortabilityError } from './storage.mjs';
 export const IMPORT_LEASE_MS=5*60*1000;
 const RENEW_MS=30*1000;
 const active=row=>['staging','applying'].includes(row.phase);
+// Once an external effect may have started, neither expiry nor a phase reset
+// attests that it stopped. Legacy applying jobs need the same conservative rule.
+const reclaimSafeSQL=`COALESCE(json_extract(metadata,'$.externalEffectsStarted'),0)=0
+  AND (phase='staging' OR (phase='applying' AND json_array_length(metadata,'$.manifest.objects')=0
+    AND json_array_length(metadata,'$.manifest.payloads')=0))`;
+export function requireSafeImportReclaim(row) {
+  if(row.metadata.externalEffectsStarted || row.phase==='applying'
+    && (row.metadata.manifest.objects.length || row.metadata.manifest.payloads.length))
+    throw new PortabilityError('import_reclaim_unsafe',409);
+}
 const runningMetadata=new WeakMap();
 // Only the lease constructor can approve these details. Mutable Error fields,
 // prototypes and diagnostic code suffixes cannot establish that provenance.
@@ -56,10 +66,15 @@ export async function withImportLease(context,id,operation,{abort=false,reclaim=
   // adapters need not expose provider-specific UPDATE result metadata.
   try {
     await db.batch([guard(db,`EXISTS(SELECT 1 FROM rer_portability_import_leases WHERE job=? AND expires_at=? AND holder IS ?)
-      AND EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND import_job=?)`,id,lease.expires_at,lease.holder,id),
+      AND EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND import_job=?)
+      ${reclaim?`AND EXISTS(SELECT 1 FROM rer_portability_jobs WHERE id=? AND (${reclaimSafeSQL}))`:''}`,
+      id,lease.expires_at,lease.holder,id,...(reclaim?[id]:[])),
       statement(db,'UPDATE rer_portability_import_leases SET holder=?,expires_at=? WHERE job=?',holder,now+IMPORT_LEASE_MS,id),
       db.prepare('DELETE FROM rer_portability_guard')]);
   }catch(error){
+    // A failed guard rolls back the whole claim, including holder and expiry.
+    // Diagnose against the current job without acquiring or releasing a lease.
+    if(reclaim)requireSafeImportReclaim(await job(db,id,'import'));
     const current=await leaseRow(db,id);
     if(current?.holder!==lease.holder || current?.expires_at!==lease.expires_at)throw await importRunning(db,id);
     throw error;

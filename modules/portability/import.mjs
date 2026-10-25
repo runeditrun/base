@@ -2,7 +2,7 @@ import { applyRestoreHook, restoreHookPublication } from './restore-hook.mjs';
 import { all, statement, state, guard, job, save, partQueries, parts, readPart, dropCopyStatements, cleanCopyStatements, quote, stream, insist, run } from './storage.mjs';
 import { stagePart } from './import-staging.mjs';
 import { normalizeStaged } from './import-safety.mjs';
-import { ensureImportLeases, createImportLease, importLeaseStatus, importRunning, withImportLease } from './import-lease.mjs';
+import { ensureImportLeases, createImportLease, importLeaseStatus, importRunning, withImportLease, requireSafeImportReclaim } from './import-lease.mjs';
 import { refuseProviderData } from './provider-data.mjs';
 import { refusePolicyApprovals } from './policy-data.mjs';
 import { refuseDevData } from './dev-data.mjs';
@@ -206,6 +206,9 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
     insist(await config.validateStaged({db,tables:{...row.metadata.copies},read,manifest})!==false,'staged_validation');
   }
   row.phase='applying';
+  // Commit uncertainty BEFORE issuing R2 writes or arbitrary payload consumers.
+  // No external generation fence/reconciliation contract exists here.
+  if(manifest.objects.length || manifest.payloads.length)row.metadata.externalEffectsStarted=true;
   await db.batch([guard(db,'(SELECT import_job FROM rer_portability_state WHERE id=1)=?',id),db.prepare('UPDATE rer_portability_state SET applying=1 WHERE id=1'),save(db,row),db.prepare('DELETE FROM rer_portability_guard')]);
   try {
     for(const object of manifest.objects) {
@@ -234,6 +237,8 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
     // D1 may have committed even when its acknowledgement failed.
     if((await job(db,id)).phase==='complete')return importStatus(context,id);
     if(!await context.importLease.owned())throw new (await import('./storage.mjs')).PortabilityError('import_lease_expired',409);
+    // Cleanup/reset cannot fence an already-issued external operation. Keep
+    // externalEffectsStarted in the saved metadata so reclaim still refuses.
     await removeOwned(context,id);row.phase='staging';await db.batch([save(db,row),db.prepare('UPDATE rer_portability_state SET applying=0 WHERE id=1')]);throw e;
   }
   return importStatus(context,id);
@@ -254,12 +259,11 @@ export async function reclaimImport(context,id,actor='direct') {
   insist(row.actor===actor,'job_not_found',404);
   insist(['staging','applying'].includes(row.phase),'import_phase',409);
   if(!(await importLeaseStatus(context.db,row)).stale)throw await importRunning(context.db,id);
-  insist(row.phase!=='applying' || (!row.metadata.manifest.objects.length && !row.metadata.manifest.payloads.length),'import_reclaim_unsafe',409);
+  requireSafeImportReclaim(row);
   return withImportLease(context,id,async leased=>{
-    const current=await job(leased.db,id,'import'),manifest=current.metadata.manifest;
-    // R2 and arbitrary consumers have no D1 generation fence. Do not take over
-    // while a lost request could still complete one of those external effects.
-    insist(current.phase!=='applying' || (!manifest.objects.length && !manifest.payloads.length),'import_reclaim_unsafe',409);
+    // The claim's D1 batch checked the current safety precondition atomically.
+    // Every later write is fenced against the previous holder generation.
+    const current=await job(leased.db,id,'import');
     for(let index=0;index<current.completed;index++) {
       const part=await readPart(leased.db,id,index);
       await checkPart(part,index,leased.config.partBytes);

@@ -1030,8 +1030,13 @@ the old request fails its holder guard. Explicit abort, automatic stale cleanup
 when creating another restore, and sole-operator CLI cleanup keep their behavior.
 
 Reclaim refuses `import_reclaim_unsafe` if the job reached `applying` and its
-archive has R2 objects or extra payload consumers. D1 cannot fence a previously
-issued R2 multipart completion or arbitrary callback, and these systems have no
+archive has R2 objects or extra payload consumers. Before issuing those effects,
+finalize durably records that external effects started. A caught error retains
+that uncertainty even when owned-object cleanup resets the phase to staging;
+cleanup cannot cancel an already-issued effect. The safety precondition and new
+lease commit in one D1 batch, so an unsafe refusal cannot change the holder or
+expiry. D1 cannot fence a previously issued R2 multipart completion or arbitrary
+callback, and these systems have no
 shared transaction. Only staging and D1-only finishing can safely resume in
 place. Wait for the external request to stop, then use the existing abort/new
 restore recovery. Lease expiry alone does not prove an external request stopped.
