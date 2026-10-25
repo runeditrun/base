@@ -1,6 +1,6 @@
 import { insist, JobError } from './codec.ts';
 import { admissionPage } from './admission.ts';
-import { claim } from './leases.ts';
+import { claim, reconcile } from './leases.ts';
 import { Context } from './storage.ts';
 import { commitUnit, failUnit, settle } from './units.ts';
 
@@ -10,13 +10,14 @@ export async function tick(context: Context, options: { maxJobs?: number; deadli
   insist(Number.isSafeInteger(maxJobs) && maxJobs > 0 && maxJobs <= context.limits.maxList, 'job_invalid_tick_limit');
   insist(Number.isSafeInteger(deadline) && deadline > context.now() && deadline <= context.now() + context.limits.leaseMs, 'job_invalid_tick_deadline');
   await context.schema();
+  await reconcile(context);
   const control = await context.control();
   insist(control?.mode === 'running', 'scheduler_unconfigured', 503);
   const candidates = await admissionPage(context, control!);
   let admitted = 0, committed = 0;
   for (const id of candidates) {
     if (admitted >= maxJobs || context.now() >= deadline) break;
-    const acquired = await claim(context, { id, holder: options.holder });
+    const acquired = await claim(context, { id, holder: options.holder }, control!);
     if (!acquired) continue;
     admitted++;
     const wallBudget = Math.min(context.limits.maxUnitMs, deadline - context.now(), acquired.expiresAt - context.now(), acquired.job.deadline - context.now());

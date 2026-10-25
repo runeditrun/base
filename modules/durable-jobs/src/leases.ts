@@ -1,7 +1,7 @@
 import { digest, identifier, insist, JobError, text } from './codec.ts';
 import { atomic, guard, one, sql } from './database.ts';
 import { initializeControl } from './intent.ts';
-import { Context, type Row } from './storage.ts';
+import { Context, type Control, type Row } from './storage.ts';
 import type { Claim, Job, Sql } from './types.ts';
 import { admissionPage } from './admission.ts';
 
@@ -41,8 +41,9 @@ export async function hold(context: Context, job: Job, reason: string, recovery:
   // Repeated wake-ups at a capacity or person hold do not append attempts or churn versions.
   await context.database.atomic([sql("UPDATE rer_job_jobs SET state=?,reason_code=?,recovery=?,version=version+1,updated_at=? WHERE installation_id=? AND id=? AND version=? AND (state<>? OR reason_code IS NOT ? OR recovery IS NOT ?)", state, reason, recovery, context.now(), context.installationId, job.id, job.version, state, reason, recovery)]);
 }
-export async function claim(context: Context, options: { id?: string; holder?: string } = {}): Promise<Claim | null> {
-  await context.schema(); await reconcile(context); const control = await context.control();
+export async function claim(context: Context, options: { id?: string; holder?: string } = {}, admissionControl?: Control): Promise<Claim | null> {
+  if (!admissionControl) { await context.schema(); await reconcile(context); }
+  const control = admissionControl ?? await context.control();
   if (!control || control.mode !== 'running') throw new JobError('scheduler_unconfigured', 503, 'Start the declared installation runtime.');
   const now = context.now(), holder = text(options.holder ?? control.holder ?? 'bounded-tick', 'holder');
   const ids = options.id ? [options.id] : await admissionPage(context, control);
