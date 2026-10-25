@@ -12,7 +12,10 @@ export async function request(context: Context, intent: Intent, authority: Autho
   const kind = context.kinds.get(text(intent.kind, 'kind'));
   insist(kind, 'job_handler_unsupported', 503); text(intent.operationKey, 'operation_key');
   const input = bounded(intent.inputRef, context.limits.maxMetadataBytes), revision = bounded(intent.requestedRevision, context.limits.maxMetadataBytes);
-  insist(canonical(kind.decodeInput(intent.inputRef)) === input, 'job_invalid_input');
+  let decoded: Json;
+  try { decoded = kind.decodeInput(intent.inputRef); }
+  catch { throw new JobError('job_invalid_input', 400, 'Supply the registered kind\'s bounded input reference.'); }
+  insist(canonical(decoded) === input, 'job_invalid_input');
   const sourceKey = text(kind.sourceKey(intent.inputRef), 'source');
   const now = context.now(), notBefore = intent.notBefore ?? now, deadline = intent.deadline ?? now + context.limits.maxJobMs;
   // Defaults depending on wall clock are excluded; explicitly requested scheduling is part of immutable intent.
