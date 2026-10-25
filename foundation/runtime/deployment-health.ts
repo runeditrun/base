@@ -8,7 +8,7 @@ export interface DeploymentBindings {
 }
 
 const identity = (value: unknown, format: RegExp): string | null =>
-  typeof value === 'string' && format.test(value) ? value : null
+  typeof value === 'string' && format.exec(value)?.[0] === value ? value : null
 const sourceSha = /^[a-f0-9]{40}$/
 const fingerprint = /^[a-f0-9]{64}$/
 const versionId = /^(?!00000000-0000-0000-0000-000000000000)[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i

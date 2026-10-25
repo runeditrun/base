@@ -295,6 +295,7 @@ test('public /health reports the supplied hosted or self-host deployment identit
     ['malformed hosted shadows legacy', { ...legacy, RER_RELEASE_DIGEST: sourceSha, RER_VERSION_METADATA: [] }, empty],
     ['null hosted shadows legacy', { ...legacy, RER_RELEASE_DIGEST: null, RER_VERSION_METADATA: null }, empty],
     ['malformed digest', { ...hosted, RER_RELEASE_DIGEST: ` ${digest}` }, { ...empty, versionId: hostedVersion }],
+    ['trailing newlines', { RER_RELEASE_DIGEST: `${digest}\n`, RER_VERSION_METADATA: { id: `${hostedVersion}\n` } }, empty],
     ['malformed metadata', { ...hosted, RER_VERSION_METADATA: { id: 42 } }, { ...empty, fingerprint: digest }],
     ['malformed self-host', { RER_DEPLOY_SOURCE: 42, RER_DEPLOY_FINGERPRINT: '', RER_VERSION: { id: '00000000-0000-0000-0000-000000000000' } }, empty],
     ['partial self-host', { RER_DEPLOY_SOURCE: sourceSha }, { ...empty, sourceSha }],
