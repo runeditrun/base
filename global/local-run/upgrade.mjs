@@ -9,7 +9,7 @@ import { recordedRelease, resolveRelease } from './release.mjs';
 import { prepareMerge, continueMerge, cleanupMerge } from './merge.mjs';
 import { backup, readJournal, writeJournal, snapshot, rowCounts, checkPriorData, restoreState } from './state.mjs';
 import { needsRecovery, artifactOutcome } from './journal.mjs';
-import { readIntent, rememberIntent, forgetIntent, intendedRunning } from './intent.mjs';
+import { readIntent, rememberIntent, forgetIntent, intendedRunning, restoredRunning } from './intent.mjs';
 import { acquireOperation, assertOperationAvailable, returnOperation, runningApp, stopApp, startApp, health, verb } from './runtime.mjs';
 
 import { preflight, discard } from './preparation.mjs';
@@ -24,6 +24,7 @@ function output(outcome, journal, started, error_code) {
 }
 async function rollback(checkout, journal, operation) {
  const { metadata } = await backup(checkout, journal.backup);
+ journal.wasRunning ??= metadata.wasRunning;
  // The repair intent must outlive this process before any checkout, state or
  // runtime mutation. A retry may never mistake the old HEAD for restored data.
  journal.stage = 'rolling_back'; journal.runtimeSettled = false; journal.custody = operation.identity; delete journal.result;
@@ -33,7 +34,7 @@ async function rollback(checkout, journal, operation) {
  await git(checkout, ['reset', '--hard', metadata.head]);
  await restoreState(checkout, journal.backup);
  await verb(checkout, ['install', '--json'], operation);
- if (metadata.wasRunning) await health(checkout, await startApp(checkout, operation));
+ if (journal.wasRunning) await health(checkout, await startApp(checkout, operation));
  journal.stage = 'rolled_back';
  await writeJournal(checkout, journal);
 }
@@ -116,7 +117,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    preserveJournal = true;
    const repairPreparation = needsRecovery(journal) ? journal.prepared : undefined;
    const { metadata } = await backup(checkout, restore);
-   journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: metadata.wasRunning };
+   journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: restoredRunning(journal, intent, metadata, wasRunning) };
    restoring = true;
    await rollback(checkout, journal, operation);
    if (repairPreparation) {

@@ -226,7 +226,11 @@ before there is a journal. The journal then takes over that intent. An app that
 was running is restarted when the retry reclaims the exact abandoned operation
 custody. If the owner restarted and then stopped the app after the crash, that
 new operation supersedes the old intent and the app stays stopped. A currently
-running app stays running. Settled attempts use the app's current state. No HEAD
+running app stays running. This also applies when abandoning that attempt with
+`--restore`: source and data come from the selected backup, while its older
+running state cannot override the owner's later stop. An interrupted restore
+keeps that runtime choice in its protected journal. With no abandoned attempt,
+explicit restore uses the backup's running state. Settled attempts use the app's current state. No HEAD
 reset or hand deletion of either control file is needed for stale preparations;
 a successful explicit restore also removes the intent. An interrupted completed
 verdict can be acknowledged after an owner commit when the committed release

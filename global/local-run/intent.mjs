@@ -4,6 +4,7 @@ import { upgradeDirectory, writeJSON } from './state.mjs';
 import { readControl } from './journal.mjs';
 import { text } from './process.mjs';
 import { failure } from './error.mjs';
+import { artifactOutcome } from './journal.mjs';
 
 const path = checkout => join(upgradeDirectory(checkout), 'intent.json');
 export async function readIntent(checkout) {
@@ -25,6 +26,15 @@ export async function readIntent(checkout) {
 export function intendedRunning(record, custody, running) {
  return Boolean(running) || Boolean(record?.wasRunning && record.runtimeSettled !== true &&
   custody.reclaimedIdentity && (record.custody ? record.custody === custody.reclaimedIdentity : true));
+}
+// Source/data come from the selected backup. Runtime intent belongs to the
+// attempt being abandoned: a later owner stop must also survive --restore.
+// Once restore starts, persist that choice in its protected journal so a kill
+// during rollback cannot replace it with the backup's older running state.
+export function restoredRunning(journal, intent, metadata, running) {
+ const outcome = artifactOutcome(journal ?? {});
+ if (outcome === 'protected') return journal.backup === metadata.name && typeof journal.wasRunning === 'boolean' ? journal.wasRunning : metadata.wasRunning;
+ return intent || outcome === 'pre-switch' || outcome === 'terminal' && journal.runtimeSettled === false ? running : metadata.wasRunning;
 }
 export async function rememberIntent(checkout, current, wasRunning, custody) {
  // With a running server, contenders share the same custody witness before
