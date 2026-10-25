@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gc10049bc",
+  "cliVersion": "0.2.80-dev.gfc812b4d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1171,7 +1171,7 @@
     },
     "edition-authoring/case-folding.mjs": {
       "source": "edition-authoring/case-folding.mjs",
-      "sha256": "f14bcedada78ec12ca195998f1b6e603ad16f43f3baf2c7d879172fce533d78f"
+      "sha256": "f5e660370be2432640e4bce30143ff41250e09dd43b815fbbb475b15abeb9d2d"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
