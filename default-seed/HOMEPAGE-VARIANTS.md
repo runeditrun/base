@@ -150,22 +150,34 @@ Run page data in one `RunData` value (`src/site/run.ts` or
 | `name` | `Cradle` | `Uptime` |
 | `repository` | `https://github.com/just-every/run-cradle` | `https://github.com/just-every/run-uptime` |
 | `clone` | `npx -y @runeditrun/rer dev just-every/run-cradle` | `npx -y @runeditrun/rer dev just-every/run-uptime` |
-| `folder` | `run-cradle` | `run-uptime` |
 | `licence` | `MIT` | `MIT` |
 | `docs` | `true` once `/docs` is built | `true` |
-| `hosted` | `[]` | `[]` |
+| `paths` | `{ product: "cradle" }` | `{ product: "uptime" }` |
 
-The Run page shows “Run <Seed> on your computer.” and one copyable command:
+The Run page shows the three-way chooser and one copyable command:
 `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` for
 the seed's repository. It gets the seed, installs everything, makes you the
-owner and prints a link that opens it signed in. To start it again later, run
-the same line from the same folder. Base supplies the combined sentence: “Git is required; rer brings Node and pnpm. Already have Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same.”
-When adopting this renderer, remove a seed's old `requirements` field when adopting this renderer.
-The page also says “This free copy runs only on your computer: nobody else can
-open it, and it sends no email until you set up a mail provider.” A README's
-“Run locally” uses the same installer command and Node alternative. `hosted`
-is the slot for hosted options, shown as cards below the command; leave it empty
-until RER hosting opens.
+owner and prints a link that opens it signed in. A README's “Run locally” uses
+the same installer command and Node alternative,
+`npx -y @runeditrun/rer dev <owner/repo>`. Base supplies the operating-system
+and Git requirements and the qualified local-only/email note.
+
+When adopting this renderer, remove the old `requirements`, `hosted` and
+`folder` fields and add `paths`. The validator refuses missing `paths` or
+retained `hosted`/`requirements` with “Run data needs paths; migrate the old
+RunData to paths.” Set `paths.product` to the seed's listing id, or `null`
+when it has no listing. Put any seed-specific requirement sentence in
+`paths.requirementsExtra` (without “free” or “$0”); Base supplies the common
+requirements. The renderer derives the local repository name from `clone`,
+so `folder` has no replacement field.
+
+The shared chooser supplies Assisted and Managed doors from `paths`, replacing
+the old hosted-options array. Both doors stay closed when `paths.product` is
+`null` or the shared `PATHS.signups` is `'request'`; with sign-ups open, either
+can remain closed via `paths.assisted = { open: false }` or
+`paths.managed = { open: false }`. The hosting guide uses the same sign-up
+switch; wire it through `sitePages({ hosting })` as described in
+`SEED-COMMAND-CONTRACT.md`.
 
 `src/site/pages.tsx` exports `sitePages({ styles })`. Every CSS file your
 components import (Landing's `import './styles'`, the docs styles) compiles into

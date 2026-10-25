@@ -7,8 +7,7 @@ export const run: RunData = {
   name: 'Default seed',
   repository: 'https://github.com/runeditrun/base',
   clone: 'npx -y @runeditrun/rer dev runeditrun/base',
-  folder: 'base/default-seed',
   licence: 'MIT',
   docs: false,
-  hosted: [],
+  paths: { product: null },
 }
