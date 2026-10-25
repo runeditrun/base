@@ -7,7 +7,9 @@ import { isAsciiHostname, splitAuthority, splitUri } from './uri.ts';
 // iteration, so such a pattern throws RangeError near 2^23 characters, at a length that differs between V8 releases.
 const originPath = /^[A-Za-z0-9._~!$&'()*+,;=:@/%-]*$/;
 const strayPercent = /%(?![0-9A-Fa-f]{2})/;
-const unsafeCredentialText = /(?:bearer\s+[a-z0-9._~+\/-]{8,}|--(?:token|password|secret|api[_-]?key)(?:\s+|=)\S+|\b(?:token|password|secret|api[_-]?key)\s*[:=]\s*\S+)/i;
+// Only test() runs it, which needs just eight token characters: an unbounded counted repeat such as {8,} also pushes a
+// V8 backtrack entry per character and threw RangeError past about 5.6M characters.
+const unsafeCredentialText = /(?:bearer\s+[a-z0-9._~+\/-]{8}|--(?:token|password|secret|api[_-]?key)(?:\s+|=)\S+|\b(?:token|password|secret|api[_-]?key)\s*[:=]\s*\S+)/i;
 
 /** Checks signed claims for internal consistency; source capture remains the signer's responsibility. */
 export async function validateReceiptPayload(payload: ImporterVerificationPayload, path: string): Promise<ImporterValidationIssue[]> {
