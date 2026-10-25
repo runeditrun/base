@@ -1,3 +1,4 @@
+import type { DeploymentBindings } from './base/deployment-health'
 import { rejectedResponse } from './base/rejected-response'
 import { createDependencies } from './modules/dependencies/index.mjs'
 import { createIdpOwnerClaimHandler } from './modules/owner-claim/index.mjs'
@@ -12,13 +13,10 @@ import branding from './branding.json'
 // The edition's declared theme (public/rer-theme.css), as Base frames link it.
 const theme = { href: '/rer-theme.css', productName: branding.name, accentColor: branding.primaryColor }
 
-export interface Bindings {
+export interface Bindings extends DeploymentBindings {
  DB: D1Database
  /** Built browser files; hosted deploys run the Worker first (staticAssetResponse). */
  ASSETS?: Fetcher
- RER_DEPLOY_SOURCE?: string
- RER_DEPLOY_FINGERPRINT?: string
- RER_VERSION?: { id: string }
  IDENTITY_PROVIDER?: string
  AUTH_ORIGIN: string
  AUTH_LOCAL?: string
