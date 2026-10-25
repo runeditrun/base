@@ -201,9 +201,14 @@ test('public refresh refuses conflicting helper destinations before changing the
     const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
     write(base, 'tools/main.mjs', `import '../${left}';\n`);
     write(base, 'other/tools/second.mjs', `import '../${right}';\n`);
-    write(base, left, 'export const first = true;\n');
-    write(base, 'other/' + right, 'export const second = true;\n');
-    const refused = refresh(commit(base)), output = refused.stdout + refused.stderr;
+    git(base, 'add', '-A');
+    // Preserve the exact origin spelling in Git even on normalizing filesystems.
+    for (const [source, bytes] of [[left, 'export const first = true;\n'], ['other/' + right, 'export const second = true;\n']]) {
+      const object = execFileSync('git', ['-C', base, 'hash-object', '-w', '--stdin'], {input: bytes, encoding: 'utf8'}).trim();
+      git(base, 'update-index', '--add', '--cacheinfo', '100644', object, source);
+    }
+    git(base, 'commit', '-qm', 'conflicting helpers');
+    const refused = refresh(git(base, 'rev-parse', 'HEAD')), output = refused.stdout + refused.stderr;
     assert.notEqual(refused.status, 0, output);
     assert.ok(output.includes(left) && output.includes('other/' + right), output);
     assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);

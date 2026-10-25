@@ -121,7 +121,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
       if (fs.existsSync(path.join(root, name)) && !local(name)) { fail('destination is outside the seed file inventory'); continue; }
       let plan = owner;
       if (plan) {
-        if (plan.retired || plan.copy.originPath + name.slice(plan.copy.path.length) !== source) { fail('destination belongs to a different copy'); continue; }
+        if (plan.retired || plan.copy.originPath + name.slice(plan.copy.path.length) !== source) { fail(`destination belongs to a different copy from ${plan.copy.originPath}`); continue; }
         plan.sources.push([source, entry]);
         plan.removed = plan.removed.filter(removed => removed !== name);
       } else {

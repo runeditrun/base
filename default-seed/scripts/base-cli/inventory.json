@@ -1167,7 +1167,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "d400d02ff4d20e184bc075c1bf7780f9c9bb15b02e3d6b436f179a8034259498"
+      "sha256": "82fb49196afa39e684411532280a029cd914740f97cb412dbfc88a889d06a9fa"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1183,7 +1183,7 @@
     },
     "edition-authoring/copy-imports.mjs": {
       "source": "edition-authoring/copy-imports.mjs",
-      "sha256": "c1e9285a042d365cfe9db67139b6190c8dddb6b8c599443647a9fc1591fafb92"
+      "sha256": "2e4b64560cb8e308fdc9c61176e9ec29182d7737b34f77bd196326371a7e2c02"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
