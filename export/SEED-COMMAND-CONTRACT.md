@@ -345,7 +345,9 @@ provider permissions and deployment ownership.
 
 **Moved documentation pages.** `SiteBuild` optionally returns
 `redirects: [{ from: '/docs/install', to: '/docs/getting-started', status: 301 }]`
-alongside `pages` and `assets`. Include a real `/docs/getting-started` HTML page
+alongside `pages` and `assets`. At most 500 rules are accepted: enough for a
+docs-site reorganization while keeping the embedded Worker declaration small.
+The checker refuses larger lists before publication. Include a real `/docs/getting-started` HTML page
 in the same build. The checker refuses malformed rows, extra fields, statuses
 other than numeric 301, duplicate sources, self redirects, chains/cycles,
 missing or non-HTML targets, and sources that would replace an asset. Both paths

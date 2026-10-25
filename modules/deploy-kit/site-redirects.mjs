@@ -1,8 +1,10 @@
 // The first site redirect contract is deliberately limited to canonical docs paths.
 const DOC_PATH = /^\/docs\/[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/;
+export const MAX_SITE_REDIRECTS = 500;
 export function siteRedirects(value = []) {
   const invalid = () => { throw new Error('invalid-site-redirects'); };
   if (!Array.isArray(value)) invalid();
+  if (value.length > MAX_SITE_REDIRECTS) throw new Error(`Run site redirects must contain at most ${MAX_SITE_REDIRECTS} rules.`);
   const sources = new Set();
   const rules = value.map(rule => {
     if (!rule || typeof rule !== 'object' || Array.isArray(rule)

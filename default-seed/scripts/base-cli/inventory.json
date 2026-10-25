@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.81",
+  "cliVersion": "0.2.81-dev.gcfa8dbf8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1055,7 +1055,7 @@
     },
     "cli/site-check.mjs": {
       "source": "cli/site-check.mjs",
-      "sha256": "5d4d255704da1004a1def841c27a3e1e6c4ea6eeacefe20e852c8ec98d4a3985"
+      "sha256": "6d37c4a4e023447b548c000a892bcd93f0c5efb36bdd0f25ac78094241b72596"
     },
     "cli/site-client.mjs": {
       "source": "cli/site-client.mjs",
@@ -1883,7 +1883,7 @@
     },
     "modules/deploy-kit/site-redirects.mjs": {
       "source": "modules/deploy-kit/site-redirects.mjs",
-      "sha256": "652bec3e2269d00645ec50451b8280c4d13dd1be47ee41e3cb1177582808ebb6"
+      "sha256": "f06b473b8cb4212cd40944fa381b13a32814636a7e65ea18eae71eba6fe86af7"
     },
     "modules/deploy-kit/site-runtime.mjs": {
       "source": "modules/deploy-kit/site-runtime.mjs",

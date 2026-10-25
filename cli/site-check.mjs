@@ -6,7 +6,7 @@ import { privateDataScanner, decodedText } from './site-data.mjs';
 import { javascriptContent, javascriptContext } from './site-references.mjs';
 import { javascriptStrings } from './site-syntax.mjs';
 import { markupReferences, markupStrings, htmlElements, cssStrings } from './site-markup.mjs';
-import { siteRedirects } from '../modules/deploy-kit/site-redirects.mjs';
+import { siteRedirects, MAX_SITE_REDIRECTS } from '../modules/deploy-kit/site-redirects.mjs';
 import { siteRuntime } from './site-runtime.mjs';
 import { refuse, RerError } from './errors.mjs';
 import { DEV_AI_MARKER, DEV_LAYER_MARKER } from './dev-identity.mjs';
@@ -66,7 +66,9 @@ export function servedFile(names, pathname) {
 export function checkSiteRedirects(names, redirects) {
  let rules;
  try { rules = siteRedirects(redirects); }
- catch { throw refuse('Invalid run site redirects: declare unique { from, to, status: 301 } docs paths, without chains or the reserved /docs/search route.'); }
+ catch {
+  if (Array.isArray(redirects) && redirects.length > MAX_SITE_REDIRECTS) throw refuse(`Run site redirects must contain at most ${MAX_SITE_REDIRECTS} rules.`);
+  throw refuse('Invalid run site redirects: declare unique { from, to, status: 301 } docs paths, without chains or the reserved /docs/search route.'); }
  for (const rule of rules) {
   const target = servedFile(names, rule.to), source = servedFile(names, rule.from);
   if (!target?.endsWith('.html') || source && !source.endsWith('.html')) throw refuse('Run site redirects must lead directly to a built docs HTML page and cannot replace an asset.');

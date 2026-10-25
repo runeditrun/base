@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add optional same-site documentation 301 redirects to SiteBuild, with build validation and matching responses in the delivered site Worker and local built-output preview.
+- Add optional same-site documentation 301 redirects to SiteBuild, limited to 500 rules per build, with build validation and matching responses in the delivered site Worker and local built-output preview.
 
 ## 0.2.81
 

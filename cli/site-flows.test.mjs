@@ -546,6 +546,20 @@ test('declared docs redirects reach the uploaded Worker and built preview with s
    await rm(assets,{recursive:true});
   }
  }
+ // Read the documented contract so this test does not pin a separate limit.
+ const contract=await readFile(join(base,'export/SEED-COMMAND-CONTRACT.md'),'utf8');
+ const limit=Number(/At most (\d+) rules are accepted/.exec(contract)[1]);
+ const {checkSite}=await import('./site-check.mjs');
+ const declaration=count=>Array.from({length:count},(_,i)=>({...rule,from:`/docs/old-${i}`}));
+ for(const count of [limit,limit+1,100001]) {
+  const redirects=declaration(count);
+  if(count===limit) {
+   await checkSite(join(f.root,'dist/site'),{redirects});
+  } else {
+   await assert.rejects(checkSite(join(f.root,'dist/site'),{redirects}),new RegExp(`at most ${limit} rules`));
+  }
+  t.diagnostic(`${count} redirects: ${count===limit?'accepted':'refused'}; serialized bytes=${Buffer.byteLength(JSON.stringify(redirects))}`);
+ }
  const invalid = [
   ['non-array',{}],['null',null],['malformed row',[null]],['extra field',[{...rule,query:'drop'}]],
   ['external',[{...rule,to:'https://other.example.test/docs/page'}]],['protocol-relative',[{...rule,to:'//other.example.test/docs/page'}]],
