@@ -194,65 +194,38 @@ No zone ruleset is read or written. Every request now invokes the Worker: one pa
 
 A read-only preflight reads the zone (it must be in this account, else `site-zone-missing`), the Worker and the zone's Custom Domains, and refuses before any write: `resource-name-collision` for a Worker of the name whose live version the kit did not upload, or for a hostname attached to another service (or to a Worker that is not the kit's); `owned-resource-replaced` for a kit Worker whose latest deployment is not the kit's upload (a dashboard rollback or a split deployment). It then uploads the assets and the site Worker, checks that the new version is live, turns workers.dev off, attaches each missing hostname, and reads the Worker and both domains back. Both post-upload Worker checks share a 90-second upload window: missing visibility or the exact preflight version waits with backoff until the upload response's version serves alone as newest with its expected fingerprint. A foreign version, changed fingerprint or split deployment refuses immediately. A timeout names the last serving/newest versions and fingerprint. A repeat attaches nothing new. `.rer/deploy/site-<environment>.json` receives a receipt for the person; it is never read. Provider propagation cases are tested against the fake Cloudflare API in `tests/site-provider.mjs`, where every zone ruleset path answers 403.
 
-A seed can opt into docs search through its command adapter's `site.runtime`:
+A seed can opt into static docs search through its command adapter:
 
 ```ts
 runtime: {
-  type: 'docs-search', module: 'docs-search', bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER'],
-  endpoint: '/docs/search', corpus: '.rer/docs-search/corpus.json',
+  type: 'docs-search', module: 'docs-search', bindings: ['ASSETS'],
+  endpoint: '/docs-search-index.json', corpus: '.rer/docs-search/corpus.json',
 }
 ```
 
-This selects Base's docs-search implementation rather than seed JavaScript.
-Adopters of the former two-binding contract must explicitly add
-SEARCH_RATE_LIMITER. The fixed policy admits 10 uncached searches per visitor
-address per 60 seconds in a Cloudflare location; its namespace is derived from
-the site Worker name. Upload metadata, deployment fingerprint and exact-version
-readback include the namespace and policy. No separate rate-limit resource or
-zone ruleset is created. Missing admission support fails closed before inference.
+The retained `runtime` key selects a build extension. The renderer returns
+`searchPages` from the same rendered Markdown as its pages, including the exact
+published heading anchors. Every build emits a deterministic MiniSearch index
+and stamps its version/source/byte identity into the docs HTML. The browser
+fetches that static asset once, refuses stale or corrupt assets, and executes
+all queries locally. A build or query makes zero outbound service requests.
+The build reports content-hash reindex counts, index bytes/gzip bytes and build
+time, and refuses outputs above 2,000,000 bytes or 500,000 gzip bytes.
 
-Normalized public query results are cached for 60 seconds, keyed by corpus and
-query digests; concurrent equal requests coalesce only inside an isolate. The
-Cache API is location-local and evictable. The Workers rate limiter is also
-location-local and eventually consistent, so this is abuse mitigation, **not a
-hard account-wide spend ceiling**. Shared visitor addresses share admission.
-No raw visitor address or query is written to a shared response or cache key.
-429 includes Retry-After: 60; other provider/index failures return 503 and are
-not cached. See SEED-COMMAND-CONTRACT.md for ranking and scope limits.
-The site Worker adds the query endpoint, Workers AI and SEARCH_RATE_LIMITER bindings; its asset
-handling, www redirect, ownership checks and Custom Domains stay the same.
-No application binding, seed-defined ownership annotation or separate Wrangler
-configuration/deployment is accepted. The domain declaration is unchanged.
-Without `site.runtime`, the assets-only path is unchanged.
+The deployment still uploads only the standard static Worker, its ASSETS
+binding and the site's assets. Search adds no binding, service or resource.
+The index bytes/source identity enter the deployment fingerprint; exact-version
+readback checks the standard module and sole assets binding. Assets-only sites
+retain their existing fingerprint. No custom Worker module or app binding is
+accepted through this declaration.
 
-The renderer produces `pages`, `assets` and
-`searchPages: [{ href, searchSections: [{ anchor, titlePath, text }] }]` from one
-`sitePages` call and writes the latter to the declared staging corpus. Build and
-dry run make no provider or embedding requests. Their plan reports runtime type,
-module, bindings, endpoint, model, pooling, `corpusHash`, module digest and the
-deployment fingerprint; it does not claim vectors exist.
-
-Only real deployment prepares vectors. It uses the corpus parent as its local
-preparation/cache directory and always reads the previous published index from
-`https://<site domain>/docs-search-vectors.json`. Model
-`@cf/baai/bge-base-en-v1.5`, pooling `cls` and 768 dimensions are fixed by the
-Base module. Vectors are reused by model, pooling and chunk hash with valid
-matching dimensions. A previous-index 404 permits a first index; other fetch,
-parse or embedding errors stop before any site publication. The same render's
-assets, completed vector index and query module are then uploaded together in
-one site deployment. There is no second render or separate search deployment.
-
-The complete 12-file module is copied and recorded from `modules/site/docs-search` under the seed's chosen
-source path, with `site.clients.docsSearch` naming its `client.ts`. The seed
-renders `SearchField`, imports `search.css`, loads the emitted island module and
-provides `--ink`, `--ink-soft`, `--rule` and `--paper`. The rendered page layout
-and copy stay seed-owned. The artifact helper has no deploy-kit sibling dependency.
-A compatible rer release must carry CLI validation and this deploy kit together;
-see SEED-COMMAND-CONTRACT.md for exact copy, record-base, binding and pin steps.
-The shared-account cap and preparation reserve remain blocked on the
-[admission scope decision](docs/docs-search-admission.md). Do not release the
-search correction until that boundary and the independent gate close.
-Local builds have no prepared semantic search service.
+Copy and record the complete `modules/site/docs-search` directory, including
+its vendored MIT libraries (MiniSearch 7.2.0 and stemmer 2.0.1) and licences.
+The helper is self-contained. Use a compatible rer release containing the static
+CLI/deploy-kit contract, update the client entry and the declaration above,
+then regenerate/check source locks. No search binding setup is needed.
+`SEED-COMMAND-CONTRACT.md` documents the exact copy/record-base/build steps;
+copying only the UI is insufficient. Seed adoptions remain independently gated.
 
 For CI, the `run-site` environment supplies `CLOUDFLARE_ACCOUNT_ID` from
 `vars.CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from
@@ -264,7 +237,6 @@ The token needs, beyond the owner-account permissions above:
 | Permission | Scope | Used for |
 | --- | --- | --- |
 | Workers Scripts: Edit | the account | the site Worker upload, its assets, versions and deployments, workers.dev, and Workers Custom Domains (`/workers/domains`) |
-| Workers AI: Read/Edit | the account, docs-search sites only | preparing embeddings and the runtime AI binding |
 | Zone: Read | the run site zones | finding the zone by name |
 | Workers Routes: Edit | the run site zones | Workers Custom Domains, which also create their DNS records and certificates |
 

@@ -288,146 +288,106 @@ The Worker mounts two shared responses before its documents: `setupStateResponse
 
 **Sign-in hint: `login_hint`.** The shared sign-in page (`createSignInHandler`, `modules/operator-auth/signin`) accepts one optional query parameter, `login_hint=<email>`, and uses it to fill in the email field of its email-link form. Only a complete email address is used; anything else is ignored, the form is never submitted for the visitor, and the visitor still presses **Email a sign-in link**. The platform's **Open app** link for a claimed owner, a seed's own links to its sign-in route and the Lobby all use this one name: `/signin?login_hint=owner%40example.com`, with `returnTo` alongside when needed. The Lobby adds it to its **Sign in** link only on an instance served on this computer (a loopback or `*.localhost` origin) with exactly one active owner; a hosted instance's Lobby stays the same page for every visitor and never names its owner.
 
-The **run site** (`run-<seed>.com`) serves rendered public pages, with an optional docs-search runtime: the seed's approved homepage with its primary action reading **Run <Seed>** and linking to `/run`, the Run page at `/run` (one copyable line, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>`, for the seed's own repository; Git is required; rer brings Node and pnpm. Already have Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same. Run the same line from the same folder to start it again; `foundation/runtime/run-site.ts`), its docs at `/docs/*` when it serves docs, and a `404` page. It never links an instance-only route (`/signin`, `/login`, `/sign-in`, `/setup`, `/app`, `/auth/*`). A seed opts in with the `commandAdapter` option `site: { entry, output, declaration, config }`: `entry` is a module whose `sitePages({ styles })` returns `{ pages: [{ path, html }], assets: [paths under public/] }`. `rer build --site` builds it for Node with the checkout's own Vite (TypeScript, TSX, JSON and CSS imports work, and a React page renders with `renderToStaticMarkup`); the optional `config` names a Vite config holding the plugins the site pages need, such as a docs virtual module or a CSS toolchain (never the app's own `vite.config.ts`, whose Worker plugins do not run in Node). The CSS the entry's modules import compiles to one stylesheet under `/site-assets/`, with the files it references; `styles` lists its site path for each page to link in its head. `output` is the ignored folder `rer build --site` writes (`dist/site` in Base's seeds), with `/` as `index.html`, `/run` as `run.html` and `/docs/a` as `docs/a.html`; `declaration` is the run site deploy declaration, `{"version": 1, "domain": "<apex hostname>"}` (`deploy-site.json`). The build reads no installation data. Before replacing the folder it refuses a site without an index or Run page, with a link that does not resolve on Cloudflare's static assets or reaches an instance-only route, with a page or style that loads from another origin, with server code, Wrangler configuration, migrations, settings or data files, with the dev layer, or with any of the checkout's owner identity, secrets or dev key. `rer dev` builds and serves it as `RER_SITE`; `rer deploy --site` publishes it (see the deploy-kit README, Run site). A Worker that reads `deploy-site.json` in `vite dev` lists it in `server.fs.allow`.
+The **run site** (`run-<seed>.com`) serves rendered public pages, with optional static docs search: the seed's approved homepage with its primary action reading **Run <Seed>** and linking to `/run`, the Run page at `/run` (one copyable line, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>`, for the seed's own repository; Git is required; rer brings Node and pnpm. Already have Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same. Run the same line from the same folder to start it again; `foundation/runtime/run-site.ts`), its docs at `/docs/*` when it serves docs, and a `404` page. It never links an instance-only route (`/signin`, `/login`, `/sign-in`, `/setup`, `/app`, `/auth/*`). A seed opts in with the `commandAdapter` option `site: { entry, output, declaration, config }`: `entry` is a module whose `sitePages({ styles })` returns `{ pages: [{ path, html }], assets: [paths under public/] }`. `rer build --site` builds it for Node with the checkout's own Vite (TypeScript, TSX, JSON and CSS imports work, and a React page renders with `renderToStaticMarkup`); the optional `config` names a Vite config holding the plugins the site pages need, such as a docs virtual module or a CSS toolchain (never the app's own `vite.config.ts`, whose Worker plugins do not run in Node). The CSS the entry's modules import compiles to one stylesheet under `/site-assets/`, with the files it references; `styles` lists its site path for each page to link in its head. `output` is the ignored folder `rer build --site` writes (`dist/site` in Base's seeds), with `/` as `index.html`, `/run` as `run.html` and `/docs/a` as `docs/a.html`; `declaration` is the run site deploy declaration, `{"version": 1, "domain": "<apex hostname>"}` (`deploy-site.json`). The build reads no installation data. Before replacing the folder it refuses a site without an index or Run page, with a link that does not resolve on Cloudflare's static assets or reaches an instance-only route, with a page or style that loads from another origin, with server code, Wrangler configuration, migrations, settings or data files, with the dev layer, or with any of the checkout's owner identity, secrets or dev key. `rer dev` builds and serves it as `RER_SITE`; `rer deploy --site` publishes it (see the deploy-kit README, Run site). A Worker that reads `deploy-site.json` in `vite dev` lists it in `server.fs.allow`.
 
-### Optional docs-search runtime
+### Static docs search
 
-A site with docs may select Base's docs-search module in its command adapter:
+Docs search is a build-time index of the site's own Markdown. The renderer's
+`searchPages` uses the same published heading ids as `pages`; no crawler or
+other corpus is involved. The retained adapter key `runtime` selects this
+static build extension:
 
 ```ts
 site: {
   entry: 'src/site/pages.tsx', output: 'dist/site',
   declaration: 'deploy-site.json', config: 'vite.site.config.ts',
-  clients: { docsSearch: 'src/site/docs-search/client.ts' },
+  clients: { docsSearch: 'COPY_PATH/client.ts' },
   runtime: {
-    type: 'docs-search', module: 'docs-search', bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER'],
-    endpoint: '/docs/search', corpus: '.rer/docs-search/corpus.json',
+    type: 'docs-search', module: 'docs-search', bindings: ['ASSETS'],
+    endpoint: '/docs-search-index.json', corpus: '.rer/docs-search/corpus.json',
   },
 }
 ```
 
-`module: 'docs-search'` selects the Base-owned implementation, not seed
-JavaScript. This optional runtime declares `ASSETS`, Workers AI (`AI`) and the Base-owned Workers Rate Limiting binding (`SEARCH_RATE_LIMITER`);
-it does not accept arbitrary application bindings, seed ownership annotations or
-a separate Wrangler deployment. `deploy-site.json` remains the same domain-only
-declaration. Sites without `runtime` keep the assets-only deployment. Search-enabled seeds declare `esbuild` as a devDependency (the maintained seed pins 0.28.2). Both package and vendored runtimes use that checkout's build toolchain.
+`sitePages({styles, clients})` returns `pages`, `assets` and
+`searchPages: [{href, searchSections: [{anchor, titlePath, text}]}]` from one
+render. Every section must name a heading present in its published page.
+Render `SearchField` from the copied module, load `clients.docsSearch` on docs
+pages and provide `--paper`, `--ink`, `--ink-soft` and `--rule` for its existing
+styles. `/` focuses the field (and opens its mobile menu); arrows select,
+Enter follows the published heading, and Escape closes while retaining focus.
 
-Search adoption must add SEARCH_RATE_LIMITER to the previously two-binding
-declaration; old declarations are refused with the required shape. No arbitrary
-binding or application fallback is accepted. The generated version binds a
-worker-derived numeric rate-limit namespace, with 10 admissions per 60 seconds,
-and readback verifies its name, type, namespace and policy at that exact version.
-The binding metadata and query-module bytes both contribute to the fingerprint.
-This adds only Worker version metadata, with no separate provider provisioning.
+Every build, dry run and deployment builds `/docs-search-index.json` locally
+before publication, using vendored MiniSearch 7.2.0 and stemmer 2.0.1 (MIT).
+The artifact helper imports only its own module files and Node builtins.
+The deploy Worker remains the standard static Worker, with its existing ASSETS
+binding and ordinary site token permissions. Search requires no extra binding,
+resource, permission, credential, preparation request or service. Building and
+querying need no account access. A real site upload still uses the ordinary
+site deployment API.
 
-Search normalizes case, Unicode compatibility and whitespace, and caches public
-results for 60 seconds in the location-local Cache API. Keys include the corpus
-digest and a query digest; responses contain no visitor headers or identity.
-Uncached equal queries share work within an isolate; caches are evictable and
-neither cross-isolate nor cross-location coalescing is promised. A cache hit or
-an in-flight result uses no new inference. Uncached inference checks the rate
-binding using an origin-scoped digest of CF-Connecting-IP. Shared/NAT addresses
-share admission; a missing address or binding, invalid vector, or provider failure
-returns 503 without fabricating results. A denial returns 429, Retry-After: 60
-and a plain retry message; failures are never cached.
+The client fetches the index once per page identity, then searches entirely in
+the browser without sending query text. The build stamps pages with index
+version, source hash and asset hash; the client refuses a mismatch with
+“Search unavailable”. Unchanged inputs produce identical bytes. A changed
+heading invalidates its content hash; changed content and its restoration each
+count as one reindexed heading. Rebuilding unchanged content reports zero.
+The build reports total/reused/reindexed headings, bytes, gzip bytes and local
+index generation time. It refuses an index above 2,000,000 bytes or 500,000 gzip
+bytes. Deployment fingerprints include the index's actual bytes and source
+identity; readback proves the standard Worker and its sole assets binding at
+the exact serving version.
 
-Cloudflare documents this rate limiter as location-local, permissive and
-eventually consistent. The configured 10/minute policy and a measured local test
-are **not a hard account-wide or even exact multi-isolate spending ceiling**.
-Multiple visitors/locations and concurrent counter propagation can exceed it.
-A Cache API read/modify/write counter would also lose concurrent updates, so it
-is not used for admission. An authoritative global ceiling would require another
-explicit, reviewed contract (for example serialized accounting); this runtime
-does not declare or provision that service.
+Ranking uses heading/title/path boosts, Porter stemming, word prefixes and
+at most one edit for words of four or more letters, plus phrase proximity.
+A relevance floor requires most query topic terms, including unknown terms.
+Nonsense and uncovered topics return “No results”. Lexical search cannot
+reliably infer paraphrases that share no words or stems with the docs, or
+answer a task the docs do not describe. Required fixed queries and diagnostics
+are in `cli/fixtures/docs-search/queries`; they are inputs, not claimed results.
+No product-specific query aliases or handwritten answers are used.
 
-Ranking uses cosine similarity plus a bounded lexical boost over published
-headings. Corpus frequency discounts common words; all paragraphs under one
-heading contribute lexical evidence while the best semantic passage supplies
-the snippet. Unknown spellings are corrected only when the existing corpus has
-one unambiguous best match; known and ambiguous words retain their spelling.
-Queries without any corpus topic evidence return no results without inference.
-A weak semantic candidate (below 0.5) needs at least 60% weighted topic coverage
-and up to two matching terms, or an exact heading. Lexical assistance adds at
-most 0.16 plus an exact/prefix heading boost, preserving semantic differences
-instead of replacing almost half their weight. These are uncalibrated retrieval
-rules, not a real-provider quality claim. The fixed independent table is in
-`cli/fixtures/docs-search/queries`: 106 required rows and 10 diagnostics, plus
-negative/historical probes, with original target sets and explicit A–D judgments.
-No real corpus/query vectors are included; provider acceptance must replay the
-full table against the exact source and prepared artifact.
-Stable href/snippet tie breaks and heading deduplication keep five bounded results.
-Published anchors, embedding text, model/pooling and content hashes are unchanged.
+#### Adoption
 
-The current release candidate still has no shared-account cap or preparation
-reserve. See `modules/deploy-kit/docs/docs-search-admission.md` for the concrete
-scope decision required before release. No additional service is provisioned by
-this correction.
+Use a rer release containing this static build contract (or the complete
+vendored CLI from the same immutable Base SHA). Previous releases' search
+contracts are incompatible; copying just the UI does not update the CLI.
+The independent adoption gate owns seed changes and the compatible rer pin.
 
-The entry's one `sitePages({ styles, clients, contract })` render returns
-`{ pages, assets, searchPages }`, where `searchPages` is
-`[{ href, searchSections: [{ anchor, titlePath, text }] }]`. `titlePath` is the
-array of heading titles. Sections come from the same rendered docs and heading
-anchors as the HTML; do not rerender or crawl the published site for the corpus.
-The renderer writes `searchPages` to the declared `corpus` path, an ignored
-staging output outside the public assets. Its parent (`.rer/docs-search` here)
-is also the inferred preparation/cache directory.
-
-Adopt the complete module and a compatible released CLI together; copying the
-UI alone does not change the CLI-owned generated Worker or binding validation.
-The independently checked rer 0.2.75, 0.2.76 and 0.2.77 releases reject
-SEARCH_RATE_LIMITER. A newer version number alone is not compatibility proof:
-use a release whose source contains this correction and the eventual admission
-contract. gr releases only after the scope decision and independent gate close.
-
-Copy these exact 12 files from `modules/site/docs-search` at one immutable Base
-release SHA: `SearchField.tsx`, `artifacts.mjs`, `client.ts`, `index-build.mjs`,
-`lexical.ts`, `policy.d.mts`, `policy.mjs`, `retrieve.ts`, `search.css`,
-`sections.ts`, `types.ts`, `worker.ts`. The artifact helper is self-contained
-inside that directory; no sibling deploy-kit files are needed. The seed supplies
-its ordinary React/esbuild toolchain. Copy byte for byte into its selected path
-and record it through the authoring CLI, never by editing the record manually:
+Copy the whole `modules/site/docs-search` directory, including `vendor/` and
+its licence files, to the seed's existing chosen module path. Remove the old
+module directory before copying so removed files cannot remain live. Record
+that exact immutable source with the existing authoring command:
 
 ```sh
 node scripts/edition-authoring/cli.mjs record-base COPY_PATH modules/site/docs-search BASE_RELEASE_SHA --base BASE_CHECKOUT
-node scripts/edition-authoring/cli.mjs verify-base --base BASE_CHECKOUT
-node scripts/edition-authoring/cli.mjs lock
-node scripts/edition-authoring/cli.mjs check
 ```
 
-The three pending copies are HappyToHelp `src/vendor/base/modules/site/docs-search`,
-Uptime `src/base/modules/site/docs-search`, and Lamp `src/base/site/docs-search`.
-Update the ordered `bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER']` in
-HappyToHelp/Uptime's `src/site/docs-search.config.mjs` and Lamp's
-`scripts/installer/local.mjs` for this candidate; the eventual shared-admission
-release will replace the direct AI binding with its explicit reviewed contract.
-Then pin that compatible `@runeditrun/rer` release exactly in package.json and
-regenerate the lockfile. Keep both the source SHA and installed CLI provenance.
+Keep each seed's layout, copy and Markdown source set. Update its adapter to
+the ASSETS-only declaration above and its client entry to `COPY_PATH/client.ts`.
+No search binding is created or provisioned. HappyToHelp's copy path is
+`src/vendor/base/modules/site/docs-search`, Uptime's is
+`src/base/modules/site/docs-search`, and Lamp's is `src/base/site/docs-search`.
+HappyToHelp/Uptime declare it in `src/site/docs-search.config.mjs`; Lamp uses
+`scripts/installer/local.mjs`. Regenerate/check `sources.lock.json` through
+the authoring CLI, then run the seed's retained docs tests, `rer build --site`
+and `rer deploy --site --dry-run`. A release and these three adoptions are
+separate from the Base branch change; this does not claim all seeds adopted.
 
-Render `SearchField`, import `search.css`, and load `clients.docsSearch` on docs
-pages, using the existing `--ink`, `--ink-soft`, `--rule` and `--paper` theme.
-Retained tests must run the generated Worker with native Cache API and rate-limit
-bindings and simulated trusted ingress identity; fake only the paid/network edge.
-The Base adapter in `cli/fixtures/docs-search/runtime.mjs` demonstrates that door.
-Do not replace admission or cache checks with always-successful stubs. After the
-release, uip owns the three seed pin/record updates and their released-rer
-build/dev/tests and fresh real-provider acceptance. This is not all-seed adoption.
+The standalone helper can also build from an already rendered corpus:
 
-`rer build --site` and `rer deploy --site --dry-run` render and validate locally
-with no provider requests or embedding calls. The plan identifies runtime type,
-module, bindings, endpoint, fixed model `@cf/baai/bge-base-en-v1.5`, pooling `cls`,
-`corpusHash`, module digest and deployment fingerprint. Vectors are prepared
-only for real deployment; a local build does not provide live semantic search.
+```js
+import { buildSearchArtifacts } from './COPY_PATH/artifacts.mjs';
+await buildSearchArtifacts({
+  corpus: '.rer/docs-search/corpus.json', assets: 'dist/site',
+  output: '.rer/docs-search',
+});
+```
 
-A real deploy renders once, prepares the vectors, then publishes the rendered
-assets, `docs-search-vectors.json` and Base-owned query module together in one
-site deployment. Preparation reuses vectors from the inferred local cache and
-`https://<site domain>/docs-search-vectors.json` only when the model, pooling,
-chunk hash and vector dimensions match. A previous-index 404 means first index;
-all other fetch or embedding failures stop before publication. The model and
-pooling belong to the selected module. See the deploy-kit Run site guidance for
-provider permissions and deployment ownership.
+The normal CLI build also stamps the HTML's index identity. A custom renderer
+must do that same step; running only the helper does not wire up the UI.
 
-**Deploying the run site from CI.** `rer deploy --site` keeps no state it depends on: it proves the site Worker and its Custom Domains are its own from the provider (the Worker's live version carries its `rer-site:` annotation; each domain's service is that Worker), so a fresh checkout, such as a GitHub Actions runner, deploys over the site it deployed before, and a Worker or domain of the same name it did not make is still refused. The www to apex 301 lives in the Base-generated site Worker. The run-site deploy token (the `run-site` environment's `CLOUDFLARE_API_TOKEN`) carries Workers Scripts: Edit on the account and Zone: Read and Workers Routes: Edit on the run site zones. A docs-search runtime additionally requires Workers AI: Read/Edit on the account for embeddings and its AI binding; assets-only sites need no Workers AI permission. A seed's `.github/workflows/run-site.yml` runs, after `pnpm install --frozen-lockfile`, `pnpm exec rer deploy --site` in the `run-site` environment with `CLOUDFLARE_ACCOUNT_ID` from `vars.CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from `secrets.CLOUDFLARE_API_TOKEN` (vendored mode: `node scripts/rer.mjs deploy --site`); `.rer/deploy/site-production.json` is a receipt for the person and needs no cache. The workflow runs on every push to `main` with no `paths` filter, so a push that changes only `CONTRACT.md` redeploys the site.
+**Deploying the run site from CI.** `rer deploy --site` keeps no state it depends on: it proves the site Worker and its Custom Domains are its own from the provider (the Worker's live version carries its `rer-site:` annotation; each domain's service is that Worker), so a fresh checkout, such as a GitHub Actions runner, deploys over the site it deployed before, and a Worker or domain of the same name it did not make is still refused. The www to apex 301 lives in the Base-generated site Worker. The run-site deploy token (the `run-site` environment's `CLOUDFLARE_API_TOKEN`) carries Workers Scripts: Edit on the account and Zone: Read and Workers Routes: Edit on the run site zones. A seed's `.github/workflows/run-site.yml` runs, after `pnpm install --frozen-lockfile`, `pnpm exec rer deploy --site` in the `run-site` environment with `CLOUDFLARE_ACCOUNT_ID` from `vars.CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from `secrets.CLOUDFLARE_API_TOKEN` (vendored mode: `node scripts/rer.mjs deploy --site`); `.rer/deploy/site-production.json` is a receipt for the person and needs no cache. The workflow runs on every push to `main` with no `paths` filter, so a push that changes only `CONTRACT.md` redeploys the site.
 
 ## Contract status
 

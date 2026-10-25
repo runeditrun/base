@@ -9,14 +9,12 @@ import { collectFiles } from '../artifact.mjs';
 import { sitePlan, siteDeploy, siteDeclaration, siteReadbackSummary } from '../site.mjs';
 import * as siteKit from '../site.mjs';
 import { hash } from '../validation.mjs';
-import { siteRateLimit } from '../site-runtime.mjs';
 
 const app = { project: 'runeditrun/cradle', environment: 'production', compatibilityDate: '2026-09-08' };
 
 function searchRuntime(overrides = {}) {
-  const contract = { corpusHash: hash('search corpus'), model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls' };
-  return { type: 'docs-search', module: 'docs-search', endpoint: '/docs/search', bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER'], ...contract,
-    source: `const contract = ${JSON.stringify(contract)}; export default { fetch(request, env) { return env.ASSETS.fetch(request); } };`, ...overrides };
+  return { type:'docs-search', module:'docs-search', endpoint:'/docs-search-index.json', bindings:['ASSETS'],
+    corpusHash:hash('search corpus'), assetHash:hash('index'), indexVersion:2, total:3, reused:0, reindexed:3, bytes:5, gzipBytes:25, ...overrides };
 }
 
 async function site(t) {
@@ -43,29 +41,29 @@ test('a run site declaration names only an apex domain, and its plan never names
   for (const environment of ['production', 'site', 'production-site', 'site-production']) assert.notEqual(sitePlan({ ...app, environment, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/x' }).worker, sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/x' }).appWorker);
 });
 
-test('site fingerprints preserve assets-only identity and bind search code, model, corpus and vector bytes', () => {
+test('site fingerprints preserve assets-only identity and bind the static search source and index bytes', () => {
   const options = { ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/checkout/dist/site' };
-  const plain = sitePlan(options), files = [{ path: 'index.html', sha256: hash('home') }, { path: 'docs-search-vectors.json', sha256: hash('vectors') }];
+  const plain = sitePlan(options), files = [{ path: 'index.html', sha256: hash('home') }, { path: 'docs-search-index.json', sha256: hash('index') }];
   assert.equal(siteKit.siteFingerprint(plain, files), hash({ files, config: plain.assetsConfig, module: hash(siteKit.SITE_WORKER), compatibilityDate: plain.compatibilityDate }));
   const runtime = searchRuntime(), search = sitePlan({ ...options, runtime });
-  assert.deepEqual(search.bindings, ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER']);
-  assert.deepEqual(search.runtime, runtime);
+  assert.deepEqual(search.bindings, ['ASSETS']); assert.deepEqual(search.runtime, runtime);
   const fingerprint = siteKit.siteFingerprint(search, files);
   assert.notEqual(fingerprint, siteKit.siteFingerprint(plain, files));
-  for (const change of [{ source: `${runtime.source}\n// rebuilt` }, { model: '@cf/baai/bge-large-en-v1.5' }, { corpusHash: hash('new corpus') }])
-    assert.notEqual(siteKit.siteFingerprint(sitePlan({ ...options, runtime: searchRuntime(change) }), files), fingerprint);
-  assert.notEqual(siteKit.siteFingerprint(search, files.map(file => file.path === 'docs-search-vectors.json' ? { ...file, sha256: hash('new vectors') } : file)), fingerprint);
-  assert.throws(() => siteKit.siteFingerprint(search, files.slice(0, 1)), /missing-site-search-vectors/);
-  for (const change of [{ type: 'custom' }, { bindings: ['ASSETS', 'AI'] }, { bindings: ['ASSETS', 'AI', 'DB'] }, { endpoint: '/custom' }, { annotations: {} }, { pooling: 'mean' }])
+  assert.notEqual(siteKit.siteFingerprint(sitePlan({ ...options, runtime: searchRuntime({ corpusHash: hash('new corpus') }) }), files), fingerprint);
+  const changed=files.map(file=>file.path==='docs-search-index.json'?{...file,sha256:hash('new index')}:file);
+  assert.notEqual(siteKit.siteFingerprint(sitePlan({...options,runtime:searchRuntime({assetHash:hash('new index')})}),changed),fingerprint);
+  assert.throws(() => siteKit.siteFingerprint(search, files.slice(0, 1)), /missing-site-search-index/);
+  assert.throws(() => siteKit.siteFingerprint(search, changed), /missing-site-search-index/);
+  for (const change of [{ type: 'custom' }, { bindings: [] }, { bindings: ['ASSETS', 'DB'] }, { endpoint: '/custom' }, { annotations: {} }, { source: 'arbitrary script' }])
     assert.throws(() => sitePlan({ ...options, runtime: searchRuntime(change) }), /invalid-site-runtime/);
 });
 
-test('search deploy uploads the generated runtime and verifies exact serving version modules and AI bindings', async t => {
+test('search deploy uses the static Worker and verifies its exact serving module and assets-only binding', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['search upload', 'missing AI', 'missing ASSETS', 'missing limiter', 'wrong namespace', 'wrong limit', 'wrong period', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']) await t.test(scenario, async t => {
+  for (const scenario of ['search upload', 'missing ASSETS', 'wrong assets type', 'extra binding', 'module changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']) await t.test(scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
     t.after(() => provider.close());
-    await writeFile(join(folder, 'docs-search-vectors.json'), JSON.stringify({ model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls', corpusHash: hash('search corpus'), chunks: [] }));
+    await writeFile(join(folder, 'docs-search-index.json'), 'index');
     const runtime = searchRuntime();
     const plan = sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: folder, runtime });
     const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
@@ -76,31 +74,23 @@ test('search deploy uploads the generated runtime and verifies exact serving ver
         uploadedVersion = provider.state.version.id;
         const bindings = provider.state.version.resources.bindings;
         const content = provider.state.content.get(uploadedVersion);
-        if (scenario === 'missing AI') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'AI');
         if (scenario === 'missing ASSETS') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'ASSETS');
-        if (scenario === 'missing limiter') provider.state.version.resources.bindings = bindings.filter(binding => binding.name !== 'SEARCH_RATE_LIMITER');
-        if (scenario === 'wrong namespace') bindings.find(binding => binding.name === 'SEARCH_RATE_LIMITER').namespace_id = '1';
-        if (scenario === 'wrong limit') bindings.find(binding => binding.name === 'SEARCH_RATE_LIMITER').simple.limit++;
-        if (scenario === 'wrong period') bindings.find(binding => binding.name === 'SEARCH_RATE_LIMITER').simple.period = 10;
-        if (scenario === 'wrong AI type') bindings.find(binding => binding.name === 'AI').type = 'plain_text';
+        if (scenario === 'wrong assets type') bindings[0].type = 'plain_text';
         if (scenario === 'extra binding') bindings.push({ type: 'plain_text', name: 'UNEXPECTED', text: 'value' });
-        if (scenario === 'module changed') content.files[0].bytes = Buffer.from(`${runtime.source}\n// changed`);
-        if (scenario === 'model changed') content.files[0].bytes = Buffer.from(runtime.source.replace(runtime.model, '@cf/baai/bge-large-en-v1.5'));
-        if (scenario === 'pooling changed') content.files[0].bytes = Buffer.from(runtime.source.replace('cls', 'mean'));
-        if (scenario === 'corpus changed') content.files[0].bytes = Buffer.from(runtime.source.replace(runtime.corpusHash, hash('different corpus')));
+        if (scenario === 'module changed') content.files[0].bytes = Buffer.from(`${siteKit.SITE_WORKER}\n// changed`);
         if (scenario === 'wrong entry') { content.files[0].path = 'other.mjs'; content.entry = 'other.mjs'; }
         if (scenario === 'extra module') content.files.push({ path: 'other.mjs', type: 'application/javascript+module', bytes: Buffer.from('export default {};') });
         if (scenario === 'settings differ') provider.state.settings.bindings = [];
       }
-      if (scenario === 'final readback changed' && path.endsWith('/subdomain')) provider.state.content.get(uploadedVersion).files[0].bytes = Buffer.from(`${runtime.source}\n// changed`);
+      if (scenario === 'final readback changed' && path.endsWith('/subdomain')) provider.state.content.get(uploadedVersion).files[0].bytes = Buffer.from(`${siteKit.SITE_WORKER}\n// changed`);
       return result;
     } };
     const run = async () => siteDeploy({ api: observed, plan, files: await collectFiles(folder), receiptPath });
     if (scenario === 'search upload' || scenario === 'settings differ') {
       const result = await run();
       assert.equal(result.origin, 'https://run-cradle.com');
-      assert.equal(provider.state.content.get(uploadedVersion).files[0].bytes.toString(), runtime.source);
-      assert.deepEqual(provider.state.version.resources.bindings, [{ type: 'assets', name: 'ASSETS' }, { type: 'ai', name: 'AI' }, siteRateLimit(plan.worker)]);
+      assert.equal(provider.state.content.get(uploadedVersion).files[0].bytes.toString(), siteKit.SITE_WORKER);
+      assert.deepEqual(provider.state.version.resources.bindings, [{ type: 'assets', name: 'ASSETS' }]);
       assert.ok(provider.state.calls.some(call => call.path.endsWith('/content/v2') && call.search.includes(uploadedVersion)), 'reads content of uploaded serving version');
       assert.equal(provider.state.settings.main_module, siteKit.SITE_MODULE);
     } else {
@@ -120,7 +110,7 @@ test('search deploy waits for the uploaded runtime instead of checking an older 
     const options = { ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: folder };
     await siteDeploy({ api, plan: sitePlan(options), files: await collectFiles(folder), receiptPath });
     const deployments = structuredClone(provider.state.deployments);
-    await writeFile(join(folder, 'docs-search-vectors.json'), JSON.stringify({ corpusHash: hash('search corpus') }));
+    await writeFile(join(folder, 'docs-search-index.json'), 'index');
     let uploaded = false, lagging = 0, elapsed = 0, sleeps = 0;
     const observed = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: async (input, init = {}) => {
       const response = await provider.fetch(input, init), url = new URL(input);

@@ -1,72 +1,36 @@
 import { createHash } from 'node:crypto';
-import { searchPolicy } from './policy.mjs';
+import { gzipSync } from 'node:zlib';
+import MiniSearch from './vendor/minisearch.mjs';
+import { searchOptions } from './lexical.mjs';
 
-export const model = '@cf/baai/bge-base-en-v1.5';
-export const pooling = 'cls';
-export const dimensions = 768;
-const digest = value => createHash('sha256').update(value).digest('hex');
+export const indexVersion = 2;
+export const indexAsset = '/docs-search-index.json';
+export const sizeBudget = { bytes: 2_000_000, gzipBytes: 500_000 };
+export const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
-// Shared by the deploy kit and the standalone 12-file artifact helper. Keep the
-// namespace algorithm stable: adoption must not reset the existing local limit.
-export const siteRateLimit = worker => ({
-  type: 'ratelimit', name: 'SEARCH_RATE_LIMITER',
-  namespace_id: String(parseInt(digest(worker).slice(0, 12), 16) + 1),
-  simple: { limit: searchPolicy.limit, period: searchPolicy.period },
-});
-
-// Keep long sections inside the model's context. Every part keeps the same
-// heading link; retrieval collapses duplicate links after scoring.
-function parts(text) {
-  const chunks = [];
-  // Paragraph boundaries are stable cache boundaries. Within a long paragraph,
-  // keep sentences together so a short task isn't diluted by an entire guide.
-  for (const paragraph of text.split(/\n\n+/).filter(Boolean)) {
-    let part = '';
-    const sentences = paragraph.split(/(?<=[.!?])\s+/);
-    for (const sentence of sentences) {
-      if (part && part.length + sentence.length > 650) { chunks.push(part.trim()); part = ''; }
-      if (sentence.length > 650) {
-        for (const word of sentence.split(/\s+/).filter(Boolean)) {
-          if (part && part.length + word.length > 650) { chunks.push(part.trim()); part = ''; }
-          if (word.length > 650) {
-            if (part) { chunks.push(part.trim()); part = ''; }
-            for (let i = 0; i < word.length; i += 650) chunks.push(word.slice(i, i + 650));
-          } else part += `${part ? ' ' : ''}${word}`;
-        }
-      } else part += `${part ? ' ' : ''}${sentence.trim()}`;
-    }
-    if (part.trim()) chunks.push(part.trim());
-  }
-  return chunks;
-}
-
-export function searchChunks(pages) {
-  return pages.flatMap(page => page.searchSections.flatMap(section => parts(section.text).map(text => {
+/** The renderer supplies sections after assigning the published heading ids. */
+export function searchDocuments(pages) {
+  return pages.flatMap(page => page.searchSections.map(section => {
     const href = `${page.href}#${section.anchor}`;
-    const hash = digest(JSON.stringify([model, pooling, href, section.titlePath, text]));
-    return { ...section, text, href, hash };
-  })));
+    return { id: href, href, heading: section.titlePath.at(-1), title: section.titlePath.slice(0, -1).join(' '),
+      titlePath: section.titlePath, path: page.href.replace(/[/_-]/g, ' '), text: section.text,
+      hash: digest(JSON.stringify([href, section.titlePath, section.text])) };
+  })).sort((a, b) => a.href < b.href ? -1 : a.href > b.href ? 1 : 0);
 }
 
-export function validVector(vector) {
-  return Array.isArray(vector) && vector.length === dimensions && vector.every(Number.isFinite) && vector.some(value => value !== 0);
-}
-
-export async function buildSearchIndex(pages, { previous = [], embed, onBatch = () => {} }) {
-  const chunks = searchChunks(pages);
-  const cached = new Map(previous.filter(index => index?.version === 1 && index.model === model && index.pooling === pooling && index.dimensions === dimensions)
-    .flatMap(index => index.chunks).filter(chunk => validVector(chunk.vector)).map(chunk => [chunk.hash, chunk.vector]));
-  const missing = chunks.filter(chunk => !cached.has(chunk.hash));
-  let embedded = 0;
-  for (let offset = 0; offset < missing.length; offset += 32) {
-    const batch = missing.slice(offset, offset + 32);
-    const response = await embed(model, { text: batch.map(chunk => `${chunk.titlePath.join(' > ')}\n${chunk.text}`), pooling });
-    if (response.data?.length !== batch.length || !response.data.every(validVector)) throw Error('Workers AI returned invalid embeddings; search build stopped.');
-    batch.forEach((chunk, i) => cached.set(chunk.hash, response.data[i].map(value => Number(value.toFixed(6)))));
-    embedded += batch.length;
-    onBatch({ embedded, total: missing.length });
-  }
-  const index = { version: 1, model, pooling, dimensions, corpusHash: digest(chunks.map(chunk => chunk.hash).join('\n')),
-    chunks: chunks.map(chunk => ({ ...chunk, vector: cached.get(chunk.hash) })) };
-  return { index, counts: { total: chunks.length, reused: chunks.length - embedded, embedded } };
+export function buildSearchIndex(pages, { previous } = {}) {
+  const started = performance.now();
+  const documents = searchDocuments(pages);
+  if (!documents.length || new Set(documents.map(row => row.id)).size !== documents.length) throw Error('Search requires unique published heading sections.');
+  const sourceHash = digest(JSON.stringify(documents));
+  const engine = new MiniSearch(searchOptions);
+  engine.addAll(documents);
+  const index = { version: indexVersion, sourceHash, engine: engine.toJSON() };
+  const bytes = JSON.stringify(index);
+  const counts = { total: documents.length, reused: 0, reindexed: 0, bytes: Buffer.byteLength(bytes), gzipBytes: gzipSync(bytes).length };
+  if (counts.bytes > sizeBudget.bytes || counts.gzipBytes > sizeBudget.gzipBytes) throw Error(`Docs search index exceeds budget (${counts.bytes}/${sizeBudget.bytes} bytes; ${counts.gzipBytes}/${sizeBudget.gzipBytes} gzip bytes).`);
+  const old = new Map(Object.values(previous?.version === indexVersion ? previous.engine.storedFields : {}).map(row => [row.href, row.hash]));
+  counts.reused = documents.filter(row => old.get(row.href) === row.hash).length;
+  counts.reindexed = counts.total - counts.reused;
+  return { index, bytes, counts, elapsedMs: performance.now() - started, assetHash: digest(bytes) };
 }
