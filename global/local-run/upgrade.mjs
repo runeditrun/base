@@ -26,8 +26,9 @@ async function rollback(checkout, journal, operation) {
  const { metadata } = await backup(checkout, journal.backup);
  // The repair intent must outlive this process before any checkout, state or
  // runtime mutation. A retry may never mistake the old HEAD for restored data.
- journal.stage = 'rolling_back'; journal.runtimeSettled = false; delete journal.result;
+ journal.stage = 'rolling_back'; journal.runtimeSettled = false; journal.custody = operation.identity; delete journal.result;
  await writeJournal(checkout, journal);
+ await forgetIntent(checkout);
  await stopApp(checkout, operation);
  await git(checkout, ['reset', '--hard', metadata.head]);
  await restoreState(checkout, journal.backup);
@@ -117,7 +118,6 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    const { metadata } = await backup(checkout, restore);
    journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: metadata.wasRunning };
    restoring = true;
-   await forgetIntent(checkout);
    await rollback(checkout, journal, operation);
    if (repairPreparation) {
     const ref = await git(checkout, ['show-ref', '--verify', '--quiet', `refs/heads/${repairPreparation.branch}`], { allow: [1] });
@@ -133,7 +133,8 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    if (!wasRunning) await stopApp(checkout, operation);
    const result = output(journal.stage === 'complete' ? 'updated' : 'rolled_back', journal, started,
     errorCodes.has(journal.result?.error_code) ? journal.result.error_code : undefined);
-   journal.result = result; await forgetIntent(checkout); settleJournal = true;
+   journal.result = result; journal.custody = operation.identity;
+   await writeJournal(checkout, journal); await forgetIntent(checkout); settleJournal = true;
    await phase(journal.stage === 'complete' ? 'ready' : 'failed', result.error_code);
    return result;
   }
