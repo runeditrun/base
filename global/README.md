@@ -228,7 +228,9 @@ custody. If the owner restarted and then stopped the app after the crash, that
 new operation supersedes the old intent and the app stays stopped. A currently
 running app stays running. Settled attempts use the app's current state. No HEAD
 reset or hand deletion of either control file is needed for stale preparations;
-a successful explicit restore also removes the intent.
+a successful explicit restore also removes the intent. An interrupted completed
+verdict can be acknowledged after an owner commit when the committed release
+record still names that target, preserving the new commit.
 
 A protected journal is retained when HEAD moves, including an owner commit or
 reset. Rer refuses a different target or `--check` until the interrupted update

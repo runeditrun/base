@@ -89,7 +89,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    }
   }
   const terminalResume = artifactOutcome(journal) === 'terminal' && journal.runtimeSettled === false && !restore &&
-   current.branch === journal.branch && current.head === (journal.stage === 'complete' ? journal.prepared?.candidate : journal.head) &&
+   (journal.stage === 'complete' ? installed?.commit === journal.target?.commit : current.branch === journal.branch && current.head === journal.head) &&
    (!to || [journal.target?.commit, journal.target?.tag].includes(to)) && (!journalKey || journalKey === journal.journalKey);
   operation = await acquireOperation(checkout, async custody => {
    wasRunning = protectedJournal ? journal.wasRunning : intendedRunning(intent ?? loaded, custody, await runningApp(checkout));
