@@ -46,7 +46,8 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
     catch (error) { failed(error); continue; }
     try {
       requests = moduleRequests(importer.bytes, format, importer.source, true);
-      specifiers = requests.specifiers.filter(value => value.startsWith('./') || value.startsWith('../'));
+      specifiers = requests.specifiers.filter(value => value.startsWith('./') || value.startsWith('../') ||
+        path.posix.isAbsolute(value) || value.startsWith('file:') || /^[a-z]:[\\/]/i.test(value));
     }
     catch (error) {
       // Tentative bytes cannot contribute imports. A later incoming edge queues
@@ -64,6 +65,9 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
     for (const specifier of specifiers) {
       let source, name;
       const fail = reason => problems.add(`${importer.name} imports ${specifier}: ${reason} (${source ?? specifier}). Review and materialize the dependency, then run record-base ${quote(name ?? specifier)} ${quote(source ?? specifier)} ${revision}${recordPath === 'base-copies.json' ? '' : ' --record ' + quote(recordPath)}.`);
+      if (!specifier.startsWith('./') && !specifier.startsWith('../')) {
+        fail('absolute import paths are outside the seed root'); continue;
+      }
       try {
         source = path.posix.relative('/repository', fileURLToPath(new URL(specifier, pathToFileURL('/repository/' + importer.source))));
         name = path.posix.relative('/repository', fileURLToPath(new URL(specifier, pathToFileURL('/repository/' + importer.name))));

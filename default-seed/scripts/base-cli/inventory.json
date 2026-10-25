@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gefeda1ec",
+  "cliVersion": "0.2.80-dev.g65da4bb5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1183,7 +1183,7 @@
     },
     "edition-authoring/copy-imports.mjs": {
       "source": "edition-authoring/copy-imports.mjs",
-      "sha256": "69acce64ab11ab8e81e47d502510aaa3bfb24df14bbf02b2fcaff86d681ba61f"
+      "sha256": "7bae7b5ccb7eeb7a4368a2bba8343df4b306a790f5351c48e5dda1930b064ed0"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
