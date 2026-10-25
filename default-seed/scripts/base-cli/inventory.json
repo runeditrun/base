@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "371851b14598095f8195ff3cec8b547c874848f07fd2b5479dfb1b049724b0da"
+      "sha256": "dcf5634e94dae2cdfa47ec56d0fa8a08350d09bf2e369bef7064cbc2644c5520"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1175,7 +1175,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "f656c9491306fa5d003a6ea8625fccfd1ab0ad6bee239e5d85ae2908874824e3"
+      "sha256": "82fb49196afa39e684411532280a029cd914740f97cb412dbfc88a889d06a9fa"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1184,6 +1184,18 @@
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
       "sha256": "7b7fff83e2cc90f4b7a1f83673ea1d77d02704377ada4e13164d9ec74e83ba00"
+    },
+    "edition-authoring/copy-destinations.mjs": {
+      "source": "edition-authoring/copy-destinations.mjs",
+      "sha256": "4c9b2dfca6d410dee4f90f534c4efa472a23e66efc52500d0a960325a4ff4c96"
+    },
+    "edition-authoring/copy-entrypoints.mjs": {
+      "source": "edition-authoring/copy-entrypoints.mjs",
+      "sha256": "dea135c2afe3860e0e635e5a2a538bb022b451ade0672c564cd70f4dfa23c518"
+    },
+    "edition-authoring/copy-imports.mjs": {
+      "source": "edition-authoring/copy-imports.mjs",
+      "sha256": "2e4b64560cb8e308fdc9c61176e9ec29182d7737b34f77bd196326371a7e2c02"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
@@ -1196,6 +1208,10 @@
     "edition-authoring/manifest.mjs": {
       "source": "edition-authoring/manifest.mjs",
       "sha256": "0c93bd39b1dd869b23a9d2727671fe8f9c933a9d56c7a3df1ba83c4a6f816e7b"
+    },
+    "edition-authoring/module-format.mjs": {
+      "source": "edition-authoring/module-format.mjs",
+      "sha256": "a85a1acc5f8feb6aeb56876442166644b6fda146fa0bae304a049796b443ea89"
     },
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
@@ -1220,6 +1236,10 @@
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",
       "sha256": "1033adaaa5f1f52053c34552c0979b6f868907f00cc1005d39fd8f845df4be09"
+    },
+    "edition-authoring/static-imports.mjs": {
+      "source": "edition-authoring/static-imports.mjs",
+      "sha256": "c57833846c740c3bfb65e9c92a5192fac2047818b66feb0d23f8d84e33ea485f"
     },
     "edition-authoring/updates.mjs": {
       "source": "edition-authoring/updates.mjs",

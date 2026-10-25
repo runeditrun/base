@@ -37,6 +37,86 @@ with `git submodule update --init`; after initialization, refresh reads the
 child's own index and bytes. Unreadable index evidence and deleted declared
 adaptations also refuse.
 
+Per-file vendored JavaScript copies outside `foundation/runtime` remain supported.
+For JavaScript outside `foundation/runtime`, refresh follows static relative
+imports and exports, including side-effect imports, transitively up to 64 levels.
+Every Base file this refresh writes, newly adopted or updated, can also bring
+required relative helpers from outside its original copied origin directory.
+This revises the earlier guarantee that refresh never writes outside a copy's
+origin: otherwise an updated file could import a missing helper and break the seed.
+Helpers come from the refreshed commit's Git objects, never the Base working tree.
+They appear under `adopted` and receive closure-derived singleton entries in
+`base-copies.json` (or join a matching directory copy), so `verify-base` sees no
+drift and later refreshes keep them current. Their own relative imports receive
+the same guarded delivery, within the depth bound.
+A dependency already delivered by another recorded copy mapping or an acknowledged
+adaptation satisfies the import. Regular seed-owned source also satisfies an
+import when no outside-origin Base helper would replace its different bytes;
+its actual static imports are checked and its missing dependencies require explicit
+reconciliation. An outside-origin Base helper whose destination holds different
+seed-owned bytes refuses, naming the file; those bytes are never overwritten.
+New helper mappings are checked against every requesting source; incompatible
+bytes cannot silently share a destination. Before any write, the complete plan
+rejects file/descendant conflicts and names that collide after case folding or
+Unicode normalization, on every platform, naming both sources. Existing
+equal-byte seed-owned dependencies are traversed without taking ownership.
+Missing source at the refreshed commit, recorded removals, files deliberately kept
+out or ignored, symlinks, seed-root escapes, absolute/file-URL/drive paths, depth
+overflow and adapted importers needing new files refuse the entire refresh before
+writes, with exact `record-base` commands for explicit reconciliation. Existing
+adapted files stay unchanged. Already recorded dependencies must remain present.
+Each file uses its origin name and the target commit's nearest `package.json`
+(read from Git objects, never the working tree or seed): `.mjs` is ESM and
+`.cjs` is CommonJS; `.js` and extensionless files follow that package's
+`"type"`. A nearest typeless package ends the search, as does `node_modules`.
+Without a recognized type, CommonJS is the default, with Node's native syntax
+detection selecting ESM for module-only syntax and lexical redeclarations of
+CommonJS wrapper parameters. Explicit `"type":"commonjs"` never uses detection.
+Only `.js`, `.mjs` and `.cjs` are inherently JavaScript. Extensionless or unknown
+names with an incoming relative import or literal `require()`, package
+`bin`/`main`/`exports` target, or Node shebang are parsed strictly: invalid
+JavaScript refuses atomically. Other unknown names are parsed tentatively in
+their decided format; valid static relative imports are followed, while a syntax
+error means the file is bytes. This preserves standalone extensionless modules
+without treating `.node-version`, `LICENSE` or `.gitignore` as broken entries.
+An incoming entry signal always restores strict refusal, including when the
+target was tentatively examined earlier. Known data formats are never parsed as
+JavaScript. Every JavaScript helper is parsed transitively. Literal `require()`
+entry signals are read from Node's bundled Acorn AST after native validation;
+they only promote selected targets and never adopt runtime dependencies.
+CommonJS is parsed as a function body with Node's five wrapper parameters using
+`vm.compileFunction`; ESM uses `vm.SourceTextModule.moduleRequests`.
+The same Node executable runs a parse-only child with `--experimental-vm-modules`
+and `--expose-internals`. It never links or evaluates source. Callers need no
+extra flag or package, including offline. For typeless inputs the CLI relies on
+Node's private `contextify.containsModuleSyntax` detector, available in Node
+22.20.0 and 26.8.1. Missing parser/detector APIs, invalid or unreadable package
+configuration, and syntax invalid for the decided format refuse the entire
+refresh before writes, naming the file and error. No content regexes or grammar
+fallbacks choose a format. These rules use Node's ordinary default flags; custom
+loader hooks and experimental default-type overrides are outside this finder.
+The detector follows [Node's syntax-detection rules](https://nodejs.org/download/release/v22.20.0/docs/api/packages.html#syntax-detection)
+through its [native parse-only implementation](https://github.com/nodejs/node/blob/v22.20.0/src/node_contextify.cc).
+Relative ESM specifiers resolve exact URL paths (including query/fragment
+removal), without suffix or directory-index searching. JSON dependencies are
+copied as terminal data files, never parsed as JavaScript; Node still enforces
+JSON import attributes and validates JSON at execution. Native `.node` addons,
+`.wasm` (including extensionless Wasm binaries) and other unsupported static
+import extensions refuse before writes: their closure is not established by
+this JavaScript finder. They are never executed to inspect dependencies.
+Strings, templates, regular expressions, comments, dynamic `import()`,
+`import.meta` and CommonJS `require()` add no static dependencies. In particular,
+relative `require()` calls are dynamic and are not followed. JSX and other
+syntax the running Node cannot parse in the chosen format refuse atomically.
+
+Copies from `foundation/runtime` retain their runtime-specific dependency policy:
+refresh resolves JS/TS runtime dependencies and companion declarations, recovers
+omitted old-pin siblings, advances copies matching their old baseline, and
+preserves differing seed-owned siblings. Runtime additions appear in each copy's
+`added` list; `adopted` reports the non-runtime JavaScript closure above. Both
+graphs are planned before any writes; deleted recorded runtime dependencies
+refuse without resurrection.
+
 Use the immutable full commit behind the release tag. Base-checkout form:
 
 ```sh
@@ -78,8 +158,9 @@ node node_modules/@runeditrun/rer/edition-authoring/cli.mjs adapt-base LOCAL_FIL
 Stage intentional source changes before `lock`, then review and commit the lock.
 Refresh does not silently update a source lock. See Base's
 [authoring protocol](https://github.com/runeditrun/base/blob/main/edition-authoring/README.md)
-for comparisons, retained origins and release operations. Existing seeds with
-local authoring scripts can continue using them unchanged.
+for comparisons, retained origins and release operations. To migrate from
+vendored scripts, pin the package, run `rer adopt-edition`, then drop the vendored
+scripts and their copy records.
 
 Both public verbs accept `--help`, `--cwd PATH`, `--non-interactive` and `--json`.
 Help exits 0 before configuration, adapters or tools. `describe --json` includes
@@ -90,7 +171,7 @@ installed package pin, installing that pin when needed.
 With `--json`, stdout is newline-delimited event objects. Success ends with
 `{version:1, verb, event:"result", ok:true, exitCode:0, ...details}`. Adoption
 details include `adopted`, `created`, `record`, `preservedCopyRecord` and `next`.
-Refresh details include `refreshed`, `record`, `copies`, `retired`, `adapted` and
+Refresh details include `refreshed`, `record`, `copies`, `retired`, `adopted`, `adapted` and
 `next`; each copy reports `path`, `from`, `files`, `added` and `removed`.
 Refusal emits an `error` event with `code`, `message` and `exitCode`, then a failed
 `result`; authoring safety refusals exit 4 and malformed invocations exit 2.

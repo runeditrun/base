@@ -5,7 +5,9 @@ and `rer refresh-base --ref FULL_COMMIT`; do not vendor authoring CLI files.
 See [EDITION-AUTHORING.md](../export/EDITION-AUTHORING.md) for adoption, acquisition,
 offline use and JSON output. Node 22+ and Git are the authoring dependencies.
 Builds and integration remain ordinary edition code. This tool never runs
-source-provided scripts. Existing local authoring scripts remain supported.
+source-provided scripts. Existing per-file vendored authoring scripts remain
+supported; to migrate, pin the package, run `rer adopt-edition`, then drop the
+vendored scripts and their copy records.
 
 The recommended path is a maintained complete edition with tested component
 choices, UI, infrastructure and commands that save implementation and adaptation
@@ -232,7 +234,77 @@ edition's verify command next to `check`.
 writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
-export removed, keeps out unrelated files the copy had left out, and re-records each copy.
+export removed, keeps out files the copy had left out, and re-records each copy.
+For JavaScript outside `foundation/runtime`, refresh follows static relative
+imports and exports, including side-effect imports, transitively up to 64 levels.
+Every Base file this refresh writes, newly adopted or updated, can also bring
+required relative helpers from outside its original copied origin directory.
+This revises the earlier guarantee that refresh never writes outside a copy's
+origin: otherwise an updated file could import a missing helper and break the seed.
+Helpers come from the refreshed commit's Git objects, never the Base working tree.
+They appear under `adopted` and receive closure-derived singleton entries in
+`base-copies.json` (or join a matching directory copy), so `verify-base` sees no
+drift and later refreshes keep them current. Their own relative imports receive
+the same guarded delivery, within the depth bound.
+A dependency already delivered by another recorded copy mapping or an acknowledged
+adaptation satisfies the import. Regular seed-owned source also satisfies an
+import when no outside-origin Base helper would replace its different bytes;
+its actual static imports are checked and its missing dependencies require explicit
+reconciliation. An outside-origin Base helper whose destination holds different
+seed-owned bytes refuses, naming the file; those bytes are never overwritten.
+New helper mappings are checked against every requesting source; incompatible
+bytes cannot silently share a destination. Before any write, the complete plan
+rejects file/descendant conflicts and names that collide after case folding or
+Unicode normalization, on every platform, naming both sources. Existing
+equal-byte seed-owned dependencies are traversed without taking ownership.
+Missing source at the refreshed commit, recorded removals, files deliberately kept
+out or ignored, symlinks, seed-root escapes, absolute/file-URL/drive paths, depth
+overflow and adapted importers needing new files refuse the entire refresh before
+writes, with exact `record-base` commands for explicit reconciliation. Existing
+adapted files stay unchanged. Already recorded dependencies must remain present.
+Each file uses its origin name and the target commit's nearest `package.json`
+(read from Git objects, never the working tree or seed): `.mjs` is ESM and
+`.cjs` is CommonJS; `.js` and extensionless files follow that package's
+`"type"`. A nearest typeless package ends the search, as does `node_modules`.
+Without a recognized type, CommonJS is the default, with Node's native syntax
+detection selecting ESM for module-only syntax and lexical redeclarations of
+CommonJS wrapper parameters. Explicit `"type":"commonjs"` never uses detection.
+Only `.js`, `.mjs` and `.cjs` are inherently JavaScript. Extensionless or unknown
+names with an incoming relative import or literal `require()`, package
+`bin`/`main`/`exports` target, or Node shebang are parsed strictly: invalid
+JavaScript refuses atomically. Other unknown names are parsed tentatively in
+their decided format; valid static relative imports are followed, while a syntax
+error means the file is bytes. This preserves standalone extensionless modules
+without treating `.node-version`, `LICENSE` or `.gitignore` as broken entries.
+An incoming entry signal always restores strict refusal, including when the
+target was tentatively examined earlier. Known data formats are never parsed as
+JavaScript. Every JavaScript helper is parsed transitively. Literal `require()`
+entry signals are read from Node's bundled Acorn AST after native validation;
+they only promote selected targets and never adopt runtime dependencies.
+CommonJS is parsed as a function body with Node's five wrapper parameters using
+`vm.compileFunction`; ESM uses `vm.SourceTextModule.moduleRequests`.
+The same Node executable runs a parse-only child with `--experimental-vm-modules`
+and `--expose-internals`. It never links or evaluates source. Callers need no
+extra flag or package, including offline. For typeless inputs the CLI relies on
+Node's private `contextify.containsModuleSyntax` detector, available in Node
+22.20.0 and 26.8.1. Missing parser/detector APIs, invalid or unreadable package
+configuration, and syntax invalid for the decided format refuse the entire
+refresh before writes, naming the file and error. No content regexes or grammar
+fallbacks choose a format. These rules use Node's ordinary default flags; custom
+loader hooks and experimental default-type overrides are outside this finder.
+The detector follows [Node's syntax-detection rules](https://nodejs.org/download/release/v22.20.0/docs/api/packages.html#syntax-detection)
+through its [native parse-only implementation](https://github.com/nodejs/node/blob/v22.20.0/src/node_contextify.cc).
+Relative ESM specifiers resolve exact URL paths (including query/fragment
+removal), without suffix or directory-index searching. JSON dependencies are
+copied as terminal data files, never parsed as JavaScript; Node still enforces
+JSON import attributes and validates JSON at execution. Native `.node` addons,
+`.wasm` (including extensionless Wasm binaries) and other unsupported static
+import extensions refuse before writes: their closure is not established by
+this JavaScript finder. They are never executed to inspect dependencies.
+Strings, templates, regular expressions, comments, dynamic `import()`,
+`import.meta` and CommonJS `require()` add no static dependencies. In particular,
+relative `require()` calls are dynamic and add no closure edges. JSX and other
+syntax the running Node cannot parse in the chosen format refuse atomically.
 An absent unadapted singleton is retired from the record entirely and named in
 the `retired` output. As with absent files in directory copies, local absence is
 the removal signal; refresh does not distinguish accidental deletion from an
@@ -253,8 +325,11 @@ their selected `foundation/runtime` modules, plus companion declarations. This
 recovers required siblings even when they existed before the old pin or each
 renderer was recorded individually. New siblings go beside the importing
 renderer at its recorded destination (for example `src/base/runtime/` in Slate),
-and receive copy records. The maintained exporters already ship the complete
-runtime directory. An unrecorded dependency equal to its old Base baseline can
+and receive copy records. Refresh reports these siblings in each copy's `added`
+list; the top-level `adopted` list reports the non-runtime JavaScript graph above.
+Both dependency graphs are planned before writes. The maintained exporters
+already ship the complete runtime directory. An unrecorded dependency equal to
+its old Base baseline can
 advance too. Existing unrecorded dependencies with different seed bytes stay
 in place. Recorded edits still require explicit adaptation acknowledgement;
 acknowledged adaptations are preserved.

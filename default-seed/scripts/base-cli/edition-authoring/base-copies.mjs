@@ -13,6 +13,8 @@ import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
 import {requireMaterializedCopies} from './copy-checkout.mjs';
+import {closeImports} from './copy-imports.mjs';
+import {checkCopyDestinations} from './copy-destinations.mjs';
 import {completeRuntimeCopies} from './runtime-dependencies.mjs';
 
 export const RECORD = 'base-copies.json';
@@ -136,7 +138,7 @@ function seedFiles(root) {
 function reader(origin) {
   const source = origin.source ?? gitReader(origin.repository);
   const format = source.git('rev-parse', '--show-object-format');
-  const trees = new Map();
+  const trees = new Map(), allEntries = new Map();
   return {
     // Git object identity of local bytes, to find copies by content without reading Base blobs.
     objectId: bytes => crypto.createHash(format).update(`blob ${bytes.length}\0`).update(bytes).digest('hex'),
@@ -145,15 +147,21 @@ function reader(origin) {
         let resolved;
         try { resolved = source.git('rev-parse', '--verify', '--quiet', `${revision}^{commit}`); } catch (error) { if (origin.offline) throw error; resolved = ''; }
         if (resolved !== revision) throw Error(`Base commit ${revision} is not available. Check the full commit with git -C <base-checkout> rev-parse <tag>^{commit}, fetch it, then repeat with --base <base-checkout>`);
-        const entries = new Map();
+        const entries = new Map(), all = new Map();
         for (const entry of source.raw('ls-tree', '-rz', '--full-tree', revision).toString('utf8').split('\0').filter(Boolean)) {
           const tab = entry.indexOf('\t');
           const [mode, type, object] = entry.slice(0, tab).split(' ');
+          all.set(entry.slice(tab + 1), {object, mode, type});
           if (type === 'blob' && FILE_MODES.includes(mode)) entries.set(entry.slice(tab + 1), {object, mode});
         }
         trees.set(revision, entries);
+        allEntries.set(revision, all);
       }
       return trees.get(revision);
+    },
+    entry(revision, name) {
+      this.tree(revision);
+      return allEntries.get(revision).get(name);
     },
     // Committed Base bytes, read in bounded batches.
     blobs(objects) {
@@ -388,6 +396,8 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       const target = path.join(root, name);
       if (fs.existsSync(target) && !fs.lstatSync(target).isFile()) throw Error(`Runtime dependency is not a regular file: ${name}`);
     }});
+    const adopted = closeImports({root, record, recordPath, plans, next, read, revision, local, files});
+    checkCopyDestinations({root, plans, files, recordPath});
     // Closure may add individually recorded siblings when the seed originally
     // selected runtime files one at a time instead of copying the directory.
     record.copies = plans.map(plan => plan.copy).sort((a, b) => a.path.localeCompare(b.path));
@@ -399,7 +409,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
     const changes = [];
     for (const {copy, sources, removed} of plans) {
-      for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }
       const recorded = {}, modes = {}, added = [];
       for (const name of Object.keys(copy.adapted || {})) {
         recorded[name] = copy.files[name];
@@ -407,12 +416,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       }
       for (const [source, {object, mode}] of sources.sort(([a], [b]) => a.localeCompare(b))) {
         const name = safe(mapped(source, copy.originPath, copy.path));
-        noLinks(root, name);
         if (!Object.hasOwn(copy.files, name)) added.push(name);
-        const target = path.join(root, name);
-        fs.mkdirSync(path.dirname(target), {recursive: true});
-        fs.writeFileSync(target, bytes.get(object));
-        fs.chmodSync(target, mode === '100755' ? 0o755 : 0o644);
         recorded[name] = upstream.get(object); modes[name] = mode;
       }
       changes.push({path: copy.path, from: copy.revision, files: sources.length, added, removed});
@@ -421,7 +425,16 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     record.copies = plans.filter(plan => !plan.retired).map(plan => plan.copy);
     delete record.repository;
     validate(record);
+    for (const {copy, sources, removed} of plans) {
+      for (const name of removed) fs.rmSync(path.join(root, name), {force: true});
+      for (const [source, {object, mode}] of sources) {
+        const target = path.join(root, mapped(source, copy.originPath, copy.path));
+        fs.mkdirSync(path.dirname(target), {recursive: true});
+        fs.writeFileSync(target, bytes.get(object));
+        fs.chmodSync(target, mode === '100755' ? 0o755 : 0o644);
+      }
+    }
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, adopted, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }
 }
