@@ -201,6 +201,7 @@ test('public refresh refuses conflicting helper destinations before changing the
     const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
     write(base, 'tools/main.mjs', `import '../${left}';\n`);
     write(base, 'other/tools/second.mjs', `import '../${right}';\n`);
+    git(base, 'config', 'core.precomposeUnicode', 'false');
     git(base, 'add', '-A');
     // Preserve the exact origin spelling in Git even on normalizing filesystems.
     for (const [source, bytes] of [[left, 'export const first = true;\n'], ['other/' + right, 'export const second = true;\n']]) {

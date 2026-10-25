@@ -22,20 +22,20 @@ export function checkCopyDestinations({root, plans, files, recordPath}) {
     safe(item.name);
     const key = portable(item.name), previous = destinations.get(key);
     if (previous) conflict(previous, item);
-    destinations.set(key, item);
+    destinations.set(key, {...item, planned: true});
   }
   const removed = new Set(plans.flatMap(plan => plan.removed));
   for (const name of files.keys()) {
     if (removed.has(name)) continue;
     const item = {name, source: 'existing seed file'}, key = portable(name), planned = destinations.get(key);
-    if (planned && planned.name !== name) conflict(planned, item);
+    if (planned?.planned && planned.name !== name) conflict(planned, item);
     if (!planned) destinations.set(key, item);
   }
   // Ancestors are checked in both directions, including seed-owned leaves.
   for (const [key, item] of destinations) {
     for (let parent = path.posix.dirname(key); parent !== '.'; parent = path.posix.dirname(parent)) {
       const ancestor = destinations.get(parent);
-      if (ancestor) conflict(ancestor, item);
+      if (ancestor && (ancestor.planned || item.planned)) conflict(ancestor, item);
     }
   }
   // Perform every filesystem-shape check before the writer can change anything.
