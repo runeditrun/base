@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {execFileSync, spawnSync} from 'node:child_process';
-import {fullCaseFold} from './case-folding.mjs';
-import {destinationKey} from './copy-path-key.mjs';
+import {fullCaseFold} from '../case-folding.mjs';
+import {destinationKey} from '../copy-path-key.mjs';
 
 const env = {...process.env, GIT_OPTIONAL_LOCKS: '0'};
 export const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], {env, encoding: 'utf8', stdio: 'pipe'}).trim();
@@ -20,7 +20,7 @@ export function fixture(t, initial = {'tools/main.mjs': 'export {};\n'}, mapping
   }
   for (const [name, bytes] of Object.entries(initial)) write(base, name, bytes);
   const revision = commit(base);
-  const cli = (...args) => spawnSync(process.execPath, [path.join(import.meta.dirname, 'cli.mjs'), ...args, '--base', base], {cwd: seed, env, encoding: 'utf8'});
+  const cli = (...args) => spawnSync(process.execPath, [path.join(import.meta.dirname, '../cli.mjs'), ...args, '--base', base], {cwd: seed, env, encoding: 'utf8'});
   for (const [destination, source] of mappings) {
     for (const [name, bytes] of Object.entries(initial)) if (name === source || name.startsWith(source + '/')) {
       const target = destination + name.slice(source.length); write(seed, target, bytes);
@@ -31,7 +31,7 @@ export function fixture(t, initial = {'tools/main.mjs': 'export {};\n'}, mapping
     assert.equal(recorded.status, 0, recorded.stderr);
   }
   git(seed, 'add', 'base-copies.json'); git(seed, 'commit', '-qm', 'fixture');
-  const refresh = revision => spawnSync(process.execPath, [path.join(import.meta.dirname, '../bin/rer.mjs'), 'refresh-base', '--ref', revision, '--base', base, '--json'], {cwd: seed, env, encoding: 'utf8'});
+  const refresh = revision => spawnSync(process.execPath, [path.join(import.meta.dirname, '../../bin/rer.mjs'), 'refresh-base', '--ref', revision, '--base', base, '--json'], {cwd: seed, env, encoding: 'utf8'});
   return {base, seed, revision, cli, refresh};
 }
 export function snapshot(root) {

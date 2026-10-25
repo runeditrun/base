@@ -5,7 +5,7 @@ import path from 'node:path';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {refreshCopies} from './base-copies.mjs';
 import {hash, json} from './files.mjs';
-import {fixture, write, commit, git, snapshot, refused, collisionClasses} from './copy-planner-fixture.mjs';
+import {fixture, write, commit, git, snapshot, refused, collisionClasses} from './fixtures/copy-planner.mjs';
 
 test('refresh rejects generated full-fold destination classes and removal aliases in either order', t => {
   const {base, seed, revision} = fixture(t, {'left/old.json': '{}\n', 'right/old.json': '{}\n'}, [['initial-left', 'left'], ['initial-right', 'right']]);
