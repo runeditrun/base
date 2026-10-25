@@ -38,7 +38,7 @@ export function client(t, directory, args, options = {}) {
     await done;
     try {
       const state = JSON.parse(await readFile(join(directory, 'state.json'), 'utf8'));
-      for (const job of state.running) await stopGroup(job.owner, 30);
+      for (const job of state.running) await stopGroup(job.owner, 30, job.membership);
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
   });
   return { child, done };

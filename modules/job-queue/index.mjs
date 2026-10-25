@@ -37,7 +37,7 @@ export async function createQueue(options = {}) {
       for (const job of state[key]) {
         if (await alive(job.owner)) kept.push(job);
         else {
-          if (key === 'running') await stopGroup(job.owner, config.killGraceMs);
+          if (key === 'running') await stopGroup(job.owner, config.killGraceMs, job.membership);
           if (job.owner.socket) await unlink(job.owner.socket).catch(error => { if (error.code !== 'ENOENT') throw error; });
         }
       }

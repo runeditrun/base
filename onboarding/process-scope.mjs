@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
-import { extensionMs, inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
+import { isExited, inspectionMs, readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
+import { commandFailure } from './failures.mjs'
 
 const execute = promisify(execFile)
 const scopes = new WeakMap()
@@ -35,9 +36,8 @@ export function processScopeEnvironment(scope, environment) {
 }
 export async function scopedProcesses(scope, table, timeout = inspectionMs, previous = []) {
   if (!scopes.has(scope)) throw new Error('Unknown process scope.')
-  // Reading environments is the slowest inspection on a busy Mac; it shares
-  // process-table's bounded extension rather than failing at the ordinary bound.
-  const inspectionEnd = Date.now() + timeout + extensionMs
+  // Environment discovery shares one bound across all candidates.
+  const inspectionEnd = Date.now() + Math.min(timeout, inspectionMs)
   // Inspect same-user candidates in one bounded call. A child can change cwd,
   // detach and lose its parent between captures; the exclusive inherited marker
   // still proves ownership. Arguments/environment never leave this function.
@@ -50,7 +50,7 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
   // a fork. Known owners (including exec transitions) are always reinspected;
   // their descendants are independently discovered by ancestry as well.
   const candidates = table.filter(member => !excluded?.has(birthKey(member))
-    && (!unmarked.has(birthKey(member)) || previous.some(saved => sameBirth(saved, member))) && !member.state?.startsWith('Z')
+    && (!unmarked.has(birthKey(member)) || previous.some(saved => sameBirth(saved, member))) && !isExited(member)
     && (member.uid === undefined || member.uid === process.getuid())
 )
   if (!candidates.length) return []
@@ -72,7 +72,7 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
         // Reconcile the same birth inside this bounded inspection; never treat
         // a transient read error as foreign ownership or completed cleanup.
         const current = await readProcessIdentity(member.pid, Math.max(1, inspectionEnd - Date.now()))
-        if (!sameBirth(current, member) || current.state.startsWith('Z')) continue inspectCandidate
+        if (!sameBirth(current, member) || isExited(current)) continue inspectCandidate
         if (Date.now() < inspectionEnd && (process.platform !== 'linux' || ['ENOENT', 'ESRCH'].includes(error.code))) {
           // The same live birth is still between images (fork/exec) or being
           // reaped. Wait for its environment to become readable, up to the
@@ -81,7 +81,7 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
           if (process.platform !== 'linux') for (const [pid, text] of await readEnvironments([member.pid], Math.max(1, inspectionEnd - Date.now()))) environments.set(pid, text)
           continue
         }
-        throw new Error(`Could not inspect ownership of process ${member.pid} (${error.code ?? 'missing'}, state ${current.state}).`)
+        throw commandFailure(`Could not inspect ownership of process ${member.pid}. Process inspection is unchecked.`, { ownershipUnchecked: true })
       }
     }
     if (environment.split(/[\0\s]+/).some(value => value.startsWith(marker + '=')
@@ -100,12 +100,13 @@ export async function scopedProcesses(scope, table, timeout = inspectionMs, prev
 async function readEnvironments(pids, timeout) {
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['eww', '-p', pids.join(','), '-o', 'pid=', '-o', 'command='], { timeout, maxBuffer: 16 * 1024 * 1024 }))
+    ({ stdout } = await execute('/bin/ps', ['eww', '-p', pids.join(','), '-o', 'pid=', '-o', 'command='], { timeout: Math.min(timeout, inspectionMs), killSignal: 'SIGKILL', maxBuffer: 16 * 1024 * 1024 }))
   } catch (error) {
     // ps may lose a candidate while it enumerates. Keep partial private output
     // only for that exit code; each missing identity is checked by the caller.
-    if (error.code === 1 && typeof error.stdout === 'string') stdout = error.stdout
-    else throw new Error('Could not inspect scoped process ownership.')
+    if (error.code === 1 && !error.killed && !error.signal && typeof error.stdout === 'string'
+      && typeof error.stderr === 'string' && !error.stderr.trim()) stdout = error.stdout
+    else throw commandFailure('Could not inspect scoped process ownership. Process inspection is unchecked.', { ownershipUnchecked: true })
   }
   const environments = new Map()
   for (const line of stdout.split('\n')) {

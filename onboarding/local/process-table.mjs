@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { execFile } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
 import { promisify } from 'node:util'
+import { commandFailure } from '../failures.mjs'
 
 const execute = promisify(execFile)
 export const validPid = (pid) => Number.isSafeInteger(pid) && pid > 0 && pid <= 0x7fffffff
@@ -66,6 +67,7 @@ async function processGroup(pgid, signal, deadline) {
 export async function readOwnedGroup(pgid, timeout = 1000) {
   if (!validPid(pgid)) throw new Error('Invalid owned process group.')
   if (!(timeout > 0)) throw new Error('Process inspection deadline expired.')
+  timeout = Math.min(timeout, 3000)
   const controller = new AbortController()
   let timer
   try {
@@ -75,7 +77,8 @@ export async function readOwnedGroup(pgid, timeout = 1000) {
         reject(new Error('Process inspection deadline expired.'))
       }, timeout)
     })])
-  } finally { clearTimeout(timer) }
+  } catch { throw unchecked() }
+  finally { clearTimeout(timer) }
 }
 
 export const sameProcess = (left, right) => left?.pid === right?.pid
@@ -87,28 +90,45 @@ export const sameProcess = (left, right) => left?.pid === right?.pid
 // Returns undefined when no process has this PID.
 export async function processStart(pid) {
   if (!validPid(pid)) throw new Error('Invalid process identity.')
+  let timer
+  try {
+    return await Promise.race([inspectStart(pid), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(unchecked()), 3000)
+    })])
+  } catch { throw unchecked() }
+  finally { clearTimeout(timer) }
+}
+
+const unchecked = () => commandFailure('Process inspection is unchecked: local process metadata could not be read within its bound. No unverified process was signalled.', { ownershipUnchecked: true })
+
+async function inspectStart(pid) {
   if (process.platform === 'linux') {
     let text
-    try { text = await readFile(`/proc/${pid}/stat`, 'utf8') } catch (error) {
+    try { text = await readFile(`/proc/${pid}/stat`, { encoding: 'utf8', signal: AbortSignal.timeout(3000) }) } catch (error) {
       if (error.code === 'ENOENT' || error.code === 'ESRCH') return undefined
       throw error
     }
     const fields = text.slice(text.lastIndexOf(')') + 2).trim().split(/\s+/)
     if (!/^\d+$/.test(fields[19] ?? '')) throw new Error('Invalid process identity.')
+    if (/^[ZX]$/i.test(fields[0])) return undefined
     return `linux:${fields[19]}`
   }
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['-o', 'lstart=', '-p', String(pid)], {
-      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, killSignal: 'SIGKILL', timeout: 5000,
+    ({ stdout } = await execute('/bin/ps', ['-o', 'lstart=', '-o', 'stat=', '-p', String(pid)], {
+      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, killSignal: 'SIGKILL', timeout: 3000,
     }))
   } catch (error) {
     // ps exits 1 when the PID does not exist.
-    if (error.code === 1 && !String(error.stdout ?? '').trim()) return undefined
+    if (error.code === 1 && !error.killed && !error.signal && typeof error.stdout === 'string'
+      && typeof error.stderr === 'string' && !error.stdout.trim() && !error.stderr.trim()) return undefined
     throw error
   }
   if (!stdout.trim()) return undefined
-  const started = Date.parse(`${stdout.trim()} UTC`)
+  const match = stdout.trim().match(/^(.{24})\s+(\S+)$/)
+  if (!match) throw new Error('Invalid process identity.')
+  if (/^[ZX]/i.test(match[2])) return undefined
+  const started = Date.parse(`${match[1]} UTC`)
   if (!Number.isFinite(started)) throw new Error('Invalid process identity.')
   return `ps:${started}`
 }

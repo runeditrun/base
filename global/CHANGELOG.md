@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Treat zombie and dead owned processes as completed during setup, dev and resume cleanup, without signalling or waiting for them. Keep live descendant escalation and birth checks, verify group identity immediately before each signal, preserve locks when owner inspection is unavailable, and report bounded inspection failures as unchecked, including failed resume inspections. Queue cleanup requires readable identity metadata and observes completion after SIGKILL before releasing its reservation. A job group whose supervisor is gone is signalled only while every live member carries that job's `RER_JOB_MEMBERSHIP` token, checked before TERM and again before KILL; otherwise nothing is signalled, the cleanup reports unchecked and the reservation is kept until the group ends.
 - Add signed runtime Business settings, same-origin logos, app accent fills, local overrides and owner-scoped team reconciliation. The reference seed adopts the module; owners can stop settings with fresh sign-in proof.
 - Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo without an unjournaled failure fence. Restore exact retained-value and complete catch-up undo report checks.
 - Keep demo Run exits out of the host layout; use spare label space, truncate the exit itself and reveal its full accessible link on keyboard focus without moving header controls.

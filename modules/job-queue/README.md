@@ -106,13 +106,25 @@ sample. Ordinary client shutdown therefore cannot abort another queued command.
 A reservation initially belongs to its calling process. A separate detached
 supervisor establishes its process group and transfers its identity into the
 lease **before** receiving permission to spawn the command under `nice -n 15`.
-The command and ordinary descendants inherit that group. Normal command exit,
-SIGINT or SIGTERM triggers TERM to the entire group, followed by KILL after the
-grace interval, then releases the slot. IPC loss tells the supervisor to stop
-its group if the caller is killed. If the supervisor itself is killed, the next
-queue operation kills remaining group members before reclaiming the lease.
-PID reuse never authorizes killing a replacement group. POSIX keeps group IDs
-reserved while old group members exist ([process ID reuse](https://pubs.opengroup.org/onlinepubs/009696699/basedefs/xbd_chap04.html)).
+The command and ordinary descendants inherit that group and the lease's
+`RER_JOB_MEMBERSHIP` token. Normal command exit, SIGINT or SIGTERM triggers TERM
+to the entire group, followed by KILL after the grace interval, then releases
+the slot. IPC loss tells the supervisor to stop its group if the caller is
+killed. While the supervisor lives, or remains as an unreaped zombie, it holds
+the group ID: POSIX keeps group IDs reserved while old group members exist
+([process ID reuse](https://pubs.opengroup.org/onlinepubs/009696699/basedefs/xbd_chap04.html)).
+Its recorded start time and title are checked before every TERM and KILL, and a
+replacement leader is never signalled. Once the supervisor is gone (killed, or a
+reservation left behind by a crashed client), its group ID proves nothing: an
+unrelated leaderless group may hold it. Cleanup, by the caller or by the next
+queue operation, then signals the group only when every live member carries the
+lease's token in its launch environment, checked again immediately before TERM
+and before KILL. Any other live member (another token, none, or an environment
+that cannot be read) means no signal at all: the operation fails as unchecked
+and keeps the reservation until that group ends. macOS shows another process's
+environment only through `ps`, and hides it for Apple platform binaries such as
+`/bin/sh` and for processes that change their title; such members always leave
+this cleanup unchecked.
 Node's [detached child option](https://nodejs.org/api/child_process.html#optionsdetached)
 establishes the supervisor's new group and session on these platforms.
 

@@ -56,7 +56,7 @@ export async function execute(command, job, config, adopt, signal, onStarted, op
       // time and unique marker protect against a replacement group leader.
       try { await options.cleanup?.(child,outcome); }
       finally {
-        if (owner) await stopGroup(owner, config.killGraceMs);
+        if (owner) await stopGroup(owner, config.killGraceMs, job.membership);
         else child.kill('SIGKILL'); // The supervisor has not been given GO.
       }
       // Its group is stopped; output still arriving on a dead supervisor's pipes
