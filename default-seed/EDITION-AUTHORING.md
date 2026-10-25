@@ -43,9 +43,12 @@ relative imports and exports, including side-effect imports, transitively up to
 64 levels inside the original copied origin directory tree. It copies missing
 helpers and reports them under `adopted`, recording separate file entries in
 `base-copies.json` while preserving the existing per-file mapping. Already
-recorded dependencies must remain present. Unrecorded imports outside that origin tree,
-missing, deleted or kept-out dependencies, adapted importers with missing
-dependencies, and destination collisions refuse before any writes and name exact
+recorded dependencies must remain present. A dependency already delivered by another
+copy mapping, an acknowledged adaptation, or regular seed-owned source satisfies
+the import. Seed-owned source is preserved and its actual static imports are
+checked; its missing dependencies require explicit reconciliation. Unrecorded
+imports outside that origin tree, missing, deleted or kept-out dependencies and
+adapted importers with missing dependencies refuse before any writes and name exact
 `record-base` commands for explicit reconciliation. Existing adapted files are
 retained unchanged.
 Each file uses its origin name and the target commit's nearest `package.json`
@@ -55,7 +58,11 @@ Each file uses its origin name and the target commit's nearest `package.json`
 Without a recognized type, CommonJS is the default, with Node's native syntax
 detection selecting ESM for module-only syntax and lexical redeclarations of
 CommonJS wrapper parameters. Explicit `"type":"commonjs"` never uses detection.
-Every JavaScript helper, including extensionless helpers, is parsed transitively.
+Only `.js`, `.mjs` and `.cjs` are inherently JavaScript. Extensionless or unknown
+names are code only as imported helpers, package `bin`/`main`/`exports` targets,
+or Node shebang entries. Unreferenced documents such as `.node-version`, `LICENSE`
+and `.gitignore` are copied as bytes. Known data formats are never parsed as
+JavaScript. Every JavaScript helper is parsed transitively.
 CommonJS is parsed as a function body with Node's five wrapper parameters using
 `vm.compileFunction`; ESM uses `vm.SourceTextModule.moduleRequests`.
 The same Node executable runs a parse-only child with `--experimental-vm-modules`
