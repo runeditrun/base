@@ -73,8 +73,10 @@ const STYLE = 'main{max-width:840px;margin:0 auto;padding:0 56px 64px}body:has(>
   + '.walk>li::before{content:counter(walk);position:absolute;left:0;top:-3px;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--site-accent);color:var(--site-accent-ink);font:600 17px/1 var(--rer-font-heading,var(--rer-font-body,inherit))}'
   + 'p code,li code{padding:.08em .32em;border-radius:6px;background:color-mix(in srgb,var(--site-ink) 7%,transparent);font:500 .9em var(--site-mono);color:var(--site-ink)}.code-word{white-space:nowrap}'
   + '.code{position:relative;container-type:inline-size;margin-top:14px;border-radius:12px;background:var(--rer-code-background,var(--site-ink));color:var(--rer-code-text,var(--rer-page,#f3f5f8))}'
-  + '.code pre{margin:0;padding:16px 104px 16px 20px;font:500 15px/1.7 var(--site-mono);white-space:pre-wrap;overflow-wrap:anywhere}.code pre code,.output pre code{padding:0;border-radius:0;background:none;font:inherit;color:inherit}'
-  + '.output{margin-top:14px;border-radius:12px;background:color-mix(in srgb,var(--site-ink) 6%,transparent)}.output pre{margin:0;padding:14px 20px;font:500 15px/1.7 var(--site-mono);color:var(--site-ink);white-space:pre-wrap;overflow-wrap:anywhere}'
+  + '.code pre{margin:0;padding:16px 104px 16px 20px;font:500 15px/1.7 var(--site-mono)}.code pre code,.output pre code{padding:0;border-radius:0;background:none;font:inherit;color:inherit}'
+  + '.output{margin-top:14px;border-radius:12px;background:color-mix(in srgb,var(--site-ink) 6%,transparent)}.output pre{margin:0;padding:14px 20px;font:500 15px/1.7 var(--site-mono);color:var(--site-ink)}'
+  // A seed theme can outrank .code pre (Buoy keeps a command on one line on phones), so the walkthrough's own classes keep every block wrapping.
+  + '.diy .walk .code pre,.diy .walk .output pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:visible}'
   + '.copy{position:absolute;top:10px;right:10px;min-height:34px;padding:0 14px;border:1px solid color-mix(in srgb,currentColor 35%,transparent);border-radius:999px;background:transparent;color:inherit;font:500 14px/1 var(--rer-font-body,inherit);cursor:pointer}'
   + '.copy:hover{background:color-mix(in srgb,currentColor 12%,transparent)}.copy:focus-visible{outline-color:var(--rer-code-text,var(--rer-page,#f3f5f8))}'
   + '@container (max-width:560px){.code pre{padding:52px 16px 14px;font-size:14px}}'

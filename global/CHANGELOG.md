@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Replace the shared Run page with a three-way chooser, exact one-line Copy, listing-aware Assisted and Managed links, and a shared sign-up switch for the hosting guide; keep the command wrapping under adopted seed themes and document the supported paths migration.
+- Replace the shared Run page with a three-way chooser, exact one-line Copy, listing-aware Assisted and Managed links, and a shared sign-up switch for the hosting guide; keep the Run and hosting guide commands wrapping under adopted seed themes and document the supported paths migration.
 
 ## 0.2.80
 

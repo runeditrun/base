@@ -153,8 +153,10 @@ test('built run-site uses US dates and keeps the one-line command start together
 
 test('built run site writes /docs/hosting from the seed\'s own declarations, Run Edit Run first', async t => {
  const f = await seed(t);
- const runData = join(f.root, 'src/site/run.ts'), declaration = join(f.root, 'deploy.json');
+ const runData = join(f.root, 'src/site/run.ts'), declaration = join(f.root, 'deploy.json'), theme = join(f.root, 'public/rer-theme.css');
  await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy'));
+ // A seed theme can outrank the page's own rules for Base's command blocks, as Buoy's keeps a command on one line on phones.
+ await writeFile(theme, await readFile(theme, 'utf8') + 'body:has(> header.bar) .code pre { white-space: pre; overflow-x: auto; overflow-wrap: normal; }\n');
  const declared = JSON.parse(await readFile(declaration, 'utf8'));
  let result = await f.build();
  assert.equal(result.code, 0, result.stdout + result.stderr);
