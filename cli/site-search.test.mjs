@@ -81,7 +81,7 @@ test('static docs search builds without network, reindexes changed headings, nav
    if (firstBytes) assert.equal(bytes,firstBytes,'unchanged input produces identical static index bytes');
    firstBytes=bytes;
    if (argv.includes('--dry-run')) {
-    const plan=JSON.parse(result.stdout.trim().split('\n').at(-1)).result.site;
+    const plan=JSON.parse(result.stdout.trim().split('\n').at(-1)).site;
     assert.deepEqual(plan.bindings,['ASSETS']);
     assert.equal(plan.runtime.endpoint,'/docs-search-index.json');
     assert.equal(plan.runtime.bytes,Buffer.byteLength(bytes));
