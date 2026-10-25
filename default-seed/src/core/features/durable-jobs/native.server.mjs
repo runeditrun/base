@@ -1,11 +1,10 @@
-import { processInfo } from '../../../../../modules/job-queue/processes.mjs';
-import { nativeDatabase } from '../../../../../modules/durable-jobs/native.mjs';
 import { nativeRefusal, referenceConfiguration, withReferenceDatabase } from './native-store.server.mjs';
 
 async function runtime(root, signal, readOnly, run) {
   const configuration = await referenceConfiguration(root);
   if (!configuration) throw nativeRefusal('job_reference_not_configured');
   return withReferenceDatabase(root, { readOnly, signal }, async sqlite => {
+    const { nativeDatabase } = await import('../../../../../modules/durable-jobs/native.mjs');
     const { createReferenceSalesJobs } = await import('./runtime.server.ts');
     const { safeJob } = await import('../../../../../modules/durable-jobs/index.ts');
     const database = nativeDatabase(sqlite);
@@ -74,6 +73,7 @@ export const nativeReferenceJobs = {
       if (control?.holder && control.holder !== holder) {
         const match = /^(\d+):(.+)$/s.exec(control.holder);
         if (!match) throw nativeRefusal('job_runner_custody_unknown');
+        const { processInfo } = await import('../../../../../modules/job-queue/processes.mjs');
         const previous = await processInfo(Number(match[1]));
         if (previous && !previous.zombie && previous.start === match[2]) throw nativeRefusal('job_runner_active');
         replaceHolder = control.holder;
