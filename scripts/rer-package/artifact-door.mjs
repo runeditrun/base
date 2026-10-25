@@ -40,8 +40,8 @@ export async function doorSmoke(entry) {
    assert.equal(uploaded.status, 200, JSON.stringify(uploaded.body));
    assert.equal(uploaded.body.intake.sanitized, true);
   }
-  const malformed = await call('uploads', 'id,name\np1,"unfinished', { 'Content-Type': 'application/octet-stream', 'X-Import-Format': 'csv' });
-  assert.equal(malformed.status, 422); assert.equal(malformed.body.error, 'intake_malformed_row');
+  const malformed = await call('uploads', 'id,name\np1,"unfinished', { 'Content-Type': 'application/octet-stream', 'X-Import-Format': 'csv', 'X-Import-Name': 'malformed-export' });
+  assert.equal(malformed.status, 422, JSON.stringify(malformed.body)); assert.equal(malformed.body.error, 'intake_malformed_row');
   const plan = await json('plan', { uploadId: uploaded.body.uploadId });
   assert.equal(plan.status, 200, JSON.stringify(plan.body));
   const refused = await json('apply', { planId: plan.body.planId, reviewedFingerprint: '0'.repeat(64) });

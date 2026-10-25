@@ -20,13 +20,14 @@ export function refreshSmoke({ root, installed, base, ref, run, output }) {
  writeFileSync(join(output, 'base-copies.json'), recordBytes);
  // Both supported entries must work. The refreshed local CLI must have every
  // sibling it imports, without borrowing a helper from the installed package.
+ const helper = 'scripts/edition-authoring/runtime-dependencies.mjs';
+ run(process.execPath, ['--input-type=module', '-e', 'await import(process.argv[1])', join(seed, helper)], { cwd: seed });
  const local = join(seed, 'scripts/edition-authoring/cli.mjs');
  const verified = JSON.parse(run(process.execPath, [local, 'verify-base', '--base', base], { cwd: seed }));
  const packaged = JSON.parse(run(process.execPath, [cli, 'verify-base', '--base', base], { cwd: seed }));
  for (const result of [verified, packaged]) {
   assert.equal(result.ok, true); assert.deepEqual(result.drift, []); assert.deepEqual(result.unrecordedCopies, []);
  }
- const helper = 'scripts/edition-authoring/runtime-dependencies.mjs';
  const copy = record.copies.find(copy => Object.hasOwn(copy.files, helper));
  assert.ok(copy, 'refreshed helper has a source record');
  assert.equal(copy.originPath, 'edition-authoring/runtime-dependencies.mjs');

@@ -51,15 +51,18 @@ export async function artifactSmoke(tarball, { base = resolve(import.meta.dirnam
   }
   await check('import-kit/door + d1', async () => {
    const entry = join(root, 'entry.mjs');
-   await build({ absWorkingDir: root, stdin: { contents: "export * as door from '@runeditrun/rer/modules/import-kit/door'; export * as d1 from '@runeditrun/rer/modules/import-kit/d1';", resolveDir: root },
+   const bundled = await build({ absWorkingDir: root, stdin: { contents: "export * as door from '@runeditrun/rer/modules/import-kit/door'; export * as d1 from '@runeditrun/rer/modules/import-kit/d1';", resolveDir: root },
     outfile: entry, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent', metafile: true });
+   const modules = Object.keys(bundled.metafile.inputs).filter(name => name !== '<stdin>');
+   assert.ok(modules.every(name => name.startsWith('node_modules/@runeditrun/rer/')), 'runtime must come only from the installed package');
+   writeFileSync(join(output, 'door-modules.json'), JSON.stringify(modules, null, 2) + '\n');
    writeFileSync(join(root, 'types.mts'), "import type { ImportDoorIntake, ImportOperatorOptions } from '@runeditrun/rer/modules/import-kit/door';\nimport type { D1Database } from '@runeditrun/rer/modules/import-kit/d1';\nexport type PublicTypes = [ImportDoorIntake, ImportOperatorOptions, D1Database];\n");
    run(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--strict', '--skipLibCheck', '--allowImportingTsExtensions', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', '--lib', 'ES2023,DOM', join(root, 'types.mts')]);
    return doorSmoke(entry);
   });
   await check('edition-authoring', () => refreshSmoke({ root, installed, base, ref, run, output }));
   const bytes = readFileSync(tarball), manifest = JSON.parse(readFileSync(join(installed, 'package.json')));
-  const report = { version: manifest.version, tarball, sha256: createHash('sha256').update(bytes).digest('hex'),
+  const report = { version: manifest.version, node: process.version, tarball, sha256: createHash('sha256').update(bytes).digest('hex'),
    source: { commit: ref, tree: execFileSync('git', ['-C', base, 'rev-parse', ref + '^{tree}'], { encoding: 'utf8' }).trim() }, surfaces, results };
   writeFileSync(join(output, 'artifact.json'), JSON.stringify(report, null, 2) + '\n');
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
