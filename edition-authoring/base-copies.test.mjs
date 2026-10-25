@@ -309,6 +309,7 @@ test('refresh-base checks file and directory transitions after each plan removes
       ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
       ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
       fs.rmSync(path.join(base, 'modules/sample', from));
+      git(base, 'rm', '--cached', '--', `modules/sample/${from}`);
       // Git does not track the now-empty source directories.
       if (from.includes('/')) fs.rmSync(path.join(base, 'modules/sample', from.split('/')[0]), {recursive: true});
       write(base, `modules/sample/${to}`, 'new transition file\n');
@@ -327,6 +328,7 @@ test('refresh-base checks file and directory transitions after each plan removes
         assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', from), 'utf8'), 'old transition file\n');
       } else {
         assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', to), 'utf8'), 'new transition file\n');
+        if (from !== to && from.toLowerCase() === to.toLowerCase()) git(seed, 'rm', '--cached', '--', `vendor/sample/${from}`);
         git(seed, 'add', '-A');
         // On insensitive filesystems mkdir reuses the old directory spelling.
         // Refresh supports that existing behavior; it does not rename directories.
