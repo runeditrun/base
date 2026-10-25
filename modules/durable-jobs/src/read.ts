@@ -36,16 +36,22 @@ export async function list(context: Context, filters: { kind?: string; state?: s
 export async function status(context: Context, authority: Authority) {
   await context.schema(); context.scope(authority);
   insist(await context.policy.authorizeScope(authority), 'job_not_found', 404);
+  // Keep the live held cohort disjoint from the aggregate even when another
+  // consumer changes a job's state between reads. Never subtract a later row
+  // from an earlier snapshot's counts.
+  const waiting = await context.database.all<Row>(sql(`SELECT j.* FROM rer_job_jobs j JOIN rer_job_control c ON c.installation_id=j.installation_id AND c.mode='running'
+    JOIN rer_job_activations a ON a.installation_id=j.installation_id AND a.job_id=j.id AND a.epoch=c.epoch AND a.principal_id=j.principal_id AND a.owner_id=j.owner_id
+    WHERE j.installation_id=? AND j.namespace=? AND j.tenant_key=? ${authority.operator ? '' : 'AND j.principal_id=?'} AND j.state='waiting'`, context.installationId, authority.namespace, authority.tenantId ?? '', ...(authority.operator ? [] : [authority.principalId])));
   // Aggregate indexed scope metadata, never the unbounded history payloads.
   const rows = await context.database.all<{ state: string; reason: string | null; n: number; oldest: number | null }>(sql(`
     WITH scoped AS (SELECT j.state,j.reason_code,j.created_at,j.not_before,
       CASE WHEN a.job_id IS NULL THEN 0 ELSE 1 END AS active,c.mode
       FROM rer_job_jobs j LEFT JOIN rer_job_control c ON c.installation_id=j.installation_id
       LEFT JOIN rer_job_activations a ON a.installation_id=j.installation_id AND a.job_id=j.id AND a.epoch=c.epoch AND a.principal_id=j.principal_id AND a.owner_id=j.owner_id
-      WHERE j.installation_id=? AND j.namespace=? AND j.tenant_key=? ${authority.operator ? '' : 'AND j.principal_id=?'}),
+      WHERE j.installation_id=? AND j.namespace=? AND j.tenant_key=? ${authority.operator ? '' : 'AND j.principal_id=?'} AND j.id NOT IN (SELECT value FROM json_each(?))),
     effective AS (SELECT CASE WHEN state IN ('succeeded','failed','cancelled','uncertain') THEN state WHEN active=0 OR mode<>'running' THEN 'waiting' ELSE state END AS state,
       CASE WHEN state IN ('succeeded','failed','cancelled','uncertain') THEN reason_code WHEN active=0 THEN 'restored_requires_reauthorization' WHEN mode<>'running' THEN 'scheduler_unconfigured' ELSE reason_code END AS reason,created_at,not_before FROM scoped)
-    SELECT state,reason,count(*) AS n,MIN(CASE WHEN state='queued' AND not_before<=? THEN created_at END) AS oldest FROM effective GROUP BY state,reason`, context.installationId, authority.namespace, authority.tenantId ?? '', ...(authority.operator ? [] : [authority.principalId]), context.now()));
+    SELECT state,reason,count(*) AS n,MIN(CASE WHEN state='queued' AND not_before<=? THEN created_at END) AS oldest FROM effective GROUP BY state,reason`, context.installationId, authority.namespace, authority.tenantId ?? '', ...(authority.operator ? [] : [authority.principalId]), JSON.stringify(waiting.map(row => row.id)), context.now()));
   const counts: Record<string, number> = {}; const held: Record<string, number> = {};
   let oldest: number | null = null;
   for (const row of rows) {
@@ -53,13 +59,8 @@ export async function status(context: Context, authority: Authority) {
     if (row.state === 'waiting' && row.reason) held[row.reason] = (held[row.reason] ?? 0) + Number(row.n);
     if (row.oldest !== null) oldest = oldest === null ? Number(row.oldest) : Math.min(oldest, Number(row.oldest));
   }
-  const waiting = await context.database.all<Row>(sql(`SELECT j.* FROM rer_job_jobs j JOIN rer_job_control c ON c.installation_id=j.installation_id AND c.mode='running'
-    JOIN rer_job_activations a ON a.installation_id=j.installation_id AND a.job_id=j.id AND a.epoch=c.epoch AND a.principal_id=j.principal_id AND a.owner_id=j.owner_id
-    WHERE j.installation_id=? AND j.namespace=? AND j.tenant_key=? ${authority.operator ? '' : 'AND j.principal_id=?'} AND j.state='waiting'`, context.installationId, authority.namespace, authority.tenantId ?? '', ...(authority.operator ? [] : [authority.principalId])));
   for (const row of waiting) {
     const job = await context.job(row);
-    counts.waiting--;
-    if (row.reason_code) { const reason = String(row.reason_code); if (--held[reason] === 0) delete held[reason]; }
     counts[job.state] = (counts[job.state] ?? 0) + 1;
     if (job.state === 'waiting' && job.reasonCode) held[job.reasonCode] = (held[job.reasonCode] ?? 0) + 1;
     if (job.state === 'queued' && job.notBefore <= context.now()) oldest = oldest === null ? job.createdAt : Math.min(oldest, job.createdAt);
