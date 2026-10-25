@@ -340,7 +340,8 @@ the exact serving version.
 
 Ranking uses heading/title/path boosts, Porter stemming, word prefixes and
 at most one edit for words of four or more letters, plus phrase proximity.
-A relevance floor requires most query topic terms, including unknown terms.
+A relevance floor uses corpus-weighted topic coverage and rejects unrecognized
+topics instead of matching only their surrounding grammar.
 Nonsense and uncovered topics return “No results”. Lexical search cannot
 reliably infer paraphrases that share no words or stems with the docs, or
 answer a task the docs do not describe. Required fixed queries and diagnostics
