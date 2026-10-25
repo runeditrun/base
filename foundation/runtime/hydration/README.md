@@ -117,7 +117,8 @@ The check requires every server Suspense boundary to finish hydration or leave
 React's committed tree through a React update. Deleting its DOM imperatively does
 not complete hydration: the legacy `removed` control and an `empty-unresolved`
 boundary time out. React removing an adopted node, including in a layout effect,
-is supported. The probe's 20-second settlement and 30-second load deadlines are
+is supported. A boundary still showing its client fallback after abandoning hydration is
+also incomplete, even though its dehydrated marker is gone. The probe's 20-second settlement and 30-second load deadlines are
 unchanged.
 
 At settlement, the check follows the body's `__reactFiber$` attachment to the

@@ -13,15 +13,18 @@ export function ownership(snapshot, counted) {
    ancestors.add(root); root = root.return;
   }
   root = root.stateNode?.current;
-  if (root?.tag !== 3 || typeof root.memoizedState?.isDehydrated !== 'boolean') return { pending: 1, error: unavailable };
+  if (root?.tag !== 3 || !root.stateNode?.containerInfo || typeof root.memoizedState?.isDehydrated !== 'boolean') return { pending: 1, error: unavailable };
   let pending = root.memoizedState.isDehydrated ? 1 : 0, bodyOwned = false;
   const owned = new WeakSet(), raw = new WeakSet(), seen = new Set();
   const stack = [[root, root.stateNode.containerInfo, false]];
   while (stack.length) {
    const [node, parent, inBody] = stack.pop();
-   if (seen.has(node) || typeof node.tag !== 'number' || !('memoizedState' in node)) return { pending: 1, error: unavailable };
+   if (seen.has(node) || typeof node.tag !== 'number' || !('memoizedState' in node) || !('child' in node) || !('sibling' in node)) return { pending: 1, error: unavailable };
    seen.add(node);
-   if (node.memoizedState?.dehydrated) pending++;
+   // A server boundary can abandon hydration for a client retry. Its
+   // dehydrated marker is then null, but its suspended state is still present:
+   // rendering the fallback has not completed that boundary.
+   if (node.tag === 13 && node.memoizedState !== null) pending++;
    let childParent = parent, childInBody = inBody;
    if (node.tag === 4) { // HostPortal: its container is the host parent, even in a shadow root.
     childParent = node.stateNode?.containerInfo;

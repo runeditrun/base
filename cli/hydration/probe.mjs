@@ -21,8 +21,7 @@ export function probe(config, ownership) {
  const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/, ADDRESS = '.__cf_email__,a[href*="/cdn-cgi/l/email-protection"]';
  const inserted = new WeakSet(), tracked = new WeakMap(), watch = new Set();
  const now = () => Math.round(performance.now() * 10) / 10;
- const own = (el, prefix) => { for (const key of Object.keys(el)) if (key.startsWith(prefix)) return el[key]; return undefined; };
- const fiber = el => own(el, '__reactFiber$') !== undefined;
+ const fiber = el => Object.keys(el).some(key => key.startsWith('__reactFiber$'));
  const counted = el => !SKIP.has(el.tagName) && !inserted.has(el);
  const kids = el => [...el.children].filter(counted);
  const keyOf = el => {
