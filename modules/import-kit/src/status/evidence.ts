@@ -1,7 +1,7 @@
 import { receiptSha256 as sha256 } from '../receipt/encoding.ts';
 import { verifyImporterVerificationReceipt } from '../receipt/index.ts';
 import type { ImporterVerificationReceipt } from '../receipt/types.ts';
-import { asciiLowerCase, isAsciiHostname, splitAuthority, splitUri } from '../receipt/uri.ts';
+import { isAsciiHostname, splitAuthority, splitUri } from '../receipt/uri.ts';
 import type {
   ImporterEvidenceArtifact,
   ImporterEvidencePort,
@@ -20,6 +20,7 @@ const maximumEvidenceBytes = 8 * 1024 * 1024;
 // overflows V8's regexp backtrack stack.
 const registeredName = /^[A-Za-z0-9._~!$&'()*+,;=%-]*$/;
 const strayPercent = /%(?![0-9A-Fa-f]{2})/;
+const nonAscii = /[^\x00-\x7f]/;
 
 export async function validateImporterEvidence(
   records: ImporterRecord[],
@@ -130,13 +131,41 @@ function readLink(text: string): { scheme: string; userinfo?: string; host?: str
 /** Names as URL searchParams decodes them (application/x-www-form-urlencoded): `+` is a space, then UTF-8 `%XX` bytes. */
 function queryKeys(query: string): string[] {
   const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
-  return query.split('&').filter(Boolean).map((pair) => pair.split('=', 1)[0]!.replaceAll('+', ' ')
-    .replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) => decoder.decode(Uint8Array.from(run.slice(1).split('%'), (hex) => parseInt(hex, 16)))));
+  return query.split('&').filter(Boolean).map((pair) => {
+    const name = pair.split('=', 1)[0]!.replaceAll('+', ' ');
+    return name.includes('%') ? decoder.decode(percentDecode(name)) : name;
+  });
 }
 
+/**
+ * The URL Standard's percent-decode of the text's UTF-8 bytes, in one pass. A global replace with a callback lists
+ * every match first, and V8 aborts the process when that list passes about 2^26 entries.
+ */
+function percentDecode(text: string): Uint8Array {
+  const bytes = new TextEncoder().encode(text);
+  let length = 0;
+  for (let index = 0; index < bytes.length; index += 1) {
+    const high = bytes[index] === 0x25 ? hexValue(bytes[index + 1]) : -1;
+    const low = high < 0 ? -1 : hexValue(bytes[index + 2]);
+    if (low < 0) bytes[length++] = bytes[index]!;
+    else { bytes[length++] = high * 16 + low; index += 2; }
+  }
+  return bytes.subarray(0, length);
+}
+
+/** 0-15 for the byte of an ASCII hex digit, otherwise -1. */
+function hexValue(byte: number | undefined): number {
+  if (byte === undefined) return -1;
+  if (byte >= 0x30 && byte <= 0x39) return byte - 0x30;
+  const lower = byte | 0x20;
+  return lower >= 0x61 && lower <= 0x66 ? lower - 0x57 : -1;
+}
+
+/** `host` is an ASCII hostname, where toLowerCase folds only A-Z; a pin with any other character never equals it. */
 function isTrustedHost(host: string, trustedHosts: readonly string[]): boolean {
-  const normalized = asciiLowerCase(host);
-  return trustedHosts.some((trusted) => asciiLowerCase(trusted) === normalized);
+  const normalized = host.toLowerCase();
+  // Checked before toLowerCase, which would fold a pin's U+212A KELVIN SIGN to "k".
+  return trustedHosts.some((trusted) => !nonAscii.test(trusted) && trusted.toLowerCase() === normalized);
 }
 
 async function verifyReceipt(

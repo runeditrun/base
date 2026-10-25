@@ -22,7 +22,8 @@ export function splitUri(text: string): UriParts | undefined {
   const parts = uriParts.exec(text);
   if (!parts) return undefined;
   const [, scheme, authority, path, query, fragment] = parts;
-  return { scheme: asciiLowerCase(scheme!), authority, path: path!, query, fragment };
+  // The scheme is ASCII, where toLowerCase folds only A-Z.
+  return { scheme: scheme!.toLowerCase(), authority, path: path!, query, fragment };
 }
 
 /** `[userinfo "@"] host [":" port]`; a port is 1 to 65535 without leading zeros. */
@@ -41,8 +42,4 @@ export function isAsciiHostname(host: string): boolean {
   if (dottedQuad.test(host)) return true;
   const labels = (host.endsWith('.') ? host.slice(0, -1) : host).split('.');
   return labels.every((label) => ldhLabel.test(label)) && !numericLabel.test(labels[labels.length - 1]!);
-}
-
-export function asciiLowerCase(text: string): string {
-  return text.replace(/[A-Z]+/g, (letters) => letters.toLowerCase());
 }
