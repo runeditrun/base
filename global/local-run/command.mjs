@@ -17,6 +17,7 @@ async function printRecovery(checkout) {
   process.stderr.write(`Recovery unavailable (${recovery.reason}). Inspect the local upgrade journal with your agent.\n`);
   return;
  }
+ process.stderr.write('Unfinished upgrade journal: .rer/upgrade/journal.json. Keep it and snapshot .rer/upgrade/backups/' + recovery.backup_name + ' until recovery completes.\n');
  process.stderr.write('Open a terminal in the parent folder containing the reported checkout folder; locate that folder locally if necessary.\n');
  process.stderr.write(`cd -- ${shellQuote(recovery.checkout_name)} &&\nrer dev --stop &&\ngit reset --hard ${shellQuote(recovery.previous_head)} && rer upgrade --restore ${shellQuote(recovery.backup_name)}\n`);
 }

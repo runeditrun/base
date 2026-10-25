@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { needsRecovery } from './journal.mjs';
 import { backup, readJournal } from './state.mjs';
 import { githubRepository } from './release.mjs';
 import { text } from './process.mjs';
@@ -29,7 +30,7 @@ export async function recoveryInfo(options = {}) {
   const checkoutName = basename(checkout);
   const journal = await readJournal(checkout);
   if (journal === null) return unavailable('journal_missing');
-  if (!object(journal) || journal.version !== 1 || !['rolling_back', 'rollback_failed'].includes(journal.stage)
+  if (!object(journal) || journal.version !== 1 || !needsRecovery(journal)
     || !matches(JOURNAL_KEY, journalKey) || journal.journalKey !== journalKey
     || !matches(REPOSITORY, repository) || !matches(SHA, fromCommit) || !matches(SHA, toCommit)
     || typeof journal.checkout_name !== 'string' || !matches(SHA, journal.head)

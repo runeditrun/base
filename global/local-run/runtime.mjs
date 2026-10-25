@@ -34,13 +34,17 @@ function management(record, action) {
   });
  });
 }
-export async function acquireOperation(checkout) {
+export async function acquireOperation(checkout, beforeHandoff = async () => {}) {
  const selected = dispatcher(checkout);
  const module = resolve(dirname(selected.entry), selected.mode === 'vendored' ? 'base-cli/cli/managed-server.mjs' : '../cli/managed-server.mjs');
  if ((await import(pathToFileURL(module).href)).operationHandoff !== 1) {
   throw failure('refused', 'This checkout pins a rer version without upgrade ownership handoff. Its app and data were left in place. Adopt a rer release with handoff support in the checkout before upgrading.');
  }
- try { return await localOperation(checkout); }
+ try {
+  const operation = await localOperation(checkout);
+  try { await beforeHandoff(); return operation; }
+  catch (error) { await operation.release(); throw error; }
+ }
  catch (error) {
   if (error.code !== 'LOCAL_OPERATION_BUSY') throw error;
   const record = await runningApp(checkout);
@@ -50,6 +54,7 @@ export async function acquireOperation(checkout) {
   if (status?.operationHandoff !== 1) {
    throw failure('refused', 'This running app uses a rer version without upgrade ownership handoff. Stop it with rer dev --stop in this checkout, then install a release with handoff support before upgrading.');
   }
+  await beforeHandoff();
   const target = { pid: process.pid, start: await processStart(process.pid) };
   const reply = await management(record, 'operation-handoff:' + Buffer.from(JSON.stringify(target)).toString('base64url'));
   return localOperation(checkout, reply.operationToken, { adopt: true });

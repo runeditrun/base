@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Persist rollback intent before mutations, retain current and recovery snapshots across clock changes, and commit the four-key `rer-upstream.json` release identity instead of selecting trailers or private release markers.
+- Persist upgrade running state before ownership handoff, refuse unreadable journals, preserve post-switch recovery when HEAD moves, retain current and recovery snapshots across clock changes, and commit the four-key `rer-upstream.json` release identity instead of selecting trailers or private release markers.
 - Record the two approved exact recovery-test fixture identities for publication hygiene, preserving the intentional mismatched-repository negative input and append-only history.
 - Validate saved-state completeness before restore, retain failed rollback journals until repair, and expose bound local recovery facts with safely quoted recovery commands.
 - Add `rer dev <repo> --release <tag|commit>` to verify a publisher-signed release before installation, preserve existing owner commits and state, and record its release identity locally. `--anchors FILE` supports community publishers.

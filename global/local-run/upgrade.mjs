@@ -8,6 +8,8 @@ import { failure, phases, errorCodes } from './error.mjs';
 import { recordedRelease, resolveRelease } from './release.mjs';
 import { prepareMerge, continueMerge, cleanupMerge } from './merge.mjs';
 import { backup, readJournal, writeJournal, snapshot, rowCounts, checkPriorData, restoreState } from './state.mjs';
+import { needsRecovery } from './journal.mjs';
+import { readIntent, rememberIntent, forgetIntent } from './intent.mjs';
 import { acquireOperation, returnOperation, runningApp, stopApp, startApp, health, verb } from './runtime.mjs';
 
 const emptyConflicts = () => ({ public_paths: [], other_count: 0 });
@@ -28,7 +30,7 @@ async function preflight(checkout) {
  return { head: await text(checkout, ['rev-parse', 'HEAD']), branch: branch.stdout.trim() };
 }
 async function discard(checkout, journal, operation) {
- if (['rolling_back', 'rollback_failed'].includes(journal.stage)) throw failure('rollback_failed');
+ if (needsRecovery(journal)) throw failure('rollback_failed');
  if (journal.wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
  if (journal.prepared) await cleanupMerge(checkout, journal.prepared);
  await rm(join(checkout, '.rer/upgrade/journal.json'), { force: true });
@@ -70,13 +72,14 @@ async function apply(checkout, journal, operation, phase, allowed) {
  * output stay in the local journal; only the design's closed outputs escape. */
 export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDiagnostic, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
  const started = Date.now(), phase = phases(onPhase);
- let journal = {}, operation, installed, switched = false, preserveJournal = false, restoring = false;
+ let journal = {}, operation, installed, wasRunning, switched = false, preserveJournal = false, restoring = false;
  try {
   if (allowDataChange.length && !process.stdin.isTTY) throw failure('refused');
   try { checkout = await realpath(checkout); } catch { throw failure('checkout_missing'); }
-  journal = await readJournal(checkout) ?? {};
-  preserveJournal = ['rolling_back', 'rollback_failed'].includes(journal.stage);
-  if (preserveJournal && !restore) {
+  const loaded = await readJournal(checkout);
+  preserveJournal = loaded !== null;
+  journal = loaded ?? {};
+  if (['rolling_back', 'rollback_failed'].includes(journal.stage) && !restore) {
    await phase('failed', 'rollback_failed');
    return output('refused', journal, started, 'rollback_failed');
   }
@@ -84,8 +87,15 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   catch (error) { if (!restore) throw error; }
   journal.from ??= installed;
   const current = await preflight(checkout);
-  const wasRunning = Boolean(await runningApp(checkout));
-  operation = await acquireOperation(checkout);
+  const unfinished = journal.version === 1 && !['rolled_back', 'complete'].includes(journal.stage);
+  if (needsRecovery(journal) && !restore && (current.branch !== journal.branch ||
+    current.head !== journal.prepared?.candidate && !(journal.stage === 'switch_pending' && current.head === journal.head))) throw failure('rollback_failed');
+  const intent = await readIntent(checkout);
+  if (intent && !unfinished && (intent.head !== current.head || intent.branch !== current.branch)) throw failure('refused', 'An unfinished upgrade intent remains in .rer/upgrade/intent.json; keep it and recover the original checkout before upgrading.');
+  wasRunning = unfinished && typeof journal.wasRunning === 'boolean' ? journal.wasRunning : intent?.wasRunning ?? Boolean(await runningApp(checkout));
+  operation = await acquireOperation(checkout, async () => {
+   if (!unfinished && !restore) wasRunning = await rememberIntent(checkout, current, wasRunning);
+  });
   try { await serverResources(checkout, { env: { ...process.env, RER_SERVERS_LOAD_THRESHOLD: undefined } }); }
   catch { throw failure('disk_low'); }
   // Ensure private upgrade records never turn an otherwise clean seed dirty.
@@ -123,11 +133,10 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    await cleanupMerge(checkout, journal.prepared); await phase('ready');
    return result;
   }
-  const unfinished = journal.version === 1 && !['verified', 'rolled_back', 'complete'].includes(journal.stage);
   if (unfinished) {
    if (journalKey && journal.journalKey && journalKey !== journal.journalKey) { preserveJournal = true; throw failure('refused'); }
    if (current.branch !== journal.branch) throw failure('not_on_branch');
-   if (journal.prepared?.candidate && current.head === journal.prepared.candidate && ['switch_pending', 'switched', 'installed', 'started'].includes(journal.stage)) {
+   if (journal.prepared?.candidate && (current.head === journal.prepared.candidate || journal.stage === 'switch_pending' && current.head === journal.head) && ['switch_pending', 'switched', 'installed', 'started'].includes(journal.stage)) {
     switched = true;
     if (to && ![journal.target.commit, journal.target.tag].includes(to)) throw failure('refused');
     await stopApp(checkout, operation);
@@ -144,7 +153,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    } else if (journal.stage === 'needs_integration') {
     await phase('failed', 'needs_integration');
     return output('needs_integration', journal, started, 'needs_integration');
-   } else { await discard(checkout, journal, operation); journal = {}; }
+   } else { await discard(checkout, journal, operation); journal = {}; preserveJournal = false; }
   } else journal = {};
   if (!switched) {
    if (!journal.head) {
@@ -159,6 +168,8 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     if (ancestry.code) throw failure('release_unverified');
     journal = { version: 1, journalKey: journalKey ?? randomUUID(), checkout_name: basename(checkout), head: current.head, branch: current.branch, from, target, wasRunning, stage: 'preparing' };
     await writeJournal(checkout, journal);
+    preserveJournal = false;
+    await forgetIntent(checkout);
     try { journal.prepared = await prepareMerge({ checkout, base: from.commit, head: current.head, target: target.commit, tag: target.tag, repository: from.repository }); }
     catch (error) {
      journal.prepared ??= error.prepared;
@@ -169,6 +180,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     }
     journal.stage = 'prepared'; await writeJournal(checkout, journal);
    }
+   await forgetIntent(checkout);
    await phase('install');
    if (check) return output('refused', journal, started);
    await phase('database');
@@ -191,7 +203,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
  } catch (error) {
   if (error.diagnostic) onDiagnostic?.(error.diagnostic);
   journal.from ??= installed;
-  const code = errorCodes.has(error.error_code) ? error.error_code : 'refused';
+  const code = !switched && needsRecovery(journal) && !restore ? 'rollback_failed' : errorCodes.has(error.error_code) ? error.error_code : 'refused';
   if (restoring) {
    journal.stage = 'rollback_failed'; await writeJournal(checkout, journal).catch(() => {});
    await phase('failed', 'rollback_failed');
@@ -214,13 +226,14 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    await phase('failed', code);
    return output('refused', journal, started, code);
   }
-  if (journal.wasRunning && operation) {
+  if ((journal.wasRunning ?? wasRunning) && operation) {
    try { if (!await runningApp(checkout)) await health(checkout, await startApp(checkout, operation)); }
    catch {
     journal.stage = 'rollback_failed'; await writeJournal(checkout, journal).catch(() => {});
     await phase('failed', 'rollback_failed'); return output('refused', journal, started, 'rollback_failed');
    }
   }
+  if (operation) await forgetIntent(checkout);
   if (operation && journal.head && code !== 'needs_integration') {
    try {
     if (journal.prepared) await cleanupMerge(checkout, journal.prepared);
