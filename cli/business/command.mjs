@@ -11,13 +11,15 @@ const usage = `Usage: rer business VERB
                                  Pair this computer, waiting until the owner approves in the browser
                                  (up to the code's 10 minutes); run it again to resume
   run [--once]                   Work this computer's tasks: the folder scan the owner allows, then
-                                 later tasks (vendor exports are not available yet). Says what it is
-                                 doing and waiting for; applies the owner's choices at each check-in
-  next                           Apply the owner's choices, then return one templated question or
-                                 nothing yet within 60 seconds
+                                 vendor exports into each app's import door (a preview the owner
+                                 approves; the vendor key stays in OS credential storage). Says what
+                                 it is doing and waiting for; applies the owner's choices at each check-in
+  next                           Apply the owner's choices, then return one templated question, the
+                                 agent's next step, or nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
                                  Catalog vendor or none; uses, sells, both, product-dependency
-  vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage
+  vendor-key add|remove VENDOR   Keep a read-only vendor key in OS credential storage; the owner
+                                 types it in their own terminal, never in chat or a command
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
   disconnect                     Revoke this computer, then remove local credentials and additions;

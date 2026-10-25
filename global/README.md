@@ -490,9 +490,13 @@ terminal, stores it in the OS keychain and prints only `sentry:read`.
 `remove` deletes it. The same commands support `uptimerobot`, `pagerduty` and
 `calendly`. Never put a key in command arguments, chat or a URL.
 
-`rer business next` returns one locally templated classification or owner link,
-or `Nothing yet`, within 60 seconds. It never reflects server instructions or
-raw evidence. Owner items cannot be answered from this CLI.
+`rer business next` returns, within 60 seconds, one locally templated
+classification, owner link or agent step, or says what `run` would start, and
+says `Nothing yet` only when no agent step waits. Once an app is claimed and its
+import door is on, its `export.vendor` task is the agent's step: next names the
+owner-typed `rer business vendor-key add <vendor>` (or says the key is already
+stored) and `rer business run`. It never reflects server instructions or raw
+evidence. Owner items cannot be answered from this CLI.
 `rer business answer ID VENDOR uses|sells|both|product-dependency [CONFIDENCE]`
 submits a task-scoped classification through MCP. Choose a vendor ID from the
 question's displayed answer schema, or `none`; the suggested vendor can be
@@ -534,23 +538,37 @@ owner's next step. It removes `run.lock` on every exit, including Ctrl-C,
 SIGTERM and a closed terminal (SIGHUP); a lock whose process is gone, or that
 has not been refreshed for two minutes, is cleared on the next start.
 
-**Remaining export blockers:** grants for linked, configured targets now resolve
-to an HTTPS `/api/rer/import/uploads` destination with a 2 MiB quota. They declare
-`upload_authorization: seed_import_grant_required` but supply no signed seed
-import authority. Vendor task inputs, adapter resume checkpoints and the chunk
-assembly/upload contract are also absent. The CLI releases these tasks before
-reading a vendor key; background mode parks them, and `run --once` reports the
-dependency as a command failure. An unavailable destination reports its reason
-and releases with `paused` after a `connected_runner_required` event.
-Vendor export remains blocked.
+`rer business run` also performs claimed `export.vendor` tasks into the app's
+import door. The claim's grant names the door (`/api/rer/import/uploads` on the
+app's HTTPS origin) and `import_grants`; every door request asks
+`POST /api/business/tasks/:taskId/import-grants` for its own short-lived
+RER-signed grant (`uploads` or `plan`; apply is the server's alone after the
+owner's wave approval), and the first grant's namespace names the vendor. The
+read-only vendor key is read from OS credential storage, never from arguments,
+the environment or a file. The shipped adapter runs into a private 0600
+`export-<id>.bundle` file in the state folder, each item checked by the outbound
+detector; the bundle is sent in 64 KiB chunks, then planned, which leaves a
+zero-write preview in the door. Run then completes the task with outputs
+`{upload_id, plan_id, bundle_sha256}` (identifiers only); Business reads that
+plan from the door with its own grants and completes the task only if it is the
+plan of exactly that bundle. Run prints only counts and removes the bundle on
+every exit. Without the key, run
+releases the task as `paused` after an `owner_required` event and names the
+owner's command; a running supervisor picks the export up once the key is
+stored. A door that is not ready releases it as `paused` after a
+`connected_runner_required` event, naming the reason. UptimeRobot needs no
+other input. Sentry (its organization and window) and PagerDuty (its window)
+need inputs the executor task view does not carry yet, and Calendly's folder
+of files has no single-bundle door format yet: these release as `paused` after a
+`configuration_required` event. While an agent step waits (an export, or a
+question for `next`, or the lease an earlier run on this computer still holds),
+run says what it waits for instead of `Nothing yet`.
 
 The current MCP `next_question` filters out owner items. When an owner summary
 is supplied, the CLI displays its browser link and refuses to answer it.
 
 The four deterministic adapter implementations and their native output formats
-are described in [the adapter guide](https://github.com/runeditrun/base/blob/main/cli/business/vendors/README.md). Their
-presence does not enable export until the seed import authority and remaining
-transport contracts are connected.
+are described in [the adapter guide](https://github.com/runeditrun/base/blob/main/cli/business/vendors/README.md).
 
 ## Local engineering companion
 

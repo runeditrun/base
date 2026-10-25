@@ -4,6 +4,7 @@ import { sensitive } from './detector.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
+import { titledVendor, keyStep, vendorNames, vendorHandle } from './export-task.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
@@ -49,6 +50,13 @@ export function waitingFor(state) {
  return `Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${ownerLink(state)}`;
 }
 const runWork = { 'discover.local': "this computer's names-only scan of the folders the owner allowed" };
+const exportStep = task => task.kind === 'export.vendor' && task.runner === 'executor' && ['ready', 'leased'].includes(task.state);
+const agentQuestion = task => task.kind === 'classify.row' && task.runner === 'executor' && ['ready', 'leased'].includes(task.state);
+
+/** Agent steps that wait on this computer but not on run itself, in plain words. */
+export function agentWaiting(tasks) {
+ return tasks.some(agentQuestion) ? [`A question waits for this computer's agent. Answer it with: ${businessCommand('next')}`] : [];
+}
 
 function classification(task) {
  const toolId = identifier(task.question?.tool_id), vendorId = task.question?.vendor_id;
@@ -74,17 +82,27 @@ export async function next() {
   if (error.status !== 401) throw error;
   throw Error(`Business pairing expired or was revoked. This computer was ${revokedText(await revokedByServer(state))}`);
  }
- const item = tasks.find(task => task.kind === 'classify.row' || task.runner === 'owner' || ownerKinds.has(task.kind));
+ const item = tasks.find(task => task.kind === 'classify.row' || task.runner === 'owner' || ownerKinds.has(task.kind) || exportStep(task));
  if (!item) {
   // Nothing to answer here; say whether run has work, or what it waits for.
   const work = tasks.find(task => Object.hasOwn(runWork, task.kind) && task.state === 'ready');
-  process.stdout.write(work ? `Ready for run: ${runWork[work.kind]}. Start it with: ${businessCommand('run')}\n` : `${waitingFor(state)}\n`);
-  process.stdout.write('Nothing yet.\n'); return;
+  if (work) { process.stdout.write(`Ready for run: ${runWork[work.kind]}. Start it with: ${businessCommand('run')}\n`); return; }
+  process.stdout.write(`${waitingFor(state)}\nNothing yet.\n`); return;
  }
  const id = identifier(item.task_id);
  if (sensitive(id)) throw Error('Business task identifier was refused by the outbound detector.');
  if (item.runner === 'owner' || ownerKinds.has(item.kind)) {
   process.stdout.write(`Owner: ${id}\nAnswer in your browser: ${ownerLink(state)}\n`); return;
+ }
+ if (item.kind === 'export.vendor') {
+  // The vendor is named from a closed local table, never from server text.
+  const vendor = titledVendor(item.title), name = vendor ? vendorNames[vendor] : 'vendor';
+  const stored = vendor && (state.vendorHandles ?? []).includes(vendorHandle(vendor));
+  process.stdout.write(`Agent: ${id}\nStep: export the owner's ${name} history into its app's import door. It lands as a preview: nothing changes in the app until the owner approves it in the browser.\n`
+   + (stored ? `Vendor key: the owner's read-only ${name} key is stored in this computer's OS credential storage. To replace it, ${keyStep(vendor)}\n`
+    : `Vendor key: ${keyStep(vendor)}${vendor ? '' : `\n  where <vendor> is the tool this step exports: ${Object.keys(vendorNames).join(' | ')}`}\n`)
+   + `Then run: ${businessCommand('run')}\n`);
+  return;
  }
  const { toolId, vendorId, vendors } = classification(item);
  process.stdout.write(`Agent: ${id}\nTool: ${toolId}\nSuggested vendor: ${vendorId}\nVendors: ${vendors.join(' | ')}\nSuggest how this tool is used. The owner confirms in the browser.\nUsage: ${classifications.join(' | ')}\nRun: rer business answer ${id} <vendor_id|none> <usage> [confidence]\n`);
