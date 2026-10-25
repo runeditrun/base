@@ -2,8 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { buildSearchIndex } from './index-build.mjs';
-import { siteRateLimit } from '../../deploy-kit/site-runtime.mjs';
+import { buildSearchIndex, siteRateLimit } from './index-build.mjs';
 
 // The seed owns its build toolchain; rer remains dependency-free for offline launch.
 const { build } = createRequire(resolve('package.json'))('esbuild');

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -16,6 +16,7 @@ import { integrity } from '../scripts/rer-package/registry.mjs';
 import { readPackage } from '../global/update/archive.mjs';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
+const { default: AxeBuilder } = createRequire(join(base, 'default-seed/package.json'))('@axe-core/playwright');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
 
 test('opt-in site prepares and reuses vectors, serves linked headings, and refuses publication on provider failure', async t => {
@@ -32,14 +33,14 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  import {SearchField} from '../../scripts/base-cli/modules/site/docs-search/SearchField';
  export function sitePages({styles,clients}) {
   const text='Restore a backup by choosing the archive and reviewing its contents.';
-  const html='<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">'+styles.map(href=>'<link rel="stylesheet" href="'+href+'">').join('')+'<style>:root{--paper:#fff;--ink:#162122;--ink-soft:#586366;--rule:#ddd}body{font:18px system-ui;margin:24px;max-width:900px}.docs-search{max-width:320px}</style></head><body><nav>'+renderToStaticMarkup(createElement(SearchField,{id:'search'}))+'</nav><main><h1 id="backups">Backups</h1><p>Keep and retrieve your saved archives.</p><h2 id="restore">Restore a backup</h2><p>'+text+'</p><h2 id="storage">Storage locations</h2><p>Choose the directory where archives are kept.</p><a href="/run">Run</a><a href="/docs/search?q=restore">Search restore</a></main><script type="module" src="'+clients.docsSearch+'"></script></body></html>';
+  const html='<!doctype html><html lang="en"><head><title>Backup documentation</title><meta name="viewport" content="width=device-width, initial-scale=1">'+styles.map(href=>'<link rel="stylesheet" href="'+href+'">').join('')+'<style>:root{--paper:#fff;--ink:#162122;--ink-soft:#586366;--rule:#ddd}body{font:18px system-ui;margin:24px;max-width:900px}.docs-search{max-width:320px}</style></head><body><nav aria-label="Docs">'+renderToStaticMarkup(createElement(SearchField,{id:'search'}))+'</nav><main><h1 id="backups">Backups</h1><p>Keep and retrieve your saved archives.</p><h2 id="restore">Restore a backup</h2><p>'+text+'</p><h2 id="storage">Storage locations</h2><p>Choose the directory where archives are kept.</p><a href="/run">Run</a><a href="/docs/search?q=restore">Search restore</a></main><script type="module" src="'+clients.docsSearch+'"></script></body></html>';
   return {pages:[{path:'/',html:'<a href="/run">Run</a><a href="/docs/backups">Backups</a>'},{path:'/run',html:'<h1>Run</h1>'},{path:'/docs/backups',html}],assets:[], searchPages:[{href:'/docs/backups',searchSections:[{anchor:'backups',titlePath:['Backups'],text:'Keep and retrieve your saved archives.'},{anchor:'restore',titlePath:['Backups','Restore a backup'],text},{anchor:'storage',titlePath:['Backups','Storage locations'],text:'Choose the directory where archives are kept.'}]}]};
  }`;
  await writeFile(pages, source);
  const provider = siteProvider({ domain:'run-search.example.test' });
  t.after(() => provider.close());
  await writeFile(join(root, 'deploy-site.json'), JSON.stringify({version:1,domain:'run-search.example.test'}));
- let requests = 0, embeddings = 0, previous, failure = false, embeddingFailure = false;
+ let requests = 0, embeddings = 0, previous, lastInput, failure = false, embeddingFailure = false;
  const vector = Array.from({length:768}, (_,i) => i === 0 ? 1 : 0);
  const edge = createServer(async (req, res) => {
   try {
@@ -50,7 +51,7 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
    if (destination === 'https://run-search.example.test/docs-search-vectors.json') response = failure ? new Response('Unavailable', {status:503}) : previous ? Response.json(previous) : new Response(null, {status:404});
    else if (destination.includes('/ai/run/')) {
     embeddings++;
-    const input = JSON.parse(body.toString());
+    const input = JSON.parse(body.toString()); lastInput=input;
     response = failure || embeddingFailure ? new Response('Unavailable', {status:503}) : Response.json({success:true,result:{shape:[input.text.length,768],data:input.text.map(()=>vector)}});
    } else {
     const headers = new Headers(req.headers); headers.delete('host'); headers.delete('x-test-destination');
@@ -107,6 +108,15 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  assert.ok(embeddings>0,'a first index uses Workers AI');
  for (const line of deployed.stdout.trim().split('\n')) JSON.parse(line);
  previous = JSON.parse(await readFile(join(root,'dist/site/docs-search-vectors.json'),'utf8'));
+ // The seed can copy only docs-search; artifact preparation must not require a
+ // sibling deploy-kit copy. Run the real helper from that isolated copy.
+ const copied=join(directory,'module-only');
+ await cp(join(base,'modules/site/docs-search'),copied,{recursive:true});
+ const helper=join(directory,'prepare-copy.mjs');
+ await writeFile(helper,`import {buildSearchArtifacts} from './module-only/artifacts.mjs'; await buildSearchArtifacts(${JSON.stringify({corpus:join(root,'.rer/docs-search/corpus.json'),assets:join(root,'dist/site'),output:join(directory,'module-output'),previousUrl:'https://run-search.example.test/docs-search-vectors.json'})});`);
+ const beforeCopy=embeddings;
+ await run(process.execPath,['--import',join(base,'cli/fixtures/docs-search/network.mjs'),helper],{cwd:root,env:{PATH:process.env.PATH,RER_TEST_NETWORK:network}});
+ assert.equal(embeddings,beforeCopy,'a copied standalone helper reuses real-format published vectors');
  const calls = embeddings;
  await rm(join(root,'.rer/docs-search'),{recursive:true});
  deployed = await command('deploy');
@@ -131,7 +141,7 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  assert.deepEqual(await measure('repeated',Array.from({length:30},(_,i)=>i%2?'  RESTORE   ARCHIVE  ':'restore archive'),'192.0.2.1'),{calls:1,ok:30,limited:0});
  assert.deepEqual(await measure('distinct',Array.from({length:30},(_,i)=>'archive task '+i),'192.0.2.2'),{calls:10,ok:10,limited:20});
  assert.deepEqual(await measure('simultaneous repeated',Array(30).fill('simultaneous restore'),'192.0.2.3',true),{calls:1,ok:30,limited:0});
- assert.deepEqual(await measure('simultaneous distinct',Array.from({length:30},(_,i)=>'parallel task '+i),'192.0.2.4',true),{calls:10,ok:10,limited:20});
+ assert.deepEqual(await measure('simultaneous distinct',Array.from({length:30},(_,i)=>'parallel archive task '+i),'192.0.2.4',true),{calls:10,ok:10,limited:20});
  // Equal fake vectors isolate lexical behavior at the paid edge; these checks
  // prove heading selection mechanics, not real semantic retrieval quality.
  for(const [query,anchor] of [['Backups','backups'],['storag locat','storage'],['restore a backup','restore']]) {
@@ -139,21 +149,52 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
   assert.equal(results[0].href,'/docs/backups#'+anchor);
   assert.equal(new Set(results.map(result=>result.href)).size,results.length);
   assert.ok(results.length<=5);
+  if(query==='storag locat') assert.match(lastInput.text[0],/storage locat/,'an unambiguous corpus typo is corrected before the paid edge');
  }
+ const beforeNegative=embeddings;
+ for(const query of ['qzxv wplk','zqxj vbwk plmoq','zzqqxxvvv','🧬🪸🧿🦷','！！！！！！']) {
+  const response=await request(query,'192.0.2.10');
+  assert.equal(response.status,200);
+  assert.deepEqual((await response.json()).results,[]);
+ }
+ assert.equal(embeddings,beforeNegative,'queries without corpus topic evidence do no paid work');
+ // Missing trusted identity and missing native binding refuse before inference.
+ const beforeIdentity=embeddings;
+ assert.equal((await (await local.getWorker('search-site')).fetch('https://run-search.example.test/docs/search?q=identity+archive',{headers:{'CF-Connecting-IP':''}})).status,503);
+ assert.equal(embeddings,beforeIdentity);
+ const unbound=searchRuntime({source:moduleBytes.toString(),assets:join(root,'dist/site'),network});
+ try {
+  assert.equal((await unbound.dispatchFetch('https://run-search.example.test/docs/search?q=unbound+archive',{headers:{'CF-Connecting-IP':'192.0.2.15'}})).status,503);
+  assert.equal(embeddings,beforeIdentity);
+ } finally { await unbound.dispose(); }
+ const second=searchRuntime({source:moduleBytes.toString(),assets:join(root,'dist/site'),network,rateLimit:siteRateLimit('second-site')});
+ try {
+  const beforeScope=embeddings;
+  const groups=await Promise.all([
+   ...Array.from({length:12},(_,i)=>request('second visitor archive '+i,'192.0.2.11')),
+   ...Array.from({length:12},(_,i)=>second.dispatchFetch('https://other-search.example.test/docs/search?q='+encodeURIComponent('second location archive '+i),{headers:{'CF-Connecting-IP':'192.0.2.12'}})),
+  ]);
+  const admitted=groups.filter(response=>response.status===200).length;
+  assert.equal(embeddings-beforeScope,admitted,'every admitted miss is counted at the paid edge across two independent runtimes');
+  assert.ok(admitted>10,'visitor/site/location-local counters do not form an account cap');
+  assert.ok(groups.some(response=>response.status===429));
+  console.log('independent admission scopes',JSON.stringify({calls:embeddings-beforeScope,admitted,limited:groups.length-admitted,accountWideCap:false}));
+ } finally { await second.dispose(); }
  const beforeBounds=embeddings;
  assert.equal((await request('x','192.0.2.5')).status,200);
  assert.equal((await request('x'.repeat(241),'192.0.2.5')).status,400);
  assert.equal((await request('archive','192.0.2.5',{method:'POST'})).status,405);
  assert.equal(embeddings,beforeBounds);
  failure=true;
- assert.equal((await request('uncached outage','192.0.2.5')).status,503);
+ assert.equal((await request('uncached archive outage','192.0.2.5')).status,503);
  failure=false;
- assert.equal((await request('uncached outage','192.0.2.5')).status,200,'provider failures are not cached');
+ assert.equal((await request('uncached archive outage','192.0.2.5')).status,200,'provider failures are not cached');
  // A second generated entry with a new corpus digest must not reuse the first
  // entry's cached result, even if the same location's Cache API survives.
  const {buildSiteRuntime}=await import('./site-runtime.mjs');
  const corpusFile=join(root,'.rer/docs-search/corpus.json');
- const corpus=JSON.parse(await readFile(corpusFile,'utf8'));
+ const originalCorpus=JSON.parse(await readFile(corpusFile,'utf8'));
+ const corpus=structuredClone(originalCorpus);
  corpus[0].searchSections[0].text+=' This archive has a newly published instruction.';
  await writeFile(corpusFile,JSON.stringify(corpus));
  const changed=await buildSiteRuntime({root}, {type:'docs-search',module:'docs-search',bindings:['ASSETS','AI','SEARCH_RATE_LIMITER'],endpoint:'/docs/search'},corpusFile,join(root,'dist/site'));
@@ -164,12 +205,22 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  assert.equal((await request('restore archive','192.0.2.7')).status,503);
  assert.equal(embeddings,beforeStale,'old cached results cannot hide a stale corpus');
  const {buildSearchIndex}=await import('../modules/site/docs-search/index-build.mjs');
- const updated=await buildSearchIndex(corpus,{previous:[previous],embed:async(model,input)=>({data:input.text.map(()=>vector)})});
+ let preparationInputs=0;
+ const embed=async(model,input)=>{ preparationInputs+=input.text.length; return {data:input.text.map(()=>vector)}; };
+ const unchanged=await buildSearchIndex(originalCorpus,{previous:[previous],embed});
+ assert.equal(unchanged.counts.embedded,0);
+ assert.equal(preparationInputs,0);
+ const updated=await buildSearchIndex(corpus,{previous:[previous],embed});
+ assert.equal(updated.counts.embedded,1);
+ assert.equal(preparationInputs,1);
  await writeFile(join(root,'dist/site/docs-search-vectors.json'),JSON.stringify(updated.index));
  const fresh=await request('Backups','192.0.2.7');
  assert.equal(fresh.status,200);
  assert.match((await fresh.json()).results[0].snippet,/newly published instruction/);
  assert.equal(embeddings,beforeStale+1);
+ const restored=await buildSearchIndex(originalCorpus,{previous:[updated.index],embed});
+ assert.equal(restored.counts.embedded,1);
+ assert.equal(restored.index.corpusHash,previous.corpusHash);
  await writeFile(join(root,'dist/site/docs-search-vectors.json'),JSON.stringify(previous));
  await local.setOptions(searchRuntimeOptions({source:moduleBytes.toString(),assets:join(root,'dist/site'),network,rateLimit:siteRateLimit('test-site')}));
 
@@ -184,26 +235,45 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']}); t.after(()=>browser.close());
  for (const width of [1440,390]) {
   browserVisitor=width===1440?'192.0.2.6':'192.0.2.8';
-  const page=await browser.newPage({viewport:{width,height:900}});
+  const context=await browser.newContext({viewport:{width,height:900}});
+  const page=await context.newPage();
+  const pageErrors=[]; page.on('pageerror',error=>pageErrors.push(error.message));
   await page.goto(origin+'/docs/backups');
+  await page.keyboard.press('/');
+  assert.equal(await page.getByRole('combobox').evaluate(el=>el===document.activeElement),true);
+  await page.getByRole('status').filter({hasText:'Search the docs'}).waitFor();
   await page.getByRole('combobox').fill('restore archive');
   const result=page.getByRole('option').first(); await result.waitFor();
+  if(process.env.RER_SEARCH_EVIDENCE) await page.screenshot({path:join(process.env.RER_SEARCH_EVIDENCE,'search-results-'+width+'.png')});
+  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
+  for(const key of ['ArrowDown','ArrowDown','ArrowUp']) await page.getByRole('combobox').press(key);
+  assert.equal(await page.getByRole('combobox').getAttribute('aria-activedescendant'),await result.getAttribute('id'));
+  await page.getByRole('combobox').press('Escape');
+  assert.equal(await page.getByRole('combobox').getAttribute('aria-expanded'),'false');
+  assert.equal(await page.getByRole('combobox').evaluate(el=>el===document.activeElement),true);
+  await page.getByRole('combobox').press('ArrowDown');
   assert.match(await result.getAttribute('href'),/\/docs\/backups#restore$/);
   if (width === 1440) await result.click();
-  else { await page.getByRole('combobox').press('ArrowDown'); await page.getByRole('combobox').press('Enter'); }
+  else { await page.getByRole('combobox').press('Enter'); }
   await page.waitForURL('**/docs/backups#restore');
   assert.equal(await page.locator('#restore').textContent(),'Restore a backup');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(process.env.RER_SEARCH_EVIDENCE) await page.screenshot({path:join(process.env.RER_SEARCH_EVIDENCE,'search-heading-'+width+'.png')});
+  await page.getByRole('combobox').fill('zqxj vbwk plmoq');
+  await page.getByRole('status').filter({hasText:'No results'}).waitFor();
+  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
+  if(process.env.RER_SEARCH_EVIDENCE) await page.screenshot({path:join(process.env.RER_SEARCH_EVIDENCE,'search-negative-'+width+'.png')});
   failure=true;
-  await page.getByRole('combobox').fill('provider outage');
+  await page.getByRole('combobox').fill('archive provider outage');
   await page.getByRole('status').filter({hasText:'Search unavailable'}).waitFor();
   failure=false;
-  for(let i=0;i<12;i++) await request('browser burst '+width+' '+i,browserVisitor);
-  await page.getByRole('combobox').fill('limit message '+width);
+  for(let i=0;i<12;i++) await request('archive browser burst '+width+' '+i,browserVisitor);
+  await page.getByRole('combobox').fill('archive limit message '+width);
   await page.getByRole('status').filter({hasText:'Too many searches. Try again in a minute.'}).waitFor();
   if(process.env.RER_SEARCH_EVIDENCE) await page.screenshot({path:join(process.env.RER_SEARCH_EVIDENCE,'search-rate-limit-'+width+'.png')});
-  await page.close();
+  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
+  assert.deepEqual(pageErrors,[]);
+  await context.close();
  }
  const writes=provider.state.writes.length, version=provider.state.version.id;
  failure=true;

@@ -1,5 +1,6 @@
 import { assert, hash } from './validation.mjs';
-import { searchPolicy } from '../site/docs-search/policy.mjs';
+import { siteRateLimit } from '../site/docs-search/index-build.mjs';
+export { siteRateLimit } from '../site/docs-search/index-build.mjs';
 
 /** Only the immutable Base docs-search bundle may extend the site Worker. */
 export function siteRuntime(runtime) {
@@ -14,13 +15,6 @@ export function siteRuntime(runtime) {
   return { ...runtime, bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER'] };
 }
 
-/** Stable per Worker; keys also include the origin and a hashed visitor. No
- * provider resource is created outside the version's binding metadata. */
-export const siteRateLimit = worker => ({
-  type: 'ratelimit', name: 'SEARCH_RATE_LIMITER',
-  namespace_id: String(parseInt(hash(worker).slice(0, 12), 16) + 1),
-  simple: { limit: searchPolicy.limit, period: searchPolicy.period },
-});
 export const siteRuntimeBindings = (runtime, worker) => [{ type: 'assets', name: 'ASSETS' },
   ...(runtime ? [{ type: 'ai', name: 'AI' }, siteRateLimit(worker)] : [])];
 

@@ -36,9 +36,13 @@ export function createSearchWorker({ corpusHash, endpoint = '/docs/search', inde
       const raw = (url.searchParams.get('q') ?? '').trim();
       if (raw.length > 240) return json({ error: 'Query too long' }, 400);
       const query = raw.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
-      if (query.length < 2) return json({ results: [] });
+      if (query.length < 2 || !/[\p{L}\p{N}]/u.test(query)) return json({ results: [] });
       if (query.length > 240) return json({ error: 'Query too long' }, 400);
       try {
+        // Validate this version before considering shared cached responses.
+        const { index, search } = await load(request, env);
+        const prepared = search.prepareQuery(query);
+        if (!prepared.known) return json({ results: [] });
         const key = new Request(new URL(`/.rer/docs-search-cache/${corpusHash}/${await digest(JSON.stringify([model, pooling, query]))}`, url.origin));
         // Cache API is location-local and evictable. Single-flight below is only
         // isolate-local; neither mechanism is an account-wide accounting system.
@@ -57,9 +61,8 @@ export function createSearchWorker({ corpusHash, endpoint = '/docs/search', inde
           if (!work) {
             if (pending.size >= searchPolicy.maxPending) throw Error('Search busy');
             work = (async () => {
-              const { index, search } = await load(request, env);
-              const vectors = await env.AI.run(index.model, { text: [`Represent this sentence for searching relevant passages: ${query}`], pooling: index.pooling });
-              const results = search(vectors.data[0], query);
+              const vectors = await env.AI.run(index.model, { text: [`Represent this sentence for searching relevant passages: ${prepared.text}`], pooling: index.pooling });
+              const results = search(vectors.data[0], prepared.text);
               // Wait for the write before releasing single-flight, closing the
               // gap between inference finishing and a later cache lookup.
               await cache.put(key, Response.json({ results }, { headers: { 'Cache-Control': `public, max-age=${searchPolicy.cacheSeconds}` } }));

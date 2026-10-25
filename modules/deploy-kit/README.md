@@ -242,11 +242,17 @@ parse or embedding errors stop before any site publication. The same render's
 assets, completed vector index and query module are then uploaded together in
 one site deployment. There is no second render or separate search deployment.
 
-The UI source is copied from `modules/site/docs-search` under the seed's chosen
+The complete 12-file module is copied and recorded from `modules/site/docs-search` under the seed's chosen
 source path, with `site.clients.docsSearch` naming its `client.ts`. The seed
 renders `SearchField`, imports `search.css`, loads the emitted island module and
 provides `--ink`, `--ink-soft`, `--rule` and `--paper`. The rendered page layout
-and copy stay seed-owned. Local builds have no prepared semantic search service.
+and copy stay seed-owned. The artifact helper has no deploy-kit sibling dependency.
+A compatible rer release must carry CLI validation and this deploy kit together;
+see SEED-COMMAND-CONTRACT.md for exact copy, record-base, binding and pin steps.
+The shared-account cap and preparation reserve remain blocked on the
+[admission scope decision](docs/docs-search-admission.md). Do not release the
+search correction until that boundary and the independent gate close.
+Local builds have no prepared semantic search service.
 
 For CI, the `run-site` environment supplies `CLOUDFLARE_ACCOUNT_ID` from
 `vars.CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from

@@ -340,16 +340,28 @@ is not used for admission. An authoritative global ceiling would require another
 explicit, reviewed contract (for example serialized accounting); this runtime
 does not declare or provision that service.
 
-Ranking combines cosine and corpus-weighted lexical evidence over the existing
-chunks. Document frequency is counted per heading; common product words carry
-less weight. Exact leaf/page headings receive priority, with one-edit and typed
-prefix matches at useful word lengths. Semantic-only candidates use a 0.42 floor
-instead of 0.55 to retain weak paraphrases; lexical admission requires multiple
-topic words or a complete heading. Scores combine 55% cosine and 45% lexical
-evidence plus heading boosts. These are ranking rules, not calibrated relevance
-probabilities; real-provider acceptance remains an independent edition gate.
+Ranking uses cosine similarity plus a bounded lexical boost over published
+headings. Corpus frequency discounts common words; all paragraphs under one
+heading contribute lexical evidence while the best semantic passage supplies
+the snippet. Unknown spellings are corrected only when the existing corpus has
+one unambiguous best match; known and ambiguous words retain their spelling.
+Queries without any corpus topic evidence return no results without inference.
+A weak semantic candidate (below 0.5) needs at least 60% weighted topic coverage
+and up to two matching terms, or an exact heading. Lexical assistance adds at
+most 0.16 plus an exact/prefix heading boost, preserving semantic differences
+instead of replacing almost half their weight. These are uncalibrated retrieval
+rules, not a real-provider quality claim. The fixed independent table is in
+`cli/fixtures/docs-search/queries`: 106 required rows and 10 diagnostics, plus
+negative/historical probes, with original target sets and explicit A–D judgments.
+No real corpus/query vectors are included; provider acceptance must replay the
+full table against the exact source and prepared artifact.
 Stable href/snippet tie breaks and heading deduplication keep five bounded results.
 Published anchors, embedding text, model/pooling and content hashes are unchanged.
+
+The current release candidate still has no shared-account cap or preparation
+reserve. See `modules/deploy-kit/docs/docs-search-admission.md` for the concrete
+scope decision required before release. No additional service is provisioned by
+this correction.
 
 The entry's one `sitePages({ styles, clients, contract })` render returns
 `{ pages, assets, searchPages }`, where `searchPages` is
@@ -360,12 +372,45 @@ The renderer writes `searchPages` to the declared `corpus` path, an ignored
 staging output outside the public assets. Its parent (`.rer/docs-search` here)
 is also the inferred preparation/cache directory.
 
-Copy the optional UI source from `modules/site/docs-search` to the seed's
-selected source path, render `SearchField`, import `search.css`, and load
-`clients.docsSearch` as a module script on the docs pages that use it. The seed
-supplies `--ink`, `--ink-soft`, `--rule` and `--paper` through its existing theme.
-The island queries the declared same-origin endpoint. Adoption preserves the
-seed's approved page layout and copy.
+Adopt the complete module and a compatible released CLI together; copying the
+UI alone does not change the CLI-owned generated Worker or binding validation.
+The independently checked rer 0.2.75, 0.2.76 and 0.2.77 releases reject
+SEARCH_RATE_LIMITER. A newer version number alone is not compatibility proof:
+use a release whose source contains this correction and the eventual admission
+contract. gr releases only after the scope decision and independent gate close.
+
+Copy these exact 12 files from `modules/site/docs-search` at one immutable Base
+release SHA: `SearchField.tsx`, `artifacts.mjs`, `client.ts`, `index-build.mjs`,
+`lexical.ts`, `policy.d.mts`, `policy.mjs`, `retrieve.ts`, `search.css`,
+`sections.ts`, `types.ts`, `worker.ts`. The artifact helper is self-contained
+inside that directory; no sibling deploy-kit files are needed. The seed supplies
+its ordinary React/esbuild toolchain. Copy byte for byte into its selected path
+and record it through the authoring CLI, never by editing the record manually:
+
+```sh
+node scripts/edition-authoring/cli.mjs record-base COPY_PATH modules/site/docs-search BASE_RELEASE_SHA --base BASE_CHECKOUT
+node scripts/edition-authoring/cli.mjs verify-base --base BASE_CHECKOUT
+node scripts/edition-authoring/cli.mjs lock
+node scripts/edition-authoring/cli.mjs check
+```
+
+The three pending copies are HappyToHelp `src/vendor/base/modules/site/docs-search`,
+Uptime `src/base/modules/site/docs-search`, and Lamp `src/base/site/docs-search`.
+Update the ordered `bindings: ['ASSETS', 'AI', 'SEARCH_RATE_LIMITER']` in
+HappyToHelp/Uptime's `src/site/docs-search.config.mjs` and Lamp's
+`scripts/installer/local.mjs` for this candidate; the eventual shared-admission
+release will replace the direct AI binding with its explicit reviewed contract.
+Then pin that compatible `@runeditrun/rer` release exactly in package.json and
+regenerate the lockfile. Keep both the source SHA and installed CLI provenance.
+
+Render `SearchField`, import `search.css`, and load `clients.docsSearch` on docs
+pages, using the existing `--ink`, `--ink-soft`, `--rule` and `--paper` theme.
+Retained tests must run the generated Worker with native Cache API and rate-limit
+bindings and simulated trusted ingress identity; fake only the paid/network edge.
+The Base adapter in `cli/fixtures/docs-search/runtime.mjs` demonstrates that door.
+Do not replace admission or cache checks with always-successful stubs. After the
+release, uip owns the three seed pin/record updates and their released-rer
+build/dev/tests and fresh real-provider acceptance. This is not all-seed adoption.
 
 `rer build --site` and `rer deploy --site --dry-run` render and validate locally
 with no provider requests or embedding calls. The plan identifies runtime type,

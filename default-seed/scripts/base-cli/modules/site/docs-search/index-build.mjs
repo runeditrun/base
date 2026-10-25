@@ -1,9 +1,18 @@
 import { createHash } from 'node:crypto';
+import { searchPolicy } from './policy.mjs';
 
 export const model = '@cf/baai/bge-base-en-v1.5';
 export const pooling = 'cls';
 export const dimensions = 768;
 const digest = value => createHash('sha256').update(value).digest('hex');
+
+// Shared by the deploy kit and the standalone 12-file artifact helper. Keep the
+// namespace algorithm stable: adoption must not reset the existing local limit.
+export const siteRateLimit = worker => ({
+  type: 'ratelimit', name: 'SEARCH_RATE_LIMITER',
+  namespace_id: String(parseInt(digest(worker).slice(0, 12), 16) + 1),
+  simple: { limit: searchPolicy.limit, period: searchPolicy.period },
+});
 
 // Keep long sections inside the model's context. Every part keeps the same
 // heading link; retrieval collapses duplicate links after scoring.
