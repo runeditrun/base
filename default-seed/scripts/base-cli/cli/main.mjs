@@ -2,7 +2,7 @@ import './sqlite-notice.mjs';
 import {authoringVerbs} from './contract.mjs';
 import { parse, help } from './parse.mjs';
 import { output } from './output.mjs';
-import { invalid, RerError } from './errors.mjs';
+import { invalid, RerError, unexpectedFailure } from './errors.mjs';
 import { resolveProject, parsingProfile } from './project.mjs';
 import { check, describe, doctorSummary } from './inspect.mjs';
 import { selectNodeRuntime } from './node-runtime.mjs';
@@ -86,12 +86,6 @@ export async function main(argv = process.argv.slice(2)) {
   const failure = error instanceof RerError ? error : unexpectedFailure(error);
   out.error(failure); out.result(false, failure.exitCode, { ...failure.exportDetails, ...(failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }) }); return failure.exitCode;
  }
-}
-
-// A failure rer did not classify keeps its own first line; the hint is the next step.
-function unexpectedFailure(error) {
- const message = String(error?.message ?? error).split('\n')[0].trim().slice(0, 300);
- return new RerError('command_failed', `${message || 'Command failed.'}\nUnexpected failure: run the command again, and if it repeats inspect the project operating documentation.`, 1);
 }
 
 function showHelp(options,out) {
