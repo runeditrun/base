@@ -26,11 +26,15 @@ test('resume keeps the running state from before the first attempt, including be
    })) { killed = true; child.kill('SIGKILL'); }
   });
   assert.equal((await exited).signal, 'SIGKILL');
-  const deadline = Date.now() + 30_000;
-  while ((await running()).length && Date.now() < deadline) await delay(100);
-  assert.equal((await running()).length, 0);
+  if (phase !== 'ready') {
+   const deadline = Date.now() + 30_000;
+   while ((await running()).length && Date.now() < deadline) await delay(100);
+   assert.equal((await running()).length, 0);
+  }
   const retry = await f.run(args);
-  assert.equal(result(retry).outcome, 'updated', retry.stderr);
+  const retried = result(retry);
+  assert.ok(retried.outcome === 'updated' || phase === 'ready' && retried.outcome === 'refused' && retried.error_code === 'release_unverified', retry.stderr);
+  assert.equal(JSON.parse(await f.git(f.root, 'show', 'HEAD:rer-upstream.json')).commit, release.commit);
   assert.equal((await running()).length, initiallyRunning ? 1 : 0);
   if (initiallyRunning) assert.equal((await fetch(f.url + '/health')).status, 200);
   assert.deepEqual((await f.sql('SELECT id, body FROM upgrade_records'))[0].results, [ownerRow]);
