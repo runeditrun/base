@@ -212,13 +212,52 @@ a sequence and protects the new snapshot and any journal-referenced backup,
 including when the clock moves backward. A previously
 stopped app is stopped again after verification.
 
-A rollback records durable `rolling_back` intent before stopping, resetting or
-restoring anything. An interrupted or failed rollback keeps its journal and backup for manual repair. Retrying an
-upgrade refuses until `rer upgrade --restore BACKUP` completes the restore.
-Restore checks the saved components and their contents before removing live
-state; an incomplete or older unverifiable backup is refused. Recovery commands
-appear only for a verified backup and a safe checkout basename, with a guarded
-folder change so a failed `cd` cannot reset the caller's checkout.
+Durable artifacts have one closed outcome table:
+
+| Artifact / journal stages | What it protects | Next upgrade, `--check`, or `--restore` |
+| --- | --- | --- |
+| PRE-SWITCH: `intent.json`, `preparing`, `needs_integration`, `prepared`, `stopping` | Running-state intent and a disposable integration; no tracked source or database needs undoing | Discard and prepare again at today's HEAD, even after owner commits or branch changes. A matching `needs_integration` can still be resolved with `--continue`. |
+| PROTECTED: `switch_pending`, `switched`, `installed`, `started`, `verified`, `rolling_back`, `rollback_failed` | A possibly switched checkout and its original data snapshot | Keep the journal, integration and referenced snapshot until verification or restore completes. `switch_pending` also covers a kill between Git switching and the next journal write. |
+| TERMINAL: `complete`, `rolled_back` | Settled source and data | Discardable at any HEAD. If `runtimeSettled` is false, first settle the earlier running-state intent; a matching request may return the saved outcome. |
+
+Before handing off runtime custody or emitting `get`, rer writes
+`.rer/upgrade/intent.json`. It carries the original running state through a crash
+before there is a journal. The journal then takes over that intent. An app that
+was running is restarted when the retry reclaims the exact abandoned operation
+custody. If the owner restarted and then stopped the app after the crash, that
+new operation supersedes the old intent and the app stays stopped. A currently
+running app stays running. Settled attempts use the app's current state. No HEAD
+reset or hand deletion of either control file is needed for stale preparations;
+a successful explicit restore also removes the intent.
+
+A protected journal is retained when HEAD moves, including an owner commit or
+reset. Rer refuses a different target or `--check` until the interrupted update
+is verified with its original target or restored. It never calls a damaged
+store an updated baseline, and never prunes a referenced snapshot. A rollback
+records durable `rolling_back` intent before its first mutation. An interrupted
+or failed rollback keeps its journal and backup until `rer upgrade --restore
+BACKUP` completes. Restore checks all saved components before removing live
+state; an incomplete or older unverifiable backup is refused.
+
+Refusals retain their cause: `worktree_dirty` means commit or stash all changes,
+including untracked files; `not_on_branch` means check out an existing branch
+(the interrupted upgrade's original branch for recovery). Detached or unborn
+HEADs cannot upgrade. A moved HEAD returns `refused` and retains protected
+recovery. A live updater returns `refused` with "another upgrade is running";
+wait for it, without attempting recovery. Linked or foreign-owned upgrade
+directories, unreadable journals or intents, and malformed control records
+return `refused` without changing the app or state. Keep unreadable records and
+backups and ask your agent to recover them. An unreadable Git HEAD can return
+`checkout_missing`; repair HEAD first. `rollback_failed` is reserved for an
+actual failed or interrupted rollback, not these precondition failures.
+
+For a protected journal, safe local guidance names the journal, snapshot and
+previous HEAD. Satisfy its preconditions first: commit or stash changes and
+check out the original branch. Run the printed `rer upgrade --cwd CHECKOUT
+--restore BACKUP`; if you stashed changes, reapply them after restore. Guidance
+never asks for a hard reset or a separate stop command. Recovery commands appear
+only for a verified backup and safe checkout identity. A healthy concurrent
+updater receives no recovery advice.
 
 The checkout's dispatcher must support local-operation ownership handoff. Older
 pins (including rer 0.2.72 and 0.2.79) are refused before any stop, snapshot or
@@ -397,7 +436,7 @@ line that still names it. A later refresh is a version bump:
 ### Exports
 
 `recoveryInfo({checkout, journalKey, repository, fromCommit, toCommit})` reads a
-failed rollback's local journal and completed backup. It returns either
+protected interrupted upgrade or rollback's local journal and completed backup. It returns either
 `{status: 'available', previous_head, checkout_name, backup_name}` or
 `{status: 'unavailable', reason}`. The task key, repository, exact pins and actual
 checkout basename must agree with the saved records. Older unbound journals are

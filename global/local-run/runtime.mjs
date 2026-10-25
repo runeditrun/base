@@ -2,7 +2,8 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createConnection } from 'node:net';
-import { localOperation } from '../../onboarding/local/operation.mjs';
+import { readFile } from 'node:fs/promises';
+import { localOperation, ownerAlive } from '../../onboarding/local/operation.mjs';
 import { processStart } from '../../onboarding/local/process-table.mjs';
 import { liveServers } from '../registry.mjs';
 import { ownRoot } from '../package-info.mjs';
@@ -11,10 +12,22 @@ import { resolveProject } from '../../cli/project.mjs';
 import { run } from './process.mjs';
 import { failure } from './error.mjs';
 
+const upgradeBusy = () => Object.assign(failure('refused', 'Another upgrade is running or another local operation owns this checkout. Wait for it to finish, then rerun rer upgrade.'), { operationBusy: true });
+
 export async function runningApp(checkout) {
  const records = (await liveServers()).filter(record => resolve(record.checkout) === checkout);
  if (records.some(record => record.mode !== 'dev') || records.length > 1) throw failure('refused');
  return records[0] ?? null;
+}
+// Read-only refusal before interpreting somebody else's in-progress journal.
+export async function assertOperationAvailable(checkout) {
+ let owner;
+ try { owner = JSON.parse(await readFile(join(checkout, '.wrangler/local-operation/active.json'), 'utf8')); }
+ catch (error) { if (error.code === 'ENOENT' || error instanceof SyntaxError) return; throw error; }
+ if (Number.isSafeInteger(owner?.pid) && owner.pid > 0 && await ownerAlive(owner)) {
+  const app = await runningApp(checkout);
+  if (app?.owner?.pid !== owner.pid) throw upgradeBusy();
+ }
 }
 // Use the pinned dispatcher's existing authenticated management transport. Old
 // servers have no advertised handoff and are refused before stop or state edits.
@@ -42,19 +55,19 @@ export async function acquireOperation(checkout, beforeHandoff = async () => {})
  }
  try {
   const operation = await localOperation(checkout);
-  try { await beforeHandoff(); return operation; }
+  try { await beforeHandoff(operation); return operation; }
   catch (error) { await operation.release(); throw error; }
  }
  catch (error) {
   if (error.code !== 'LOCAL_OPERATION_BUSY') throw error;
   const record = await runningApp(checkout);
-  if (!record || record.owner?.pid !== error.ownerPid) throw error;
+  if (!record || record.owner?.pid !== error.ownerPid) throw upgradeBusy();
   let status;
   try { status = await management(record, 'status'); } catch { /* Old protocol or unreachable control: refuse without mutation. */ }
   if (status?.operationHandoff !== 1) {
    throw failure('refused', 'This running app uses a rer version without upgrade ownership handoff. Stop it with rer dev --stop in this checkout, then install a release with handoff support before upgrading.');
   }
-  await beforeHandoff();
+  await beforeHandoff({ identity: error.ownerIdentity });
   const target = { pid: process.pid, start: await processStart(process.pid) };
   const reply = await management(record, 'operation-handoff:' + Buffer.from(JSON.stringify(target)).toString('base64url'));
   return localOperation(checkout, reply.operationToken, { adopt: true });

@@ -44,5 +44,21 @@ export async function readControl(path, name) {
  } finally { await file?.close(); }
 }
 
+/** Closed durable-artifact outcome table (also in global/README.md):
+ * PRE-SWITCH: intent, preparing, needs_integration, prepared, stopping.
+ *   No tracked source/database needs undoing. Discard and prepare at today's HEAD.
+ * PROTECTED: switch_pending, switched, installed, started, verified,
+ *   rolling_back, rollback_failed. Retain until verified or snapshot restored,
+ *   regardless of today's HEAD. switch_pending protects the Git/write gap.
+ * TERMINAL: complete, rolled_back. Data is settled; discardable at any HEAD.
+ *   runtimeSettled=false still requires settling runtime custody before redo.
+ * Runtime intent is inherited only from the exact crashed custodian reclaimed
+ * by this attempt; an owner's later start/stop supersedes it.
+ */
+export const preSwitchStages = ['preparing', 'needs_integration', 'prepared', 'stopping'];
 export const recoveryStages = ['switch_pending', 'switched', 'installed', 'started', 'verified', 'rolling_back', 'rollback_failed'];
+export const terminalStages = ['complete', 'rolled_back'];
+export const journalStages = [...preSwitchStages, ...recoveryStages, ...terminalStages];
 export const needsRecovery = journal => recoveryStages.includes(journal.stage);
+export const artifactOutcome = journal => needsRecovery(journal) ? 'protected' :
+ terminalStages.includes(journal.stage) ? 'terminal' : preSwitchStages.includes(journal.stage) ? 'pre-switch' : 'none';

@@ -8,9 +8,11 @@ import { failure, phases, errorCodes } from './error.mjs';
 import { recordedRelease, resolveRelease } from './release.mjs';
 import { prepareMerge, continueMerge, cleanupMerge } from './merge.mjs';
 import { backup, readJournal, writeJournal, snapshot, rowCounts, checkPriorData, restoreState } from './state.mjs';
-import { needsRecovery } from './journal.mjs';
-import { readIntent, rememberIntent, forgetIntent } from './intent.mjs';
-import { acquireOperation, returnOperation, runningApp, stopApp, startApp, health, verb } from './runtime.mjs';
+import { needsRecovery, artifactOutcome } from './journal.mjs';
+import { readIntent, rememberIntent, forgetIntent, intendedRunning } from './intent.mjs';
+import { acquireOperation, assertOperationAvailable, returnOperation, runningApp, stopApp, startApp, health, verb } from './runtime.mjs';
+
+import { preflight, discard } from './preparation.mjs';
 
 const emptyConflicts = () => ({ public_paths: [], other_count: 0 });
 function output(outcome, journal, started, error_code) {
@@ -19,21 +21,6 @@ function output(outcome, journal, started, error_code) {
   migrations_applied: outcome === 'updated' ? journal.prepared?.migrations_applied ?? [] : [],
   owner_changes_kept: journal.prepared?.owner_changes_kept ?? 0,
   conflicts: journal.prepared?.conflicts ?? emptyConflicts(), ...(error_code ? { error_code } : {}), duration_ms: Date.now() - started };
-}
-async function preflight(checkout) {
- try {
-  if (await text(checkout, ['rev-parse', '--show-toplevel']) !== checkout) throw failure('checkout_missing');
- } catch { throw failure('checkout_missing'); }
- const branch = await git(checkout, ['symbolic-ref', '--quiet', '--short', 'HEAD'], { allow: [1] });
- if (!branch.stdout.trim()) throw failure('not_on_branch');
- if (await text(checkout, ['status', '--porcelain', '--untracked-files=all'])) throw failure('worktree_dirty');
- return { head: await text(checkout, ['rev-parse', 'HEAD']), branch: branch.stdout.trim() };
-}
-async function discard(checkout, journal, operation) {
- if (needsRecovery(journal)) throw failure('rollback_failed');
- if (journal.wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
- if (journal.prepared) await cleanupMerge(checkout, journal.prepared);
- await rm(join(checkout, '.rer/upgrade/journal.json'), { force: true });
 }
 async function rollback(checkout, journal, operation) {
  const { metadata } = await backup(checkout, journal.backup);
@@ -70,39 +57,47 @@ async function apply(checkout, journal, operation, phase, allowed) {
 
 /** Local signed updates. All private paths, database names/counts and subprocess
  * output stay in the local journal; only the design's closed outputs escape. */
-export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDiagnostic, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
+export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDiagnostic, onRecovery, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
  const started = Date.now(), phase = phases(onPhase);
- let journal = {}, operation, installed, wasRunning, rememberedIntent = false, settleJournal = false, switched = false, preserveJournal = false, restoring = false;
+ let journal = {}, operation, installed, wasRunning, settleJournal = false, switched = false, preserveJournal = false, restoring = false;
  try {
   if (allowDataChange.length && !process.stdin.isTTY) throw failure('refused');
   try { checkout = await realpath(checkout); } catch { throw failure('checkout_missing'); }
   const loaded = await readJournal(checkout);
-  preserveJournal = loaded !== null;
   journal = loaded ?? {};
-  if (['rolling_back', 'rollback_failed'].includes(journal.stage) && !restore) {
-   await phase('failed', 'rollback_failed');
-   return output('refused', journal, started, 'rollback_failed');
-  }
+  preserveJournal = loaded !== null;
+  const intent = await readIntent(checkout);
+  await assertOperationAvailable(checkout);
   try { installed = await recordedRelease(checkout); }
   catch (error) { if (!restore) throw error; }
   journal.from ??= installed;
   const current = await preflight(checkout);
-  const terminalResume = ['complete', 'rolled_back'].includes(journal.stage) && journal.runtimeSettled === false;
-  const unfinished = journal.version === 1 && (!['rolled_back', 'complete'].includes(journal.stage) || terminalResume);
-  if (terminalResume && !restore && (journalKey && journal.journalKey && journalKey !== journal.journalKey || current.branch !== journal.branch ||
-    current.head !== (journal.stage === 'complete' ? journal.prepared?.candidate : journal.head) ||
-    installed?.commit !== (journal.stage === 'complete' ? journal.target?.commit : journal.from?.commit) ||
-    to && ![journal.target?.commit, journal.target?.tag].includes(to))) throw failure('refused');
-  if (needsRecovery(journal) && !restore && (current.branch !== journal.branch ||
-    current.head !== journal.prepared?.candidate && !(journal.stage === 'switch_pending' && current.head === journal.head))) throw failure('rollback_failed');
-  const intent = await readIntent(checkout);
-  if (intent && !unfinished && (intent.head !== current.head || intent.branch !== current.branch)) throw failure('refused', 'An unfinished upgrade intent remains in .rer/upgrade/intent.json; keep it and recover the original checkout before upgrading.');
-  wasRunning = unfinished && typeof journal.wasRunning === 'boolean' ? journal.wasRunning : intent?.wasRunning ?? Boolean(await runningApp(checkout));
-  operation = await acquireOperation(checkout, async () => {
-   if (!unfinished && !restore) {
-    wasRunning = await rememberIntent(checkout, current, wasRunning); rememberedIntent = true;
+  const protectedJournal = needsRecovery(journal);
+  if (protectedJournal && !restore) {
+   if (current.branch !== journal.branch) throw failure('not_on_branch', 'The interrupted upgrade belongs to a different branch. Return to that branch before recovery.');
+   if (['rolling_back', 'rollback_failed'].includes(journal.stage)) {
+    onRecovery?.(); await phase('failed', 'rollback_failed');
+    return output('refused', journal, started, 'rollback_failed');
    }
+   if (current.head !== journal.prepared?.candidate && !(journal.stage === 'switch_pending' && current.head === journal.head)) {
+    throw failure('refused', 'HEAD moved after an interrupted upgrade. Its journal and snapshot are retained; restore them before another upgrade.');
+   }
+   if (check || to && ![journal.target?.commit, journal.target?.tag].includes(to) ||
+     journalKey && journal.journalKey && journalKey !== journal.journalKey) {
+    throw failure('refused', 'An interrupted upgrade must be verified with its original target or explicitly restored before another request.');
+   }
+  }
+  const terminalResume = artifactOutcome(journal) === 'terminal' && journal.runtimeSettled === false && !restore &&
+   current.branch === journal.branch && current.head === (journal.stage === 'complete' ? journal.prepared?.candidate : journal.head) &&
+   (!to || [journal.target?.commit, journal.target?.tag].includes(to)) && (!journalKey || journalKey === journal.journalKey);
+  operation = await acquireOperation(checkout, async custody => {
+   wasRunning = protectedJournal ? journal.wasRunning : intendedRunning(intent ?? loaded, custody, await runningApp(checkout));
+   if (!protectedJournal && !restore) await rememberIntent(checkout, current, wasRunning, custody);
   });
+  if (!protectedJournal) preserveJournal = false;
+  // Discardable attempts protect runtime intent only. Settle it at today's HEAD
+  // even when the owner committed or selected a different target after the crash.
+  if (!protectedJournal && !restore && wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
   try { await serverResources(checkout, { env: { ...process.env, RER_SERVERS_LOAD_THRESHOLD: undefined } }); }
   catch { throw failure('disk_low'); }
   // Ensure private upgrade records never turn an otherwise clean seed dirty.
@@ -117,6 +112,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    const { metadata } = await backup(checkout, restore);
    journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: metadata.wasRunning };
    restoring = true;
+   await forgetIntent(checkout);
    await rollback(checkout, journal, operation);
    if (repairPreparation) {
     const ref = await git(checkout, ['show-ref', '--verify', '--quiet', `refs/heads/${repairPreparation.branch}`], { allow: [1] });
@@ -129,22 +125,21 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   if (terminalResume) {
    // A kill after the verdict but before returning runtime custody must still
    // restore attempt one's running state. A settled journal is ordinary history.
-   await stopApp(checkout, operation);
-   if (journal.wasRunning) await health(checkout, await startApp(checkout, operation));
+   if (!wasRunning) await stopApp(checkout, operation);
    const result = output(journal.stage === 'complete' ? 'updated' : 'rolled_back', journal, started,
     errorCodes.has(journal.result?.error_code) ? journal.result.error_code : undefined);
-   journal.result = result; settleJournal = true;
+   journal.result = result; await forgetIntent(checkout); settleJournal = true;
    await phase(journal.stage === 'complete' ? 'ready' : 'failed', result.error_code);
    return result;
   }
   if (journalKey && journal.journalKey === journalKey && journal.result) {
-   if (journal.wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
-   if (rememberedIntent) await forgetIntent(checkout);
+   await forgetIntent(checkout);
    return journal.result;
   }
   if (journal.stage === 'verified') {
    if (current.head !== journal.prepared?.candidate || current.branch !== journal.branch || to && ![journal.target.commit, journal.target.tag].includes(to)) throw failure('refused');
    switched = true;
+   await forgetIntent(checkout);
    if (journal.wasRunning) await health(checkout, (await runningApp(checkout))?.url ?? await startApp(checkout, operation));
    else await stopApp(checkout, operation);
    const result = output('updated', journal, started);
@@ -152,28 +147,30 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    await cleanupMerge(checkout, journal.prepared); await phase('ready');
    return result;
   }
-  if (unfinished) {
-   if (journalKey && journal.journalKey && journalKey !== journal.journalKey) { preserveJournal = true; throw failure('refused'); }
-   if (current.branch !== journal.branch) throw failure('not_on_branch');
+  if (protectedJournal || artifactOutcome(journal) === 'pre-switch') {
+   const samePreparation = current.head === journal.head && current.branch === journal.branch && (!to || [journal.target?.commit, journal.target?.tag].includes(to));
    if (journal.prepared?.candidate && (current.head === journal.prepared.candidate || journal.stage === 'switch_pending' && current.head === journal.head) && ['switch_pending', 'switched', 'installed', 'started'].includes(journal.stage)) {
     switched = true;
-    if (to && ![journal.target.commit, journal.target.tag].includes(to)) throw failure('refused');
+    journal.custody = operation.identity; await writeJournal(checkout, journal);
+    await forgetIntent(checkout);
     await stopApp(checkout, operation);
     await phase('get');
     const verified = await resolveRelease({ checkout, to: journal.target.commit, repository: journal.from.repository, anchors });
     if (verified.commit !== journal.target.commit) throw failure('release_unverified');
     await apply(checkout, journal, operation, phase, allowDataChange);
-   } else if (current.head !== journal.head) throw failure('refused');
-   else if (journal.stage === 'needs_integration' && continuing) {
+   } else if (journal.stage === 'needs_integration' && samePreparation && continuing) {
     await phase('get');
     journal.target = await resolveRelease({ checkout, to: journal.target.commit, repository: journal.from.repository, anchors });
     journal.prepared = await continueMerge({ checkout, ...journal.prepared });
     journal.stage = 'prepared';
-   } else if (journal.stage === 'needs_integration') {
+   } else if (journal.stage === 'needs_integration' && samePreparation) {
     await phase('failed', 'needs_integration');
     return output('needs_integration', journal, started, 'needs_integration');
-   } else { await discard(checkout, journal, operation); journal = {}; preserveJournal = false; }
-  } else journal = {};
+   } else { await discard(checkout, journal); journal = {}; preserveJournal = false; }
+  } else {
+   if (loaded) await discard(checkout, journal);
+   journal = {};
+  }
   if (!switched) {
    if (!journal.head) {
     if (continuing) throw failure('needs_integration');
@@ -185,7 +182,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     if (compareVersion(target.tag.slice(1), from.tag.slice(1)) <= 0) throw failure('release_unverified');
     const ancestry = await git(checkout, ['merge-base', '--is-ancestor', from.commit, target.commit], { allow: [1] });
     if (ancestry.code) throw failure('release_unverified');
-    journal = { version: 1, journalKey: journalKey ?? randomUUID(), checkout_name: basename(checkout), head: current.head, branch: current.branch, from, target, wasRunning, runtimeSettled: false, stage: 'preparing' };
+    journal = { version: 1, journalKey: journalKey ?? randomUUID(), checkout_name: basename(checkout), head: current.head, branch: current.branch, from, target, wasRunning, custody: operation.identity, runtimeSettled: false, stage: 'preparing' };
     await writeJournal(checkout, journal);
     preserveJournal = false;
     await forgetIntent(checkout);
@@ -199,9 +196,11 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     }
     journal.stage = 'prepared'; await writeJournal(checkout, journal);
    }
+   journal.custody = operation.identity; journal.wasRunning = wasRunning; journal.runtimeSettled = false;
+   await writeJournal(checkout, journal);
    await forgetIntent(checkout);
    await phase('install');
-   if (check) return output('refused', journal, started);
+   if (check) { settleJournal = true; return output('refused', journal, started); }
    await phase('database');
    journal.wasRunning ??= wasRunning;
    journal.stage = 'stopping'; await writeJournal(checkout, journal);
@@ -222,7 +221,9 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
  } catch (error) {
   if (error.diagnostic) onDiagnostic?.(error.diagnostic);
   journal.from ??= installed;
-  const code = !switched && needsRecovery(journal) && !restore ? 'rollback_failed' : errorCodes.has(error.error_code) ? error.error_code : 'refused';
+  const code = errorCodes.has(error.error_code) ? error.error_code : 'refused';
+  const busy = error.code === 'LOCAL_OPERATION_BUSY' || error.operationBusy;
+  if (!switched && needsRecovery(journal) && !busy) onRecovery?.();
   if (restoring) {
    journal.stage = 'rollback_failed'; await writeJournal(checkout, journal).catch(() => {});
    await phase('failed', 'rollback_failed');
@@ -242,15 +243,14 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    }
   }
   if (preserveJournal) {
-   if (operation && rememberedIntent) await forgetIntent(checkout);
    await phase('failed', code);
    return output('refused', journal, started, code);
   }
   if ((journal.wasRunning ?? wasRunning) && operation) {
    try { if (!await runningApp(checkout)) await health(checkout, await startApp(checkout, operation)); }
    catch {
-    journal.stage = 'rollback_failed'; await writeJournal(checkout, journal).catch(() => {});
-    await phase('failed', 'rollback_failed'); return output('refused', journal, started, 'rollback_failed');
+    onDiagnostic?.('The app could not be restarted. Its pre-switch runtime intent is retained; rerun rer upgrade to try again.');
+    await phase('failed', 'start_failed'); return output('refused', journal, started, 'start_failed');
    }
   }
   if (operation) await forgetIntent(checkout);

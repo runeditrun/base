@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
 import { privateDirectory } from '../../onboarding/local/files.mjs';
 import { resolveProject } from '../../cli/project.mjs';
 import { failure } from './error.mjs';
-import { readControl } from './journal.mjs';
+import { readControl, journalStages } from './journal.mjs';
 import { stateManifest, validBackupName } from './state-manifest.mjs';
 
 export const upgradeDirectory = checkout => join(checkout, '.rer/upgrade');
@@ -46,7 +46,7 @@ async function safeParents(checkout, directory) {
 export async function readJournal(checkout) {
  await safeParents(checkout, upgradeDirectory(checkout));
  const journal = await readControl(join(upgradeDirectory(checkout), 'journal.json'), 'upgrade journal (.rer/upgrade/journal.json)');
- if (journal && (journal.version !== 1 || !['preparing', 'needs_integration', 'prepared', 'stopping', 'switch_pending', 'switched', 'installed', 'started', 'verified', 'complete', 'rolling_back', 'rollback_failed', 'rolled_back'].includes(journal.stage))) throw failure('refused', 'Unreadable upgrade journal (.rer/upgrade/journal.json); keep it and the upgrade backups and ask your agent to recover them.');
+ if (journal && (journal.version !== 1 || !journalStages.includes(journal.stage))) throw failure('refused', 'Unreadable upgrade journal (.rer/upgrade/journal.json); keep it and the upgrade backups and ask your agent to recover them.');
  return journal;
 }
 export const writeJournal = (checkout, value) => writeJSON(checkout, join(upgradeDirectory(checkout), 'journal.json'), value);

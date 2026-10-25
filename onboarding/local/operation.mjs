@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { link, lstat, open, readFile, rename, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { privateDirectory } from './files.mjs'
@@ -11,7 +11,7 @@ const busy = async (path) => {
  let command='process';
  if(pid)try{command=await processName(pid,inspectionContext({budgetMs:1000}));}catch(error){if(!uncheckedInspection(error))throw error;}
  const identity=pid?`PID ${pid} (${command})`:'an unidentified process';
- return Object.assign(new Error(`An active local operation owns the state: ${identity}. Stop it with rer dev --stop or rer preview --stop; for an unmanaged process, stop PID ${pid ?? 'shown in the lock'} before retrying.`), {code: 'LOCAL_OPERATION_BUSY', ownerPid: pid});
+ return Object.assign(new Error(`An active local operation owns the state: ${identity}. Stop it with rer dev --stop or rer preview --stop; for an unmanaged process, stop PID ${pid ?? 'shown in the lock'} before retrying.`), {code: 'LOCAL_OPERATION_BUSY', ownerPid: pid, ownerIdentity: capabilityIdentity(owner?.token)});
 }
 const graceMs = 10000
 
@@ -33,22 +33,25 @@ export async function localOperation(root, inheritedToken, { adopt = false } = {
     const self = await currentProcess()
     // Nested builds can borrow in the very same process as setup. Their release
     // remains a no-op; only an explicit incoming handoff may adopt that record.
-    return custody(path, inheritedToken, self, adopt || owner.pid !== self.pid)
+    return Object.assign(custody(path, inheritedToken, self, adopt || owner.pid !== self.pid), { identity: capabilityIdentity(inheritedToken) })
   }
   const self = await currentProcess()
-  let file
+  let file, reclaimedIdentity
   for (let attempt = 0; !file; attempt++) {
     try { file = await open(path, 'wx', 0o600) } catch (error) {
       if (error.code !== 'EEXIST') throw error
       // A killed process cannot release its lock. Take over only when the
       // recorded process is gone; a half-written file gets a short grace.
-      if (attempt === 0 && await takeOver(path)) continue
+      if (attempt === 0) {
+        const reclaimed = await takeOver(path)
+        if (reclaimed) { reclaimedIdentity = reclaimed.identity; continue }
+      }
       throw await busy(path)
     }
   }
   const token = randomUUID()
   try { await file.writeFile(JSON.stringify({ ...self, token })) } finally { await file.close() }
-  return custody(path, token, self)
+  return Object.assign(custody(path, token, self), { reclaimedIdentity, identity: capabilityIdentity(token) })
 }
 
 // Ownership changes by atomic replacement, never by unlink/create. Borrowers
@@ -124,8 +127,8 @@ export async function ownerAlive(owner) {
 async function takeOver(path) {
   const judged = await staleIdentity(path)
   if (judged === undefined) return false
-  if (judged === null) return true // Already gone: retry the exclusive create.
-  const guardPath = `${path}.takeover-${judged}`
+  if (judged === null) return {} // Already gone: retry the exclusive create.
+  const guardPath = `${path}.takeover-${judged.id}`
   let guard
   for (let attempt = 0; !guard; attempt++) {
     try { guard = await open(guardPath, 'wx', 0o600) } catch (error) {
@@ -138,8 +141,10 @@ async function takeOver(path) {
   try {
     await guard.writeFile(JSON.stringify(await currentProcess()))
     const current = await identity(path)
-    if (current === judged) await unlink(path).catch(missing)
-    return true
+    if (current !== judged.id) return {}
+    await unlink(path).catch(missing)
+    // Report only the exact abandoned custodian we removed, never a capability.
+    return { identity: judged.identity }
   } finally {
     await guard.close()
     await unlink(guardPath).catch(missing)
@@ -160,9 +165,9 @@ async function staleIdentity(path) {
     const id = key(status)
     try {
       const owner = JSON.parse(await handle.readFile('utf8'))
-      if (Number.isSafeInteger(owner.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
+      if (Number.isSafeInteger(owner.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : { id, identity: capabilityIdentity(owner.token) }
     } catch { /* Half-written or unreadable: judged by age below. */ }
-    return Date.now() - Number(status.mtimeMs) > graceMs ? id : undefined
+    return Date.now() - Number(status.mtimeMs) > graceMs ? { id } : undefined
   } finally { await handle.close() }
 }
 
@@ -216,3 +221,7 @@ async function identity(path) {
 const key = (status) => `${status.dev}-${status.ino}-${status.ctimeNs}`
 // A rename changes ctime, so a moved file is matched by its unchanged fields.
 const movedKey = (status) => `${status.dev}-${status.ino}-${status.birthtimeNs}-${status.mtimeNs}`
+
+// A non-capability witness: callers can recognize the exact crashed custody
+// reclaimed by takeOver without exposing or reusing its secret token.
+const capabilityIdentity = token => typeof token === 'string' ? createHash('sha256').update(token).digest('hex') : undefined

@@ -1,40 +1,7 @@
 import { locate } from '../checkout.mjs';
 import { upgrade } from './upgrade.mjs';
-import { backup, readJournal } from './state.mjs';
-import { needsRecovery } from './journal.mjs';
-import { git } from './process.mjs';
-import { isDeepStrictEqual } from 'node:util';
-import { recoveryInfo } from './recovery.mjs';
-
-const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
-
-async function printRecovery(checkout) {
- let identity = {}, journal;
- try {
-  journal = await readJournal(checkout);
-  identity = { journalKey: journal?.journalKey, repository: journal?.from?.repository,
-   fromCommit: journal?.from?.commit, toCommit: journal?.target?.commit };
- } catch { /* The safe reader supplies the closed unavailable result. */ }
- const recovery = await recoveryInfo({ checkout, ...identity });
- if (recovery.status === 'unavailable') {
-  process.stderr.write(`Recovery unavailable (${recovery.reason}). Inspect the local upgrade journal with your agent.\n`);
-  // An unreadable HEAD can prevent Git from even recognizing its repository.
-  // Name only a validated local snapshot; never invent a bound reset command.
-  if (recovery.reason === 'journal_invalid' && needsRecovery(journal ?? {})) {
-   try {
-    const head = await git(checkout, ['rev-parse', '--verify', 'HEAD^{commit}'], { allow: [1, 128] });
-    const { metadata } = await backup(checkout, journal.backup);
-    if (head.code && metadata.head === journal.head && isDeepStrictEqual(metadata.from, journal.from) && isDeepStrictEqual(metadata.target, journal.target)) {
-     process.stderr.write(`Retained journal: .rer/upgrade/journal.json; snapshot: .rer/upgrade/backups/${metadata.name}. Ask your agent to repair unreadable Git HEAD, then run rer upgrade --restore ${shellQuote(metadata.name)} in this checkout.\n`);
-    }
-   } catch { /* Unverifiable snapshots never produce a recovery command. */ }
-  }
-  return;
- }
- process.stderr.write('Unfinished upgrade journal: .rer/upgrade/journal.json. Keep it and snapshot .rer/upgrade/backups/' + recovery.backup_name + ' until recovery completes.\n');
- process.stderr.write('Open a terminal in the parent folder containing the reported checkout folder; locate that folder locally if necessary.\n');
- process.stderr.write(`cd -- ${shellQuote(recovery.checkout_name)} &&\nrer dev --stop &&\ngit reset --hard ${shellQuote(recovery.previous_head)} && rer upgrade --restore ${shellQuote(recovery.backup_name)}\n`);
-}
+import { readJournal } from './state.mjs';
+import { printRecovery } from './recovery-guidance.mjs';
 
 export const help = `Usage: rer upgrade [--check] [--to COMMIT] [--continue] [--restore BACKUP]
                    [--json] [--anchors FILE] [--allow-data-change TABLE] [--cwd DIR]
@@ -64,7 +31,8 @@ export async function upgradeCommand(args) {
  }
  if ([options.check, options.continue, Boolean(options.restore)].filter(Boolean).length > 1 || options.restore && options.to) { process.stderr.write(help); return 2; }
  const checkout = locate(['upgrade', ...(options.cwd ? ['--cwd', options.cwd] : [])]).root;
- const result = await upgrade({ checkout, ...options, allowDataChange: allowed, onDiagnostic: message => process.stderr.write(message + '\n'), onPhase: event => {
+ let recoveryNeeded = false;
+ const result = await upgrade({ checkout, onRecovery: () => { recoveryNeeded = true; }, ...options, allowDataChange: allowed, onDiagnostic: message => process.stderr.write(message + '\n'), onPhase: event => {
   if (options.json) process.stdout.write(JSON.stringify({ event: 'phase', ...event }) + '\n');
   else process.stderr.write(`rer upgrade: ${event.phase}${event.error_code ? ` (${event.error_code})` : ''}\n`);
  } });
@@ -74,6 +42,6 @@ export async function upgradeCommand(args) {
   const journal = await readJournal(checkout);
   if (journal?.prepared?.worktree) process.stderr.write(`Resolve and commit the integration in ${journal.prepared.worktree}, then run rer upgrade --continue in the original checkout.\n`);
  }
- if (result.error_code === 'rollback_failed') await printRecovery(checkout);
+ if (recoveryNeeded || result.error_code === 'rollback_failed') await printRecovery(checkout);
  return result.outcome === 'updated' || options.check && !result.error_code || options.restore && !result.error_code ? 0 : 1;
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gb54d1744",
+  "cliVersion": "0.2.80-dev.g413e6a11",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -133,7 +133,7 @@
     },
     "local/operation.mjs": {
       "source": "onboarding/local/operation.mjs",
-      "sha256": "0ac43ad973a99d9f77e6210407d42f5599447714aa842817c7ba8495f34f66cd"
+      "sha256": "79cee70886b656225786d294d2e1fd203090cb2346aa58e12eafe06d5e6ff6b2"
     },
     "local/owner.mjs": {
       "source": "onboarding/local/owner.mjs",
