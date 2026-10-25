@@ -2,6 +2,15 @@ import { createPortability, createPortabilityHandler, readArchive, type ArchiveP
 declare const db: D1Database;
 declare const bucket: R2Bucket;
 const policy:ArchivePolicy={
+  restoreHook:{registry:{table:'erased_accounts',idColumn:'id'},async run({stagedDb,liveDb,archiveManifest}) {
+    const records=await stagedDb.read('accounts',{limit:10});
+    for(const id of liveDb.erasedIds()) {
+      const session=await stagedDb.delete('sessions',{account:id});
+      await stagedDb.update('accounts',{id},{state:'erased'});
+      liveDb.audit({opaqueId:id,revocations:{session}});
+    }
+    void [records,archiveManifest];
+  }},
   product:'fixture',buckets:{FILES:{}},exportRow:(_table,row):Row=>row,
   importSafety:{connections:{status:['inactive'],token:[null]}},
   importRow:(_table,row):Row=>({...row,status:'inactive',token:null}),
@@ -14,6 +23,7 @@ const id:string=await service.exports.create();
 const statements:D1PreparedStatement[]=await service.erasureStatements('notes',{id:'one'});
 const handler:(request:Request)=>Promise<Response|null>=await createPortabilityHandler({db,buckets:{FILES:bucket},policy,appOrigin:'https://example.test',authorize:async()=> 'owner'});
 for await(const record of readArchive(await service.exports.download(id)))if(record.kind==='part')await service.imports.uploadPart('target',record.index,record);
+await service.imports.reclaim('target','owner');
 const restored=await service.imports.finalize('target',{archiveHash:'verified-archive-hash'});
 const safetyChanges:SafetyChange[]=restored.safetyChanges??[];
 const changedRows:number=safetyChanges.reduce((total,change)=>total+change.rows,0);

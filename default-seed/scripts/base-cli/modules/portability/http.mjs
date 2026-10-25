@@ -39,6 +39,7 @@ export async function createPortabilityHandler({db,buckets,policy,appOrigin,base
       if(collection==='exports' && request.method==='POST' && id && action==='advance' && !index)return json(await api.advance(id,await boundedJson(request,maxBodyBytes)));
       if(collection==='exports' && request.method==='GET' && id && action==='download' && !index)return new Response(await api.download(id),{headers:{'Content-Type':'application/x-ndjson','Cache-Control':'no-store'}});
       if(collection==='imports' && request.method==='PUT' && id && action==='parts' && /^(0|[1-9]\d*)$/.test(index??''))return json(await api.uploadPart(id,Number(index),await boundedJson(request,maxBodyBytes)));
+      if(collection==='imports' && request.method==='POST' && id && action==='reclaim' && !index)return json(await api.reclaim(id,actor));
       if(collection==='imports' && request.method==='POST' && id && action==='finalize' && !index)return json(await api.finalize(id,await boundedJson(request,maxBodyBytes)));
       throw new PortabilityError('route_not_found',404);
     }catch(e){const failure=httpFailure(e,{actor:authorizedActor});return json(failure.body,failure.status);}

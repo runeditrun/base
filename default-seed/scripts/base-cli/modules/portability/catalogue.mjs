@@ -1,10 +1,11 @@
+import { restoreHookPolicy } from './restore-hook.mjs';
 import { all, insist, quote, PortabilityError } from './storage.mjs';
 import { canonicalJson, base64, unbase64, utf8 } from './hash.mjs';
 import { schemaIdentityOf } from './schema-identity.mjs';
 import { platformTables, platformTable, identifier, matches } from './bookkeeping.mjs';
 /** Platform bookkeeping is mandatory; operator identity remains a seed choice. */
 export const excludedTables=Object.freeze([...platformTables,'oa_%','oc_%']);
-const fields=['product','excludeTables','includeTables','derivedTables','secretColumns','exportRow','importSafety','importRow','replaceableTables','requiredConfiguration','validateStaged','acceptedSchemas','buckets','extraPayloads','partBytes'];
+const fields=['product','excludeTables','includeTables','derivedTables','secretColumns','exportRow','importSafety','importRow','replaceableTables','requiredConfiguration','validateStaged','restoreHook','acceptedSchemas','buckets','extraPayloads','partBytes'];
 const name=value=>typeof value==='string' && value.length>0 && value.length<=512 && !/[\x00-\x1f]/.test(value);
 const names=value=>Array.isArray(value) && value.every(name) && new Set(value).size===value.length;
 const record=value=>value && typeof value==='object' && !Array.isArray(value) && [Object.prototype,null].includes(Object.getPrototypeOf(value));
@@ -48,10 +49,16 @@ export function policy(input) {
   }
   for(const [key,entry] of Object.entries(result.extraPayloads)) insist(name(key) && typeof entry.produce==='function' && typeof entry.consume==='function','invalid_extra_payload');
   for(const key of ['secretColumns','acceptedSchemas','buckets','extraPayloads'])result[key]=Object.assign(Object.create(null),result[key]);
+  result.restoreHook=restoreHookPolicy(result.restoreHook);
+  if(result.restoreHook) {
+    const table=result.restoreHook.registry.table;
+    insist(!result.includeTables.some(name=>matches(name,table)) && !result.replaceableTables.some(name=>matches(name,table)),'invalid_restore_hook');
+    result.excludeTables=[...result.excludeTables,table];
+  }
   return {...result,excludeTables:[...excludedTables,...result.excludeTables]};
 }
 /** Platform tables are always excluded; explicit includes override only optional exclusions. */
-export const excludedTable=(table,input={})=>platformTable(table) || (!(input.includeTables??[]).includes(table) && [...excludedTables,...(input.excludeTables??[])].some(pattern=>matches(table,pattern)));
+export const excludedTable=(table,input={})=>platformTable(table) || (input.restoreHook?.registry?.table && matches(table,input.restoreHook.registry.table)) || (!(input.includeTables??[]).includes(table) && [...excludedTables,...(input.excludeTables??[])].some(pattern=>matches(table,pattern)));
 async function archived(db,config) {
   const objects=await all(db,"SELECT name,sql,type,tbl_name FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name");
   const kinds=await all(db,'PRAGMA table_list');

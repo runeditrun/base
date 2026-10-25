@@ -46,11 +46,11 @@ export async function importRunning(db,id) {
 // Upload, finalize and abort each claim one request. Renewal and takeover are
 // conditional writes on that claim; an expired request cannot revive itself.
 // Every mutating D1 batch is fenced by the same claim, including publication.
-export async function withImportLease(context,id,operation,{abort=false,staleOnly=false,soleOperator=false}={}) {
+export async function withImportLease(context,id,operation,{abort=false,reclaim=false,staleOnly=false,soleOperator=false}={}) {
   const db=context.db,holder=crypto.randomUUID(),now=Date.now(),lease=await leaseRow(db,id);
   if(!lease)throw new PortabilityError('import_lease_expired',409);
   if(staleOnly && lease.expires_at>now)throw await importRunning(db,id);
-  if(!abort && lease.expires_at<=now)throw new PortabilityError('import_lease_expired',409);
+  if(!abort && !reclaim && lease.expires_at<=now)throw new PortabilityError('import_lease_expired',409);
   if(!soleOperator && lease.holder && lease.expires_at>now)throw await importRunning(db,id);
   // Like staging/publication, claim by a transactional SQL guard. Transport
   // adapters need not expose provider-specific UPDATE result metadata.
@@ -97,6 +97,15 @@ export async function withImportLease(context,id,operation,{abort=false,staleOnl
     const wrap=raw=>{const wrapped=new Proxy(raw,{get(target,key){
       if(key==='bind')return (...values)=>wrap(target.bind(...values));
       if(key==='run')return async()=> (await batch([target]))[0];
+      // D1 also executes mutating SQL through all/first/raw (including WITH
+      // and RETURNING). Only an ordinary SELECT can bypass the write fence.
+      if(!/^\s*SELECT\b/i.test(sql) && ['all','first','raw'].includes(key))return async option=>{
+        const result=(await batch([target]))[0],rows=result.results??[];
+        if(key==='all')return result;
+        if(key==='first')return option===undefined?(rows[0]??null):(rows[0]?.[option]??null);
+        const columns=Object.keys(rows[0]??{}),values=rows.map(row=>columns.map(column=>row[column]));
+        return option?.columnNames?[columns,...values]:values;
+      };
       const value=target[key];return typeof value==='function'?value.bind(target):value;
     }});native.set(wrapped,raw);return wrapped;};
     return wrap(db.prepare(sql));
