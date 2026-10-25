@@ -35,7 +35,7 @@ export function searchCorpus(pages, searchPages) {
  return searchPages;
 }
 
-export async function buildSiteRuntime(project, declaration, corpus, assets, { prepare = false, domain, compatibilityDate, store, signal } = {}) {
+export async function buildSiteRuntime(project, declaration, corpus, assets, { prepare = false, redirects = [], domain, compatibilityDate, store, signal } = {}) {
  const pages = JSON.parse(await readFile(corpus, 'utf8'));
  const chunks = searchChunks(pages), corpusHash = digest(chunks.map(chunk => chunk.hash).join('\n'));
  if (prepare) {
@@ -45,7 +45,11 @@ export async function buildSiteRuntime(project, declaration, corpus, assets, { p
  const { build } = createRequire(join(project.root, 'package.json'))('esbuild');
  const worker = fileURLToPath(new URL('../modules/site/docs-search/worker.ts', import.meta.url));
  const contract = { endpoint: declaration.endpoint, corpusHash, model, pooling };
- const bundled = await build({ absWorkingDir: dirname(worker), stdin: { contents: `import {createSearchWorker} from ${JSON.stringify(worker)};export default createSearchWorker(${JSON.stringify(contract)});`,
+ const redirectModule = fileURLToPath(new URL('../modules/deploy-kit/site-redirects.mjs', import.meta.url));
+ const entry = redirects.length
+  ? `import {createSearchWorker} from ${JSON.stringify(worker)};import {siteRedirectResponse} from ${JSON.stringify(redirectModule)};const search = createSearchWorker(${JSON.stringify(contract)});export default {fetch(request,env){return siteRedirectResponse(request,${JSON.stringify(redirects)}) ?? search.fetch(request,env);}};`
+  : `import {createSearchWorker} from ${JSON.stringify(worker)};export default createSearchWorker(${JSON.stringify(contract)});`;
+ const bundled = await build({ absWorkingDir: dirname(worker), stdin: { contents: entry,
   resolveDir: dirname(worker), sourcefile: 'site-search-entry.ts', loader: 'ts' }, bundle: true, format: 'esm', platform: 'browser', target: 'es2022', write: false });
  const source = bundled.outputFiles[0].text;
  return { type: declaration.type, module: declaration.module, endpoint: declaration.endpoint, bindings: declaration.bindings, model, pooling, corpusHash, source };

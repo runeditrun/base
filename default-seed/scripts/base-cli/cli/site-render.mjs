@@ -72,6 +72,8 @@ try {
  const build = await module.sitePages({ styles, clients, ...(contract ? { contract } : {}), hosting: options.hosting ?? null });
  if (!Array.isArray(build?.pages) || !Array.isArray(build.assets)) fail('sitePages() returns { pages, assets }.');
 
+ // Build metadata stays beside the assets, never in the public asset upload.
+ await writeFile(`${output}.redirects.json`, JSON.stringify(build.redirects === undefined ? [] : build.redirects));
  const written = new Set();
  for (const page of build.pages) {
   if (typeof page?.path !== 'string' || !/^\/(?:[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*)?$/i.test(page.path) || page.path.endsWith('.html') || typeof page.html !== 'string') fail(`Invalid site page ${JSON.stringify(page?.path)}: a path such as /run with its HTML.`);
