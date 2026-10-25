@@ -38,7 +38,7 @@ export async function commitUnit(context: Context, claim: Claim, unit: CommitUni
   const initialLease = await leaseGuard(context, claim);
   insist(await one(context.database, sql(`SELECT 1 WHERE ${initialLease.sql}`, ...(initialLease.params ?? []))), 'job_lease_stale');
   if (unit.rows === 0 && !final) insist(checkpoint === canonical(claim.job.checkpoint), 'job_cursor_without_writes');
-  if (final) insist(await budget.verify(kind.verifyResult(claim.job, unit.resultRef!)), 'job_result_unverified');
+  if (final) insist(await budget.verify(() => kind.verifyResult(claim.job, unit.resultRef!)), 'job_result_unverified');
   const resultHash = final ? await digest(result) : null, tokenHash = await digest(claim.token);
   const predicates = context.predicates(final ? 'publish' : 'commit', claim.job);
   // No pre-verification timestamp is reused in the committing guards.

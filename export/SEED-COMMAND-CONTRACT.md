@@ -74,7 +74,12 @@ adapter resolves native authority and opens persistent storage read-only.
 `--origin URL`, or `--target remote --environment NAME` using a recorded
 deployment, selects the authenticated HTTP job door and requires a private
 `--session-file FILE`. Inspection never installs, starts a daemon, claims a unit
-or changes a job. `rer describe` and `rer jobs --help` expose the actual flags.
+or changes a job. Hosted `--tenant ID` selects a tenant through the door's
+`x-rer-sales-tenant` header under the session's current membership. Omitting it
+selects installation-wide work. IDs start with a letter or digit and contain at
+most 100 letters, digits, underscores, dots, colons or hyphens; malformed values
+fail before a request. A tenant outside the session's membership returns 404
+without metadata. `rer describe` and `rer jobs --help` expose the actual flags.
 The development-command admission door remains `rer queue`.
 
 Seeds adopting `modules/durable-jobs` mount `/api/rer/jobs`, register versioned
