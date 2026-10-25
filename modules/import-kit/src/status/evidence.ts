@@ -16,7 +16,10 @@ interface ImporterEvidenceReference extends ImporterEvidenceArtifact {
 }
 
 const maximumEvidenceBytes = 8 * 1024 * 1024;
-const registeredName = /^(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f]{2})*$/;
+// One class with `%` and a stray-`%` check, as for the export origin's path (receipt/validation.ts), so no host length
+// overflows V8's regexp backtrack stack.
+const registeredName = /^[A-Za-z0-9._~!$&'()*+,;=%-]*$/;
+const strayPercent = /%(?![0-9A-Fa-f]{2})/;
 
 export async function validateImporterEvidence(
   records: ImporterRecord[],
@@ -120,7 +123,7 @@ function readLink(text: string): { scheme: string; userinfo?: string; host?: str
   if (!link || /[\u0000-\u0020\u007f-\u009f]/.test(text)) return undefined;
   if (link.authority === undefined) return link.scheme === 'https' ? undefined : link;
   const address = splitAuthority(link.authority);
-  if (!address || !(link.scheme === 'https' ? isAsciiHostname(address.host) : registeredName.test(address.host))) return undefined;
+  if (!address || !(link.scheme === 'https' ? isAsciiHostname(address.host) : registeredName.test(address.host) && !strayPercent.test(address.host))) return undefined;
   return { ...link, ...address };
 }
 

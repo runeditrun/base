@@ -3,7 +3,10 @@ import type { ImporterValidationIssue } from '../status/types.ts';
 import type { ImporterVerificationPayload } from './types.ts';
 import { isAsciiHostname, splitAuthority, splitUri } from './uri.ts';
 
-const originPath = /^(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})*$/;
+// One class with `%` plus a stray-`%` check, not a group like (?:[chars]|%XX)*: V8 pushes a backtrack entry per group
+// iteration, so such a pattern throws RangeError near 2^23 characters, at a length that differs between V8 releases.
+const originPath = /^[A-Za-z0-9._~!$&'()*+,;=:@/%-]*$/;
+const strayPercent = /%(?![0-9A-Fa-f]{2})/;
 const unsafeCredentialText = /(?:bearer\s+[a-z0-9._~+\/-]{8,}|--(?:token|password|secret|api[_-]?key)(?:\s+|=)\S+|\b(?:token|password|secret|api[_-]?key)\s*[:=]\s*\S+)/i;
 
 /** Checks signed claims for internal consistency; source capture remains the signer's responsibility. */
@@ -27,7 +30,7 @@ function validateExportOrigin(originValue: string, path: string, issues: Importe
   const origin = splitUri(originValue);
   const address = origin?.authority === undefined ? undefined : splitAuthority(origin.authority);
   if (!origin || origin.scheme !== 'https' || !address || address.userinfo !== undefined || !isAsciiHostname(address.host)
-    || !originPath.test(origin.path) || origin.query !== undefined || origin.fragment !== undefined) {
+    || !originPath.test(origin.path) || strayPercent.test(origin.path) || origin.query !== undefined || origin.fragment !== undefined) {
     issues.push({ code: 'RECEIPT_ORIGIN_INVALID', path: `${path}.receipt.payload.source.origin`, message: 'Export origin must be an ASCII HTTPS URL (IDN hosts as xn-- labels) without credentials, query parameters, or fragments.' });
   }
 }

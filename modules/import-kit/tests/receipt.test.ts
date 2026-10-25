@@ -143,9 +143,11 @@ test('the evidence port admits verified only with a verifying receipt and preser
 test('Worker and Node exchange signed receipts using WebCrypto without nodejs_compat and judge export origins alike', async () => {
   const f = await fixture();
   // Origins whose URL/IDNA parse differs by runtime get the one verdict of the module's ASCII grammar in Node and the Worker.
+  // So does a path of 2^23 + 1 characters, more than V8's regexp backtrack stack holds for a grouped path pattern.
   const origins = new Map([
     ['https://exampledesk.example.test/account/export', true], ['https://xn--a.test/export', true],
     ['https://xn--abc-.test/export', false], ['https://\u04c0.test/export', false],
+    [`https://exampledesk.example.test/${'a'.repeat(2 ** 23)}`, true],
   ]);
   const originReceipts = await Promise.all([...origins.keys()].map((origin) => signImporterVerificationReceipt(
     { ...f.payload, source: { ...f.payload.source, origin } }, 'stage', f.keys.privateKey)));
