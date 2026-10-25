@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g5c2e7cdf",
+  "cliVersion": "0.2.80-dev.gf0849181",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3807,7 +3807,7 @@
     },
     "modules/site/docs-search/index-build.mjs": {
       "source": "modules/site/docs-search/index-build.mjs",
-      "sha256": "a977e5f5b001c9a7e7fc73d392d2d09b7ebb379788efb8fef35646577add4357"
+      "sha256": "d2250641e14a52397741a7cf06231644d8ca0038edd78fe66df16603134f6aae"
     },
     "modules/site/docs-search/lexical.mjs": {
       "source": "modules/site/docs-search/lexical.mjs",
@@ -3819,7 +3819,7 @@
     },
     "modules/site/docs-search/retrieve.mjs": {
       "source": "modules/site/docs-search/retrieve.mjs",
-      "sha256": "d9b2cb15f7139d2b3fc14f774896991c310842abd7a1e2d9e074d8a2beff740c"
+      "sha256": "757904261ff84aa30cfb97e6856aa28e4f76d3ad21fbbb4854a7268339e208c1"
     },
     "modules/site/docs-search/search.css": {
       "source": "modules/site/docs-search/search.css",

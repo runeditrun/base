@@ -24,7 +24,13 @@ export function buildSearchIndex(pages, { previous } = {}) {
   if (!documents.length || new Set(documents.map(row => row.id)).size !== documents.length) throw Error('Search requires unique published heading sections.');
   const sourceHash = digest(JSON.stringify(documents));
   const engine = new MiniSearch(searchOptions);
-  engine.addAll(documents);
+  // Paragraphs are retrieval units so a short task in a long guide remains
+  // visible. Every part still navigates to its original published heading.
+  const passages = documents.flatMap(doc => doc.text.split(/\n\s*\n/).filter(Boolean).flatMap(paragraph => {
+    const parts = paragraph.match(/[\s\S]{1,900}(?:\s|$)|[\s\S]{1,900}/g) ?? [];
+    return parts.map(text => ({ ...doc, text: text.trim() }));
+  }).map((doc, position) => ({ ...doc, id: String(position) })));
+  engine.addAll(passages);
   const index = { version: indexVersion, sourceHash, engine: engine.toJSON() };
   const bytes = JSON.stringify(index);
   const counts = { total: documents.length, reused: 0, reindexed: 0, bytes: Buffer.byteLength(bytes), gzipBytes: gzipSync(bytes).length };
