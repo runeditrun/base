@@ -106,7 +106,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   }
   if (restore) {
    preserveJournal = true;
-   const repairPreparation = ['rolling_back', 'rollback_failed'].includes(journal.stage) ? journal.prepared : undefined;
+   const repairPreparation = needsRecovery(journal) ? journal.prepared : undefined;
    const { metadata } = await backup(checkout, restore);
    journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: metadata.wasRunning };
    restoring = true;

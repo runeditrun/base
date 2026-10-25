@@ -10,7 +10,7 @@ const invalid = name => failure('refused', `Unreadable ${name}; keep this file a
 export async function readControl(path, name) {
  let file;
  try {
-  file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   const stat = await file.stat();
   if (!stat.isFile() || stat.nlink !== 1 || process.getuid && stat.uid !== process.getuid() || stat.size > limit) throw invalid(name);
   const bytes = Buffer.alloc(stat.size + 1);
