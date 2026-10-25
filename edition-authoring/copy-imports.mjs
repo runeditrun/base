@@ -9,6 +9,8 @@ import {copyEntrypoints} from './copy-entrypoints.mjs';
 
 const within = (name, directory) => directory === '.' || name.startsWith(directory + '/');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+// URL schemes are case insensitive; a drive-relative path is still a drive path.
+const outsidePath = value => path.posix.isAbsolute(value) || /^(?:file:|[a-z]:)/i.test(value);
 
 export function closeImports({root, record, recordPath, plans, next, read, revision, local, files}) {
   const formatFor = moduleFormats(read, revision);
@@ -46,7 +48,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
     try {
       requests = moduleRequests(importer.bytes, format, importer.source, true);
       specifiers = requests.specifiers.filter(value => value.startsWith('./') || value.startsWith('../') ||
-        path.posix.isAbsolute(value) || value.startsWith('file:') || /^[a-z]:[\\/]/i.test(value));
+        outsidePath(value));
     }
     catch (error) {
       // Tentative bytes cannot contribute imports. A later incoming edge queues
@@ -72,8 +74,17 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         name = path.posix.relative('/repository', fileURLToPath(new URL(specifier, pathToFileURL('/repository/' + importer.name))));
         safe(source); safe(name);
       } catch { fail(`Cannot resolve relative Base import ${specifier} in ${importer.name}`); continue; }
+      if (isCode(source, Buffer.alloc(0), true) === false && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       const existing = scheduled.get(name);
       if (existing) {
+        // Only mappings that existed before this refresh are authoritative.
+        // A synthesized helper must satisfy every request that shares it.
+        if (existing.delivered && existing.source !== source) {
+          const requested = next.get(source), supplied = next.get(existing.source);
+          if (!requested || requested.mode !== supplied.mode || !read.blobs([requested.object]).get(requested.object).equals(existing.bytes)) {
+            fail(`conflicting planned delivery to ${name} from ${existing.source} and ${source}`); continue;
+          }
+        }
         // The destination's own copy mapping is authoritative. A seed may
         // compose siblings from different Base directories or adapt one of them.
         enqueue(existing.plan, existing.source, name, existing.bytes, existing.boundary, existing.depth, existing.adapted, existing.pin, true);
@@ -88,7 +99,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
       try { noLinks(root, name); }
       catch (error) { fail(error.message); continue; }
       if (fs.existsSync(path.join(root, name)) && !files.get(name)?.regular) { fail('destination is not a regular seed file'); continue; }
-      if (local(name) && (outside && importer.adapted || !entry || local(name) !== read.digests([entry.object]).get(entry.object))) {
+      if (local(name) && (importer.adapted || !entry || local(name) !== read.digests([entry.object]).get(entry.object))) {
         if (outside && !importer.adapted && entry) { fail('destination contains seed-owned bytes'); continue; }
         // Preserve seed-owned bytes, but parse their actual graph so presence
         // cannot conceal a missing dependency. They cannot adopt new Base files.
@@ -99,7 +110,6 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         continue;
       }
       if (!entry) { fail('no regular Base file at the target revision'); continue; }
-      if (isCode(source, Buffer.alloc(0), true) === false && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       if (importer.adapted) { fail('seed-owned importer needs explicit dependency reconciliation'); continue; }
       if (importer.depth >= 64) { fail('relative import closure exceeds 64 levels'); continue; }
       // A file excluded at the pin, deleted locally, ignored, or owned by the
@@ -122,6 +132,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
       }
       adopted.push({path: name, originPath: source});
       enqueue(plan, source, name, content, importer.boundary, importer.depth + 1, false, importer.pin, true);
+      scheduled.get(name).delivered = true;
     }
   }
   if (problems.size) throw Error(`Unresolvable relative Base imports; no files were changed:\n${[...problems].sort().join('\n')}`);

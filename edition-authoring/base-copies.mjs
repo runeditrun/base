@@ -14,6 +14,7 @@ import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './file
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
 import {requireMaterializedCopies} from './copy-checkout.mjs';
 import {closeImports} from './copy-imports.mjs';
+import {checkCopyDestinations} from './copy-destinations.mjs';
 import {completeRuntimeCopies} from './runtime-dependencies.mjs';
 
 export const RECORD = 'base-copies.json';
@@ -396,6 +397,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (fs.existsSync(target) && !fs.lstatSync(target).isFile()) throw Error(`Runtime dependency is not a regular file: ${name}`);
     }});
     const adopted = closeImports({root, record, recordPath, plans, next, read, revision, local, files});
+    checkCopyDestinations({root, plans, files, recordPath});
     // Closure may add individually recorded siblings when the seed originally
     // selected runtime files one at a time instead of copying the directory.
     record.copies = plans.map(plan => plan.copy).sort((a, b) => a.path.localeCompare(b.path));
@@ -407,7 +409,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
     const changes = [];
     for (const {copy, sources, removed} of plans) {
-      for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }
       const recorded = {}, modes = {}, added = [];
       for (const name of Object.keys(copy.adapted || {})) {
         recorded[name] = copy.files[name];
@@ -415,12 +416,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       }
       for (const [source, {object, mode}] of sources.sort(([a], [b]) => a.localeCompare(b))) {
         const name = safe(mapped(source, copy.originPath, copy.path));
-        noLinks(root, name);
         if (!Object.hasOwn(copy.files, name)) added.push(name);
-        const target = path.join(root, name);
-        fs.mkdirSync(path.dirname(target), {recursive: true});
-        fs.writeFileSync(target, bytes.get(object));
-        fs.chmodSync(target, mode === '100755' ? 0o755 : 0o644);
         recorded[name] = upstream.get(object); modes[name] = mode;
       }
       changes.push({path: copy.path, from: copy.revision, files: sources.length, added, removed});
@@ -429,6 +425,15 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     record.copies = plans.filter(plan => !plan.retired).map(plan => plan.copy);
     delete record.repository;
     validate(record);
+    for (const {copy, sources, removed} of plans) {
+      for (const name of removed) fs.rmSync(path.join(root, name), {force: true});
+      for (const [source, {object, mode}] of sources) {
+        const target = path.join(root, mapped(source, copy.originPath, copy.path));
+        fs.mkdirSync(path.dirname(target), {recursive: true});
+        fs.writeFileSync(target, bytes.get(object));
+        fs.chmodSync(target, mode === '100755' ? 0o755 : 0o644);
+      }
+    }
     fs.writeFileSync(filename, json(record));
     return {refreshed: revision, record: recordPath, copies: changes, adopted, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }

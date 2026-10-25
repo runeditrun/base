@@ -184,3 +184,48 @@ test('public refresh preserves a satisfied seed-owned dependency and follows its
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
   assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), owned);
 });
+
+test('public refresh refuses conflicting helper destinations before changing the seed', t => {
+  for (const [left, right] of [
+    ['shared/helper.mjs', 'shared/helper.mjs'],
+    ['shared/helper.mjs', 'shared'], ['shared', 'shared/helper.mjs'],
+    ['shared/Helper.mjs', 'shared/helper.mjs'], ['Shared', 'shared/helper.mjs'],
+    ['shared/caf\u00e9.mjs', 'shared/cafe\u0301.mjs'],
+    ['shared/Stra\u00dfe.mjs', 'shared/STRASSE.mjs'],
+  ]) {
+    const {base, seed, run, refresh} = fixture(t);
+    write(base, 'other/tools/second.mjs', "console.log('second');\n");
+    write(seed, 'scripts/second.mjs', fs.readFileSync(path.join(base, 'other/tools/second.mjs')));
+    assert.equal(run('record-base', 'scripts/second.mjs', 'other/tools/second.mjs', commit(base)).status, 0);
+    commit(seed);
+    const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+    write(base, 'tools/main.mjs', `import '../${left}';\n`);
+    write(base, 'other/tools/second.mjs', `import '../${right}';\n`);
+    write(base, left, 'export const first = true;\n');
+    write(base, 'other/' + right, 'export const second = true;\n');
+    const refused = refresh(commit(base)), output = refused.stdout + refused.stderr;
+    assert.notEqual(refused.status, 0, output);
+    assert.ok(output.includes(left) && output.includes('other/' + right), output);
+    assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+    assert.equal(git(seed, 'status', '--porcelain=v1', '-uall'), '', output);
+    assert.equal(git(seed, 'diff', '--binary', 'HEAD'), '', output);
+  }
+});
+
+test('public refresh traverses a present equal-byte leaf of a seed-owned importer', t => {
+  const {base, seed, run, refresh} = fixture(t);
+  const leaf = 'export{};\n';
+  write(base, 'tools/local.mjs', leaf);
+  write(seed, 'scripts/local.mjs', leaf);
+  write(seed, 'scripts/owned.mjs', "import './local.mjs'; console.log('owned');\n");
+  write(base, 'tools/main.mjs', "import './owned.mjs';\n");
+  const revision = commit(base);
+  assert.equal(run('verify-base').status, 0);
+  const result = refresh(revision);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout, 'owned\n');
+  assert.equal(fs.readFileSync(path.join(seed, 'scripts/local.mjs'), 'utf8'), leaf);
+  assert.equal(run('verify-base').status, 0);
+});

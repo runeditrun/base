@@ -252,6 +252,11 @@ import when no outside-origin Base helper would replace its different bytes;
 its actual static imports are checked and its missing dependencies require explicit
 reconciliation. An outside-origin Base helper whose destination holds different
 seed-owned bytes refuses, naming the file; those bytes are never overwritten.
+New helper mappings are checked against every requesting source; incompatible
+bytes cannot silently share a destination. Before any write, the complete plan
+rejects file/descendant conflicts and names that collide after case folding or
+Unicode normalization, on every platform, naming both sources. Existing
+equal-byte seed-owned dependencies are traversed without taking ownership.
 Missing source at the refreshed commit, recorded removals, files deliberately kept
 out or ignored, symlinks, seed-root escapes, absolute/file-URL/drive paths, depth
 overflow and adapted importers needing new files refuse the entire refresh before
