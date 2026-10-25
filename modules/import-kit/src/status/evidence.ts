@@ -1,6 +1,7 @@
 import { receiptSha256 as sha256 } from '../receipt/encoding.ts';
 import { verifyImporterVerificationReceipt } from '../receipt/index.ts';
 import type { ImporterVerificationReceipt } from '../receipt/types.ts';
+import { asciiLowerCase, isAsciiHostname, splitAuthority, splitUri } from '../receipt/uri.ts';
 import type {
   ImporterEvidenceArtifact,
   ImporterEvidencePort,
@@ -15,6 +16,7 @@ interface ImporterEvidenceReference extends ImporterEvidenceArtifact {
 }
 
 const maximumEvidenceBytes = 8 * 1024 * 1024;
+const registeredName = /^(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f]{2})*$/;
 
 export async function validateImporterEvidence(
   records: ImporterRecord[],
@@ -58,23 +60,22 @@ async function resolveAndCheckArtifact(
     return undefined;
   }
 
-  let linkUrl: URL;
-  try {
-    linkUrl = new URL(reference.link);
-  } catch {
-    issues.push({ code: 'EVIDENCE_LINK_INVALID', path: `${path}.link`, message: 'Evidence link must be an absolute HTTPS or evidence URL.' });
+  const link = readLink(reference.link);
+  if (!link) {
+    issues.push({ code: 'EVIDENCE_LINK_INVALID', path: `${path}.link`, message: 'Evidence link must be an absolute HTTPS (ASCII host; IDN as xn-- labels) or evidence URL without spaces or controls.' });
     return undefined;
   }
-  if (linkUrl.protocol !== 'https:' && linkUrl.protocol !== 'evidence:') {
+  if (link.scheme !== 'https' && link.scheme !== 'evidence') {
     issues.push({ code: 'EVIDENCE_LINK_SCHEME', path: `${path}.link`, message: 'Evidence links must use HTTPS or the consumer evidence scheme.' });
     return undefined;
   }
-  if (linkUrl.username || linkUrl.password
-    || [...linkUrl.searchParams.keys()].some((key) => /token|password|secret|api[_-]?key|authorization/i.test(key))) {
+  // The form decoding behind URL.searchParams, applied to the query alone: it reads no host.
+  if (link.userinfo !== undefined
+    || [...new URLSearchParams(link.query ?? '').keys()].some((key) => /token|password|secret|api[_-]?key|authorization/i.test(key))) {
     issues.push({ code: 'EVIDENCE_LINK_CREDENTIALS', path: `${path}.link`, message: 'Evidence links cannot embed credentials.' });
     return undefined;
   }
-  if (linkUrl.protocol === 'https:' && !isTrustedHost(linkUrl.hostname, evidence.trustedHosts)) {
+  if (link.scheme === 'https' && !isTrustedHost(link.host!, evidence.trustedHosts)) {
     issues.push({ code: 'EVIDENCE_PUBLISHER_UNTRUSTED', path: `${path}.link`, message: 'The evidence host is not pinned by the consumer.' });
     return undefined;
   }
@@ -112,9 +113,22 @@ async function resolveAndCheckArtifact(
   return { url: resolved.url, bytes: snapshot };
 }
 
-function isTrustedHost(hostname: string, trustedHosts: readonly string[]): boolean {
-  const normalized = hostname.toLowerCase();
-  return trustedHosts.some((trusted) => trusted.toLowerCase() === normalized);
+/**
+ * Scheme, userinfo, host and port by the module's ASCII grammar: an https host must be an ASCII hostname, another
+ * scheme's host an RFC 3986 registered name. Path, query and fragment reach the resolver as written.
+ */
+function readLink(text: string): { scheme: string; userinfo?: string; host?: string; query?: string } | undefined {
+  const link = splitUri(text);
+  if (!link || /[\u0000-\u0020\u007f-\u009f]/.test(text)) return undefined;
+  if (link.authority === undefined) return link.scheme === 'https' ? undefined : link;
+  const address = splitAuthority(link.authority);
+  if (!address || !(link.scheme === 'https' ? isAsciiHostname(address.host) : registeredName.test(address.host))) return undefined;
+  return { ...link, ...address };
+}
+
+function isTrustedHost(host: string, trustedHosts: readonly string[]): boolean {
+  const normalized = asciiLowerCase(host);
+  return trustedHosts.some((trusted) => asciiLowerCase(trusted) === normalized);
 }
 
 async function verifyReceipt(

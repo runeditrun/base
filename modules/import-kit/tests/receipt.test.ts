@@ -140,8 +140,15 @@ test('the evidence port admits verified only with a verifying receipt and preser
   assert.equal((await validateImporters(document, production)).evidence.verifiedReceipts, 0);
 });
 
-test('Worker and Node exchange signed receipts using WebCrypto without nodejs_compat', async () => {
+test('Worker and Node exchange signed receipts using WebCrypto without nodejs_compat and judge export origins alike', async () => {
   const f = await fixture();
+  // Origins whose URL/IDNA parse differs by runtime get the one verdict of the module's ASCII grammar in Node and the Worker.
+  const origins = new Map([
+    ['https://exampledesk.example.test/account/export', true], ['https://xn--a.test/export', true],
+    ['https://xn--abc-.test/export', false], ['https://\u04c0.test/export', false],
+  ]);
+  const originReceipts = await Promise.all([...origins.keys()].map((origin) => signImporterVerificationReceipt(
+    { ...f.payload, source: { ...f.payload.source, origin } }, 'stage', f.keys.privateKey)));
   const entry = fileURLToPath(new URL('../src/receipt/index.ts', import.meta.url));
   const bundle = await build({
     stdin: { resolveDir: fileURLToPath(new URL('../src/receipt/', import.meta.url)), contents: `
@@ -152,9 +159,10 @@ test('Worker and Node exchange signed receipts using WebCrypto without nodejs_co
         const policy = { environment: 'stage', keys: { stage: { publicKey, environments: ['stage'] } } };
         const accepted = await verifyImporterVerificationReceipt(input.receipt, policy);
         const refused = await verifyImporterVerificationReceipt(input.receipt, { ...policy, environment: 'production' });
+        const origins = await Promise.all(input.originReceipts.map(async (receipt) => (await verifyImporterVerificationReceipt(receipt, policy)).valid));
         const keys = await crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']);
         const receipt = await signImporterVerificationReceipt(input.receipt.payload, 'worker', keys.privateKey);
-        return Response.json({ accepted, refused, receipt, publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey))) });
+        return Response.json({ accepted, refused, origins, receipt, publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey))) });
       } };
     ` },
     bundle: true, platform: 'browser', format: 'esm', write: false,
@@ -162,12 +170,14 @@ test('Worker and Node exchange signed receipts using WebCrypto without nodejs_co
   const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-01' }));
   try {
     const response = await mf.dispatchFetch('https://receipt.test', {
-      method: 'POST', body: JSON.stringify({ receipt: f.receipt, publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', f.keys.publicKey))) }),
+      method: 'POST', body: JSON.stringify({ receipt: f.receipt, originReceipts, publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', f.keys.publicKey))) }),
     });
     assert.equal(response.status, 200);
     const result = await response.json();
     assert.equal(result.accepted.valid, true, JSON.stringify(result.accepted.issues));
     assert.equal(result.refused.valid, false);
+    const node = await Promise.all(originReceipts.map(async (receipt) => (await verifyImporterVerificationReceipt(receipt, f.policy)).valid));
+    assert.deepEqual({ node, worker: result.origins }, { node: [...origins.values()], worker: [...origins.values()] });
     const publicKey = await crypto.subtle.importKey('raw', new Uint8Array(result.publicKey), 'Ed25519', false, ['verify']);
     assert.equal((await verifyImporterVerificationReceipt(result.receipt, { environment: 'stage', keys: { worker: { publicKey } } })).valid, true);
   } finally {

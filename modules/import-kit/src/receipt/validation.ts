@@ -1,7 +1,9 @@
 import { canonicalReceiptJson as canonicalJson, receiptSha256 as sha256 } from './encoding.ts';
 import type { ImporterValidationIssue } from '../status/types.ts';
 import type { ImporterVerificationPayload } from './types.ts';
+import { isAsciiHostname, splitAuthority, splitUri } from './uri.ts';
 
+const originPath = /^(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})*$/;
 const unsafeCredentialText = /(?:bearer\s+[a-z0-9._~+\/-]{8,}|--(?:token|password|secret|api[_-]?key)(?:\s+|=)\S+|\b(?:token|password|secret|api[_-]?key)\s*[:=]\s*\S+)/i;
 
 /** Checks signed claims for internal consistency; source capture remains the signer's responsibility. */
@@ -20,12 +22,13 @@ export async function validateReceiptPayload(payload: ImporterVerificationPayloa
   return issues;
 }
 
+/** `https://` host [":" port] and an RFC 3986 path over ASCII; no userinfo, query or fragment. */
 function validateExportOrigin(originValue: string, path: string, issues: ImporterValidationIssue[]): void {
-  try {
-    const origin = new URL(originValue);
-    if (origin.protocol !== 'https:' || origin.username || origin.password || origin.search || origin.hash) throw new Error('origin policy');
-  } catch {
-    issues.push({ code: 'RECEIPT_ORIGIN_INVALID', path: `${path}.receipt.payload.source.origin`, message: 'Export origin must be an HTTPS URL without credentials, query parameters, or fragments.' });
+  const origin = splitUri(originValue);
+  const address = origin?.authority === undefined ? undefined : splitAuthority(origin.authority);
+  if (!origin || origin.scheme !== 'https' || !address || address.userinfo !== undefined || !isAsciiHostname(address.host)
+    || !originPath.test(origin.path) || origin.query !== undefined || origin.fragment !== undefined) {
+    issues.push({ code: 'RECEIPT_ORIGIN_INVALID', path: `${path}.receipt.payload.source.origin`, message: 'Export origin must be an ASCII HTTPS URL (IDN hosts as xn-- labels) without credentials, query parameters, or fragments.' });
   }
 }
 

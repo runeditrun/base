@@ -408,6 +408,19 @@ and the existing mapping, count, reconciliation, unmapped-manifest and safe-text
 rules. Unmapped items must be sorted by `sourceIdentitySha256` in the same UTF-16
 code-unit order as canonical keys, never by locale, so every host reaches the
 same verdict.
+For the same reason the export origin, `source.origin`, is read by the module's
+own ASCII grammar, never by the runtime's URL parser, whose IDNA tables differ
+between Node and Workers releases. It must be `https://` (scheme letters in
+either case), then a host, an optional port from 1 to 65535 without leading
+zeros, and an optional RFC 3986 path (`/` and unreserved, sub-delimiter, `:`,
+`@` and well-formed `%XX` characters), with no credentials, `?` or `#`. The
+host is either a dotted-quad IPv4 address without leading zeros or labels of
+ASCII letters (either case), digits and inner hyphens, optionally ending in one
+dot, whose last label is not numeric (all digits, or `0x` hex). Write an
+internationalized host as its `xn--` labels; they are not decoded, so every
+runtime treats them as ASCII. Non-ASCII text anywhere, IPv6 literals and
+WHATWG's lenient forms (backslashes, missing slashes, short or hexadecimal IPv4
+numbers, empty labels) are refused.
 `synthetic: true` always fails. A policy maps each `keyId` to a public
 Ed25519 `CryptoKey` with `verify` usage or an SPKI PEM public key. Its `environment`
 is a non-empty string chosen by the consumer; a key's optional `environments` array
@@ -454,7 +467,14 @@ if (!result.valid) throw new Error(JSON.stringify(result.issues));
 
 `validateImporters` accepts that port directly. It additionally binds the receipt
 to the row's incumbent/product and the resolved research bytes, and retains URL,
-publisher-host, size and artifact hash checks. A valid result's
+publisher-host, size and artifact hash checks. An evidence link's scheme,
+credentials, host and port are read by the same grammar: an `https` link needs
+`//` and a host of that form, which must equal an entry of `trustedHosts`
+ignoring ASCII case (pin an internationalized host by its `xn--` form); a host
+in the consumer's `evidence:` scheme may be any RFC 3986 registered name. The
+path, query and fragment reach the resolver as written. A link may contain no
+spaces or control characters, no credentials and no query key naming a token,
+password, secret, API key or authorization. A valid result's
 `evidence.verifiedReceipts` counts only verified rows whose receipts pass every
 check. It does not promote or mutate registry rows; `documented format` keeps its
 synthetic-only meaning. Existing `receiptPublicKeys` PEM pins remain an unrestricted
