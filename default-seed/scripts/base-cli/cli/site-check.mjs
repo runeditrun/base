@@ -6,6 +6,7 @@ import { privateDataScanner, decodedText } from './site-data.mjs';
 import { javascriptContent, javascriptContext } from './site-references.mjs';
 import { javascriptStrings } from './site-syntax.mjs';
 import { markupReferences, markupStrings, htmlElements, cssStrings } from './site-markup.mjs';
+import { siteRedirects } from '../modules/deploy-kit/site-redirects.mjs';
 import { siteRuntime } from './site-runtime.mjs';
 import { refuse, RerError } from './errors.mjs';
 import { DEV_AI_MARKER, DEV_LAYER_MARKER } from './dev-identity.mjs';
@@ -61,15 +62,28 @@ export function servedFile(names, pathname) {
  return null;
 }
 
+/** Validate declarations against the same built assets used by publication and preview. */
+export function checkSiteRedirects(names, redirects) {
+ let rules;
+ try { rules = siteRedirects(redirects); }
+ catch { throw refuse('Invalid run site redirects: declare unique { from, to, status: 301 } docs paths, without chains or the reserved /docs/search route.'); }
+ for (const rule of rules) {
+  const target = servedFile(names, rule.to), source = servedFile(names, rule.from);
+  if (!target?.endsWith('.html') || source && !source.endsWith('.html')) throw refuse('Run site redirects must lead directly to a built docs HTML page and cannot replace an asset.');
+ }
+ return rules;
+}
+
 /**
  * Refuse a run site folder that is not exactly static pages and the files they
  * use: an index and a Run page, every same-origin link resolving, no link to an
  * instance-only route, nothing fetched from another origin, no dev layer, and
  * none of the given private values (owner identity, secrets, the dev key).
  */
-export async function checkSite(folder, { privateValues = [], privateIdentities = [], root, runtime } = {}) {
+export async function checkSite(folder, { privateValues = [], privateIdentities = [], root, runtime, redirects } = {}) {
  const route = siteRuntime(runtime)?.endpoint;
  const all = await files(folder), names = new Set(all.keys());
+ const rules = checkSiteRedirects(names, redirects);
  if (!names.has('index.html')) throw refuse('The run site has no index.html (its homepage).');
  if (!servedFile(names, '/run')) throw refuse('The run site has no /run page.');
  const markers = [DEV_LAYER_MARKER, DEV_AI_MARKER].map(value => Buffer.from(value));
@@ -114,9 +128,9 @@ export async function checkSite(folder, { privateValues = [], privateIdentities 
    // fragment already fixes the instance path even when its tail is runtime.
    const boundary = !reference.dynamic || /[?#]/.test(url) || pathPrefix.endsWith('/');
    if (INSTANCE_ROUTES.some(route => (pathname === route && boundary) || pathname.startsWith(route + '/'))) problems.push(`${site} links to ${pathname}, which exists only on an installed instance`);
-   else if (!reference.dynamic && !servedFile(names, safeDecode(pathname)) && pathname !== route) problems.push(`${site} links to ${pathname}, which the site does not have`);
+   else if (!reference.dynamic && !servedFile(names, safeDecode(pathname)) && !rules.some(rule => rule.from === pathname) && pathname !== route) problems.push(`${site} links to ${pathname}, which the site does not have`);
   }
  }
  if (problems.length) throw refuse(`The run site has broken or out-of-site references: ${problems.slice(0, 8).join('; ')}${problems.length > 8 ? `; and ${problems.length - 8} more` : ''}.`);
- return { files: names.size, pages: [...names].filter(name => name.endsWith('.html')).length, references:{unresolved} };
+ return { redirects: rules, files: names.size, pages: [...names].filter(name => name.endsWith('.html')).length, references:{unresolved} };
 }

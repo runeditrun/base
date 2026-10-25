@@ -77,11 +77,12 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
    throw error;
   }
   const privacy = await privateValues(project);
-  const checkOptions = {root:project.root, ...privacy, ...(site.runtime ? {runtime:site.runtime} : {})};
+  const redirects = JSON.parse(await readFile(`${staging}.redirects.json`, 'utf8'));
+  const checkOptions = {root:project.root, ...privacy, redirects, ...(site.runtime ? {runtime:site.runtime} : {})};
   let checked = await checkSite(staging, checkOptions);
   let runtime;
   if (site.runtime) {
-   try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging, { prepare, domain:deployment?.domain, compatibilityDate:deployment?.compatibilityDate, store, signal }); }
+   try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging, { prepare, redirects:checked.redirects, domain:deployment?.domain, compatibilityDate:deployment?.compatibilityDate, store, signal }); }
    catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search preparation failed; publication stopped. Check the previous artifact and Workers AI availability.', 1); }
    if (prepare) checked = await checkSite(staging, checkOptions);
    const corpus = await contained(project.root, site.runtime.corpus, {optional:true});
@@ -90,16 +91,17 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
   }
   await rm(folder, { recursive: true, force: true });
   await rename(staging, folder);
+  await rename(`${staging}.redirects.json`, `${folder}.redirects.json`);
   return { folder, ...checked, ...(runtime ? {runtime} : {}) };
- } finally { await Promise.all([staging, `${staging}.render`, `${staging}.refusal`, `${staging}.corpus.json`].map(path => rm(path, { recursive: true, force: true }))); }
+ } finally { await Promise.all([staging, `${staging}.render`, `${staging}.refusal`, `${staging}.corpus.json`, `${staging}.redirects.json`].map(path => rm(path, { recursive: true, force: true }))); }
 }
 
-async function siteDeployment(project, options, folder, runtime) {
+async function siteDeployment(project, options, folder, runtime, redirects) {
  const site = declaredSite(project), environment = options.environment ?? 'production';
  const read = async path => { try { return JSON.parse(await readFile(await contained(project.root, path), 'utf8')); } catch (error) { if (error instanceof RerError) throw error; throw invalid(`Malformed ${path}.`); } };
  const app = await read(project.adapter.deploy?.declaration ?? 'deploy.json'), declaration = await read(site.declaration);
  const { sitePlan } = await import('../modules/deploy-kit/site.mjs');
- try { return sitePlan({ project: app.project, environment, compatibilityDate: app.compatibilityDate, declaration, assets: folder, runtime }); }
+ try { return sitePlan({ project: app.project, environment, compatibilityDate: app.compatibilityDate, declaration, assets: folder, runtime, redirects }); }
  catch (error) { throw invalid(`The run site deploy declaration is invalid (${error.message}). ${site.declaration} holds {"version": 1, "domain": "<apex hostname>"}.`); }
 }
 
@@ -122,9 +124,9 @@ export async function siteCommand(project, options, store, signal, out) {
    out.human(`Run site written to ${path} (${built.pages} pages, ${built.files} files): ${built.folder}`);
    if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; bindings ASSETS, AI; corpus ${built.runtime.corpusHash}; vectors prepared only on a real deploy`);
   }
-  return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references, ...(built.runtime ? {runtime:runtimeSummary(built.runtime)} : {}) } };
+  return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references, redirects:built.redirects, ...(built.runtime ? {runtime:runtimeSummary(built.runtime)} : {}) } };
  }
- const plan = await siteDeployment(project, options, built.folder, built.runtime);
+ const plan = await siteDeployment(project, options, built.folder, built.runtime, built.redirects);
  const assets = relative(project.root, plan.assets);
  const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS and AI' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
   `  custom domains: ${plan.hostnames.join(', ')}; workers.dev off`, ...plan.redirects.map(rule => `  redirect in the Worker: ${rule.from} -> ${rule.to} (${rule.status}, keeps ${rule.keeps.join(' and ')})`)];
