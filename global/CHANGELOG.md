@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add fenced same-owner reclaim for expired staged and D1-only imports, plus a seed-owned erasure hook before restore activation with scoped registry access and atomic live audit. Refuse reclaim after uncertain R2 or payload effects, including finalize errors; refusal cannot cancel an already-issued unfenced external operation.
+- Add fenced same-owner reclaim for expired staged and D1-only imports, plus a seed-owned erasure hook before restore activation with scoped registry access and atomic live audit; include the hook in the documented portable runtime copy. Refuse reclaim after uncertain R2 or payload effects, including finalize errors; refusal cannot cancel an already-issued unfenced external operation.
 
 ## 0.2.81
 

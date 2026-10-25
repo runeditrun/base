@@ -939,6 +939,7 @@ modules/portability/provider-data.mjs
 modules/portability/policy-data.mjs
 modules/portability/generated.mjs
 modules/portability/restore-safety.mjs
+modules/portability/restore-hook.mjs
 modules/portability/bridge.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
