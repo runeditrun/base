@@ -12,7 +12,7 @@ const mapped = (name, from, to) => to + name.slice(from.length);
 // Static imports (including type imports), re-exports and literal import() /
 // require() calls share the same relative resolution below. Templates are page
 // content, never static module declarations.
-function specifiers(source) {
+export function specifiers(source) {
   const tokens = [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|[\w$]+|[^\s]/g)]
     .map(match => match[0]).filter(token => !token.startsWith('//') && !token.startsWith('/*') && !token.startsWith('`'));
   const result = [];

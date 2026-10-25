@@ -3,9 +3,10 @@
 ## 0.2.82
 
 - Deliver the accepted import-door intake implementation and its runtime and type dependencies at `@runeditrun/rer/modules/import-kit/door`, preserving the D1 entry.
-- Refresh legacy singleton authoring-tool copies with their maintained sibling helpers, recording the delivered source bytes so `verify-base` can run after refresh.
-- Preflight every refresh destination and its parent permissions before writes, accounting for each plan's own removals, including helpers, the record and existing lock; refuse unrecorded helper destinations (even ignored or matching Base bytes) and preserve acknowledged adaptations.
-- Check the packed door lifecycle and fresh seed refresh before package publication.
+- Close relative imports from every recorded authoring module, including mirror-origin copies and acknowledged local adaptations, and record newly delivered siblings. Preserve tracked unrecorded siblings without traversing them.
+- Preflight destination types, casing, ownership and effective permissions using filesystem metadata and access checks before writes, accounting for the plan's own removals; overwrites require writable files (and ownership when setting copy modes), while creates and removals require writable, searchable directories. Refuse untracked authoring helper collisions, including ignored files or matching Base bytes. Races, disk and I/O failures, new-directory umasks and two new case-distinct names on an insensitive volume remain outside these checks.
+- Check the packed door lifecycle and refresh pinned Pegboard, Pencil, Dial, Placemat and Envelope checkouts before package publication, resolving every direct authoring module's relative imports, running local and package verification and requiring byte-identical records on repeat.
+- To adopt with a copied authoring CLI predating 0.2.82, update the installed package and run `rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout` through that package.
 
 ## 0.2.81
 

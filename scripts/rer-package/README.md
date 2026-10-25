@@ -32,7 +32,7 @@ release groups still require their independent release proofs.
 | --- | --- | --- |
 | Import door and intake | `@runeditrun/rer/modules/import-kit/door` | Bundle actual runtime imports, compile public type imports; CSV, NDJSON and JSON projection, typed refusals, plan, apply, reconcile, replay and Undo against real SQLite. |
 | Existing D1 engine | `@runeditrun/rer/modules/import-kit/d1` | Bundle and initialize the packed engine used by the door; compile its public types. |
-| Base authoring refresh | `edition-authoring/cli.mjs` in the installed package | Refresh a fresh pinned public Pegboard checkout with its legacy singleton records; run both the refreshed local CLI and the package's `verify-base` against committed Base blobs, recorded SHA-256 values, modes and unrecorded copies; repeat refresh. |
+| Base authoring refresh | `edition-authoring/cli.mjs` in the installed package | Refresh pinned public Pegboard, Pencil, Dial, Placemat and Envelope checkouts; resolve the relative imports of every module directly in each authoring directory; run both the refreshed local CLI and the package's `verify-base` against committed Base blobs, recorded SHA-256 values, modes and unrecorded copies; require byte-identical records on repeat refresh. |
 
 ```sh
 node scripts/rer-package/artifact.mjs TARBALL --out EVIDENCE_DIR
@@ -45,6 +45,12 @@ it). It never supplies a missing runtime module from checkout source. The JSON
 report lists every checked surface and retains each authoring command's output.
 The two groups run independently, so one missing surface cannot mask the other.
 No global rer or seed dependency pin is changed.
+
+The refresh check uses the real public seed revisions pinned in
+`artifact-refresh.mjs`, the installed package's refresh entry and the explicit
+Base ref. It discovers authoring modules and their relative imports using the
+delivered tokenizer, without fixing a helper list or count. Evidence includes
+each seed's copy record, checked imports and both verification results.
 
 ## Smoke test
 

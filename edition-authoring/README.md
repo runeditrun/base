@@ -50,6 +50,11 @@ Commands below use the historical local-script form. Package adopters run
 `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs` in its place; Base
 authors can run `node /absolute/base/edition-authoring/cli.mjs` from the seed root.
 The public adoption and refresh verbs call these same implementation helpers.
+For release adoption, a copied CLI predating 0.2.82 must use the updated
+installed package: run `rer refresh-base --ref FULL_40_HEX_COMMIT --base
+/absolute/base-checkout`, or invoke that installed package's
+`edition-authoring/cli.mjs refresh-base` directly. The older copied CLI does not
+gain the release's refresh behavior until the package refresh delivers it.
 
 Commands, run at the edition root:
 
@@ -227,8 +232,9 @@ local bytes against the record, without reading Base. Add `verify-base` to the
 edition's verify command next to `check`.
 
 **Upgrade to a new pin.** Run Base's export tools first (for example
-`node BASE/scripts/export-cli.mjs .`), then `... refresh-base FULL_40_HEX_COMMIT
---base /absolute/base-checkout` to move every recorded copy to that commit. It
+`node BASE/scripts/export-cli.mjs .`), then use the updated installed package's
+`rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout` to move
+every recorded copy to that commit. It
 writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
@@ -272,7 +278,7 @@ node scripts/edition-authoring/cli.mjs adapt-base .github/workflows/run-demo.yml
 node scripts/edition-authoring/cli.mjs adapt-base public/fonts/fonts.css
 node scripts/edition-authoring/cli.mjs adapt-base src/base/dispatch.ts
 node scripts/edition-authoring/cli.mjs adapt-base src/base/font-head.ts
-node scripts/edition-authoring/cli.mjs refresh-base FULL_40_HEX_COMMIT --base /absolute/base-checkout
+rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout
 ```
 
 `adapt-base <file> [--record <file>]` only accepts an existing regular recorded
@@ -358,9 +364,26 @@ read as ordinary Git and never inherits the projection identity. Lamp's
 `scripts/public-projections/` is the reference producer.
 
 
-Legacy seeds that recorded `edition-authoring/cli.mjs` as a singleton receive
-Base's maintained authoring sibling modules during refresh, each with its own
-source record and digest. This delivery is limited to the authoring toolkit;
-it does not infer application dependencies. Existing local helper edits, removed
-recorded helpers, conflicting mappings and symlinks refuse before any writes.
-Package-mode seeds continue using the installed package's authoring entry.
+Authoring refresh closes relative imports from every recorded authoring module,
+including singleton copies and modules whose Base origin is another maintained
+authoring mirror. It follows the bytes that will remain in the seed, including
+acknowledged local adaptations, and gives newly delivered siblings source records
+and digests. Tracked unrecorded siblings remain seed-owned: refresh preserves
+them without traversing their imports. Untracked helper collisions, including
+ignored files and files matching Base bytes, refuse before writes, as do removed
+recorded dependencies still imported, conflicting mappings and symlinks. This
+delivery is limited to the authoring toolkit; it does not infer application
+dependencies. Use the updated installed package's `rer refresh-base --ref
+FULL_40_HEX_COMMIT --base /absolute/base-checkout` to adopt 0.2.82 when the seed's
+copied CLI predates it.
+
+Before writing, refresh checks destination types, existing filesystem casing,
+ownership and effective permissions with `lstat` and access checks. Overwriting
+a copy requires a writable file owned by the current user so its mode can be
+set; overwriting the record requires only a writable file. Neither overwrite
+requires directory write permission. Creating or removing a file requires a
+writable, searchable parent directory; missing directories are checked through
+their existing ancestors. The plan accounts for its own removals. These checks
+cannot predict races, disk or I/O failures, restrictive umasks on newly created
+directories, or collisions between two new case-distinct names on an insensitive
+volume.

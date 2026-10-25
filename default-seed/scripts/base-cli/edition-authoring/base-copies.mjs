@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
-import {completeAuthoringCopies, requireMaterializedCopies, preflightRefresh} from './copy-checkout.mjs';
+import {completeAuthoringImports, requireMaterializedCopies, preflightRefresh} from './copy-checkout.mjs';
 import {completeRuntimeCopies} from './runtime-dependencies.mjs';
 
 export const RECORD = 'base-copies.json';
@@ -383,7 +383,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
       return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
-    completeAuthoringCopies(root, plans, {tree: next, revision});
+    completeAuthoringImports(root, plans, {tree: next, read, revision, base: origin.repository});
     completeRuntimeCopies(plans, {tree: next, read, local, upstream, revision, checkTarget(name) {
       safe(name); noLinks(root, name);
       const target = path.join(root, name);
@@ -398,7 +398,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       .filter(([name, object]) => name.split('/').slice(0, -1).includes('migrations') && local(name) && local(name) !== upstream.get(object)).map(([name]) => name));
     if (applied.length) throw Error(`Refusing to rewrite migrations that may already be applied: ${applied.join(', ')}. Base changed these files after they were copied; keep them as they are, drop them from ${recordPath}, and add a new migration for the change instead.`);
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
-    preflightRefresh(root, plans, recordPath);
+    preflightRefresh(root, plans, recordPath, files);
     const changes = [];
     for (const {copy, sources, removed} of plans) {
       for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }

@@ -543,13 +543,14 @@ seconds (queue time remains). An unverified main SHA, or one whose newest push
 run failed, must run every shard.
 
 For release adoption, update the installed CLI with `rer update --version
-0.2.80` once that release exists; package-mode seeds update their exact pin with
-`pnpm add -D -E @runeditrun/rer@0.2.80`. This checkout has **no bare `rer refresh`
+0.2.82` once that release exists; package-mode seeds update their exact pin with
+`pnpm add -D -E @runeditrun/rer@0.2.82`. This checkout has **no bare `rer refresh`
 command**, and an npm update alone does not copy seed-owned workflow files.
-For files already tracked in `base-copies.json`, the supported source refresh is:
+For files already tracked in `base-copies.json`, use the updated installed
+package's source refresh, including when the seed's copied CLI predates 0.2.82:
 
 ```sh
-node scripts/edition-authoring/cli.mjs refresh-base <release-commit> --base <base-checkout>
+rer refresh-base --ref <release-commit> --base <base-checkout>
 ```
 
 Copy or merge the workflows and helper above in that same adoption commit,
