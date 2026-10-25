@@ -10,6 +10,14 @@ export async function admissionPage(context: Context, control: Control): Promise
   const after = await context.database.all<{ id: string }>(sql("SELECT id FROM rer_job_jobs WHERE installation_id=? AND state='waiting' AND id>? ORDER BY id LIMIT ?", context.installationId, control.admission_cursor, limit));
   const before = after.length < limit ? await context.database.all<{ id: string }>(sql("SELECT id FROM rer_job_jobs WHERE installation_id=? AND state='waiting' AND id<=? ORDER BY id LIMIT ?", context.installationId, control.admission_cursor, limit - after.length)) : [];
   const held = [...after, ...before];
-  await context.database.atomic([sql('UPDATE rer_job_control SET heartbeat=?,updated_at=?,admission_cursor=? WHERE installation_id=? AND epoch=?', now, now, held.at(-1)?.id ?? '', context.installationId, control.epoch)]);
-  return [...ready, ...held].map(row => row.id);
+  await context.database.atomic([
+    sql('UPDATE rer_job_control SET heartbeat=?,updated_at=?,admission_cursor=? WHERE installation_id=? AND epoch=?', now, now, held.at(-1)?.id ?? '', context.installationId, control.epoch),
+    // Expiry must advance even when ready work consumes every execution slot.
+    // json_each binds only this bounded page, never the whole held backlog.
+    sql("UPDATE rer_job_jobs SET state='failed',reason_code='job_deadline_exhausted',recovery=?,version=version+1,updated_at=? WHERE installation_id=? AND state='waiting' AND deadline<=? AND id IN (SELECT value FROM json_each(?)) AND EXISTS(SELECT 1 FROM rer_job_activations a WHERE a.installation_id=rer_job_jobs.installation_id AND a.job_id=rer_job_jobs.id AND a.epoch=?)", 'Create a new reviewed intent after inspecting the partial committed outcome.', now, context.installationId, now, JSON.stringify(held.map(row => row.id)), control.epoch),
+  ]);
+  // Share slots with reconsidered work. At a cursor wrap it goes first, so
+  // even a one-slot runtime makes progress under a continuous ready backlog.
+  const first = after.length < limit ? held : ready, second = after.length < limit ? ready : held;
+  return Array.from({ length: Math.max(first.length, second.length) }, (_, i) => [first[i]?.id, second[i]?.id]).flat().filter((id): id is string => id !== undefined);
 }
