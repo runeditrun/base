@@ -318,7 +318,7 @@ styles. `/` focuses the field (and opens its mobile menu); arrows select,
 Enter follows the published heading, and Escape closes while retaining focus.
 
 Every build, dry run and deployment builds `/docs-search-index.json` locally
-before publication, using vendored MiniSearch 7.2.0 and stemmer 2.0.1 (MIT).
+before publication, using vendored MiniSearch 7.2.0 and wink-porter2-stemmer 2.0.1 (MIT).
 The artifact helper imports only its own module files and Node builtins.
 The deploy Worker remains the standard static Worker, with its existing ASSETS
 binding and ordinary site token permissions. Search requires no extra binding,
@@ -338,7 +338,7 @@ bytes. Deployment fingerprints include the index's actual bytes and source
 identity; readback proves the standard Worker and its sole assets binding at
 the exact serving version.
 
-Ranking uses heading/title/path boosts, Porter stemming, word prefixes and
+Ranking uses heading/title/path boosts, Porter2 stemming, word prefixes and
 at most one edit for words of four or more letters, plus phrase proximity.
 A relevance floor uses corpus-weighted topic coverage and rejects unrecognized
 topics instead of matching only their surrounding grammar.
@@ -363,12 +363,6 @@ that exact immutable source with the existing authoring command:
 ```sh
 node scripts/edition-authoring/cli.mjs record-base COPY_PATH modules/site/docs-search BASE_RELEASE_SHA --base BASE_CHECKOUT
 ```
-
-When publishing this vendored MIT source with Base's publication scanner, retain
-its copyright notices and add the stemmer author's exact public contact identity
-from `vendor/STEMMER-LICENSE` to `.publish-check/config.json` `publicEmails`, as
-Base does. This is an attribution declaration, not a runtime dependency or
-resource setup. Do not remove licence text or disable email scanning.
 
 Keep each seed's layout, copy and Markdown source set. Update its adapter to
 the ASSETS-only declaration above and its client entry to `COPY_PATH/client.ts`.

@@ -1,4 +1,4 @@
-import { stemmer } from './vendor/stemmer.mjs';
+import { stemmer } from './vendor/wink-porter2.mjs';
 
 // Function words identify grammar, not a heading. Topic words stay corpus-driven.
 const stop = new Set('a all an and any are as at be been being by can could did do does for from had has have how i if in into is it its me my of on or our should that the their them there these they this those to was we were what when where which who why will with would you your each every some another both either neither other same such certain several please get need want use using'.split(' '));

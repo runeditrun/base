@@ -220,7 +220,7 @@ retain their existing fingerprint. No custom Worker module or app binding is
 accepted through this declaration.
 
 Copy and record the complete `modules/site/docs-search` directory, including
-its vendored MIT libraries (MiniSearch 7.2.0 and stemmer 2.0.1) and licences.
+its vendored MIT libraries (MiniSearch 7.2.0 and wink-porter2-stemmer 2.0.1) and licences.
 The helper is self-contained. Use a compatible rer release containing the static
 CLI/deploy-kit contract, update the client entry and the declaration above,
 then regenerate/check source locks. No search binding setup is needed.

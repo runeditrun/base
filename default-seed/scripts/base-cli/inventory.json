@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g5dd1b780",
+  "cliVersion": "0.2.80-dev.g3c79cdd7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1715,7 +1715,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "2bb8c8722e7e08af9b09d83d2296c19a2334aad911b7d3546add77813706cc5c"
+      "sha256": "101d9bef71b35fadeb6cc2d78a901d9f692344e4643c305d904c79f8d2e10fbd"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -3811,7 +3811,7 @@
     },
     "modules/site/docs-search/lexical.mjs": {
       "source": "modules/site/docs-search/lexical.mjs",
-      "sha256": "26018797f5e5422bc4b1e43c74736b51703928031566fb20c2acdbe0fdc21aef"
+      "sha256": "e91560b7db42212635a3547406e2ba0e19d049c9f58b89f96959481f88aa792c"
     },
     "modules/site/docs-search/retrieve.d.mts": {
       "source": "modules/site/docs-search/retrieve.d.mts",
@@ -3839,11 +3839,11 @@
     },
     "modules/site/docs-search/vendor/README.md": {
       "source": "modules/site/docs-search/vendor/README.md",
-      "sha256": "9353cf3623800665957f771796bea7fc19e79b219d1b934de56916100251065a"
+      "sha256": "2368752dd395f8c31306d748ffc50f8ccd44693449dc16fce71da3973d7d00dc"
     },
     "modules/site/docs-search/vendor/STEMMER-LICENSE": {
       "source": "modules/site/docs-search/vendor/STEMMER-LICENSE",
-      "sha256": "9966260ba3ea9d6a5f839297dca80ddc99735a34b4ae82811cac7b956d2e3afd"
+      "sha256": "4e7b73bec5f5230f10d3543b9560d5a674666e99f8db80c100a437638e569d44"
     },
     "modules/site/docs-search/vendor/minisearch.d.mts": {
       "source": "modules/site/docs-search/vendor/minisearch.d.mts",
@@ -3853,13 +3853,13 @@
       "source": "modules/site/docs-search/vendor/minisearch.mjs",
       "sha256": "9978b03db8b310d0f677bda3c244140c20e5de925fbd113d58f6bdf88f795ba0"
     },
-    "modules/site/docs-search/vendor/stemmer.d.mts": {
-      "source": "modules/site/docs-search/vendor/stemmer.d.mts",
-      "sha256": "9ceebcf92f21ebad6a149867b88db77674d29e1c81c45ef18605cb84f30e9905"
+    "modules/site/docs-search/vendor/wink-porter2.d.mts": {
+      "source": "modules/site/docs-search/vendor/wink-porter2.d.mts",
+      "sha256": "67c67536a1a16c7af83ba3801539943d7a5dbc4727e01e4748c96492ab7798f6"
     },
-    "modules/site/docs-search/vendor/stemmer.mjs": {
-      "source": "modules/site/docs-search/vendor/stemmer.mjs",
-      "sha256": "154936155f541e1dca18bb75f0fe47c5d881f7b68b2953d92bd33254aca5cc39"
+    "modules/site/docs-search/vendor/wink-porter2.mjs": {
+      "source": "modules/site/docs-search/vendor/wink-porter2.mjs",
+      "sha256": "e7f232f86875dd46fb3e66fa35c8e40c9ae14bd4a09b439bc6715857ba7e5639"
     },
     "operations/README.md": {
       "source": "operations/README.md",
