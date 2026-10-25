@@ -405,11 +405,16 @@ canonical JSON produces an invalid signature.
 The verifier returns `{ valid, issues }`. It checks the complete schema
 (including `source.sha256`, every dry-run/apply count and `byKind`), the signature,
 and the existing mapping, count, reconciliation, unmapped-manifest and safe-text
-rules. `synthetic: true` always fails. A policy maps each `keyId` to a public
+rules. Unmapped items must be sorted by `sourceIdentitySha256` in the same UTF-16
+code-unit order as canonical keys, never by locale, so every host reaches the
+same verdict.
+`synthetic: true` always fails. A policy maps each `keyId` to a public
 Ed25519 `CryptoKey` with `verify` usage or an SPKI PEM public key. Its `environment`
-is chosen by the consumer; a key's optional `environments` list restricts its use
-to those environments. An empty list refuses it everywhere; omitting the list
-permits every environment. Unknown IDs and keys outside these rules fail closed.
+is a non-empty string chosen by the consumer; a key's optional `environments` array
+restricts its use to the environments it names. An empty array refuses it
+everywhere; omitting `environments` permits every environment, and any other
+value (such as a string, `null` or `false`) refuses the key. Unknown IDs and keys
+outside these rules fail closed.
 The policy is trusted consumer configuration and must never come from the receipt
 or registry being checked.
 

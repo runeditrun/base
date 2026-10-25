@@ -24,7 +24,7 @@ async function fixture() {
   return { ...existing, keys, policy, receipt };
 }
 
-test('public signer and verifier round trip canonical JSON independently of insertion order', async () => {
+test('public signer and verifier round trip canonical JSON independently of insertion order and host collation', async () => {
   const { receipt, policy, payload, keys } = await fixture();
   const reordered = Object.fromEntries(Object.entries(payload).reverse());
   const signedAgain = await signImporterVerificationReceipt(reordered, 'stage', keys.privateKey);
@@ -36,9 +36,32 @@ test('public signer and verifier round trip canonical JSON independently of inse
   for (const lossy of [undefined, NaN, { field: undefined }, new Date(), [ , 1]]) {
     assert.throws(() => canonicalReceiptJson(lossy));
   }
+  // Unmapped items keep code-unit order under any host collation; Danish sorts "aa" after "z".
+  const items = [
+    { sourceIdentitySha256: 'aa' + '1'.repeat(62), sourceKind: 'ticket', fields: ['tags'] },
+    { sourceIdentitySha256: 'b2' + '2'.repeat(62), sourceKind: 'ticket', fields: ['priority'] },
+  ];
+  const identities = items.map((item) => item.sourceIdentitySha256);
+  assert.deepEqual([...identities].sort(), identities);
+  const withUnmapped = (ordered) => {
+    const unmapped = structuredClone(payload);
+    for (const run of [unmapped.runs.dryRun, unmapped.runs.apply]) run.unmapped = ordered.length;
+    unmapped.unmapped = { count: ordered.length, itemManifestSha256: digest(canonicalReceiptJson(ordered)), items: ordered };
+    return signImporterVerificationReceipt(unmapped, 'stage', keys.privateKey);
+  };
+  const hostCompare = String.prototype.localeCompare;
+  const danish = new Intl.Collator('da');
+  String.prototype.localeCompare = function (that) { return danish.compare(String(this), String(that)); };
+  try {
+    assert.deepEqual([...identities].sort((left, right) => left.localeCompare(right)), [...identities].reverse());
+    assert.equal((await verifyImporterVerificationReceipt(await withUnmapped(items), policy)).valid, true);
+    assert.equal((await verifyImporterVerificationReceipt(await withUnmapped([...items].reverse()), policy)).valid, false);
+  } finally {
+    String.prototype.localeCompare = hostCompare;
+  }
 });
 
-test('verification refuses tampering, unknown or wrong keys, synthetic data and noncanonical signatures', async () => {
+test('verification refuses tampering, unknown, wrong or misrestricted keys, synthetic data and noncanonical signatures', async () => {
   const { receipt, policy, keys } = await fixture();
   const unsortedBytes = new TextEncoder().encode(JSON.stringify(Object.fromEntries(Object.entries(receipt.payload).reverse())));
   assert.notEqual(new TextDecoder().decode(unsortedBytes), canonicalReceiptJson(receipt.payload));
@@ -56,10 +79,17 @@ test('verification refuses tampering, unknown or wrong keys, synthetic data and 
   for (const outsidePolicy of [{ ...policy, keys: {} }, { ...policy, environment: 'production' }]) {
     assert.equal((await verifyImporterVerificationReceipt(receipt, outsidePolicy)).valid, false);
   }
+  // Only an omitted list or an array naming the environment admits a key; any other restriction fails closed.
+  const production = (environments, environment = 'production') => ({ environment, keys: { stage: { publicKey: keys.publicKey, environments } } });
+  const misrestricted = ['non-production', 'preproduction', null, false, 0, '', {}, new Set(['production'])].map((environments) => production(environments));
+  for (const odd of [...misrestricted, production(undefined, ['production'])]) {
+    assert.equal((await verifyImporterVerificationReceipt(receipt, odd)).valid, false);
+  }
+  assert.equal((await verifyImporterVerificationReceipt(receipt, production(['stage', 'production']))).valid, true);
   await assert.rejects(signImporterVerificationReceipt({ ...receipt.payload, synthetic: true }, 'stage', keys.privateKey));
 });
 
-test('signed receipts must include source digest and all schema counts', async () => {
+test('signed receipts must include source digest and all schema counts, and nothing outside the schema', async () => {
   const { receipt, policy, keys } = await fixture();
   for (const remove of [
     (payload) => { delete payload.source.sha256; },
@@ -71,6 +101,15 @@ test('signed receipts must include source digest and all schema counts', async (
     const bytes = new TextEncoder().encode(canonicalReceiptJson(payload));
     const signature = Buffer.from(await crypto.subtle.sign('Ed25519', keys.privateKey, bytes)).toString('base64');
     assert.equal((await verifyImporterVerificationReceipt({ ...receipt, payload, signature }, policy)).valid, false);
+  }
+  // Members named after Object.prototype properties are unknown members too, in the envelope and in a payload.
+  for (const name of ['constructor', '__proto__', 'toString']) {
+    const published = JSON.parse(JSON.stringify(receipt).replace('{', `{${JSON.stringify(name)}:{"synthetic":true},`));
+    const result = await verifyImporterVerificationReceipt(published, policy);
+    assert.equal(result.valid, false);
+    assert.deepEqual(result.issues.map((issue) => issue.code), ['SCHEMA_ADDITIONAL_PROPERTY']);
+    const payload = JSON.parse(canonicalReceiptJson(receipt.payload).replace('"source":{', `"source":{${JSON.stringify(name)}:"outside the schema",`));
+    await assert.rejects(signImporterVerificationReceipt(payload, 'stage', keys.privateKey), /SCHEMA_ADDITIONAL_PROPERTY/);
   }
 });
 

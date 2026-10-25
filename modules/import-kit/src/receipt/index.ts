@@ -44,7 +44,10 @@ export async function verifyImporterVerificationReceipt(
   if (issues.length) return { valid: false, issues };
 
   const trusted = policy?.keys && Object.hasOwn(policy.keys, receipt.keyId) ? policy.keys[receipt.keyId] : undefined;
-  if (!trusted || !policy.environment || (trusted.environments && !trusted.environments.includes(policy.environment))) {
+  // Only an omitted list is unrestricted; any value other than an array naming the environment refuses the key.
+  const environments: unknown = trusted?.environments;
+  if (!trusted || typeof policy.environment !== 'string' || !policy.environment
+    || (environments !== undefined && !(Array.isArray(environments) && environments.includes(policy.environment)))) {
     return { valid: false, issues: [{ code: 'RECEIPT_KEY_UNTRUSTED', path: `${path}.receipt.keyId`, message: 'The issuer key is not allowed in this consumer environment.' }] };
   }
   let validSignature = false;

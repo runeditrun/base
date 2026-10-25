@@ -108,7 +108,8 @@ function schemaIssues(value: unknown, schema: JsonSchema, root: JsonSchema, path
       issues.push({ code: 'SCHEMA_MIN_PROPERTIES', path, message: `Object must contain at least ${schema.minProperties} property/properties.` });
     }
     for (const [key, propertyValue] of Object.entries(value)) {
-      const propertySchema = schema.properties?.[key];
+      // Own members only: `constructor` or `__proto__` must not resolve to Object.prototype.
+      const propertySchema = schema.properties && Object.hasOwn(schema.properties, key) ? schema.properties[key] : undefined;
       if (propertySchema) {
         issues.push(...schemaIssues(propertyValue, propertySchema, root, `${path}.${key}`));
       } else if (schema.additionalProperties === false) {

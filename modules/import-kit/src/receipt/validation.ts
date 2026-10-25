@@ -70,9 +70,10 @@ async function validateReconciliation(reconciliation: ImporterVerificationPayloa
 async function validateUnmapped(unmapped: ImporterVerificationPayload['unmapped'], expectedCount: number, path: string, issues: ImporterValidationIssue[]): Promise<void> {
   const items = unmapped.items;
   const identities = items.map((item) => item.sourceIdentitySha256);
-  const ordered = [...items].sort((left, right) => String(left.sourceIdentitySha256).localeCompare(String(right.sourceIdentitySha256)));
+  // The default sort is UTF-16 code-unit order, as for canonical keys, never the host locale's collation.
+  const ordered = [...identities].sort();
   if (unmapped.count !== expectedCount || unmapped.count !== items.length || new Set(identities).size !== identities.length
-    || canonicalJson(items) !== canonicalJson(ordered) || unmapped.itemManifestSha256 !== await sha256(canonicalJson(items))) {
+    || canonicalJson(identities) !== canonicalJson(ordered) || unmapped.itemManifestSha256 !== await sha256(canonicalJson(items))) {
     issues.push({ code: 'UNMAPPED_MANIFEST_MISMATCH', path: `${path}.receipt.payload.unmapped`, message: 'Unmapped count, ordered distinct source identities, and item manifest do not agree.' });
   }
 }
