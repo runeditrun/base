@@ -235,22 +235,28 @@ writes Base's bytes and modes for recorded files and for files already equal to
 Base, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out files the copy had left out, and re-records each copy.
-For JavaScript outside `foundation/runtime`, refresh follows static relative imports and
-exports, including side-effect imports, transitively up to 64 levels inside
-the original copied origin directory tree. A file newly adopted by this refresh
-can also bring required relative helpers from outside that tree, transitively,
-when they exist at the refreshed Base commit and have no conflicting seed bytes
-or recorded removal. These closure-derived helpers receive ordinary copy records
-so verification and later refreshes keep them current. Missing helpers are copied and
-reported under `adopted`, with separate file entries in `base-copies.json` that
-preserve the existing per-file mapping. Already recorded dependencies must remain
-present. A dependency already delivered by another copy mapping, an acknowledged
-adaptation, or regular seed-owned source satisfies the import. Seed-owned source
-is preserved and its actual static imports are checked; missing dependencies of
-that source require explicit reconciliation. Other unrecorded imports outside that origin
-tree, missing, deleted or kept-out dependencies and adapted importers with missing
-dependencies refuse the entire refresh before writes, with exact `record-base`
-commands for explicit reconciliation. Existing adapted files stay unchanged.
+For JavaScript outside `foundation/runtime`, refresh follows static relative
+imports and exports, including side-effect imports, transitively up to 64 levels.
+Every Base file this refresh writes, newly adopted or updated, can also bring
+required relative helpers from outside its original copied origin directory.
+This revises the earlier guarantee that refresh never writes outside a copy's
+origin: otherwise an updated file could import a missing helper and break the seed.
+Helpers come from the refreshed commit's Git objects, never the Base working tree.
+They appear under `adopted` and receive closure-derived singleton entries in
+`base-copies.json` (or join a matching directory copy), so `verify-base` sees no
+drift and later refreshes keep them current. Their own relative imports receive
+the same guarded delivery, within the depth bound.
+A dependency already delivered by another recorded copy mapping or an acknowledged
+adaptation satisfies the import. Regular seed-owned source also satisfies an
+import when no outside-origin Base helper would replace its different bytes;
+its actual static imports are checked and its missing dependencies require explicit
+reconciliation. An outside-origin Base helper whose destination holds different
+seed-owned bytes refuses, naming the file; those bytes are never overwritten.
+Missing source at the refreshed commit, recorded removals, files deliberately kept
+out or ignored, symlinks, seed-root escapes, absolute/file-URL/drive paths, depth
+overflow and adapted importers needing new files refuse the entire refresh before
+writes, with exact `record-base` commands for explicit reconciliation. Existing
+adapted files stay unchanged. Already recorded dependencies must remain present.
 Each file uses its origin name and the target commit's nearest `package.json`
 (read from Git objects, never the working tree or seed): `.mjs` is ESM and
 `.cjs` is CommonJS; `.js` and extensionless files follow that package's

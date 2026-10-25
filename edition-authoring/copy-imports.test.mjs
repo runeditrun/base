@@ -29,13 +29,15 @@ function fixture(t) {
 test('per-file refresh records a transitive runnable module set and repeats without drift', t => {
   const {base, seed, run} = fixture(t);
   // Lexical traps around real imports: postfix operators before a slash, a regular expression and nested templates holding import text.
-  write(base, 'tools/main.mjs', "let n = 2; n++ / 2; if (n) /import '.\\/ghost.mjs'/.test('x');\nconst text = `outer ${`inner import './ghost.mjs'`}`;\nimport './side.mjs'; import {value} from './lib/helper.mjs'; console.log(value, text.length > 0);\n");
+  write(base, 'tools/main.mjs', "let n = 2; n++ / 2; if (n) /import '.\\/ghost.mjs'/.test('x');\nconst text = `outer ${`inner import './ghost.mjs'`}`;\nimport '../shared/first.mjs'; import './side.mjs'; import {value} from './lib/helper.mjs'; console.log(value, text.length > 0);\n");
   write(base, 'tools/lib/helper.mjs', "export {value} from './value.mjs';\n");
   write(base, 'tools/lib/value.mjs', 'export const value = 42;\n');
-  write(base, 'tools/side.mjs', 'globalThis.authoringReady = true;\n');
+  write(base, 'tools/side.mjs', "import '../shared/first.mjs'; globalThis.authoringReady = true;\n");
+  write(base, 'shared/first.mjs', "import '../domain/value.mjs';\n");
+  write(base, 'domain/value.mjs', 'export const shared = true;\n');
   const revision = commit(base), refresh = run('refresh-base', revision);
   assert.equal(refresh.status, 0, refresh.stderr);
-  assert.equal(JSON.parse(refresh.stdout).adopted.length, 3);
+  assert.equal(JSON.parse(refresh.stdout).adopted.length, 5);
   const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
   assert.equal(execution.status, 0, execution.stderr);
   assert.equal(execution.stdout.trim(), '42 true');
@@ -53,9 +55,10 @@ test('unresolvable relative imports refuse the entire refresh before source or r
   write(base, 'outside.mjs', 'export const outside = true;\n');
   const revision = commit(base), refused = run('refresh-base', revision);
   assert.equal(refused.status, 1);
-  for (const [name, origin] of [['scripts/missing.mjs', 'tools/missing.mjs'], ['outside.mjs', 'outside.mjs']]) {
-    assert.ok(refused.stderr.includes(`record-base '${name}' '${origin}' ${revision}`), refused.stderr);
-  }
+  assert.ok(refused.stderr.includes(`record-base 'scripts/missing.mjs' 'tools/missing.mjs' ${revision}`), refused.stderr);
+  // The updated importer may bring outside.mjs, but an unrelated missing
+  // dependency still refuses the entire plan, including that valid delivery.
+  assert.ok(!refused.stderr.includes("record-base 'outside.mjs'"), refused.stderr);
   assert.deepEqual(fs.readFileSync(path.join(seed, 'scripts/main.mjs')), original);
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
   assert.equal(fs.existsSync(path.join(seed, 'outside.mjs')), false);
