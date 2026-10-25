@@ -44,7 +44,8 @@ async function safeParents(checkout, directory) {
  }
 }
 export async function readJournal(checkout) {
- await safeParents(checkout, upgradeDirectory(checkout));
+ try { await safeParents(checkout, upgradeDirectory(checkout)); }
+ catch { throw failure('refused', 'The upgrade directory is linked, foreign-owned or unreadable. Keep .rer/upgrade and its backups; repair its ownership and links before rerunning rer upgrade.'); }
  const journal = await readControl(join(upgradeDirectory(checkout), 'journal.json'), 'upgrade journal (.rer/upgrade/journal.json)');
  if (journal && (journal.version !== 1 || !journalStages.includes(journal.stage))) throw failure('refused', 'Unreadable upgrade journal (.rer/upgrade/journal.json); keep it and the upgrade backups and ask your agent to recover them.');
  return journal;
