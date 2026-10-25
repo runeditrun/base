@@ -139,8 +139,9 @@ function queryKeys(query: string): string[] {
 
 /**
  * The URL Standard's form decoding of the text's UTF-8 bytes in one pass: `+` becomes a space, `%` and two hex digits
- * that byte. String replaces build their result from one piece per match: a global replace with a callback aborts V8
- * past about 2^26 matches, and replaceAll('+', ' ') ended the workerd process at 75,000,000 characters.
+ * that byte. String replaces build their result from one piece per match: a global replace with a callback first lists
+ * every match, and V8 aborts the process once that list outgrows 2^26 entries (it did at 25,000,000 matches);
+ * replaceAll('+', ' ') ended the workerd process at 75,000,000 characters.
  */
 function formDecode(text: string): Uint8Array {
   const bytes = new TextEncoder().encode(text);
@@ -162,7 +163,7 @@ function hexValue(byte: number | undefined): number {
   return lower >= 0x61 && lower <= 0x66 ? lower - 0x57 : -1;
 }
 
-/** `host` is an ASCII hostname, where toLowerCase folds only A-Z; a pin with any other character never equals it. */
+/** `host` is an ASCII hostname, where toLowerCase folds only A-Z; a pin with a non-ASCII character never equals it. */
 function isTrustedHost(host: string, trustedHosts: readonly string[]): boolean {
   const normalized = host.toLowerCase();
   // Checked before toLowerCase, which would fold a pin's U+212A KELVIN SIGN to "k".
