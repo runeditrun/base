@@ -39,7 +39,7 @@ async function rollback(checkout, journal, operation) {
  const { metadata } = await backup(checkout, journal.backup);
  // The repair intent must outlive this process before any checkout, state or
  // runtime mutation. A retry may never mistake the old HEAD for restored data.
- journal.stage = 'rolling_back'; delete journal.result;
+ journal.stage = 'rolling_back'; journal.runtimeSettled = false; delete journal.result;
  await writeJournal(checkout, journal);
  await stopApp(checkout, operation);
  await git(checkout, ['reset', '--hard', metadata.head]);
@@ -72,7 +72,7 @@ async function apply(checkout, journal, operation, phase, allowed) {
  * output stay in the local journal; only the design's closed outputs escape. */
 export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDiagnostic, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
  const started = Date.now(), phase = phases(onPhase);
- let journal = {}, operation, installed, wasRunning, rememberedIntent = false, switched = false, preserveJournal = false, restoring = false;
+ let journal = {}, operation, installed, wasRunning, rememberedIntent = false, settleJournal = false, switched = false, preserveJournal = false, restoring = false;
  try {
   if (allowDataChange.length && !process.stdin.isTTY) throw failure('refused');
   try { checkout = await realpath(checkout); } catch { throw failure('checkout_missing'); }
@@ -87,7 +87,12 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   catch (error) { if (!restore) throw error; }
   journal.from ??= installed;
   const current = await preflight(checkout);
-  const unfinished = journal.version === 1 && !['rolled_back', 'complete'].includes(journal.stage);
+  const terminalResume = ['complete', 'rolled_back'].includes(journal.stage) && journal.runtimeSettled === false;
+  const unfinished = journal.version === 1 && (!['rolled_back', 'complete'].includes(journal.stage) || terminalResume);
+  if (terminalResume && !restore && (current.branch !== journal.branch ||
+    current.head !== (journal.stage === 'complete' ? journal.prepared?.candidate : journal.head) ||
+    installed?.commit !== (journal.stage === 'complete' ? journal.target?.commit : journal.from?.commit) ||
+    to && ![journal.target?.commit, journal.target?.tag].includes(to))) throw failure('refused');
   if (needsRecovery(journal) && !restore && (current.branch !== journal.branch ||
     current.head !== journal.prepared?.candidate && !(journal.stage === 'switch_pending' && current.head === journal.head))) throw failure('rollback_failed');
   const intent = await readIntent(checkout);
@@ -118,7 +123,18 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     if (!ref.code) await cleanupMerge(checkout, repairPreparation);
    }
    const result = output('rolled_back', journal, started);
-   journal.result = result; await writeJournal(checkout, journal); await phase('ready');
+   journal.result = result; await writeJournal(checkout, journal); settleJournal = true; await phase('ready');
+   return result;
+  }
+  if (terminalResume) {
+   // A kill after the verdict but before returning runtime custody must still
+   // restore attempt one's running state. A settled journal is ordinary history.
+   await stopApp(checkout, operation);
+   if (journal.wasRunning) await health(checkout, await startApp(checkout, operation));
+   const result = output(journal.stage === 'complete' ? 'updated' : 'rolled_back', journal, started,
+    errorCodes.has(journal.result?.error_code) ? journal.result.error_code : undefined);
+   journal.result = result; settleJournal = true;
+   await phase(journal.stage === 'complete' ? 'ready' : 'failed', result.error_code);
    return result;
   }
   if (journalKey && journal.journalKey === journalKey && journal.result) {
@@ -132,7 +148,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    if (journal.wasRunning) await health(checkout, (await runningApp(checkout))?.url ?? await startApp(checkout, operation));
    else await stopApp(checkout, operation);
    const result = output('updated', journal, started);
-   journal.stage = 'complete'; journal.result = result; await writeJournal(checkout, journal);
+   journal.stage = 'complete'; journal.result = result; await writeJournal(checkout, journal); settleJournal = true;
    await cleanupMerge(checkout, journal.prepared); await phase('ready');
    return result;
   }
@@ -169,7 +185,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     if (compareVersion(target.tag.slice(1), from.tag.slice(1)) <= 0) throw failure('release_unverified');
     const ancestry = await git(checkout, ['merge-base', '--is-ancestor', from.commit, target.commit], { allow: [1] });
     if (ancestry.code) throw failure('release_unverified');
-    journal = { version: 1, journalKey: journalKey ?? randomUUID(), checkout_name: basename(checkout), head: current.head, branch: current.branch, from, target, wasRunning, stage: 'preparing' };
+    journal = { version: 1, journalKey: journalKey ?? randomUUID(), checkout_name: basename(checkout), head: current.head, branch: current.branch, from, target, wasRunning, runtimeSettled: false, stage: 'preparing' };
     await writeJournal(checkout, journal);
     preserveJournal = false;
     await forgetIntent(checkout);
@@ -199,7 +215,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    await apply(checkout, journal, operation, phase, allowDataChange);
   }
   const result = output('updated', journal, started);
-  journal.stage = 'complete'; journal.result = result; await writeJournal(checkout, journal);
+  journal.stage = 'complete'; journal.result = result; await writeJournal(checkout, journal); settleJournal = true;
   await cleanupMerge(checkout, journal.prepared);
   await phase('ready');
   return result;
@@ -217,7 +233,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     await rollback(checkout, journal, operation);
     if (journal.prepared) await cleanupMerge(checkout, journal.prepared);
     const result = output('rolled_back', journal, started, code);
-    journal.result = result; await writeJournal(checkout, journal); await phase('failed', code);
+    journal.result = result; await writeJournal(checkout, journal); settleJournal = true; await phase('failed', code);
     return result;
    } catch {
     journal.stage = 'rollback_failed'; await writeJournal(checkout, journal).catch(() => {});
@@ -248,8 +264,13 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   return output(code === 'needs_integration' ? 'needs_integration' : 'refused', journal, started, code);
  } finally {
   if (operation) {
-   try { await returnOperation(checkout, operation); }
-   finally { await operation.release(); }
+   try {
+    await returnOperation(checkout, operation);
+    if (settleJournal) { journal.runtimeSettled = true; await writeJournal(checkout, journal); }
+   } catch {
+    onDiagnostic?.('Runtime custody could not be confirmed. Keep .rer/upgrade/journal.json and rerun rer upgrade to finish this attempt.');
+    return output('refused', journal, started, 'refused');
+   } finally { await operation.release(); }
   }
  }
 }

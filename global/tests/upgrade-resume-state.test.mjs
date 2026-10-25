@@ -13,9 +13,9 @@ test('resume keeps the running state from before the first attempt, including be
  const f = await upgradeFixture(t);
  await f.launch(); await f.ownerCommit(); await f.addRow();
  const running = async () => (await liveServers(f.env)).filter(r => r.checkout === f.root);
- for (const [phase, initiallyRunning] of [['get', true], ['install', true], ['get', false]]) {
+ for (const [index, [phase, initiallyRunning]] of [['get', true], ['install', true], ['ready', true], ['get', false]].entries()) {
   if (!initiallyRunning) await stopOwnedApp(f.env, f.root);
-  const release = await f.publish(`3.${phase === 'install' ? 1 : initiallyRunning ? 0 : 2}.0`);
+  const release = await f.publish(`3.${index}.0`);
   const args = ['upgrade', '--to', release.commit, '--anchors', f.anchors, '--json'];
   const child = f.start(args);
   const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
