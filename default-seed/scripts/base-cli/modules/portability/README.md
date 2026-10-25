@@ -66,6 +66,7 @@ belong to the current runtime or environment and never travel:
 | `rer_command_receipts` | Command replay receipts tied to the source installation. |
 | `rer_erasure_blobs`, `rer_erasure_guard`, `rer_erasure_scope`, `rer_erasure_rates` | Erasure work queues, transaction guards, working scope and local rate limits. |
 | `rer_demo` | Local demo setup markers. |
+| `rer_job_leases`, `rer_job_control`, `rer_job_activations` | Local durable-job claims, execution epoch and execution authorization. |
 
 `excludedTables` combines this list with the default identity exclusions `oa_%`
 and `oc_%`. Policy may override those identity exclusions through `includeTables`,
@@ -82,6 +83,13 @@ Durable erasure receipts in `rer_erasure_operations`, installation identity in
 delivery receipts and state in `rer_mail_event_receipts` and
 `rer_mail_event_states` remain portable unless product policy excludes them.
 Seed-owned tables are likewise discovered and remain portable by default.
+Durable-job intent and history in `rer_job_jobs`, `rer_job_units` and
+`rer_job_attempts` remain portable. They carry no executable authorization:
+every execution boundary requires an excluded local activation for the current
+installation epoch. Restored nonterminal jobs are effectively held for explicit
+reauthorization, regardless of their saved state. Container job restore refuses
+before destination apply until the destination-owned job archive validator is
+available; table exclusions alone do not supply normalization or validation.
 
 For native local CLI transfers, declare executable policy through
 `localPortability({database, buckets, policyModule})`. `policyModule` is a

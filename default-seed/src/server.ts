@@ -21,6 +21,7 @@ import { importDoorResponse } from './core/features/people/door.server'
 import { importPageResponse } from './core/features/people/import-page.server'
 import { rejectedResponse } from '../../foundation/runtime/rejected-response'
 import { businessSettings } from './core/platform/business.server'
+import { durableJobsResponse, tickReferenceSales } from './core/features/durable-jobs/http.server'
 
 const api = createApi()
 const queueMessage = z.union([z.object({ id: z.string().length(26) }).strict(), z.object({ erasure: z.string().regex(/^[0-9a-f]{32}$/) }).strict(),
@@ -31,6 +32,8 @@ export default withDemo({
     const asset = await staticAssetResponse(request, bindings)
     if (asset) return asset
     bindings = requireBindings(bindings)
+    const durableJob = await durableJobsResponse(request, bindings)
+    if (durableJob) return rejectedResponse(request, durableJob)
     if (['/api/rer/business-settings', '/rer-business-logo', '/rer-business.css'].includes(new URL(request.url).pathname)) {
       const businessResponse = await businessSettings(bindings).handle(request)
       if (businessResponse) return rejectedResponse(request, businessResponse)
@@ -97,6 +100,7 @@ export default withDemo({
     const checked = requireBindings(bindings)
     const failures: unknown[] = []
     for (const job of [
+      () => tickReferenceSales(checked),
       () => recordScheduledRun(checked, controller.cron),
       async () => (await import('./core/features/policies/scheduled.server')).runScheduledPolicies(checked),
       async () => (await import('./core/features/people/routes')).resumePendingErasures(checked),

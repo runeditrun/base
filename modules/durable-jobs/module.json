@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "durable-jobs",
+  "kind": "optional-source",
+  "entry": "index.ts",
+  "nativeEntry": "native.mjs",
+  "copy": [
+    "index.ts",
+    "src",
+    "native.mjs",
+    "native.d.mts",
+    "schema"
+  ],
+  "migrations": [
+    "schema/0001-durable-jobs.sql"
+  ],
+  "tables": {
+    "portable": [
+      "rer_job_jobs",
+      "rer_job_units",
+      "rer_job_attempts"
+    ],
+    "excluded": [
+      "rer_job_leases",
+      "rer_job_control",
+      "rer_job_activations"
+    ]
+  },
+  "requires": [
+    "installation-database",
+    "current-authority-and-revision-guards",
+    "registered-local-handlers",
+    "bounded-native-or-manual-tick"
+  ],
+  "status": "Round 1 local durable units; external effects and qualified container job restore are refused"
+}

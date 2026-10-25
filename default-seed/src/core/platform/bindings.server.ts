@@ -33,6 +33,8 @@ export interface Bindings {
   /** Public Business settings verification ring and installation binding. */
   RER_BUSINESS_TRUST?: string
   RER_INSTALLATION_ID?: string
+  /** Explicit optional registration; requires this installation's RER_INSTALLATION_ID. */
+  DURABLE_JOBS_REFERENCE?: string
   RER_MANAGEMENT_ORIGIN?: string
   AUTH_ALLOW_LIST?: string
   AUTH_IP_LIMIT?: string

@@ -13,6 +13,7 @@
   "originVar": "AUTH_ORIGIN",
   "publicOriginSetting": "PUBLIC_ORIGIN",
   "vars": {
+    "DURABLE_JOBS_REFERENCE": "false",
     "AUTH_LOCAL": "false",
     "MAIL_PROVIDER": "resend",
     "MAIL_FROM": "auth@example.invalid"

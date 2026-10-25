@@ -209,3 +209,11 @@ node --test --test-concurrency=1 modules/container/tests/ssh.test.mjs modules/co
 Set `DOCKER_HOST`, `RER_SSH_IDENTITY` and `RER_SSH_KNOWN_HOSTS` for that fixture.
 The suite uses public source and packaged CLI commands and removes only its own
 labeled test resources. It never supplies real provider credentials.
+
+Installation archive exports omit durable-job leases, control and activations.
+Imports carrying portable `rer_job_` history currently refuse before migrations
+or destination apply with `durable_jobs_restore_validator_required`: keep the
+archive and source installation, and upgrade to a release with the supported
+destination-owned inactive job restore validator. Serializable exclusions alone
+do not validate references or normalize saved job state. This refusal preserves
+the existing restrictions on executable inline/container archive policies.

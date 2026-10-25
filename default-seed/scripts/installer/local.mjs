@@ -4,11 +4,13 @@ import { ownerDeploy } from '../base-cli/cli/deploy.mjs';
 import { localPortability } from '../base-cli/cli/portability.mjs';
 import * as model from './ui/seed.mjs';
 import { portabilityPolicy } from '../../src/core/platform/portability-policy.mjs';
+import { nativeReferenceJobs } from '../../src/core/features/durable-jobs/native.server.mjs';
 
 const lifecycle = operatorInstaller({ database: 'default-seed-reference', features: model.features });
 export const adapter = lifecycle;
 export const { install } = lifecycle;
 export const commandAdapter = createCommandAdapter(lifecycle, {
+ jobs: nativeReferenceJobs,
  dev: developmentTarget, preview: previewTarget, verify: ['pnpm', ['run', 'verify:app']], deploy: ownerDeploy('deploy.json', lifecycle),
  // Portable-hosting moves use the shared archive policy and its default identity exclusions.
  // The destination claims a fresh owner and re-links authentication explicitly.

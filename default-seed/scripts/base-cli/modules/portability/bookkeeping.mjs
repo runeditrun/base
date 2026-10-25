@@ -11,6 +11,7 @@ export const platformTables=Object.freeze([
   'rer_dependency_keys','rer_dependency_pending','rer_dependency_codes',
   'rer_command_receipts','rer_erasure_blobs','rer_erasure_guard',
   'rer_erasure_scope','rer_erasure_rates','rer_demo',
+  'rer_job_leases','rer_job_control','rer_job_activations',
 ]);
 export const identifier=value=>value.replace(/[A-Z]/g,letter=>letter.toLowerCase());
 export const matches=(table,pattern)=>pattern.endsWith('%') ? identifier(table).startsWith(identifier(pattern.slice(0,-1))) : identifier(table)===identifier(pattern);
