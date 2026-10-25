@@ -60,7 +60,7 @@ export async function server(t) {
   requireValue(Array.isArray(body.capabilities) && body.capabilities.length <= 100 && body.capabilities.every(value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,100}$/.test(value)));
   // Each explicit pairing starts a fresh browser-created fixture pairing.
   // Like the platform, the code's own expiry applies until approval.
-  redeemed = true; issued = false; state.approved = false; state.revoked = false; state.active = false;
+  redeemed = true; issued = false; state.approved = false; state.revoked = false; state.active = false; state.agentKind = body.agent_kind;
   const seconds = state.pairingSeconds ?? 600; pairingExpires = Date.now() + seconds * 1000;
   return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(seconds), interval: state.pollSeconds ?? 5 }, 202];
  }
@@ -136,7 +136,8 @@ export async function server(t) {
     if (request.method === 'GET') await state.onSelf?.();
     state.active = true;
     if (state.selfMissing) return send({}, 403);
-    if (request.method === 'GET') return send({ optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
+    // The platform's computer projection: the device as it reported itself, and the owner's choices.
+    if (request.method === 'GET') return send({ device: { agent_kind: { value: state.agentKind, source: 'device_reported' } }, optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
     requireValue(request.method === 'DELETE', 405);
     if (state.revokeRefused) return send({}, 503);
     state.revoked = true; return send({ revoked: true });
@@ -155,6 +156,12 @@ export async function server(t) {
    if (route === '/api/business/executors/token') return send(mint(request, body));
    if (route === '/api/business/mcp') return mcp(request, body, send);
    if (route === '/api/business/executors/claim') { requireDevice(request); return send(tasks.claim(body)); }
+   const granting = /^\/api\/business\/tasks\/([^/]+)\/import-grants$/.exec(route);
+   if (granting) {
+    if (request.headers.authorization === `Bearer ${device}`) { requireDevice(request); requireValue(false, 403); }
+    const id = decodeURIComponent(granting[1]); bearer(request, 'tasks', id);
+    return send(tasks.importGrant(id, body));
+   }
    const match = /^\/api\/business\/tasks\/([^/]+)\/(heartbeat|events|complete|release|uploads)$/.exec(route);
    if (match) {
     if (request.headers.authorization === `Bearer ${device}`) { requireDevice(request); requireValue(false, 403); }
