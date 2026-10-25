@@ -5,6 +5,8 @@ import { Context, type Control, type Row } from './storage.ts';
 import type { Claim, Job, Sql } from './types.ts';
 import { admissionPage } from './admission.ts';
 
+const reconsiderable = new Set(['job_capacity_exhausted', 'job_revision_stale', 'job_authority_revoked', 'job_dependency_unavailable', 'job_handler_unsupported', 'job_checkpoint_corrupt', 'job_checkpoint_invalid', 'job_input_corrupt', 'job_revision_corrupt']);
+
 export function activation(context: Context, job: Job, epoch: string): Sql {
   return sql("EXISTS(SELECT 1 FROM rer_job_activations a JOIN rer_job_control c ON c.installation_id=a.installation_id AND c.epoch=a.epoch WHERE a.installation_id=? AND a.job_id=? AND a.epoch=? AND a.principal_id=? AND a.owner_id=? AND c.mode='running')", context.installationId, job.id, epoch, job.principalId, job.ownerId);
 }
@@ -54,6 +56,10 @@ export async function claim(context: Context, options: { id?: string; holder?: s
     if (now >= job.deadline || job.failures >= context.limits.maxFailureAttempts || job.starts >= context.limits.maxUnits + context.limits.maxFailureAttempts || job.progress.units >= context.limits.maxUnits) {
       await hold(context, job, now >= job.deadline ? 'job_deadline_exhausted' : 'job_attempts_exhausted', 'Create a new reviewed intent after inspecting the partial committed outcome.', 'failed'); continue;
     }
+    // Only holds whose condition is checked below can wake automatically.
+    // A handler's explicit wait or proof failure still needs repaired input and
+    // an authorized resume, without probing it by spending another attempt.
+    if (job.state === 'waiting' && !reconsiderable.has(job.reasonCode ?? '')) continue;
     try {
       const kind = await context.compatible(job);
       insist(await kind.validateRevision(job), 'job_revision_stale');
