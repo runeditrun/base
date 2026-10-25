@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reuse the Base development Vite → workerd connection pool, expire idle sockets before workerd closes them, and disable transport replay.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.
