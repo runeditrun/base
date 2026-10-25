@@ -1,6 +1,7 @@
 """Real authoring-generated metadata and a public-CLI test boundary."""
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -67,12 +68,18 @@ def generated_sources(fixture):
     return {p: json.loads((fixture.repo / p).read_bytes()) for p in paths}
 
 
-def public_scan(fixture, scanner=ROOT, env_file=None):
+def public_scan(fixture, scanner=ROOT, env_file=None, base_origin=None):
     # Only the GitHub network edge is fake; Git, authoring and Gitleaks are real.
     with tempfile.TemporaryDirectory() as network:
         gh = Path(network) / 'gh'
         gh.write_text("#!/bin/sh\nprintf 'HTTP/2 200\\n\\n{\"private\":false}\\n'\n")
         gh.chmod(0o700)
+        if base_origin is not None:
+            git = Path(network) / 'git'
+            git.write_text('#!/usr/bin/env python3\nimport os, sys\n'
+                + 'args = [' + repr(str(base_origin)) + " if a == 'https://github.com/runeditrun/base.git' else a for a in sys.argv[1:]]\n"
+                + 'os.execv(' + repr(shutil.which('git')) + ', [\'git\', *args])\n')
+            git.chmod(0o700)
         args = ['node', str(scanner / 'scripts/publish-check.mjs'), '--repo', str(fixture.repo)]
         if env_file:
             args.extend(['--env-file', str(env_file)])

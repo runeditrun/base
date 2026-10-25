@@ -16,6 +16,7 @@ from tree_scan import context, text_rules, working_files, working_regular
 from public_hygiene import reference_rules
 from content_identities import ContentIdentities, candidate as identity_candidate
 from checksum_maps import ChecksumMaps
+from copy_origins import CopyOrigins
 from credential_assignments import text_rules, Findings
 from assignment import is_assignment
 
@@ -24,6 +25,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
     report = new_report(public_base is not None)
     timings = Timings(report)
     history = staged = None
+    origins = CopyOrigins()
     add = Findings(report, {}, frozenset()).add
     try:
         hashes = load_hashes(env_file)
@@ -118,8 +120,9 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         if not (Path(history.repo) / 'LICENSE').is_file():
             add('license.missing', 'LICENSE', scope='working-tree')
         identities = {'working-tree': timings.call('identities.prepare', ContentIdentities, working_identities,
-            lambda path: working_regular(Path(history.repo), path))}
+            lambda path: working_regular(Path(history.repo), path), origins.read)}
         checksums = {}
+        preimage_key = preimage = None
         for mode in ('git', 'dir'):
             for hit in timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
                 path, commit = hit.get('File', '.'), hit.get('Commit') or history.commit
@@ -139,7 +142,13 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                     def read_regular(path, scoped_entries=scoped_entries):
                         entry = scoped_entries.get(path)
                         return (history.blob(entry['oid']), entry['mode']) if entry and entry['kind'] == 'blob' and entry['mode'] in ('100644', '100755') else None
-                    held = working_regular(Path(history.repo), path) if mode == 'dir' else read_regular(path)
+                    # Native reports group many matches in the same file. Read
+                    # that preimage once, including over-budget digest maps.
+                    key = (mode, commit, path)
+                    if key != preimage_key:
+                        preimage_key = key
+                        preimage = working_regular(Path(history.repo), path) if mode == 'dir' else read_regular(path)
+                    held = preimage
                     if held and not is_assignment(held[0], hit):
                         continue
                     if identity_scope not in checksums:
@@ -150,7 +159,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                         if identity_scope not in identities:
                             identities[identity_scope] = timings.call('identities.prepare', ContentIdentities, {
                                 p: history.blob(e['oid']) for p, e in scoped_entries.items()
-                                if identity_candidate(p) and e['kind'] == 'blob' and e['mode'] in ('100644', '100755')}, read_regular)
+                                if identity_candidate(p) and e['kind'] == 'blob' and e['mode'] in ('100644', '100755')}, read_regular, origins.read)
                         if identities[identity_scope].matches(path, hit):
                             continue
                     else:
@@ -208,6 +217,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
     except (OSError, ValueError, TypeError, KeyError, UnicodeError):
         add('scan.configuration-incomplete', '.')
     finally:
+        origins.close()
         if history:
             history.close()
         timings.finish()
