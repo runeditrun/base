@@ -133,8 +133,18 @@ function queryKeys(query: string): string[] {
   const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
   return query.split('&').filter(Boolean).map((pair) => {
     const name = pair.split('=', 1)[0]!;
-    return name.includes('%') || name.includes('+') ? decoder.decode(formDecode(name)) : name;
+    return name.includes('%') || name.includes('+') ? decodeUtf8(decoder, formDecode(name)) : name;
   });
+}
+
+/** One TextDecoder call per 16 MiB with streaming state: workerd's decoder refuses one input above about 170 MB. */
+function decodeUtf8(decoder: TextDecoder, bytes: Uint8Array): string {
+  const chunk = 16 * 1024 * 1024;
+  let text = '';
+  for (let start = 0; start < bytes.length; start += chunk) {
+    text += decoder.decode(bytes.subarray(start, start + chunk), { stream: start + chunk < bytes.length });
+  }
+  return text;
 }
 
 /**

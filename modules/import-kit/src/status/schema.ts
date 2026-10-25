@@ -66,7 +66,7 @@ function schemaIssues(value: unknown, schema: JsonSchema, root: JsonSchema, path
   }
 
   if (typeof value === 'string') {
-    const length = Array.from(value).length;
+    const length = codePointLength(value);
     if (schema.minLength !== undefined && value.trim().length === 0) {
       issues.push({ code: 'SCHEMA_BLANK_STRING', path, message: 'A non-empty string cannot contain only whitespace.' });
     }
@@ -121,6 +121,19 @@ function schemaIssues(value: unknown, schema: JsonSchema, root: JsonSchema, path
   }
 
   return issues;
+}
+
+/** Array.from(value).length without building the array: a surrogate pair counts once, a lone surrogate once. */
+function codePointLength(value: string): number {
+  let length = value.length;
+  for (let index = 0; index + 1 < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) { length -= 1; index += 1; }
+    }
+  }
+  return length;
 }
 
 function resolveSchemaReference(root: JsonSchema, reference: string): JsonSchema | undefined {
