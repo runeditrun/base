@@ -1,252 +1,56 @@
-# Edition-owned source authoring 1.1.0
+# Edition source authoring
 
-Seeds pin the published `@runeditrun/rer` package and use `rer adopt-edition`
-and `rer refresh-base --ref FULL_COMMIT`; do not vendor authoring CLI files.
-See [EDITION-AUTHORING.md](../export/EDITION-AUTHORING.md) for adoption, acquisition,
-offline use and JSON output. Node 22+ and Git are the authoring dependencies.
-Builds and integration remain ordinary edition code. This tool never runs
-source-provided scripts. Existing per-file vendored authoring scripts remain
-supported; to migrate, pin the package, run `rer adopt-edition`, then drop the
-vendored scripts and their copy records.
+Pin the published `@runeditrun/rer` package in the seed. Its public commands run
+that pin; a seed does not need to carry `scripts/edition-authoring/`.
 
-The recommended path is a maintained complete edition with tested component
-choices, UI, infrastructure and commands that save implementation and adaptation
-work. All source remains editable: core domain, schema, UI, framework and
-infrastructure changes are ordinary use, alongside configuration and hooks.
-Agents may merge, reapply, adapt or rewrite upstream improvements; preserve
-recorded owner requirements, applicable guarantees and applied migration history.
-Deep divergence does not prevent later adoption of useful upstream changes.
+From an existing seed's Git root:
 
-Shared implementations may be substantial and optional. A module can be exported
-from an edition, family, Base or independent repository. During product work,
-roll useful mechanisms and tests back into maintained shared source, then verify
-adoption in another edition with its own requirements. This is deliberate reuse,
-not automatic synchronization or a requirement that every fork converge.
-
-`edition.json` is authoritative:
-
-```json
-{
-  "schemaVersion": 1,
-  "id": "runeditrun/orbit",
-  "toolchain": {"id": "runeditrun/edition-authoring", "version": "1.1.0"},
-  "parent": null,
-  "components": [
-    {"id":"runeditrun/base","role":"foundation","source":{"kind":"local","paths":["src/base"],"origin":{"repository":"BASE_SOURCE_REPOSITORY","revision":"FULL_40_HEX_COMMIT","path":"default-seed/src"}}},
-    {"id":"runeditrun/orbit","role":"edition","source":{"kind":"local","paths":["src/routes","package.json"]}},
-    {"id":"acme/approvals","role":"module","source":{"kind":"git","repository":"/absolute/local/repo-or-https-url","revision":"FULL_40_HEX_COMMIT","path":"exports/approvals","destination":"src/modules/approvals"}}
-  ]
-}
+```sh
+rer adopt-edition
+rer refresh-base --ref FULL_40_HEX_BASE_COMMIT
 ```
 
-Local `paths` identify files or directories already owned and edited in this
-edition; do not list overlapping paths. All other tracked edition files remain
-authoritative and ship, including integration, requirements, migration history,
-intent and build configuration. `origin` records a comparison baseline, never a
-claim that edited local source equals upstream. `parent`, when present, is
-`{repository, revision}`. There may be at most one foundation. Semantic
-compatibility, route/resource conflicts and migration transitions require product
-tests; unique paths alone do not establish compatibility.
+`adopt-edition` creates `edition.json` describing the existing tracked local
+source and `sources.lock.json` binding its working-tree bytes and authoring tools.
+The initial lock also binds the generated recipe and the preserved or new copy
+record, including an existing record that has not yet been staged. It uses
+`rer-project.json`'s `projectId`, or the declared OPERATIONS project when no
+project ID exists. It preserves an existing `base-copies.json` byte for byte;
+without one it creates an empty record, which claims no Base copies. Existing
+composition records remain historical evidence. It does not invent a
+composition, infer copy mappings, regenerate source, stage files or commit.
+Existing edition inputs cause a refusal; review them with their authoring tools.
+Review and stage `edition.json`, `sources.lock.json` and any untracked
+`base-copies.json`, and run the seed's tests before committing.
 
-Commands below use the historical local-script form. Package adopters run
-`node node_modules/@runeditrun/rer/edition-authoring/cli.mjs` in its place; Base
-authors can run `node /absolute/base/edition-authoring/cli.mjs` from the seed root.
-The public adoption and refresh verbs call these same implementation helpers.
+Refresh itself needs a Git root and a valid `base-copies.json`; the optional
+edition recipe and source lock are not prerequisites. It updates recorded
+verbatim copies, preserves acknowledged adaptations and refuses undeclared local
+edits or rewriting existing migrations. Review those seed-side differences
+explicitly. An absent, unadapted singleton is retired and named in `retired` and
+its copy's `removed` list; repeating the same refresh does not recreate it.
+Ordinary local absence is the removal signal, including an accidental deletion.
+Absent files marked `skip-worktree`, `assume-unchanged` or `fsmonitor-valid`
+are incomplete checkout evidence: refresh refuses before writes and names the
+Git repair command. A recorded child beneath an uninitialized submodule refuses
+with `git submodule update --init`; after initialization, refresh reads the
+child's own index and bytes. Unreadable index evidence and deleted declared
+adaptations also refuse.
 
-Commands, run at the edition root:
-
-- `node scripts/edition-authoring/cli.mjs inspect`: validate and describe selections.
-- `... lock`: resolve exact source bytes and retain comparison snapshots under
-  `.edition/sources/`; writes `sources.lock.json`. Commit both with the recipe.
-- `... check`: verify recipe, tool version, retained baselines and selected bytes
-  match the lock. Re-lock after intentional edits; no command silently updates pins.
-- `... changes`: report added, removed and modified effective file identities,
-  manifest/selection metadata and tool changes since the lock. It does not write
-  or accept a new lock. Stage new files to include them in authoring inputs.
-- `... extract publisher/component /absolute/new-directory`: validate the selected
-  baseline against its lock and extract retained source without overwriting any
-  existing destination. Use `parent` for the parent edition. Works offline when
-  snapshots have been retained.
-- `... compare publisher/component /absolute/candidate-checkout`: compare the
-  baseline with the same export path at a clean candidate checkout HEAD; report
-  current edition source identities and local differences for explicit mappings.
-  Unmapped local source remains visible without guessing correspondence. Candidate
-  reads do not update source pins or retain archives.
-- `... compare parent /absolute/candidate-checkout [/absolute/current-checkout]`:
-  compare the whole retained parent baseline with a clean candidate parent and
-  with current tracked source (this edition, or an independent checkout).
-- `... verify-base`, `... record-base` and `... refresh-base`: record, verify and
-  refresh verbatim copies of Base source; see [Copied Base source](#copied-base-source).
-- `... materialize /absolute/new-directory`: copy tracked edition source and
-  selected Git ingredients into a new build tree. It never overwrites the edition.
-- `... promote publisher/component`: capture the selected Git ingredient into its
-  absent destination, switch to local source and retain the immutable origin.
-- `... release /absolute/new-local-repository`: require a clean committed edition,
-  verify its lock, and create a portable ordinary Git clone with all author inputs.
-  Also creates an adjacent `<new-local-repository>.release.json` sidecar. Distribute
-  this file with the repository or attach it to the source release; Git clone does
-  not copy adjacent files automatically. Both output paths must be absent.
-- `... receipt /absolute/release.json`: verify that a sidecar identifies this clean
-  checkout, including commit and tree, lock and tool identity. Works in later clones.
-  The sidecar avoids changing the source commit it identifies; it is not a signed
-  publisher attestation or product acceptance.
-
-For live development, a Git source may add `workspace: '/absolute/checkout'`.
-`materialize` reads the actual checkout, including dirty/untracked files under the
-selected export path, into the build tree; rerun materialize into a fresh directory
-to see subsequent edits. Nothing edits a cache. `promote` captures those edits
-before release; release rejects workspace selectors. Commit effective source and
-re-lock. Alternatively commit the external checkout and select its immutable
-revision, removing `workspace`. Neither build nor release fetches floating refs.
-
-The lock stores effective file hashes and retained source snapshots. Each
-comparison reference hashes its complete archive, including ancestry metadata;
-ancestor references also bind complete archive contents. Removing comparison
-relationships cannot pass a source check merely because application bytes match.
-Snapshots make fetched selections and comparison origins available after remote
-repositories disappear. Local source with an origin requires that exact origin
-at first lock; subsequent locks use the retained snapshot. Publication is the same
-local Git operation for first-party and community identities. Network pushing and
-deployment are separate explicit owner operations. Release receipts identify source
-commit and tree and lock hash, not product verification or reproducible compiled bytes.
-
-For dispersed imported files, local sources may declare
-`mappings: [{path: "src/base/file.ts", originPath: "default-seed/src/file.ts"}]`.
-Mappings may overlap. The most specific mapping owns a local file, and one origin
-file may have several local copies, such as a module's schema file and the
-numbered migration made from it. `compare` reports each copy on its own, with
-`path` naming the origin file and `localPath` the copy. One local path mapped to
-two different origins is ambiguous and refused.
-An origin may specify `paths: ["default-seed/src/file.ts", "deployment"]` to
-retain only those baseline inputs, relative to its `path` (default `.`).
-Retain useful prior composition evidence as explicitly historical material when
-needed by an update harness; it does not govern edition source. `requires` and
-`conflicts` on each component list publisher-qualified selected component IDs;
-validation rejects absent requirements and selected conflicts. Optional assumptions
-are ordinary descriptive metadata; product tests establish them.
-
-Initial acquisition honors standard Git URL rewrite configuration, including
-`GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0=url.<local-repository>.insteadOf` and
-`GIT_CONFIG_VALUE_0=<declared-public-repository>`. This lets unpublished exact
-local commits retain their intended repository identity without network access.
-The parent edition baseline is also retained. Locks independently identify the
-exact distributed tool file bytes, separate from foundation source revisions.
-
-Thin editions build from `materialize` output: run their package install/build/dev
-commands in that new directory. The author repository remains the original
-checkout. Materialized build trees are disposable and exclude `.edition` and the
-lock; they are not publication sources. A released thin edition retains the
-original recipe, lock and snapshots, so its same materialize command works offline.
-Single-file Git exports are placed under the destination using their basename.
-
-Acquisition reads committed Git blobs directly, so checkout attributes, line-ending
-conversion and smudge filters cannot change immutable baseline bytes. Live source
-selection respects Git ignore rules: tracked and nonignored untracked source edits
-are included, while ignored secrets/dependencies are excluded. Parent comparisons
-retain ancestor archives once by content address, separately from parent source
-bytes, avoiding recursive archive embedding. Mapping targets must exist in both
-the local source and retained comparison baseline. Promotion into an existing
-directory is allowed when each selected file destination is absent.
-Git tree listings and individual blob reads have a 64 MiB output limit and fail
-explicitly above it; the tool does not silently omit or truncate large source.
-
-## Copied Base source
-
-Some editions copy Base modules byte for byte, for example the Base mail module into
-`src/base/modules/mail`. A copy record makes those copies traceable, so a later
-Base change can reach the edition and later accidental edits can be detected
-against the recorded snapshots.
-`base-copies.json` at the edition root records each copy's local path, Base
-origin path, Base commit, and the SHA-256 of every copied file:
-
-```json
-{
-  "schemaVersion": 1,
-  "copies": [
-    {"path": "src/base/modules/mail", "originPath": "modules/mail", "revision": "FULL_40_HEX_COMMIT",
-     "files": {"src/base/modules/mail/index.mjs": "SHA256_OF_BASE_BYTES"},
-     "modes": {"src/base/modules/mail/index.mjs": "100644"}},
-    {"path": "migrations/0005_operator_auth.sql", "originPath": "modules/operator-auth/accounts/schema/operator-auth.sql",
-     "revision": "FULL_40_HEX_COMMIT", "files": {"migrations/0005_operator_auth.sql": "SHA256_OF_BASE_BYTES"},
-     "modes": {"migrations/0005_operator_auth.sql": "100644"}}
-  ],
-  "ignore": ["docs/coincidental-example.txt"]
-}
-```
-
-Each copy has its own commit, so modules can move to new pins independently. A
-copy may omit Base files, such as upstream tests. Copies must not overlap.
-The record names no repository. A full Git commit identifies the same Base
-tree wherever Base is hosted, and the file digests and modes bind the copied
-bytes, so anyone holding that commit can check the record and a public reader
-sees no private address. To read Base, `record-base`, `refresh-base` and
-`verify-base` use `--base <checkout>` or the seed's `edition.json` component
-runeditrun/base: `source.repository` for Git source or `source.origin.repository`
-for local source. Without either, `runeditrun/base` resolves to the public
-`https://github.com/runeditrun/base.git` repository. Pass `--offline` to verify
-local bytes without acquisition; offline refresh requires `--base <checkout>`.
-Offline source reads use a temporary repository sharing only the checkout’s
-object store and HEAD, with no remotes or inherited Git configuration. This
-prevents lazy fetches on Git 2.43 as well as newer Git. Missing objects require
-an online refresh without `--offline`; corrupt objects require checkout repair.
-Older records with a `repository` field are still read and verified from it; recording or refreshing drops the field.
-`modes` records each file's Git mode in Base, `100644` or `100755`, using the
-owner executable bit; a record
-without `modes` still verifies, but without mode checks until it is re-recorded.
-`ignore` lists edition files that happen to equal Base bytes but are the
-edition's own. Discovery excludes root `LICENSE` and `CLAUDE.md` by default;
-explicit copy records still verify these files normally.
-
-**Record.** Copy the files from Base at the chosen commit, then run
-`node scripts/edition-authoring/cli.mjs record-base src/base/modules/mail modules/mail FULL_40_HEX_COMMIT`.
-It writes the SHA-256 of the Base bytes, never of the local bytes, for every
-Base file under the origin path that exists in the copy, and the Base mode of each. It reports Base files
-the copy leaves out (`notCopied`), local files that differ from Base
-(`differs`, bytes or executable bit) and local files with no Base counterpart (`localOnly`). Pass
-`--base /absolute/base-checkout` to read a local Base checkout instead of
-cloning the recorded repository, and `--record <file>` for another record path.
-An explicit acquisition URL or local source checkout can remain in the seed's
-own source declaration; the default Base publisher identity uses its public URL.
-
-**Verify.** `... verify-base` checks three things and exits nonzero on any finding:
-
-- local bytes against the record: `modified`, `missing`, `unrecorded` (a file
-  in a copied path that the record does not name), `not-a-file` and `mode` (a
-  script copied without its executable bit, or the reverse);
-- the record against Base at each recorded commit: `origin-missing`,
-  `origin-mismatch` and `origin-mode`;
-- `unrecordedCopies`: edition files outside every copy whose bytes equal a Base
-  file at a recorded commit, or at the `--base` checkout's HEAD. Files under 16 bytes are skipped, so
-  empty files and one-line files such as a `CLAUDE.md` containing `@AGENTS.md`
-  are not reported. Root `LICENSE` and `CLAUDE.md` are also excluded from
-  discovery regardless of size; list other coincidental matches in `ignore`.
-
-Tracked and nonignored untracked files are checked. Without a record the
-command stops with a message naming `record-base`. The record path must be a
-regular file with no symlink in it; `verify-base` and `record-base` refuse
-anything else and never write through a link. `--offline` checks only the
-local bytes against the record, without reading Base. Add `verify-base` to the
-edition's verify command next to `check`.
-
-**Upgrade to a new pin.** Run Base's export tools first (for example
-`node BASE/scripts/export-cli.mjs .`), then `... refresh-base FULL_40_HEX_COMMIT
---base /absolute/base-checkout` to move every recorded copy to that commit. It
-writes Base's bytes and modes for recorded files and for files already equal to
-Base, adopts files Base added under a copied path since the copy's pin (tests
-only into copies that already carry tests), drops recorded files that Base or the
-export removed, keeps out files the copy had left out, and re-records each copy.
-For JavaScript outside `foundation/runtime`, refresh follows static relative imports and
-exports, including side-effect imports, transitively up to 64 levels inside
-the original copied origin directory tree. Missing helpers are copied and
-reported under `adopted`, with separate file entries in `base-copies.json` that
-preserve the existing per-file mapping. Already recorded dependencies must remain
-present. A dependency already delivered by another copy mapping, an acknowledged
-adaptation, or regular seed-owned source satisfies the import. Seed-owned source
-is preserved and its actual static imports are checked; missing dependencies of
-that source require explicit reconciliation. Unrecorded imports outside that origin
-tree, missing, deleted or kept-out dependencies and adapted importers with missing
-dependencies refuse the entire refresh before writes, with exact `record-base`
-commands for explicit reconciliation. Existing adapted files stay unchanged.
+Per-file vendored JavaScript copies outside `foundation/runtime` remain supported.
+Refresh follows static
+relative imports and exports, including side-effect imports, transitively up to
+64 levels inside the original copied origin directory tree. It copies missing
+helpers and reports them under `adopted`, recording separate file entries in
+`base-copies.json` while preserving the existing per-file mapping. Already
+recorded dependencies must remain present. A dependency already delivered by another
+copy mapping, an acknowledged adaptation, or regular seed-owned source satisfies
+the import. Seed-owned source is preserved and its actual static imports are
+checked; its missing dependencies require explicit reconciliation. Unrecorded
+imports outside that origin tree, missing, deleted or kept-out dependencies and
+adapted importers with missing dependencies refuse before any writes and name exact
+`record-base` commands for explicit reconciliation. Existing adapted files are
+retained unchanged.
 Each file uses its origin name and the target commit's nearest `package.json`
 (read from Git objects, never the working tree or seed): `.mjs` is ESM and
 `.cjs` is CommonJS; `.js` and extensionless files follow that package's
@@ -288,131 +92,73 @@ import extensions refuse before writes: their closure is not established by
 this JavaScript finder. They are never executed to inspect dependencies.
 Strings, templates, regular expressions, comments, dynamic `import()`,
 `import.meta` and CommonJS `require()` add no static dependencies. In particular,
-relative `require()` calls are dynamic and add no closure edges. JSX and other
+relative `require()` calls are dynamic and are not followed. JSX and other
 syntax the running Node cannot parse in the chosen format refuse atomically.
-An absent unadapted singleton is retired from the record entirely and named in
-the `retired` output. As with absent files in directory copies, local absence is
-the removal signal; refresh does not distinguish accidental deletion from an
-intentional removal. Absent files marked `skip-worktree`, `assume-unchanged`
-or `fsmonitor-valid`, and recorded children beneath uninitialized submodules,
-refuse before writes with the corresponding Git repair command. After submodule
-initialization, the child index and recorded bytes are read. Unreadable index
-evidence also refuses safely. Offline refresh suppresses promisor lazy fetching;
-a missing local object names an online refresh command, preserving the record.
-Verify before refreshing to inspect missing copies. Deleted
-adaptations still block refresh, and a singleton still present locally whose
-Base source disappeared still reports an error.
-If a retained runtime module still imports a deleted recorded dependency, refresh
-refuses before writes; restore the dependency or adapt the importing module
-before refreshing. Required unrecorded siblings are discovered as described below.
-Runtime copies also include the recursive relative imports and re-exports of
-their selected `foundation/runtime` modules, plus companion declarations. This
-recovers required siblings even when they existed before the old pin or each
-renderer was recorded individually. New siblings go beside the importing
-renderer at its recorded destination (for example `src/base/runtime/` in Slate),
-and receive copy records. Refresh reports these siblings in each copy's `added`
-list; the top-level `adopted` list reports the non-runtime JavaScript graph above.
-Both dependency graphs are planned before writes. The maintained exporters
-already ship the complete runtime directory. An unrecorded dependency equal to
-its old Base baseline can
-advance too. Existing unrecorded dependencies with different seed bytes stay
-in place. Recorded edits still require explicit adaptation acknowledgement;
-acknowledged adaptations are preserved.
-It refuses undeclared local edits that differ from both the recorded and incoming
-Base bytes; declare intentional adaptations as described below. To move one copy,
-copy its files from Base at the new commit over the old copy, deleting files
-Base removed, and run `record-base` with the new commit. Then run `verify-base`
-and the edition's own tests, and commit the copies with the record. To review
-what changed upstream first, read `git -C BASE diff OLD NEW -- modules/mail`.
 
-**Keep seed adaptations.** Before refreshing, explicitly declare each adapted file:
+Copies from `foundation/runtime` retain their runtime-specific dependency policy:
+refresh resolves JS/TS runtime dependencies and companion declarations, recovers
+omitted old-pin siblings, advances copies matching their old baseline, and
+preserves differing seed-owned siblings. Runtime additions appear in each copy's
+`added` list; `adopted` reports the non-runtime JavaScript closure above. Both
+graphs are planned before any writes; deleted recorded runtime dependencies
+refuse without resurrection.
+
+Use the immutable full commit behind the release tag. Base-checkout form:
 
 ```sh
-node scripts/edition-authoring/cli.mjs adapt-base .github/workflows/run-demo.yml
-node scripts/edition-authoring/cli.mjs adapt-base public/fonts/fonts.css
-node scripts/edition-authoring/cli.mjs adapt-base src/base/dispatch.ts
-node scripts/edition-authoring/cli.mjs adapt-base src/base/font-head.ts
-node scripts/edition-authoring/cli.mjs refresh-base FULL_40_HEX_COMMIT --base /absolute/base-checkout
+git clone https://github.com/runeditrun/base.git ../base
+git -C ../base rev-parse 'rer-vVERSION^{commit}'
+rer refresh-base --ref FULL_40_HEX_BASE_COMMIT --base ../base
+# The original Base-checkout command remains available:
+node ../base/edition-authoring/cli.mjs refresh-base FULL_40_HEX_BASE_COMMIT --base ../base
 ```
 
-`adapt-base <file> [--record <file>]` only accepts an existing regular recorded
-file. It keeps local bytes and mode unchanged, and adds `adapted: {"local/path":
-"ORIGINAL_FULL_BASE_COMMIT"}` and `acknowledged: {"local/path":
-{"sha256": "SHA256_OF_LOCAL_BYTES", "mode": "100644"}}` to that copy (`100755`
-for an executable file). The existing `files` digest and
-`modes` entry remain the Base baseline at this per-file commit, even when the
-copy's other files move to a newer revision. Repeating the declaration does not
-advance that baseline. Commit the record alongside the adaptation.
+Without `--base`, the helper clones the declared Base source as a temporary bare
+Git repository and reads committed blobs. The default publisher identity
+`runeditrun/base` resolves to `https://github.com/runeditrun/base.git`. A legacy
+record repository or an edition's Base source URL is still honored. No source
+scripts run, and the temporary clone is removed. `--base` is relative to the
+seed root; it must contain both the recorded and target commits.
 
-The acknowledgement records those local bytes and mode. With that snapshot
-unchanged, a later change to either makes `refresh-base` refuse the entire refresh
-before writing any file or record. `verify-base` exits nonzero and
-reports `adaptation-modified` or `adaptation-mode` with the file and a runnable
-`acknowledge` command, including `--record` when needed. Review the change, then
-run `adapt-base <file>` again to update the local snapshot. This keeps the original
-Base baseline and upstream conflict notes. Older declarations without an
-`acknowledged` snapshot remain readable, but report `adaptation-unacknowledged`
-and block refresh until the same explicit re-acknowledgement; neither command
-automatically accepts the current bytes.
+For offline use, supply `--offline --base CHECKOUT`. Without a checkout refresh
+refuses plainly; it cannot refresh from hashes alone. Offline Git reads use an isolated
+repository with the checkout’s object store and no remotes, including on Git 2.43.
+They cannot launch promisor lazy fetches. If a partial
+checkout lacks a required object, refresh preserves the record and names the
+online refresh command to acquire it; retry offline after that command succeeds. Acquisition failures name
+the public clone command and `--base`; an unavailable or malformed ref names how
+to resolve/fetch an immutable release commit. Refusals preserve copy records.
+`--record PATH` selects another contained copy record.
 
-The record is plain data in the owner's repository, under the owner's control.
-Its acknowledged snapshot guards against accidental later drift in a declared
-file's digest or mode; it is not tamper-evident. A hand edit to the record that
-supplies a digest and mode matching the current file is treated as acknowledged
-by `verify-base` (online or offline) and `refresh-base`, just like running
-`adapt-base`. Both are the same owner trust act. Review record diffs in code
-review like source diffs, alongside the adaptations they acknowledge.
+The package also includes the existing authoring CLI for recipe and copy work:
 
-Refresh never writes or removes declared adaptations, including when Base deletes
-the source. It still refreshes every untouched copy. Its `adapted` report lists
-each seed-owned file; `conflict: true` means upstream bytes, mode or existence
-changed against the original baseline. A conflict note supplies a Git diff hint
-for explicit reconciliation. The note remains visible on repeated refreshes until
-you reconcile the baseline; it does not prevent other copies from refreshing.
-A second refresh to the same commit leaves the record and local file bytes
-unchanged. Undeclared local edits that differ from both the recorded and incoming
-Base bytes still block before any file is written, with an instruction naming
-`adapt-base`.
+```sh
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs inspect
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs lock
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs check
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs verify-base --offline
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base LOCAL_PATH BASE_PATH FULL_COMMIT --base ../base
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs adapt-base LOCAL_FILE
+```
 
-`verify-base` reports declarations separately: it checks their existence,
-regular-file status, acknowledged local bytes and mode, and retained Base
-baselines. `--offline` checks the local acknowledgement but cannot
-validate the upstream baseline. Run the edition's product tests for adaptations.
-For richer source comparisons, use `edition.json` origins and mappings with
-`compare` instead.
+Stage intentional source changes before `lock`, then review and commit the lock.
+Refresh does not silently update a source lock. See Base's
+[authoring protocol](https://github.com/runeditrun/base/blob/main/edition-authoring/README.md)
+for comparisons, retained origins and release operations. To migrate from
+vendored scripts, pin the package, run `rer adopt-edition`, then drop the vendored
+scripts and their copy records.
 
-To return a copy to verbatim management, save the seed adaptation somewhere safe,
-restore its files and modes from the desired Base commit (including deletions),
-then run `record-base <copy-path> <origin-path> <commit> --base <checkout>`.
-This explicitly replaces that copy's declarations with a fresh verbatim record;
-redeclare any other adaptations in the same copy before refreshing. Verify and
-run edition tests before committing. To retain a reconciled adaptation against a
-new baseline, record that Base baseline first, restore the saved adaptation, and
-run `adapt-base <file>` again. Never update a previously applied migration in
-place: keep it and add a new seed migration for schema changes.
+Both public verbs accept `--help`, `--cwd PATH`, `--non-interactive` and `--json`.
+Help exits 0 before configuration, adapters or tools. `describe --json` includes
+the verbs without requiring seed adapter declarations. Their bootstrap policy
+comes from the command contract: project-code commands run the seed's exact
+installed package pin, installing that pin when needed.
 
-Penny's `base/PROVENANCE.json` and `verify-base-source.mjs` were the model for
-this record and command.
-
-## Public projections
-
-A parent or component baseline can be a reviewed public projection of a private
-original, for example with credential fixtures replaced and presentation images
-omitted. Its origin carries
-`projection: {schemaVersion: 1, originalSha256, recipeSha256}` in place of a
-`revision`. A projection cannot be fetched or used with `workspace`; it exists
-only as a retained archive under `.edition/sources/`. The source lock must
-already bind that archive's key, digest and exact file SHA-256 before the first
-`lock` reads it. Readers never take that authority from the archive's own
-claims, and changed bytes, even an equivalent reserialization, fail.
-`promote` keeps the projection identity.
-
-Whole-parent comparison of a projected parent reads the plan and receipt at
-`scripts/public-projections/plan.json` and `scripts/public-projections/receipt.json`.
-Both must match the source lock. The plan names every replaced or omitted
-member by its original SHA-256, and each omission must state its reason. The
-receipt binds each member's original and projected SHA-256 and mode. Comparison
-maps only exact original bytes to their projected identity; every other byte,
-mode, addition and removal stays visible. Incoming candidate source is always
-read as ordinary Git and never inherits the projection identity. Lamp's
-`scripts/public-projections/` is the reference producer.
+With `--json`, stdout is newline-delimited event objects. Success ends with
+`{version:1, verb, event:"result", ok:true, exitCode:0, ...details}`. Adoption
+details include `adopted`, `created`, `record`, `preservedCopyRecord` and `next`.
+Refresh details include `refreshed`, `record`, `copies`, `retired`, `adopted`, `adapted` and
+`next`; each copy reports `path`, `from`, `files`, `added` and `removed`.
+Refusal emits an `error` event with `code`, `message` and `exitCode`, then a failed
+`result`; authoring safety refusals exit 4 and malformed invocations exit 2.
+Node selection or package bootstrap can emit progress events before the result.
