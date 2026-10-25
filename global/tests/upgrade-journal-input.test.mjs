@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from './harness.mjs';
@@ -9,6 +9,7 @@ const rer = new URL('../rer.mjs', import.meta.url).pathname;
 test('unreadable upgrade journals return a closed refusal without changing the checkout', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-journal-input-'));
  t.after(() => rm(root, { recursive: true, force: true }));
+ await copyFile(new URL('../../default-seed/OPERATIONS.json', import.meta.url), join(root, 'OPERATIONS.json'));
  await mkdir(join(root, '.rer/upgrade'), { recursive: true });
  const journal = join(root, '.rer/upgrade/journal.json');
  const variants = ['42', '"text"', 'null', '[]', ' '.repeat(1024 * 1024) + '{}',
