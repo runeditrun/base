@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 import { setup, until, worker } from './helpers.mjs';
 import { atomicJson, transaction } from '../storage.mjs';
 import { processInfo } from '../processes.mjs';
@@ -48,9 +49,12 @@ test('one occupied slot holds FIFO jobs; owner overtakes classes but normal reta
 test('stale queued/running leases and reused PID are reclaimed without touching live process', async t => {
   const { directory, queue } = await setup(t);
   const current = await processInfo(process.pid);
+  // A real owner that has exited (macOS ps rejects PIDs beyond its range as an error, not absence).
+  const gone = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+  await new Promise(resolve => gone.once('close', resolve));
   const job = (id, owner) => ({ id, owner, sequence: 1, priority: 'normal' });
   await atomicJson(join(directory, 'state.json'), { version: 1, sequence: 3,
-    queued: [job('gone', { pid: 2147483647, start: 'gone' })],
+    queued: [job('gone', { pid: gone.pid, start: 'gone' })],
     running: [job('reused', { ...current, start: 'prior-process-start', pgid: process.pid })] });
   const ledger = recordedState(directory);
   assert.deepEqual((await ledger.read()).queued.map(job => job.id), ['gone']);
