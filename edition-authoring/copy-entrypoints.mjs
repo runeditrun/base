@@ -1,5 +1,4 @@
-// Copy selection includes documents and data. Only Node entry points turn
-// extensionless files into JavaScript; their spelling alone says nothing.
+// Unknown names are tentative until a real entry signal makes parsing strict.
 import path from 'node:path';
 
 const code = new Set(['.js', '.mjs', '.cjs']);
@@ -39,6 +38,6 @@ export function copyEntrypoints(read, tree) {
       })) { entries.add(name); return true; }
       if (directory === '.' || path.posix.basename(directory) === 'node_modules') break;
     }
-    return false;
+    return null;
   };
 }

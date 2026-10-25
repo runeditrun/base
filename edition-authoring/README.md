@@ -255,10 +255,17 @@ Without a recognized type, CommonJS is the default, with Node's native syntax
 detection selecting ESM for module-only syntax and lexical redeclarations of
 CommonJS wrapper parameters. Explicit `"type":"commonjs"` never uses detection.
 Only `.js`, `.mjs` and `.cjs` are inherently JavaScript. Extensionless or unknown
-names are code only as imported helpers, package `bin`/`main`/`exports` targets,
-or Node shebang entries. Unreferenced documents such as `.node-version`, `LICENSE`
-and `.gitignore` are copied as bytes. Known data formats are never parsed as
-JavaScript. Every JavaScript helper is parsed transitively.
+names with an incoming relative import or literal `require()`, package
+`bin`/`main`/`exports` target, or Node shebang are parsed strictly: invalid
+JavaScript refuses atomically. Other unknown names are parsed tentatively in
+their decided format; valid static relative imports are followed, while a syntax
+error means the file is bytes. This preserves standalone extensionless modules
+without treating `.node-version`, `LICENSE` or `.gitignore` as broken entries.
+An incoming entry signal always restores strict refusal, including when the
+target was tentatively examined earlier. Known data formats are never parsed as
+JavaScript. Every JavaScript helper is parsed transitively. Literal `require()`
+entry signals are read from Node's bundled Acorn AST after native validation;
+they only promote selected targets and never adopt runtime dependencies.
 CommonJS is parsed as a function body with Node's five wrapper parameters using
 `vm.compileFunction`; ESM uses `vm.SourceTextModule.moduleRequests`.
 The same Node executable runs a parse-only child with `--experimental-vm-modules`
@@ -281,7 +288,7 @@ import extensions refuse before writes: their closure is not established by
 this JavaScript finder. They are never executed to inspect dependencies.
 Strings, templates, regular expressions, comments, dynamic `import()`,
 `import.meta` and CommonJS `require()` add no static dependencies. In particular,
-relative `require()` calls are dynamic and are not followed. JSX and other
+relative `require()` calls are dynamic and add no closure edges. JSX and other
 syntax the running Node cannot parse in the chosen format refuse atomically.
 An absent unadapted singleton is retired from the record entirely and named in
 the `retired` output. As with absent files in directory copies, local absence is

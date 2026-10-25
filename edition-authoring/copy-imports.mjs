@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {safe, noLinks} from './files.mjs';
-import {staticImports} from './static-imports.mjs';
-import {moduleFormats, javascript} from './module-format.mjs';
+import {staticImports, moduleRequests} from './static-imports.mjs';
+import {moduleFormats} from './module-format.mjs';
 import {copyEntrypoints} from './copy-entrypoints.mjs';
 
 const within = (name, directory) => directory === '.' || name.startsWith(directory + '/');
@@ -20,7 +20,9 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
     const item = previous || {plan, source, name, bytes, boundary, depth, adapted, pin};
     scheduled.set(name, item);
     // Runtime source has its own TS resolution and seed-sibling policy.
-    if (!item.queued && !source.startsWith('foundation/runtime/') && isCode(source, bytes, imported)) {
+    const kind = isCode(item.source, item.bytes, imported);
+    if (kind === true && !item.strict) { item.strict = true; item.queued = false; }
+    if (!item.queued && !source.startsWith('foundation/runtime/') && kind !== false) {
       item.queued = true;
       queue.push(item);
     }
@@ -37,9 +39,27 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
   }
   for (let i = 0; i < queue.length; i++) {
     const importer = queue[i];
-    let specifiers;
-    try { specifiers = staticImports(importer.bytes, formatFor(importer.source), importer.source).filter(value => value.startsWith('./') || value.startsWith('../')); }
-    catch (error) { problems.add(`${importer.name}: cannot establish its static imports (${error.message}); refresh will not guess. Simplify the construct in Base, or adopt the edition with rer adopt-edition.`); continue; }
+    let specifiers, format, requests;
+    const failed = error => problems.add(`${importer.name}: cannot establish its static imports (${error.message}); refresh will not guess. Simplify the construct in Base, or adopt the edition with rer adopt-edition.`);
+    try { format = formatFor(importer.source); }
+    catch (error) { failed(error); continue; }
+    try {
+      requests = moduleRequests(importer.bytes, format, importer.source, true);
+      specifiers = requests.specifiers.filter(value => value.startsWith('./') || value.startsWith('../'));
+    }
+    catch (error) {
+      // Tentative bytes cannot contribute imports. A later incoming edge queues
+      // this same file again with strict parsing, including a prior parse error.
+      if (importer.strict || !(error instanceof SyntaxError)) failed(error);
+      continue;
+    }
+    // Literal require calls are entry signals for selected files, not static
+    // closure edges. Their runtime resolution never adopts a missing target.
+    for (const specifier of requests.requires.filter(value => value.startsWith('./') || value.startsWith('../'))) {
+      const target = path.posix.join(path.posix.dirname(importer.name), specifier);
+      const existing = scheduled.get(target);
+      if (existing) enqueue(existing.plan, existing.source, target, existing.bytes, existing.boundary, existing.depth, existing.adapted, existing.pin, true);
+    }
     for (const specifier of specifiers) {
       let source, name;
       try {
@@ -70,7 +90,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         continue;
       }
       if (!entry) { fail('no regular Base file at the target revision'); continue; }
-      if (!javascript(source) && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
+      if (isCode(source, Buffer.alloc(0), true) === false && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       if (importer.adapted) { fail('seed-owned importer needs explicit dependency reconciliation'); continue; }
       if (importer.depth >= 64) { fail('relative import closure exceeds 64 levels'); continue; }
       // A file excluded at the pin, deleted locally, ignored, or owned by the
