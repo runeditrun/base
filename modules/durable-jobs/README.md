@@ -2,7 +2,7 @@
 
 Optional source for durable local work: immutable intent, exact requested
 revisions, checkpoints, attempts, fenced claims and atomic domain writes.
-`modules/job-queue` still owns development-command admission; import-kit still
+`job-queue` still owns development-command admission; import-kit still
 owns reviewed imports, provenance and reversal. Neither is replaced or migrated.
 
 Round 1 supports bounded local handlers only. External compute, delivery and
@@ -73,8 +73,8 @@ an applied migration. Runtime identity, limits and scheduling remain seed-owned
 configuration outside that recipe.
 
 Legacy family composition adds `durable-jobs` to the selected modules and
-copies `modules/durable-jobs` to `src/modules/durable-jobs`, plus
-`modules/durable-jobs/schema/0001-durable-jobs.sql` to the seed's next numbered
+copies `./modules/durable-jobs` to `src/modules/durable-jobs`, plus
+`./modules/durable-jobs/schema/0001-durable-jobs.sql` to the seed's next numbered
 migration. Both copies have `component: "durable-jobs"` and the same repository
 origin. The ordinary `composition.lock.json` records committed source paths,
 full repository commits and hashes. Merely shipping CLI source does not enable
