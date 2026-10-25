@@ -28,9 +28,11 @@ rer dev --cwd default-seed
   minutes. If the tool times out, run the same command again: it resumes.
 - Never run install, setup, reset or deploy for this, and never ask for an
   email, port, password or answers file.
-- Give the owner the `RER_READY` address and the `RER_OPEN` link, and ask
-  nothing. `RER_OPEN` is a credential: share it only with the owner, in this
-  chat.
+- Give the owner the `RER_READY` address, then open the app for them with
+  `rer open --cwd default-seed`: it opens their browser on this computer,
+  signed in. Ask nothing. Without a terminal `rer dev` never prints the sign-in
+  link; never copy it from `default-seed/.rer/local/open-url` into a chat or a
+  file.
 - Stop the app with `rer dev --stop --cwd default-seed`. If a start is refused,
   the message names the cause and the next command: run that command.
 

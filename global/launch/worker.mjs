@@ -11,9 +11,11 @@ import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { liveServers } from '../registry.mjs';
+import { productName } from '../open.mjs';
+import { portBusy } from './facts.mjs';
 import { LaunchFailure, workerFailure } from './failure.mjs';
 import { prepare } from './prepare.mjs';
-import { claimLaunch, eventLog, launchDirectory, liveWorker, releaseLaunch, serverRecord, stopRequest } from './state.mjs';
+import { claimLaunch, eventLog, launchDirectory, liveWorker, lookBound, releaseLaunch, serverRecord, stopRequest } from './state.mjs';
 import { startServer } from './steps.mjs';
 
 const [root, token, argsJSON, requestedAtText, mode] = process.argv.slice(2), args = JSON.parse(argsJSON), requestedAt = Number(requestedAtText), doorStart = mode === 'door-start';
@@ -32,19 +34,32 @@ if (!await claimLaunch(directory, token)) {
  try {
   if (await stopRequest.covers(directory, requestedAt)) stop();
   stopping.signal.throwIfAborted();
-  const prepared = await prepare({ root, args, env: process.env, report: fields => events.write({ event: 'phase', ...fields }), directory, log, children, signal: stopping.signal, doorStart });
-  await events.write({ event: 'phase', phase: 'start', message: prepared.own ? 'the app is already running; checking it' : 'starting the app' });
+  const report = fields => events.write({ event: 'phase', ...fields });
+  const prepared = await prepare({ root, args, env: process.env, report, directory, log, children, signal: stopping.signal, doorStart });
+  const name = await productName(checkout) ?? 'the app';
+  await report({ phase: 'start', message: prepared.own ? `${name} is already running; checking it` : `starting ${name}` });
   // A server rer started logs to server.log; asking a running one for its
   // ready lines goes to reuse.log, and names server.log only when rer started it.
   const serverLog = join(directory, 'server.log');
-  let started;
-  try { started = await startServer(prepared.entry, args, { root, env: { ...process.env, ...prepared.added }, logPath: prepared.own ? join(directory, 'reuse.log') : serverLog, children, signal: stopping.signal, note: message => events.write({ event: 'phase', phase: 'note', message }) }); }
-  finally { await prepared.release?.(); }
+  const start = () => startServer(prepared.entry, args, { root, env: { ...process.env, ...prepared.added }, logPath: prepared.own ? join(directory, 'reuse.log') : serverLog, children, signal: stopping.signal, note: message => report({ phase: 'note', message }) });
+  let started, release = prepared.release;
+  try {
+   try { started = await start(); }
+   catch (failure) {
+    // This launch set the checkout up moments ago; when its port was taken
+    // since, it moves to the next free port and starts there.
+    if (!prepared.move || failure.exitCode !== 4 || stopping.signal.aborted || !await portBusy(prepared.port)) throw failure;
+    await release?.();
+    release = (await prepared.move(prepared.port)).release;
+    await report({ phase: 'start', message: `starting ${name}` });
+    started = await start();
+   }
+  } finally { await release?.(); }
   const record = (await liveServers(process.env)).find(item => item.checkout === checkout);
   const pid = record?.owner?.pid ?? started.pid;
   // The server's PID, and the process rer spawned for it (the same one unless
   // the pin re-runs itself under its own Node), each with its start time.
-  const identity = async id => ({ pid: id, start: (await processInfo(id))?.start });
+  const identity = async id => ({ pid: id, start: (await processInfo(id, { bound: lookBound }).catch(() => undefined))?.start });
   if (!prepared.own) await serverRecord.write(directory, { ...await identity(pid), spawned: await identity(started.pid) });
   const ours = !prepared.own || (await serverRecord.read(directory))?.pid === pid;
   // A stop that arrived while the server came up finds it registered and

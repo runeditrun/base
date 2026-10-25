@@ -3,7 +3,9 @@
 // reference in package mode (exported, then converted by the export tool to
 // pin that tarball's version, served from a local registry) with one `rer
 // dev`; open its sign-in link in a browser and stop it. Before any install,
-// `rer check` installs the pin and passes. The export's setup
+// `rer check` installs the pin and passes. Without a terminal no output
+// carries the sign-in link: rer dev --open and rer open hand it to the
+// browser (here a recorder). The export's setup
 // manifest gains required fields that only their localDefault can fill:
 // without one the launch stops naming the field and changes nothing. A fresh
 // copy of the converted checkout then builds as the trusted delivery job runs
@@ -111,7 +113,10 @@ test('an installed rer launches the package-mode default-seed reference with one
  const bare = await run('git', ['clone', '--bare', root, remote], { cwd: directory, env });
  assert.equal(bare.code, 0, bare.stderr);
  await rm(root, { recursive: true, force: true });
- const fromRepo = args => run(rer, ['dev', repo, '--dir', root, ...args], { cwd: directory, env });
+ // The browser rer opens: a recorder of the one link it is handed.
+ const opened = join(directory, 'opened-url'), recorder = { ...env, BROWSER: join(directory, 'browser') };
+ await writeFile(recorder.BROWSER, `#!/bin/sh\nprintf '%s' "$1" > '${opened}'\n`, { mode: 0o755 });
+ const fromRepo = args => run(rer, ['dev', repo, '--dir', root, ...args], { cwd: directory, env: recorder });
 
  // A required field with no value and no localDefault: exit 3 naming it, and
  // no settings, owner, dev key or server.
@@ -133,8 +138,8 @@ test('an installed rer launches the package-mode default-seed reference with one
  assert.ok(parseEnv(retained).OWNER_PASSWORD, 'failed setup saved its generated owner password');
  assert.deepEqual(localData(root).owners, [], 'failed setup has not claimed an owner');
  await rm(join(root, 'fail-before-owner'));
- // Not a terminal: the one command prepares, starts, prints and returns.
- const launched = await fromRepo(['--port', String(port)]);
+ // Not a terminal: the one command prepares, starts, opens the app, prints and returns.
+ const launched = await fromRepo(['--port', String(port), '--open']);
  assert.equal(launched.code, 0, 'rer dev resumes the saved owner claim: ' + launched.stderr + launched.stdout);
  assert.ok(retained === await readFile(join(root, '.dev.vars'), 'utf8'), 'resume preserves every private setting byte');
  assert.deepEqual(localData(root).owners.map(owner => owner.email), [parseEnv(retained).OWNER_EMAIL], 'resume claims the saved owner');
@@ -149,6 +154,14 @@ test('an installed rer launches the package-mode default-seed reference with one
  const lines = Object.fromEntries(launched.stdout.split('\n').filter(line => /^RER_[A-Z_]+ /.test(line)).map(line => [line.split(' ')[0], line.slice(line.indexOf(' ') + 1)]));
  assert.equal(lines.RER_READY, url);
  assert.equal(lines.RER_SIGNED_IN, 'owner@seed-with-spaces.test');
+ assert.ok(!(launched.stdout + launched.stderr).includes('rer-dev='), 'output without a terminal never carries the sign-in link');
+ const handed = await readFile(opened, 'utf8');
+ assert.equal(new URL(handed).origin, url, 'rer dev --open handed the browser the sign-in link');
+ await rm(opened);
+ const reopened = await run(rer, ['open'], { cwd: root, env: recorder });
+ assert.equal(reopened.code, 0, reopened.stderr);
+ assert.ok(!(reopened.stdout + reopened.stderr).includes('rer-dev='));
+ assert.equal(await readFile(opened, 'utf8'), handed, 'rer open hands the browser the same link');
  assert.equal((await fetch(url + '/health')).status, 200, 'the server keeps running after rer dev returns');
  // The seed's run site: RER_SITE serves its static homepage and /run, and a repeated rer dev names it again.
  assert.match(lines.RER_SITE, /^http:\/\/127\.0\.0\.1:\d+$/);
@@ -160,10 +173,10 @@ test('an installed rer launches the package-mode default-seed reference with one
  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
  try {
   const context = await browser.newContext(), page = await context.newPage();
-  await page.goto(lines.RER_OPEN);
+  await page.goto(handed);
   await page.waitForURL(url + '/setup');
   const session = await (await context.request.get(url + '/auth/session')).json();
-  assert.equal(session.operator.email, 'owner@seed-with-spaces.test', 'RER_OPEN signs the browser in as the generated owner');
+  assert.equal(session.operator.email, 'owner@seed-with-spaces.test', 'the opened link signs the browser in as the generated owner');
  } finally { await browser.close(); }
 
  const stopped = await run(rer, ['dev', '--stop'], { cwd: root, env });

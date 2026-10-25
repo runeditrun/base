@@ -166,7 +166,7 @@ test('retired custody reopens a pre-rotation D1 restore explicitly and survives 
 
 // Public lifecycle command, real owner kit and legacy custom adapters; only the
 // provider and hosted HTTP edge are faked. No seed source is modified.
-async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false, namedState = false, queued = false, installation = false } = {}) {
+async function fixture(t, { declared = false, selfClaim = false, existing = false, idp = false, ownRecord = false, returnState = false, namedState = false, queued = false, installation = false, signOutPath = '/auth/signout' } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-hook-deploy-')));
  const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
@@ -190,7 +190,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
    assert.equal(signedOut, false, 'the hook can finish using its bootstrap session');
    return new Response(null, { status: 303, headers: { location: '/app' } });
   }
-  if (url.pathname === '/auth/signout') {
+  if (url.pathname === signOutPath) {
    assert.equal(new Headers(init.headers).get('cookie'), 'session=test');
    signedOut = true;
    return new Response(null, { status: 204 });
@@ -223,6 +223,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
   const next = await fetch(new URL('/setup', context.origin), { headers: { cookie: response.headers.get('set-cookie') } });
   assert.equal(next.status, 303);
  } } };
+ adapter.hooks.owner.signOutPath = signOutPath;
  adapter.deploy = async ({ options, store, signal }) => {
   // Both preflight and build use the real process environment, as old hooks do.
   assert.equal(process.env.MAIL_API_KEY, 'synthetic-mail-value');
@@ -256,11 +257,13 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
 }
 
 test('conventional legacy function hook claims actual bootstrap, retires re-uploaded tokens, and bypasses hooks for changes', async t => {
- const f = await fixture(t);
+ for (const signOutPath of ['/auth/signout', '/api/auth/logout']) {
+ const f = await fixture(t, { signOutPath });
  const original = { ...process.env };
  const dry = await f.run({ dryRun: true }); assert.equal(dry.deployed, false); assert.ok(f.requests.length>0); assert.ok(f.requests.every(call=>call.startsWith('GET '))); assert.equal(f.provider.state.writes.length,0);
  const first = await f.run(); assert.equal(first.owner, 'claimed'); assert.equal(f.claims.length, 1);
- assert.equal(f.requests.filter(call => call === 'POST /auth/signout').length, 1, 'the unused claim session is retired once');
+ assert.equal(f.requests.filter(call => call === `POST ${signOutPath}`).length, 1, 'the unused claim session is retired once');
+ if (signOutPath === '/api/auth/logout') assert.equal(f.requests.includes('POST /auth/signout'), false);
  assert.ok(Object.keys(process.env).length === Object.keys(original).length && Object.entries(original).every(([key, value]) => process.env[key] === value), 'caller environment restored');
  assert.ok(!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
  const next = await f.run(); assert.equal(next.owner, 'kept'); assert.equal(f.claims.length, 1);
@@ -273,6 +276,7 @@ test('conventional legacy function hook claims actual bootstrap, retires re-uplo
  await f.run({ unsetSecret: 'SESSION_SECRET' });
  await f.run({ remove: true, yes: true });
  assert.equal(f.builds(), builds); assert.equal(f.provider.state.settings, null);
+ }
 });
 
 test('declared minimal hook keeps an established owner and refuses provider replacement without changing it', async t => {
@@ -285,7 +289,7 @@ test('declared minimal hook keeps an established owner and refuses provider repl
  assert.equal(f.provider.state.writes.length, writes);
 });
 
-test('first custom deploy exits zero for late health, and wrong-commit health fails with the exact rerun', async t => {
+test('first custom deploy accepts late health, rejects missing signout, and rejects wrong-commit health with the exact rerun', async t => {
  const f = await finalizingDeploy(t);
  const result = await f.run('late'), output = result.stdout + result.stderr;
  assert.equal(result.code, 0, output);
@@ -301,6 +305,17 @@ test('first custom deploy exits zero for late health, and wrong-commit health fa
  assert.match(failure, /still answers for commit 0123456789ab/);
  assert.match(failure, /90-second finalization wait/);
  assert.ok(failure.includes(f.again), failure);
+ // A missing sign-out route fails even after the owner account was created.
+ for (const status of [404, 405]) {
+  await rm(join(f.root, '.rer'), { recursive: true, force: true });
+  const missing = await f.run('late', { signout: status }), said = missing.stdout + missing.stderr;
+  assert.equal(missing.code, 1, said);
+  assert.match(said, /\/api\/auth\/logout/);
+ }
+ // A declared route is threaded through nested custom-deploy observers.
+ await rm(join(f.root, '.rer'), { recursive: true, force: true });
+ const elsewhere = await f.run('late', { signout: 404, signOutPath: '/api/auth/logout' });
+ assert.equal(elsewhere.code, 0, elsewhere.stdout + elsewhere.stderr);
 });
 
 test('claim and retirement failures fail the command with deployment state and same-input recovery', async t => {

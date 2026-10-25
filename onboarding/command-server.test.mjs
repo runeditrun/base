@@ -10,14 +10,25 @@ import { startInstaller } from './server.mjs';
 const pause=()=>new Promise(resolve=>setTimeout(resolve,5));
 async function setup(t,install){
  const root=await mkdtemp(join(tmpdir(),'command-server-'));
- const seed={product:'Command server fixture',model:{fields:{NAME:{valid:()=>true},PRIVATE_CREDENTIAL:{valid:()=>true}},safeKeys:['NAME'],secretScopes:{PRIVATE_CREDENTIAL:['NAME']}},validateInput:value=>value,install};
+ // Observe the store's actual publication, after cleanup and persistence. A
+ // number of 5 ms polls is neither an installation nor a cleanup deadline.
+ const phases=new Map();
+ const phase=value=>{if(!phases.has(value))phases.set(value,Promise.withResolvers());return phases.get(value).promise;};
+ let observed=false;
+ const observeInstall=(...args)=>{
+  if(!observed){
+   observed=true;const store=args[2],publish=store.phase;
+   store.phase=async value=>{await publish(value);phase(value);phases.get(value).resolve();};
+  }
+  return install(...args);
+ };
+ const seed={product:'Command server fixture',model:{fields:{NAME:{valid:()=>true},PRIVATE_CREDENTIAL:{valid:()=>true}},safeKeys:['NAME'],secretScopes:{PRIVATE_CREDENTIAL:['NAME']}},validateInput:value=>value,install:observeInstall};
  await writeTestManifest(root,[{name:'NAME',label:'Name',kind:'text'},{name:'PRIVATE_CREDENTIAL',label:'Private credential',kind:'secret',input:'entered',ownerVisible:true,required:false,when:{field:'NAME',nonEmpty:true}},{name:'NESTED_KEY',label:'Direct credential',kind:'secret',input:'entered',ownerVisible:true,required:false}]);
  const server=await startInstaller(root,{seed:manifestContract(seed),noPrefill:true});
  t.after(async()=>{await server.close();await rm(root,{recursive:true,force:true});});
  const response=await fetch(server.origin),page=await response.text();const cookie=response.headers.get('set-cookie').split(';')[0],token=page.match(/name="installer-token" content="([a-f0-9]+)"/)[1];
  const headers={Origin:server.origin,Cookie:cookie,'X-Installer-Token':token,'Content-Type':'application/json'};
  const call=(path,value,extra={})=>fetch(server.origin+path,{method:'POST',headers:{...headers,...extra},body:JSON.stringify(value)});
- const phase=async value=>{for(let n=0;n<200;n++){if(server.state.phase===value)return;await pause();}assert.fail('phase '+value);};
  return {server,root,token,cookie,call,phase};
 }
 
@@ -87,8 +98,9 @@ for(const reason of ['readiness exit','core failure','hard deadline','owner stop
   const exits=reason==='readiness exit'||reason==='core failure';
   const script=`const {spawn}=require('node:child_process');process.on('SIGTERM',()=>{});const descendant=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});process.send('ready');setInterval(()=>{},1000)"],{stdio:['ignore','inherit','inherit','ipc']});descendant.on('message',()=>{console.log('ESCALATION_GROUP_READY');${exits?'setTimeout(()=>process.exit(40),30)':''}});`;
   child=store.spawn('Uncooperative application',process.execPath,['-e',script]);onApp(child);child.once('close',()=>{closed=true;});
+  const exited=reason==='core failure'?once(child,'exit'):undefined;
   await once(child.stdout,'data');
-  if(reason==='core failure'){await once(child,'exit');throw Error('Core operation failed');}
+  if(reason==='core failure'){await exited;throw Error('Core operation failed');}
   await store.waitForReady('Uncooperative application',child,()=>({ready:false,message:'HTTP 503 waiting for startup'}),{timeoutMs:reason==='hard deadline'?25:10000,intervalMs:5});
  });
  try {
@@ -98,7 +110,7 @@ for(const reason of ['readiness exit','core failure','hard deadline','owner stop
    assert.ok(client.server.state.logs.join('\n').includes('ESCALATION_GROUP_READY'));
    assert.equal((await client.call('/api/stop',{})).status,202);
   }
-  for(let n=0;n<600&&client.server.state.phase!=='failed';n++)await pause();
+  await client.phase('failed');
   assert.equal(client.server.state.phase,'failed');assert.equal(closed,true);
   assert.equal(child.stdout.destroyed,true);assert.equal(child.stderr.destroyed,true);
   if(reason==='readiness exit')assert.match(client.server.state.error,/exit 40/);

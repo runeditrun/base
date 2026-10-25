@@ -1,37 +1,39 @@
-import { execFile } from 'node:child_process'
 import { readFile, readdir, stat } from 'node:fs/promises'
-import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
+import { boundedProcessRead, processReadMs, readProcessCommand } from './process-read.mjs'
+import { commandFailure } from './failures.mjs'
 
-const execute = promisify(execFile)
-// One bounded wait for any process inspection; a loaded machine can take over a
-// second to list processes, which must not abort an otherwise healthy cleanup.
-export const inspectionMs = 5000
+// The entire read, including transient retries, shares this hard maximum.
+export const inspectionMs = processReadMs
 // A snapshot taken while processes start or exit can hold a row ps has not yet
 // finished, or ps itself can fail for an instant. Such a read says nothing
 // about ownership; it is repeated within the same bound rather than ending a
 // launch whose own processes are accounted for.
 const transient = (message) => Object.assign(new Error(message), { transient: true })
 const retryMs = 10
-// A busy machine can starve ps, or this process, past the ordinary bound while
-// the read itself is healthy; its finished output can even be queued behind
-// the deadline timer. Such a read is not a failure of the caller's work: the
-// same in-flight read is awaited for a bounded extension, with a warning, and
-// only an inspection that also outlives the extension fails.
-export const extensionMs = 25000
-async function withinBound(timeout, attempt, extension = extensionMs) {
-  const deadline = Date.now() + timeout + extension
-  const slow = setTimeout(() => process.emitWarning(
-    `Process inspection is taking longer than ${timeout} ms on a busy machine; waiting up to ${extension} ms more.`,
-    { code: 'RER_PROCESS_INSPECTION_SLOW' }), timeout)
-  slow.unref()
+// Callers may warn at a shorter soft deadline, but an explicit extension can
+// never increase the hard maximum. Startup reads have no default extension.
+async function withinBound(timeout, attempt, extension = 0) {
+  const budget = Math.min(inspectionMs, timeout + extension)
+  const deadline = performance.now() + budget
+  const slow = budget > timeout ? setTimeout(() => process.emitWarning(
+    `Process inspection is taking longer than ${timeout} ms on a busy machine; waiting up to ${budget - timeout} ms more.`,
+    { code: 'RER_PROCESS_INSPECTION_SLOW' }), timeout) : undefined
+  slow?.unref()
+  let lastTransient
   try {
-    for (;;) {
-      try { return await attempt(Math.max(1, deadline - Date.now())) } catch (error) {
-        if (!error.transient || Date.now() + retryMs >= deadline) throw error
-        await delay(retryMs)
+    return await boundedProcessRead(async (_bound, signal) => {
+      for (;;) {
+        try { return await attempt(Math.max(1, Math.floor(deadline - performance.now())), signal) } catch (error) {
+          if (error.transient) lastTransient = error
+          if (!error.transient || performance.now() + retryMs >= deadline) throw error
+          await delay(retryMs, undefined, { signal })
+        }
       }
-    }
+    }, budget)
+  } catch (error) {
+    const cause = error.code === 'ETIMEDOUT' && lastTransient ? lastTransient : error
+    throw commandFailure(cause.message, { ownershipUnchecked: true })
   } finally { clearTimeout(slow) }
 }
 export const validPid = (pid) => Number.isSafeInteger(pid) && pid > 0 && pid <= 0x7fffffff
@@ -74,7 +76,7 @@ export function parseLinuxProcess(pid, pgid, text) {
   return { pid, ppid, pgid, state: fields[0], birth: fields[19], command: text.slice(text.indexOf('(') + 1, text.lastIndexOf(')')) }
 }
 
-async function processGroup(pgid, signal) {
+async function processGroup(pgid, signal, timeout) {
   if (process.platform === 'linux') {
     // Minimal Linux containers need not install ps. Procfs provides exact
     // start ticks and includes zombies until their actual parent reaps them.
@@ -89,9 +91,9 @@ async function processGroup(pgid, signal) {
   }
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', [
+    ({ stdout } = await readProcessCommand('/bin/ps', [
       '-ax', '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=',
-    ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
+    ], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, signal, timeout, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 }))
   } catch (error) { if (signal.aborted) throw error; throw transient('Could not read process identities.') }
   const group = []
   for (const line of stdout.split('\n').filter((line) => line.trim())) {
@@ -113,21 +115,21 @@ async function processGroup(pgid, signal) {
 // Executable inspection is limited to owned candidates. Asking macOS ps for
 // comm across every user process invokes expensive argv lookups and can make
 // cleanup slower than the existing bounded shutdown contract.
-export async function readProcessIdentity(pid, timeout = inspectionMs) {
+export async function readProcessIdentity(pid, timeout = inspectionMs, extension = 0) {
   if (!validPid(pid) || !(timeout > 0)) throw new Error('Invalid process identity deadline.')
-  if (process.platform === 'linux') return withinBound(timeout, (remaining) => linuxProcess(pid, undefined, AbortSignal.timeout(remaining)))
-  return withinBound(timeout, (remaining) => psIdentity(pid, remaining))
+  return withinBound(timeout, (remaining, signal) => process.platform === 'linux'
+    ? linuxProcess(pid, undefined, signal) : psIdentity(pid, remaining, signal), extension)
 }
 
 // macOS ps comm is read from the process's own argv, which process.title
 // rewrites (the job supervisor retitles itself after launch). ucomm is the
 // kernel's executable name: set only by exec, so it survives a retitle.
-async function psIdentity(pid, timeout) {
+async function psIdentity(pid, timeout, signal) {
   let stdout
   try {
-    ({ stdout } = await execute('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'ucomm='],
-      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
-  } catch (error) { if (error.code === 1 && !error.stdout?.trim()) return; throw transient('Could not inspect process identity.') }
+    ({ stdout } = await readProcessCommand('/bin/ps', ['-p', String(pid), '-o', 'pid=', '-o', 'ppid=', '-o', 'pgid=', '-o', 'uid=', '-o', 'stat=', '-o', 'lstart=', '-o', 'ucomm='],
+      { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, timeout, signal, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }))
+  } catch (error) { if (error.code === 1 && !error.killed && !error.signal && !error.stdout?.trim() && !error.stderr?.trim()) return; throw transient('Could not inspect process identity.') }
   const match = stdout.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.{24})\s+(.+?)\s*$/)
   if (!match) throw transient('Invalid process identity.')
   const [, id, parent, groupId, uid, state, birth, command] = match
@@ -137,20 +139,9 @@ async function psIdentity(pid, timeout) {
 
 // `read` is the process edge: it returns the table or throws; tests supply a
 // failing one.
-export async function readProcessTable(timeout = inspectionMs, pgid, read = processGroup, extension = extensionMs) {
+export async function readProcessTable(timeout = inspectionMs, pgid, read = processGroup, extension = 0) {
   if (!(timeout > 0)) throw new Error('Process inspection deadline expired.')
-  return withinBound(timeout, async (remaining) => {
-    const controller = new AbortController()
-    let timer
-    try {
-      return await Promise.race([read(pgid, controller.signal), new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort()
-          reject(new Error('Process inspection deadline expired.'))
-        }, remaining)
-      })])
-    } finally { clearTimeout(timer) }
-  }, extension)
+  return withinBound(timeout, (remaining, signal) => read(pgid, signal, remaining), extension)
 }
 
 // Custody follows a process lifetime: exec changes its executable name without

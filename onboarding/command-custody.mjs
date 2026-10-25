@@ -11,8 +11,12 @@ export function commandCustody(child, scope) {
  Object.defineProperty(ownership, 'scope', { value: scope });
  // Capture the actual launch identity directly. A global startup scan can
  // compete with the app's startup and delay an otherwise prompt cancellation.
- const captured = readProcessIdentity(owner.pid).then(live => {
+ const captured = readProcessIdentity(owner.pid, 3000, 0).then(live => {
   if (live?.ppid === process.pid && owner.exitCode == null && owner.signalCode == null) ownership.push(live);
+ }).catch(error => {
+  // A scoped child still carries its private marker. Cleanup must discover
+  // and recheck actual ownership then; no guessed PID identity is recorded.
+  if (!scope) throw error;
  });
  // Attach a handler now; the error is still propagated to the awaited cleanup.
  void captured.catch(() => {});

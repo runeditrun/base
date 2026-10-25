@@ -13,9 +13,10 @@ export async function liveServers(env = process.env) {
  catch (error) { if (error.code === 'ENOENT') return []; throw error; }
  const live = [];
  for (const record of state.running ?? []) {
-  // An identity that cannot be verified is kept, as the dispatchers keep it.
+  // An identity that cannot be verified is kept, as the dispatchers keep it,
+  // and so is one the process table does not answer for within a few seconds.
   let running = true;
-  try { running = await alive(record.owner); } catch {}
+  try { running = await alive(record.owner, { bound: 3000 }); } catch {}
   if (running) live.push(record);
  }
  return live;

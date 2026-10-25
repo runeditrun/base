@@ -7,7 +7,7 @@ import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { exportCLI, inventory } from './export.mjs';
-import { parse } from './parse.mjs';
+import { parse, help } from './parse.mjs';
 import { authoringVerbs, verbs, commonFlags } from './contract.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 const base = resolve(import.meta.dirname, '..'), cli = join(base, 'bin/rer.mjs');
@@ -26,11 +26,24 @@ const events = result => result.stdout.trim().split('\n').map(line => JSON.parse
 
 test('every command help is effect-free outside a checkout, before adapters and tools', async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-help-')); t.after(() => rm(root, { recursive: true, force: true }));
- for (const verb of Object.keys({...verbs, ...authoringVerbs})) {
-  const result = run(root, [verb, '--help']);
-  assert.equal(result.status, 0, `${verb}: ${result.stderr}`); assert.match(result.stdout, /Usage:/);
+ for (const verb of [...Object.keys({ ...verbs, ...authoringVerbs }), 'demo', 'signin']) {
   const json = run(root, [verb, '--help', '--json']); assert.equal(json.status, 0); assert.equal(events(json).at(-1).event, 'result');
  }
+ // The complete public command tree, through the checkout dispatcher and the installed rer.
+ const checkout = [...Object.keys({ ...verbs, ...authoringVerbs }), 'demo', 'signin', 'release', 'release sign', 'release receipt', 'release keygen', 'listing', 'archive', 'archive diff', 'business', 'companion'];
+ const installed = [...checkout, 'update', 'list', 'cli', 'cli status', 'cli install', 'cli uninstall', 'queue', 'queue NAME', 'door', 'door enable', 'run'];
+ for (const [entry, commands] of [[cli, checkout], [join(base, 'global/rer.mjs'), installed]]) for (const command of commands) {
+  const result = run(root, [...command.split(' '), '--help'], entry, { ...environment(), RER_NO_UPDATE_CHECK: '1' });
+  assert.equal(result.status, 0, `${entry} ${command}: ${result.stdout}${result.stderr}`);
+  assert.ok(result.stdout.includes(`rer ${command.split(' ')[0]}`), `${command} --help prints its own usage: ${result.stdout}`);
+ }
+ // A demo advertises exactly the flags it accepts.
+ const advertised = /^Flags: (.*)$/m.exec(run(root, ['demo', '--help']).stdout)[1].split(', ');
+ const value = { '--cwd': '.', '--port': '4000', '--host': '127.0.0.1', '--idle-timeout': '60' };
+ for (const flag of advertised) assert.doesNotThrow(() => parse(['demo', flag, ...(value[flag] ? [value[flag]] : [])]), flag);
+ for (const flag of verbs.dev.flags.filter(flag => flag !== '--demo' && !advertised.includes(flag))) assert.throws(() => parse(['demo', flag, '1']), error => error.exitCode === 2 && error.message.includes('rer demo --help'), flag);
+ // rer dev --demo takes what rer demo takes.
+ for (const argv of [['--login'], ['--platform', 'container'], ['--as', 'owner']]) assert.throws(() => parse(['dev', '--demo', ...argv]), error => error.exitCode === 2 && error.message.includes('rer demo --help'), argv[0]);
  for (const argv of [['dev','--foreground','--help'], ['preview','--detach','--help']]) assert.equal(run(root,argv).status,0);
  assert.deepEqual(await readdir(root), []);
  await writeFile(join(root,'OPERATIONS.json'),'{invalid configuration');
@@ -39,11 +52,34 @@ test('every command help is effect-free outside a checkout, before adapters and 
 });
 
 test('parsing rejects every unsupported flag, missing value, invalid host/port and duplicate before effects', () => {
- for (const verb of Object.keys({...verbs, ...authoringVerbs})) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
+ for (const verb of Object.keys({ ...verbs, ...authoringVerbs })) assert.throws(() => parse([verb, '--unknown']), error => error.exitCode === 2);
+ // A refusal names the verb's help, and a flag only for a near miss: one that verb's help lists.
+ const named = argv => {
+  try { parse(argv); } catch (error) {
+   assert.ok(error.message.includes(`rer ${argv[0]} --help`), error.message);
+   const flags = (error.message.match(/--[\w-]+/g) ?? []).filter(flag => flag !== argv[1] && flag !== '--help');
+   assert.ok(flags.every(flag => /^Flags: (.*)$/m.exec(help(argv[0]))[1].split(', ').includes(flag)), error.message);
+   return flags;
+  }
+  assert.fail(`${argv.join(' ')} was accepted`);
+ };
+ for (const [argv, meant] of [[['dev', '--prot'], '--port'], [['check', '--jsn'], '--json'], [['deploy', '--dryrun'], '--dry-run'], [['setup', '--email'], '--owner-email'], [['dev', '--timeout', '60'], '--idle-timeout'], [['import', '--legacy'], '--legacy-v1'], [['dev', '--port=3000'], '--port']]) assert.deepEqual(named(argv), [meant], argv.join(' '));
+ for (const argv of [['check', '--frobnicate'], ['export', '--xyz'], ['install', '--verbose'], ['deploy', '--port'], ['check', 'positional'], ['dev', '3000'], ['import', '--file'], ['install', '--queue'], ['dev', '--log'], ['deploy', '--remote'], ['deploy', '--name'], ['demo', '--dmeo']]) assert.deepEqual(named(argv), [], argv.join(' '));
  for (const argv of [['dev', '--port'], ['dev', '--port', '0'], ['dev', '--port', '65536'], ['dev', '--port', '1.5'], ['setup', '--owner-email', 'owner name <a@b.test>'], ['check', '--profile', 'independent'], ['dev', '--json', '--json']]) assert.throws(() => parse(argv), error => error.exitCode === 2);
  for (const host of ['0.0.0.0', '::', 'example.test', '[::1]']) assert.throws(() => parse(['dev', '--host', host]), error => error.exitCode === 4);
  assert.equal(parse(['dev', '--', '--port', '08787']).port, 8787);
  assert.equal(parse(['dev', '--host', '::1']).host, '::1');
+});
+
+test('a missing or mistyped project folder reports its status, folder and --cwd', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'rer-cwd-')); t.after(() => rm(root, { recursive: true, force: true }));
+ await writeFile(join(root, 'notes.txt'), '');
+ for (const [args, status] of [[['check', '--cwd', 'absent-folder'], 3], [['dev', '--cwd', 'absent-folder', '--json'], 3], [['check', '--cwd', 'notes.txt'], 2]]) {
+  const result = run(root, args);
+  assert.equal(result.status, status, result.stdout + result.stderr);
+  const message = args.includes('--json') ? events(result).find(row => row.event === 'error').message : result.stderr;
+  assert.ok(message.includes(args[2]) && message.includes('--cwd'), message);
+ }
 });
 
 test('independent execution needs no package, edition, pnpm, installer or Base runtime and preserves raw argv', async t => {
