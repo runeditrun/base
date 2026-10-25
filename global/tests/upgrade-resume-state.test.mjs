@@ -4,6 +4,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { upgradeFixture, ownerRow } from './fixtures/upgrade/fixture.mjs';
 import { stopOwnedApp } from './fixtures/upgrade/owned-app.mjs';
 import { liveServers } from '../registry.mjs';
+import { stateManifest } from '../local-run/state-manifest.mjs';
+import { join } from 'node:path';
 
 const result = r => r.stdout.split('\n').flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } }).findLast(e => e.event === 'result');
 
@@ -34,4 +36,10 @@ test('resume keeps the running state from before the first attempt, including be
   assert.deepEqual((await f.sql('SELECT id, body FROM upgrade_records'))[0].results, [ownerRow]);
   t.diagnostic(JSON.stringify({ phase, initiallyRunning, killedPid: child.pid, result: result(retry) }));
  }
+ const records = join(f.root, '.rer/upgrade');
+ const beforeRefusal = await stateManifest(records);
+ const refused = await f.run(['upgrade', '--to', f.v1.commit, '--anchors', f.anchors, '--json']);
+ assert.equal(result(refused).outcome, 'refused');
+ assert.deepEqual(await stateManifest(records), beforeRefusal);
+ assert.equal((await running()).length, 0);
 });
