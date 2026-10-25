@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.82-dev.g631bb343",
+  "cliVersion": "0.2.82-dev.g30a8231f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "84a65a19034b84104e192497e7808715d67ab8a93eefa808f16a27d519db63fd"
+      "sha256": "58181b3574bdd2d447ae32f73ed2145e8e81f14890ee13c10551e0b45fca3e0b"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -2649,37 +2649,9 @@
       "source": "modules/import-kit/src/door/uploads.ts",
       "sha256": "31b6ae6e7d1a615ed3f348209d907fd160b1a331af0efb0e7e8ba71782d44c82"
     },
-    "modules/import-kit/src/engine/apply.ts": {
-      "source": "modules/import-kit/src/engine/apply.ts",
-      "sha256": "f7b73708e4ecd05b7835cd384595bcf577239bf4e36fbffdf49609cedc8e6c2a"
-    },
-    "modules/import-kit/src/engine/index.ts": {
-      "source": "modules/import-kit/src/engine/index.ts",
-      "sha256": "b7570a4ab5a12e9df4eb427aec3ab3bdc2c55330c50fefcd42815ad76cd7c91f"
-    },
-    "modules/import-kit/src/engine/reverse.ts": {
-      "source": "modules/import-kit/src/engine/reverse.ts",
-      "sha256": "d9471fdfece79d7419a6832014cd9f6fe9b0349922968f8f82b1e7b4425d2a81"
-    },
-    "modules/import-kit/src/index.ts": {
-      "source": "modules/import-kit/src/index.ts",
-      "sha256": "3d6c29b0cd2449988f6973da43ba44ef1d5d1ff66ec99a99d0a4daf556e718c6"
-    },
     "modules/import-kit/src/journal/authority.ts": {
       "source": "modules/import-kit/src/journal/authority.ts",
       "sha256": "45934861cf653954615329c2ac003a106d8abad33a8e42c633cde43832af7b37"
-    },
-    "modules/import-kit/src/journal/boundary.ts": {
-      "source": "modules/import-kit/src/journal/boundary.ts",
-      "sha256": "ee0ef90f37adaae55859d4875b56c12bf9de8eabbbcac892f9fc91d76c79cde0"
-    },
-    "modules/import-kit/src/journal/jobs.ts": {
-      "source": "modules/import-kit/src/journal/jobs.ts",
-      "sha256": "0108321240af0073d0f6c136929c9063dfe311e7d0cf5023142f61587ac1f440"
-    },
-    "modules/import-kit/src/journal/originals.ts": {
-      "source": "modules/import-kit/src/journal/originals.ts",
-      "sha256": "8861f01cc383b4c4d16d1c5804b5369a158c16161f550ed9e9a8e066dadf4ae7"
     },
     "modules/import-kit/src/plan/budget.ts": {
       "source": "modules/import-kit/src/plan/budget.ts",
@@ -2773,38 +2745,6 @@
       "source": "modules/import-kit/src/readers/records.ts",
       "sha256": "70ae03031d410934836528223239fd4c30921ffe8e9a024002d9f41feb601814"
     },
-    "modules/import-kit/src/reconcile/index.ts": {
-      "source": "modules/import-kit/src/reconcile/index.ts",
-      "sha256": "0d73e5867657405de295b20e3aaaf659062a4f2e357b3a3ae18d1b5289d54f54"
-    },
-    "modules/import-kit/src/status/encoding.ts": {
-      "source": "modules/import-kit/src/status/encoding.ts",
-      "sha256": "27c23888a400c38e63fad8febda18d339d9a6114a3f2fa6db79d3e1c7e18c49d"
-    },
-    "modules/import-kit/src/status/evidence.ts": {
-      "source": "modules/import-kit/src/status/evidence.ts",
-      "sha256": "f253b3e73ba183fec6c9a15da2f476bac35e9bdf70778cd081b00cdc9ef7f362"
-    },
-    "modules/import-kit/src/status/index.ts": {
-      "source": "modules/import-kit/src/status/index.ts",
-      "sha256": "ae8a6d4e5081f29407a407d0d028f030ad5a8abffade573bd3985a80830aa225"
-    },
-    "modules/import-kit/src/status/schema.ts": {
-      "source": "modules/import-kit/src/status/schema.ts",
-      "sha256": "00a0255dd540b42140218f6b4832590d8be18ad8f7f70b6c414310d257d33f17"
-    },
-    "modules/import-kit/src/status/types.ts": {
-      "source": "modules/import-kit/src/status/types.ts",
-      "sha256": "c77fdb0801f3b49fefa302540cfb42bccd421dc94e61fa047e511a252d4d4138"
-    },
-    "modules/import-kit/src/storage/cleanup.ts": {
-      "source": "modules/import-kit/src/storage/cleanup.ts",
-      "sha256": "d07d231a526948e59ec89ef5113b01cf4a7b25b8e897e53bc6ede19183cdb58e"
-    },
-    "modules/import-kit/src/storage/integrity.ts": {
-      "source": "modules/import-kit/src/storage/integrity.ts",
-      "sha256": "d9dc5e580e97e6355e7b092bedaf9e6ecc395e53dd085f10f0fb440ac1cdf5c4"
-    },
     "modules/import-kit/src/storage/originals.ts": {
       "source": "modules/import-kit/src/storage/originals.ts",
       "sha256": "66a12da0328088340c4791454c2689a3b536faeb2058273fa7f478ba34700041"
@@ -2816,10 +2756,6 @@
     "modules/import-kit/src/storage/schema.ts": {
       "source": "modules/import-kit/src/storage/schema.ts",
       "sha256": "4173d0e3d1c02ee49899cbe651986363c4bb5d8a8c7d59fc068313d4c00ad5df"
-    },
-    "modules/import-kit/src/storage/sqlite.ts": {
-      "source": "modules/import-kit/src/storage/sqlite.ts",
-      "sha256": "e13a6a0902ea266a40e5db7a95c32017e0c4341b8ad7c0d7587d3919729f545c"
     },
     "modules/import-kit/src/types.ts": {
       "source": "modules/import-kit/src/types.ts",

@@ -54,7 +54,7 @@ export async function artifactSmoke(tarball, { base = resolve(import.meta.dirnam
    await build({ absWorkingDir: root, stdin: { contents: "export * as door from '@runeditrun/rer/modules/import-kit/door'; export * as d1 from '@runeditrun/rer/modules/import-kit/d1';", resolveDir: root },
     outfile: entry, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent', metafile: true });
    writeFileSync(join(root, 'types.mts'), "import type { ImportDoorIntake, ImportOperatorOptions } from '@runeditrun/rer/modules/import-kit/door';\nimport type { D1Database } from '@runeditrun/rer/modules/import-kit/d1';\nexport type PublicTypes = [ImportDoorIntake, ImportOperatorOptions, D1Database];\n");
-   run(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--strict', '--skipLibCheck', '--allowImportingTsExtensions', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', join(root, 'types.mts')]);
+   run(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--strict', '--skipLibCheck', '--allowImportingTsExtensions', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', '--lib', 'ES2023,DOM', join(root, 'types.mts')]);
    return doorSmoke(entry);
   });
   await check('edition-authoring', () => refreshSmoke({ root, installed, base, ref, run, output }));
