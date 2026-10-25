@@ -3,16 +3,21 @@ import { access, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Api, taskPath, pause } from './api.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
-import { nextQuestions, ownerLink, waitingFor, agentWaiting } from './questions.mjs';
+import { nextQuestions, ownerLink, waitingFor, agentWaiting, ownerWaiting } from './questions.mjs';
 import { lockSupervisor, stateDirectory, saveState, loadState } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
-import { runExport, ExportWaiting, vendorHandle } from './export-task.mjs';
+import { ExportWaiting, vendorHandle } from './vendor-door.mjs';
+import { runExport } from './export-task.mjs';
+import { runCatchup } from './catchup-task.mjs';
+import { runArchive } from './archive-task.mjs';
 
-const kinds = new Set(['discover.local', 'export.vendor']);
+// The vendor tasks this computer performs into an app's import door.
+const vendorWork = { 'export.vendor': runExport, 'catchup.vendor': runCatchup, 'switchoff.archive': runArchive };
+const kinds = new Set(['discover.local', ...Object.keys(vendorWork)]);
 const checkIn = 25_000;
 
 /** Work this computer's tasks. It says what it is doing and what it waits
@@ -36,6 +41,8 @@ export async function run({ once = false } = {}) {
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
  // An agent step that waits is said in its own words, never as "Nothing yet".
  const waits = () => [...new Set([...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
+ // With no agent step waiting, a move's owner step (freeze, rollback, cancellation) is named with its link.
+ const idle = () => { const owner = ownerWaiting(summaries, state); return owner.length ? owner.join('\n') : waitingFor(state); };
  try {
   progress = await loadProgress();
   // A claim saved before this computer stopped is the task it was doing.
@@ -55,7 +62,7 @@ export async function run({ once = false } = {}) {
     const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
     if (!selected) {
      const waiting = waits();
-     say(waiting.length ? waiting.join('\n') : waitingFor(state));
+     say(waiting.length ? waiting.join('\n') : idle());
      if (once) { if (!waiting.length) process.stdout.write('Nothing yet.\n'); return; }
      await pause(checkIn, stop.signal); continue;
     }
@@ -80,7 +87,7 @@ export async function run({ once = false } = {}) {
     if (once && !claimed.task) {
      // Only with no agent step waiting does run say "Nothing yet".
      const waiting = interrupted ? [] : waits();
-     if (!interrupted) say(waiting.length ? waiting.join('\n') : waitingFor(state));
+     if (!interrupted) say(waiting.length ? waiting.join('\n') : idle());
      if (!interrupted && !waiting.length) process.stdout.write('Nothing yet.\n');
      return;
     }
@@ -92,14 +99,14 @@ export async function run({ once = false } = {}) {
    try {
     progress.current = { kind: claimed.task.kind, checkpoint: claimed.task.checkpoint, uploadedBytes: claimed.task.checkpoint?.bytes_done ?? 0 };
     await saveProgress(progress);
-    if (claimed.task.kind === 'export.vendor') {
+    if (Object.hasOwn(vendorWork, claimed.task.kind)) {
      try {
-      const done = await runExport({ lease, task: claimed.task, grant: claimed.grant, directory, say, ownerPage: ownerLink(state) });
+      const done = await vendorWork[claimed.task.kind]({ lease, task: claimed.task, grant: claimed.grant, directory, say, ownerPage: ownerLink(state) });
       finished = true;
       say(done);
      } catch (error) {
       if (!(error instanceof ExportWaiting) || lease.signal.aborted) throw error;
-      // Business shows the owner what this export waits for; the lease goes back as paused.
+      // Business shows the owner what this vendor task waits for; the lease goes back as paused.
       parked.set(claimed.task.id, { message: error.message, keyMissing: error.keyMissing });
       await lease.send(taskPath(claimed.task.id, 'events'), { event: { kind: 'question', payload: { question: error.question } } });
       throw error;
