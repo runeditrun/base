@@ -1,21 +1,27 @@
-type SearchResult = { href: string; titlePath: string[]; snippet: string; score: number };
+import { createSearcher } from './retrieve.mjs';
+import type { SearchResult } from './types';
 const mounted = new WeakMap<HTMLElement, () => void>();
 
-function readResults(payload: unknown): SearchResult[] {
-  if (!payload || typeof payload !== 'object' || !('results' in payload) || !Array.isArray(payload.results)) {
-    throw new Error('Invalid search response');
+const indexes = new Map<string, Promise<(query: string) => SearchResult[]>>();
+function loadIndex(address: URL) {
+  const identity = document.querySelector<HTMLMetaElement>('meta[name="docs-search-index"]')?.content;
+  if (!identity || address.origin !== location.origin) throw Error('Missing search identity');
+  const [version, sourceHash, assetHash] = identity.split(':');
+  const key = address.href + ':' + identity;
+  let pending = indexes.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const response = await fetch(address, { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw Error('Search index unavailable');
+      const bytes = await response.arrayBuffer();
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), value => value.toString(16).padStart(2, '0')).join('');
+      if (hash !== assetHash) throw Error('Search asset mismatch');
+      return createSearcher(JSON.parse(new TextDecoder().decode(bytes)), { version: Number(version), sourceHash });
+    })();
+    indexes.set(key, pending);
+    pending.catch(() => indexes.delete(key));
   }
-  return payload.results.slice(0, 5).map((value: unknown) => {
-    if (!value || typeof value !== 'object' || !('href' in value) || typeof value.href !== 'string'
-      || !('titlePath' in value) || !Array.isArray(value.titlePath) || !value.titlePath.every((part: unknown) => typeof part === 'string')
-      || !('snippet' in value) || typeof value.snippet !== 'string'
-      || !('score' in value) || typeof value.score !== 'number' || !Number.isFinite(value.score)) {
-      throw new Error('Invalid search result');
-    }
-    const url = new URL(value.href, document.baseURI);
-    if (url.origin !== location.origin || !['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid search link');
-    return { href: url.href, titlePath: value.titlePath, snippet: value.snippet, score: value.score };
-  });
+  return pending;
 }
 
 function mount(root: HTMLElement): () => void {
@@ -106,11 +112,8 @@ function mount(root: HTMLElement): () => void {
       request = controller;
       list!.setAttribute('aria-busy', 'true');
       try {
-        const endpoint = new URL(baseEndpoint);
-        endpoint.searchParams.set('q', query);
-        const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: 'application/json' } });
-        if (!response.ok) throw new Error('Search request failed');
-        const results = readResults(await response.json());
+        const search = await loadIndex(baseEndpoint);
+        const results = search(query);
         if (current !== revision || controller.signal.aborted) return;
         renderedQuery = query;
         render(results);

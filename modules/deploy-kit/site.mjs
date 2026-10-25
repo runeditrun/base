@@ -11,8 +11,7 @@ export { servedVersion, siteReadbackSummary } from './site-readback.mjs';
 
 /* A seed's run site (run-<seed>.com): the folder `rer build --site` writes,
  * served on the owner's own account by a Base-generated module Worker (no
- * seed code). Its default binding is its assets; opt-in docs search adds AI
- * and an immutable Base-generated search bundle. The Worker runs
+ * seed code). Its only binding is its assets; docs search is a build-time static asset. The Worker runs
  * first on every request: www.<domain> gets a 301 to the apex with path and
  * query kept, and everything else is answered from the assets. It has no
  * secrets and no schedules, workers.dev stays off, and its name can never be
@@ -73,15 +72,15 @@ export function sitePlan({ project, environment, compatibilityDate, declaration,
 }
 
 /** Assets-only plans retain the original fingerprint byte for byte. */
-export function siteFingerprint(plan, files, { preparing = false } = {}) {
+export function siteFingerprint(plan, files) {
   const runtime = siteRuntime(plan.runtime);
   const identity = { files: files.map(({ path, sha256 }) => ({ path, sha256 })), config: plan.assetsConfig,
-    module: hash(runtime?.source ?? SITE_WORKER), compatibilityDate: plan.compatibilityDate };
+    module: hash(SITE_WORKER), compatibilityDate: plan.compatibilityDate };
   if (runtime) {
-    const vectors = files.find(file => file.path === 'docs-search-vectors.json');
-    assert(preparing || vectors && /^[a-f0-9]{64}$/.test(vectors.sha256), 'missing-site-search-vectors');
+    const index = files.find(file => file.path === runtime.endpoint.slice(1));
+    assert(index && index.sha256 === runtime.assetHash, 'missing-site-search-index');
     identity.runtime = { type: runtime.type, module: runtime.module, endpoint: runtime.endpoint, bindings: runtime.bindings,
-      model: runtime.model, pooling: runtime.pooling, corpusHash: runtime.corpusHash, vectors: preparing ? 'prepare-on-deploy' : vectors.sha256 };
+      indexVersion: runtime.indexVersion, corpusHash: runtime.corpusHash, index: index.sha256 };
   }
   return hash(identity);
 }
@@ -113,16 +112,16 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
 
   const jwt = await uploadAssets(api, plan.worker, files);
   const body = new FormData();
-  body.set('metadata', new Blob([JSON.stringify({ main_module: SITE_MODULE, compatibility_date: plan.compatibilityDate, bindings: siteRuntimeBindings(runtime),
+  body.set('metadata', new Blob([JSON.stringify({ main_module: SITE_MODULE, compatibility_date: plan.compatibilityDate, bindings: siteRuntimeBindings(runtime, plan.worker),
     assets: { jwt, config: { ...plan.assetsConfig, run_worker_first: true } }, annotations: { 'workers/message': `rer-site:${fingerprint}` } })], { type: 'application/json' }));
-  body.set(SITE_MODULE, new Blob([runtime?.source ?? SITE_WORKER], { type: 'application/javascript+module' }), SITE_MODULE);
+  body.set(SITE_MODULE, new Blob([SITE_WORKER], { type: 'application/javascript+module' }), SITE_MODULE);
   const window = readiness.window ?? readinessWindow(readiness);
   window.start();
   api = readinessAPI(api, window, 'site-upload-timeout');
   const upload = await api.request(`/workers/scripts/${plan.worker}`, { method: 'PUT', body });
   const versionId = uploadVersionId(upload);
   assert(versionId, 'invalid-upload-version');
-  const readback = () => waitForSiteUpload({ api, worker: plan.worker, versionId, fingerprint, previous, window, runtime, module: SITE_MODULE });
+  const readback = () => waitForSiteUpload({ api, worker: plan.worker, versionId, fingerprint, previous, window, runtime: runtime ? SITE_WORKER : undefined, module: SITE_MODULE });
   await readback();
   await workerOrigin(api, plan.worker, { enable: true, workersDev: false });
   for (const hostname of plan.hostnames) {

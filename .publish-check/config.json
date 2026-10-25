@@ -1,4 +1,7 @@
 {
   "schemaVersion": 1,
-  "publicEmails": ["hello@yourdomain.com"]
+  "publicEmails": [
+    "hello@yourdomain.com",
+    "tituswormer@gmail.com"
+  ]
 }

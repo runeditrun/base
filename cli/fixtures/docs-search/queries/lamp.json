@@ -1,0 +1,450 @@
+{
+  "seedHead": "3cbae9ad1d6ae6e0e2e7c6843f293bed314712a5",
+  "inputSha256": "25f0d884e14baddd0a3155092868aed181f91508eb473e725836f901b0d21ecc",
+  "negativeInputSha256": "c6e8ea0db7a1b92268f7e156b84e60959743a6d53e09e4bb5210824341e5bb89",
+  "queries": [
+    {
+      "source": "prior",
+      "topic": "install",
+      "q": "how do I install lamp",
+      "relevant": [
+        "/docs/install#",
+        "/docs/deploy#",
+        "/docs/first-run#"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "install",
+      "q": "run lamp on my own cloudflare account",
+      "relevant": [
+        "/docs/deploy#",
+        "/docs/install#"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "component",
+      "q": "add a new component to my status page",
+      "relevant": [
+        "/docs/components-and-groups#set-up-components",
+        "/docs/components-and-groups#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "component",
+      "q": "bulk import components from a spreadsheet",
+      "relevant": [
+        "/docs/components-and-groups#edit-the-catalog-together"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "incidents/updates",
+      "q": "post an update about an outage we're having",
+      "relevant": [
+        "/docs/incidents-and-updates#compose-and-publish",
+        "/docs/incidents-and-updates#docs-title",
+        "/docs/incidents-and-updates#track-due-updates-and-reports"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "incidents/updates",
+      "q": "mark the incident resolved",
+      "relevant": [
+        "/docs/incidents-and-updates#"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "subscribers/email",
+      "q": "how do visitors subscribe to email updates",
+      "relevant": [
+        "/docs/subscribers-and-notifications#docs-title",
+        "/docs/subscribers-and-notifications#choose-what-each-subscriber-follows"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "subscribers/email",
+      "q": "someone wants to stop getting emails",
+      "relevant": [
+        "/docs/subscribers-and-notifications#process-email-unsubscribe-requests",
+        "/docs/subscribers-and-notifications#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "subscribers/email",
+      "q": "send status updates to slack",
+      "relevant": [
+        "/docs/subscribers-and-notifications#create-a-slack-webhook",
+        "/docs/subscribers-and-notifications#add-webhooks-or-team-channels",
+        "/docs/subscribers-and-notifications#save-the-channel"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "custom domain",
+      "q": "use my own domain like status.example.com",
+      "relevant": [
+        "/docs/domains#",
+        "/docs/deploy#step-3-your-two-addresses"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "import",
+      "q": "migrate from statuspage.io",
+      "relevant": [
+        "/docs/moving-in#statuspage",
+        "/docs/moving-in#docs-title",
+        "/docs/moving-in#common-workflow",
+        "/docs/moving-in#operating-lamp-after-statuspage"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "export",
+      "q": "download a copy of all my data",
+      "relevant": [
+        "/docs/backups-and-recovery#export-your-page-data-from-the-app",
+        "/docs/backups-and-recovery#back-up-a-hosted-installation",
+        "/docs/backups-and-recovery#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "exact title",
+      "q": "Hostnames and your own domain",
+      "relevant": [
+        "/docs/domains#docs-title",
+        "/docs/domains#use-a-custom-domain"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "exact title",
+      "q": "Alerts from monitoring tools",
+      "relevant": [
+        "/docs/alerts-from-monitoring-tools#"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "misspelling",
+      "q": "custom domian setup",
+      "relevant": [
+        "/docs/domains#"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "misspelling",
+      "q": "subscibers and notifcations",
+      "relevant": [
+        "/docs/subscribers-and-notifications#"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: setup",
+      "q": "how do I set up my first page",
+      "relevant": [
+        "/docs/first-run#",
+        "/docs/install#"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: core task",
+      "q": "publish an incident update",
+      "relevant": [
+        "/docs/incidents-and-updates#compose-and-publish"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: cost",
+      "q": "how much does Lamp cost to run",
+      "relevant": [
+        "/docs/install#prepare-a-hosted-installation"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: export",
+      "q": "export page data",
+      "relevant": [
+        "/docs/backups-and-recovery#export-your-page-data-from-the-app"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: exact title",
+      "q": "Feeds, APIs, badges and embeds",
+      "relevant": [
+        "/docs/public-resources#feed-readers-and-badges"
+      ],
+      "required": true,
+      "judgment": {
+        "gate": "D",
+        "additionalRelevant": [
+          "/docs/public-resources#docs-title"
+        ],
+        "reason": "The exact page title is an answering heading as well as its subsection."
+      }
+    },
+    {
+      "source": "prior",
+      "topic": "repin: misspelling",
+      "q": "schedule maintenence",
+      "relevant": [
+        "/docs/maintenance#"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "setup",
+      "q": "start Lamp on my computer",
+      "relevant": [
+        "/docs/install#",
+        "/docs/first-run#"
+      ],
+      "required": true,
+      "judgment": {
+        "gate": "C",
+        "additionalRelevant": [
+          "/docs/run-locally#docs-title",
+          "/docs/run-locally#start-lamp"
+        ],
+        "reason": "Run it locally and Start Lamp answer the request."
+      }
+    },
+    {
+      "source": "new",
+      "topic": "cost",
+      "q": "what hosting and mail services will I need to pay for",
+      "relevant": [
+        "/docs/install#prepare-a-hosted-installation",
+        "/docs/deploy#step-1-make-a-private-input-file"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "export",
+      "q": "save all my status page data as a file",
+      "relevant": [
+        "/docs/backups-and-recovery#export-your-page-data-from-the-app",
+        "/docs/backups-and-recovery#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "teammates",
+      "q": "invite a colleague to operate the page",
+      "relevant": [
+        "/docs/operators-and-sign-in#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "privacy",
+      "q": "erase an operators personal data",
+      "relevant": [
+        "/docs/operators-and-sign-in#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "exact title",
+      "q": "Operators and sign-in",
+      "relevant": [
+        "/docs/operators-and-sign-in#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "misspelling",
+      "q": "componnts and grups",
+      "relevant": [
+        "/docs/components-and-groups#"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "synonym",
+      "q": "tell visitors the outage is over",
+      "relevant": [
+        "/docs/incidents-and-updates#"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "one word",
+      "q": "maintenance",
+      "relevant": [
+        "/docs/maintenance#"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "question",
+      "q": "How do I add a Microsoft Teams webhook?",
+      "relevant": [
+        "/docs/subscribers-and-notifications#create-a-microsoft-teams-webhook"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "notifications",
+      "q": "remove someone from email notifications",
+      "relevant": [
+        "/docs/subscribers-and-notifications#process-email-unsubscribe-requests",
+        "/docs/subscribers-and-notifications#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "export",
+      "q": "restore page data into a new Lamp",
+      "relevant": [
+        "/docs/backups-and-recovery#restore-page-data-into-a-new-lamp"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "domain",
+      "q": "use a custom domain for my public page",
+      "relevant": [
+        "/docs/domains#use-a-custom-domain",
+        "/docs/domains#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "reports",
+      "q": "download availability reports",
+      "relevant": [
+        "/docs/components-and-groups#download-availability-reports"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "security",
+      "q": "configure optional single sign on",
+      "relevant": [
+        "/docs/operators-and-sign-in#optional-single-sign-on"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "subscribers",
+      "q": "choose which components a subscriber follows",
+      "relevant": [
+        "/docs/subscribers-and-notifications#choose-what-each-subscriber-follows"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "prior diagnostic",
+      "q": "add a component",
+      "relevant": [
+        "/docs/components-and-groups#"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior diagnostic",
+      "q": "how do I add components",
+      "relevant": [
+        "/docs/components-and-groups#"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior freshness paraphrase",
+      "q": "why does my browser say the connection to my status page is not private",
+      "relevant": [
+        "/docs/domains#"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior freshness paraphrase",
+      "q": "browser privacy warning on my custom domain",
+      "relevant": [
+        "/docs/domains#"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior freshness paraphrase",
+      "q": "how long does the certificate take for a custom domain",
+      "relevant": [
+        "/docs/domains#"
+      ],
+      "required": false
+    }
+  ],
+  "negativeAndHistorical": [
+    {
+      "q": "qzxv wplk",
+      "kind": "negative"
+    },
+    {
+      "q": "🧬🪸🧿🦷",
+      "kind": "negative"
+    },
+    {
+      "q": "zzqqxxvvv",
+      "kind": "negative"
+    },
+    {
+      "q": "！！！！！！",
+      "kind": "negative"
+    }
+  ]
+}

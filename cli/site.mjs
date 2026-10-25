@@ -51,7 +51,7 @@ async function privateValues(project) {
 }
 
 /** Render the run site into its declared folder, check it and replace the previous build. */
-export async function buildSite(project, store, signal, { prepare = false, deployment } = {}) {
+export async function buildSite(project, store, signal) {
  const site = declaredSite(project);
  await contained(project.root, site.entry);
  if (site.config) await contained(project.root, site.config);
@@ -77,17 +77,16 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
    throw error;
   }
   const privacy = await privateValues(project);
-  const checkOptions = {root:project.root, ...privacy, ...(site.runtime ? {runtime:site.runtime} : {})};
-  let checked = await checkSite(staging, checkOptions);
+  const checkOptions = {root:project.root, ...privacy};
   let runtime;
   if (site.runtime) {
-   try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging, { prepare, domain:deployment?.domain, compatibilityDate:deployment?.compatibilityDate, store, signal }); }
-   catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search preparation failed; publication stopped. Check the previous artifact and Workers AI availability.', 1); }
-   if (prepare) checked = await checkSite(staging, checkOptions);
+   try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging); }
+   catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search index build failed; publication stopped. Check the on-site heading source and index size budget.', 1); }
    const corpus = await contained(project.root, site.runtime.corpus, {optional:true});
    await mkdir(dirname(corpus), {recursive:true});
    await cp(`${staging}.corpus.json`, corpus);
   }
+  const checked = await checkSite(staging, checkOptions);
   await rm(folder, { recursive: true, force: true });
   await rename(staging, folder);
   return { folder, ...checked, ...(runtime ? {runtime} : {}) };
@@ -105,11 +104,7 @@ async function siteDeployment(project, options, folder, runtime) {
 
 /** `rer build --site` and `rer deploy --site [--dry-run]`. */
 export async function siteCommand(project, options, store, signal, out) {
- const prepare = options.verb !== 'build' && !options.dryRun;
- if (prepare && declaredSite(project).runtime && ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'].some(name => !process.env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required, with the run site token permissions in the deploy-kit README.');
- const declaration = declaredSite(project);
- const deployment = prepare && declaration.runtime ? await siteDeployment(project, options, '/') : undefined;
- const built = await buildSite(project, store, signal, {prepare, deployment});
+ const built = await buildSite(project, store, signal);
  if (!options.json && built.references.unresolved.length) {
   out.human(`Run site references: ${built.references.unresolved.length} runtime resource target(s) could not be resolved statically:`);
   for (const {asset, kind} of built.references.unresolved) out.human(`  ${asset}: ${kind}`);
@@ -120,22 +115,21 @@ export async function siteCommand(project, options, store, signal, out) {
   const path = relative(project.root, built.folder);
   if (!options.json) {
    out.human(`Run site written to ${path} (${built.pages} pages, ${built.files} files): ${built.folder}`);
-   if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; bindings ASSETS, AI; corpus ${built.runtime.corpusHash}; vectors prepared only on a real deploy`);
+   if (built.runtime) out.human(`  runtime: docs-search; endpoint ${built.runtime.endpoint}; static client search; binding ASSETS; corpus ${built.runtime.corpusHash}; index ${built.runtime.bytes} bytes (${built.runtime.gzipBytes} gzip)`);
   }
   return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references, ...(built.runtime ? {runtime:runtimeSummary(built.runtime)} : {}) } };
  }
  const plan = await siteDeployment(project, options, built.folder, built.runtime);
  const assets = relative(project.root, plan.assets);
- const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS and AI' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
+ const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'static docs search with ASSETS' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
   `  custom domains: ${plan.hostnames.join(', ')}; workers.dev off`, ...plan.redirects.map(rule => `  redirect in the Worker: ${rule.from} -> ${rule.to} (${rule.status}, keeps ${rule.keeps.join(' and ')})`)];
  const { collectFiles } = await import('../modules/deploy-kit/artifact.mjs');
  const { siteFingerprint } = await import('../modules/deploy-kit/site.mjs');
  const files = await collectFiles(built.folder);
  const runtime = runtimeSummary(built.runtime);
- if (runtime) human.push(`  runtime: ${runtime.type}; module ${runtime.module}; endpoint ${runtime.endpoint}; bindings ${runtime.bindings.join(', ')}; model ${runtime.model}; pooling ${runtime.pooling}; corpus ${runtime.corpusHash}`);
- const fingerprint = siteFingerprint(plan, files, {preparing:Boolean(runtime) && !prepare});
- if (runtime) human.push(`  fingerprint: ${fingerprint}${prepare ? '' : ' (vectors prepared only on a real deploy)'}`);
- const summary = { ...(runtime ? {runtime, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
+ if (runtime) human.push(`  search: static; index ${runtime.endpoint}; corpus ${runtime.corpusHash}; ${runtime.bytes} bytes (${runtime.gzipBytes} gzip)`);
+ const fingerprint = siteFingerprint(plan, files);
+ const summary = { ...(runtime ? {runtime, fingerprint} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
  if (options.dryRun) {
   if (options.json) out.event('site', summary); else for (const line of human) out.human(line);
   store.report('deploy --site: dry run complete; no deployment occurred and no provider request was made.');
