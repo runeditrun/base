@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.81",
+  "cliVersion": "0.2.81-dev.gc00a496f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1047,7 +1047,7 @@
     },
     "cli/shell-word.mjs": {
       "source": "cli/shell-word.mjs",
-      "sha256": "6a972e50c1fe1876d3d37fc9314627b9257defcb414d51219e454127350cd937"
+      "sha256": "ebe9a52d1f4aefb4fc42bdcc47da7ea1a74138d0eb61552f94508264c21daa97"
     },
     "cli/signin.mjs": {
       "source": "cli/signin.mjs",

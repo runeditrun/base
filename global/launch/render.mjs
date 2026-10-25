@@ -13,7 +13,6 @@ const quiet = 5000, advise = 30000;
 // `open`, when given, opens the browser at ready and resolves { opened }.
 // `reattach` is the command that picks a stopped wait up again.
 export function printer({ json, stopHint, keyless = false, name, openHint, open, reattach = 'rer dev' }) {
- const started = Date.now();
  let current = 'preparing', last = Date.now(), stepStarted = Date.now(), advised = false;
  const event = (name, fields) => process.stdout.write(JSON.stringify({ version: 1, verb: 'dev', event: name, ...fields }) + '\n');
  const line = text => process.stderr.write(`rer dev: ${text}\n`);
