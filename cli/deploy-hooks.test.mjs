@@ -257,11 +257,13 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
 }
 
 test('conventional legacy function hook claims actual bootstrap, retires re-uploaded tokens, and bypasses hooks for changes', async t => {
- const f = await fixture(t);
+ for (const signOutPath of ['/auth/signout', '/api/auth/logout']) {
+ const f = await fixture(t, { signOutPath });
  const original = { ...process.env };
  const dry = await f.run({ dryRun: true }); assert.equal(dry.deployed, false); assert.ok(f.requests.length>0); assert.ok(f.requests.every(call=>call.startsWith('GET '))); assert.equal(f.provider.state.writes.length,0);
  const first = await f.run(); assert.equal(first.owner, 'claimed'); assert.equal(f.claims.length, 1);
- assert.equal(f.requests.filter(call => call === 'POST /auth/signout').length, 1, 'the unused claim session is retired once');
+ assert.equal(f.requests.filter(call => call === `POST ${signOutPath}`).length, 1, 'the unused claim session is retired once');
+ if (signOutPath === '/api/auth/logout') assert.equal(f.requests.includes('POST /auth/signout'), false);
  assert.ok(Object.keys(process.env).length === Object.keys(original).length && Object.entries(original).every(([key, value]) => process.env[key] === value), 'caller environment restored');
  assert.ok(!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
  const next = await f.run(); assert.equal(next.owner, 'kept'); assert.equal(f.claims.length, 1);
@@ -274,13 +276,7 @@ test('conventional legacy function hook claims actual bootstrap, retires re-uplo
  await f.run({ unsetSecret: 'SESSION_SECRET' });
  await f.run({ remove: true, yes: true });
  assert.equal(f.builds(), builds); assert.equal(f.provider.state.settings, null);
-});
-
-test('function owner hook declares its session revocation route', async t => {
- const f = await fixture(t, { signOutPath: '/api/auth/logout' });
- assert.equal((await f.run()).owner, 'claimed');
- assert.equal(f.requests.filter(call => call === 'POST /api/auth/logout').length, 1);
- assert.equal(f.requests.includes('POST /auth/signout'), false);
+ }
 });
 
 test('declared minimal hook keeps an established owner and refuses provider replacement without changing it', async t => {

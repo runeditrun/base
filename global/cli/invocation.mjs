@@ -1,5 +1,5 @@
-// How the person runs this rer again from their own shell: the first words of
-// every next-step line rer prints. install.sh names the launcher it ran
+// How the person runs this rer again for install, setup and ready next steps
+// from their own shell. install.sh names the launcher it ran
 // (RER_INVOKED_AS). Otherwise `rer` when the first rer on PATH runs the
 // launcher rer cli install wrote; that launcher's own path when it is not on
 // PATH yet (an npx start writes it too); `rer` for another rer on PATH; and

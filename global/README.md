@@ -38,8 +38,9 @@ npm_config_update_notifier=false npx -y @runeditrun/rer dev just-every/run-inkwe
 Each of these installs the user CLI, clones into `./run-inkwell`, install dependencies, set
 up a local owner and start the app. The last line names the app and its address;
 `rer open` (or `rer dev --open` at the start) opens it in your browser, signed in.
-Every next step it prints runs as printed from the folder you started in: after
-an npx start or before `~/.local/bin` is on PATH, it names the launcher's path.
+The install, setup and ready next steps name the launcher's path after an npx
+start or before `~/.local/bin` is on PATH, with `--cwd` for the folder you started
+in. Failure and holder-recovery commands retain the released launcher's behavior.
 Use `setup <repo>` to stop after setup, or `install <repo>` to stop after
 dependency installation; each prints the next command. The repo can be
 `<owner>/<repo>`, a GitHub HTTPS URL (with or without `.git`), or a git URL.
