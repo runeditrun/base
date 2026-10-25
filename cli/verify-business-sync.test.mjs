@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, rm, stat, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { credentialHandle } from './business/state.mjs';
@@ -118,9 +118,13 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  await registry.reserve('dev', {}); await registry.update({ url: `http://127.0.0.1:${app.address().port}` });
  const applied = await command(); assert.equal(applied.code, 0, applied.output); assert.equal(received, 1); assert.match(applied.output, /rev 1/);
  rev = 2; assert.equal((await command('--app', 'notes-one')).code, 0); assert.equal(received, 2);
+ // A copied or restored settings file may be dated ahead of the local clock.
+ const future = new Date(Date.now() + 86_400_000); await utimes(join(root, '.dev.vars'), future, future);
+ rev = 3; const skewed = await command();
+ assert.equal(skewed.code, 0, skewed.output); assert.equal(received, 3); assert.match(skewed.output, /rev 3 applied/);
  // A running app that stopped taking settings answers its door 404 while healthy: one POST, no reload wait.
  stoppedApp = true; const declined = await command(); stoppedApp = false;
- assert.equal(declined.code, 0, declined.output); assert.equal(received, 3);
+ assert.equal(declined.code, 0, declined.output); assert.equal(received, 4);
  await registry.close();
  const config = await readFile(join(root, '.rer/business-runtime.json'), 'utf8');
  const membership = await readFile(join(root, '.rer/business.json'), 'utf8');
@@ -160,7 +164,7 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  assert.equal(await readFile(join(root, '.dev.vars'), 'utf8'), privateFile);
  assert.ok(!/audit@example|bz_device_|bz_task_|eyJhbGci|RER_OPEN/.test(transcript.join('') + config + membership));
  for (const [label, result] of [['unpaired', unpaired], ['multiple', multiple], ['none', none], ['not-adopted', notAdopted], ['wrong-app', wrongApp], ['invalid-signature', invalidDocument], ['different-business', connected], ['replace-without-terminal', noTerminal], ['app-stopped', stopped], ['applied', applied], ['settings-stopped', declined], ['leave', left]]) t.diagnostic(`${label} exit=${result.code}: ${result.output.trim()}`);
- t.diagnostic(`sync rev 1 and 2 acknowledged; ${requests.length} platform requests; scoped reads; trust before=false after=true in dev, plan and Worker bindings; private canary absent before/after; offline files unchanged; refusals and leave passed`);
+ t.diagnostic(`sync rev 1, 2 and future-mtime rev 3 acknowledged; ${requests.length} platform requests; scoped reads; trust before=false after=true in dev, plan and Worker bindings; private canary absent before/after; offline files unchanged; refusals and leave passed`);
 
  // Exercise the real maintained app and managed-server readiness hook offline.
  const runtime = join(directory, 'runtime'); await exportReference(base, runtime);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g47331156",
+  "cliVersion": "0.2.80-dev.g308cba75",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -543,7 +543,7 @@
     },
     "cli/business/sync-app.mjs": {
       "source": "cli/business/sync-app.mjs",
-      "sha256": "c590918ee6320ed4966fc0525a25e67b2a1332fb5343e2ad0dea865dfbb7677e"
+      "sha256": "03860819469de1078e4b419490e5408c9478e255a47c05685833187eaa689abb"
     },
     "cli/business/sync-checkout.mjs": {
       "source": "cli/business/sync-checkout.mjs",

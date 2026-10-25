@@ -38,11 +38,12 @@ async function settled(origin, signal, until = 0) {
 
 // Before this run changes the running app's settings file or posts to it, a
 // restart in flight is waited out; a change younger than startMs may not show
-// its restart yet.
+// its restart yet. A future file timestamp counts as now, so clock skew
+// cannot extend that window.
 export async function quiet(project, running, signal) {
  if (!running) return;
  let changed = 0;
- try { changed = (await stat(resolve(project.root, project.adapter.hooks.secrets.file ?? '.dev.vars'))).mtimeMs; }
+ try { changed = Math.min((await stat(resolve(project.root, project.adapter.hooks.secrets.file ?? '.dev.vars'))).mtimeMs, Date.now()); }
  catch (error) { if (error.code !== 'ENOENT') throw error; }
  if (await settled(running, signal, performance.now() + changed + startMs - Date.now()) === null) throw failed('The app is still restarting, so nothing was changed. Run rer business sync again once it answers.');
 }
