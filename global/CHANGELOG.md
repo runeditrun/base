@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add optional same-site documentation 301 redirects to SiteBuild, limited to 500 rules per build, with build validation and matching responses in the delivered site Worker and local built-output preview.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.
