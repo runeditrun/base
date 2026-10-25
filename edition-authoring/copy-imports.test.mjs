@@ -142,14 +142,15 @@ test('public refresh copies ordinary documents and data without parsing them as 
   write(base, 'tools/helper', "import './leaf.mjs';\n");
   write(base, 'tools/leaf.mjs', "console.log('leaf');\n");
   write(base, 'package.json', '{"type":"module"}\n');
-  write(seed, 'package.json', '{"type":"module"}\n');
+  write(seed, 'package.json', '{"type":"module","private":true}\n');
   const result = refresh(commit(base));
   assert.equal(result.status, 0, result.stdout + result.stderr);
   for (const [name, bytes] of Object.entries(files)) assert.deepEqual(fs.readFileSync(path.join(seed, 'scripts', name)), Buffer.from(bytes));
   const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
   assert.equal(execution.status, 0, execution.stderr);
   assert.equal(execution.stdout, 'leaf\nready\n');
-  assert.equal(run('verify-base').status, 0);
+  const verification = run('verify-base');
+  assert.equal(verification.status, 0, verification.stdout + verification.stderr);
 });
 
 test('public refresh preserves a satisfied seed-owned dependency and follows its actual imports', t => {
