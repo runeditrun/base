@@ -1,10 +1,12 @@
 import { completeFirstRun } from './first-run.mjs'
 import { test } from 'node:test'
+import { createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { emittedRuntime, root, owner, setupToken, decodeStart } from './emitted-runtime.mjs'
 import { startTogether } from '../ports.mjs'
+import { healthRequest } from '../../scripts/base-cli/modules/deploy-kit/health-request.mjs'
 
 export const cookieOf = (response) => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
 export async function functionId(name) {
@@ -269,4 +271,47 @@ test('emitted Worker administration: invitations, scoped admin roles, deactivati
 test('emitted Worker: the Start renderer stays out of the complete eager module graph', async () => {
   const { rendererBoundaryProof } = await import('./renderer-boundary.mjs')
   await rendererBoundaryProof()
+})
+
+
+test('public /health reports the supplied hosted or self-host deployment identity', async () => {
+  const hash = (text, algorithm = 'sha256') => createHash(algorithm).update(text).digest('hex')
+  const sourceSha = hash('fixture-source', 'sha1'), fingerprint = hash('fixture-self-host')
+  const versionId = '11111111-2222-4333-8444-555555555555'
+  const digest = hash('fixture-hosted-release'), hostedVersion = '66666666-7777-4888-8999-aaaaaaaaaaaa'
+  const legacy = { RER_DEPLOY_SOURCE: sourceSha, RER_DEPLOY_FINGERPRINT: fingerprint, RER_VERSION: { id: versionId } }
+  const hosted = { RER_RELEASE_DIGEST: digest, RER_VERSION_METADATA: { id: hostedVersion } }
+  const empty = { sourceSha: null, fingerprint: null, versionId: null }
+  const release = { sourceSha: null, fingerprint: digest, versionId: hostedVersion }
+  // Only deployment bindings vary at the network edge. Every request runs the
+  // actual emitted Worker, Hono health route, readiness query and migrated D1.
+  for (const [name, bindings, deployment] of [
+    ['self-host', legacy, { sourceSha, fingerprint, versionId }],
+    ['hosted', hosted, release],
+    ['hosted precedence', { ...legacy, ...hosted }, release],
+    ['digest only', { ...legacy, RER_RELEASE_DIGEST: digest }, { ...empty, fingerprint: digest }],
+    ['version only', { ...legacy, RER_VERSION_METADATA: hosted.RER_VERSION_METADATA }, { ...empty, versionId: hostedVersion }],
+    ['missing', {}, empty],
+    ['malformed hosted shadows legacy', { ...legacy, RER_RELEASE_DIGEST: sourceSha, RER_VERSION_METADATA: [] }, empty],
+    ['null hosted shadows legacy', { ...legacy, RER_RELEASE_DIGEST: null, RER_VERSION_METADATA: null }, empty],
+    ['malformed digest', { ...hosted, RER_RELEASE_DIGEST: ` ${digest}` }, { ...empty, versionId: hostedVersion }],
+    ['trailing newlines', { RER_RELEASE_DIGEST: `${digest}\n`, RER_VERSION_METADATA: { id: `${hostedVersion}\n` } }, empty],
+    ['malformed metadata', { ...hosted, RER_VERSION_METADATA: { id: 42 } }, { ...empty, fingerprint: digest }],
+    ['malformed self-host', { RER_DEPLOY_SOURCE: 42, RER_DEPLOY_FINGERPRINT: '', RER_VERSION: { id: '00000000-0000-0000-0000-000000000000' } }, empty],
+    ['partial self-host', { RER_DEPLOY_SOURCE: sourceSha }, { ...empty, sourceSha }],
+  ]) {
+    const runtime = await emittedRuntime({ noMail: true, bindings })
+    try {
+      const response = await runtime.call('/health')
+      assert.equal(response.status, 200, name)
+      assert.equal(response.headers.get('x-reference-dispatch'), 'hono', name)
+      assert.equal(await response.text(), JSON.stringify({ status: 'ok', ok: true, deployment }), name)
+      for (const expected of [{ sourceSha, fingerprint, versionId }, { fingerprint: digest, versionId: hostedVersion }]) {
+        const observed = await healthRequest({ origin: runtime.origin, expected, timeoutMs: 30000, offsetMs: 0,
+          request: url => runtime.call(new URL(url).pathname) })
+        const matches = Object.entries(expected).every(([key, value]) => deployment[key] === value)
+        assert.equal(observed.attempt.errorClass, matches ? null : 'health-identity-mismatch', name)
+      }
+    } finally { await runtime.close() }
+  }
 })

@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers'
+import type { DeploymentBindings } from '../../../../foundation/runtime/deployment-health'
 
-export interface Bindings {
+export interface Bindings extends DeploymentBindings {
   DB: D1Database
   JOBS: Queue
   /** Built browser files; hosted deploys run the Worker first (staticAssetResponse). */
@@ -14,9 +15,6 @@ export interface Bindings {
   SETUP_TOKEN?: string
   AUTH_ORIGIN: string
   AUTH_LOCAL?: string
-  RER_DEPLOY_SOURCE?: string
-  RER_DEPLOY_FINGERPRINT?: string
-  RER_VERSION?: { id: string }
   RER_DEV_ORIGIN?: string
   /** Local runtimes only: the checkout's key gate and dev identity switch. Deploy refuses both. */
   RER_MODELS_SERVICE?: string
