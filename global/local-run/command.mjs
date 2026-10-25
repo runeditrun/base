@@ -1,20 +1,34 @@
 import { locate } from '../checkout.mjs';
 import { upgrade } from './upgrade.mjs';
-import { readJournal } from './state.mjs';
+import { backup, readJournal } from './state.mjs';
+import { needsRecovery } from './journal.mjs';
+import { git } from './process.mjs';
+import { isDeepStrictEqual } from 'node:util';
 import { recoveryInfo } from './recovery.mjs';
 
 const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
 
 async function printRecovery(checkout) {
- let identity = {};
+ let identity = {}, journal;
  try {
-  const journal = await readJournal(checkout);
+  journal = await readJournal(checkout);
   identity = { journalKey: journal?.journalKey, repository: journal?.from?.repository,
    fromCommit: journal?.from?.commit, toCommit: journal?.target?.commit };
  } catch { /* The safe reader supplies the closed unavailable result. */ }
  const recovery = await recoveryInfo({ checkout, ...identity });
  if (recovery.status === 'unavailable') {
   process.stderr.write(`Recovery unavailable (${recovery.reason}). Inspect the local upgrade journal with your agent.\n`);
+  // An unreadable HEAD can prevent Git from even recognizing its repository.
+  // Name only a validated local snapshot; never invent a bound reset command.
+  if (recovery.reason === 'journal_invalid' && needsRecovery(journal ?? {})) {
+   try {
+    const head = await git(checkout, ['rev-parse', '--verify', 'HEAD^{commit}'], { allow: [1, 128] });
+    const { metadata } = await backup(checkout, journal.backup);
+    if (head.code && metadata.head === journal.head && isDeepStrictEqual(metadata.from, journal.from) && isDeepStrictEqual(metadata.target, journal.target)) {
+     process.stderr.write(`Retained journal: .rer/upgrade/journal.json; snapshot: .rer/upgrade/backups/${metadata.name}. Ask your agent to repair unreadable Git HEAD, then run rer upgrade --restore ${shellQuote(metadata.name)} in this checkout.\n`);
+    }
+   } catch { /* Unverifiable snapshots never produce a recovery command. */ }
+  }
   return;
  }
  process.stderr.write('Unfinished upgrade journal: .rer/upgrade/journal.json. Keep it and snapshot .rer/upgrade/backups/' + recovery.backup_name + ' until recovery completes.\n');

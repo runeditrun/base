@@ -72,7 +72,7 @@ async function apply(checkout, journal, operation, phase, allowed) {
  * output stay in the local journal; only the design's closed outputs escape. */
 export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDiagnostic, check = false, continue: continuing = false, restore, allowDataChange = [] } = {}) {
  const started = Date.now(), phase = phases(onPhase);
- let journal = {}, operation, installed, wasRunning, switched = false, preserveJournal = false, restoring = false;
+ let journal = {}, operation, installed, wasRunning, rememberedIntent = false, switched = false, preserveJournal = false, restoring = false;
  try {
   if (allowDataChange.length && !process.stdin.isTTY) throw failure('refused');
   try { checkout = await realpath(checkout); } catch { throw failure('checkout_missing'); }
@@ -94,7 +94,9 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   if (intent && !unfinished && (intent.head !== current.head || intent.branch !== current.branch)) throw failure('refused', 'An unfinished upgrade intent remains in .rer/upgrade/intent.json; keep it and recover the original checkout before upgrading.');
   wasRunning = unfinished && typeof journal.wasRunning === 'boolean' ? journal.wasRunning : intent?.wasRunning ?? Boolean(await runningApp(checkout));
   operation = await acquireOperation(checkout, async () => {
-   if (!unfinished && !restore) wasRunning = await rememberIntent(checkout, current, wasRunning);
+   if (!unfinished && !restore) {
+    wasRunning = await rememberIntent(checkout, current, wasRunning); rememberedIntent = true;
+   }
   });
   try { await serverResources(checkout, { env: { ...process.env, RER_SERVERS_LOAD_THRESHOLD: undefined } }); }
   catch { throw failure('disk_low'); }
@@ -121,6 +123,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   }
   if (journalKey && journal.journalKey === journalKey && journal.result) {
    if (journal.wasRunning && !await runningApp(checkout)) await health(checkout, await startApp(checkout, operation));
+   if (rememberedIntent) await forgetIntent(checkout);
    return journal.result;
   }
   if (journal.stage === 'verified') {
@@ -223,6 +226,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    }
   }
   if (preserveJournal) {
+   if (operation && rememberedIntent) await forgetIntent(checkout);
    await phase('failed', code);
    return output('refused', journal, started, code);
   }
