@@ -27,6 +27,11 @@ test('refresh rejects generated full-fold destination classes and removal aliase
     write(f.base, 'left/helper.mjs', 'export const added = true;\n'); fs.unlinkSync(path.join(f.base, 'right/Helper.mjs'));
     refused(f.seed, () => f.refresh(commit(f.base)), ['SHARED/helper.mjs', 'shared/Helper.mjs']);
   }
+  const creation = fixture(t, {'left/tools/a.mjs': 'export {};\n', 'right/tools/b.mjs': 'export {};\n'}, [['scripts/a.mjs', 'left/tools/a.mjs'], ['scripts/b.mjs', 'right/tools/b.mjs']]);
+  write(creation.base, 'left/tools/a.mjs', "import '../Parent/one.mjs';\n");
+  write(creation.base, 'right/tools/b.mjs', "import '../parent/two.mjs';\n");
+  write(creation.base, 'left/Parent/one.mjs', 'export {};\n'); write(creation.base, 'right/parent/two.mjs', 'export {};\n');
+  refused(creation.seed, () => creation.refresh(commit(creation.base)), ['left/Parent/one.mjs', 'right/parent/two.mjs']);
   for (const {pair: [left, right]} of [...classes, {pair: ['Straße', 'Straẞe']}, {pair: ['ẞ', 'SS']}]) {
     // Missing recorded directory members are deliberate removals. New files
     // added at the target still require the complete destination preflight.
