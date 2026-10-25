@@ -48,7 +48,7 @@ test('static docs search builds without network, reindexes changed headings, nav
    const chunks=[]; for await (const chunk of req) chunks.push(chunk); const body = Buffer.concat(chunks);
    const headers = new Headers(req.headers); headers.delete('host'); headers.delete('x-test-destination');
    const request = new Request(destination, {method:req.method,headers,...(req.method !== 'GET' ? {body} : {})});
-   const init = {method:req.method,headers:Object.fromEntries(headers)};
+   const init = {method:req.method,headers:{...Object.fromEntries(headers),Authorization:headers.get('authorization')}};
    if (req.method !== 'GET') init.body = headers.get('content-type')?.includes('multipart/form-data') ? await request.formData() : body.toString();
    const response = await provider.fetch(destination, init);
    res.writeHead(response.status,Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
