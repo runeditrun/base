@@ -3,8 +3,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {execFileSync, spawnSync} from 'node:child_process';
-import {fullCaseFold} from '../case-folding.mjs';
-import {destinationKey} from '../copy-path-key.mjs';
+import {caseFoldMappings} from '../case-folding.mjs';
+
+// Build the reference directly from the published table, independently of the
+// destination key and its production folding function.
+const reference = new Map(caseFoldMappings);
+const fold = value => {
+  let result = '';
+  for (const character of value) result += reference.get(character) ?? character;
+  return result;
+};
+const canonicalFold = value => fold(value.normalize('NFC')).normalize('NFC');
 
 const env = {...process.env, GIT_OPTIONAL_LOCKS: '0'};
 export const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], {env, encoding: 'utf8', stdio: 'pipe'}).trim();
@@ -68,15 +77,19 @@ export function collisionClasses() {
   const classes = new Map();
   for (let point = 0; point <= 0x10ffff; point++) {
     if (point >= 0xd800 && point <= 0xdfff) continue;
-    const character = String.fromCodePoint(point), folded = fullCaseFold(character);
+    const character = String.fromCodePoint(point), folded = reference.get(character) ?? character;
     const lowerUpper = character.toUpperCase().toLowerCase(), upperLower = character.toLowerCase().toUpperCase();
     if (folded === lowerUpper && folded === upperLower) continue;
-    const key = destinationKey(character);
+    const key = canonicalFold(character);
     const partner = [folded, lowerUpper, upperLower, character.toUpperCase(), character.toLowerCase()]
-      .find(value => value !== character && destinationKey(value) === key);
+      .find(value => value !== character && canonicalFold(value) === key);
     // A singleton fold class (dotless i, for example) has no distinct scalar
     // partner. Preserve it verbatim and vary a neighboring ASCII case pair.
-    if (!classes.has(key)) classes.set(key, {pair: partner ? [character, partner] : [character + 'A', character + 'a'], singleton: !partner, points: []});
+    const priority = folded === lowerUpper ? 0 : 1;
+    const previous = classes.get(key);
+    // Prefer a member that defeats lower(upper(x)), rather than letting an
+    // ordinary member hide a broken round-trip key in this same fold class.
+    if (!previous || priority > previous.priority) classes.set(key, {pair: partner ? [character, partner] : [character + 'A', character + 'a'], singleton: !partner, priority, points: previous?.points ?? []});
     classes.get(key).points.push(point);
   }
   return [...classes.values()];

@@ -44,7 +44,7 @@ dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 */
 // Unlisted code points map to themselves. Keep independent of the host ICU version.
-const mappings = `
+export const caseFoldMappings = `
 0041:0061 0042:0062 0043:0063 0044:0064 0045:0065 0046:0066 0047:0067 0048:0068
 0049:0069 004a:006a 004b:006b 004c:006c 004d:006d 004e:006e 004f:006f 0050:0070
 0051:0071 0052:0072 0053:0073 0054:0074 0055:0075 0056:0076 0057:0077 0058:0078
@@ -248,5 +248,5 @@ ff35:ff55 ff36:ff56 ff37:ff57 ff38:ff58 ff39:ff59 ff3a:ff5a 10400:10428 10401:10
   const [from, to] = item.split(':');
   return [String.fromCodePoint(parseInt(from, 16)), String.fromCodePoint(...to.split(',').map(value => parseInt(value, 16)))];
 });
-const folds = new Map(mappings);
+const folds = new Map(caseFoldMappings);
 export const fullCaseFold = value => Array.from(value, character => folds.get(character) ?? character).join('');
