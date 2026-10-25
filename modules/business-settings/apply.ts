@@ -8,8 +8,10 @@ export async function apply(options: Options, document: SettingsDocument, suppli
   const { db, business } = options;
   const before = await settingsRow(db) ?? initialSettings();
   if (before.stopped) throw new SettingsError('not_found', 404);
-  if (document.rev <= before.rev) return Response.json(ack(await snapshot(db), business), { status: 409, headers: { 'cache-control': 'no-store' } });
+  // Revisions count per Business: another Business's document is refused
+  // whatever its revision, so an equal one never reads as already applied.
   if (before.document && (JSON.parse(before.document) as SettingsDocument).business !== document.business) throw new SettingsError('business_binding_mismatch');
+  if (document.rev <= before.rev) return Response.json(ack(await snapshot(db), business), { status: 409, headers: { 'cache-control': 'no-store' } });
   const oldLogo = await db.prepare('SELECT sha256 FROM bs_logo WHERE singleton=1').first<{sha256: string}>();
   let bytes: Uint8Array<ArrayBuffer> | undefined;
   if (!document.detached && document.logo) {

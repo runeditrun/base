@@ -4,8 +4,9 @@ import { resolveProject } from '../project.mjs';
 import { selectedOrigin } from '../local.mjs';
 import { heldDeployments } from '../deployment-record.mjs';
 import { routeRunning } from '../door-mode.mjs';
-import { serverRegistry } from '../server-registry.mjs';
+import { serverRegistry, stopInstruction } from '../server-registry.mjs';
 import { originUrl } from './api.mjs';
+import { failed } from './sync-app.mjs';
 
 export async function checkout(root) {
  let project;
@@ -25,21 +26,35 @@ export function sameSeed(remote, local) {
  return remote === local || remote === local.split('/').at(-1);
 }
 
+// This checkout's registered server, whatever its verb: the registry answers
+// for one verb at a time and refuses a server of another.
+async function registeredServer(project) {
+ if (!(await selectedOrigin(project, {})).savedOrigin) return null;
+ const registry = await serverRegistry(project.root);
+ try {
+  for (const mode of ['dev', 'preview', 'demo']) {
+   try { return await registry.existing(mode, { supplied: new Set() }); }
+   catch (error) { if (error.code !== 'safety_refusal' || mode === 'demo') throw error; }
+  }
+ } finally { await registry.close(); }
+}
+
 // On loopback the document goes only to this checkout's registered dev server,
 // at the origin it registered: once the app stops, an unrelated process may
 // hold its saved port.
+async function devOrigin(record) {
+ if (record?.mode !== 'dev' || !record.url) return undefined;
+ await routeRunning(record);
+ return record.url;
+}
+export const runningApp = async project => devOrigin(await registeredServer(project));
+
+// A preview or demo of this checkout takes no settings: that is said before
+// anything is written.
 export async function appOrigins(project) {
- const origins = [];
- let running;
- if ((await selectedOrigin(project, {})).savedOrigin) {
-  const registry = await serverRegistry(project.root);
-  try {
-   const record = await registry.existing('dev', { supplied: new Set() });
-   if (record?.url) { await routeRunning(record); running = record.url; }
-  }
-  finally { await registry.close(); }
- }
- if (running) origins.push(running);
+ const record = await registeredServer(project);
+ if (record && record.mode !== 'dev') throw failed(`This checkout is running rer ${record.mode}, which does not take Business settings, so nothing was saved. Stop it with ${stopInstruction(record)}, then run rer business sync.`, 'business_checkout_busy');
+ const running = await devOrigin(record), origins = running ? [running] : [];
  const deployed = await heldDeployments(project.root);
  const production = deployed.find(item => item.environment === 'production');
  if (production?.record.receipt?.origin) origins.push(originUrl(production.record.receipt.origin));

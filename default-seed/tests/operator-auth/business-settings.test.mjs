@@ -125,6 +125,7 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
     const rowBefore = await fullRow()
     await post(document, 409, 'equal rev')
     await post({ ...document, rev: 0 }, 409, 'older revision zero')
+    await post({ ...document, business: 'other-business' }, 403, 'another Business at the equal rev')
     assert.deepEqual(await fullRow(), rowBefore)
     // Give the lower-revision case two valid positive revisions.
     document = { ...document, rev: 2 }

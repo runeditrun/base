@@ -78,13 +78,15 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  await writeFile(statePath, JSON.stringify({ origin, businessId: 'business', executorId: 'executor' }));
  const missingCredential = await command(); assert.equal(missingCredential.code, 2); assert.match(missingCredential.output, /rer business connect/);
  await writeFile(join(home, 'fake-keychain.json'), JSON.stringify({ [credentialHandle(origin)]: device }));
- let received = 0;
+ let received = 0, stoppedApp = false;
  const app = createServer(async (req, res) => {
   let body = ''; for await (const chunk of req) body += chunk;
+  if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end('{"status":"ok"}'); }
   assert.equal(req.url, '/api/rer/business-settings'); assert.equal(req.headers.authorization, undefined);
   received++; const document = JSON.parse(body);
   assert.deepEqual(Object.keys(document), ['settings']);
   assert.equal(JSON.parse(Buffer.from(document.settings.split('.')[1], 'base64url')).rev, rev);
+  if (stoppedApp) { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('Not found'); }
   res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ rev, applied: ['display_name'], overrides: [], logo: null, team: [] }));
  });
  await new Promise(resolve => app.listen(0, '127.0.0.1', resolve));
@@ -116,6 +118,9 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  await registry.reserve('dev', {}); await registry.update({ url: `http://127.0.0.1:${app.address().port}` });
  const applied = await command(); assert.equal(applied.code, 0, applied.output); assert.equal(received, 1); assert.match(applied.output, /rev 1/);
  rev = 2; assert.equal((await command('--app', 'notes-one')).code, 0); assert.equal(received, 2);
+ // A running app that stopped taking settings answers its door 404 while healthy: one POST, no reload wait.
+ stoppedApp = true; const declined = await command(); stoppedApp = false;
+ assert.equal(declined.code, 0, declined.output); assert.equal(received, 3);
  await registry.close();
  const config = await readFile(join(root, '.rer/business-runtime.json'), 'utf8');
  const membership = await readFile(join(root, '.rer/business.json'), 'utf8');
@@ -154,7 +159,7 @@ test('sync joins an existing checkout with verified scoped pairing, keeps public
  await assert.rejects(stat(join(root, '.rer/business-runtime.json')), { code: 'ENOENT' });
  assert.equal(await readFile(join(root, '.dev.vars'), 'utf8'), privateFile);
  assert.ok(!/audit@example|bz_device_|bz_task_|eyJhbGci|RER_OPEN/.test(transcript.join('') + config + membership));
- for (const [label, result] of [['unpaired', unpaired], ['multiple', multiple], ['none', none], ['not-adopted', notAdopted], ['wrong-app', wrongApp], ['invalid-signature', invalidDocument], ['different-business', connected], ['replace-without-terminal', noTerminal], ['app-stopped', stopped], ['applied', applied], ['leave', left]]) t.diagnostic(`${label} exit=${result.code}: ${result.output.trim()}`);
+ for (const [label, result] of [['unpaired', unpaired], ['multiple', multiple], ['none', none], ['not-adopted', notAdopted], ['wrong-app', wrongApp], ['invalid-signature', invalidDocument], ['different-business', connected], ['replace-without-terminal', noTerminal], ['app-stopped', stopped], ['applied', applied], ['settings-stopped', declined], ['leave', left]]) t.diagnostic(`${label} exit=${result.code}: ${result.output.trim()}`);
  t.diagnostic(`sync rev 1 and 2 acknowledged; ${requests.length} platform requests; scoped reads; trust before=false after=true in dev, plan and Worker bindings; private canary absent before/after; offline files unchanged; refusals and leave passed`);
 
  // Exercise the real maintained app and managed-server readiness hook offline.

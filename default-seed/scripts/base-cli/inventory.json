@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g56cfad65",
+  "cliVersion": "0.2.80-dev.g1aad5f1e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -541,9 +541,13 @@
       "source": "cli/business/supervisor.mjs",
       "sha256": "aba5214e581d25e50bc25b6b6588ef4f6a575873c86e877e449ada53d69a892b"
     },
+    "cli/business/sync-app.mjs": {
+      "source": "cli/business/sync-app.mjs",
+      "sha256": "c590918ee6320ed4966fc0525a25e67b2a1332fb5343e2ad0dea865dfbb7677e"
+    },
     "cli/business/sync-checkout.mjs": {
       "source": "cli/business/sync-checkout.mjs",
-      "sha256": "fe034f478cdd697eab2812cbda90c912932e6a816eff93206f78df5b89ab47bf"
+      "sha256": "9fad6abba1af1a92a60b3521d2dd046cb9e5cae0533605f37e029bc85efd0ccc"
     },
     "cli/business/sync-document-json.mjs": {
       "source": "cli/business/sync-document-json.mjs",
@@ -553,13 +557,17 @@
       "source": "cli/business/sync-document.mjs",
       "sha256": "74851c8a55dbf9e125f1ed1fa649b790ad3e08f3ea7a2c34dfd0f7def4843d02"
     },
+    "cli/business/sync-lock.mjs": {
+      "source": "cli/business/sync-lock.mjs",
+      "sha256": "fbe992246a3719a83de8a8e6bf74f23003e2692914f0a79038903e03209995e6"
+    },
     "cli/business/sync-membership.mjs": {
       "source": "cli/business/sync-membership.mjs",
       "sha256": "be3cbeb7134189fa00f271faa0500629a1f42c25fd5e0a0b2748c63ed104d229"
     },
     "cli/business/sync.mjs": {
       "source": "cli/business/sync.mjs",
-      "sha256": "7b1d3c68fc8f02aef110a9a749fbe5a3a66c19d27ea937d861c5e10e5558ff8c"
+      "sha256": "7f1d56bb6171cdb47970673d4573a5dc700eaba9696950faa142cfb261cd504c"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
