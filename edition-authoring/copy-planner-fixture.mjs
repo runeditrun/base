@@ -46,7 +46,10 @@ export function snapshot(root) {
     }
   };
   visit('');
-  for (const [key, args] of [['status', ['status', '--porcelain=v1', '-uall']], ['diff', ['diff', '--binary', 'HEAD']], ['staged', ['diff', '--cached', '--binary']]]) values[key] = git(root, ...args);
+  for (const [key, args] of [['status', ['status', '--porcelain=v1', '-uall']], ['diff', ['diff', '--binary', 'HEAD']], ['staged', ['diff', '--cached', '--binary']]]) {
+    const result = spawnSync('git', ['-C', root, ...args], {env, encoding: 'utf8'});
+    values[key] = {status: result.status, stdout: result.stdout, stderr: result.stderr};
+  }
   values.index = fs.readFileSync(path.join(root, '.git/index')).toString('hex');
   return values;
 }
@@ -71,8 +74,9 @@ export function collisionClasses() {
     const key = destinationKey(character);
     const partner = [folded, lowerUpper, upperLower, character.toUpperCase(), character.toLowerCase()]
       .find(value => value !== character && destinationKey(value) === key);
-    assert.ok(partner, `No collision partner for U+${point.toString(16)}`);
-    if (!classes.has(key)) classes.set(key, {pair: [character, partner], points: []});
+    // A singleton fold class (dotless i, for example) has no distinct scalar
+    // partner. Preserve it verbatim and vary a neighboring ASCII case pair.
+    if (!classes.has(key)) classes.set(key, {pair: partner ? [character, partner] : [character + 'A', character + 'a'], singleton: !partner, points: []});
     classes.get(key).points.push(point);
   }
   return [...classes.values()];
