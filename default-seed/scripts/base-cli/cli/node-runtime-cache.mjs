@@ -8,7 +8,7 @@ import { missing } from './errors.mjs';
 export const nodeCache = () => join(homedir(), '.rer', 'node');
 export const runtimeName = version => `node-v${version}-${process.platform}-${process.arch}`;
 export const runtimeBinary = directory => join(directory, ...(process.platform === 'win32' ? ['node.exe'] : ['bin', 'node']));
-export const shellQuote = value => `'${String(value).replaceAll("'", "'\\''")}'`;
+export { shellQuote } from './shell-word.mjs';
 
 export async function binaryDigest(path) {
  const hash = createHash('sha256');

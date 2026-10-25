@@ -214,7 +214,7 @@ override the choice, and `--json` prints `progress` events and the ready event. 
 first launch can take minutes. Each line names the step that runs: getting the
 code (or reusing its clone), installing dependencies, setting up the local
 database and owner (with setup's own steps as they start), starting the app. A
-step quiet for 5 seconds gets one line saying so, then one every 20 seconds
+step quiet for 5 seconds gets one line saying so, then one every 5 seconds
 (`--json`: a `progress` event with `phase` `get`, `install`, `setup`, `start`,
 `note`, `waiting` or `attach`). If the calling command is killed the launch carries on; run
 `rer dev` again to reattach. A first launch whose starting port is taken says

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g0c2aa21e",
+  "cliVersion": "0.2.80-dev.g4764de7a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -907,7 +907,7 @@
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
-      "sha256": "38cefca874c00203903b9c9c04da4751d59e58f3e4966b2d8b9ea782ac665bf8"
+      "sha256": "97b529c9f5c64aadb52951a8d42ec91bfaf6f8edf5298cbccbc7d3c974533d07"
     },
     "cli/node-runtime-discovery.mjs": {
       "source": "cli/node-runtime-discovery.mjs",
@@ -1040,6 +1040,10 @@
     "cli/shared.mjs": {
       "source": "cli/shared.mjs",
       "sha256": "38bdde3688e3206fb76b6c3f6d407e9c733231443f312648ce4e5fd898da26d3"
+    },
+    "cli/shell-word.mjs": {
+      "source": "cli/shell-word.mjs",
+      "sha256": "413d9b10fe31b3cf03fb66ab0a6b33bf1ee18d6d9ed5b22152f02976568df4d8"
     },
     "cli/signin.mjs": {
       "source": "cli/signin.mjs",

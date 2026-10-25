@@ -2,16 +2,48 @@
 // on one reused checkout. Every source and dependency below is local.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spawn } from 'node:child_process';
 import { buildPackage } from '../../scripts/rer-package.mjs';
 import { run } from './harness.mjs';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 import { offlineRepository } from './fixtures/offline-repository.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
+
+test('a failed launch preserves the shell-quoted checkout in text and JSON recovery commands', { timeout: 60000 }, async t => {
+ const directory = await mkdtemp(join(tmpdir(), 'rer-quoted-recovery-'));
+ const root = join(directory, "O'Brien rer dev --stop folder"), home = join(directory, 'home');
+ t.after(() => rm(directory, { recursive: true, force: true }));
+ await Promise.all([mkdir(root), mkdir(home)]);
+ // A real first-party checkout with an absent adapter fails before install.
+ await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'quoted-recovery', private: true, packageManager: 'pnpm@10.12.4' }));
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/quoted-recovery', seedContract: { version: 1, profile: 'first-party', adapter: 'missing.mjs' }, commands: { dev: { argv: ['rer', 'dev'], inputs: [], effects: 'Start locally.' } } }));
+ for (const json of [false, true]) {
+  const child = spawn(process.execPath, [join(base, 'global/rer.mjs'), 'dev', '--cwd', root, ...(json ? ['--json'] : [])], {
+   cwd: directory, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+   env: { PATH: process.env.PATH, HOME: home, RER_INVOKED_AS: '/working bin/rer', RER_NO_UPDATE_CHECK: '1', RER_NODE_AUTO: '0', CI: 'true',
+    ...Object.fromEntries(['RER_PNPM_ENTRY', 'COREPACK_HOME'].filter(name => process.env[name]).map(name => [name, process.env[name]])) },
+  });
+  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); });
+  let stdout = '', stderr = '';
+  child.stdout.on('data', data => { stdout += data; }); child.stderr.on('data', data => { stderr += data; });
+  const code = await new Promise((resolveRun, reject) => { child.once('error', reject); child.once('close', resolveRun); });
+  assert.equal(code, 3, stderr + stdout);
+  const message = json ? JSON.parse(stdout.trim().split('\n')[0]).message : stderr;
+  assert.ok(message.includes(await realpath(root)), 'the diagnostic preserves the checkout name');
+  // Decode only the printed argument with the real shell, without running rer.
+  const recovery = message.split('\n').find(line => line.startsWith('Correct the cause, then run '));
+  assert.ok(recovery, message);
+  const command = recovery.slice('Correct the cause, then run '.length, -' again.'.length);
+  const decoded = await run('/bin/sh', ['-c', `set -- ${command}; printf '%s\\n' "$@"`]);
+  assert.equal(decoded.code, 0, decoded.stderr);
+  assert.deepEqual(decoded.stdout.trimEnd().split('\n'), ['/working bin/rer', 'dev', '--cwd', await realpath(root)]);
+ }
+});
 
 test('rer dev <repo> clones every release tag, so git checkout <tag> works in the clone', { timeout: 60000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-clone-')), source = join(directory, 'source'), home = join(directory, 'home');

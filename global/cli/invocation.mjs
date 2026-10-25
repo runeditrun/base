@@ -7,8 +7,9 @@
 import { accessSync, constants, realpathSync, statSync } from 'node:fs';
 import { delimiter, join, relative, sep } from 'node:path';
 import { launcherWritten, layout } from './layout.mjs';
+import { shellQuote } from '../../cli/shell-word.mjs';
 
-const word = value => /^[A-Za-z0-9_./~:@%+=,-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
+const word = value => /^[A-Za-z0-9_./~:@%+=,-]+$/.test(value) ? value : shellQuote(value);
 const real = path => { try { return realpathSync(path); } catch { return undefined; } };
 
 function firstOnPath(path = '') {
