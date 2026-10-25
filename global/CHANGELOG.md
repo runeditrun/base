@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased
+
+- Add signed runtime Business settings, same-origin logos, app accent fills, local overrides and owner-scoped team reconciliation. The reference seed adopts the module; owners can stop settings with fresh sign-in proof.
+- Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo without an unjournaled failure fence. Restore exact retained-value and complete catch-up undo report checks.
+- Keep demo Run exits out of the host layout; use spare label space, truncate the exit itself and reveal its full accessible link on keyboard focus without moving header controls.
+- Add seed-owned transactional audit hooks for native operator administration and direct installation export creation. Provider unlink audits require a new pin generation; already-unlinked requests keep HTTP 200 without another audit row. The export hook belongs to the direct `createPortability` service; the HTTP handler has no hook.
+- Treat RER Platform's `rer_migrations` ledger as a first-class source when a Managed installation leaves for native: exports record `manifest.migrationLedger` (native file names with SHA-256, origin `rer_migrations`), imports map it by hash and refuse only a true mismatch with a named code and fix, and the ledger is never archived as product tables. Native-source archives, v1 recovery and existing refusals are unchanged.
+- Add `mapMigrationLedger` to `@runeditrun/rer/portability-migrations` for adapters with their own archive format, and name the unapplied checkout file in the preflight refusal.
+- Replace the shared Run page with a three-way chooser, exact one-line Copy, listing-aware Assisted and Managed links, and a shared sign-up switch for the hosting guide; keep the Run and hosting guide commands wrapping under adopted seed themes and document the supported paths migration.
+
+## 0.2.80
+
+- Healthy doctor now exits 0 when local settings are present.
+- Restore installation archives using SQL-aware schema identity and an object inventory; ignore SQL comments while preserving behavioral schema checks and staged file validation.
+- Expose edition adoption and `refresh-base` in the packaged CLI, preserve adaptation acknowledgements and offline provenance, and retire absent singleton Base copies.
+- Accept a successful exact-SHA branch push or dispatch Verify for releases, including when a duplicate main run failed; reuse qualified branch verification in seed workflows.
+- Keep harness ingress listeners bound across Worker generations and let test runtimes own ephemeral ports.
+- Link demo exits to the seed's canonical Run chooser, bootstrap pinned demo commands, and improve shared header, link and minimum text sizes.
+- Limit Business profile hints to declared public input names and reject credential-shaped hints and duplicate field claims.
+- Update compatible dependencies while retaining Node 22.20.0 and pnpm 10.12.4; pnpm 10.34.7 is not adopted.
+- Give Chromium apt attempts separate deadlines and clean up timed-out attempts and cache payloads.
+
+## 0.2.79
+
+- Reuse bounded keep-alive connections in the local dev proxy and retry stale connections for bodyless reads.
+- Give each native demo visitor a separate 64-hex installation key so dependency signing works.
+
+## 0.2.78
+
+- Add signed seed test delivery to the optional mail relay, with public Worker routing, bounded target checks and invocation logs.
+- Restore transient migration tables when replaying installation archives.
+- Expose native migration preflight and refuse replay through relocated ledger identities.
+- Convert reviewed completed D1 import jobs to preserve-conflicts reversal with a durable journal; ordinary previews stay SELECT-only.
+- Package the D1 import kit at `@runeditrun/rer/modules/import-kit/d1` for adopting Workers.
+
+## 0.2.77
+
+- **Dependency signing keys are sealed at rest with a rotatable installation key (#367, #382).** Each interface's private signing key is stored as an AES-256-GCM envelope under a key derived from the generated `INSTALLATION_KEY` setting, which setup and hosted deploys keep beside `SESSION_SECRET` and archives never carry. Legacy plaintext keys upgrade once. `rer deploy --rotate-secret INSTALLATION_KEY` re-seals every row and retires the previous binding; `rer deploy --reopen-installation-key KID` reopens a D1 restore from before a rotation with retained private custody, reporting the D1 key history first. Missing or wrong keys fail closed with `installation_key_missing` or `installation_key_unavailable`.
+- **The Run page keeps its install command whole at the shell pipe.** At phone widths the command wraps before the URL, or after its last slash, never beside `| sh`; Copy still copies the exact command.
+- **The misbound-port startup check no longer races the app's own sockets.** Its test picks the wrong port the way rer picks its internal one, outside the OS ephemeral range, so the app's Miniflare sockets cannot take it before Vite binds.
+
 ## 0.2.76
 
 - **Patch the maintained TanStack Start security closure (#386).** The default seed and foundation carry the patched Start and server-core dependencies for GHSA-qx66-fv34-fjm8.

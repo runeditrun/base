@@ -16,7 +16,7 @@ function html(env, { page, title, body, status = 200, headers = {}, turnstile = 
   const nonce = crypto.randomUUID().replaceAll('-', ''), site = new URL(env.DEMO_SITE);
   const policy = `default-src 'none'; style-src 'self' 'nonce-${nonce}'; font-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; script-src 'nonce-${nonce}'${turnstile ? ` https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com` : ''}`;
   return new Response(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title>${env.DEMO_ICON_HEAD ?? ''}${refresh ? '<noscript><meta http-equiv="refresh" content="2;url=/__demo/status"></noscript>' : ''}<style nonce="${nonce}">${(env.DEMO_THEME ?? '').replace(/<(?=\/style)/gi, '\\3c ')}\n${STYLE}</style>${turnstile ? `<noscript><style nonce="${nonce}">#note{display:none}</style></noscript><script nonce="${nonce}">${START_SCRIPT}</script>${warm(env)}` : ''}</head>
-<body class="${page}"><main><section class="card" aria-labelledby="title"><p class="brand"><img class="mark" alt="${escape(env.DEMO_NAME)}" width="40" height="40" hidden><span>${escape(env.DEMO_NAME)}</span></p>${body}</section><nav class="back" aria-label="Return"><a href="${escape(site.origin)}/">Back to ${escape(site.host)}</a></nav></main><script nonce="${nonce}">${THEME_SCRIPT}</script>${turnstile ? `<script nonce="${nonce}" src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=rerDemoRender&render=explicit" async defer></script>` : ''}</body></html>`,
+<body class="${page}"><main><section class="card" aria-labelledby="title"><p class="brand"><img class="mark" alt="${escape(env.DEMO_NAME)}" width="40" height="40" hidden><span>${escape(env.DEMO_NAME)}</span></p>${body}</section><nav class="back" aria-label="Return"><a href="${escape(site.origin)}/">Back to ${escape(site.host)}</a>${page === 'start' ? `<a href="${escape(env.DEMO_RUN_URL ?? new URL('/run', site).href)}">Run ${escape(env.DEMO_NAME)}</a>` : ''}</nav></main><script nonce="${nonce}">${THEME_SCRIPT}</script>${turnstile ? `<script nonce="${nonce}" src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=rerDemoRender&render=explicit" async defer></script>` : ''}</body></html>`,
   { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': policy, 'referrer-policy': 'strict-origin', 'x-content-type-options': 'nosniff', ...headers } });
 }
 
@@ -25,7 +25,7 @@ export function startPage(env, { status = 200, notice, pending = false, headers 
   const name = escape(env.DEMO_NAME);
   return html(env, { page: 'start', title: `Try ${env.DEMO_NAME}`, status, headers, turnstile: true, refresh: pending, body: `<h1 id="title">Try ${name}</h1>
 <p class="intro">Your own copy of ${name}, signed in as its owner, with sample data.</p>
-<ul><li>Public checks run live. Messages and account changes are simulated.</li><li>It ends after an hour, or 15 idle minutes.</li><li>Then it is deleted. Nobody else can see it.</li></ul>
+<ul><li>Public checks run live.</li><li>It ends after an hour, or 15 idle minutes.</li><li>Then it is deleted. Nobody else can see it.</li></ul>
 <p class="notice" id="notice" role="alert"${notice ? '' : ' hidden'}>${notice ? escape(notice) : ''}</p><form id="start" method="post" action="/__demo/start" data-auto="${notice || pending ? '0' : '1'}"${pending ? ' data-resume="1" data-state="working"' : ' data-state="waiting"'}><div class="cf-turnstile" data-theme="light" data-sitekey="${escape(env.TURNSTILE_SITE_KEY)}" data-size="flexible" data-callback="rerDemoVerified" data-before-interactive-callback="rerDemoInteractive" data-after-interactive-callback="rerDemoChecking" data-expired-callback="rerDemoExpired" data-error-callback="rerDemoCheckFailed"></div>
 <button class="button" type="submit" disabled><span class="spinner" aria-hidden="true"></span><span class="label">${pending ? 'Starting your demo…' : 'Waiting for the human check…'}</span></button>
 <ol class="steps" aria-hidden="true"><li data-at="done">Checking you're human</li><li data-at="now">Starting a private copy</li><li data-at="next">Signing you in</li></ol>
@@ -37,7 +37,7 @@ export function endedPage(env, { status = 410, headers = {} } = {}) {
   const name = escape(env.DEMO_NAME);
   return html(env, { page: 'ended', title: 'This demo has ended', status, headers, body: `<h1 id="title">This demo has ended</h1>
 <p class="intro">A demo ends when you sign out, after an hour, or after 15 minutes with nothing happening. Its copy of ${name} and everything in it have been deleted.</p>
-<a class="button" href="${escape(env.DEMO_ORIGIN)}/">Start a new demo</a><p class="secondary"><a href="${escape(new URL(env.DEMO_SITE).origin)}/run">Run ${name} yourself</a></p>` });
+<a class="button" href="${escape(env.DEMO_ORIGIN)}/">Start a new demo</a><p class="secondary"><a href="${escape(env.DEMO_RUN_URL ?? new URL('/run', env.DEMO_SITE).href)}">Run ${name} yourself</a></p>` });
 }
 
 const cookie = (env, value, seconds) => `rer_demo=${value}; Domain=${new URL(env.DEMO_ORIGIN).hostname}; Path=/; Max-Age=${seconds}; HttpOnly; Secure; SameSite=Lax`;

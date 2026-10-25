@@ -37,6 +37,19 @@ separate from reviewed source import: it requires an empty destination and has
 no door plan or Undo. The reference door accepts people JSON source exports,
 not `.rer` archives; do not imply that `rer import --input` uses the door.
 
+## Runtime Business settings adoption
+
+Seeds that take Business name, logo, timezone, app accent or team changes
+while running follow the [Business settings adoption recipe](../modules/business-settings/ADOPTING.md).
+Declare the optional `rer-setup.json` `business` block only for slots the seed
+renders at runtime. Integrate the signed settings door, its D1 migration,
+native team authority and owner overrides; declaring metadata alone does not
+adopt the feature. Logo uses the same-origin document route, never a
+`businessField: "logo_ref"` environment input. Keep the Business accent inside
+the signed-in app shell and preserve approved public pages and product marks.
+The recipe documents source-copy dependencies, mail display-name integration
+and the assembled-seed checks; it does not promise a package export.
+
 ## Browser-free agent check
 
 After the pinned `pnpm install --frozen-lockfile`, run `pnpm run verify:agent`.
@@ -76,7 +89,7 @@ Run from the project root, or use `--cwd PATH`. Every new verb accepts `--help`,
 
 `signin` is rer's own verb, not a seed operation: no seed declares it and `check` does not ask for it. `rer signin [--environment NAME] [--env-file FILE]` gives the hosted owner a one-time sign-in link without mail when the seed uses operator-auth's `accounts/schema/owner-signin.sql` migration. It uses only the Cloudflare credentials that deployed that environment, writes a single-use grant for the recorded owner into the deployment's auth D1, and prints the link once to the terminal (never to a log or receipt). The link expires within 15 minutes and its use is recorded in the owner's audit log. Those seeds document `rer signin` in their README as the way into a hosted install whose mail is not working yet; after it, the owner corrects a wrong email in settings (`POST /auth/email`). A seed with native sign-in can declare its browser page with the `commandAdapter` option `signInPath: '/login'` (a same-origin path, not a magic-link API endpoint). When the owner sign-in table is absent, `rer signin` explains that the seed uses its own sign-in flow and points to that page on the recorded environment's origin, or to `/setup` for owner recovery when no page is declared. It exits 4 and issues no link.
 
-`release` is the compatibility exception: preserve its existing parser, required `--repo`/`--output`, JSON receipt and exit codes; do not retrofit the new common flags or infer publishing identities. Root help may list the new commands. Release never pushes or deploys. A refused release prints the underlying message (a malformed `CONTRACT.md` names its file and line) on stderr and exits 2. Source inspection and locking remain edition-authoring commands, not another implementation in `rer`.
+`release` is the compatibility exception: preserve its existing parser, required `--repo`/`--output`, JSON receipt and exit codes; do not retrofit the new common flags or infer publishing identities. Root help may list the new commands. Release never pushes or deploys. A refused release prints the underlying message (a malformed `CONTRACT.md` names its file and line) on stderr and exits 2. Source inspection and locking use the package's edition-authoring implementation. `rer adopt-edition` and `rer refresh-base --ref FULL_COMMIT` are rer-owned source commands, declared through the same bootstrap contract; seeds do not add adapter hooks or OPERATIONS entries for them. See `EDITION-AUTHORING.md` for effects, acquisition, offline refusal and JSON fields.
 
 For GitHub sources, `release` selects its verification workflow in this order:
 `--verify-workflow NAME_OR_FILE`; optional top-level `verifyWorkflow` in the
@@ -89,12 +102,26 @@ through. Multiple conventional files or matching names are refused with the
 candidates and `--verify-workflow` remedy. This optional declaration does not
 change `operations.verify`, the seed's local command.
 
-The selected workflow must have a completed successful `push` or
-`workflow_dispatch` run for the exact source SHA in the same repository, on its
-default branch or the release tag when that tag resolves to the same commit.
+The selected workflow must have a completed successful run whose `head_sha`
+equals the source commit exactly, with both `repository.full_name` and
+`head_repository.full_name` matching the source repository, and its event must
+be `push` or `workflow_dispatch`. Any branch of that repository can qualify.
+These events run that commit's own workflow file on that commit's tree.
+Pull-request runs test a merge ref and cannot serve as exact-SHA evidence, even
+for a same-repository PR. Forks, other events and different SHAs cannot qualify.
+Release-tag runs still require the tag to resolve remotely to that commit. A
+failed tag lookup disqualifies that tag run; a separate qualifying run can still
+authorize release.
+The highest qualifying run ID is chosen deterministically. Failed or unfinished
+duplicates are informational entries in the receipt and do not invalidate a
+qualifying success.
 `gates.verify` in the receipt and site provenance records `workflowFile`,
-`workflowName`, `workflowId`, `runId` and `runUrl`. `--local-verify` explicitly
-runs frozen installation and the seed's local verification targets instead.
+`workflowName`, `workflowId`, `runId`, `runUrl`, branch, event and conclusion.
+When no run qualifies, the refusal names unfinished runs and advises pushing
+the exact commit to any branch of the source repository and waiting for its
+selected Verify workflow to complete successfully. `--local-verify` explicitly
+runs frozen installation and the seed's local verification targets instead,
+only when the source repository's verification policy permits it.
 
 For a tag-first patch release from an already public source, push the branch,
 create `git -c tag.gpgSign=false tag -a --cleanup=verbatim v<version> <exact-source-sha> -m "$release_message"`, push that
@@ -261,7 +288,7 @@ The Worker mounts two shared responses before its documents: `setupStateResponse
 
 **Sign-in hint: `login_hint`.** The shared sign-in page (`createSignInHandler`, `modules/operator-auth/signin`) accepts one optional query parameter, `login_hint=<email>`, and uses it to fill in the email field of its email-link form. Only a complete email address is used; anything else is ignored, the form is never submitted for the visitor, and the visitor still presses **Email a sign-in link**. The platform's **Open app** link for a claimed owner, a seed's own links to its sign-in route and the Lobby all use this one name: `/signin?login_hint=owner%40example.com`, with `returnTo` alongside when needed. The Lobby adds it to its **Sign in** link only on an instance served on this computer (a loopback or `*.localhost` origin) with exactly one active owner; a hosted instance's Lobby stays the same page for every visitor and never names its owner.
 
-The **run site** (`run-<seed>.com`) serves rendered public pages, with an optional docs-search runtime: the seed's approved homepage with its primary action reading **Run <Seed>** and linking to `/run`, the Run page at `/run` (step 1 is the installer, `curl -fsSL https://runeditrun.com/install.sh | sh`, which brings its own Node; step 2 is `rer dev <owner>/<repo>` for the seed's own repository, which needs nothing the installer did not put on PATH, with `cd <folder> && rer dev` to start it again; `npx -y @runeditrun/rer dev <owner>/<repo>` is offered only as the one-line alternative for someone who already has Node 22 or later; `foundation/runtime/run-site.ts`), its docs at `/docs/*` when it serves docs, and a `404` page. It never links an instance-only route (`/signin`, `/login`, `/sign-in`, `/setup`, `/app`, `/auth/*`). A seed opts in with the `commandAdapter` option `site: { entry, output, declaration, config }`: `entry` is a module whose `sitePages({ styles })` returns `{ pages: [{ path, html }], assets: [paths under public/] }`. `rer build --site` builds it for Node with the checkout's own Vite (TypeScript, TSX, JSON and CSS imports work, and a React page renders with `renderToStaticMarkup`); the optional `config` names a Vite config holding the plugins the site pages need, such as a docs virtual module or a CSS toolchain (never the app's own `vite.config.ts`, whose Worker plugins do not run in Node). The CSS the entry's modules import compiles to one stylesheet under `/site-assets/`, with the files it references; `styles` lists its site path for each page to link in its head. `output` is the ignored folder `rer build --site` writes (`dist/site` in Base's seeds), with `/` as `index.html`, `/run` as `run.html` and `/docs/a` as `docs/a.html`; `declaration` is the run site deploy declaration, `{"version": 1, "domain": "<apex hostname>"}` (`deploy-site.json`). The build reads no installation data. Before replacing the folder it refuses a site without an index or Run page, with a link that does not resolve on Cloudflare's static assets or reaches an instance-only route, with a page or style that loads from another origin, with server code, Wrangler configuration, migrations, settings or data files, with the dev layer, or with any of the checkout's owner identity, secrets or dev key. `rer dev` builds and serves it as `RER_SITE`; `rer deploy --site` publishes it (see the deploy-kit README, Run site). A Worker that reads `deploy-site.json` in `vite dev` lists it in `server.fs.allow`.
+The **run site** (`run-<seed>.com`) serves rendered public pages, with an optional docs-search runtime: the seed's approved homepage with its primary action reading **Run <Seed>** and linking to `/run`, the Run page at `/run` (one copyable line, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>`, for the seed's own repository; Git is required; rer brings Node and pnpm. Already have Node 22 or later? `npx -y @runeditrun/rer dev <owner/repo>` does the same. Run the same line from the same folder to start it again; `foundation/runtime/run-site.ts`), its docs at `/docs/*` when it serves docs, and a `404` page. It never links an instance-only route (`/signin`, `/login`, `/sign-in`, `/setup`, `/app`, `/auth/*`). A seed opts in with the `commandAdapter` option `site: { entry, output, declaration, config }`: `entry` is a module whose `sitePages({ styles })` returns `{ pages: [{ path, html }], assets: [paths under public/] }`. `rer build --site` builds it for Node with the checkout's own Vite (TypeScript, TSX, JSON and CSS imports work, and a React page renders with `renderToStaticMarkup`); the optional `config` names a Vite config holding the plugins the site pages need, such as a docs virtual module or a CSS toolchain (never the app's own `vite.config.ts`, whose Worker plugins do not run in Node). The CSS the entry's modules import compiles to one stylesheet under `/site-assets/`, with the files it references; `styles` lists its site path for each page to link in its head. `output` is the ignored folder `rer build --site` writes (`dist/site` in Base's seeds), with `/` as `index.html`, `/run` as `run.html` and `/docs/a` as `docs/a.html`; `declaration` is the run site deploy declaration, `{"version": 1, "domain": "<apex hostname>"}` (`deploy-site.json`). The build reads no installation data. Before replacing the folder it refuses a site without an index or Run page, with a link that does not resolve on Cloudflare's static assets or reaches an instance-only route, with a page or style that loads from another origin, with server code, Wrangler configuration, migrations, settings or data files, with the dev layer, or with any of the checkout's owner identity, secrets or dev key. `rer dev` builds and serves it as `RER_SITE`; `rer deploy --site` publishes it (see the deploy-kit README, Run site). A Worker that reads `deploy-site.json` in `vite dev` lists it in `server.fs.allow`.
 
 ### Optional docs-search runtime
 
@@ -366,7 +393,7 @@ A seed's `CONTRACT.md` says what the product is being built towards and how far 
 - **Status.** Exactly one `## Status` section. Its first line is `` Judged from the code and tests at commit `<sha>` (<date>). `` with a 7 to 40 character hex commit and a date written `16 October 2026` or `2026-10-16` (the sentence may go on after a semicolon). It holds one table with the header `| Clause | Title | Kind | Status | Evidence | Gap |` and exactly one row per defined clause: no row for an undefined clause and no second row. Kind is `published`, `target` or `push-further`; Status is `done`, `partial` or `missing`; the title matches the definition's. Evidence lists the repository paths, each in backticks, that back a `done` or `partial` row (one is required); Gap says what is missing for a `partial` or `missing` row (required).
 - **Summaries.** Optional, and checked against the rows when present: a `| Clauses | Done | Partial | Missing | Total |` table whose rows are labelled `All`, a kind (`Published`, `Target`, `Push further`) or kinds joined by `and`, and sentences such as `88 clauses: 23 done, 38 partial, 27 missing.`
 
-**The /contract page.** `rer build --site` parses a seed's `CONTRACT.md` and passes it to the site entry as `sitePages({ contract })`; a contract that does not parse stops the build with each problem's line, and no site is written. The entry adds `{ path: '/contract', html: contractPageHtml(identity, run, contract) }` (`src/base/contract-page.ts`) and passes `contract` to `runPageHtml`, `siteHomeHtml` and `siteNotFoundHtml`, whose headers then link Contract; a seed's own pages and docs link `/contract` only when `contract` is given. Without a `CONTRACT.md` there is no `contract`, no page and no link. The page reads the seed's theme, and the status tokens in `onboarding/README.md` ("Seed theme") recolour it.
+**The /contract page.** `rer build --site` parses a seed's `CONTRACT.md` and passes it to the site entry as `sitePages({ contract })`; a contract that does not parse stops the build with each problem's line, and no site is written. The entry adds `{ path: '/contract', html: contractPageHtml(identity, run, contract) }` (`src/base/contract-page.ts`) and passes `contract` to `runPageHtml`, `siteHomeHtml` and `siteNotFoundHtml`, whose headers then link Contract; a seed's own pages and docs link `/contract` only when `contract` is given. The site has one header: Base's on its own homepage, `/run`, `/contract` and the not-found page, or, for a seed with an approved homepage, that homepage's header, passed to `runPageHtml`, `contractPageHtml` and `siteNotFoundHtml` as their last argument (`HomepageHeader`, `HOMEPAGE-VARIANTS.md`), with its own links. Without a `CONTRACT.md` there is no `contract`, no page and no link. The page reads the seed's theme, and the status tokens in `onboarding/README.md` ("Seed theme") recolour it.
 
 `rer check` validates a seed's `CONTRACT.md` when it has one: every parse problem is a failing `CONTRACT.status` clause naming its line, and each evidence path that is not in the checkout fails `CONTRACT.evidence.<ID>`, naming the row's line. A seed without `CONTRACT.md` is unaffected. Run `rer check` in the seed after changing the contract.
 
@@ -501,13 +528,32 @@ site: {
 }
 ```
 
-`sitePages({ styles, clients })` receives each emitted module URL, for example
+`sitePages({ styles, clients, hosting })` receives each emitted module URL, for example
 `clients.hero`; link it with `<script type="module" src="…"></script>` on the
 pages that use it. Browser modules and their reachable imports/assets are
 bundled under `site-assets/`. `clientConfig` is optional, separate from the SSR
 page config, and names browser plugins such as React; an external import still
 reachable from an island refuses the build. No seed-specific client plugin is
 needed. The rendered page's appearance and copy stay seed-owned.
+
+`hosting` is the public context derived from the seed's deploy, setup and mail
+declarations, or `null` when those declarations do not support the shared
+walkthrough. When hosting context is provided, include `/docs/hosting` through
+Base's shared hosting page. It explains deployment using the actual declared
+resources and inputs; it does not store deployment credentials.
+
+Base's shared `/run` chooser reads `RunData.paths`: `product` is the app listing
+id or `null` while the seed has no listing; optional `requirementsExtra` adds
+one requirements sentence; optional `assisted.open` and `managed.open` can each
+hold a door closed with `false`. Reference data and newly initialized seeds
+start with `paths: { product: null }`. `RunData` no longer carries `hosted`,
+`requirements` or `folder`. Name, repository and clone command remain seed data.
+Keep the shared sign-up state and entry URL builder in the single `PATHS`
+constant in `run-site.ts`; seeds do not add their own plan links or sign-up
+state. Both doors close while sign-ups are by request, when the listing is
+null, or when that door's `open` is `false`. Entry links carry the plan and the
+listing id when available; an unlisted seed uses the shared repository-derived
+`run-<slug>` entry product until it has a listing.
 
 Known targets at browser resource operations, including fetches, imports, DOM
 URL writes and emitted CSS, are checked against the run-site boundary. Inert

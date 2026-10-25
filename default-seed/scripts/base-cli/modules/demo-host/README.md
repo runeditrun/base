@@ -1,7 +1,7 @@
 # Native hosted demos
 
 `rer deploy --demo` builds the seed's production Worker for a Worker Loader
-host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
+host. See [adoption and deployment](https://github.com/runeditrun/base/blob/main/export/DEMO.md#hosting-the-demo).
 
 - `build.mjs`: ordinary Vite output, declared SQL and public configuration,
   using the shared container migration-inventory and image-variable checks.
@@ -21,8 +21,10 @@ host. See [adoption and deployment](../../export/DEMO.md#hosting-the-demo).
   `theme-script.mjs` sets the page and Turnstile scheme from the painted card's
   background and text before the widget renders, and updates on preference changes.
   The maintained default seed's theme assets supply missing tokens or an
-  absent theme, under `/__demo/theme/`. Styles, fonts and marks stay same-origin;
-  a missing mark leaves the product name visible.
+  absent theme, under `/__demo/theme/`, except the link colour: a seed theme
+  without `--rer-link` links in its own `--rer-text`, as the theme grammar reads
+  it. Styles, fonts and marks stay same-origin; a missing mark leaves the
+  product name visible.
 - `native/warm.mjs`: the start page's prefetch list, built from `dist/client`
   (the Vite manifest if the build wrote one, else the build's `assetsDir`, else
   `assets`) and TanStack Start's route manifest, the console's views first,

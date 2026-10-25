@@ -106,24 +106,17 @@ Playwright cache plus its system libraries.
 Their typechecks use package-local, gitignored `.cache/typecheck.tsbuildinfo`; deleting it forces a full check, while `build` still builds the real Worker and assets.
 The Verify workflow runs for pull requests and main pushes; its manual
 `clean_bootstrap` option verifies without restoring caches. It also runs
-`pnpm verify:launcher-acceptance` for the full packed-launcher journey and real
-Ferry installation, then `launcher/tests/release-acceptance.mjs` for exact
-committed Ferry/Beacon acquisition, browser onboarding and offline resume.
-After Base's Node 22 verification phase, CI installs pinned Node 26.8.1 for
-these edition suites, retains Base's pnpm 10.12.4, and lets pnpm run the
-editions' declared pnpm 8.15.6 for their unchanged frozen lockfiles.
+packed-launcher acquisition, browser onboarding and offline resume for pinned
+public HappyToHelp source through `scripts/ci/launcher-acceptance.mjs` and
+`launcher/tests/release-acceptance.mjs`. CI fetches commit
+`60e9a84688ea41575d56a8f692bbb8173366c7c5` without credentials and selects Node
+26.8.1 after Base's Node 22 stages finish. The helper writes its manifest and
+evidence under `$RUNNER_TEMP`; CI removes those temporary outputs after the suite.
+This browser suite does not install the app. The separately available
+`pnpm verify:launcher-acceptance` runs the full packed-launcher installation
+journey; the current Verify workflow does not invoke it.
 The reference prerender preview uses explicit IPv4 loopback so its listener and
-fetch URL agree in Linux containers. Edition pnpm version checks run from the
-edition directory, where pnpm resolves the declared package-manager pin.
-These require reviewed pinned sibling Git sources at `../sales-ferry` and
-`../crisp` (Beacon), and Ferry's locked Playwright dependencies. CI downloads
-one checksum-bound private Base release asset with its Base-only read token,
-removes download authentication before source execution, and writes receipts
-under `$RUNNER_TEMP/base-launcher-evidence`. The source SHA-256 and commit/tree
-pins are fixed in `verify.yml`; owner publication and binding of the exact
-asset ID is a prerequisite. An absent binding fails explicitly. The release
-browser suite does not cover the full install journey supplied by
-`verify:launcher-acceptance`.
+fetch URL agree in Linux containers.
 
 Publication checks use system Git and Gitleaks 8.30.1. On macOS or Linux,
 run `bash scripts/install-gitleaks.sh` for the checksum-pinned release binary

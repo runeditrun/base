@@ -20,6 +20,7 @@ import { seedDemo } from './demo'
 import { importDoorResponse } from './core/features/people/door.server'
 import { importPageResponse } from './core/features/people/import-page.server'
 import { rejectedResponse } from '../../foundation/runtime/rejected-response'
+import { businessSettings } from './core/platform/business.server'
 
 const api = createApi()
 const queueMessage = z.union([z.object({ id: z.string().length(26) }).strict(), z.object({ erasure: z.string().regex(/^[0-9a-f]{32}$/) }).strict(),
@@ -30,6 +31,10 @@ export default withDemo({
     const asset = await staticAssetResponse(request, bindings)
     if (asset) return asset
     bindings = requireBindings(bindings)
+    if (['/api/rer/business-settings', '/rer-business-logo', '/rer-business.css'].includes(new URL(request.url).pathname)) {
+      const businessResponse = await businessSettings(bindings).handle(request)
+      if (businessResponse) return rejectedResponse(request, businessResponse)
+    }
     const imported = await importDoorResponse(request, bindings)
     // Admission runs before dispatch, so finish refused uploads with the same
     // bounded drain as the normal router. Otherwise workerd can replace 4xx
@@ -47,14 +52,14 @@ export default withDemo({
     // The installed variant: the Lobby at / and the public claim state it reads.
     const state = await setupStateResponse(request, bindings)
     if (state) return state
-    const lobby = await lobbyResponse(request, bindings, identity)
+    const lobby = await lobbyResponse(request, bindings, identity, undefined, request => operatorAuth(bindings).getSession(request))
     if (lobby) return lobby
     if (path === '/signin') {
       const page = await signInResponse(request, bindings, waitUntil)
       if (page) return page
     }
     if (path === '/setup' || path === '/app' || path.startsWith('/app/')) {
-      const setup = await firstRunResponse(request, bindings, operatorAuth(bindings), { theme })
+      const setup = await firstRunResponse(request, bindings, operatorAuth(bindings), { theme: { ...theme, businessSettings: businessSettings(bindings) } })
       if (setup) return setup
     }
     if (path === '/app/import') {

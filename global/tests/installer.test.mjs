@@ -14,9 +14,10 @@ import { readPackage } from '../update/archive.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 
-function run(program, args, env) {
+function run(program, args, env, input) {
  return new Promise((resolveRun, reject) => {
-  const child = spawn(program, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(program, args, { env, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+  if (input !== undefined) child.stdin.end(input);
   let stdout = '', stderr = '';
   child.stdout.on('data', data => { stdout += data; });
   child.stderr.on('data', data => { stderr += data; });
@@ -32,7 +33,8 @@ async function runPageCommands() {
  const { sitePages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
  const html = sitePages({ styles: [], clients: {} }).pages.find(page => page.path === '/run').html;
  const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
- return [...html.matchAll(/<pre[^>]*><code>([^<]*)<\/code><\/pre>/g)].map(match => match[1].replace(/&(amp|lt|gt|quot|#39);/g, entity => entities[entity]));
+ // A block's command is its text: inline spans only keep words together when it wraps.
+ return [...html.matchAll(/<pre[^>]*><code>([\s\S]*?)<\/code><\/pre>/g)].map(match => match[1].replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39);/g, entity => entities[entity]));
 }
 
 // The built package again under another version, optionally with extra raw entries.
@@ -87,9 +89,9 @@ test('install.sh and rer update install verified registry releases, the Run page
  assert.equal((await run('sh', ['-c', `${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
  assert.equal((await run('sh', ['-l', '-c', 'rer --version'], env)).stdout.trim(), manifest.version, 'a new shell finds rer after the line ran once');
 
- // The Run page's step 2 runs on what install.sh put on PATH and nothing else:
- // no npx and no Node on PATH. The private Node install.sh downloads when there
- // is none stands in as its runtime link.
+ // The Run page hands its start arguments to install.sh in the same pipeline.
+ // Its installed rer also runs with no npx or Node on PATH: the private Node
+ // install.sh downloads when there is none stands in as its runtime link.
  const runtime = join(home, '.local/share/rer/node'), installedOnly = { ...env, PATH: join(home, '.local/bin') };
  await symlink(dirname(dirname(process.execPath)), runtime);
  // The managed launcher uses its private Node without making that Node's
@@ -101,14 +103,20 @@ if (execFileSync('npm', [], { env: { ...process.env, NODE_OPTIONS: '' }, encodin
  const managed = await run(rer, ['--version'], callerTools);
  assert.equal(managed.code, 0, managed.stderr);
  await rm(join(bin, 'npm'));
- const commands = await runPageCommands(), installLine = commands.findIndex(command => /\| *sh$/.test(command));
- assert.ok(installLine >= 0 && commands.length > installLine + 1, `the Run page installs rer, then starts the seed: ${commands.join(' / ')}`);
- for (const command of commands.slice(installLine + 1)) {
-  const program = command.split(/\s+/)[0], found = await run('/bin/sh', ['-c', `command -v '${program}'`], installedOnly);
-  assert.equal(found.code, 0, `${program} (from "${command}") is not on the PATH install.sh gives`);
-  const started = await run(found.stdout.trim(), ['--version'], installedOnly);
-  assert.equal(started.code, 0, `${program} does not run on the PATH install.sh gives: ${started.stderr}`);
- }
+ const commands = await runPageCommands();
+ assert.equal(commands.length, 1, 'the Run page installs and starts with one command');
+ const pipeline = commands[0].split('|');
+ assert.equal(pipeline.length, 2, 'the downloaded installer is piped to the shell');
+ const [program, ...scriptArguments] = pipeline[1].trim().split(/\s+/);
+ const startAt = scriptArguments.indexOf('--');
+ assert.ok(startAt >= 0 && scriptArguments.length > startAt + 1, 'the shell forwards start arguments to the installer');
+ // Supply the real downloaded script at the network edge. --help exercises
+ // argument forwarding without cloning the reference or starting a server.
+ const started = await run(program, [...scriptArguments, '--help'], env, await readFile(installer));
+ assert.equal(started.code, 0, started.stderr);
+ const direct = await run(rer, [...scriptArguments.slice(startAt + 1), '--help'], installedOnly);
+ assert.equal(direct.code, 0, `the installed rer runs without Node or npx on PATH: ${direct.stderr}`);
+ assert.ok(direct.stdout.trim() && started.stdout.endsWith(direct.stdout), 'the installer runs the Run page’s requested command with its installed rer');
  await rm(runtime);
  const status = JSON.parse((await run(rer, ['cli', 'status', '--json'], env)).stdout);
  assert.equal(status.channel, 'script');

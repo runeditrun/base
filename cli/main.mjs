@@ -1,9 +1,10 @@
 import './sqlite-notice.mjs';
+import {authoringVerbs} from './contract.mjs';
 import { parse, help } from './parse.mjs';
 import { output } from './output.mjs';
 import { invalid, RerError } from './errors.mjs';
 import { resolveProject, parsingProfile } from './project.mjs';
-import { check, describe } from './inspect.mjs';
+import { check, describe, doctorSummary } from './inspect.mjs';
 import { selectNodeRuntime } from './node-runtime.mjs';
 
 export async function main(argv = process.argv.slice(2)) {
@@ -37,6 +38,11 @@ export async function main(argv = process.argv.slice(2)) {
   if(options.noQueue){const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw invalid('--no-queue requires the original caller CI=true.');}finally{await policy.close();}}
   const runtime = await selectNodeRuntime(options, argv, out);
   if (runtime) return runtime.exitCode;
+  if (!independent && Object.hasOwn(authoringVerbs, options.verb)) {
+   const result = (await import('./authoring.mjs')).authoringCommand(options);
+   if (!options.json) out.human(JSON.stringify(result, null, 2));
+   out.result(true, 0, result); return 0;
+  }
   project ??= await resolveProject(options.cwd);
   if (project.profile === 'independent' && !['describe', 'check', 'doctor'].includes(options.verb)) options = parse(argv, process.cwd(), { independent: true });
   else if (options.forwarded.length) throw invalid('First-party commands accept only the documented flags, without forwarded arguments.');
@@ -51,7 +57,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (options.verb === 'doctor') {
    const result = await (await import('./lifecycle.mjs')).runCommand(project, options, out);
-   if (!options.json) out.human(JSON.stringify(result, null, 2));
+   if (!options.json) out.human(doctorSummary(result));
    out.result(result.ok, result.ok ? 0 : 3, { diagnostics: result }); return result.ok ? 0 : 3;
   }
   // The owner link is printed once to this terminal: never through the logged lifecycle.
@@ -64,7 +70,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   // A hosted address never exports this computer's copy under its name.
   if (options.verb === 'export' && project.profile === 'first-party') await (await import('./hosted-export.mjs')).refuseHostedExport(project, options);
-  if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret) {
+  if (options.verb === 'deploy' && !options.site && !options.demo && !options.remove && !options.setSecret && !options.unsetSecret && !options.reopenInstallationKey) {
    const { deliveryDeclarationClauses } = await import('./delivery-declarations.mjs');
    const failures = (await deliveryDeclarationClauses(project.root)).filter(clause => !clause.ok);
    if (failures.length) throw new RerError('invalid_deployment_declaration', failures.map(clause => clause.message).join('\n'), 1);

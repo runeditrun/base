@@ -48,6 +48,8 @@ function commandFor(options, environment) {
  if (options.verb === 'signin') return again.replace(/^rer deploy/, 'rer signin');
  if (options.remove) return `${again} --remove --yes`;
  if (options.setSecret) return `${again} --set-secret ${options.setSecret}`;
+ if (options.reopenInstallationKey) return `${again} --reopen-installation-key ${options.reopenInstallationKey}`;
+ if (options.rotateSecret) return `${again} --rotate-secret ${options.rotateSecret}`;
  if (options.unsetSecret) return `${again} --unset-secret ${options.unsetSecret}`;
  return again;
 }

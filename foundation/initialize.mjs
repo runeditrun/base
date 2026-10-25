@@ -28,9 +28,15 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     // The docs a person reads first start the seed from its public repository, named by convention.
     const startDocs = new Set(['README.md', 'ONBOARDING.md', 'OPERATIONS.md'])
     for (const file of files) await put(`editions/${edition}/${file.relative}`, startDocs.has(file.relative) ? file.bytes.toString().replaceAll('run-foundation', `run-${edition}`) : file.bytes, file.path)
-    for (const name of ['verify.yml', 'verify-nightly.yml']) {
-      const workflow = select(baseRepo, revision, `export/${name}`)[0]
-      await put(`editions/${edition}/.github/workflows/${name}`, workflow.bytes, workflow.path)
+    const workflows = ['verify.yml', 'verify-nightly.yml'].map(name => select(baseRepo, revision, `export/${name}`)[0])
+    for (const workflow of workflows) {
+      await put(`editions/${edition}/.github/workflows/${workflow.path.slice('export/'.length)}`, workflow.bytes, workflow.path)
+    }
+    // Older pinned workflows install inline. A workflow using the helper must
+    // supply it from that same revision; select still rejects a missing helper.
+    if (workflows.some(workflow => workflow.bytes.includes('scripts/install-chromium-deps.py'))) {
+      const helper = select(baseRepo, revision, 'export/install-chromium-deps.py')[0]
+      await put(`editions/${edition}/scripts/install-chromium-deps.py`, helper.bytes, helper.path)
     }
     await json('family.json', { schemaVersion: 1, id: family, repository, base: { repository: 'runeditrun/base', commit: revision } })
     await put('core/README.md', '# Headless family core\n\nAdd domain source only when every edition needs it. No domain is preselected.\n')
@@ -46,7 +52,17 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
       { component: 'demo', repository: 'base', source: 'modules/demo', target: 'src/modules/demo' },
       { component: 'ai', repository: 'base', source: 'modules/ai', target: 'src/modules/ai' },
       ...['dependencies','owner-claim'].map(name=>({component:name,repository:'base',source:`modules/${name}`,target:`src/modules/${name}`})),
-      ...[['operator-auth','accounts/schema/provider-control.sql','0006_provider_control'],['dependencies','schema/dependencies.sql','0007_dependencies'],['owner-claim','schema/owner-claim.sql','0008_owner_claim'],['owner-claim','schema/idp.sql','0009_idp_owner'],['operator-auth','accounts/schema/provider-pins.sql','0010_provider_pins'],['operator-auth','accounts/schema/dependency-setup.sql','0011_dependency_setup'],['dependencies','schema/approval-attempt.sql','0012_dependency_approval'],['operator-auth','accounts/schema/owner-signin.sql','0014_owner_signin']].map(([component,file,name])=>({component,repository:'base',source:`modules/${component}/${file}`,target:`migrations/core/${name}.sql`})),
+      ...[
+        ['operator-auth','accounts/schema/provider-control.sql','0006_provider_control'],
+        ['dependencies','schema/dependencies.sql','0007_dependencies'],
+        ['owner-claim','schema/owner-claim.sql','0008_owner_claim'],
+        ['owner-claim','schema/idp.sql','0009_idp_owner'],
+        ['operator-auth','accounts/schema/provider-pins.sql','0010_provider_pins'],
+        ['operator-auth','accounts/schema/dependency-setup.sql','0011_dependency_setup'],
+        ['dependencies','schema/approval-attempt.sql','0012_dependency_approval'],
+        ['dependencies','schema/keys-sealed.sql','0016_sealing'],
+        ['operator-auth','accounts/schema/owner-signin.sql','0014_owner_signin'],
+      ].map(([component,file,name])=>({component,repository:'base',source:`modules/${component}/${file}`,target:`migrations/core/${name}.sql`})),
       { component: 'operator-auth', repository: 'base', source: 'modules/operator-auth/accounts/schema/operator-auth.sql', target: 'migrations/core/0001_owner.sql' },
       { component: 'operator-auth', repository: 'base', source: 'modules/operator-auth/identity/oidc/schema/oidc.sql', target: 'migrations/core/0005_identity_providers.sql' },
       { component: 'mail', repository: 'base', source: 'modules/mail/src/development/schema.sql', target: 'migrations/core/0002_outbox.sql' },
@@ -76,7 +92,7 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     // instructions name the edition's product repository by convention.
     const run = JSON.parse(files.find(f => f.relative === 'src/site/run.json').bytes)
     const publicRepository = `just-every/run-${edition}`
-    Object.assign(run, { name: edition, repository: `https://github.com/${publicRepository}`, clone: `npx -y @runeditrun/rer dev ${publicRepository}`, folder: `run-${edition}` })
+    Object.assign(run, { name: edition, repository: `https://github.com/${publicRepository}`, clone: `npx -y @runeditrun/rer dev ${publicRepository}` })
     await json(`editions/${edition}/src/site/run.json`, run)
     await json(`editions/${edition}/deploy-site.json`, { version: 1, domain: siteDomain })
     const browserSeed = files.find(f => f.relative === 'scripts/installer/ui/seed.mjs')

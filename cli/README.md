@@ -100,8 +100,9 @@ preview before either operation. `import --journal LATER_ARCHIVE` also applies
 the erasure journal of a later archive from the same installation, so a fresh
 destination refuses rows erased since. Erasure-fence refusals (`erased_row`,
 `erasure_epoch`, `later_journal`) exit 4. Reset preserves exports. Remote transfer is
-available only when the adapter declares complete resource coverage; an
-unsupported target exits 4.
+available only when the adapter declares complete resource coverage. Unsupported
+hosted export exits 2 before effects; unsupported import or transfer capability
+can refuse with exit 4.
 
 A first-party adapter may also declare `portability.hostedExport` as an argv
 array, for example `['node', 'scripts/export.mjs']`. With that declaration,
@@ -135,20 +136,23 @@ base rows across a fresh installation. Ordinary-table archives from before this
 support remain compatible with the same schema.
 
 Every first-party seed verifies local export/import/export equivalence for its
-supported domain and resource data. In default-seed, each export advances the
-included authority generation, so archive hashes may differ even when retained
-domain and identity rows are equal. The technical foundation currently has no
-product domain or background jobs; default-seed retains its durable jobs and
+supported domain and resource data. With foundation's included auth settings,
+each export advances the authority generation, so archive hashes may differ even
+when retained domain and identity rows are equal. The technical foundation
+currently has no product domain or background jobs; default-seed retains its durable jobs and
 schedule records while omitting transient queue delivery state, local runtime
 caches and logs, transfer bookkeeping, provider credentials,
-provider link keys and transient provider sessions. People, external identity
-bindings, the installation sector and the original owner claim are retained.
+provider link keys and transient provider sessions. Default-seed excludes
+authentication identities and the owner claim; setup claims a fresh owner after
+restore. Foundation explicitly retains selected identity tables and the original
+owner claim. Both retain the installation sector.
 Retained dependency links are marked as needing re-link, and provider sign-in
 and first-setup enablement are off after import. Restore does not re-dispatch
 jobs. Run setup after restore to create local configuration and initiate the
-owner-approved provider re-link. The original owner recovers access through
-ordinary native sign-in; setup does not grant a new owner. A new binding or
-product effect needs an explicit policy and integrated proof.
+owner-approved provider re-link. With foundation's retained owner claim, the
+original owner recovers access through ordinary native sign-in; setup does not
+grant a new owner. A new binding or product effect needs an explicit policy and
+integrated proof.
 
 Setup reads the declared `rer-setup.json` with the shared reader and validates
 answers against the shared manifest model. The manifest owns fields and managed
@@ -162,6 +166,12 @@ manifest default and receives `--owner-name`; it replaces the generated
 
 Run `node --test --test-concurrency=2 cli/*.test.mjs` from Base. Base's shared tests
 stay in Base; exported seeds carry runtime source and their own adopting tests.
+CI uses `CLI_SHARD=1` through `5` for the five CLI push shards,
+`MODULE_SHARD=1` through `6` for the module shards, and `REFERENCE_SHARD=1`,
+`2` or `nightly` for reference checks. `CI_INCLUDE_JOURNEYS=true` adds the slower
+CLI `reference-journey.test.mjs` and reference `journey-installer-browser`,
+`journey-installer` and `journey-journey` checks to the CI plan; scheduled and tag
+runs select them, and manual dispatch can opt in.
 
 ## Managed local serving
 
@@ -303,8 +313,10 @@ deploy's local build/validation, release's expensive phases and local transfer
 resource work. Serving uses the registry, with finite preparation queued.
 Labels include project, initiating verb/phase and a safe checkout digest. Use
 `node scripts/base-cli/modules/job-queue/cli.mjs status` to inspect admission.
-Waits go to redacted progress/stderr. Nested commands validate live lease
-membership and actual process ancestry before sharing the admitted slot.
+The CLI wrapper defaults `RER_JOBS_MAX_WAIT_SECONDS` to 1200 seconds; admission
+timeout exits 75 without starting work, while the bare queue defaults to an
+indefinite wait. Waits go to redacted progress/stderr. Nested commands validate
+live lease membership and actual process ancestry before sharing the admitted slot.
 Direct documented browser/runtime entrypoints and indirect package scripts join
 the same executor. Original-caller `CI=true` skips admission; `CI=false` and unset CI queue.
 Heavy verbs alone accept `--no-queue`, only with `CI=true`. Synthesized install
@@ -455,3 +467,58 @@ contain only the filename, path, size and modification time. Sensitive-looking
 outbound names are dropped entirely and counted in `withheld`. Symlinks, build
 outputs and dependency trees are skipped. Unsupported syntax yields no signal;
 an empty result is not proof that a repository has no business dependencies.
+
+`INSTALLATION_KEY` has a dedicated rotation path: `rer deploy --rotate-secret INSTALLATION_KEY`
+saves current and previous values privately before publishing both as one Worker
+version, reseals and verifies all dependency keys in the recorded D1, then retires
+the previous binding. Routine rotation uses only the current/previous pair;
+older retired keys require explicit reopen. By default, every retired key remains
+in the same private 0600,
+Git-ignored `.rer/deploy/<environment>.secrets.env` custody as `SESSION_SECRET`,
+in `INSTALLATION_KEY_RETIRED=<kid>:<value>[,<kid>:<value>...]`. Retired values
+never enter routine Worker bindings or installation archives. Back up this file
+securely and copy it when moving the deployment to another checkout. If rotation
+stops, run the same command again; it resumes the saved pair. Manual set/unset of
+these bindings is refused.
+
+Retain each retired key until no D1 Time Travel recovery point or exported backup
+predates the completed rotation that retired it or otherwise needs that key.
+After any rotation or reopen has finished, edit
+`.rer/deploy/<environment>.secrets.env` and remove only its `<kid>:<value>` entry
+from `INSTALLATION_KEY_RETIRED`, keeping valid comma separators; remove the
+assignment if no entries remain. Preserve the current key, all other entries
+and the file's owned 0600 permissions. There is no per-key removal command;
+reopening a removed ID refuses before provider writes unless its custody is restored.
+
+A D1 backup or Time Travel restore from before a rotation can restore ciphertext
+that needs retired keys. Select a retained key explicitly:
+
+```sh
+rer deploy --reopen-installation-key KID
+```
+
+Use the envelope's installation `kid` or its entry in private retired custody;
+this ID is different from the signing JWK's ID. Include the original deployment's
+`--environment` and `--env-file` when applicable. This command publishes the
+current key and selected retired key as `INSTALLATION_KEY_PREVIOUS`, reseals all
+dependency keys through the recorded D1, verifies them under the current key,
+then removes the previous binding while retaining all retired custody. It skips
+the build and upload hook. CLI-side reopen rekey receives every validated retired key
+in custody, allowing a mid-rotation snapshot with multiple retired envelope IDs
+to reopen with either ID; these additional keys are never Worker bindings.
+Reopen/rekey prints the D1 `key_ids` tail and custody availability for each history
+ID before opening rows, even when the tail is unavailable. A whole pre-rotation
+restore whose history tail is unavailable reports `installation_key_unavailable`;
+`installation_key_version_unknown` applies to a known row ID only after that
+history custody check succeeds.
+A failure preserves the exact pair and reopen marker;
+repeat the same command before other deploy changes. Missing retired custody
+refuses with `installation_key_unavailable` before any provider write: recover
+the private file before reopening. For backups spanning several rotations,
+retain every historical key they need; unrelated ciphertext never silently regenerates keys.
+
+Base versions before #367 cannot open sealed dependency keys. Roll forward to a
+sealing-capable Base version after restoring D1; rolling code back cannot decrypt
+the rows. The CLI has no old-Base capability receipt or code rollback command,
+so it cannot preflight an out-of-band provider rollback. Current Base rejects a
+sealed key passed to its plaintext signing path with `installation_key_sealed_rollback`.

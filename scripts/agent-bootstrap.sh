@@ -37,11 +37,79 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 readonly repo_root
 cd "$repo_root"
 
-"${root[@]}" apt-get update
-"${root[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  ca-certificates curl git libatomic1 python3 tar unzip
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
+# Keep archives outside Docker's /var/cache/apt cleanup hook. The workflow
+# restores this directory only after recording the clean-container preconditions.
+readonly apt_archives="$HOME/.cache/rer-apt/archives"
+mkdir -p "$apt_archives"
+readonly apt_config="$scratch/apt.conf"
+readonly apt_base_config="$scratch/apt-base.conf"
+cat > "$apt_base_config" <<APT
+Dir::Cache::archives "$apt_archives";
+APT::Keep-Downloaded-Packages "true";
+APT::Update::Error-Mode "any";
+Acquire::Retries "2";
+Acquire::http::Timeout "30";
+Acquire::https::Timeout "30";
+APT
+# A hosted runner's Azure mirror path can hang on package downloads while its
+# index fetches work, so a fresh connection to the same host does not recover.
+# Attempt 1 keeps the configured mirrors; attempts 2 and 3 use these other
+# mirrors of the same Ubuntu-signed archive (apt still verifies every Release
+# signature against the installed keyring). Keep in step with verify.yml.
+readonly -a apt_fallback_mirrors=(http://mirrors.edge.kernel.org/ubuntu http://us-east-1.ec2.archive.ubuntu.com/ubuntu)
+readonly apt_mirror_host_re='https?://(([a-z0-9.-]+\.)?archive\.ubuntu\.com|security\.ubuntu\.com|mirrors\.edge\.kernel\.org)/ubuntu/?'
+apt_mirror_label=
+# Point apt at attempt $1's mirrors through scratch copies of the source lists;
+# the system's own apt sources are never modified.
+apt_select_mirror() {
+  local attempt=$1 mirror src dest changed=0
+  cp "$apt_base_config" "$apt_config"
+  apt_mirror_label=$(sed -nE 's@^(URIs:[[:space:]]*|deb (\[[^]]*\][[:space:]]*)?)(https?://[^/[:space:]]+).*@\3@p' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null | head -n 1 || true)
+  apt_mirror_label=${apt_mirror_label:-configured-sources}
+  (( attempt > 1 )) || return 0
+  mirror=${apt_fallback_mirrors[attempt - 2]}
+  rm -rf "$scratch/apt-sources"
+  mkdir -p "$scratch/apt-sources/parts"
+  : > "$scratch/apt-sources/sources.list"
+  for src in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
+    [[ -f $src ]] || continue
+    dest="$scratch/apt-sources/parts/${src##*/}"
+    [[ $src == /etc/apt/sources.list ]] && dest="$scratch/apt-sources/sources.list"
+    sed -E "s@${apt_mirror_host_re}@${mirror}/@g" "$src" > "$dest"
+    cmp -s "$src" "$dest" || changed=1
+  done
+  if (( changed )); then
+    printf 'Dir::Etc::sourcelist "%s/apt-sources/sources.list";\nDir::Etc::sourceparts "%s/apt-sources/parts";\n' "$scratch" "$scratch" >> "$apt_config"
+    apt_mirror_label=$mirror
+  fi
+}
+apt_phase() {
+  local label=$1 status attempt started=$SECONDS
+  shift
+  # Three fresh connections, including kill grace/backoff, stay below 300s.
+  # Keep the archive directory (including partial downloads) across attempts.
+  for attempt in 1 2 3; do
+    apt_select_mirror "$attempt"
+    printf 'Bootstrap apt: %s attempt %s/3 (90s deadline; mirror %s)\n' "$label" "$attempt" "$apt_mirror_label"
+    if "${root[@]}" env APT_CONFIG="$apt_config" timeout --kill-after=5s 90s \
+      bash -ec 'dpkg --configure -a; "$@"' bash "$@"; then
+      printf 'Bootstrap apt: %s complete (attempts=%s mirror=%s seconds=%s)\n' "$label" "$attempt" "$apt_mirror_label" "$((SECONDS - started))"
+      return 0
+    else
+      status=$?
+      printf 'Bootstrap apt: %s attempt %s/3 failed (mirror %s, exit %s, seconds=%s)\n' "$label" "$attempt" "$apt_mirror_label" "$status" "$((SECONDS - started))" >&2
+    fi
+    if (( attempt < 3 )); then sleep "$((attempt * 2))"; fi
+  done
+  fail "apt phase '$label' failed after 3 attempts (exit $status; 90s per attempt; seconds=$((SECONDS - started))). Inspect the apt download log."
+}
+apt_phase 'toolchain packages' bash -c '
+  apt-get update &&
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates curl git libatomic1 python3 tar unzip
+'
 "${root[@]}" env GITLEAKS_INSTALL_DIR="$BIN_DIR" bash "$repo_root/scripts/install-gitleaks.sh"
 if [[ ! -x "$node_home/bin/node" ]] || [[ $("$node_home/bin/node" --version) != "v${NODE_VERSION}" ]]; then
   archive="node-v${NODE_VERSION}-linux-${arch}.tar.gz"
@@ -70,7 +138,11 @@ hash -r
 pnpm --config.only-built-dependencies=esbuild --config.only-built-dependencies=workerd \
   install --frozen-lockfile
 pnpm --dir modules/mail install --frozen-lockfile --ignore-workspace --ignore-scripts
-pnpm --dir default-seed exec playwright install --with-deps chromium
+# Bound apt separately from the browser download, while retaining every OS
+# dependency and the real browser/workerd probes below. Pass APT_CONFIG through
+# privilege elevation so Playwright's own apt-get uses the same archive cache.
+apt_phase 'Chromium OS dependencies' pnpm --dir default-seed exec playwright install-deps chromium
+pnpm --dir default-seed exec playwright install chromium
 
 # Resolve the actual locked Wrangler runtime and launch the actual Chromium.
 # These checks fail if an optional native binary or an OS library is missing.

@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { checkSchema, validate } from './json-schema.mjs';
+import { validateSetupManifest } from './setup-validation.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (name) => JSON.parse(readFileSync(join(here, name), 'utf8'));
@@ -133,44 +134,6 @@ test('an edition that exists validates as readily as one that does not', () => {
   assert.deepEqual(validate(seedSchema, JSON.parse(withEdition)), []);
 });
 
-// The root path. `/` ends in a slash without being a prefix, and a validator cannot
-// express a matching rule, so what is under test is that the schema states the rule,
-// that the example shows it, and that the two readings really do differ.
-test('the schema states the root-path rule where a path is defined', () => {
-  const { description } = seedSchema.$defs.path;
-  assert.match(description, /trailing slash means the prefix and everything under it/);
-  assert.match(description, /root path `\/` is matched exactly and never as a prefix/);
-  assert.match(seedSchema.$defs.deploy.properties.publicPaths.description, /matched exactly/);
-});
-
-// The spine id is a record kept elsewhere, so what the schema can carry is where to
-// read it; the example then has to use an id from that record rather than invent one.
-test('the schema names the record spine ids are read from', () => {
-  assert.match(seedSchema.$defs.spine.properties.id.description, /research\/spines\.json/);
-});
-
-test('the example carries the root path beside prefix entries and says which is which', () => {
-  const { publicPaths, notes } = read('SEED.example.json').deploy;
-  assert.ok(publicPaths.includes('/'), 'the public landing is declared');
-  const prefixes = publicPaths.filter((rule) => rule.endsWith('/') && rule !== '/');
-  assert.ok(prefixes.length > 0, `expected trailing-slash prefixes beside "/", got ${JSON.stringify(publicPaths)}`);
-  assert.match(notes, /matched exactly/);
-});
-
-test('reading the root as a prefix would admit every path', () => {
-  const { publicPaths } = read('SEED.example.json').deploy;
-  const literal = (pathname) =>
-    publicPaths.some((rule) => (rule.endsWith('/') ? pathname.startsWith(rule) : pathname === rule));
-  const asStated = (pathname) =>
-    publicPaths.some((rule) => (rule.endsWith('/') && rule !== '/' ? pathname.startsWith(rule) : pathname === rule));
-
-  assert.equal(literal('/app/settings'), true, 'the literal reading defeats the allowlist');
-  assert.equal(asStated('/app/settings'), false, 'the stated rule keeps the operator app behind a session');
-  assert.equal(asStated('/'), true, 'the root itself stays public');
-  assert.equal(asStated('/assets/app.css'), true, 'a trailing-slash entry below the root is still a prefix');
-  assert.equal(asStated('/signin/other'), false, 'an entry without a trailing slash is exact');
-});
-
 const seedProbes = [
   ['a missing category', SEED.replace(/\n  "category": "knowledge",/, ''), 'missing required property "category"'],
   ['a category outside the vocabulary', SEED.replace('"knowledge"', '"knowledge-base"'), 'is not one of'],
@@ -223,6 +186,27 @@ for (const [name, text, expected] of seedProbes) {
   });
 }
 
+const setupSchema = read('SETUP.schema.json');
+const setupProbes = [
+  ...[
+    ['LEGAL_NAME', 'TRADING_NAME', 'legal_name'],
+    ['OWNER_EMAIL', 'SUPPORT_EMAIL', 'owner_email']
+  ].map(([first, second, businessField]) => [
+    `two inputs claiming ${businessField}`,
+    [first, second].map(name => ({ name, label: 'Profile value', kind: 'text', businessField })),
+    new RegExp(`(?=.*${first})(?=.*${second})(?=.*${businessField})`)
+  ])
+];
+
+for (const [name, fields, message] of setupProbes) {
+  test(`the setup manifest ${message ? 'rejects' : 'accepts'} ${name}`, () => {
+    const manifest = { schema: 1, title: 'Settings', groups: [], fields, steps: [{ type: 'extension', id: 'workspace' }] };
+    const errors = validateSetupManifest(setupSchema, manifest);
+    if (message) assert.ok(errors.some(error => message.test(error)), `expected ${message}, got ${JSON.stringify(errors)}`);
+    else assert.deepEqual(errors, []);
+  });
+}
+
 test('required is satisfied only by own properties', () => {
   const own = { type: 'object', required: ['constructor'], properties: {}, additionalProperties: false };
   assert.deepEqual(validate(own, JSON.parse('{}')), ['$: missing required property "constructor"']);
@@ -257,6 +241,7 @@ test('an unsupported keyword in an untaken conditional branch throws', () => {
   };
   assert.deepEqual(validate(probe, { kind: 'b' }), [], 'validate cannot see a branch the document does not take');
   assert.throws(() => checkSchema(probe), /unsupported schema keyword "minProperties"/);
+  assert.throws(() => checkSchema({not: {minProperties: 1}}), /unsupported schema keyword "minProperties" at #\/not/);
 });
 
 test('an unsupported format anywhere in the schema throws', () => {

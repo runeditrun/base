@@ -147,3 +147,44 @@ test('excluded writes are admitted; carried UPDATE/DELETE, another writer and no
     });
   }
 });
+
+test('import reconstructs a transient backfill from archived evidence and drops it atomically', async t => {
+  const baseline = { name: '0002_baseline.sql', sql: `CREATE TABLE room_baseline(room TEXT PRIMARY KEY);
+INSERT INTO room_baseline SELECT id FROM rooms;
+${log}
+CREATE TABLE attribution(seq INTEGER PRIMARY KEY,user TEXT NOT NULL);` };
+  const retained = { name: '0003_retained.sql', sql: `CREATE TABLE "retained staging"(seq INTEGER PRIMARY KEY,room TEXT,user TEXT);
+INSERT INTO "retained staging" SELECT coalesce((SELECT max(seq) FROM membership_log),0)+row_number() OVER (ORDER BY m.room,m.user),m.room,m.user FROM members m JOIN room_baseline b ON b.room=m.room;
+INSERT INTO membership_log(seq,room,user,action,at) SELECT seq,room,user,'retained','2026-10-20T00:00:00Z' FROM "retained staging";
+INSERT INTO attribution(seq,user) SELECT seq,user FROM "retained staging";
+DROP TABLE "retained staging";` };
+  for (const evidence of [true, false]) {
+    const original = await source(t);
+    if (!evidence) await original.db.prepare('DELETE FROM members').run();
+    const archive = await bundle(original.service);
+    await apply(original.db, [baseline, retained]);
+    const queries = ['SELECT * FROM membership_log ORDER BY seq', 'SELECT * FROM attribution ORDER BY seq', 'SELECT * FROM room_baseline ORDER BY room'];
+    const expected = await Promise.all(queries.map(sql => select(original.db, sql)));
+    assert.equal(expected[0].length, evidence ? 3 : 0);
+    const target = await installed(t, [rooms, baseline, retained], failingOnce);
+    const id = await stage(target.service, archive);
+    await assert.rejects(finalize(target.service, archive, id));
+    assert.deepEqual(await select(target.db, 'SELECT * FROM members'), []);
+    assert.deepEqual(await select(target.db, "SELECT name FROM sqlite_master WHERE name='retained staging'"), []);
+    assert.equal((await finalize(target.service, archive, id)).phase, 'complete');
+    assert.deepEqual(await Promise.all(queries.map(sql => select(target.db, sql))), expected);
+    assert.deepEqual(await archived(target.db), await archived(original.db));
+    assert.deepEqual(await select(target.db, "SELECT name FROM sqlite_master WHERE name='retained staging'"), []);
+    // A newer archive already carries the facts; it must not reconstruct them.
+    const newer = await bundle(original.service),fresh = await installed(t, [rooms, baseline, retained]);
+    assert.equal((await finalize(fresh.service, newer, await stage(fresh.service, newer))).phase, 'complete');
+    assert.deepEqual(await Promise.all(queries.map(sql => select(fresh.db, sql))), expected);
+  }
+  // An unsupported transient UPDATE keeps the old new-table-only admission;
+  // its consumers must not run against the missing table at finalize.
+  const original = await source(t),unsupported = { ...retained, sql: retained.sql.replace('INSERT INTO membership_log', 'UPDATE "retained staging" SET user=upper(user);\nINSERT INTO membership_log') };
+  const target = await installed(t, [rooms, baseline, unsupported]);
+  assert.equal((await finalize(target.service, original.archive, await stage(target.service, original.archive))).phase, 'complete');
+  assert.deepEqual(await membership(target.db), []);
+  assert.deepEqual(await archived(target.db), await archived(original.db));
+});

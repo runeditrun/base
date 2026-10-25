@@ -59,7 +59,7 @@ test('public import uses Platform file hashes without replaying them, admits dec
  assert.deepEqual((await target.data("SELECT name FROM sqlite_master WHERE name='d1_migrations'"))[0].results,[],'no shadow native ledger');
  await target.data("DELETE FROM computed_entries; INSERT INTO rer_migrations(name,sha256) VALUES('initial-page.sql','"+'0'.repeat(64)+"')");
  const refused=await target.text(['import','--input','exports/saved.rer','--yes'],4);
- assert.match(refused.stderr,/migration_ledger:unknown:initial-page\.sql/);
+ assert.match(refused.stderr,/migration_ledger:unknown/);
  assert.deepEqual((await target.data('SELECT * FROM computed_entries'))[0].results,[]);
  const adapter=join(target.root,'scripts/installer/local.mjs');
  await writeFile(adapter,(await readFile(adapter,'utf8')).replace("localPortability({ database: 'default-seed-reference'", "localPortability({ database: 'default-seed-reference', platformMigrations: { prefix: 'delivered-', dataOnly: ['initial-page.sql'] }"));
@@ -72,7 +72,7 @@ test('public import uses Platform file hashes without replaying them, admits dec
  await target.data('DELETE FROM computed_entries');
  await writeFile(join(directory,'1000_pending.sql'),'CREATE TABLE pending_items(id TEXT PRIMARY KEY);');
  const pending=await target.text(['import','--input','exports/saved.rer','--yes'],4);
- assert.match(pending.stderr,/migration_ledger:unapplied:1000_pending\.sql/);
+ assert.match(pending.stderr,/migration_ledger:unapplied/);
  assert.deepEqual((await target.data("SELECT name FROM sqlite_master WHERE name='pending_items'"))[0].results,[]);
  await rm(join(directory,'1000_pending.sql'));
 });

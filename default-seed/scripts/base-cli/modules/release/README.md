@@ -63,11 +63,19 @@ For a GitHub source, the producer uses the operator's existing `gh` authenticati
 to resolve the source repository's **Verify** workflow for the exact selected
 commit. The source identity comes from its GitHub `origin` (HTTPS or SSH), or the
 committed `rer-project.json.sourceRepository` when no GitHub origin is present;
-it is independent of the publication destination. Only a completed successful
-`push` or `workflow_dispatch` run on the default branch or the version's release
-tag qualifies. The run and head repository must both match the source repository,
-and a release tag must resolve remotely to the exact source commit. PR merge runs,
-other SHAs, repositories, branches and unsuccessful runs cannot authorize release.
+it is independent of the publication destination. A completed successful run of
+the selected workflow qualifies when its `head_sha` equals the source commit
+exactly, both `repository.full_name` and `head_repository.full_name` match the
+source repository, and its event is `push` or `workflow_dispatch`. Any branch
+of that repository can qualify. These events run that commit's own workflow
+file on that commit's tree. Pull-request runs test a merge ref and cannot serve
+as exact-SHA evidence, even for a same-repository PR. Fork runs and other events
+cannot authorize release. A run on the version's release tag still requires
+that tag to resolve remotely to the source commit. A failed tag lookup
+disqualifies that tag run; a separate qualifying run can still authorize release.
+When several runs qualify, the highest run ID is selected. Failed or unfinished
+duplicates do not invalidate a qualifying success; the receipt records them as
+informational entries, including their run identities and outcomes.
 `gates.verify` records the source repository and commit, `workflowId`,
 `workflowFile`, `workflowName`, `runId`,
 `runUrl`, event, branch and conclusion in both receipt and site provenance.
@@ -87,15 +95,18 @@ script, when declared, in a disposable clone. `gates.verify.install` and
 `gates.verify.build` record those local results; failure or a tracked-source
 mutation blocks release. Publication/history/annotation scans, exact-source
 packaging, package integrity checks and the separate signing commands still run
-locally. A missing green Verify blocks with the exact SHA and instructions to
-push or re-run it. API/authentication failures also block, without substituting
-local verification.
+locally. A missing green Verify blocks with the exact SHA and the rejected run
+details; an unfinished run is named. Push the exact commit to any branch of the
+source repository and wait for its selected Verify workflow to complete
+successfully. If the required GitHub evidence cannot be resolved, release
+blocks without substituting local verification.
 
 Pass **`--local-verify`** to explicitly retain the previous behavior: frozen
 installation, `pnpm run verify`, then the committed `pnpm run verify:release`
 when declared, with its result in `gates.verify.release`. Sources without a
 GitHub origin or committed source identity also retain this behavior. This local
-path needs the seed's browser prerequisites and any resources its verification
+path is appropriate only when the repository's verification policy permits it
+and needs the seed's browser prerequisites and any resources its verification
 requires. Routine CI and default verification do not invoke the release-only
 script.
 
@@ -486,7 +497,10 @@ not a complete anchor set. On success the PKCS#8 private key goes to stdout
 only when stdout is not a terminal. Pipe it directly to the owner's vault;
 never send private key bytes to a terminal, repository, log or evidence. The
 signer accepts `--artifact DIR` and exactly one of `--key-file FILE` or
-`--key-stdin`, with `--scope test|rer` (default `rer`). Read production
+`--key-stdin`, with `--scope test|rer` (default `rer`) and optional
+`--publisher NAMESPACE`. Without `--publisher`, the signing publisher remains
+the project ID prefix before `/`. Supply the flag when the authenticating
+publisher differs from that prefix. Read production
 signing material from the vault through `--key-stdin`; `sign` never echoes it.
 `--key-stdin` refuses terminal input; pipe the key from a vault or file instead.
 
@@ -522,6 +536,69 @@ Base receipt check always requires a signature and refuses a missing envelope
 with `SIGNATURE_MISSING`, even where site or service consumers accept a legacy
 unsigned listing.
 
+### Anchor manifest versions and project authorization
+
+An anchor manifest has exactly the top-level fields `schemaVersion`,
+`environment`, `serial`, `legacyUnsigned` and `keys`. Schema version 2 requires
+`schemaVersion: 2` and a `projects` array on **every** entry in `keys`. Each array
+must contain 1–1024 unique, well-formed project IDs. There is no top-level
+`projects` field. All other anchor fields retain their existing meanings:
+
+- Each key requires `keyId`, `publicKey`, `publisher`, `githubOwner`, `notBefore`,
+  `notAfter`, `status`, `enrolment` and `review`, plus `projects` in version 2.
+  The existing optional fields are `retiredAt`, `compromisedAt` and
+  `keepStatements`, subject to the existing key-status rules.
+- `githubOwner` contains exactly `login` and `id`. The enrolment envelope retains
+  exactly `payloadType`, `payload` and `signatures`, with exactly `keyid` and
+  `sig` on its single signature. Its signed claim retains exactly
+  `schemaVersion`, `keyId`, `publicKey`, `publisher`, `githubOwner`, `notBefore`,
+  `notAfter`, `issuedAt` and `unsignedThrough`.
+- Unknown fields are refused at every level. Malformed manifests, including a
+  version 2 key without `projects`, are refused with `ANCHORS_INVALID`.
+
+Project IDs use the verifier's existing `validProject` grammar: exactly
+`OWNER`, a slash, and `NAME`, where `OWNER` matches `[a-z0-9][a-z0-9-]{0,38}` and `NAME` is a
+nonempty printable ASCII component (U+0020–U+007E), excluding `/`, `\` and the
+whole components `.` and `..`. Names remain literal and case-sensitive; this
+change introduces no name-length limit. Arrays containing duplicates or invalid
+IDs are invalid manifests.
+
+For version 2, only the signing key's own `projects` array authorizes the
+statement's project. Membership is exact and case-sensitive, with no prefix,
+namespace, repository-name or other-key inference. A well-formed project absent
+from that array is refused with `PUBLISHER_MISMATCH`; a statement with malformed
+project grammar is refused with `STATEMENT_INVALID`. The statement's publisher
+must still match the signing key's authenticated publisher.
+
+Version 1 requires the explicit numeric `schemaVersion: 1` and preserves the
+existing namespace checks and refusal behavior: the statement's project must
+start with its publisher followed by `/`, and that publisher must match the
+signing key. `projects` is invalid both at the top level and on a key in a
+version 1 manifest. Omitting a version or adding `projects` never opts a version
+1 manifest into version 2.
+
+This version change applies only to the anchor manifest. Release statements and
+key-enrolment claims remain at `schemaVersion: 1`, with the same DSSE payload
+types. Revocation and compromise handling, retirement, expiry and validity,
+serial freshness, unsigned-version floors and environment/scope checks remain
+unchanged. In particular, `projects` does not change the enrolment's
+`unsignedThrough` or the manifest's `legacyUnsigned` policy.
+
+For example, to sign project `octocat/hello-world` using a key whose publisher is
+`just-every`, use:
+
+```sh
+rer release sign --artifact /path/to/release --key-stdin --publisher just-every
+```
+
+Pipe the signing key from the vault into that command as described above. Its
+version 2 anchor must list `octocat/hello-world` in that key's `projects`. Verify with
+`rer release receipt --artifact /path/to/release --anchors /path/to/anchors-v2.json`.
+The receipt check matches the signed project, repository and files against the
+artifact while authenticating the publisher through the anchor; it does not
+infer the publisher from the project owner component. The signer's temporary self-proof anchor
+manifest uses version 2 and lists exactly the one project being signed.
+
 The dependency-free verifier source is `modules/release/signature.mjs`; it has
 no `node:` imports and is exported as
 `@runeditrun/rer/modules/release/signature`. Its default-seed portable copy is
@@ -530,5 +607,11 @@ generated byte-for-byte at
 test vectors live in `modules/release/vectors/release-signature-vectors.json`
 and are generated byte-for-byte at
 `default-seed/scripts/base-cli/modules/release/vectors/release-signature-vectors.json`.
-The vectors use the existing public Octocat example repository context with synthetic bundle bytes and throwaway test keys; they do not represent an actual release.
+The vectors use public Octocat and just-every repository contexts with synthetic
+bundle bytes and throwaway test keys; they do not represent actual releases.
+`vectors/publisher-projects.mjs` regenerates only the appended publisher-project
+cases while preserving the historical v1 vector bytes.
 Consumers vendor and pin the verifier source by Base commit and SHA-256.
+Site and Platform adoption must copy `signature.mjs` and the shared vectors
+byte-for-byte and repin them to the landed Base commit. Migration of their
+anchor manifests to version 2 is separate from that source adoption.

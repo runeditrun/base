@@ -11,13 +11,15 @@ import { privateSitePaths } from './site-inputs.mjs';
 import { redactSiteText } from './site-diagnostics.mjs';
 import { siteRuntime, buildSiteRuntime, runtimeSummary } from './site-runtime.mjs';
 import { siteRateLimit } from '../modules/deploy-kit/site-runtime.mjs';
+import { siteHosting } from './site-hosting.mjs';
 
 // The run site: a seed's static marketing pages, /run and docs, built from
 // edition identity with no installation data. A seed opts in with
 // commandAdapter's `site: { entry, output, declaration, config?, runtime? }`: the module
 // whose sitePages({ styles }) returns the pages, the ignored folder the build
 // writes, the deploy declaration naming the run site's domain, and optionally
-// the Vite config holding the plugins the site pages need.
+// the Vite config holding the plugins the site pages need. sitePages also gets
+// `hosting`, what /docs/hosting says, read from the seed's deploy declarations.
 const relativePath = value => typeof value === 'string' && /^[A-Za-z0-9._/-]+$/.test(value) && !value.split('/').some(part => !part || part === '.' || part === '..');
 
 export function declaredSite(project) {
@@ -63,7 +65,8 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
  await rm(staging, { recursive: true, force: true });
  try {
   await mkdir(staging);
-  try { await store.run('Building the run site', process.execPath, [fileURLToPath(new URL('./site-render.mjs', import.meta.url)), project.root, site.entry, staging, site.config ?? '', JSON.stringify({entries:site.clients ?? {}, config:site.clientConfig, privatePaths:privateSitePaths(project.adapter), ...(site.runtime ? {runtime:site.runtime, corpus:`${staging}.corpus.json`} : {})})], { cwd: project.root, signal, heavy: false }); }
+  const { hosting } = await siteHosting(project);
+  try { await store.run('Building the run site', process.execPath, [fileURLToPath(new URL('./site-render.mjs', import.meta.url)), project.root, site.entry, staging, site.config ?? '', JSON.stringify({entries:site.clients ?? {}, config:site.clientConfig, privatePaths:privateSitePaths(project.adapter), hosting, ...(site.runtime ? {runtime:site.runtime, corpus:`${staging}.corpus.json`} : {})})], { cwd: project.root, signal, heavy: false }); }
   catch (error) {
    const code = await readFile(`${staging}.refusal`, 'utf8').catch(() => '');
    if (code === 'site_private_input') throw new RerError(code, 'Run site client imports a private installation file or a file outside the seed and its declared dependencies.', 4);
@@ -123,7 +126,8 @@ export async function siteCommand(project, options, store, signal, out) {
   return { site: { folder: built.folder, path, pages: built.pages, files: built.files, references:built.references, ...(built.runtime ? {runtime:runtimeSummary(built.runtime)} : {}) } };
  }
  const plan = await siteDeployment(project, options, built.folder, built.runtime);
- const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS, AI and SEARCH_RATE_LIMITER' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${plan.assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
+ const assets = relative(project.root, plan.assets);
+ const human = [`Run site plan: site Worker ${plan.worker}, Base-generated, ${built.runtime ? 'docs-search runtime with ASSETS, AI and SEARCH_RATE_LIMITER' : 'its only binding the assets'} (the app's Worker ${plan.appWorker} is not touched)`, `  assets: ${assets} (${built.files} files; HTML ${plan.assetsConfig.html_handling}, not found ${plan.assetsConfig.not_found_handling}; the Worker runs first)`,
   `  custom domains: ${plan.hostnames.join(', ')}; workers.dev off`, ...plan.redirects.map(rule => `  redirect in the Worker: ${rule.from} -> ${rule.to} (${rule.status}, keeps ${rule.keeps.join(' and ')})`)];
  const { collectFiles } = await import('../modules/deploy-kit/artifact.mjs');
  const { siteFingerprint } = await import('../modules/deploy-kit/site.mjs');
@@ -134,7 +138,7 @@ export async function siteCommand(project, options, store, signal, out) {
  if (rateLimit) human.push('  search admission: '+rateLimit.simple.limit+' per '+rateLimit.simple.period+'s; namespace '+rateLimit.namespace_id+'; location-local, eventually consistent; no hard account-wide spend cap');
  const fingerprint = siteFingerprint(plan, files, {preparing:Boolean(runtime) && !prepare});
  if (runtime) human.push(`  fingerprint: ${fingerprint}${prepare ? '' : ' (vectors prepared only on a real deploy)'}`);
- const summary = { ...(runtime ? {runtime, rateLimit, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets: plan.assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
+ const summary = { ...(runtime ? {runtime, rateLimit, fingerprint, vectors:prepare ? 'prepared' : 'prepare-on-deploy'} : {}), worker: plan.worker, appWorker: plan.appWorker, module: plan.module, bindings: plan.bindings, assets, files: built.files, references:built.references, domain: plan.domain, hostnames: plan.hostnames, workersDev: false, runWorkerFirst: true, assetsConfig: plan.assetsConfig, redirects: plan.redirects.map(({ from, to, status }) => ({ from, to, status })) };
  if (options.dryRun) {
   if (options.json) out.event('site', summary); else for (const line of human) out.human(line);
   store.report('deploy --site: dry run complete; no deployment occurred and no provider request was made.');

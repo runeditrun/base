@@ -4,6 +4,7 @@
 import { createOperatorAuth, createAuthHandler, createSignInHandler, AuthError } from '../../../index.mjs';
 import { withDevIdentity } from '../../../dev/index.mjs';
 import { linkEdge } from '../../../tests/native/provider-edge.mjs';
+import { openDependencyKey } from '../../../../dependencies/sealing.mjs';
 import { publicKey } from '../../../../dependencies/crypto.mjs';
 import { fixture as nativeFixture } from '../../../tests/native/accounts.mjs';
 import { directEmail } from '../../../tests/native/email.mjs';
@@ -32,18 +33,18 @@ export default {
     let request = incoming;
     if (new URL(incoming.url).pathname === '/__test_dispatch') { const { url, ...init } = await incoming.json(); request = new Request(url, init); }
     const url = request.url;
-    const setup = JSON.parse(env.TEST_SETUP);
     const db = env.DB;
     const current = await state(db);
+    const setup = current.browserSetup ?? JSON.parse(env.TEST_SETUP);
     const offset = current.clock ?? 0;
     const now = () => Date.now() + offset;
     const patch = current.fakes ?? {};
-    const nativeLink = setup.native && setup.dependencyIssuer ? linkEdge(db,setup.dependencyIssuer,'app-at-auth',now) : null;
+    const nativeLink = setup.native && setup.dependencyIssuer ? linkEdge(db,setup.dependencyIssuer,'app-at-auth',now,setup.core) : null;
     const nativeKey=setup.native?await db.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='oidc-provider@1'").first():null;
     const fakes = await Promise.all(setup.fakes.map(async spec => {
       const changes = patch[spec.issuer] ?? {};
       const { keyName, clientKeyName, signingKeyName, jwksNames, failure, ...options } = { ...spec, ...changes };
-      return fakeProvider({ ...options, key: setup.keys[keyName], clientKey: nativeKey && spec.issuer===setup.dependencyIssuer ? publicKey(JSON.parse(nativeKey.private_key)) : clientKeyName ? setup.keys[clientKeyName].public : undefined,
+      return fakeProvider({ ...options, key: setup.keys[keyName], clientKey: nativeKey && spec.issuer===setup.dependencyIssuer ? publicKey((await openDependencyKey(setup.core,'oidc-provider@1',nativeKey.private_key)).key) : clientKeyName ? setup.keys[clientKeyName].public : undefined,
         ...(signingKeyName ? { signingKey: setup.keys[signingKeyName] } : {}), ...(jwksNames ? { jwks: jwksNames.map(name => setup.keys[name].public) } : {}),
         transport: failure ? async uri => uri.endsWith('/token') ? null : failures[failure]() : undefined,
         grants: grants(db, spec.issuer), now });
@@ -57,6 +58,10 @@ export default {
     };
     const providers = setup.providers.map(p => ({ ...p, ...(p.privateKeyName ? { privateKey: setup.keys[p.privateKeyName].private } : {}), privateKeyName: undefined, ...current.config?.[p.id] }));
     const hooks = {
+      audit: setup.audit ? event => {
+        const insert = ['INSERT INTO fixture_admin_audit(payload) VALUES(?)', [JSON.stringify(event)]];
+        return current.auditFailure ? [insert, ['INSERT INTO fixture_admin_audit(payload) VALUES(NULL)', []]] : [insert];
+      } : undefined,
       beforeMagicLink: setup.hooks?.quietFor ? ({ email }) => email !== setup.hooks.quietFor : undefined,
       afterConfirm: setup.hooks?.reviewFor || setup.hooks?.refuseFor ? async ({ operator, session, method }) => {
         await db.prepare('INSERT INTO fixture_hook_calls(session_id,method) VALUES(?,?)').bind(session.id,method).run();
@@ -117,7 +122,7 @@ export default {
       if (error instanceof AuthError) return Response.json({ error: error.code }, { status: error.status });
       throw error;
     }
-    if(setup.native && setup.core?.dependencies) {const response=await createDependencies({db,origin:setup.core.origin??'https://app.example',name:'Native',provider:setup.dependencyIssuer,auth,fetch:fetcher,clock:now}).handle(request);if(response)return response;}
+    if(setup.native && setup.core?.dependencies) {const response=await createDependencies({db,INSTALLATION_KEY:setup.core.INSTALLATION_KEY,origin:setup.core.origin??'https://app.example',name:'Native',provider:setup.dependencyIssuer,auth,fetch:fetcher,clock:now}).handle(request);if(response)return response;}
     const app = { async fetch(request) {
       return await createSignInHandler(auth)(request) ?? await createAuthHandler(auth)(request) ?? new Response('Not found', { status: 404 });
     } };

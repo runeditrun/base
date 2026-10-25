@@ -1,7 +1,9 @@
 # Building and releasing `@runeditrun/rer`
 
-The package is pure JavaScript with no dependencies, so its npm tarball is the
-only artifact: no per-platform bundles and no website infrastructure. The site
+The ordinary CLI is JavaScript with no runtime npm dependencies. The package
+also carries TypeScript source, including its public D1 entry; Worker TypeScript
+entries require a suitable bundler. Its npm tarball is the only package artifact:
+no per-platform bundles and no website infrastructure. The site
 serves a byte-identical copy of the package's `install.sh`.
 
 ## Build
@@ -51,13 +53,14 @@ pnpm run build`, no `rer` on PATH) are proved before anything is published.
 stops the workflow. Every other trigger (`workflow_dispatch`, or a branch push
 touching `global/`, the build scripts or the workflow) is a dry run.
 
-One job, in order: build once; rebuild from a second clone at another path and
-require identical bytes; require a version with no development stamp (a dry run
-reports it); unpack the exact tarball and run `scripts/publish-check.mjs` over
-it, stopping on any finding; smoke-test the same tarball; upload the tarball,
-`install.sh`, `SHA256SUMS` and the scan report as a run artifact. On a release
-tag only: `npm publish TARBALL --access public` (skipped when that version is
-already on npm; nothing is rebuilt), then a GitHub release for the tag with the
+The `build` job builds once, rebuilds from a second clone at another path and
+requires identical bytes. It requires a version with no development stamp (a dry
+run reports it), unpacks the exact tarball and runs `scripts/publish-check.mjs`
+over it, stopping on any finding, then smoke-tests the same tarball and uploads
+it with `install.sh`, `SHA256SUMS` and the scan report as a run artifact. On a release
+tag only, the dependent `publish` job downloads that artifact and runs
+`npm publish TARBALL --access public` (skipped when that version is
+already on npm; nothing is rebuilt), then creates a GitHub release for the tag with the
 tarball, `install.sh`, `SHA256SUMS` and the scan report attached.
 
 The publish job runs in the GitHub environment `npm`, the only place its

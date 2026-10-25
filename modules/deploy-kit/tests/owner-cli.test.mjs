@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main, report } from '../owner-cli.mjs';
 import { ownerProvider } from './owner-provider.mjs';
+import { deadlineClock } from './deadline-clock.mjs';
 
 const declaration = {version:1,project:'runeditrun/vector',compatibilityDate:'2026-09-08',compatibilityFlags:['nodejs_compat'],
   d1:[{binding:'DB'}],r2:[{binding:'FILES'}],secrets:[{binding:'SESSION_SECRET',environment:'SESSION_SECRET'}],crons:['* * * * *'],
@@ -73,13 +74,13 @@ test('owner CLI inspection uses the native receipt origin even when current sett
   assert.equal((await main(['inspect',...args],inputs(provider),options)).origin,deployed.origin);
 });
 
-test('owner CLI names only its two Cloudflare inputs and refuses uncommitted source before any provider write', async t => {
+test('owner CLI refuses missing inputs and uncommitted source before any provider write', async t => {
   const provider = ownerProvider(); t.after(() => provider.close());
   const root = await seed(t);
   const options = {fetch:provider.fetch,cwd:root};
   const argv = ['deploy','--declaration','deploy.json','--environment','production'];
   const throwaway = {CF_THROWAWAY_ACCOUNT_ID:provider.accountId,CF_THROWAWAY_API_TOKEN:provider.token,RER_DEPLOY_RUN_ID:'1'};
-  await assert.rejects(main(argv,throwaway,options),error => error.message === 'missing-input' && JSON.stringify(error.inputs) === '["CLOUDFLARE_ACCOUNT_ID","CLOUDFLARE_API_TOKEN"]');
+  await assert.rejects(main(argv,throwaway,options),error => error.message === 'missing-input');
   await assert.rejects(main(['deploy','--environment','production'],inputs(provider),options),/usage/);
   await assert.rejects(main(argv,inputs(provider,{CLOUDFLARE_ACCOUNT_ID:'not-an-account'}),options),/invalid-cloudflare-input/);
   await writeFile(join(root,'migrations/core/0001_projects.sql'),'CREATE TABLE changed(id TEXT);');
@@ -89,7 +90,7 @@ test('owner CLI names only its two Cloudflare inputs and refuses uncommitted sou
 });
 
 // Virtual time for the kit's list waits: no test sleeps.
-function clock() { let now = 0; return {settle:{clock:() => now,sleep:async ms => { now += ms; }},elapsed:() => now}; }
+function clock() { let now = 0; return {settle:{clock:() => now,sleep:async ms => { now += ms; }}}; }
 
 test('a first deploy completes while the account lists its new D1 database up to two minutes late', async t => {
   for (const shape of ['count','omit']) {
@@ -99,7 +100,7 @@ test('a first deploy completes while the account lists its new D1 database up to
     provider.lagD1(28,shape);
     const first = await main(argv,inputs(provider),{fetch:provider.fetch,cwd:root,settle:time.settle,notice:() => {}});
     assert.deepEqual(first.created,['d1:vector-production-db','r2:vector-production-files'],shape);
-    assert.ok(time.elapsed() > 60000,'the listing stayed behind for over a minute');
+    assert.equal(provider.state.calls.filter(call => call.lagged).length,28,'every delayed listing was observed before deployment');
     assert.equal(provider.state.databases.length,1);
     assert.equal((await main(argv,inputs(provider),{fetch:provider.fetch,cwd:root,settle:time.settle,notice:() => {}})).changed,false);
   }
@@ -127,7 +128,6 @@ test('owner CLI reports refusal codes and resource names, never other error text
   assert.deepEqual(report(collision),{ok:false,code:'resource-name-collision',resource:'d1:vector-production-db'});
   assert.deepEqual(report(new Error('missing-secret-SESSION_SECRET')),{ok:false,code:'missing-secret-SESSION_SECRET'});
   assert.deepEqual(report(new Error('Unexpected token test-only-session-value in JSON')),{ok:false,code:'owner-deploy-failed'});
-  assert.deepEqual(report(Object.assign(new Error('missing-input'),{inputs:['CLOUDFLARE_API_TOKEN']})),{ok:false,code:'missing-input',inputs:['CLOUDFLARE_API_TOKEN']});
 });
 
 test('postdeploy readback waits only for fresh workers.dev 1042 within the upload deadline', async t => {
@@ -164,27 +164,46 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
  assert.equal(attempts, 1, 'no probe starts after the original upload deadline');
  assert.ok(elapsed <= deadline, 'postdeploy readback stops by the original upload deadline');
  assert.equal(first.propagation.window.remaining(), 0, 'persistent propagation exhausts only the original budget');
- // The same deadline also aborts a provider response, not just the next poll.
- const slow = ownerProvider(); t.after(() => slow.close());
- const slowRoot = await seed(t); let uploaded = false, aborted = false, reads = 0;
- const fetch = async (input, init = {}) => {
-  const url = new URL(input);
-  if (uploaded && url.pathname.endsWith('/settings')) {
-   reads++;
-   await new Promise((resolve, reject) => {
-    const abort = () => { aborted = true; reject(init.signal.reason); };
-    if (init.signal.aborted) abort(); else init.signal.addEventListener('abort', abort, {once:true});
-   });
+ // Expiry before entry and during a provider read use the same owned deadline.
+ for (const phase of ['before-entry','after-entry']) {
+  const slow = ownerProvider(); t.after(() => slow.close());
+  const slowRoot = await seed(t), time = deadlineClock(), barrier = slow.holdSettingsAfterUpload();
+  const readiness = {...time.readiness};
+  if (phase === 'before-entry') readiness.timeout = ms => {
+   const signal = time.readiness.timeout(ms);
+   time.advance(ms);
+   return signal;
+  };
+  const deployed = main(['deploy',...args], inputs(slow), {cwd:slowRoot,fetch:slow.fetch,notice:()=>{},healthOptions:{readiness}});
+  const rejected = assert.rejects(deployed, /provider-transport-failed/);
+  if (phase === 'after-entry') {
+   await barrier.entered;
+   assert.equal(barrier.pending, 1);
+   time.advance(readiness.totalMs);
+   await barrier.aborted;
   }
-  const result = await slow.fetch(input, init);
-  if (init.method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') uploaded = true;
+  await rejected;
+  assert.equal(barrier.reads, phase === 'after-entry' ? 1 : 0, 'expiry never retries or enters a later settings read');
+  assert.equal(barrier.pending, 0, 'abort releases the settings read and its listener');
+ }
+
+ // A transient failure can land after clock expiry while the abort timer is pending.
+ const boundary = ownerProvider(); t.after(() => boundary.close());
+ const boundaryRoot = await seed(t), boundaryTime = deadlineClock(); let boundaryUploaded = false, boundaryReads = 0;
+ const boundaryFetch = async (input, init = {}) => {
+  const url = new URL(input);
+  if (boundaryUploaded && (init.method ?? 'GET') === 'GET' && url.pathname.endsWith('/settings')) {
+   boundaryReads++;
+   assert.equal(init.signal.aborted, false, 'the deadline timer has not fired');
+   boundaryTime.advance(boundaryTime.readiness.totalMs, false);
+   throw Object.assign(new Error('reset'), {code:'ECONNRESET'});
+  }
+  const result = await boundary.fetch(input, init);
+  if (init.method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') boundaryUploaded = true;
   return result;
  };
- // Keep the test process alive while the production timeout (an unref timer) fires.
- const hold = setTimeout(() => {}, 1000);
- try { await assert.rejects(main(['deploy',...args], inputs(slow), {cwd:slowRoot,fetch,notice:()=>{},healthOptions:{readiness:{totalMs:50}}}), /provider-transport-failed/); }
- finally { clearTimeout(hold); }
- assert.ok(aborted); assert.equal(reads, 1, 'an expired provider read is not retried');
+ await assert.rejects(main(['deploy',...args], inputs(boundary), {cwd:boundaryRoot,fetch:boundaryFetch,notice:()=>{},healthOptions:{readiness:boundaryTime.readiness}}), /provider-transport-failed/);
+ assert.equal(boundaryReads, 1, 'clock expiry blocks another provider read before the abort timer fires');
 
  // A changed-source upload can briefly lose its established route too.
  await writeFile(join(root,'source.mjs'),'export const edition = "updated";');

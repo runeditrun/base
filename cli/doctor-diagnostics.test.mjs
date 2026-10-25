@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -58,8 +58,44 @@ test('doctor reports every failed check in complete JSON and keeps human output 
  if (process.env.RER_TEST_EVIDENCE_DIRECTORY) await writeFile(join(process.env.RER_TEST_EVIDENCE_DIRECTORY, 'doctor-human.txt'), human);
  const summaryAt = human.lastIndexOf('\ndoctor:');
  assert.ok(summaryAt > 0, 'human mode puts its summary on a separate line after the report');
- const report = JSON.parse(human.slice(0, summaryAt));
- assert.deepEqual(report.operations.commands, diagnostics.operations.commands);
- assert.equal(report.state.issue, diagnostics.state.issue);
- assert.equal(report.pnpm.issue, diagnostics.pnpm.issue);
+ assert.throws(() => JSON.parse(human.slice(0, summaryAt)), 'human mode is readable text');
+ const unavailable = /^Unavailable command inputs:\n((?: {2}[^\n]+\n)+)/m.exec(human)?.[1];
+ assert.ok(unavailable, 'human report identifies unavailable command inputs');
+ const reportedCommands = unavailable.trimEnd().split('\n').map(line => /^ {2}([^:]+):/.exec(line)?.[1]);
+ assert.deepEqual(reportedCommands, diagnostics.operations.commands.filter(command => !command.available).map(command => command.name));
+ assert.ok(human.includes(diagnostics.state.issue));
+ assert.ok(human.includes(diagnostics.pnpm.issue));
+});
+
+test('local doctor succeeds without deployment credentials and still refuses missing local settings', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'rer-doctor-local-'));
+ t.after(() => rm(root, { recursive: true, force: true }));
+ await mkdir(join(root, 'home'));
+ await symlink(join(import.meta.dirname, '../default-seed/node_modules'), join(root, 'node_modules'), 'dir');
+ await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
+ await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+ await writeFile(join(root, 'adapter.mjs'), "export const commandAdapter={version:1,state:'.wrangler/state',hooks:{secrets:{file:'.dev.vars'}}};\n");
+ const deploymentInputs = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-doctor-1', runtime: { requirements: [] }, requiredEnvironment: deploymentInputs, seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { dev: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Run this checkout locally.' } } }));
+ const invoke = async json => {
+  const child = spawn(process.execPath, [cli, 'doctor', ...(json ? ['--json'] : [])], { cwd: root, env: { PATH: process.env.PATH, HOME: join(root, 'home'), TZ: 'UTC' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '', stderr = '';
+  child.stdout.on('data', chunk => stdout += chunk); child.stderr.on('data', chunk => stderr += chunk);
+  const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+  return { code, stdout, stderr, ...(json ? { result: JSON.parse(stdout) } : {}) };
+ };
+ await writeFile(join(root, '.dev.vars'), 'OWNER_EMAIL=owner@example.test\nAUTH_ORIGIN=http://localhost:8787\n');
+ const healthy = await invoke(true);
+ assert.equal(healthy.code, 0, healthy.stdout + healthy.stderr);
+ assert.equal(healthy.result.diagnostics.ok, true);
+ assert.deepEqual(healthy.result.diagnostics.missingInputs, []);
+ assert.deepEqual(healthy.result.diagnostics.deploymentInputs, deploymentInputs);
+ const human = await invoke(false);
+ assert.equal(human.code, 0, human.stdout + human.stderr);
+ assert.throws(() => JSON.parse(human.stdout));
+ for (const name of deploymentInputs) assert.ok(human.stdout.includes(name));
+ await writeFile(join(root, '.dev.vars'), 'AUTH_ORIGIN=http://localhost:8787\n');
+ const missing = await invoke(true);
+ assert.equal(missing.code, 3, missing.stdout + missing.stderr);
+ assert.deepEqual(missing.result.diagnostics.missingInputs, ['OWNER_EMAIL']);
 });

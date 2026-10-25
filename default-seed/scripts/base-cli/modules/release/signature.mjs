@@ -1,7 +1,7 @@
 // Shared release authentication: dependency-free, with one WebCrypto code path.
 export const PAYLOAD_TYPE = 'application/vnd.runeditrun.release-statement.v1+json';
 export const ENROLMENT_TYPE = 'application/vnd.runeditrun.key-enrolment.v1+json';
-export const LIMITS = Object.freeze({ envelopeBytes: 65536, files: 256, fileBytes: 1073741824 });
+export const LIMITS = Object.freeze({ envelopeBytes: 65536, files: 256, fileBytes: 1073741824, projectsPerKey: 1024 });
 const encoder = new TextEncoder();
 const trusted = new WeakMap();
 const codes = new Set(('SIGNATURE_MISSING INPUT_TOO_LARGE ENVELOPE_INVALID KEY_TEST_REFUSED KEY_UNKNOWN SIGNATURE_INVALID STATEMENT_NOT_CANONICAL STATEMENT_INVALID PUBLISHER_MISMATCH KEY_OUTSIDE_VALIDITY KEY_RETIRED KEY_REVOKED ISSUED_IN_FUTURE SUBJECT_MISMATCH FILE_MISSING FILE_UNDECLARED DIGEST_MISMATCH PATH_UNSAFE VERSION_ROLLBACK VERSION_REUSED ANCHORS_INVALID ANCHORS_STALE').split(' '));
@@ -110,11 +110,13 @@ const filePattern = /^(public-source\.tar|release-receipt\.json|publish-check\.j
 function safePath(path) {
   return validRelativePath(path) && matches(path, filePattern);
 }
-export function validateStatement(s) {
+// V1 anchors retain their original namespace/schema refusal. V2 separates
+// project grammar from the signing key's reviewed authority below.
+export function validateStatement(s, anchorsVersion = 1) {
   try {
     if (!shape(s, ['schemaVersion', 'publisher', 'project', 'version', 'tag', 'repository', 'publicCommit', 'publicTree', 'tagObject', 'files', 'issuedAt', 'keyId'])
       || s.schemaVersion !== 1 || !matches(s.publisher, namespace) || !validProject(s.project)
-      || !s.project.startsWith(s.publisher + '/') || !version(s.version) || s.tag !== 'v' + s.version
+      || (anchorsVersion === 1 && !s.project.startsWith(s.publisher + '/')) || !version(s.version) || s.tag !== 'v' + s.version
       || !matches(s.repository, repositoryPattern) || ['.', '..'].includes(s.repository.split('/')[4])
       || !matches(s.publicCommit, hex40) || !matches(s.publicTree, hex40) || !matches(s.tagObject, hex40)
       || !instant(s.issuedAt) || !matches(s.keyId, keyPattern) || !Array.isArray(s.files)) refuse('STATEMENT_INVALID');
@@ -173,17 +175,21 @@ export async function loadAnchors(raw, environment = 'production', options = {})
       || (Object.hasOwn(options, 'minimumSerial') && (!Number.isSafeInteger(options.minimumSerial) || options.minimumSerial < 0))) refuse('ANCHORS_INVALID');
     const anchors = raw instanceof Uint8Array ? parseJSON(raw, 'ANCHORS_INVALID')
       : typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(canonical(raw));
-    if (!shape(anchors, ['schemaVersion', 'environment', 'serial', 'legacyUnsigned', 'keys']) || anchors.schemaVersion !== 1
+    if (!shape(anchors, ['schemaVersion', 'environment', 'serial', 'legacyUnsigned', 'keys']) || ![1, 2].includes(anchors.schemaVersion)
       || anchors.environment !== environment || !Number.isSafeInteger(anchors.serial) || anchors.serial < 1
       || !Array.isArray(anchors.keys) || !floors(anchors.legacyUnsigned)) refuse('ANCHORS_INVALID');
     const lookup = new Map(), owners = new Map();
     for (const k of anchors.keys) {
-      if (!shape(k, ['keyId', 'publicKey', 'publisher', 'githubOwner', 'notBefore', 'notAfter', 'status', 'enrolment', 'review'], ['retiredAt', 'compromisedAt', 'keepStatements'])
+      const projectFields = anchors.schemaVersion === 2 ? ['projects'] : [];
+      if (!shape(k, ['keyId', 'publicKey', 'publisher', 'githubOwner', 'notBefore', 'notAfter', 'status', 'enrolment', 'review', ...projectFields], ['retiredAt', 'compromisedAt', 'keepStatements'])
         || !matches(k.keyId, keyPattern) || lookup.has(k.keyId) || !matches(k.publisher, namespace)
         || !shape(k.githubOwner, ['login', 'id']) || !matches(k.githubOwner.login, namespace)
         || !Number.isSafeInteger(k.githubOwner.id) || k.githubOwner.id <= 0 || !ascii(k.review)
         || !instant(k.notBefore) || !instant(k.notAfter) || k.notBefore >= k.notAfter
         || !['active', 'retired', 'compromised'].includes(k.status)) refuse('ANCHORS_INVALID');
+      if (anchors.schemaVersion === 2 && (!Array.isArray(k.projects) || k.projects.length < 1
+        || k.projects.length > LIMITS.projectsPerKey || !k.projects.every(validProject)
+        || new Set(k.projects).size !== k.projects.length)) refuse('ANCHORS_INVALID');
       const maximum = new Date(k.notBefore); maximum.setUTCFullYear(maximum.getUTCFullYear() + 2);
       if (Date.parse(k.notAfter) > maximum.getTime()) refuse('ANCHORS_INVALID');
       if ((k.status === 'retired' && !Object.hasOwn(k, 'retiredAt'))
@@ -315,10 +321,11 @@ export async function verifyRelease(envelopeBytes, loadedAnchors, input = {}) {
     if (!found) refuse('KEY_UNKNOWN');
     await checkSignature(found.publicKey, PAYLOAD_TYPE, parts.payload, parts.signature);
     const statement = canonicalPayload(parts.payload);
-    validateStatement(statement);
+    validateStatement(statement, loadedAnchors.schemaVersion);
     if (statement.keyId !== parts.keyid) refuse('STATEMENT_INVALID');
     const anchor = found.anchor;
-    if (statement.publisher !== anchor.publisher || statement.repository.split('/')[3] !== anchor.githubOwner.login) refuse('PUBLISHER_MISMATCH');
+    if (statement.publisher !== anchor.publisher || statement.repository.split('/')[3] !== anchor.githubOwner.login
+      || (loadedAnchors.schemaVersion === 2 && !anchor.projects.includes(statement.project))) refuse('PUBLISHER_MISMATCH');
     const statementSha256 = await sha256(parts.payload);
     const now = context.now === undefined ? Date.now() : context.now;
     if (!Number.isSafeInteger(now) || Math.abs(now) > 8640000000000000) refuse('STATEMENT_INVALID');

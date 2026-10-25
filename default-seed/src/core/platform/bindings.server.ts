@@ -9,6 +9,8 @@ export interface Bindings {
   FILES?: R2Bucket
   OWNER_EMAIL: string
   SESSION_SECRET: string
+  INSTALLATION_KEY?: string
+  INSTALLATION_KEY_PREVIOUS?: string
   SETUP_TOKEN?: string
   AUTH_ORIGIN: string
   AUTH_LOCAL?: string
@@ -28,6 +30,8 @@ export interface Bindings {
   RER_OWNER_CLAIM_ISSUER?: string
   RER_OWNER_CLAIM_INSTALLATION_ID?: string
   RER_OWNER_CLAIM_PUBLIC_KEYS?: string
+  /** Public Business settings verification ring and installation binding. */
+  RER_BUSINESS_TRUST?: string
   RER_INSTALLATION_ID?: string
   RER_MANAGEMENT_ORIGIN?: string
   AUTH_ALLOW_LIST?: string

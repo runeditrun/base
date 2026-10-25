@@ -4,7 +4,7 @@ Every seed has two versions of its homepage (owner, 12 October 2026):
 
 1. **The run site**, `run-<seed>.com`: the seed's owner-approved marketing
    homepage, whose primary action reads **Run <Seed>** and opens `/run`, a page
-   with the two commands that run the seed for free on your own computer. It is
+   with one command that runs the seed for free on your own computer. It is
    static, built by `rer build --site`.
 2. **The installed instance**, the app someone runs or deploys: its `/` is the
    **Lobby**, a minimal page whose one action is **Sign in**, or **Finish
@@ -141,35 +141,43 @@ export default defineConfig({ plugins: [docsSite(), react()] })
 ```
 
 and add `deploy-site.json` (`{"version": 1, "domain": "run-<seed>.com"}`); list
-it in `vite.config.ts` `server.fs.allow` when the Worker imports it. Keep every
-Run page string and command in one `RunData` value (`src/site/run.ts` or
+it in `vite.config.ts` `server.fs.allow` when the Worker imports it. Keep the seed-specific
+Run page data in one `RunData` value (`src/site/run.ts` or
 `run.json`):
 
 | Field | Cradle | Uptime |
 | --- | --- | --- |
 | `name` | `Cradle` | `Uptime` |
-| `repository` | `https://github.com/just-every/cradle` | `https://github.com/just-every/uptime-monitor` |
-| `clone` | `npx -y @runeditrun/rer dev just-every/cradle` | `npx -y @runeditrun/rer dev just-every/uptime-monitor --dir uptime` |
-| `folder` | `cradle` | `uptime` |
-| `requirements` | `Runs on macOS, Linux or Windows with WSL2, with git. The installer brings Node when it is missing, and rer brings pnpm.` | same |
+| `repository` | `https://github.com/just-every/run-cradle` | `https://github.com/just-every/run-uptime` |
+| `clone` | `npx -y @runeditrun/rer dev just-every/run-cradle` | `npx -y @runeditrun/rer dev just-every/run-uptime` |
 | `licence` | `MIT` | `MIT` |
 | `docs` | `true` once `/docs` is built | `true` |
-| `hosted` | `[]` | `[]` |
+| `paths` | `{ product: "cradle" }` | `{ product: "uptime" }` |
 
-The Run page then reads, exactly: "Run <Seed> on your computer."; "100% free and
-open source. Two lines, and <Seed> opens in your browser."; step 1 **Install rer**,
-`curl -fsSL https://runeditrun.com/install.sh | sh`, "It installs rer for you
-alone, with its own Node if you have no Node 22 or later. It changes no shell
-settings: if its last line puts rer on your PATH, run that line before step 2.";
-step 2 **Start <Seed>**, the `clone` line without `npx -y @runeditrun/` (`rer dev
-just-every/cradle`), "rer gets <Seed>, installs everything, makes you the owner
-and prints a link that opens <Seed> signed in. To start it again later: `cd
-<folder> && rer dev`", and "Already have Node 22 or later? <clone> does both steps
-in one line."; then the requirements line and "Source: <repository> · MIT
-license". Step 2 runs on what the installer put on PATH alone, without npx. A
-README's "Run locally" shows the same two lines, so the Run page and the README
-agree. `hosted` is the slot for hosted options, shown as cards under step 2
-when RER hosting opens; leave it empty until then.
+The Run page shows the three-way chooser and one copyable command:
+`curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` for
+the seed's repository. It gets the seed, installs everything, makes you the
+owner and prints a link that opens it signed in. A README's “Run locally” uses
+the same installer command and Node alternative,
+`npx -y @runeditrun/rer dev <owner/repo>`. Base supplies the operating-system
+and Git requirements and the qualified local-only/email note.
+
+When adopting this renderer, remove the old `requirements`, `hosted` and
+`folder` fields and add `paths`. The validator refuses missing `paths` or
+retained `hosted`/`requirements` with “Run data needs paths; migrate the old
+RunData to paths.” Set `paths.product` to the seed's listing id, or `null`
+when it has no listing. Put any seed-specific requirement sentence in
+`paths.requirementsExtra` (without “free” or “$0”); Base supplies the common
+requirements. The renderer derives the local repository name from `clone`,
+so `folder` has no replacement field.
+
+The shared chooser supplies Assisted and Managed doors from `paths`, replacing
+the old hosted-options array. Both doors stay closed when `paths.product` is
+`null` or the shared `PATHS.signups` is `'request'`; with sign-ups open, either
+can remain closed via `paths.assisted = { open: false }` or
+`paths.managed = { open: false }`. The hosting guide uses the same sign-up
+switch; wire it through `sitePages({ hosting })` as described in
+`SEED-COMMAND-CONTRACT.md`.
 
 `src/site/pages.tsx` exports `sitePages({ styles })`. Every CSS file your
 components import (Landing's `import './styles'`, the docs styles) compiles into
@@ -212,6 +220,20 @@ export function sitePages({ styles }: SiteContext): SiteBuild {
     assets: ['rer-theme.css', 'fonts', 'brand', 'design-assets', 'favicon.svg'],
   }
 }
+```
+
+**One header across the site.** `/run`, `/contract` and the not-found page carry
+Base's header, the one Base's own homepage carries. A seed with an approved
+homepage passes that homepage's header as their last argument instead,
+`{ html, styles }` (`HomepageHeader` in `src/base/run-site.ts`): `html` rendered
+from the homepage's own header component in its site variant, marking the current
+page the way it does on the docs, and `styles` the `styles` that `sitePages`
+receives. Base's pages then wear the homepage's header exactly: the same logo
+position, wordmark and links.
+
+```tsx
+const homepageHeader = { html: renderToStaticMarkup(<SiteHeader variant="site" />), styles }
+{ path: '/run', html: runPageHtml(identity, run, contract, homepageHeader) },
 ```
 
 The pages must work without JavaScript and load nothing from another origin.

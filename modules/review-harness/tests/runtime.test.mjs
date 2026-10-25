@@ -11,7 +11,7 @@ import { root, temporary, fixture } from './helpers.mjs';
 
 async function options(t, mode, extra = {}) {
   const directory = await temporary(t, 'review-runtime-');
-  return { cwd: root, command: process.execPath, args: [new URL('./process-fixture.mjs', import.meta.url).pathname, mode, '{PORT}', '{ORIGIN}'], logDir: directory, readyTimeoutMs: 3000, stopTimeoutMs: 150, ...extra };
+  return { cwd: root, command: process.execPath, args: [new URL('./process-fixture.mjs', import.meta.url).pathname, mode, '{PORT}'], logDir: directory, readyTimeoutMs: 3000, stopTimeoutMs: 150, ...extra };
 }
 function fallbackCleanup(t, runtime) {
   t.after(() => { try { process.kill(-runtime.pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; } });
@@ -24,15 +24,24 @@ async function refused(t, config) {
   return error;
 }
 
-test('slow health becomes ready inside the bound', async t => {
+test('concurrent runtimes own distinct listeners while slow health becomes ready inside the bound', async t => {
   const started = performance.now();
-  const runtime = await startRuntime(await options(t, 'slow'));
-  fallbackCleanup(t, runtime);
+  const configs = await Promise.all([options(t, 'slow'), options(t, 'environment')]);
+  const [runtime, other] = await Promise.all(configs.map(async config => {
+    const launched = await startRuntime(config);
+    fallbackCleanup(t, launched);
+    t.after(() => launched.stop());
+    return launched;
+  }));
   try {
     assert.equal(new URL(runtime.origin).hostname, '127.0.0.1');
+    assert.notEqual(runtime.port, other.port);
     assert.ok(performance.now() - started >= 300);
     assert.equal((await fetch(runtime.origin + '/health')).status, 200);
-  } finally { await runtime.stop(); }
+    assert.equal((await fetch(other.origin + '/environment')).status, 200);
+    await runtime.stop();
+    assert.equal((await fetch(other.origin + '/health')).status, 200);
+  } finally { await Promise.all([runtime.stop(), other.stop()]); }
 });
 test('exit before readiness fails with the private log path', async t => {
   const error = await refused(t, await options(t, 'exit'));
@@ -64,7 +73,7 @@ test('logs redact chunked secrets and token queries; files and temporary storage
   assert.equal((await stat(join(runtime.logPath, '..'))).mode & 0o777, 0o700);
   await assert.rejects(access(environment.env.TMPDIR));
 });
-test('environment is minimal, extras explicit, isolation flags enforced and origin substituted', async t => {
+test('environment is minimal, extras explicit, isolation flags enforced and listener origin reported', async t => {
   process.env.REVIEW_UNDECLARED = 'must-not-inherit';
   const runtime = await startRuntime(await options(t, 'environment', { env: { REVIEW_EXPLICIT: 'supplied', WRANGLER_SEND_METRICS: 'true' } }));
   fallbackCleanup(t, runtime);
@@ -97,7 +106,7 @@ test('TERM, bounded KILL and group inspection remove a resistant grandchild', as
   fallbackCleanup(t, runtime);
   let log = '';
   for (let attempt = 0; attempt < 50 && !log.includes('grandchild'); attempt++) { await delay(20); log = await readFile(runtime.logPath, 'utf8'); }
-  const pid = JSON.parse(log.trim()).grandchild;
+  const pid = JSON.parse(log.split('\n').find(line => line.startsWith('{'))).grandchild;
   assert.ok(pid > 0);
   const started = performance.now();
   await runtime.stop();
@@ -129,7 +138,7 @@ test('slow process inspection uses the remaining shutdown budget', async t => {
   fallbackCleanup(t, runtime);
   let log = '';
   for (let attempt = 0; attempt < 50 && !log.includes('grandchild'); attempt++) { await delay(20); log = await readFile(runtime.logPath, 'utf8'); }
-  assert.ok(JSON.parse(log.trim()).grandchild > 0);
+  assert.ok(JSON.parse(log.split('\n').find(line => line.startsWith('{'))).grandchild > 0);
   const directory = await temporary(t, 'review-slow-inspector-');
   // An inspector can exit zero after its deadline signal, with an incomplete
   // snapshot. That is not proof that the resistant child has disappeared.

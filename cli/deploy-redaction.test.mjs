@@ -1,3 +1,4 @@
+import { productionSender } from './fixtures/production-sender.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -40,7 +41,7 @@ async function checkout(t, { publicSettings = ['APP_HOST'] } = {}) {
  await writeFile(join(root, 'dist/server/index.js'), 'export default { fetch(){return new Response("ok")} }');
  await writeFile(join(root, 'dist/client/index.html'), 'Application');
  await writeFile(join(root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@10.12.4' }));
- const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', vars: { MAIL_PROVIDER: 'resend', MAIL_FROM: 'auth@example.test' }, publicSettings,
+ const declaration = { version: 1, project: 'tests/fixture', compatibilityDate: '2026-09-08', vars: { MAIL_PROVIDER: 'resend', MAIL_FROM: productionSender }, publicSettings,
   secrets: ['OWNER_EMAIL', 'SETUP_TOKEN', 'SESSION_SECRET', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name })) };
  await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
  await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\nowner.env\n');

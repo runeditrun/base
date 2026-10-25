@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { verifyOwnerClaim } from '../../owner-claim/verify.mjs';
+import { installationKeyId } from '../../dependencies/sealing.mjs';
 import add from './native-add.wasm';
 import data from './native-data.bin';
 export default {
@@ -22,6 +23,9 @@ export default {
     }
     if (path === '/health-client') return Response.json(await env.COUNTER.getByName('health').noteClient());
     if (path === '/own-data') return Response.json((await env.DB.prepare('SELECT name FROM items ORDER BY name').all()).results.map(row => row.name));
+    // The dependency door's discovery check: createDependencies answers 503 without
+    // a valid INSTALLATION_KEY. A key's ID carries no key material.
+    if (path === '/.well-known/rer-dependencies') return installationKeyId(env.INSTALLATION_KEY).then(kid => Response.json({ kid }), error => Response.json({ error: error.code }, { status: error.status }));
     if (!(request.headers.get('cookie') ?? '').split(';').some(part => part.trim() === `owner=${env.SESSION_SECRET}`)) return new Response('Unauthorized', { status: 401 });
     if (path === '/auth/signout' && request.method === 'POST') return new Response(null, { status: 204, headers: { 'set-cookie': 'owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax' } });
     if (path === '/own-fetch') {

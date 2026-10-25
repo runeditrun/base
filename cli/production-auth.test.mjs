@@ -1,9 +1,46 @@
+import { productionSender } from './fixtures/production-sender.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, readFile, access, mkdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { portabilityFixture } from './fixtures/portability.mjs';
+import { deployProviderFixture } from './fixtures/deploy-provider.mjs';
+
+test('credentials-only deploy update uses declared live mail secrets with a valid declared sender', async t => {
+ const f=await deployProviderFixture(t,{vars:{MAIL_PROVIDER:'sendgrid'},r2:[],secrets:[
+  {binding:'MAIL_FROM',environment:'PRODUCT_MAIL_FROM',optional:true},
+  {binding:'SENDGRID_API_KEY',environment:'PRODUCT_MAIL_KEY',optional:true},
+ ]});
+ const packagingPath=join(f.root,'rer-packaging.json');
+ await writeFile(packagingPath,JSON.stringify({artifact:{specInputs:{publicVariables:{MAIL_FROM:productionSender}}}}));
+ for(const name of ['PRODUCT_MAIL_FROM','PRODUCT_MAIL_KEY','MAIL_FROM','SENDGRID_API_KEY'])delete process.env[name];
+ const output=[];
+ t.mock.method(process.stdout,'write',chunk=>{output.push(String(chunk));return true;});
+ const run=async()=>{output.length=0;const code=await f.run('--env-file','deploy.env');return {code,events:output.join('').trim().split('\n').filter(Boolean).map(JSON.parse)};};
+ await writeFile(join(f.root,'deploy.env'),'',{mode:0o600});
+ const missing=await run();assert.equal(missing.code,4,JSON.stringify(missing.events));
+ assert.equal(f.provider.state.writes.length,0);
+ await writeFile(join(f.root,'deploy.env'),`PRODUCT_MAIL_FROM=${productionSender}\nPRODUCT_MAIL_KEY=synthetic-mail-credential\n`,{mode:0o600});
+ const first=await run();assert.equal(first.code,0,JSON.stringify(first.events));
+ const writes=f.provider.state.writes.length;
+ await writeFile(join(f.root,'deploy.env'),'');
+ const update=await run();
+ console.error('credentials-only update:',JSON.stringify(update));
+ assert.equal(update.code,0,JSON.stringify(update.events));
+ assert.equal(f.provider.state.writes.length,writes,'an unchanged deployment makes no provider writes');
+ assert.ok(f.provider.state.calls.some(call=>call.path?.endsWith('/secrets')&&call.method==='GET'));
+ // A supplied invalid replacement must not borrow the existing sender's approval.
+ await writeFile(join(f.root,'deploy.env'),'PRODUCT_MAIL_FROM=invalid-sender\n');
+ assert.equal((await run()).code,4);assert.equal(f.provider.state.writes.length,writes);
+ await writeFile(join(f.root,'deploy.env'),'');
+ const declarationPath=join(f.root,'deploy.json'),declaration=JSON.parse(await readFile(declarationPath,'utf8'));
+ await rm(packagingPath);
+ declaration.secrets=declaration.secrets.filter(secret=>secret.binding!=='MAIL_FROM');
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ assert.equal((await run()).code,4,'an undeclared live sender cannot satisfy the deployment contract');
+ assert.equal(f.provider.state.writes.length,writes);
+});
 
 // Public commands on the real exported seed. Deliberately dirty source stops a
 // configured deployment before its build or any provider request.
@@ -140,7 +177,7 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
   const missing = await error('');
   for (const name of ['MAIL_FROM', 'SENDGRID_API_KEY', 'RESEND_API_KEY']) assert.ok(missing.includes(name), missing);
   for (const key of ['SENDGRID_API_KEY', 'RESEND_API_KEY']) {
-   assert.match(await error(`${key}=test-only-provider-credential\nMAIL_FROM=sender@example.test\n`), /not committed/, `${path}: declared native provider passes preflight`);
+   assert.match(await error(`${key}=test-only-provider-credential\nMAIL_FROM=${productionSender}\n`), /not committed/, `${path}: declared native provider passes preflight`);
   }
   await rm(join(seed.root, path));
  }
@@ -148,22 +185,26 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
  await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: spec } }));
  assert.match(await error('SENDGRID_API_KEY=test-only-provider-credential\n'), /MAIL_FROM/);
  // The documented display-name sender passes like a bare address, quoted or not; an invalid one names the accepted forms.
- for (const from of ['Your Business <sender@example.test>', '"Your Business <sender@example.test>"']) assert.match(await error(`MAIL_FROM=${from}\nRESEND_API_KEY=test-only-provider-credential\n`), /not committed/, from);
- assert.match(await error('MAIL_FROM=Your Business sender@example.test\nRESEND_API_KEY=test-only-provider-credential\n'), /MAIL_FROM \(\S+@\S+ or [^)]*<\S+@\S+>\)/);
- assert.match(await error('MAIL_FROM=sender@example.test\nMAIL_PROVIDER=resend\nSENDGRID_API_KEY=test-only-provider-credential\n'), /RESEND_API_KEY/, 'explicit provider cannot borrow another provider key');
- assert.match(await error('MAIL_FROM=sender@example.test\nMAIL_API_KEY=test-only-provider-credential\n'), /SENDGRID_API_KEY.*RESEND_API_KEY/, 'an ambiguous shared key does not resolve a deferred native provider');
+ for (const from of [`Your Business <${productionSender}>`, `"Your Business <${productionSender}>"`]) assert.match(await error(`MAIL_FROM=${from}\nRESEND_API_KEY=test-only-provider-credential\n`), /not committed/, from);
+ const invalidSender = await error(`MAIL_FROM=Your Business ${productionSender}\nRESEND_API_KEY=test-only-provider-credential\n`);
+ const guidance = /\((?<forms>[^)]+)\)\.\s+(?<correction>[^.]+),\s+then\b/.exec(invalidSender)?.groups;
+ assert.ok(guidance, invalidSender);
+ assert.deepEqual(guidance.forms.split(/\s+or\s+/).map(form => form.replace(/^a\s+/, '')), ['bare address', 'Display Name <address>'], invalidSender);
+ assert.match(guidance.correction, /\bMAIL_FROM\b.*\benvironment\b.*--env-file\b/, invalidSender);
+ assert.match(await error(`MAIL_FROM=${productionSender}\nMAIL_PROVIDER=resend\nSENDGRID_API_KEY=test-only-provider-credential\n`), /RESEND_API_KEY/, 'explicit provider cannot borrow another provider key');
+ assert.match(await error(`MAIL_FROM=${productionSender}\nMAIL_API_KEY=test-only-provider-credential\n`), /SENDGRID_API_KEY.*RESEND_API_KEY/, 'an ambiguous shared key does not resolve a deferred native provider');
  spec.optionalSecretNames = ['RESEND_API_KEY'];
  await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: spec } }));
- assert.match(await error('MAIL_FROM=sender@example.test\nSENDGRID_API_KEY=test-only-provider-credential\n'), /RESEND_API_KEY/, 'undeclared ambient provider key does not count');
+ assert.match(await error(`MAIL_FROM=${productionSender}\nSENDGRID_API_KEY=test-only-provider-credential\n`), /RESEND_API_KEY/, 'undeclared ambient provider key does not count');
  spec.publicVariableNames = ['MAIL_PROVIDER'];
  await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: spec } }));
- assert.match(await error('MAIL_FROM=sender@example.test\nRESEND_API_KEY=test-only-provider-credential\n'), /MAIL_FROM/, 'undeclared ambient sender does not count');
+ assert.match(await error(`MAIL_FROM=${productionSender}\nRESEND_API_KEY=test-only-provider-credential\n`), /MAIL_FROM/, 'undeclared ambient sender does not count');
  // Fixed deployment-spec variables and the adapter's own deployment binding
  // are source declarations too; a mapped root secret keeps its environment name.
- await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: { publicVariables: { MAIL_PROVIDER: 'resend', MAIL_FROM: 'sender@example.test' }, optionalSecretNames: ['RESEND_API_KEY'] } } }));
+ await writeFile(packagingPath, JSON.stringify({ artifact: { specInputs: { publicVariables: { MAIL_PROVIDER: 'resend', MAIL_FROM: productionSender }, optionalSecretNames: ['RESEND_API_KEY'] } } }));
  assert.match(await error('RESEND_API_KEY=test-only-provider-credential\n'), /not committed/);
  await rm(packagingPath);
- declaration.vars.MAIL_FROM = 'sender@example.test';
+ declaration.vars.MAIL_FROM = productionSender;
  declaration.secrets.push({ binding: 'SENDGRID_API_KEY', environment: 'PRODUCT_MAIL_TOKEN' });
  await writeFile(declarationPath, JSON.stringify(declaration));
  assert.match(await error('PRODUCT_MAIL_TOKEN=test-only-provider-credential\n'), /not committed/);

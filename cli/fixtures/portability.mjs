@@ -1,5 +1,6 @@
+import { productionSender } from './production-sender.mjs';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -27,6 +28,9 @@ export async function portabilityFixture(t,{generated=true}={}) {
  const children=new Set();
  t.after(async()=>{for(const child of children)if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await child.done;}await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100});});
  await exportReference(base,root);
+ const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
+ declaration.vars.MAIL_FROM = productionSender;
+ await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
  await mkdir(join(root,'exports'));
  await useWorkspaceDependencies(root);
  if(generated)await writeFile(join(root,'migrations/core/0999_computed_entries.sql'),generatedSQL);

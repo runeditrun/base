@@ -1,15 +1,15 @@
+import { releaseVerb } from './contract.mjs';
 import { parseTimeoutSeconds, timeoutBounds } from '../scripts/publish-check/timeout.mjs';
 
 // Preserve release's accepted parser, producer, receipt and validation exits.
-const releaseHelp = `Usage: rer release --repo DIR --project PUBLISHER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
+const releaseHelp = `Usage: rer release --repo DIR --project OWNER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
 
 Produce local artifacts using the exact source commit's green GitHub Verify,
 frozen installation, local build and publication checks.
 Without --tag, write a preview. This command never pushes, uploads or deploys.
 
   --repo DIR             Source Git repository.
-  --project PUBLISHER/NAME
-                         Publishing identity.
+  --project OWNER/NAME   Project identity recorded by the edition.
   --repository GITHUB_URL
                          Credential-free https://github.com/<owner>/<repository> destination.
   --output NEW_DIR       New output directory outside the source repository.
@@ -39,19 +39,20 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --help                 Print this help without performing release work.
 
 Signing and receipt commands:
-  rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer]
+  rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer] [--publisher NAMESPACE]
   rer release receipt --artifact DIR --anchors FILE [--environment test] [--after VERSION:SHA256]
   rer release keygen --scope test|rer --publisher NAMESPACE --github-owner LOGIN --github-owner-id ID --anchor-out FILE
     [--not-before YYYY-MM-DDTHH:MM:SSZ] [--not-after YYYY-MM-DDTHH:MM:SSZ]
     [--unsigned-through PROJECT:VERSION ...]
 
 Signing scope defaults to rer; receipt environment defaults to production.
+Signing publisher defaults to the project prefix; use --publisher for a different publisher.
 Key generation requires non-terminal stdout; --key-stdin requires non-terminal stdin.
 `;
 
 export async function dispatchRelease(args) {
  if (args.length === 1 && args[0] === '--help') { console.log(releaseHelp); return 0; }
- if (['sign', 'receipt', 'keygen'].includes(args[0])) return (await import('../modules/release/signing-cli.mjs')).dispatchSigning(args[0], args.slice(1));
+ if (Object.hasOwn(releaseVerb.subcommands, args[0])) return (await import('../modules/release/signing-cli.mjs')).dispatchSigning(args[0], args.slice(1));
  try {
   const options = {};
   for (let index = 0; index < args.length; index++) {

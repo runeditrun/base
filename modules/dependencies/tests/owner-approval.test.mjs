@@ -1,3 +1,4 @@
+import { dependencyStore } from '../store.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -42,7 +43,7 @@ async function changePin(r,proof,change) {
  // extra revocation, so a stale pin alone must defeat setup-session authority.
  const issuer=change==='moved pin'?'https://next.example':ISSUER;
  const next=await provider({issuer,alg:'ES256',method:'private_key_jwt',rerInterfaces:['oidc-provider@1.0.0']});
- const privateKey=JSON.parse(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='oidc-provider@1'").get().private_key);
+ const privateKey=(await dependencyStore(r.db,r.config).readKey()).key;
  const auth=createOperatorAuth({db:r.db,clock:r.now,fetch:issuer===ISSUER?r.fetch:network([next]),clientIp:()=> '192.0.2.1',config:{...r.config,dependencies:false,OIDC_TRANSACTION_SECRET:'static-fixture-transaction-secret-thirty-two-bytes',providers:[{id:'auth',preset:'auth',issuer,clientId:'app-client',privateKey}]}});
  const path=change==='unlinked pin'?'/auth/providers/unlink':'/auth/providers/relink';
  assert.equal((await createAuthHandler(auth)(r.request(path,{cookie:proof,body:{provider:'auth'}}))).status,200,change);
@@ -183,11 +184,11 @@ test('only the originating first setup can enable provider sign-in; settings and
  // Both unchanged off and unchanged on finish setup without generation/audit churn.
  for(const enabled of [false,true]) {
   const r=await runtime(t),owner=await r.bootstrap();
-  if(enabled)assert.equal((await r.call('/auth/settings/identity',{cookie:owner,body:{idpSignIn:true}})).status,200);
+  if(enabled)assert.equal((await r.rawLink()).status,200);
   const before=setting(r),beforeAudit=audit(r);
   assert.equal((await r.call('/auth/settings/identity',{cookie:owner,body:{idpSignIn:enabled}})).status,200);
   assert.deepEqual(setting(r),{...before,first_setup:0});assert.deepEqual(audit(r),beforeAudit);
-  assert.equal((await r.rawLink()).status,200);assert.equal(setting(r).idp_sign_in,Number(enabled));assert.deepEqual(audit(r),beforeAudit);
+  assert.equal((await r.link()).status,200);assert.equal(setting(r).idp_sign_in,Number(enabled));assert.deepEqual(audit(r),beforeAudit);
  }
  const paused=await runtime(t),owner=await paused.bootstrap(),gate=paused.pauseLink(),callback=paused.rawLink();await gate.ready;
  try{assert.equal((await paused.call('/auth/settings/identity',{cookie:owner,body:{idpSignIn:false}})).status,200);}finally{gate.release();}

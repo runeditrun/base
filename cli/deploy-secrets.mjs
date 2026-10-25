@@ -87,6 +87,8 @@ export async function keepHookSecrets({ root, environment, declaration, setupMan
   const held = kept.filter(item => fresh.includes(item.binding) && live.includes(item.binding));
   if (held.length) throw refuseRotation({ worker: ownerWorkerName(declaration.project, environment), held, environment, again });
  }
+ const { keepInstallationKey } = await import('./deploy-installation-key.mjs');
+ await keepInstallationKey({ root, environment, declaration, env, generated });
  await keepSecrets({ root, environment, kept, env, generated, reused, report });
 }
 

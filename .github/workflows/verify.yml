@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       clean_bootstrap:
-        description: Run without restoring dependency or browser caches
+        description: Run without restoring dependency, browser or apt caches
         type: boolean
         default: false
       journeys:
@@ -21,7 +21,7 @@ on:
 permissions:
   contents: read
 
-# Main needs evidence for every pushed SHA, including repeated runs of a SHA.
+# Keep each main run; a green push of the same SHA to a branch or tag can satisfy it.
 # A distinct run key also avoids GitHub replacing a pending main run.
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
@@ -29,9 +29,13 @@ concurrency:
 
 jobs:
   plan:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.stages.outputs.matrix }}
+      skip: ${{ steps.duplicate.outputs.skip }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -39,6 +43,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.20.0'
+      - name: Reuse successful branch verification on main
+        id: duplicate
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node export/verify-ci.mjs --main-skip
       - id: stages
         name: Assign every full-verify stage exactly once
         env:
@@ -48,6 +58,8 @@ jobs:
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
   companion-macos:
+    needs: plan
+    if: ${{ needs.plan.outputs.skip != 'true' }}
     name: Verify (companion macOS)
     runs-on: macos-latest
     timeout-minutes: 10
@@ -66,6 +78,7 @@ jobs:
   verify:
     name: Verify (${{ matrix.group }}${{ matrix.shard && format(' {0}/{1}', matrix.shard, matrix.total) || '' }})
     needs: plan
+    if: ${{ needs.plan.outputs.skip != 'true' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -112,8 +125,45 @@ jobs:
           df -Pk "$GITHUB_WORKSPACE"
       - name: Install checkout prerequisites
         run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git
+          # Attempt 1 uses the runner's Azure mirror, which avoids the public
+          # archive's runner-dependent ~80 kB/s transfers. A fresh runner can
+          # have a dead Azure package path (index fetches work, package GETs
+          # hang), so retrying the same host does not help: attempts 2 and 3
+          # use other mirrors serving the same Ubuntu-signed archive. Keep this
+          # list in step with apt_fallback_mirrors in scripts/agent-bootstrap.sh.
+          mirrors=(http://azure.archive.ubuntu.com/ubuntu http://mirrors.edge.kernel.org/ubuntu http://us-east-1.ec2.archive.ubuntu.com/ubuntu)
+          # Checkout cannot source a repository helper or restore an Actions
+          # cache yet. Retain apt archives/partials locally across fresh attempts.
+          mkdir -p /var/tmp/rer-checkout-apt/archives
+          export APT_CONFIG=/var/tmp/rer-checkout-apt/apt.conf
+          cat > "$APT_CONFIG" <<'APT'
+          Dir::Cache::archives "/var/tmp/rer-checkout-apt/archives";
+          APT::Keep-Downloaded-Packages "true";
+          APT::Update::Error-Mode "any";
+          Acquire::Retries "2";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT
+          started=$SECONDS
+          for attempt in 1 2 3; do
+            mirror=${mirrors[attempt - 1]}
+            sed -i -E "s@^(URIs:[[:space:]]*)https?://(([a-z0-9.-]+\.)?archive\.ubuntu\.com|security\.ubuntu\.com|mirrors\.edge\.kernel\.org)/ubuntu/?@\1${mirror}/@" /etc/apt/sources.list.d/ubuntu.sources
+            printf 'Checkout apt: prerequisites attempt %s/3 (90s deadline; mirror %s)\n' "$attempt" "$mirror"
+            if timeout --kill-after=5s 90s bash -ec '
+              dpkg --configure -a
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git
+            '; then
+              printf 'Checkout apt: prerequisites complete (attempts=%s mirror=%s seconds=%s)\n' "$attempt" "$mirror" "$((SECONDS - started))"
+              exit 0
+            else
+              status=$?
+              printf 'Checkout apt: prerequisites attempt %s/3 failed (mirror %s, exit %s, seconds=%s)\n' "$attempt" "$mirror" "$status" "$((SECONDS - started))" >&2
+            fi
+            if (( attempt < 3 )); then sleep "$((attempt * 2))"; fi
+          done
+          printf 'Checkout apt: prerequisites failed after 3 attempts (exit %s; 90s per attempt; seconds=%s). Inspect the apt download log.\n' "$status" "$((SECONDS - started))" >&2
+          exit 1
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
@@ -128,6 +178,19 @@ jobs:
           test ! -d default-seed/node_modules
           test ! -d "$HOME/.cache/ms-playwright"
           printf 'Clean Linux: no Node, pnpm, dependencies or browser cache before restore\n'
+      - name: Read the pinned Playwright version for the apt cache
+        id: apt-cache-inputs
+        run: |
+          version=$(sed -n 's/^readonly PLAYWRIGHT_VERSION=//p' scripts/agent-bootstrap.sh)
+          test -n "$version"
+          printf 'playwright=%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - name: Cache apt package archives
+        id: apt-cache
+        if: ${{ !inputs.clean_bootstrap }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ~/.cache/rer-apt/archives
+          key: base-apt-ubuntu24-${{ runner.arch }}-playwright-${{ steps.apt-cache-inputs.outputs.playwright }}-${{ hashFiles('scripts/agent-bootstrap.sh') }}
       - name: Cache shared pnpm store and Playwright browsers
         if: ${{ !inputs.clean_bootstrap }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
@@ -137,7 +200,10 @@ jobs:
             ~/.cache/ms-playwright
           key: base-ubuntu24-${{ runner.arch }}-${{ hashFiles('scripts/agent-bootstrap.sh', 'scripts/install-gitleaks.sh', 'pnpm-lock.yaml', 'modules/mail/pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'default-seed/package.json', 'foundation/template/package.json', 'foundation/template/pnpm-lock.yaml') }}
       - name: Bootstrap pinned Linux toolchain
+        env:
+          APT_CACHE_HIT: ${{ steps.apt-cache.outputs.cache-hit || 'false' }}
         run: |
+          printf 'Apt archive cache hit: %s\n' "$APT_CACHE_HIT"
           # Checkout configures a temporary HOME; the root container's test
           # shell needs this exact reviewed workspace trusted in its own HOME.
           git config --global --add safe.directory "$GITHUB_WORKSPACE"

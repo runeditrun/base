@@ -379,3 +379,4 @@ add('unsigned release outside every legacy floor', false, testAnchors,
 const output = new URL('./release-signature-vectors.json', import.meta.url);
 writeFileSync(output, JSON.stringify(vectors, null, 2) + '\n');
 console.log(`Wrote ${vectors.length} public release-signature vectors.`);
+await import('./publisher-projects.mjs');

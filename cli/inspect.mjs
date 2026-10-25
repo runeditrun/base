@@ -4,7 +4,7 @@ import { inventory } from './export.mjs';
 import { lstat, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { delimiter, dirname, resolve } from 'node:path';
-import { aliases, demoVerb, pins, requiredHooks, serverDefaults, signinVerb, verbs, releaseFlags } from './contract.mjs';
+import { authoringVerbs, aliases, demoVerb, pins, requiredHooks, serverDefaults, signinVerb, verbs, releaseFlags } from './contract.mjs';
 import { runningVersion } from './version.mjs';
 import { contained, readPackage } from './project.mjs';
 import { shared } from './shared.mjs';
@@ -24,6 +24,7 @@ import { deliveryDeclarationClauses } from './delivery-declarations.mjs';
 import { checkoutPlaceholderMarks } from './placeholder-mark.mjs';
 import { contractStatusClauses } from './contract-status.mjs';
 import { hostedExportCommand } from './hosted-export-command.mjs';
+import { cloudflareCredentials } from './deploy-needs.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
 // too old to record one). defaults: what a server start applies when the person
@@ -48,6 +49,7 @@ export async function describe(project) {
    return [verb, { flags: (verbs[verb]?.flags ?? releaseFlags).filter(flag => capability.flags?.includes(flag)), effects }];
   }).concat(capabilities.dev?.flags?.includes('--demo') ? [['demo', { flags: demoVerb.flags.filter(flag => capabilities.dev.flags.includes(flag)), effects: demoVerb.effects }]] : [])
    // rer signin is rer's own: any seed it can deploy, it can sign the owner in to.
+   .concat(Object.entries(authoringVerbs))
    .concat(capabilities.deploy ? [['signin', { flags: signinVerb.flags, effects: signinVerb.effects }]] : [])),
   aliases: Object.fromEntries(Object.entries(aliases).filter(([alias, verb]) => pkg.scripts?.[alias] === commandLine(verb, declaredPackage(pkg) !== undefined))),
   local: { state: project.adapter?.state, settings: project.adapter?.settings ?? [], installerState: '.seed/installer', ...await localState(project), origin: await savedOrigin(project), ...(project.adapter?.devIdentity ? { devIdentity: true, devKey: '.rer/local/dev-key.env' } : {}) },
@@ -203,6 +205,13 @@ const usePnpm = directory => {
 export async function doctor(project, store, signal) {
  const { inspectOperations } = await import('../operations/operations.mjs');
  const diagnostic = await inspectOperations(project.root);
+ // The operations declaration includes deployment prerequisites. Local health
+ // does not require an account, and doctor never checks provider access.
+ const deploymentInputs = project.profile === 'first-party' ? diagnostic.missingEnvironment.filter(name => cloudflareCredentials.includes(name)) : [];
+ if (deploymentInputs.length) {
+  diagnostic.missingEnvironment = diagnostic.missingEnvironment.filter(name => !deploymentInputs.includes(name));
+  diagnostic.ok = diagnostic.commands.every(command => command.available) && !diagnostic.missingEnvironment.length && diagnostic.configuration === 'valid' && (diagnostic.loops ?? []).every(loop => ['ready', 'optional-disabled'].includes(loop.status));
+ }
  const { localVariables } = await shared('local/environment.mjs');
  let values = {}, pnpm, expectedPnpm, stateIssue, stateValid = true;
  const pnpmIssues = [];
@@ -239,8 +248,35 @@ export async function doctor(project, store, signal) {
   node: { actual: process.versions.node, expected: expectedNode },
   pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,
   ai: { issues: aiIssues },
-  missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])],
+  missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])], deploymentInputs,
   sources: project.descriptor.environmentSources ?? {}, state: { path: project.adapter?.state, safe: stateValid, ...(stateIssue ? { issue: stateIssue } : {}) }, scope: 'local-inputs-only' };
+}
+
+export function doctorSummary(result) {
+ const lines = [result.ok ? 'Local checks passed.' : 'Local checks need attention.'];
+ if (result.node.expected) lines.push(`Node: ${result.node.actual} (expected ${result.node.expected}).`);
+ if (result.pnpm) {
+  lines.push(`pnpm: ${result.pnpm.actual ?? 'unavailable'} (expected ${result.pnpm.expected ?? 'an exact project pin'}).`);
+  if (result.pnpm.issue) lines.push(result.pnpm.issue);
+ }
+ if (result.missingInputs.length) {
+  lines.push('Missing local inputs:');
+  for (const name of result.missingInputs) lines.push(`  ${name}${result.sources[name] ? `: ${result.sources[name]}` : ''}`);
+  lines.push('Run rer setup to configure this checkout.');
+ }
+ const unavailable = result.operations.commands.filter(command => !command.available);
+ if (unavailable.length) lines.push('Unavailable command inputs:', ...unavailable.map(command => `  ${command.name}: restore its declared input files.`));
+ if (result.operations.configuration === 'invalid') lines.push('Local configuration is invalid. Check the declared configuration module; private validator details are suppressed.');
+ for (const loop of result.operations.loops ?? []) if (!['ready', 'optional-disabled'].includes(loop.status)) lines.push(`Loop ${loop.id}: ${loop.status}${loop.missingEnvironment?.length ? `; missing ${loop.missingEnvironment.join(', ')}` : ''}.`);
+ if (!result.state.safe) lines.push(`Local state: ${result.state.issue}`);
+ if (result.browser?.issue) lines.push(`Browser dependencies: ${result.browser.issue}`);
+ else if (result.browser?.note) lines.push(result.browser.note);
+ for (const issue of result.ai.issues) lines.push(`AI ${issue.feature}: ${issue.code}: ${issue.message}`);
+ for (const dependency of result.dependencies) lines.push(`Dependency ${dependency.interface ?? 'local state'}: ${dependency.status}.`);
+ for (const warning of result.warnings) lines.push(typeof warning === 'string' ? warning : warning.message);
+ if (result.deploymentInputs.length) lines.push(`Optional for local use; needed to deploy: ${result.deploymentInputs.join(', ')}.`);
+ lines.push('Remote deployment, provider credentials and permissions, and deployed health were not checked.');
+ return lines.join('\n');
 }
 
 // SC-05: a seed declaring devIdentity loads the dev layer only from a local-only

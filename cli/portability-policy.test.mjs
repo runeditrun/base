@@ -45,9 +45,10 @@ export default { ...portabilityPolicy, validateStaged: async ({ read }) =>
   const events = failure.stdout.trim().split('\n').map(JSON.parse), errors = events.filter(event => event.event === 'error');
   assert.equal(errors.length, 1);
   assert.equal(errors[0].code, 'invalid_archive');
-  assert.match(errors[0].message, /archive_json/);
+  assert.match(errors[0].message, /rer export --output/);
+  assert.match(errors[0].message, /--target remote/);
   const diagnostic = failure.stdout + failure.stderr;
-  assert.equal(diagnostic.match(/archive_json/g)?.length, 1);
+  assert.doesNotMatch(diagnostic, /archive_json/);
   assert.doesNotMatch(diagnostic, /private-domain-sentinel|SyntaxError|Unexpected|JSON at position|not valid for encoding/);
   await noData();
  }

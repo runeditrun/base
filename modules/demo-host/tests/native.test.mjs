@@ -18,7 +18,8 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     // The seed's Worker build as rer deploy --demo receives it, including a tiny
     // WebAssembly module (add) and a data module the app imports.
     const app = join(folder, 'bundle/app'), server = join(app, 'dist/server');
-    for (const file of ['modules/demo-host/tests/native-app.mjs', 'modules/owner-claim/verify.mjs', 'modules/operator-auth/loopback.mjs']) await cp(join(base, file), join(server, file));
+    for (const file of ['modules/demo-host/tests/native-app.mjs', 'modules/owner-claim/verify.mjs', 'modules/operator-auth/loopback.mjs', 'modules/dependencies/sealing.mjs',
+      'modules/operator-auth/errors.mjs', 'modules/operator-auth/identity/oidc/aes-gcm.mjs', 'modules/operator-auth/identity/oidc/errors.mjs']) await cp(join(base, file), join(server, file));
     await writeFile(join(server, 'modules/demo-host/tests/native-add.wasm'), Buffer.from('0061736d0100000001070160027f7f017f030201000707010361646400000a09010700200020016a0b', 'hex'));
     await writeFile(join(server, 'modules/demo-host/tests/native-data.bin'), Buffer.from([7, 8, 9]));
     await mkdir(join(app, 'dist/client/assets'), { recursive: true });
@@ -40,7 +41,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
       compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
       durableObjects: { DEMO: { className: 'NativeDemo', useSQLite: true }, CAPACITY: { className: 'DemoCapacity', useSQLite: true } },
       ratelimits: { STARTS: { namespace_id: '1001', simple: { limit: 3, period: 60 } } },
-      bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}', DEMO_SECONDARY_ORIGINS: '["https://page.demo.example.test"]',
+      bindings: { DEMO_ORIGIN: origin, DEMO_SITE: 'https://example.test', DEMO_RUN_URL: 'https://canonical.example.test/run', DEMO_NAME: 'Test', DEMO_ORIGIN_VAR: 'AUTH_ORIGIN', DEMO_MAX_INSTANCES: '10', DEMO_SETTINGS: '{}', DEMO_SECONDARY_ORIGINS: '["https://page.demo.example.test"]',
         TURNSTILE_SITE_KEY: 'fixture-site-key', TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA', RER_DEMO_MEASUREMENT_TOKEN: measurement, NATIVE_TEST_TTL_MS: '12000' },
       serviceBindings: { ASSETS: () => new Response('fixture-asset') },
       outboundService: request => { if (request.url === 'https://network.example.test/') return new Response('network'); assert.equal(request.url, 'https://challenges.cloudflare.com/turnstile/v0/siteverify'); return Response.json({ success: true }); },
@@ -64,7 +65,10 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     for (let i = 0; i < 10; i++) await capacity.acquire(capacityNamespace.newUniqueId().toString(), Date.now() + 60_000, 100, 'retired-visitor');
     const home = await fetch('/');
     assert.equal(home.status, 200);
-    assert.match(await home.text(), /<link rel="prefetch" href="\/app-assets\/chunk-ABCDEFGH\.js">/, "the start page prefetches the seed's built chunks");
+    const homeHtml = await home.text();
+    assert.ok(homeHtml.includes(`href="https://canonical.example.test/run"`), 'the start door leads to the canonical run chooser');
+    assert.ok(homeHtml.includes(`href="https://example.test/"`), 'the original home exit remains available');
+    assert.match(homeHtml, /<link rel="prefetch" href="\/app-assets\/chunk-ABCDEFGH\.js">/, "the start page prefetches the seed's built chunks");
     // A start without a readable form is a clean 400 before any place is reserved.
     for (const init of [{}, { body: '{"x":1}', headers: { 'content-type': 'application/json' } }, { body: 'x', headers: { 'content-type': 'multipart/form-data; boundary=none' } }]) {
       const refused = await fetch('/__demo/start', `rer_demo_measure=${measurement}`, { method: 'POST', ...init, headers: { 'cf-connecting-ip': '203.0.113.9', accept: 'application/json', ...init.headers } });
@@ -73,6 +77,17 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     }
     const [a, b] = await Promise.all([start('203.0.113.1'), start('203.0.113.2')]);
     assert.deepEqual([await (await fetch('/health-client', a)).json(), await (await fetch('/health-client', b)).json()], ['203.0.113.1', '203.0.113.2'], "the seed's /health during start sees each visitor's client address");
+    // A public request to each copy's dependency door finds its own installation
+    // key, kept for the copy's lifetime and never another visitor's.
+    const keyIds = [];
+    for (const cookies of [a, b, a]) {
+      const door = await fetch('/.well-known/rer-dependencies', cookies.match(/rer_demo=[^;]+/)[0]);
+      const body = await door.json();
+      assert.equal(door.status, 200, body.error);
+      keyIds.push(body.kid);
+    }
+    assert.equal(keyIds[2], keyIds[0], 'a copy keeps its installation key');
+    assert.notEqual(keyIds[1], keyIds[0], 'two visitors never share an installation key');
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);
     assert.deepEqual(await (await fetch('/items', b)).json(), [{ name: 'sample' }]);
     assert.deepEqual(await (await fetch('/d1-session', b)).json(), { names: ['sample'], bookmark: 'string', unknown: true, warnings: 1 }, 'D1 sessions read the visitor database; an unknown D1 method reads undefined and warns once');

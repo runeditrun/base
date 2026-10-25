@@ -23,12 +23,14 @@ test('auth-3 store upgrade preserves old people, invitations, bindings and nativ
  sqlite.prepare("INSERT INTO oa_tokens(id,token_hash,kind,operator_id,operator_version,issuer_id,issuer_version,return_to,created_at,expires_at) VALUES('invite','invitation-hash','invite','invitee',1,'owner',4,'/app',?,?)").run(now,now+3600000);
  const tables=sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name),snapshot=()=>Object.fromEntries(tables.map(name=>[name,sqlite.prepare('SELECT * FROM '+name).all()]));
  const before=snapshot();
- for(const path of ['operator-auth/accounts/schema/provider-control.sql','dependencies/schema/dependencies.sql','operator-auth/accounts/schema/dependency-setup.sql','dependencies/schema/approval-attempt.sql','owner-claim/schema/owner-claim.sql','owner-claim/schema/idp.sql'])sqlite.exec(await readFile(new URL('../../'+path,import.meta.url),'utf8'));
+ for(const path of ['operator-auth/accounts/schema/provider-control.sql','dependencies/schema/dependencies.sql','operator-auth/accounts/schema/dependency-setup.sql','dependencies/schema/approval-attempt.sql','dependencies/schema/keys-sealed.sql','owner-claim/schema/owner-claim.sql','owner-claim/schema/idp.sql'])sqlite.exec(await readFile(new URL('../../'+path,import.meta.url),'utf8'));
  assert.deepEqual(snapshot(),before);
  const auth=createOperatorAuth({db:database(sqlite),clock:()=>now,clientIp:()=> '192.0.2.1',config:{origin:'https://app.example',OWNER_EMAIL:'owner@example.com',SESSION_SECRET:secret,dependencies:true}}),handler=createAuthHandler(auth);
  const request=(path,method='GET')=>new Request('https://app.example'+path,{method,headers:{Origin:'https://app.example',Cookie:'__Host-operator_session='+token,'Content-Type':'application/json'},...(method==='POST'?{body:'{}'}:{})});
  assert.equal((await handler(request('/auth/session'))).status,200);
- assert.deepEqual(await (await handler(request('/auth/settings/identity'))).json(),{idpSignIn:false});
+ const settings=await (await handler(request('/auth/settings/identity'))).json();
+ assert.equal(settings.idpSignIn,false);assert.equal(settings.providerSetup.canEnable,false);
+ assert.equal(settings.providerSetup.providers[0].state,'unlinked');
  assert.equal((await handler(request('/auth/oidc/auth/start','POST'))).status,403);
  assert.deepEqual(snapshot(),before);
 });

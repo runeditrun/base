@@ -12,11 +12,12 @@ export async function browserProof() {
   try { sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim() } catch { /* Downloaded source need not have Git metadata. */ }
   const source = sha ? { sha } : { sha: null, inventorySha256: createHash('sha256').update(await readFile(join(root,'reference-export.json'))).digest('hex') }
   const manifest = { ...source, capturedAt: new Date().toISOString(), captures: [], browsers: [] }
-  const browser = await chromium.launch({ headless: true })
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
   try {
     if (captureDir) await mkdir(captureDir, { recursive: true })
     for (const width of [1440, 390]) {
-      const runtime = await emittedRuntime()
+      const runtime = await emittedRuntime({ oidc: true })
+      assert.equal((await runtime.call('/auth/dependencies/setup', { method: 'POST', input: { issuer: runtime.provider.issuer, token: setupToken } })).status, 200)
       const context = await browser.newContext({ viewport: { width, height: 900 }, ignoreHTTPSErrors: true })
       const page = await context.newPage()
       const errors = [], failed = [], badResponses = [], documents = [], fetches = new Set()
@@ -50,16 +51,16 @@ export async function browserProof() {
         assert.equal(runtime.mails.length, 0)
         await page.getByRole('button', { name: 'Revoke', exact: true }).waitFor()
         await capture('owner')
+        assert.equal((await runtime.provider.link(runtime.call)).status, 200)
         await page.goto(runtime.origin+'/auth/settings/identity')
         await capture('identity-settings')
-        await page.getByLabel('Allow provider sign-in').check()
-        await page.getByRole('button',{name:'Save settings'}).click()
-        await page.waitForURL('**/auth/settings/identity')
-        assert.equal(await page.getByLabel('Allow provider sign-in').isChecked(),true)
-        await page.getByLabel('Allow provider sign-in').uncheck()
-        await page.getByRole('button',{name:'Save settings'}).click()
-        await page.waitForURL('**/auth/settings/identity')
-        assert.equal(await page.getByLabel('Allow provider sign-in').isChecked(),false)
+        for (const enabled of [false, true, false]) {
+          await page.getByLabel('Allow provider sign-in').setChecked(enabled)
+          await Promise.all([page.waitForNavigation(), page.getByRole('button',{name:'Save settings'}).click()])
+          assert.equal(new URL(page.url()).searchParams.get('saved'), '1')
+          assert.equal(await page.getByLabel('Allow provider sign-in').isChecked(), enabled)
+          assert.equal(await page.getByRole('status').count(), 1)
+        }
         await page.goto(runtime.origin+'/app')
         const before = await page.evaluate(() => performance.timeOrigin)
         const count = documents.length

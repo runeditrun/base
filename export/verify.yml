@@ -18,19 +18,31 @@ permissions:
   contents: read
 
 concurrency:
-  group: seed-verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: seed-verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   plan:
     runs-on: ubuntu-24.04
     timeout-minutes: 1
+    permissions:
+      contents: read
+      actions: read
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      skip: ${{ steps.duplicate.outputs.skip }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Check reusable workflow permissions
+        run: node scripts/verify-ci.mjs --check-workflows
+      - name: Reuse successful branch verification on main
+        id: duplicate
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-ci.mjs --main-skip
       - id: plan
         env:
           TIER: ${{ inputs.tier || 'push' }}
@@ -38,6 +50,7 @@ jobs:
 
   shards:
     needs: plan
+    if: ${{ needs.plan.outputs.skip != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.timeout || 12 }}
     strategy:
@@ -59,18 +72,23 @@ jobs:
         if: ${{ hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
       - run: npm install --global pnpm@10.12.4
+      # Save completed packages; apt keeps partial downloads private to _apt.
       - name: Cache frozen dependencies and Chromium
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
         with:
           path: |
             ~/.local/share/pnpm/store
             ~/.cache/ms-playwright
+            ~/.cache/rer-apt/archives/*.deb
           key: seed-ubuntu24-${{ runner.arch }}-browser-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Install Chromium and system libraries
         if: matrix.browser
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          set -euo pipefail
+          sudo env "PATH=$PATH" "APT_ARCHIVES=$HOME/.cache/rer-apt/archives" python3 scripts/install-chromium-deps.py
+          pnpm exec playwright install chromium
       - name: Reserve disk for native runtime journeys
         if: matrix.browser
         run: |
@@ -94,4 +112,8 @@ jobs:
         env:
           PLAN: ${{ needs.plan.result }}
           SHARDS: ${{ needs.shards.result }}
-        run: test "$PLAN" = success && test "$SHARDS" = success
+          SKIP: ${{ needs.plan.outputs.skip }}
+        run: |
+          test "$PLAN" = success && {
+            test "$SHARDS" = success || { test "$SKIP" = true && test "$SHARDS" = skipped; }
+          }

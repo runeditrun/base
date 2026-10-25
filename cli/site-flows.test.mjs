@@ -2,15 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, symlink, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { createRequire } from 'node:module';
 import { sitePreview } from './site-preview.mjs';
-import { freePort } from '../global/tests/harness.mjs';
 import { codeChipBreaksWord, commandBlocks, runLayoutTheme } from './fixtures/run-page.mjs';
 import { headerLayout, splitCardLayout } from './fixtures/contract-page.mjs';
+import { parseContract } from '../foundation/runtime/seed-contract.mjs';
+import { deployPermissions } from './deploy-needs.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -30,6 +31,21 @@ async function seed(t) {
  return { root, adapter, original, pages, render, build };
 }
 
+test('site dry-run names the usable checkout-relative asset destination in human and JSON output', async t => {
+ const f = await seed(t);
+ for (const json of [false, true]) {
+  const result = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'deploy', '--site', '--dry-run', ...(json ? ['--json'] : [])], {
+   cwd: f.root, env: { PATH: process.env.PATH, HOME: resolve(f.root, '../home'), PWD: f.root, TZ: 'UTC', RER_NO_UPDATE_CHECK: '1' },
+  });
+  const assets = json ? JSON.parse(result.stdout.trim().split('\n').at(-1)).site.assets : /assets: (.*?) \(/.exec(result.stdout)?.[1];
+  assert.ok(assets, result.stdout);
+  assert.equal(isAbsolute(assets), false);
+  assert.ok(!assets.includes('[REDACTED]'), 'the destination remains readable after redaction');
+  assert.ok((await stat(resolve(f.root, assets))).isDirectory(), 'the printed destination identifies the built assets');
+  assert.ok(!(result.stdout + result.stderr).includes(f.root), 'shared dry-run output keeps the checkout path private');
+ }
+});
+
 test('built run-site uses US dates and keeps the one-line command start together', async t => {
  const f = await seed(t);
  await writeFile(join(f.root, 'CONTRACT.md'), (await readFile(join(base, 'foundation/template/CONTRACT.md'), 'utf8')).replaceAll('BASE_COMMIT', '0123abcd').replaceAll('BASE_DATE', '2026-10-18'));
@@ -38,16 +54,23 @@ test('built run-site uses US dates and keeps the one-line command start together
  const identity = join(f.root, 'src/core/app/identity.ts'), theme = join(f.root, 'public/rer-theme.css');
  await writeFile(identity, (await readFile(identity, 'utf8')).replace("product: 'Default seed'", "product: 'Chest'"));
  await writeFile(theme, await readFile(theme, 'utf8') + runLayoutTheme);
- // This fixture has documentation, so its header exercises all three links.
- await writeFile(f.pages, (await readFile(f.pages, 'utf8')).replace('pages: [', "pages: [{ path: '/docs', html: '<!doctype html><title>Docs</title><h1>Documentation</h1>' },"));
+ // A seed with docs and no install article serves Base's moved-page helper.
+ await writeFile(f.pages, (await readFile(f.pages, 'utf8')).replace('import { runPageHtml,', 'import { docsMovedHtml, runPageHtml,').replace('pages: [', "pages: [{ path: '/docs', html: '<!doctype html><title>Docs</title><h1>Documentation</h1>' }, { path: '/docs/getting-started', html: '<!doctype html><title>Getting started</title><h1>Getting started</h1>' }, { path: '/docs/install', html: docsMovedHtml(identity, run, '/docs/getting-started', 'Getting started') },"));
  await writeFile(join(f.root, 'public/favicon.svg'), await readFile(join(f.root, 'public/brand/mark.svg')));
  const result = await f.build({TZ:'America/Los_Angeles'});
  assert.equal(result.code, 0, result.stdout + result.stderr);
- const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const context = await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/Los_Angeles',permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
   await page.goto(preview.url + '/contract');
   const contractDate = { text:await page.locator('time').textContent(), datetime:await page.locator('time').getAttribute('datetime'), dataDate:await page.locator('#progress').getAttribute('data-date') };
+  const moved = await context.request.get(preview.url + '/docs/install');
+  assert.equal(moved.status(), 200);
+  const movedHtml = await moved.text();
+  assert.match(movedHtml, /http-equiv="refresh"/);
+  assert.match(movedHtml, /rel="canonical" href="\/docs\/getting-started"/);
+  await page.goto(preview.url + '/docs/install');
+  await page.waitForURL(preview.url + '/docs/getting-started');
   await page.goto(preview.url + '/run');
   await page.evaluate(() => document.fonts.ready);
   assert.deepEqual(await page.locator('link[rel=icon], link[rel=apple-touch-icon]').evaluateAll(links => links.map(link => ({ href: link.getAttribute('href'), sizes: link.getAttribute('sizes') }))), [{ href: '/favicon.svg', sizes: 'any' }], 'the built shared head selects the existing small icon instead of the full mark');
@@ -88,12 +111,27 @@ test('built run-site uses US dates and keeps the one-line command start together
   }
   // Exercise the same built run site with both kinds populated, using the
   // existing full contract fixture rather than a hand-built card fragment.
-  await writeFile(join(f.root, 'CONTRACT.md'), await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md')));
+  const slate = await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md'), 'utf8');
+  // Expand a "see the clause" gap to that clause's own full text, exercising
+  // long-form gaps without inventing a second contract or changing its status.
+  const long = parseContract(slate).clauses.find(clause => clause.id === 'COLLAB-001');
+  await writeFile(join(f.root, 'CONTRACT.md'), slate.replace(/^(\| `COLLAB-001`[^\n]*?)\| see the clause \|/m, (_, row) => `${row}| ${long.text.replace(/\s+/g, ' ').replaceAll('|', '\\|')} |`));
   const contractBuild = await f.build();
   assert.equal(contractBuild.code, 0, contractBuild.stdout + contractBuild.stderr);
   await page.reload();
-  await page.getByRole('navigation', {name:'Site', exact:true}).getByRole('link', {name:'Contract', exact:true}).click();
+  await page.getByRole('navigation', {name:'Site', exact:true}).getByRole('link', {name:'Roadmap', exact:true}).click();
   await page.evaluate(() => document.fonts.ready);
+  const rendered = await page.locator('body').textContent();
+  assert.doesNotMatch(rendered, /\b[0-9a-f]{7,40}\b|\b(?:src|tests)\/|\b[\w./-]+\.(?:ts|mjs|sql)\b/i);
+  assert.equal(await page.locator('[data-commit], a[href*="/commit/"]').count(), 0);
+  const disclosure = page.locator('details.gap').first();
+  assert.ok(await disclosure.count(), 'long product gaps are disclosed on request');
+  await disclosure.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await disclosure.getAttribute('open'), '');
+  assert.ok(await disclosure.locator('p').isVisible());
+  await page.keyboard.press('Space');
+  assert.equal(await disclosure.getAttribute('open'), null);
   assert.equal(await page.locator('.card.split > div').count(), 2, 'both clause kinds are visible');
   for (const width of [860, 1000, 1160]) {
    await page.setViewportSize({width,height:900});
@@ -103,12 +141,66 @@ test('built run-site uses US dates and keeps the one-line command start together
    assert.equal(layout.sideways, false, `split-card sideways overflow at ${width}px`);
    assert.equal(layout.pageSideways, false, `contract sideways overflow at ${width}px`);
   }
-  // The header keeps its links on screen at the narrowest phone: Docs, Contract and Source beside a long name wrap below it.
+  // The header keeps its links on screen at the narrowest phone: Docs, Roadmap and Source beside a long name wrap below it.
   for (const path of ['/contract', '/run']) {
    await page.goto(preview.url + path);
    await page.setViewportSize({width:320,height:700});
    assert.deepEqual(await headerLayout(page), { sideways:false, links:3, offscreen:[], small:[], overlaps:[] }, `header at 320px on ${path}`);
   }
+  await context.close();
+ } finally { await browser.close(); await preview.close(); }
+});
+
+test('built run site writes /docs/hosting from the seed\'s own declarations, Run Edit Run first', async t => {
+ const f = await seed(t);
+ const runData = join(f.root, 'src/site/run.ts'), declaration = join(f.root, 'deploy.json'), theme = join(f.root, 'public/rer-theme.css');
+ await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy'));
+ // A seed theme can outrank the page's own rules for Base's command blocks, as Buoy's keeps a command on one line on phones.
+ await writeFile(theme, await readFile(theme, 'utf8') + 'body:has(> header.bar) .code pre { white-space: pre; overflow-x: auto; overflow-wrap: normal; }\n');
+ const declared = JSON.parse(await readFile(declaration, 'utf8'));
+ let result = await f.build();
+ assert.equal(result.code, 0, result.stdout + result.stderr);
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const context = await browser.newContext({viewport:{width:390,height:844},permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
+  const hosting = async () => {
+   await page.goto(preview.url + '/docs/hosting');
+   return page.evaluate(() => ({
+    sections: [...document.querySelectorAll('main > section')].map(section => section.getAttribute('aria-labelledby')),
+    request: document.querySelector('.assisted a')?.href,
+    token: document.querySelector('#token')?.closest('li')?.textContent ?? '',
+    deployFile: [...document.querySelectorAll('.code pre code')].map(code => code.textContent).find(text => text.includes('CLOUDFLARE_API_TOKEN=')) ?? '',
+   }));
+  };
+  const built = await hosting();
+  assert.deepEqual(built.sections, ['assisted', 'diy'], 'Run Edit Run comes before the do-it-yourself steps');
+  const request = new URL(built.request);
+  assert.deepEqual([request.origin, request.searchParams.get('product'), request.searchParams.get('plan')], ['https://app.runeditrun.com', 'run-buoy', 'assisted']);
+  for (const permission of deployPermissions(declared)) assert.ok(built.token.includes(permission), `the token step asks for ${permission}`);
+  assert.equal(built.token.includes('R2 Storage'), false, 'nothing the declaration does not use');
+  for (const width of [320, 390, 1440]) {
+   await page.setViewportSize({width,height:900});
+   assert.deepEqual((await commandBlocks(page)).filter(block => block.covered || block.clipped), [], `command blocks at ${width}px`);
+   assert.deepEqual(await codeChipBreaksWord(page), [], `inline code at ${width}px`);
+   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 0.5), false, `sideways overflow at ${width}px`);
+   assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('body *')].filter(element => [...element.childNodes].some(node => node.nodeType === 3 && node.textContent.trim())).map(element => parseFloat(getComputedStyle(element).fontSize)).filter(size => size < 13)), [], `text under 13px at ${width}px`);
+  }
+  for (const button of await page.locator('.copy').all()) {
+   const command = await button.getAttribute('data-copy');
+   assert.equal(command, await button.evaluate(element => element.closest('.code').querySelector('pre code').textContent), 'Copy holds the command shown');
+   await button.click();
+   await page.waitForFunction(async expected => await navigator.clipboard.readText() === expected, command);
+  }
+  // The page follows the declaration: an R2 binding adds its permission, and one rer deploy
+  // refuses leaves Run Edit Run's help alone while the run site still builds.
+  await writeFile(declaration, JSON.stringify({ ...declared, r2: [{ binding: 'FILES' }] }));
+  result = await f.build();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.ok((await hosting()).token.includes('Workers R2 Storage: Edit'));
+  await writeFile(declaration, JSON.stringify({ ...declared, platforms: ['cloudflare'] }));
+  result = await f.build();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.deepEqual((await hosting()).sections, ['assisted']);
   await context.close();
  } finally { await browser.close(); await preview.close(); }
 });
@@ -154,7 +246,7 @@ test('site build bundles declared client islands and their imports for the brows
  assert.equal(result.code, 0, result.stdout + result.stderr);
  const home = await readFile(join(f.root,'dist/site/index.html'),'utf8'), source = /src="([^"]+)"/.exec(home)?.[1];
  assert.ok(source?.startsWith('/site-assets/'), 'page receives the emitted client URL');
- const preview = await sitePreview(join(f.root,'dist/site'), {ports:[await freePort()]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ const preview = await sitePreview(join(f.root,'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const page = await browser.newPage();
   await page.goto(preview.url);
@@ -268,4 +360,75 @@ test('site build renders /contract from CONTRACT.md, links it only when it exist
  const line = broken.split('\n').findIndex(text => text.startsWith('| HOME-002')) + 1;
  assert.match(result.stdout + result.stderr, new RegExp(`CONTRACT\\.md:${line}: A Status row has 6 cells`));
  assert.match(await page('contract.html'), /0 of 3 clauses done/);
+});
+
+test('built Run command accepts one repository argument and refuses shell syntax', async t => {
+ const f = await seed(t), data = join(f.root, 'src/site/run.ts');
+ const original = await readFile(data, 'utf8');
+ const valid = 'owner/run-repo_2.js';
+ await writeFile(data, original.replace('npx -y @runeditrun/rer dev runeditrun/base', `npx -y @runeditrun/rer dev ${valid}`));
+ const built = await f.build();
+ assert.equal(built.code, 0, built.stdout + built.stderr);
+ const html = await readFile(join(f.root, 'dist/site/run.html'), 'utf8');
+ const command = /data-copy="([^"]+)"/.exec(html)[1].replaceAll('&#39;', "'").replaceAll('&quot;', '"').replaceAll('&amp;', '&');
+ const result = await run('/bin/sh', ['-c', `curl() { :; }; sh() { printf '%s\\n' "$@"; }; ${command}`]);
+ assert.deepEqual(result.stdout.trim().split('\n'), ['-s', '--', 'dev', valid]);
+ for (const repo of ['owner/r; printf INJECTED', 'owner/r$(printf INJECTED)', 'owner/r`printf INJECTED`', 'owner/with space', "owner/r'quote", 'owner/repo\ntrue', 'owner/repo\n', '-owner/repo', 'owner/../repo']) {
+  await writeFile(data, original.replace(/clone: '[^']*'/, `clone: ${JSON.stringify('npx -y @runeditrun/rer dev ' + repo)}`));
+  const failed = await f.build();
+  assert.notEqual(failed.code, 0, repo);
+  assert.match(failed.stdout + failed.stderr, /valid repository id/, repo);
+ }
+});
+
+test('built Roadmap preserves product prose while removing explicit source citations', async t => {
+ const f = await seed(t);
+ const source = (await readFile(join(base, 'foundation/fixtures/slate-contract-e60b107.md'), 'utf8'));
+ const prose = '.NET public/private CLI/MCP Docs/Sheets/Slides package/revision Claim.MD/Availity https://www.ssa.gov/oact/cola/cbb.html https://status.cloud.google.com/incidents.json Next.js Normalize.css Animate.css ASP.NET v1.2.3 e.g. 3.14 example.com defaced React.js Node.js Socket.io Vue.js D3.js Nuxt.js three.js decimal deadheaded decade feedback';
+ const input = source.replace(/^(\| `COLLAB-001`[^\n]*?)\| see the clause \|/m, (_, row) => `${row}| ${prose}; inspect \`src/private.ts\`, tests/private.test.mjs, README.md and commit a1234567890b. |`);
+ assert.notEqual(input, source);
+ await writeFile(join(f.root, 'CONTRACT.md'), input);
+ const built = await f.build();
+ assert.equal(built.code, 0, built.stdout + built.stderr);
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const page = await browser.newPage(); await page.goto(preview.url + '/contract');
+  const clause = page.locator('tr.clause[data-id="COLLAB-001"]');
+  const text = await clause.textContent();
+  for (const word of prose.split(' ')) assert.ok(text.includes(word), word);
+  assert.doesNotMatch(text, /src\/private|tests\/private|README\.md|a1234567890b/);
+  for (const word of prose.split(' ')) {
+   await page.locator('input[type="search"]').fill(word);
+   assert.equal(await clause.isVisible(), true, `search finds ${word}`);
+  }
+ } finally { await browser.close(); await preview.close(); }
+});
+
+test('built chooser keeps self first and carries each paid plan through the shared entry', async t => {
+ const f = await seed(t), data = join(f.root, 'src/site/run.ts'), renderer = join(f.root, 'src/base/run-site.ts');
+ const original = await readFile(data, 'utf8'), source = await readFile(renderer, 'utf8');
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const page = await browser.newPage();
+  for (const [mode, product, managed] of [['request', 'errors-workbench', true], ['app', 'errors-workbench', true], ['app', 'errors-workbench', false], ['app', null, true]]) {
+   await writeFile(data, original.replaceAll("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`));
+   await writeFile(renderer, source.replace("signups: 'request' as", `signups: '${mode}' as`));
+   const result = await f.build();
+   assert.equal(result.code, 0, result.stdout + result.stderr);
+   await page.goto(preview.url + '/run');
+   assert.deepEqual(await page.locator('.chooser section[aria-labelledby]').evaluateAll(sections => sections.filter(s => !s.closest('.paste-panel')).map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', 'managed']);
+   assert.equal(await page.locator('button').count(), 1);
+   const closed = mode === 'request' || product === null;
+   assert.equal(await page.locator('.assisted .chip').count(), Number(closed));
+   assert.equal(await page.locator('.managed .chip').count(), Number(closed || !managed));
+   for (const plan of ['assisted', 'managed']) {
+    const href = new URL(await page.locator(`.${plan} a`).getAttribute('href'));
+    assert.deepEqual([href.origin, href.searchParams.get('product'), href.searchParams.get('plan')], ['https://app.runeditrun.com', product ?? 'run-spool', plan]);
+   }
+   const entry = await page.locator('.assisted a').getAttribute('href');
+   await page.goto(preview.url + '/docs/hosting');
+   assert.equal(await page.locator('.assisted a').getAttribute('href'), entry);
+   assert.equal(await page.locator('.assisted .go p').count(), Number(closed), 'hosting follows the same sign-ups and listing state');
+  }
+ } finally { await browser.close(); await preview.close(); }
 });

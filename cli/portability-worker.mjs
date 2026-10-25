@@ -12,7 +12,7 @@ import { transferProgress } from '../modules/portability/progress.mjs';
 import { nativeFailure, stateBytes } from './portability-progress.mjs';
 import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
-import { appliedMigrations, platformMigrationDeclaration, platformMigrationPreflight } from './portability-migrations.mjs';
+import { appliedMigrations, platformMigrationDeclaration, nativeMigrationPreflight } from './portability-migrations.mjs';
 
 // Transfers read only the D1 database and R2 buckets. A configuration with just
 // those keeps the app's other bindings out of the proxy: a Durable Object class
@@ -45,7 +45,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
  let proxy;
  try {
   proxy = await getPlatformProxy({ configPath, persist: { path: join(root, '.wrangler/state/v3') }, remoteBindings: false });
-  if(direction==='migration-preflight')return await platformMigrationPreflight(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery);
+  if(direction==='migration-preflight')return await nativeMigrationPreflight({root,db:proxy.env[binding],binding,platformMigrations});
   const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery),policy,declaration);
   const options={ db: proxy.env[binding], buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations };
   if(direction==='legacy-preflight') {
@@ -74,6 +74,9 @@ catch (error) {
  const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
  // A later migration that changes restorable data is named: it is a file of this installation.
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
+ // An unapplied migration is a file of this checkout: it is named so it can be applied.
+ const unapplied = error instanceof PortabilityError && error.code === 'migration_ledger:unapplied' ? error.migration : undefined;
+ const reExport = error instanceof PortabilityError && ['schema_mismatch:legacy_schema','schema_mismatch:unsupported_sql'].includes(error.code);
  // A populated destination names its table or bucket: schema names, never row data.
  const occupied = error instanceof PortabilityError && /^(target|bucket)_not_empty:/.test(error.code) ? error.code.slice(error.code.indexOf(':') + 1) : undefined;
  // Safety diagnostics contain only policy schema names, never source values.
@@ -81,5 +84,5 @@ catch (error) {
  // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
  const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
 }

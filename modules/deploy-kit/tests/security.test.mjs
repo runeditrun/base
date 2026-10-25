@@ -53,6 +53,21 @@ test('provider read retries share the original timeout, cancellation and request
     await assert.rejects(shared.request('/queues'),/provider-request-budget/);
   } finally { clearTimeout(hold); }
 });
+test('an expired deployment deadline is visible to provider retries before the next clock tick', async () => {
+  const controller = new AbortController();
+  let calls = 0, deadlines = 0;
+  const api = cloudflare({accountId,token:'test-secret',
+    requestSignal:() => { deadlines++; return controller.signal; },
+    fetch:async (url,{signal}) => {
+      calls++;
+      controller.abort(new DOMException('Deployment deadline expired','TimeoutError'));
+      signal.throwIfAborted();
+      return response([]);
+    }});
+  await assert.rejects(api.request('/queues'),error => error.message === 'provider-transport-failed' && error.providerTransport.attempts === 1);
+  assert.equal(calls,1,'an expired provider read is not retried');
+  assert.equal(deadlines,1,'the operation captures its deadline once');
+});
 test('complete multi-page listing, partial page failure and request limits',async()=>{
   let calls=0;const api=cloudflare({accountId,token:'test',fetch:async()=>{calls++;return response([{name:`resource-${calls}`}],{page:calls,total_pages:2,total_count:2});}});
   assert.equal((await api.list('/d1/database')).length,2);

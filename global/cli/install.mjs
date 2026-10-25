@@ -8,6 +8,7 @@ import { ownManifest, ownRoot, packageDigest, packageFileList } from '../package
 import { installRecord, launcherOwner, launcherScript, layout } from './layout.mjs';
 import { pathAdvice } from './path-link.mjs';
 import { runningDoor } from '../../cli/door.mjs';
+import { channelOf } from './status.mjs';
 
 async function readLink(path) { try { return await readlink(path); } catch (error) { if (['ENOENT', 'EINVAL'].includes(error.code)) return undefined; throw error; } }
 
@@ -49,7 +50,8 @@ async function closing(paths) {
 
 export async function install({ quiet = false } = {}) {
  const paths = layout(), manifest = ownManifest(), digest = await packageDigest(ownRoot);
- const name = `${manifest.version}-${digest.slice(0, 8)}`, channel = process.env.RER_INSTALL_CHANNEL === 'script' ? 'script' : 'npx';
+ const name = `${manifest.version}-${digest.slice(0, 8)}`;
+ const channel = (process.env.RER_INSTALL_CHANNEL ?? (await channelOf(paths)).channel) === 'script' ? 'script' : 'npx';
  const launcher = await launcherOwner(paths.launcher);
  if (launcher.state === 'foreign') {
   process.stderr.write(`rer cli install: ${paths.launcher} already exists and was not written by rer cli install (it may be the unrelated npm package "rer"). Nothing was changed. Remove or rename it, then run the install again.\n`);
