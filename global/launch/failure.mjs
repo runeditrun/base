@@ -13,17 +13,24 @@ export class LaunchFailure extends Error {
 // every event field, keeps the shared credential rules.
 const shellDirectories = new Set(['PWD', 'OLDPWD']);
 
-// Native errors have no dispatcher exit code, but their message is still the
-// cause of this launch's failure. Redact before transporting it to followers;
-// a JSON caller must receive the same cause and recovery as a terminal caller.
-export function workerFailure(error, { root, env = process.env }) {
+// A launch failure keeps private every credential its environment or its own
+// error event names, in text (`redact`) and in each string of an event (`clean`).
+export function launchRedaction(event, env = process.env) {
  const redaction = createRedaction();
  const environment = Object.fromEntries(Object.entries(env).filter(([name]) => !shellDirectories.has(name)));
- redaction.addSecrets([...credentialValues(environment), ...credentialValues(error?.event)]);
+ redaction.addSecrets([...credentialValues(environment), ...credentialValues(event)]);
  const redact = text => redaction.redact(String(text).replace(/([#&]rer-dev=)[^&\s"'<>]+/g, '$1[REDACTED]'));
  const clean = value => typeof value === 'string' ? redact(value)
   : Array.isArray(value) ? value.map(clean)
   : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clean(item)])) : value;
+ return { redact, clean };
+}
+
+// Native errors have no dispatcher exit code, but their message is still the
+// cause of this launch's failure. Redact before transporting it to followers;
+// a JSON caller must receive the same cause and recovery as a terminal caller.
+export function workerFailure(error, { root, env = process.env }) {
+ const { redact, clean } = launchRedaction(error?.event, env);
  const exitCode = Number.isInteger(error?.exitCode) && error.exitCode > 0 && error.exitCode <= 255 ? error.exitCode : 1;
  const cause = redact(error?.message || error || 'The launch stopped before the app was ready.');
  const retry = [rerWord(), 'dev', '--cwd', shellQuote(root)].join(' ');

@@ -1,3 +1,4 @@
+import { launchRedaction } from './failure.mjs';
 import { qualifyHints } from './hints.mjs';
 
 // What `rer dev` prints while it launches: one line per step, one honest line
@@ -48,11 +49,14 @@ export function printer({ json, stopHint, keyless = false, name, openHint, open,
    process.stdout.write(out.join('\n') + '\n');
   },
   failure(failure) {
+   // Qualifying adds this launch's own invocation and checkout, so what is
+   // printed passes through the same redaction as the failure itself.
+   const { redact, clean } = launchRedaction(failure.event);
    if (json) {
-    if (failure.event) process.stdout.write(JSON.stringify(qualifyHints(failure.event, stopHint)) + '\n');
-    else event('error', { code: 'launch_refused', message: qualifyHints(failure.message, stopHint), exitCode: failure.exitCode });
+    if (failure.event) process.stdout.write(JSON.stringify(clean(qualifyHints(failure.event, stopHint))) + '\n');
+    else event('error', { code: 'launch_refused', message: redact(qualifyHints(failure.message, stopHint)), exitCode: failure.exitCode });
     event('result', { ok: false, exitCode: failure.exitCode });
-   } else process.stderr.write(qualifyHints(failure.message, stopHint) + '\n');
+   } else process.stderr.write(redact(qualifyHints(failure.message, stopHint)) + '\n');
   },
  };
 }
