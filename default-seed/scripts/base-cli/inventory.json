@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g0c0227d5",
+  "cliVersion": "0.2.80-dev.g5dd1b780",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3839,7 +3839,7 @@
     },
     "modules/site/docs-search/vendor/README.md": {
       "source": "modules/site/docs-search/vendor/README.md",
-      "sha256": "1bf61033ab051f93de80c1ed76ea7a1fd6e796de762295a051c28e955a872eb7"
+      "sha256": "9353cf3623800665957f771796bea7fc19e79b219d1b934de56916100251065a"
     },
     "modules/site/docs-search/vendor/STEMMER-LICENSE": {
       "source": "modules/site/docs-search/vendor/STEMMER-LICENSE",

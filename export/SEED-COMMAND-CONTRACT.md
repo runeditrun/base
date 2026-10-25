@@ -364,6 +364,12 @@ that exact immutable source with the existing authoring command:
 node scripts/edition-authoring/cli.mjs record-base COPY_PATH modules/site/docs-search BASE_RELEASE_SHA --base BASE_CHECKOUT
 ```
 
+When publishing this vendored MIT source with Base's publication scanner, retain
+its copyright notices and add the stemmer author's exact public contact identity
+from `vendor/STEMMER-LICENSE` to `.publish-check/config.json` `publicEmails`, as
+Base does. This is an attribution declaration, not a runtime dependency or
+resource setup. Do not remove licence text or disable email scanning.
+
 Keep each seed's layout, copy and Markdown source set. Update its adapter to
 the ASSETS-only declaration above and its client entry to `COPY_PATH/client.ts`.
 No search binding is created or provisioned. HappyToHelp's copy path is

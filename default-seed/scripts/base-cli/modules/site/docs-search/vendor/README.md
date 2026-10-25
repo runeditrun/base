@@ -13,3 +13,10 @@ public declaration file still checks typed callers. Licence notices are in
 the included notices. MiniSearch owns the inverted index and BM25 scoring; the
 small surrounding module supplies generic tokenization, field boosts and relevance
 filtering. stemmer supplies the Porter algorithm rather than a custom stemmer.
+
+The stemmer MIT copyright notice includes its author’s public contact identity,
+verified in the pinned npm source archive above. Base declares that exact
+identity in `.publish-check/config.json` using the maintained `publicEmails`
+field; no scanner rule or licence text is changed. Adopters running the same
+publication scanner preserve the notice and declare that same exact public
+identity in their own publication config.
