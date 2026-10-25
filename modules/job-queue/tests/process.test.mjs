@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createConnection } from 'node:net';
+import { randomUUID } from 'node:crypto';
 import { deliverGroupSignal, processInfo, stopGroup } from '../processes.mjs';
+import { atomicJson } from '../storage.mjs';
 import { setup, until, client, worker, noLivePids, cli } from './helpers.mjs';
 import { recordedState } from './state.mjs';
 
@@ -89,6 +91,32 @@ for (const target of ['caller', 'supervisor']) test(`SIGKILL of ${target} leaves
   await until(async () => (await queue.status()).running.length === 0);
   assert.deepEqual((await ledger.read()).running, []);
   await until(() => noLivePids([lease.owner.pid, ...pids]));
+});
+
+test('a stale reservation never signals an unrelated leaderless group holding its group ID', async t => {
+  const { directory } = await setup(t);
+  const received = join(directory, 'received');
+  // The unrelated group's leader exits, leaving a member that records SIGTERM.
+  const member = `process.on('SIGTERM',()=>require('node:fs').appendFileSync(${JSON.stringify(received)},'TERM'));setInterval(()=>{},1000)`;
+  const env = { ...process.env }; delete env.RER_JOB_MEMBERSHIP;
+  const leader = spawn(process.execPath, ['-e', `const c=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(member)}],{stdio:'ignore'});c.unref();console.log(c.pid)`],
+    { detached: true, env, stdio: ['ignore', 'pipe', 'ignore'] });
+  const pid = Number(await new Promise(resolve => leader.stdout.once('data', resolve)));
+  await new Promise(resolve => leader.once('close', resolve));
+  const saved = await processInfo(pid);
+  t.after(async () => { if ((await processInfo(pid))?.start === saved.start) process.kill(pid, 'SIGKILL'); });
+  await atomicJson(join(directory, 'state.json'), { version: 1, sequence: 1, queued: [], running: [{ id: 'stale', membership: randomUUID(),
+    label: 'stale', sequence: 1, priority: 'normal', owner: { pid: leader.pid, pgid: leader.pid, start: 'previous-lifetime',
+      marker: 'rer-job-supervisor-previous', token: 'previous', socket: join(directory, 'previous.sock') } }] });
+  assert.notEqual((await client(t, directory, ['status', '--json']).done).code, 0);
+  assert.deepEqual((await recordedState(directory).read()).running.map(job => job.id), ['stale']);
+  assert.equal(await readFile(received, 'utf8').catch(() => ''), '');
+  assert.equal((await processInfo(pid))?.start, saved.start, 'The unrelated member must survive untouched');
+  // Once that group ends, the kept reservation is released.
+  process.kill(pid, 'SIGKILL');
+  await until(() => noLivePids([pid]));
+  assert.equal((await client(t, directory, ['status', '--json']).done).code, 0);
+  assert.deepEqual((await recordedState(directory).read()).running, []);
 });
 
 test('failure to spawn executable passes 127 and releases slot', async t => {

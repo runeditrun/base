@@ -218,7 +218,11 @@ cannot cause a remaining-process failure. Node reaps its direct children before
 the command store finishes closing. Inspections have a three-second read bound;
 an unreadable table is marked unchecked and grants no signalling authority.
 Live children retain birth-identity checks and TERM-to-KILL escalation.
-Group discovery precedes the final identity check for every TERM and KILL.
+Queue cleanup discovers a job group's live members before the final identity
+check for every TERM and KILL: the recorded supervisor's birth and title while
+it holds the group ID, otherwise the job's `RER_JOB_MEMBERSHIP` token on every
+live member. A group without that proof receives no signal; its cleanup is
+unchecked and the reservation is kept.
 A same-birth zombie supervisor's erased title does not hide live descendants;
 birth mismatches still reject cleanup. Unavailable owner metadata preserves
 an existing operation lock, including a legacy lock without a birth stamp.

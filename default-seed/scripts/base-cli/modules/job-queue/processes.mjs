@@ -105,25 +105,99 @@ export async function deliverGroupSignal(pgid, signal, { send = signalGroup, liv
   }
 }
 
-// A group ID cannot be reused while the old group has surviving members (POSIX).
-// A live replacement leader is never signalled; both platforms check its unique title.
-export async function stopGroup(owner, graceMs) {
+// Live members of a group, by PID. These PIDs decide custody, so every row must parse.
+async function readGroupMembers(pgid, timeout) {
+  const members = [];
+  if (process.platform === 'darwin') {
+    const { stdout } = await execute('/bin/ps', ['-A', '-o', 'pid=', '-o', 'pgid=', '-o', 'stat='], { timeout, killSignal: 'SIGKILL' });
+    for (const line of stdout.trim().split('\n')) {
+      const [, pid, group, state] = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/) ?? [];
+      if (!pid) throw Error('Invalid process listing');
+      if (Number(group) === pgid && !/^[ZX]/i.test(state) && !state.includes('E')) members.push(Number(pid));
+    }
+    return members;
+  }
+  const signal = AbortSignal.timeout(timeout);
+  for (const name of (await readdir('/proc')).filter(name => /^\d+$/.test(name))) {
+    try {
+      signal.throwIfAborted();
+      const stat = await readFile(`/proc/${name}/stat`, { encoding: 'utf8', signal });
+      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+      if (!stat.startsWith(`${name} (`) || !/^\d+$/.test(fields[2] ?? '')) throw Error('Invalid process listing');
+      if (Number(fields[2]) === pgid && !/^[ZX]$/i.test(fields[0])) members.push(Number(name));
+    } catch (error) { if (!['ENOENT', 'ESRCH'].includes(error.code)) throw error; }
+  }
+  return members;
+}
+
+// Each PID's launch environment as text; '' while it is gone or not yet readable.
+async function readEnvironments(pids, timeout) {
+  if (process.platform === 'linux') {
+    const signal = AbortSignal.timeout(timeout);
+    return Promise.all(pids.map(pid => readFile(`/proc/${pid}/environ`, { encoding: 'utf8', signal })
+      .catch(error => { if (['ENOENT', 'ESRCH'].includes(error.code)) return ''; throw error; })));
+  }
+  // macOS shows another process's environment only through ps, after its
+  // arguments, and never for Apple platform binaries or retitled processes.
+  let stdout;
+  try {
+    ({ stdout } = await execute('/bin/ps', ['eww', '-p', pids.join(','), '-o', 'pid=', '-o', 'command='],
+      { timeout, killSignal: 'SIGKILL', maxBuffer: 16 * 1024 * 1024 }));
+  } catch (error) {
+    // A quiet exit 1 means a listed PID has exited; the other rows still stand.
+    if (error.code !== 1 || error.killed || error.signal || typeof error.stdout !== 'string'
+      || typeof error.stderr !== 'string' || error.stderr.trim()) throw error;
+    stdout = error.stdout;
+  }
+  const rows = new Map(stdout.split('\n').map(line => line.match(/^\s*(\d+) (.*)$/)).filter(Boolean)
+    .map(([, pid, text]) => [Number(pid), text]));
+  return pids.map(pid => rows.get(pid) ?? '');
+}
+
+// The supervisor gives the job command RER_JOB_MEMBERSHIP={…,"token":"<lease
+// token>"} (command.mjs), and its descendants inherit it.
+const carriesToken = (environment, token) => /^[\da-f-]{36}$/i.test(token ?? '')
+  && new RegExp(`(?:^|[\\0\\s])RER_JOB_MEMBERSHIP=\\{[^\\0]*?"token":"${token}"`).test(environment);
+
+// Once the leader is gone its group ID proves nothing: an unrelated leaderless
+// group may hold it (PID reuse, a stale reservation). Signal only while every
+// live member carries the lease's membership token; otherwise nothing is sent.
+async function membersProven(pgid, token, deadline) {
+  const remaining = () => Math.max(1, Math.ceil(deadline - performance.now()));
+  const unproven = pid => commandFailure(`Job cleanup is unchecked: the supervisor of process group ${pgid} is gone and its live member ${pid} does not carry this job's RER_JOB_MEMBERSHIP token (another program may now hold that group ID, or the system hides that process's environment). No unverified process was signalled; the job's reservation is kept until that group ends.`, { ownershipUnchecked: true });
+  const proven = new Set();
+  for (;;) {
+    const members = await inspected(() => readGroupMembers(pgid, remaining()), remaining());
+    const pending = members.filter(pid => !proven.has(pid));
+    if (!pending.length) return members.length > 0;
+    const environments = await inspected(() => readEnvironments(pending, remaining()), remaining());
+    for (const [index, pid] of pending.entries()) {
+      if (carriesToken(environments[index], token)) proven.add(pid);
+      else if (environments[index]) throw unproven(pid);
+    }
+    // A member that is exiting or between images shows no environment yet.
+    const waiting = pending.find(pid => !proven.has(pid));
+    if (waiting !== undefined) {
+      if (performance.now() >= deadline) throw unproven(waiting);
+      await delay(25);
+    }
+  }
+}
+
+// A live leader, or its unreaped zombie, reserves the group ID (POSIX): its
+// recorded start and unique title authorize the group, and a replacement
+// leader is never signalled. Without the leader only membersProven authorizes.
+// membership is the lease's token (job.membership), inherited by its command.
+export async function stopGroup(owner, graceMs, membership) {
   if (!owner?.pgid) return;
   if (!Number.isInteger(owner.pgid) || owner.pgid < 2 || owner.pgid !== owner.pid)
     throw Error('Invalid lease process group');
-  const verify = async (timeout = inspectionMs) => inspected(async () => {
-    if (process.platform === 'linux') {
-      // An absent leader anchors surviving members only in the recorded boot.
-      // Check this before the final PID inspection, never after it: metadata
-      // discovery must not open another reuse window before signal delivery.
-      const boot = (await readFile('/proc/sys/kernel/random/boot_id', { encoding: 'utf8', signal: AbortSignal.timeout(timeout) })).trim();
-      if (!boot) throw Error('Invalid boot identity');
-      if (!owner.start.startsWith(`${boot}:`)) return false;
-    }
+  const verify = async (timeout = inspectionMs) => {
+    const deadline = performance.now() + timeout;
     const current = await processInfoWithin(owner.pid, timeout);
-    return !current || (current.start === owner.start
-      && (current.zombie || !owner.marker || current.title.includes(owner.marker)));
-  }, timeout);
+    if (!current) return membersProven(owner.pgid, membership, deadline);
+    return current.start === owner.start && (current.zombie || !owner.marker || current.title.includes(owner.marker));
+  };
   if (await deliverGroupSignal(owner.pgid, 'SIGTERM', { verify })) {
     await delay(graceMs);
     if (await deliverGroupSignal(owner.pgid, 'SIGKILL', { verify })) {
