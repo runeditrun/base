@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.82-dev.ged378e1b",
+  "cliVersion": "0.2.82-dev.gf6fa618e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1183,7 +1183,7 @@
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
-      "sha256": "2d6b485155154f68d1f27c57bd3f78a140dd052ab2abbccdd6ffa029032f2329"
+      "sha256": "24797c71eeb5cc3e954726d1fc0f5bf01cbafe96554b0d9db33662b289aec475"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",

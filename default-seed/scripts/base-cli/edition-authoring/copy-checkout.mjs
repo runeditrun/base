@@ -100,55 +100,94 @@ export function completeAuthoringCopies(root, plans, {tree, revision}) {
 // anything. This catches known filesystem obstructions, not failures that arise
 // after preflight (concurrent changes, exhausted space or I/O failures).
 export function preflightRefresh(root, plans, recordPath) {
-  const writes = new Set([recordPath, ...plans.flatMap(({copy, sources}) =>
-    sources.map(([source]) => copy.path + source.slice(copy.originPath.length)))]);
-  // Acknowledgements live in the copy record. An existing source lock must also
-  // remain writable, although refresh does not regenerate it.
-  if (fs.existsSync(path.join(root, 'sources.lock.json'))) writes.add('sources.lock.json');
-  const removals = plans.flatMap(plan => plan.removed).filter(name => !writes.has(name));
-  const uid = process.geteuid?.(), entries = new Map();
+  const uid = process.geteuid?.();
   const writable = (target, stat, directory = false) => {
     // Root's DAC bypass must not turn explicitly read-only inputs into writes.
     if (uid === 0 && !(stat.mode & 0o222)) throw Error('no write permission bits');
     fs.accessSync(target, fs.constants.W_OK | (directory ? fs.constants.X_OK : 0));
   };
+  const directory = (target, stat, ancestor) => ({target, stat, directory: true, ancestor});
+  const checkout = directory(root, fs.lstatSync(root));
+  // Inherit the volume's aliasing for directories created only in this model.
+  const alternate = path.basename(root).replace(/[a-zA-Z]/, c => c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase());
+  let caseInsensitive = false;
+  if (alternate !== path.basename(root)) {
+    try {
+      const stat = fs.lstatSync(path.join(path.dirname(root), alternate));
+      caseInsensitive = stat.dev === checkout.stat.dev && stat.ino === checkout.stat.ino;
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  const children = node => node.children ??= new Map(node.stat ? fs.readdirSync(node.target).map(name => [name, null]) : []);
+  const child = (parent, name) => {
+    const entries = children(parent);
+    if (!entries.has(name)) return;
+    if (!entries.get(name)) {
+      const target = path.join(parent.target, name), stat = fs.lstatSync(target);
+      entries.set(name, {target, stat, directory: stat.isDirectory()});
+    }
+    return entries.get(name);
+  };
   const inspect = name => {
     safe(name);
-    let parent = root, parentStat = fs.lstatSync(root);
+    let parent = checkout;
     const parts = name.split('/');
     for (const [index, part] of parts.entries()) {
-      if (!entries.has(parent)) entries.set(parent, fs.readdirSync(parent));
-      const variant = entries.get(parent).find(entry => entry !== part && entry.toLowerCase() === part.toLowerCase());
-      if (variant) throw Error(`case-variant destination exists: ${path.relative(root, path.join(parent, variant))}`);
-      const target = path.join(parent, part);
-      let stat;
-      try { stat = fs.lstatSync(target); }
-      catch (error) { if (error.code !== 'ENOENT') throw error; }
-      if (stat?.isSymbolicLink()) throw Error(`symlink in destination path: ${path.relative(root, target)}`);
-      if (!stat || index === parts.length - 1) return {target, stat, parent, parentStat};
-      if (!stat.isDirectory()) throw Error(`directory required at ${path.relative(root, target)}`);
-      parent = target; parentStat = stat;
+      const entries = children(parent);
+      const variant = [...entries.keys()].find(entry => entry !== part && entry.toLowerCase() === part.toLowerCase());
+      const other = variant && child(parent, variant);
+      // Surviving file aliases remain obstructions. A directory can be reused
+      // on an insensitive volume, or coexist with the new spelling otherwise.
+      if (other && !other.directory) throw Error(`case-variant destination exists: ${path.relative(root, other.target)}`);
+      const node = child(parent, part) ?? (caseInsensitive ? other : undefined);
+      if (node?.stat?.isSymbolicLink()) throw Error(`symlink in destination path: ${path.relative(root, node.target)}`);
+      if (!node || index === parts.length - 1) return {parent, node, parts: parts.slice(index)};
+      if (!node.directory) throw Error(`directory required at ${path.relative(root, node.target)}`);
+      parent = node;
     }
   };
-  for (const name of new Set([...writes, ...removals])) {
+  const check = (name, write) => {
     try {
-      const {target, stat, parent, parentStat} = inspect(name);
-      if (!writes.has(name) && !stat) continue;
-      if (stat && !stat.isFile()) throw Error('destination is not a regular file');
-      // This is also the nearest existing ancestor of any missing directories.
-      writable(parent, parentStat, true);
-      if (stat && uid !== undefined && uid !== 0 && (parentStat.mode & 0o1000) && uid !== parentStat.uid && uid !== stat.uid) {
+      const found = inspect(name), {parent, node} = found;
+      if (!write && !node) return found;
+      if (node && node.directory) throw Error('destination is not a regular file');
+      const ancestor = parent.stat ? parent : parent.ancestor;
+      writable(ancestor.target, ancestor.stat, true);
+      if (node?.stat && uid !== undefined && uid !== 0 && (ancestor.stat.mode & 0o1000) && uid !== ancestor.stat.uid && uid !== node.stat.uid) {
         throw Error('sticky directory prevents replacing the directory entry');
       }
-      if (stat && writes.has(name)) {
-        writable(target, stat);
+      if (node?.stat && write) {
+        writable(node.target, node.stat);
         // The write loop sets the delivered mode as well as the bytes.
-        if (uid !== undefined && uid !== 0 && uid !== stat.uid) throw Error('file is owned by another user; cannot set its mode');
-        const fd = fs.openSync(target, fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW ?? 0));
+        if (uid !== undefined && uid !== 0 && uid !== node.stat.uid) throw Error('file is owned by another user; cannot set its mode');
+        const fd = fs.openSync(node.target, fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW ?? 0));
         fs.closeSync(fd);
       }
+      return found;
     } catch (error) {
       throw Error(`Cannot refresh ${name}: ${error.message}. Fix the named path and its parent permissions before refreshing; no files were refreshed.`);
     }
+  };
+  // Mirror apply's per-plan order, not a global union of removals. rmSync does
+  // not remove directories: dropping their children cannot make them absent.
+  for (const {copy, sources, removed} of plans) {
+    for (const name of removed) {
+      const {parent, node, parts} = check(name, false);
+      if (node) children(parent).delete(parts[0]);
+    }
+    for (const [source] of [...sources].sort(([a], [b]) => a.localeCompare(b))) {
+      const name = copy.path + source.slice(copy.originPath.length);
+      let {parent, node, parts} = check(name, true);
+      if (node) continue;
+      for (const [index, part] of parts.entries()) {
+        const target = path.join(parent.target, part);
+        node = index === parts.length - 1 ? {target, directory: false} : directory(target, undefined, parent.stat ? parent : parent.ancestor);
+        children(parent).set(part, node);
+        parent = node;
+      }
+    }
   }
+  // Acknowledgements live in the record, written after all source plans. An
+  // existing lock must remain writable, although refresh does not regenerate it.
+  check(recordPath, true);
+  if (fs.existsSync(path.join(root, 'sources.lock.json'))) check('sources.lock.json', true);
 }
