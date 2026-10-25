@@ -33,13 +33,12 @@ test('a failed launch preserves the shell-quoted checkout in text and JSON recov
   child.stdout.on('data', data => { stdout += data; }); child.stderr.on('data', data => { stderr += data; });
   const code = await new Promise((resolveRun, reject) => { child.once('error', reject); child.once('close', resolveRun); });
   assert.equal(code, 3, stderr + stdout);
-  const message = json ? JSON.parse(stdout.trim().split('\n')[0]).message : stderr;
+  const message = json ? stdout.trim().split('\n').map(line => JSON.parse(line)).find(event => event.event === 'error')?.message : stderr;
   assert.ok(message.includes(await realpath(root)), 'the diagnostic preserves the checkout name');
   // Decode only the printed argument with the real shell, without running rer.
-  const recovery = message.split('\n').find(line => line.startsWith('Correct the cause, then run '));
-  assert.ok(recovery, message);
-  const command = recovery.slice('Correct the cause, then run '.length, -' again.'.length);
-  const decoded = await run('/bin/sh', ['-c', `set -- ${command}; printf '%s\\n' "$@"`]);
+  const start = message.indexOf("'/working bin/rer' dev --cwd ");
+  assert.ok(start >= 0, message);
+  const decoded = await run('/bin/sh', ['-c', `set -- ${message.slice(start)}; printf '%s\\n' "$1" "$2" "$3" "$4"`]);
   assert.equal(decoded.code, 0, decoded.stderr);
   assert.deepEqual(decoded.stdout.trimEnd().split('\n'), ['/working bin/rer', 'dev', '--cwd', await realpath(root)]);
  }
