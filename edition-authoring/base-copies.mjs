@@ -137,7 +137,7 @@ function seedFiles(root) {
 function reader(origin) {
   const source = origin.source ?? gitReader(origin.repository);
   const format = source.git('rev-parse', '--show-object-format');
-  const trees = new Map();
+  const trees = new Map(), allEntries = new Map();
   return {
     // Git object identity of local bytes, to find copies by content without reading Base blobs.
     objectId: bytes => crypto.createHash(format).update(`blob ${bytes.length}\0`).update(bytes).digest('hex'),
@@ -146,15 +146,21 @@ function reader(origin) {
         let resolved;
         try { resolved = source.git('rev-parse', '--verify', '--quiet', `${revision}^{commit}`); } catch (error) { if (origin.offline) throw error; resolved = ''; }
         if (resolved !== revision) throw Error(`Base commit ${revision} is not available. Check the full commit with git -C <base-checkout> rev-parse <tag>^{commit}, fetch it, then repeat with --base <base-checkout>`);
-        const entries = new Map();
+        const entries = new Map(), all = new Map();
         for (const entry of source.raw('ls-tree', '-rz', '--full-tree', revision).toString('utf8').split('\0').filter(Boolean)) {
           const tab = entry.indexOf('\t');
           const [mode, type, object] = entry.slice(0, tab).split(' ');
+          all.set(entry.slice(tab + 1), {object, mode, type});
           if (type === 'blob' && FILE_MODES.includes(mode)) entries.set(entry.slice(tab + 1), {object, mode});
         }
         trees.set(revision, entries);
+        allEntries.set(revision, all);
       }
       return trees.get(revision);
+    },
+    entry(revision, name) {
+      this.tree(revision);
+      return allEntries.get(revision).get(name);
     },
     // Committed Base bytes, read in bounded batches.
     blobs(objects) {

@@ -99,3 +99,33 @@ test('public refresh refuses an unparsable transitive helper before writing any 
   for (const name of ['ok', 'bad', 'child']) assert.equal(fs.existsSync(path.join(seed, `scripts/${name}.mjs`)), false);
   assert.equal(git(seed, 'status', '--porcelain=v1', '-uall'), before);
 });
+
+test('public refresh follows extensionless ESM through the committed origin package scope', t => {
+  const {base, seed, refresh} = fixture(t);
+  for (const root of [base, seed]) write(root, 'package.json', '{"type":"module"}\n');
+  write(base, 'tools/main.mjs', "import './helper'; console.log('complete');\n");
+  write(base, 'tools/helper', "import './leaf';\n");
+  write(base, 'tools/leaf', "console.log('leaf');\n");
+  const revision = commit(base);
+  write(base, 'package.json', '{"type":"commonjs"}\n');
+  const result = refresh(revision);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).adopted.map(item => item.path), ['scripts/helper', 'scripts/leaf']);
+  const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout, 'leaf\ncomplete\n');
+});
+
+test('public refresh accepts valid CommonJS wrapper bodies inside a module package', t => {
+  const {base, seed, refresh} = fixture(t);
+  for (const root of [base, seed]) write(root, 'package.json', '{"type":"module"}\n');
+  write(base, 'tools/main.mjs', "import './return.cjs'; import './with.cjs'; import './duplicate.cjs';\n");
+  write(base, 'tools/return.cjs', "if (false) return; module.exports=2; console.log('cjs');\n");
+  write(base, 'tools/with.cjs', "with ({a:2}) console.log(a); module.exports=2;\n");
+  write(base, 'tools/duplicate.cjs', "function f(a,a){return a}; console.log(f(1,2));\n");
+  const result = refresh(commit(base));
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const execution = spawnSync(process.execPath, ['scripts/main.mjs'], {cwd: seed, encoding: 'utf8'});
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout, 'cjs\n2\n2\n');
+});

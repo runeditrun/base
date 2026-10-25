@@ -4,12 +4,13 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {safe, noLinks} from './files.mjs';
 import {staticImports} from './static-imports.mjs';
+import {moduleFormats, javascript} from './module-format.mjs';
 
 const within = (name, directory) => directory === '.' || name.startsWith(directory + '/');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
-const javascript = name => /\.(?:mjs|cjs|js)$/.test(name);
 
 export function closeImports({root, record, recordPath, plans, next, read, revision, local, files}) {
+  const formatFor = moduleFormats(read, revision);
   const adopted = [], problems = new Set(), queue = [], scheduled = new Map();
   const locate = name => plans.find(({copy}) => Object.hasOwn(copy.files, name) || copy.path === name || name.startsWith(copy.path + '/'));
   const enqueue = (plan, source, name, bytes, boundary, depth, adapted = false, pin = plan.copy.revision) => {
@@ -33,7 +34,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
   for (let i = 0; i < queue.length; i++) {
     const importer = queue[i];
     let specifiers;
-    try { specifiers = staticImports(importer.bytes.toString('utf8')).filter(value => value.startsWith('./') || value.startsWith('../')); }
+    try { specifiers = staticImports(importer.bytes, formatFor(importer.source), importer.source).filter(value => value.startsWith('./') || value.startsWith('../')); }
     catch (error) { problems.add(`${importer.name}: cannot establish its static imports (${error.message}); refresh will not guess. Simplify the construct in Base, or adopt the edition with rer adopt-edition.`); continue; }
     for (const specifier of specifiers) {
       let source, name;
@@ -43,6 +44,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         safe(source); safe(name);
       } catch { throw Error(`Cannot resolve relative Base import ${specifier} in ${importer.name}; no files were changed.`); }
       const fail = reason => problems.add(`${importer.name} imports ${specifier}: ${reason} (${source}). Review and materialize the dependency, then run record-base ${quote(name)} ${quote(source)} ${revision}${recordPath === 'base-copies.json' ? '' : ' --record ' + quote(recordPath)}.`);
+      if (!javascript(source) && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       const existing = scheduled.get(name);
       if (existing) {
         if (existing.source !== source) fail('recorded with a different Base origin');

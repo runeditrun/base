@@ -244,16 +244,36 @@ present. Unrecorded imports outside that origin tree, missing, deleted or kept-o
 dependencies, adapted importers with missing dependencies, and destination
 collisions refuse the entire refresh before writes, with exact `record-base`
 commands for explicit reconciliation. Existing adapted files stay unchanged.
-Imports come from Node's V8 module parser (`vm.SourceTextModule.moduleRequests`),
-run in a child using the same Node executable with `--experimental-vm-modules`.
-The child only parses: it never links dependencies or evaluates source. Callers
-need no VM flag or additional packages; this works offline. The child requires
-`SourceTextModule.moduleRequests` (verified on Node 22.20.0 and 26.8.1). Parser
-startup failures and unavailable APIs also refuse the refresh. Strings, templates,
-regular expressions, comments, dynamic `import()` and
-`import.meta` do not add static dependencies. Syntax the running Node cannot
-parse as an ECMAScript module (including JSX) refuses the entire refresh before
-writes and names the importing file and parser error.
+Each file uses its origin name and the target commit's nearest `package.json`
+(read from Git objects, never the working tree or seed): `.mjs` is ESM and
+`.cjs` is CommonJS; `.js` and extensionless files follow that package's
+`"type"`. A nearest typeless package ends the search, as does `node_modules`.
+Without a recognized type, CommonJS is the default, with Node's native syntax
+detection selecting ESM for module-only syntax and lexical redeclarations of
+CommonJS wrapper parameters. Explicit `"type":"commonjs"` never uses detection.
+Every JavaScript helper, including extensionless helpers, is parsed transitively.
+CommonJS is parsed as a function body with Node's five wrapper parameters using
+`vm.compileFunction`; ESM uses `vm.SourceTextModule.moduleRequests`.
+The same Node executable runs a parse-only child with `--experimental-vm-modules`
+and `--expose-internals`. It never links or evaluates source. Callers need no
+extra flag or package, including offline. For typeless inputs the CLI relies on
+Node's private `contextify.containsModuleSyntax` detector, available in Node
+22.20.0 and 26.8.1. Missing parser/detector APIs, invalid or unreadable package
+configuration, and syntax invalid for the decided format refuse the entire
+refresh before writes, naming the file and error. No content regexes or grammar
+fallbacks choose a format. These rules use Node's ordinary default flags; custom
+loader hooks and experimental default-type overrides are outside this finder.
+Relative ESM specifiers resolve exact URL paths (including query/fragment
+removal), without suffix or directory-index searching. JSON dependencies are
+copied as terminal data files, never parsed as JavaScript; Node still enforces
+JSON import attributes and validates JSON at execution. Native `.node` addons,
+`.wasm` (including extensionless Wasm binaries) and other unsupported static
+import extensions refuse before writes: their closure is not established by
+this JavaScript finder. They are never executed to inspect dependencies.
+Strings, templates, regular expressions, comments, dynamic `import()`,
+`import.meta` and CommonJS `require()` add no static dependencies. In particular,
+relative `require()` calls are dynamic and are not followed. JSX and other
+syntax the running Node cannot parse in the chosen format refuse atomically.
 An absent unadapted singleton is retired from the record entirely and named in
 the `retired` output. As with absent files in directory copies, local absence is
 the removal signal; refresh does not distinguish accidental deletion from an
