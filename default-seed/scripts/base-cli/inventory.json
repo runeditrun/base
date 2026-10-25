@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g354bbb55",
+  "cliVersion": "0.2.80-dev.g439207ff",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -269,7 +269,7 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "56a77c2149626eaa3a69764f25b21421ce0be22ce8a11540350ee9f391e77e1a"
+      "sha256": "c5723c26307ca85d8f993f6a8589a0ef49a956c4038564c38acd63fa10329105"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
@@ -1043,7 +1043,7 @@
     },
     "cli/shell-word.mjs": {
       "source": "cli/shell-word.mjs",
-      "sha256": "413d9b10fe31b3cf03fb66ab0a6b33bf1ee18d6d9ed5b22152f02976568df4d8"
+      "sha256": "6a972e50c1fe1876d3d37fc9314627b9257defcb414d51219e454127350cd937"
     },
     "cli/signin.mjs": {
       "source": "cli/signin.mjs",

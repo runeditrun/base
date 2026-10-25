@@ -11,6 +11,7 @@ import { liveServers, stopCommand } from '../registry.mjs';
 import { RerError } from '../../cli/errors.mjs';
 import { serverLimitFile } from '../../cli/server-limit-file.mjs';
 import { LaunchFailure } from './failure.mjs';
+import { shellQuote } from '../../cli/shell-word.mjs';
 
 export const personDefaults = { limit: 10, idleSeconds: 43200 };
 const unboundedLoad = '1000000';
@@ -65,7 +66,7 @@ export async function checkCapacity(checkout, env, pin) {
   `Not started: ${holders.length === 1 ? 'a server' : 'servers'} started with a limit of ${cap} hold${holders.length === 1 ? 's' : ''} this checkout's rer copy to ${cap} running servers, and ${counted.length} ${counted.length === 1 ? 'is' : 'are'} running:`,
   ...holders.map(record => `  ${record.mode} for ${record.checkout} (PID ${record.owner?.pid})`),
   `Restart ${holders.length === 1 ? 'it' : 'each'} under rer, which records ${personDefaults.limit} servers:`,
-  ...holders.flatMap(record => [`  rer ${record.mode} --stop --cwd ${JSON.stringify(record.checkout)}`, `  rer ${record.mode} --cwd ${JSON.stringify(record.checkout)}`]),
+  ...holders.flatMap(record => [`  rer ${record.mode} --stop --cwd ${shellQuote(record.checkout)}`, `  rer ${record.mode} --cwd ${shellQuote(record.checkout)}`]),
   'rer never stops another checkout\'s server itself.',
  ].join('\n'));
  throw new LaunchFailure(4, [

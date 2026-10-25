@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { alive } from '../modules/job-queue/identity.mjs';
 import { rerWord } from './cli/invocation.mjs';
+import { shellQuote } from '../cli/shell-word.mjs';
 
 export const serversDirectory = (env = process.env) => resolve(env.RER_SERVERS_DIR ?? join((env.HOME || homedir()), '.rer/servers'));
 
@@ -23,4 +24,4 @@ export async function liveServers(env = process.env) {
  return live;
 }
 
-export const stopCommand = record => `${rerWord()} ${record.mode} --stop --cwd ${JSON.stringify(record.checkout)}`;
+export const stopCommand = record => `${rerWord()} ${record.mode} --stop --cwd ${shellQuote(record.checkout)}`;

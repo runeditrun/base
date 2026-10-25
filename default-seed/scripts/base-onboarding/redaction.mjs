@@ -6,8 +6,11 @@ const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]{0,64}PRIVATE KEY(?: BLOCK)?-----/g;
 const PEM_END = /-----END [A-Z0-9 ]{0,64}PRIVATE KEY(?: BLOCK)?-----/g;
 // A credential variable name has a credential word as a whole word part:
 // GITHUB_TOKEN, db-password, apiKey or TOKEN, never PATH, DESIGN_MODE,
-// SIGNAL_NAME, KEYBOARD_LAYOUT, COMPASS_DIR or AUTHOR_NAME.
-const CREDENTIAL_WORD = 'token|secret|credential|key|pat|dsn|auth|pass|passwd|password|pwd|signature|sig|cookie|apikey|accesskey|privatekey|secretkey|authtoken|accesstoken';
+// SIGNAL_NAME, KEYBOARD_LAYOUT, COMPASS_DIR or AUTHOR_NAME. PWD by itself
+// means print working directory; DB_PWD and ADMIN_PWD mark passwords.
+const DIRECTORY_NAME = /^(?:PWD|OLDPWD|HOME|USERPROFILE|HOMEPATH|HOMEDRIVE|TMPDIR|TMP|TEMP|XDG_(?:CONFIG|DATA|CACHE|STATE)_HOME)$/i;
+const PASSWORD_ABBREVIATION = /[_.-]pwds?(?:$|[_.-])/i;
+const CREDENTIAL_WORD = 'token|secret|credential|key|pat|dsn|auth|pass|passwd|password|signature|sig|cookie|apikey|accesskey|privatekey|secretkey|authtoken|accesstoken';
 const CREDENTIAL_NAME = new RegExp(`(?:^|[_.-])(?:${CREDENTIAL_WORD})s?(?:$|[_.-])`, 'i');
 // Keep camelCase matching separate: inline flag modifiers are unavailable in
 // Base's maintained Node 22 runtime. These names require a real case boundary.
@@ -293,7 +296,7 @@ export function createRedaction({mask = MASK} = {}) {
 }
 
 // A variable whose name marks a credential, or whose value is a URL carrying one.
-export const credentialName = key => CREDENTIAL_NAME.test(key) || CAMEL_CREDENTIAL_NAME.test(key);
+export const credentialName = key => !DIRECTORY_NAME.test(key) && (CREDENTIAL_NAME.test(key) || PASSWORD_ABBREVIATION.test(key) || CAMEL_CREDENTIAL_NAME.test(key));
 export const credentialUrl = value => CREDENTIAL_URL.test(value);
 // A value that carries a credential whatever its variable is called: a known
 // provider token of at least 16 characters, a JWT, or a URL with userinfo or a
