@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g3f4792d8",
+  "cliVersion": "0.2.80-dev.g3a02f46e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -907,7 +907,7 @@
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
-      "sha256": "97b529c9f5c64aadb52951a8d42ec91bfaf6f8edf5298cbccbc7d3c974533d07"
+      "sha256": "bb1dc29877ee6600d3c309a62a4132d62b87adfac3cf82fd01c235b944fb8acc"
     },
     "cli/node-runtime-discovery.mjs": {
       "source": "cli/node-runtime-discovery.mjs",
