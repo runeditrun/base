@@ -86,12 +86,11 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
       // Only source this refresh newly adopts can bring previously unselected
       // Base helpers across its origin boundary. Existing seed source retains
       // that boundary, and each new helper gets the same guarded permission.
-      if (outside && !importer.newlyAdopted) { fail('outside the copied origin directory'); continue; }
       try { noLinks(root, name); }
       catch (error) { fail(error.message); continue; }
       if (fs.existsSync(path.join(root, name)) && !files.get(name)?.regular) { fail('destination is not a regular seed file'); continue; }
-      if (local(name) && (!entry || local(name) !== read.digests([entry.object]).get(entry.object))) {
-        if (outside) { fail('destination contains seed-owned bytes'); continue; }
+      if (local(name) && (outside && !importer.newlyAdopted || !entry || local(name) !== read.digests([entry.object]).get(entry.object))) {
+        if (outside && importer.newlyAdopted) { fail('destination contains seed-owned bytes'); continue; }
         // Preserve seed-owned bytes, but parse their actual graph so presence
         // cannot conceal a missing dependency. They cannot adopt new Base files.
         const content = files.get(name).read();
@@ -100,6 +99,7 @@ export function closeImports({root, record, recordPath, plans, next, read, revis
         enqueue(importer.plan, source, name, content, importer.boundary, importer.depth + 1, true, importer.pin, true);
         continue;
       }
+      if (outside && !importer.newlyAdopted) { fail('outside the copied origin directory'); continue; }
       if (!entry) { fail('no regular Base file at the target revision'); continue; }
       if (isCode(source, Buffer.alloc(0), true) === false && path.posix.extname(source) !== '.json') { fail('unsupported static import format; only JavaScript and JSON are supported'); continue; }
       if (importer.adapted) { fail('seed-owned importer needs explicit dependency reconciliation'); continue; }
