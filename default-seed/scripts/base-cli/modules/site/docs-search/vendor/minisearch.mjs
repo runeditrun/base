@@ -1,3 +1,4 @@
+// @ts-nocheck -- vendored upstream JavaScript; public types are shipped alongside.
 /** @ignore */
 const ENTRIES = 'ENTRIES';
 /** @ignore */

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.gd1a1f47f",
+  "cliVersion": "0.2.80-dev.g6ac62ffe",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3839,7 +3839,7 @@
     },
     "modules/site/docs-search/vendor/README.md": {
       "source": "modules/site/docs-search/vendor/README.md",
-      "sha256": "c49212fa0ee7910065c1ab39296ef5729156121a2ac7356499d7e7acc9e573ac"
+      "sha256": "1bf61033ab051f93de80c1ed76ea7a1fd6e796de762295a051c28e955a872eb7"
     },
     "modules/site/docs-search/vendor/STEMMER-LICENSE": {
       "source": "modules/site/docs-search/vendor/STEMMER-LICENSE",
@@ -3851,7 +3851,7 @@
     },
     "modules/site/docs-search/vendor/minisearch.mjs": {
       "source": "modules/site/docs-search/vendor/minisearch.mjs",
-      "sha256": "be655f42574cbfc32f7143d8f9ed20d287a98f70d76fe16e7d422918174b5c04"
+      "sha256": "9978b03db8b310d0f677bda3c244140c20e5de925fbd113d58f6bdf88f795ba0"
     },
     "modules/site/docs-search/vendor/stemmer.d.mts": {
       "source": "modules/site/docs-search/vendor/stemmer.d.mts",
