@@ -285,6 +285,57 @@ test('refresh-base refuses a read-only destination before updating any copy', ()
   }
 });
 
+test('refresh-base checks file and directory transitions after each plan removes its old files', () => {
+  const cases = [
+    {from: 'part.mjs', to: 'part.mjs/index.mjs'},
+    {from: 'part.mjs', to: 'part.mjs/deep/index.mjs'},
+    {from: 'nested/part.mjs', to: 'nested/part.mjs/index.mjs'},
+    {from: 'part/index.mjs', to: 'part', refuses: true},
+    {from: 'part/deep/index.mjs', to: 'part', refuses: true},
+    {from: 'part/index.mjs', to: 'part', removeDirectory: true},
+    {from: 'part.mjs', to: 'Part.mjs'},
+    {from: 'part/index.mjs', to: 'Part/index.mjs', directoryCase: true},
+  ];
+  for (const {from, to, refuses, removeDirectory, directoryCase} of cases) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-transition-'));
+    try {
+      const {base, seed} = fixture(temp);
+      git(base, 'config', 'core.ignorecase', 'false');
+      git(seed, 'config', 'core.ignorecase', 'false');
+      write(base, `modules/sample/${from}`, 'old transition file\n');
+      write(seed, `vendor/sample/${from}`, 'old transition file\n');
+      const revision = commit(base);
+      commit(seed);
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+      ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+      fs.rmSync(path.join(base, 'modules/sample', from));
+      // Git does not track the now-empty source directories.
+      if (from.includes('/')) fs.rmSync(path.join(base, 'modules/sample', from.split('/')[0]), {recursive: true});
+      write(base, `modules/sample/${to}`, 'new transition file\n');
+      write(base, 'tools/helper.mjs', 'updated earlier copy\n');
+      const next = commit(base);
+      if (removeDirectory) {
+        fs.rmSync(path.join(seed, 'vendor/sample/part'), {recursive: true});
+        git(seed, 'add', '-A');
+      }
+      const before = fs.readFileSync(path.join(seed, 'base-copies.json'));
+      const result = run(seed, 'refresh-base', next, '--base', base);
+      assert.equal(result.status, refuses ? 1 : 0, `${from} -> ${to}: ${result.error}`);
+      if (refuses) {
+        assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), before);
+        assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'export const helper = true;\n');
+        assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', from), 'utf8'), 'old transition file\n');
+      } else {
+        assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', to), 'utf8'), 'new transition file\n');
+        git(seed, 'add', '-A');
+        // On insensitive filesystems mkdir reuses the old directory spelling.
+        // Refresh supports that existing behavior; it does not rename directories.
+        if (!directoryCase) assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+      }
+    } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  }
+});
+
 test('refresh-base refuses to rewrite an applied migration and leaves every file as it was', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-migration-'));
   try {
