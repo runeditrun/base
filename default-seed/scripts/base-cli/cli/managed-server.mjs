@@ -125,9 +125,12 @@ export async function managedServer(project,options,out,{clock={}}={}){
   await project.adapter.run(project.root,input,store,async child=>{
    app=child;
    child.once('exit',code=>{if(!reason){reason='unexpected application exit';void cleanup().then(()=>finished({code:code||1}));}});
-   const identity=await processInfo(child.pid);
-   if(!identity)throw Error('Runtime exited before custody registration.');
-   await registry.update({runtimeProcess:{pid:identity.pid,start:identity.start}});
+   const identity=await processInfo(child.pid).catch(()=>undefined);
+   if(identity===null)throw Error('Runtime exited before custody registration.');
+   // Serving already owns this ChildProcess through its command scope. A slow
+   // process table omits the optional recovery birth claim instead of inventing
+   // PID custody or failing startup; live cleanup still uses that owned scope.
+   if(identity)await registry.update({runtimeProcess:{pid:identity.pid,start:identity.start}});
   },controller.signal,{...adapterOptions,verb:options.verb,dev:project.adapter.dev,preview:project.adapter.preview});
   // A key is sent (or printed) for a door origin only once the door proves it is ours.
   if(devKey)await verifyDoorFor(selected.url);

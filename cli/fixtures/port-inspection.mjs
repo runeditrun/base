@@ -38,13 +38,18 @@ fs.readFile=async(path,...args)=>{
  if(path===`/proc/${pid}/comm`)return 'node\n';
  if(path==='/proc/net/tcp'||path==='/proc/net/tcp6'){
   if(entry==='select'&&path==='/proc/net/tcp'&&++queries===2)await releaseCandidate();
-  observe();
+  // Linux identifies the holder only after matching a PID's FD to this
+  // table's socket inode. Expire late there, as lsof does with its PID row.
+  if(mode!=='late')observe();
   return 'header\n'+(unknown||path.endsWith('6')?'':`0: 00000000:${Number(port).toString(16)} 00000000:0000 0A 0 0 0 0 0 1234\n`);
  }
  return read(path,...args);
 };
 fs.readdir=async(path,...args)=>path==='/proc'?[pid]:path===`/proc/${pid}/fd`?['1']:dirs(path,...args);
-fs.readlink=async(path,...args)=>path===`/proc/${pid}/fd/1`?'socket:[1234]':link(path,...args);
+fs.readlink=async(path,...args)=>{
+ if(path===`/proc/${pid}/fd/1`){observe();return 'socket:[1234]';}
+ return link(path,...args);
+};
 syncBuiltinESMExports();
 const {availablePort}=await import('../local.mjs');
 const {firstFreePort}=await import('../port.mjs');

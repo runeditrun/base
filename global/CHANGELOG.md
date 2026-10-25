@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- First-run core: show cold-launch steps and five-second heartbeats, close with the app address and `rer open`, recover first-launch port races, bound process reads and retain uncertain job custody, support `setup.claimOnDev` and doctor anywhere, preflight Git, respect redirected installs, revoke claim sessions, suppress package-manager notices, and keep Node-pin handoffs and nonterminal output keyless with `RER_SIGNED_IN`. Holder-hint qualification, holder command formatting and working-launcher failure retries remain parked.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.

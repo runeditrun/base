@@ -7,9 +7,10 @@
 import { pathToFileURL } from 'node:url';
 import { dispatcher } from './checkout.mjs';
 
-export async function delegate(target, args) {
+export async function delegate(target, args, { entryOnly = false } = {}) {
  const { entry, launcher } = dispatcher(target.root);
  if (target.root) process.chdir(target.root);
- process.argv = [process.argv[0], launcher ?? entry, ...args];
- await import(pathToFileURL(launcher ?? entry).href);
+ const command = entryOnly ? entry : launcher ?? entry;
+ process.argv = [process.argv[0], command, ...args];
+ await import(pathToFileURL(command).href);
 }

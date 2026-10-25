@@ -70,9 +70,11 @@ export async function setupNeeded(root, described, last) {
  return await finishedSince(root, described, last.at) ? undefined : 'resume';
 }
 
-// Only a positive listener observation justifies saying another process took it.
-export async function portTaken(port) {
- return Boolean((await probePort('127.0.0.1', port, { hosts: ['127.0.0.1', '::1'], anyAddress: true })).listener);
+// A port is busy when it cannot be bound now on 127.0.0.1 or ::1. The bind
+// itself is the evidence: identifying the listener (slow on a busy computer,
+// and unknown when that inspection times out) is not needed to move on.
+export async function portBusy(port) {
+ return !(await probePort('127.0.0.1', port, { hosts: ['127.0.0.1', '::1'], searching: true })).available;
 }
 
 // The first port from 8787 (RER_DEV_PORT_FROM moves the start), among the next

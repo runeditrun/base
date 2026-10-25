@@ -66,7 +66,7 @@ export async function smoke(tarball, { port } = {}) {
   assert.equal(launched.code, 0, `zero-setup rer dev (${mode})`);
   const lines = Object.fromEntries(launched.stdout.split('\n').filter(line => /^RER_[A-Z_]+ /.test(line)).map(line => [line.split(' ')[0], line.slice(line.indexOf(' ') + 1)]));
   assert.equal(lines.RER_READY, url, `rer dev prints the ready URL (${mode})`);
-  assert.ok(lines.RER_OPEN || lines.RER_SIGN_IN, `rer dev prints a sign-in line (${mode})`);
+  assert.ok(lines.RER_SIGNED_IN, `rer dev prints its signed-in identity (${mode})`);
   assert.equal((await fetch(url + '/health')).status, 200, `the app answers after rer dev returns (${mode})`);
   const stopped = await run(rer, ['dev', '--stop'], { cwd: root, env: launchEnv });
   started.delete(root);

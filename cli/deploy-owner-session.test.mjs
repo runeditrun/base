@@ -12,16 +12,16 @@ test('deploy claims leave no live session, normal sign-in works, and browser cla
   };
   const r = await fresh(), table = native ? 'sessions' : 'oa_sessions';
   const live = async app => (await app.db.prepare(`SELECT count(*) AS n FROM ${table} WHERE revoked_at IS NULL AND expires_at>?`).bind(Date.now()).first()).n;
-  let bootstrapCookie, refuseSignout = false, app = r;
-  const claim = () => claimHostedOwner({
-   hook: {}, declaration: { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] },
-   deployed: { origin: ORIGIN }, env: { SETUP_TOKEN: SETUP }, addSecret() {},
+  let bootstrapCookie, refuseSignout = false, app = r, signOutPath, fallbackSignout = false;
+  const claim = store => claimHostedOwner({
+   hook: { signOutPath }, declaration: { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] },
+   deployed: { origin: ORIGIN }, env: { SETUP_TOKEN: SETUP }, addSecret() {}, store,
    fetch: async (input, init) => {
     const url = new URL(input);
     assert.equal(url.origin, ORIGIN);
-    if (refuseSignout && url.pathname === '/auth/signout') return new Response(null, { status: 503 });
+    if (refuseSignout && url.pathname === '/auth/signout') return new Response(null, { status: refuseSignout });
     const headers = new Headers(init.headers);
-    const response = await app.call(url.pathname, { method: init.method, input: JSON.parse(init.body), cookie: headers.get('cookie'), headers: { Origin: headers.get('origin') } });
+    const response = await app.call(url.pathname === signOutPath || (fallbackSignout && url.pathname === '/api/auth/logout') ? '/auth/signout' : url.pathname, { method: init.method, input: JSON.parse(init.body), cookie: headers.get('cookie'), headers: { Origin: headers.get('origin') } });
     if (url.pathname === '/auth/bootstrap') bootstrapCookie = app.session(response);
     return response;
    },
@@ -47,7 +47,43 @@ test('deploy claims leave no live session, normal sign-in works, and browser cla
 
   // A refused sign-out must prevent deploy from reporting a successful claim.
   app = await fresh();
-  refuseSignout = true;
+  refuseSignout = 503;
   await assert.rejects(claim(), { message: 'owner-claim-failed' });
+  // Missing or unsupported routes cannot stand in for server-side revocation.
+  for (const status of [404, 405]) {
+   app = await fresh();
+   refuseSignout = status;
+   await assert.rejects(claim(), { message: 'owner-claim-failed' });
+   assert.equal(await live(app), 1);
+  }
+  // Without a declaration, the compatibility route must revoke the same real
+  // session after the default route answers 404 or 405.
+  for (const status of [404, 405]) {
+   app = await fresh();
+   refuseSignout = status;
+   fallbackSignout = true;
+   assert.equal(await claim(), 'claimed');
+   assert.equal(await live(app), 0);
+   assert.equal((await app.call('/auth/session', { cookie: bootstrapCookie })).status, 401);
+  }
+  fallbackSignout = false;
+  // The declared native route must revoke the actual bootstrap session.
+  app = await fresh();
+  signOutPath = '/api/auth/logout';
+  assert.equal(await claim(), 'claimed');
+  assert.equal(await live(app), 0);
+  assert.equal((await app.call('/auth/session', { cookie: bootstrapCookie })).status, 401);
+  app = await fresh();
+  fallbackSignout = true;
+  signOutPath = '/auth/signout';
+  await assert.rejects(claim(), { message: 'owner-claim-failed' });
+  assert.equal(await live(app), 1, 'an explicit missing route cannot use the compatibility route');
+  fallbackSignout = false;
+  for (const path of ['https://other.example/logout', '//other.example/logout', '/logout?next=/']) {
+   app = await fresh();
+   signOutPath = path;
+   await assert.rejects(claim(), error => error.ownerSessionRetirement && /signOutPath/.test(error.cause));
+   assert.equal(await live(app), 1);
+  }
  });
 });

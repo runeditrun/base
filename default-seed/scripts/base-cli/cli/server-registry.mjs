@@ -4,8 +4,7 @@ import { homedir, tmpdir } from 'node:os';
 import { chmod, realpath, unlink, lstat, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { processInfo } from '../modules/job-queue/processes.mjs';
-import { identity, alive } from '../modules/job-queue/identity.mjs';
+import { identity, alive, inspectOwner } from '../modules/job-queue/identity.mjs';
 import { transaction } from '../modules/job-queue/storage.mjs';
 import { refuse, invalid } from './errors.mjs';
 import { serverDefaults } from './contract.mjs';
@@ -111,14 +110,13 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
  async function inspect(state,{recover=false}={}) {
   const kept=[];
   for(const record of state.running){
-   let current;
-   try{current=await processInfo(record.owner?.pid);}catch{current=undefined;}
-   let live=false;
+   let current,live=true;
+   // A timed-out process read or nonce probe retains the reservation. It never
+   // grants PID custody; stop still requires the checkout/generation capability.
+   try{({current,alive:live}=await inspectOwner(record.owner));}catch{}
    // Other roots remain counted under their existing lifetime protocol; this
    // client never acquires stop/recovery authority over those live records.
-   if(record.checkout!==checkout||record.owner?.checkout===record.checkout&&current&&current.title===record.owner.command){
-    try{live=await alive(record.owner);}catch{}
-   }
+   if(record.checkout===checkout&&(record.owner?.checkout!==checkout||current&&record.owner.command!==undefined&&current.title!==record.owner.command))live=false;
    if(live) kept.push(record);
    else {
     // Fleet inspection is passive. In particular --stop never recovers an
@@ -172,8 +170,7 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
    // Unreadable memory is not a reason to refuse; only a reading below the floor is.
    const available=journey||floor===0?NaN:await memory();
    if(available<floor)throw refuse(memoryMessage(counted,available,floor,mode));
-   const {title:command}=await processInfo(process.pid);
-   owned={checkout,mode,journey,generation:randomUUID(),token:randomUUID(),owner:{...lifetime.info,checkout,command},limit:fileLimit?fileLimit.limit:limit,explicit:explicit||Boolean(fileLimit),startedAt:Number(process.hrtime.bigint()/1000000n),idleTimeout:options.idleTimeout};
+   owned={checkout,mode,journey,generation:randomUUID(),token:randomUUID(),owner:{...lifetime.info,checkout,command:lifetime.command},limit:fileLimit?fileLimit.limit:limit,explicit:explicit||Boolean(fileLimit),startedAt:Number(process.hrtime.bigint()/1000000n),idleTimeout:options.idleTimeout};
    owned.lastActivity=owned.startedAt;owned.active=0;
    const name=`rer-server-${createHash('sha256').update(owned.generation).digest('hex').slice(0,20)}.sock`;
    owned.control=join(tmpdir(),name);if(Buffer.byteLength(owned.control)>=100)owned.control=join('/tmp',name);

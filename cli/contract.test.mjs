@@ -31,6 +31,11 @@ test('check diagnoses command and deployment declarations, accepts corrections a
  const { root, descriptor, save, check } = await structuralSeed(t);
  const accepted = check();
  assert.equal(accepted.status, 0, accepted.stderr);
+ assert.equal(accepted.stdout.trim().split('\n').length, 1, 'JSON mode prints one result');
+ // A person sees that the structural check passed, how much it read and what to run next.
+ const human = spawnSync(process.execPath, [join(root, 'scripts/rer.mjs'), 'check', '--profile', 'first-party'], { cwd: root, encoding: 'utf8', timeout: 10000 });
+ assert.equal(human.status, 0, human.stderr);
+ assert.ok(human.stdout.includes(String(accepted.report.clauses.length)) && human.stdout.includes('rer doctor'), human.stdout);
  for (const [path, wrap] of [
   ['rer-packaging.json', spec => ({ artifact: { specInputs: spec } })],
   ['packaging.json', spec => ({ artifact: { specInputs: spec } })],
