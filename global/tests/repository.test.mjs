@@ -38,7 +38,7 @@ test('a failed launch preserves the shell-quoted checkout in text and JSON recov
   // Decode only the printed argument with the real shell, without running rer.
   const start = message.indexOf("'/working bin/rer' dev --cwd ");
   assert.ok(start >= 0, message);
-  const decoded = await run('/bin/sh', ['-c', `set -- ${message.slice(start)}; printf '%s\\n' "$1" "$2" "$3" "$4"`]);
+  const decoded = await run('/bin/sh', ['-c', `set -- ${message.slice(start)}\nprintf '%s\\n' "$1" "$2" "$3" "$4"`]);
   assert.equal(decoded.code, 0, decoded.stderr);
   assert.deepEqual(decoded.stdout.trimEnd().split('\n'), ['/working bin/rer', 'dev', '--cwd', await realpath(root)]);
  }
