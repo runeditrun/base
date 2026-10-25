@@ -69,9 +69,7 @@ async function resolveAndCheckArtifact(
     issues.push({ code: 'EVIDENCE_LINK_SCHEME', path: `${path}.link`, message: 'Evidence links must use HTTPS or the consumer evidence scheme.' });
     return undefined;
   }
-  // The form decoding behind URL.searchParams, applied to the query alone: it reads no host.
-  if (link.userinfo !== undefined
-    || [...new URLSearchParams(link.query ?? '').keys()].some((key) => /token|password|secret|api[_-]?key|authorization/i.test(key))) {
+  if (link.userinfo !== undefined || queryKeys(link.query ?? '').some((key) => /token|password|secret|api[_-]?key|authorization/i.test(key))) {
     issues.push({ code: 'EVIDENCE_LINK_CREDENTIALS', path: `${path}.link`, message: 'Evidence links cannot embed credentials.' });
     return undefined;
   }
@@ -124,6 +122,13 @@ function readLink(text: string): { scheme: string; userinfo?: string; host?: str
   const address = splitAuthority(link.authority);
   if (!address || !(link.scheme === 'https' ? isAsciiHostname(address.host) : registeredName.test(address.host))) return undefined;
   return { ...link, ...address };
+}
+
+/** Names as URL searchParams decodes them (application/x-www-form-urlencoded): `+` is a space, then UTF-8 `%XX` bytes. */
+function queryKeys(query: string): string[] {
+  const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
+  return query.split('&').filter(Boolean).map((pair) => pair.split('=', 1)[0]!.replaceAll('+', ' ')
+    .replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) => decoder.decode(Uint8Array.from(run.slice(1).split('%'), (hex) => parseInt(hex, 16)))));
 }
 
 function isTrustedHost(host: string, trustedHosts: readonly string[]): boolean {
