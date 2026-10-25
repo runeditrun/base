@@ -253,8 +253,8 @@ actual failed or interrupted rollback, not these precondition failures.
 
 For a protected journal, safe local guidance names the journal, snapshot and
 previous HEAD. Satisfy its preconditions first: commit or stash changes and
-check out the original branch. Run the printed `rer upgrade --cwd CHECKOUT
---restore BACKUP`; if you stashed changes, reapply them after restore. Guidance
+check out the original branch. Run the printed `rer upgrade --restore BACKUP
+--cwd CHECKOUT`; if you stashed changes, reapply them after restore. Guidance
 never asks for a hard reset or a separate stop command. Recovery commands appear
 only for a verified backup and safe checkout identity. A healthy concurrent
 updater receives no recovery advice.

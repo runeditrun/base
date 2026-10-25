@@ -17,7 +17,7 @@ export async function printRecovery(checkout) {
     const head = await git(checkout, ['rev-parse', '--verify', 'HEAD^{commit}'], { allow: [1, 128] });
     const { metadata } = await backup(checkout, journal.backup);
     if (head.code && metadata.head === journal.head && isDeepStrictEqual(metadata.from, journal.from) && isDeepStrictEqual(metadata.target, journal.target)) {
-     process.stderr.write(`Retained journal: .rer/upgrade/journal.json; snapshot: .rer/upgrade/backups/${metadata.name}. Repair unreadable Git HEAD and check out the original branch first. Then run:\nrer upgrade --cwd ${quote(checkout)} --restore ${quote(metadata.name)}\n`);
+     process.stderr.write(`Retained journal: .rer/upgrade/journal.json; snapshot: .rer/upgrade/backups/${metadata.name}. Repair unreadable Git HEAD and check out the original branch first. Then run:\nrer upgrade --restore ${quote(metadata.name)} --cwd ${quote(checkout)}\n`);
     }
    } catch { /* Unverifiable snapshots never produce a command. */ }
   }
@@ -32,6 +32,6 @@ export async function printRecovery(checkout) {
   const valid = typeof journal.branch === 'string' && !(await git(checkout, ['check-ref-format', '--branch', journal.branch], { allow: [1, 128] })).code;
   if (valid && branch.stdout.trim() !== journal.branch) process.stderr.write(`Return to the interrupted upgrade's branch first, in this checkout:\ngit checkout ${quote(journal.branch)}\n`);
  } catch { process.stderr.write('Repair Git HEAD and check out the original branch; commit or stash all changes before restoring.\n'); }
- process.stderr.write(`Then restore the saved source and data:\nrer upgrade --cwd ${quote(checkout)} --restore ${quote(recovery.backup_name)}\n`);
+ process.stderr.write(`Then restore the saved source and data:\nrer upgrade --restore ${quote(recovery.backup_name)} --cwd ${quote(checkout)}\n`);
  if (dirty) process.stderr.write('After a successful restore, reapply the changes you stashed:\ngit stash pop\n');
 }

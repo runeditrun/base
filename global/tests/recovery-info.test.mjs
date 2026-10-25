@@ -59,7 +59,7 @@ test('recovery binds local task facts and emits checkout-scoped commands only fo
  await chmod(join(bin, 'rer'), 0o755); f.env.PATH = `${bin}:${f.env.PATH}`;
  const emitted = await f.run(['upgrade', '--json']);
  assert.equal(result(emitted).error_code, 'rollback_failed');
- const command = emitted.stderr.split('\n').find(line => line.startsWith('rer upgrade --cwd '));
+ const command = emitted.stderr.split('\n').find(line => line.startsWith('rer upgrade --restore '));
  assert.ok(command);
  assert.doesNotMatch(emitted.stderr, /git\s+reset|rer\s+dev\s+--stop/);
  const wrong = join(f.directory, 'wrong-directory'); await mkdir(wrong);

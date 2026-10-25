@@ -21,7 +21,8 @@ test('printed recovery restores owner data and preserves dirty, detached and oth
   const child = f.start(['upgrade', '--to', broken.commit, '--anchors', f.anchors, '--json']);
   let reached = false;
   for (let i = 0; i < 60_000 && !reached; i++) {
-   reached = (await readJournal(f.root))?.stage === 'started';
+   // Atomic journal replacement may retire the descriptor while observed.
+   reached = await readFile(join(f.root, '.rer/upgrade/journal.json'), 'utf8').then(bytes => JSON.parse(bytes).stage === 'started', () => false);
    if (!reached) await delay(2);
   }
   assert.ok(reached, 'post-switch crash boundary reached');
@@ -39,8 +40,8 @@ test('printed recovery restores owner data and preserves dirty, detached and oth
   assert.equal(result(refused).error_code, fixture === 'dirty' ? 'worktree_dirty' : 'not_on_branch');
   assert.doesNotMatch(refused.stderr, /git\s+reset\s+--hard|rer\s+dev\s+--stop|&&/);
   assert.deepEqual(await readFile(join(f.root, '.rer/upgrade/journal.json')), saved);
-  const commands = refused.stderr.split('\n').filter(line => /^(git stash push |git checkout |rer upgrade --cwd |git stash pop$)/.test(line));
-  assert.ok(commands.some(line => line.startsWith('rer upgrade --cwd ')));
+  const commands = refused.stderr.split('\n').filter(line => /^(git stash push |git checkout |rer upgrade --restore |git stash pop$)/.test(line));
+  assert.ok(commands.some(line => line.startsWith('rer upgrade --restore ')));
   for (const command of commands) await f.command('sh', ['-c', command], f.root);
   assert.equal(await f.git(f.root, 'rev-parse', 'HEAD'), journal.head);
   assert.equal((await readJournal(f.root)).stage, 'rolled_back');
