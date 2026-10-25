@@ -11,7 +11,7 @@ const { build } = require('esbuild');
 
 // Real server markup and a bundled React client, served through the same built
 // Worker/assets door as verify. The unresolved boundary retains server DOM.
-export async function hydrationSeed(t, { neverHydrates = false, replaceServer = false } = {}) {
+export async function hydrationSeed(t, { neverHydrates = false, replaceServer = false, removeServer = false } = {}) {
  const root = await mkdtemp(join(tmpdir(), 'rer-hydration-'));
  t.after(() => rm(root, { recursive: true, force: true }));
  await mkdir(join(root, 'dist/server'), { recursive: true });
@@ -39,6 +39,7 @@ export async function hydrationSeed(t, { neverHydrates = false, replaceServer = 
      server.replaceWith(replacement);
      document.body.append(replacement);
     }
+    if (${removeServer}) document.getElementById('server').remove();
     if (${neverHydrates}) return;
     const tooltip = document.createElement('div');
     tooltip.className = 'ui-tooltip';

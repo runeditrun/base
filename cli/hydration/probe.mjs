@@ -11,10 +11,10 @@
 //    and which page sections are present;
 //  - once React owns the page and the DOM and animations are quiet, it records
 //    which snapshot elements were replaced and sets settledAt.
-// Section and animation diagnostics use a structural key (tag:index path from
+// Replacement reporting (not ownership) uses a structural key (tag:index path from
 // <body>) that ignores script, style, link, template and noscript elements and the
 // nodes the probe inserted.
-export function probe(config) {
+export function probe(config, ownership) {
  const S = window.__rerProbe = { config, survey: null, edit: null, editBeforeHydration: null, sectionKeys: [], addressSections: [], addressLoose: false,
   replaced: [], starts: {}, opacity: {}, missing: [], frames: 0, oneShot: [], releasedAt: null, releaseNote: null, fiberAtRelease: null, hydratedAt: null, settledAt: null, settled: null, rer: null, error: null };
  const SECTION = new Set(['HEADER', 'NAV', 'SECTION', 'ARTICLE', 'ASIDE', 'FOOTER']), SKIP = new Set(['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE', 'NOSCRIPT']);
@@ -48,49 +48,6 @@ export function probe(config) {
  const lone = n => n.nodeValue.trim().length >= 2 && n.parentNode.childNodes.length === 1;
  const split = n => { const rest = n.splitText(Math.max(1, Math.floor(n.nodeValue.length / 2))), span = document.createElement('span'); inserted.add(span); span.textContent = rest.nodeValue; rest.replaceWith(span); };
  const anyFiber = () => fiber(document.body) || [...document.body.querySelectorAll('*')].some(fiber);
- // Identity membership survives moves. New unowned additions following an
- // unowned server detachment become same-tag candidates. Earlier additions need
- // actual clone provenance, so a pre-existing effect widget is not guessed to
- // replace a server element that a later React recovery removes.
- const server = new WeakSet(), detached = new WeakSet(), clones = new WeakMap();
- const cloned = new Set(), candidates = new Set(), detachedTags = new Set();
- const needsFiber = el => el.isConnected && el.ownerDocument === document && counted(el) && !el.closest('svg') && !fiber(el) && !(el.parentElement && own(el.parentElement, '__reactProps$')?.dangerouslySetInnerHTML);
- const pending = () => snapshot.filter(([el]) => document.body.contains(el) && needsFiber(el) && el.parentElement && fiber(el.parentElement)).length + [...new Set([...candidates, ...cloned])].filter(el => needsFiber(el) && (candidates.has(el) || detached.has(clones.get(el)))).length;
- const visit = (node, fn) => {
-  if (node.nodeType !== Node.ELEMENT_NODE || !counted(node)) return;
-  fn(node);
-  for (const child of node.children) visit(child, fn);
- };
- const nativeClone = Node.prototype.cloneNode;
- const rememberClone = (source, copy) => {
-  const origin = server.has(source) ? source : clones.get(source);
-  if (origin) { clones.set(copy, origin); cloned.add(copy); }
-  // Native deep cloning copies childNodes in order. Record that provenance at
-  // creation; subsequent DOM positions play no part in the relationship.
-  for (let child = source.firstChild, twin = copy.firstChild; twin; child = child.nextSibling, twin = twin.nextSibling) rememberClone(child, twin);
- };
- function cloneNode(deep) {
-  const copy = nativeClone.call(this, deep);
-  rememberClone(this, copy);
-  return copy;
- }
- const observeNew = el => {
-  if (server.has(el) || fiber(el)) return;
-  if (detachedTags.has(el.tagName)) candidates.add(el);
- };
- const changed = records => {
-  lastMutation = now();
-  for (const record of records) {
-   for (const node of record.removedNodes) visit(node, el => {
-    if (server.has(el) && !document.body.contains(el)) {
-     detached.add(el);
-     detachedTags.add(el.tagName);
-    } else observeNew(el);
-   });
-   for (const node of record.addedNodes) visit(node, observeNew);
-  }
-  for (const el of candidates) if (!el.isConnected || el.ownerDocument !== document || fiber(el)) candidates.delete(el);
- };
  const oneShot = () => document.getAnimations().filter(a => {
   if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) return false;
   const timing = a.effect && a.effect.getComputedTiming();
@@ -112,7 +69,7 @@ export function probe(config) {
   S.editBeforeHydration = !anyFiber();
   if (config.kind === 'section' || config.kind === 'loose') {
    const root = config.kind === 'section' ? sections[config.section] : document.body;
-   if (config.kind === 'section') scope = root;
+   if (config.kind === 'section' && root) scope = new WeakRef(root);
    const candidates = root ? texts(root).filter(n => config.kind === 'section' || outside(n)) : [];
    const target = candidates.find(mixed) ?? (config.kind === 'section' ? candidates.find(lone) : undefined);
    if (target) {
@@ -121,12 +78,10 @@ export function probe(config) {
     if (mode === 'split') split(target); else target.nodeValue = 'Übersetzt: ' + target.nodeValue;
    }
   }
-  snapshot = walk(document.body, '', []);
-  for (const [el] of snapshot) server.add(el);
-  Node.prototype.cloneNode = cloneNode;
+  snapshot = walk(document.body, '', []).map(([el, key]) => [new WeakRef(el), key]);
   editAt = now();
-  observer = new MutationObserver(changed);
-  observer.observe(document, { childList: true, subtree: true, characterData: true });
+  observer = new MutationObserver(() => { lastMutation = now(); });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   requestAnimationFrame(frame);
  }
 
@@ -141,7 +96,7 @@ export function probe(config) {
   if (S.releasedAt !== null || S.frames < 3) return;
   const animations = oneShot();
   if (config.release === 'mid') {
-   const mine = animations.filter(a => (scope ?? document.body).contains(a.effect.target));
+   const mine = animations.filter(a => (scope?.deref() ?? document.body).contains(a.effect.target));
    if (!mine.length) return release('no intro to release into');
    if (mine.some(a => a.startTime === null)) return;
    const start = Math.min(...mine.map(a => a.startTime + a.effect.getTiming().delay)), end = Math.max(...mine.map(a => a.startTime + a.effect.getComputedTiming().endTime));
@@ -183,12 +138,13 @@ export function probe(config) {
    tryRelease();
    const t = now();
    if (S.releasedAt !== null) {
-    if (fiber(document.body) && pending() === 0) { if (S.hydratedAt === null) S.hydratedAt = t; }
-    else S.hydratedAt = null;
+    const current = ownership(snapshot, counted);
+    S.error = current.error;
+    if (current.pending === 0) { if (S.hydratedAt === null) S.hydratedAt = t; } else S.hydratedAt = null;
     const quiet = t - lastMutation > 300 && !oneShot().some(a => a.playState === 'running');
     if (S.hydratedAt !== null && t - S.hydratedAt > 300 && quiet) return settle('hydrated');
     if (S.hydratedAt === null && t - S.releasedAt > 8000 && !anyFiber()) return settle('not hydrated');
-    if (t - S.releasedAt > 20000) return settle('timeout');
+    if (t - S.releasedAt > 20000) return settle(S.error ? 'error' : 'timeout');
    }
   } catch (error) { S.error = String(error && error.stack || error); return settle('error'); }
   requestAnimationFrame(frame);
@@ -196,9 +152,9 @@ export function probe(config) {
 
  function settle(state) {
   observer?.disconnect();
-  if (Node.prototype.cloneNode === cloneNode) Node.prototype.cloneNode = nativeClone;
   S.settled = state; S.settledAt = now();
-  S.replaced = snapshot.filter(([el]) => !el.isConnected).map(([, key]) => key);
+  S.replaced = snapshot.filter(([ref]) => !ref.deref()?.isConnected).map(([, key]) => key);
+  snapshot = []; scope = null;
   S.rer = window.__rerHydration ? JSON.parse(JSON.stringify(window.__rerHydration)) : null;
  }
 

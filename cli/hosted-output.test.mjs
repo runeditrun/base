@@ -15,9 +15,9 @@ test('the built hydration check accepts an effect-created body child', async t =
  assert.ok(result.pages.every(page => !page.skipped), 'React hydrated the built page');
 });
 
-test('the built hydration check rejects unadopted server markup and same-tag replacements', async t => {
- for (const replaceServer of [false, true]) {
-  await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true, replaceServer }), { pages: ['/'] }), error => {
+test('the built hydration check rejects incomplete server boundaries after replacement or imperative removal', async t => {
+ for (const change of [{}, { replaceServer: true }, { removeServer: true }]) {
+  await assert.rejects(checkHydration(await hydrationSeed(t, { neverHydrates: true, ...change }), { pages: ['/'] }), error => {
    assert.equal(error.code, 'hydration_units_failed');
    assert.equal(error.exitCode, 1);
    assert.ok(error.failures.length > 0);

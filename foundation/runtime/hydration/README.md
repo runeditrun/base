@@ -111,6 +111,47 @@ plugin's build `config` gives `assets: { binding: 'ASSETS', run_worker_first: tr
 as the reference's `vite.config.ts` does), so `rer preview` serves them the same way
 and not as bare assets without `no-transform`.
 
+## Completion and ownership
+
+The check requires every server Suspense boundary to finish hydration or leave
+React's committed tree through a React update. Deleting its DOM imperatively does
+not complete hydration: the legacy `removed` control and an `empty-unresolved`
+boundary time out. React removing an adopted node, including in a layout effect,
+is supported. The probe's 20-second settlement and 30-second load deadlines are
+unchanged.
+
+At settlement, the check follows the body's `__reactFiber$` attachment to the
+root's current committed tree. It checks root and Suspense dehydration state,
+then matches host nodes by identity and their committed host parent. An attachment
+may name either current Fiber or its alternate; a key alone is insufficient.
+An adopted node moved by page code into an unrelated holder (`stale-owned-move`)
+stays pending because its actual parent disagrees with React's committed parent.
+Portals use their explicit container, including a shadow root, as the host parent.
+
+The initial body snapshot contains weak references. Connected snapshot elements
+must be owned by the committed tree, or descend through a validated
+`dangerouslySetInnerHTML` container (including nested parser-created descendants).
+When a server node disappears, completion of its boundary and the surviving
+committed host relationships decide whether React completed or removed it. No
+same-tag or positional substitute is presumed owned. Newly created imperative
+widgets, including body tooltips and portal containers, are not snapshot
+candidates. The probe patches no DOM methods and observes only body mutations;
+it disconnects the observer and releases the snapshot when it settles.
+
+This internal React shape was verified on React **18.2.0, 18.3.1, 19.0.0, 19.1.1,
+19.2.8, 19.3.0 and 19.3.1**, each in production and development, plus root
+StrictMode in both modes on 19.3.1 (16 experiments). The verified range is
+18.2.0–19.3.1; future or other versions need qualification. Missing, unreadable or
+incompatible fields fail closed with **React ownership/current-root information
+unavailable**. Plain HTML with no application scripts remains eligible to skip.
+
+These checks diagnose hydration, not hostile scripts. Stale or fabricated expando
+keys alone do not establish ownership. Copying a real node's fiber and props keys
+onto a clone is rejected while the committed Fiber still points to the original.
+A page can fool the check by also rewriting React's committed `stateNode` and its
+alternate (`rewritten-fiber`), or by fabricating a consistent internal tree. That
+is an accepted limit: a script controlling the page can overwrite the probe too.
+
 ## Adopting
 
 One change per seed, after the Base commit that carries these files. An

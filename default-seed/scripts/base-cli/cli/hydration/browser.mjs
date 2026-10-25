@@ -5,6 +5,7 @@ import { checkoutPlaywright } from '../browser-runtime.mjs';
 import { RerError } from '../errors.mjs';
 import { serveHosted } from '../hosted-output.mjs';
 import { probe } from './probe.mjs';
+import { ownership } from './ownership.mjs';
 import { cloudflareRewrite } from './cases.mjs';
 
 export async function launchChromium(root) {
@@ -45,7 +46,7 @@ export async function runLoad(browser, server, path, item, { timeout = 30000 } =
  try {
   const page = await context.newPage();
   await page.exposeBinding('__rerRelease', () => { release(); });
-  await page.addInitScript({ content: `(${probe})(${JSON.stringify({ kind: item.kind, section: item.section, release: item.release })})` });
+  await page.addInitScript({ content: `(${probe})(${JSON.stringify({ kind: item.kind, section: item.section, release: item.release })}, ${ownership})` });
   page.on('pageerror', error => errors.push(`page error: ${String(error.message).split('\n')[0]}`));
   page.on('console', message => {
    const text = message.text(), type = message.type();

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Track unadopted server markup and same-tag replacements by node identity and clone provenance through moves and further replacements; allow genuine removals and effect-created widgets without a detached counterpart to settle.
+- Require every server Suspense boundary to finish hydration or be removed by React, using committed React ownership without patching DOM methods. Effect-created widgets and portals settle; nested raw HTML inherits its container’s ownership, and stale moved nodes fail. The legacy `removed` control (imperative deletion of unresolved markup) and `empty-unresolved` deliberately change from pass to timeout. Missing ownership/current-root information fails with a diagnostic; verified React 18.2.0–19.3.1 in production and development.
 
 ## 0.2.80
 

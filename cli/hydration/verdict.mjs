@@ -43,7 +43,7 @@ export const plainHtml = (load, scripts) => load.record?.settled === 'not hydrat
 /** The failure for a page whose plain load never hydrated and is not plain HTML. */
 export function judgeUnhydrated({ path, scripts, baseline: { record, errors } }) {
  const state = record?.settled ?? 'no probe record';
- const why = state === 'not hydrated' ? `React never hydrated the page${scripts.length ? ` although it loads application scripts (${list(scripts, 3)})` : ''}` : `the page did not settle (${state}${record?.error ? ': ' + record.error : ''})`;
+ const why = state === 'not hydrated' ? `React never hydrated the page${scripts.length ? ` although it loads application scripts (${list(scripts, 3)})` : ''}${record?.error ? '; ' + record.error : ''}` : `the page did not settle (${state}${record?.error ? ': ' + record.error : ''})`;
  return `${path} plain load: ${why}${errors.length ? `; ${list([...new Set(errors)], 3)}` : ''}`;
 }
 
