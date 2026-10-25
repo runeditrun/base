@@ -4,13 +4,17 @@
 
 - Add fenced same-owner reclaim for expired staged and D1-only imports, plus a seed-owned erasure hook before restore activation with scoped registry access and atomic live audit. Refuse reclaim after uncertain R2 or payload effects, including finalize errors; refusal cannot cancel an already-issued unfenced external operation.
 
-- Add signed runtime Business settings, same-origin logos, app accent fills, local overrides and owner-scoped team reconciliation. The reference seed adopts the module; owners can stop settings with fresh sign-in proof.
-- Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo without an unjournaled failure fence. Restore exact retained-value and complete catch-up undo report checks.
-- Keep demo Run exits out of the host layout; use spare label space, truncate the exit itself and reveal its full accessible link on keyboard focus without moving header controls.
-- Add seed-owned transactional audit hooks for native operator administration and direct installation export creation. Provider unlink audits require a new pin generation; already-unlinked requests keep HTTP 200 without another audit row. The export hook belongs to the direct `createPortability` service; the HTTP handler has no hook.
-- Treat RER Platform's `rer_migrations` ledger as a first-class source when a Managed installation leaves for native: exports record `manifest.migrationLedger` (native file names with SHA-256, origin `rer_migrations`), imports map it by hash and refuse only a true mismatch with a named code and fix, and the ledger is never archived as product tables. Native-source archives, v1 recovery and existing refusals are unchanged.
-- Add `mapMigrationLedger` to `@runeditrun/rer/portability-migrations` for adapters with their own archive format, and name the unapplied checkout file in the preflight refusal.
-- Replace the shared Run page with a three-way chooser, exact one-line Copy, listing-aware Assisted and Managed links, and a shared sign-up switch for the hosting guide; keep the Run and hosting guide commands wrapping under adopted seed themes and document the supported paths migration.
+## 0.2.81
+
+- Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.
+- Project declared import intake fields before storing chunks, keeping excluded values such as Auth0 password hashes and Okta credentials and factors out of custody.
+- Validate preserving import adapters before every apply batch, including resumed work; retain earlier admitted batches for Undo when later preparation is refused.
+- Deliver the shared three-way Run chooser and hosting guide through Base refresh, with byte-exact Copy, listing-aware Assisted and Managed links, and commands that wrap under adopted seed themes.
+- Keep demo Run exits within available header space and reveal the full accessible link on keyboard focus without moving host controls.
+- Add transactional audit hooks for native operator administration and direct installation exports; audit provider unlink only for a new pin generation.
+- Apply signed runtime Business settings, same-origin logos, app accents, local overrides and owner-scoped team reconciliation; allow owners to stop settings with fresh sign-in proof.
+- Authorize explicit publisher project lists with version 2 signing anchors and an optional signing publisher, while retaining version 1 verification.
+- Simplify the shared Run invocation, show the public Roadmap without repository citations, and preserve retained runtime dependencies during Base copy refresh.
 
 ## 0.2.80
 
