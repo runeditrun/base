@@ -1,6 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { door } from './fixtures/business/door.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
@@ -814,6 +815,55 @@ test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs it
   for (const name of await readdir(stateDir)) assert.ok(!(await readFile(join(stateDir, name), 'utf8')).includes(key), `${name} holds no key`);
  }
  assert.ok(!/TypeError: Cannot read|Responder 1|Elevated checkout errors/.test(printed), 'no vendor record is printed');
+ assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
+});
+
+test('status names active catch-up and archive tasks while their uploads are in flight', async t => {
+ const remote = await fixtureServer(t), seed = await door(t), home = join(directory, 'active-status-home');
+ const stateDir = join(home, '.rer-business'), env = { RER_BUSINESS_STATE_DIR: stateDir };
+ const vendorEnv = { ...env, NODE_OPTIONS: `--import=${join(fixture, 'register.mjs')} --import=${join(fixture, 'vendor-edge.mjs')}` };
+ await connect(home, remote, { env });
+ seed.state.stateDir = stateDir;
+ seed.state.baselines.set('uptimerobot', Array.from({ length: 590 }, (_, index) => String(800000 + index)));
+ const added = await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: 'fixture-active-status-read-only-key\n', env });
+ assert.equal(added.code, 0, added.stderr);
+ // Hold the second chunk at the network edge while the first acknowledged
+ // chunk is saved by the real supervisor, then use both public status forms.
+ let inspect;
+ const proxy = createServer(async (request, response) => {
+  try {
+   let raw = ''; for await (const chunk of request) raw += chunk;
+   if (request.url === '/api/rer/import/uploads' && JSON.parse(raw).index === 1) await inspect();
+   const result = await fetch(seed.origin + request.url, { method: request.method, headers: { authorization: request.headers.authorization, 'content-type': 'application/json' }, body: raw });
+   response.writeHead(result.status, { 'content-type': 'application/json' }); response.end(await result.text());
+  } catch { response.writeHead(500); response.end('{}'); }
+ });
+ await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));
+ t.after(() => new Promise(resolve => { proxy.close(resolve); proxy.closeAllConnections(); }));
+ remote.state.door = { ...seed, origin: `http://127.0.0.1:${proxy.address().port}` };
+ const observations = [];
+ for (const [kind, title] of [['catchup.vendor', 'Bring over recent UptimeRobot changes'], ['switchoff.archive', 'Archive UptimeRobot before switching it off']]) {
+  remote.state.tasks = [{ task_id: `biz:tool1:${kind}`, kind, state: 'ready', runner: 'executor', fence: 0, title }];
+  let observed;
+  inspect = async () => {
+   if (observed) return;
+   const json = await cli(home, ['business','status','--json'], { env }), text = await cli(home, ['business','status'], { env });
+   observed = { kind, json, text, progress: JSON.parse(await readFile(join(stateDir, 'progress.json'), 'utf8')) };
+  };
+  const run = await cli(home, ['business','run','--once'], { env: vendorEnv });
+  assert.equal(run.code, 0, run.stderr);
+  assert.ok(observed, `${kind} reached the second upload chunk`);
+  observations.push(observed);
+  const done = await cli(home, ['business','status','--json'], { env });
+  assert.equal(done.code, 0, done.stderr); assert.equal(JSON.parse(done.stdout).current_task, null);
+ }
+ for (const { kind, json, text, progress } of observations) {
+  assert.equal(json.code, 0, json.stderr); assert.equal(text.code, 0, text.stderr);
+  assert.equal(progress.current.kind, kind);
+  assert.ok(progress.current.uploadedBytes > 0, 'an acknowledged checkpoint is saved');
+  assert.equal(JSON.parse(json.stdout).current_task, kind);
+  assert.ok(text.stdout.includes(`\nTask: ${kind}.\n`), text.stdout);
+ }
  assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
 });
 

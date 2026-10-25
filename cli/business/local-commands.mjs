@@ -10,6 +10,7 @@ import { KEYED_VENDORS } from './vendors/index.mjs';
 import { vendorHandle } from './vendor-door.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
 import { describe } from './errors.mjs';
+import { supportsTaskKind } from './supervisor.mjs';
 
 export async function paired() {
  const state = await loadState();
@@ -140,10 +141,10 @@ export async function status({ json = false } = {}) {
  const service = await serviceStatus();
  const active = state.revoked ? null : (await loadProgress()).current;
  if (json) {
-  process.stdout.write(JSON.stringify({ paired: Boolean(stored), ...(state.revoked ? { revoked: true } : {}), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: ['discover.local', 'export.vendor'].includes(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
+  process.stdout.write(JSON.stringify({ paired: Boolean(stored), ...(state.revoked ? { revoked: true } : {}), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: supportsTaskKind(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
   return;
  }
  process.stdout.write(`Business: ${state.revoked ? revokedText(state) : stored ? 'paired.' : 'credential missing.'}\nService: ${service.running ? 'running' : service.installed ? 'installed, stopped' : 'not installed'}.\n`);
- process.stdout.write(`Task: ${['discover.local', 'export.vendor'].includes(active?.kind) ? active.kind : 'none'}.\n`);
+ process.stdout.write(`Task: ${supportsTaskKind(active?.kind) ? active.kind : 'none'}.\n`);
  process.stdout.write(`Checkpoint: ${active?.checkpoint ? 'saved' : 'none'}${Number.isSafeInteger(active?.uploadedBytes) ? `; ${active.uploadedBytes} bytes uploaded` : ''}.\n`);
 }

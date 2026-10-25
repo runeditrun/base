@@ -18,6 +18,7 @@ import { runArchive } from './archive-task.mjs';
 // The vendor tasks this computer performs into an app's import door.
 const vendorWork = { 'export.vendor': runExport, 'catchup.vendor': runCatchup, 'switchoff.archive': runArchive };
 const kinds = new Set(['discover.local', ...Object.keys(vendorWork)]);
+export function supportsTaskKind(kind) { return kinds.has(kind); }
 const checkIn = 25_000;
 
 /** Work this computer's tasks. It says what it is doing and what it waits

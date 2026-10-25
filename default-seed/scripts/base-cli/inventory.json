@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.80-dev.g62857e33",
+  "cliVersion": "0.2.80-dev.ge7509112",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -479,7 +479,7 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "35f17725fd2908f207ad51d1d7a57a973d980d6e7d994588435302e13561a7f1"
+      "sha256": "89f8e91dfaf3dde616488e00b05d1b5fc61e752484c1bb117d63086b3947e522"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -551,7 +551,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "fe072c7690fe7b5b930c2bce5e5b60066da239b5aa69533a7e867458d9e8436b"
+      "sha256": "f35a36f867cabe5b41f61b47a7b2bdc543df18789079dd7620d85c5fb96d587c"
     },
     "cli/business/vendor-door.mjs": {
       "source": "cli/business/vendor-door.mjs",
