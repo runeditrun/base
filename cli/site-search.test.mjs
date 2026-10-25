@@ -60,7 +60,7 @@ test('static docs search builds without network, reindexes changed headings, nav
  let cli=join(base,'bin/rer.mjs');
  const command = async (...argv) => {
   try { return {code:0,...await run(process.execPath,['--import',join(base,'cli/fixtures/docs-search/network.mjs'),cli,...argv,'--site','--json','--no-queue'],{
-   cwd:root,env:{PATH:process.env.PATH,HOME:join(directory,'home'),CI:'true',RER_NO_UPDATE_CHECK:'1',RER_TEST_NETWORK:network,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token},maxBuffer:1024*1024})}; }
+   cwd:root,env:{PATH:process.env.PATH,COREPACK_HOME:process.env.COREPACK_HOME,HOME:join(directory,'home'),CI:'true',RER_NO_UPDATE_CHECK:'1',RER_TEST_NETWORK:network,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token},maxBuffer:1024*1024})}; }
   catch(error) { return {code:error.code,stdout:error.stdout,stderr:error.stderr}; }
  };
  // Exercise the installed package as well as the source CLI.
