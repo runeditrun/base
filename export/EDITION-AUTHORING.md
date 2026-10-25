@@ -40,13 +40,17 @@ adaptations also refuse.
 Per-file vendored JavaScript copies outside `foundation/runtime` remain supported.
 Refresh follows static
 relative imports and exports, including side-effect imports, transitively up to
-64 levels inside the original copied origin directory tree. It copies missing
+64 levels inside the original copied origin directory tree. A file newly adopted
+by this refresh can also bring required relative helpers from outside that tree,
+transitively, when they exist at the refreshed Base commit and have no conflicting
+seed bytes or recorded removal. These closure-derived helpers receive ordinary
+copy records so verification and later refreshes keep them current. It copies missing
 helpers and reports them under `adopted`, recording separate file entries in
 `base-copies.json` while preserving the existing per-file mapping. Already
 recorded dependencies must remain present. A dependency already delivered by another
 copy mapping, an acknowledged adaptation, or regular seed-owned source satisfies
 the import. Seed-owned source is preserved and its actual static imports are
-checked; its missing dependencies require explicit reconciliation. Unrecorded
+checked; its missing dependencies require explicit reconciliation. Other unrecorded
 imports outside that origin tree, missing, deleted or kept-out dependencies and
 adapted importers with missing dependencies refuse before any writes and name exact
 `record-base` commands for explicit reconciliation. Existing adapted files are

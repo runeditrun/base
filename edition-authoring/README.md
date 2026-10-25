@@ -237,13 +237,17 @@ only into copies that already carry tests), drops recorded files that Base or th
 export removed, keeps out files the copy had left out, and re-records each copy.
 For JavaScript outside `foundation/runtime`, refresh follows static relative imports and
 exports, including side-effect imports, transitively up to 64 levels inside
-the original copied origin directory tree. Missing helpers are copied and
+the original copied origin directory tree. A file newly adopted by this refresh
+can also bring required relative helpers from outside that tree, transitively,
+when they exist at the refreshed Base commit and have no conflicting seed bytes
+or recorded removal. These closure-derived helpers receive ordinary copy records
+so verification and later refreshes keep them current. Missing helpers are copied and
 reported under `adopted`, with separate file entries in `base-copies.json` that
 preserve the existing per-file mapping. Already recorded dependencies must remain
 present. A dependency already delivered by another copy mapping, an acknowledged
 adaptation, or regular seed-owned source satisfies the import. Seed-owned source
 is preserved and its actual static imports are checked; missing dependencies of
-that source require explicit reconciliation. Unrecorded imports outside that origin
+that source require explicit reconciliation. Other unrecorded imports outside that origin
 tree, missing, deleted or kept-out dependencies and adapted importers with missing
 dependencies refuse the entire refresh before writes, with exact `record-base`
 commands for explicit reconciliation. Existing adapted files stay unchanged.
