@@ -167,10 +167,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
     await phase('failed', 'needs_integration');
     return output('needs_integration', journal, started, 'needs_integration');
    } else { await discard(checkout, journal); journal = {}; preserveJournal = false; }
-  } else {
-   if (loaded) await discard(checkout, journal);
-   journal = {};
-  }
+  } else journal = {}; // Leave settled history intact until a new verified preparation replaces it.
   if (!switched) {
    if (!journal.head) {
     if (continuing) throw failure('needs_integration');
