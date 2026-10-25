@@ -113,9 +113,9 @@ test('job authority, cancellation and admission boundaries refuse stale publicat
   assert.equal(heldRead.status, 200);
   assert.deepEqual((await f.cli(['inspect', old[0].id, '--tenant', 'admission'])).job, heldRead.body.job);
   await assert.rejects(() => boundedJobs.get(old[0].id, member), { code: 'job_not_found' });
-  const heldVersions = await f.db.prepare("SELECT id,version,starts,failures FROM rer_job_jobs WHERE tenant_key='admission' ORDER BY id").all();
+  const heldVersions = (await f.db.prepare("SELECT id,version,starts,failures FROM rer_job_jobs WHERE tenant_key='admission' ORDER BY id").all()).results;
   for (let i = 0; i < 3; i++) await boundedJobs.tick();
-  assert.deepEqual(await f.db.prepare("SELECT id,version,starts,failures FROM rer_job_jobs WHERE tenant_key='admission' ORDER BY id").all(), heldVersions);
+  assert.deepEqual((await f.db.prepare("SELECT id,version,starts,failures FROM rer_job_jobs WHERE tenant_key='admission' ORDER BY id").all()).results, heldVersions);
   const ownerCancelled = await f.call('/' + old[0].id + '/cancel', { expectedVersion: heldRead.body.job.version, operationKey: 'owner-cancels-revoked' }, headers);
   assert.equal(ownerCancelled.body.job.state, 'cancelled');
   const healthy = (await boundedJobs.request(input('healthy-owner'), owner)).job;

@@ -28,7 +28,7 @@ export async function tick(context: Context, options: { maxJobs?: number; deadli
         new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(new JobError('job_unit_timeout')), { once: true })),
       ]);
       if (signal.aborted || context.now() >= deadline) throw new JobError('job_unit_timeout');
-      if (result.type === 'commit') { await commitUnit(context, acquired, result, { signal, deadline }); committed++; }
+      if (result.type === 'commit') { await commitUnit(context, acquired, result, { signal, deadline }); committed++; candidates.push(id); }
       else if (result.type === 'yield' || result.type === 'wait') await settle(context, acquired, result);
       else throw new JobError('job_effect_protocol_required', 503);
     } catch (error) { await failUnit(context, acquired, error); }
