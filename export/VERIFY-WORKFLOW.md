@@ -545,9 +545,10 @@ admission, only the light plan or gate and the aggregate execute, finishing in
 seconds (queue time remains). An unverified main SHA, or one whose newest push
 run failed, must run every shard.
 
-For release adoption, update the installed CLI with `rer update --version
-0.2.82` once that release exists; package-mode seeds update their exact pin with
-`pnpm add -D -E @runeditrun/rer@0.2.82`. This checkout has **no bare `rer refresh`
+For release adoption, select a release containing the workflow refresh repair
+described below. Update the installed CLI with `rer update --version
+<release-version>`; package-mode seeds update their exact pin with
+`pnpm add -D -E @runeditrun/rer@<release-version>`. This checkout has **no bare `rer refresh`
 command**, and an npm update alone does not copy seed-owned workflow files.
 For files already tracked in `base-copies.json`, use the updated installed
 package's source refresh, including when the seed's copied CLI predates 0.2.82:
