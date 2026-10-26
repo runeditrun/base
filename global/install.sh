@@ -24,7 +24,7 @@ main() {
  # Preserve both bypass lists and keep local RER services off the proxy.
  if [ -n "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}" ]; then
   http_proxy=${http_proxy:-${HTTP_PROXY:-}}
-  https_proxy=${https_proxy:-${HTTPS_PROXY:-}}
+  https_proxy=${https_proxy:-${HTTPS_PROXY:-$http_proxy}}
   no_proxy="${no_proxy:-},${NO_PROXY:-},127.0.0.1,localhost,::1"
   NO_PROXY=$no_proxy
   NODE_USE_ENV_PROXY=1

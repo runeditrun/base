@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
 
 const proxied = env => Boolean(env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy);
-const loopback = ['127.0.0.1', 'localhost', '::1'];
+const loopback = ['127.0.0.1', 'localhost', '::1', '[::1]'];
 
 // Node reads these at startup, before any fetch or imported application code.
 // Lowercase has precedence in Node; preserve both lists when adding loopback.

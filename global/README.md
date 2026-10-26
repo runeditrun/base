@@ -267,6 +267,17 @@ settings without their user:password, and `npm_config_*`, `PNPM_*`,
 `COREPACK_*` and `RER_*` settings that carry no credential by name or value.
 No other variable reaches the package manager or a dependency's build script.
 
+Node and pnpm downloads honour `HTTPS_PROXY`/`https_proxy` and
+`HTTP_PROXY`/`http_proxy`; lowercase settings take precedence. The shell
+installer's HTTPS downloads use the HTTP proxy when no HTTPS proxy is set.
+Node proxy downloads require Node 22.21 or Node 24 or later; unsupported
+runtimes refuse before starting a download. Existing `NO_PROXY`/`no_proxy`
+entries are preserved, with `127.0.0.1`, `localhost` and `::1` added for bypass
+(including the bracketed IPv6 form Node needs). Other `127.x.x.x` addresses
+or IPv6 spellings are not guaranteed to bypass a configured proxy on these
+supported Node versions. A proxy that is itself local-only is unaffected;
+rer's own local servers use the exact names above.
+
 Heavy package scripts wait for this computer's job queue with
 `rer queue NAME -- COMMAND [ARGS]` (in vendored mode,
 `node scripts/base-onboarding/queued-entry.mjs NAME -- COMMAND`).

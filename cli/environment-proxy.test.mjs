@@ -39,7 +39,9 @@ test('rer downloads use the environment proxy and its child Node bypasses loopba
  let localRequests = 0;
  const local = httpServer((_req, res) => { localRequests++; res.end('loopback'); });
  const localPort = await listen(local);
- t.after(async () => { for (const socket of sockets) socket.destroy(); for (const server of [edge, proxy, local]) { server.closeAllConnections?.(); await new Promise(resolve => server.close(resolve)); } });
+ const local6 = httpServer((_req, res) => { localRequests++; res.end('loopback'); });
+ local6.listen(localPort, '::1'); await once(local6, 'listening');
+ t.after(async () => { for (const socket of sockets) socket.destroy(); for (const server of [edge, proxy, local, local6]) { server.closeAllConnections?.(); await new Promise(resolve => server.close(resolve)); } });
  // Only real, required executables are visible: never inherit a matching pnpm,
  // runtime cache selectors, package-manager settings or Node startup flags.
  const tools = join(directory, 'bin'); await mkdir(tools);
@@ -86,7 +88,7 @@ test('rer downloads use the environment proxy and its child Node bypasses loopba
  // A genuine independently authored operation exercises the same rer child
  // environment, including the two preserved bypass lists and local fetch.
  const descriptor = { version: 2, project: 'example/proxy', runtime: { requirements: [] }, requiredEnvironment: [], commands: { setup: { argv: ['node', 'loopback.mjs'], inputs: ['loopback.mjs'], effects: 'Fetch loopback through a real Node child.' } } };
- await writeFile(join(root, 'loopback.mjs'), `const r=await fetch('http://127.0.0.1:${localPort}');if(await r.text()!=='loopback')process.exit(1);for(const name of ['NO_PROXY','no_proxy'])for(const host of ['127.0.0.1','localhost','::1','example.invalid','another.invalid'])if(!process.env[name].split(',').includes(host))process.exit(2);`);
+ await writeFile(join(root, 'loopback.mjs'), `for(const host of ['127.0.0.1','localhost','[::1]']){const r=await fetch('http://'+host+':${localPort}');if(await r.text()!=='loopback')process.exit(1);}for(const name of ['NO_PROXY','no_proxy'])for(const host of ['127.0.0.1','localhost','::1','example.invalid','another.invalid'])if(!process.env[name].split(',').includes(host))process.exit(2);`);
  // The independent descriptor runs the operation without acquiring project pnpm.
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(descriptor));
  await nodePin(process.versions.node);
@@ -115,7 +117,7 @@ test('rer downloads use the environment proxy and its child Node bypasses loopba
  const prior = tunnels.length;
  const loopback = await run(['setup'], true);
  assert.equal(loopback.code, 0, loopback.output);
- assert.equal(localRequests, 1);
+ assert.equal(localRequests, 3);
  assert.equal(tunnels.length, prior, 'loopback never reaches the proxy');
  t.diagnostic(`downloads observed: ${paths.join(', ')}; proxy CONNECTs=${tunnels.length}`);
 });

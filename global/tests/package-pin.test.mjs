@@ -175,7 +175,7 @@ test('a fresh clone installs dependencies without credentials, and its deploy st
   assert.ok(seen.PATH?.includes(process.env.PATH), 'PATH reaches the dependency build script');
   for (const [name, value] of Object.entries({ HOME: environment().HOME, ...kept })) {
    if (nativeProxy && /^no_proxy$/i.test(name)) {
-    assert.deepEqual(new Set(seen[name].split(',')), new Set([...value.split(','), '127.0.0.1', 'localhost', '::1']), `${name} preserves entries and bypasses loopback`);
+    assert.deepEqual(new Set(seen[name].split(',')), new Set([...value.split(','), '127.0.0.1', 'localhost', '::1', '[::1]']), `${name} preserves entries and bypasses loopback`);
    } else assert.equal(seen[name], value, `${name} reaches the dependency build script`);
   }
   if (nativeProxy) {

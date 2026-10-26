@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Honour environment proxies for Node and pnpm downloads, preserve proxy bypass entries and always bypass loopback; clearly refuse proxy downloads on Node versions without native proxy support.
+- Honour environment proxies for Node and pnpm downloads and use the HTTP proxy for the shell installer's HTTPS fetches when no HTTPS proxy is set. Preserve proxy bypass entries and bypass exactly `127.0.0.1`, `localhost` and `::1`; other `127.x.x.x` addresses or IPv6 spellings are not guaranteed to bypass a configured proxy on supported Node versions (22.21 and 24 or later). A proxy that is itself local-only is unaffected; rer's own local servers use these exact names. Clearly refuse proxy downloads on Node versions without native proxy support.
 - Treat zombie children as exited during bounded process cleanup, allowing living parents to finish cleanup.
 
 ## 0.2.81

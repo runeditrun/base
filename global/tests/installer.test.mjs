@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { createServer as httpServer } from 'node:http';
+import { createServer as httpsServer } from 'node:https';
+import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
@@ -13,6 +16,33 @@ import { integrity, localRegistry } from '../../scripts/rer-package/registry.mjs
 import { readPackage } from '../update/archive.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
+
+test('install.sh uses an HTTP-only proxy for HTTPS registry downloads', async t => {
+ const directory = await mkdtemp(join(tmpdir(), 'rer-installer-proxy-'));
+ const servers = [];
+ t.after(async () => {
+  for (const server of servers) { server.closeAllConnections(); await new Promise(done => server.close(done)); }
+  await rm(directory, { recursive: true, force: true });
+ });
+ const env = { PATH: '/usr/bin:/bin', HOME: directory, CURL_HOME: directory, TMPDIR: directory };
+ const key = join(directory, 'key.pem'), cert = join(directory, 'cert.pem');
+ const generated = await run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=registry.proxy.test', '-addext', 'subjectAltName=DNS:registry.proxy.test'], env);
+ assert.equal(generated.code, 0, generated.stderr);
+ async function listen(server) { servers.push(server); server.listen(0, '127.0.0.1'); await once(server, 'listening'); return server.address().port; }
+ let directRequests = 0;
+ const registryPort = await listen(httpsServer({ key: await readFile(key), cert: await readFile(cert) }, (_req, res) => { directRequests++; res.end('{}'); }));
+ const tunnels = [];
+ const proxy = httpServer((_req, res) => res.writeHead(502).end());
+ proxy.on('connect', (req, socket) => { tunnels.push(req.url); socket.end('HTTP/1.1 502 Fixture\r\nContent-Length: 0\r\nConnection: close\r\n\r\n'); });
+ const proxyPort = await listen(proxy);
+ const bin = join(directory, 'bin'); await mkdir(bin); await symlink(process.execPath, join(bin, 'node'));
+ await writeFile(join(directory, '.curlrc'), `resolve = "registry.proxy.test:${registryPort}:127.0.0.1"\ncacert = "${cert}"\nmax-time = 5\n`);
+ const result = await run('sh', [join(base, 'global/install.sh')], { ...env, PATH: `${bin}:${env.PATH}`, HTTP_PROXY: `http://127.0.0.1:${proxyPort}`, npm_config_registry: `https://registry.proxy.test:${registryPort}` });
+ assert.notEqual(result.code, 0, 'the rejecting network edge stops installation');
+ assert.deepEqual(tunnels, [`registry.proxy.test:${registryPort}`], 'the HTTPS fetch reaches the HTTP-only proxy');
+ assert.equal(directRequests, 0, 'the installer never fetches directly');
+ t.diagnostic(`proxy/listener PID=${process.pid}; CONNECTs=${tunnels.length}; direct requests=${directRequests}`);
+});
 
 function run(program, args, env, input) {
  return new Promise((resolveRun, reject) => {
