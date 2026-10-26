@@ -6,10 +6,11 @@ import { contractPageHtml } from '../base/contract-page'
 import { hostingPageHtml } from '../base/hosting-page'
 import { runPageHtml, siteHomeHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
 import { identity } from '../identity'
+import { runPricing } from '../base/run-pricing'
 import run from './run.json'
 
 export function sitePages({ contract, hosting }: Partial<SiteContext> = {}): SiteBuild {
-  const data: RunData = run
+  const data: RunData = { ...run, pricing: runPricing }
   return {
     pages: [
       { path: '/', html: siteHomeHtml(identity, data, contract) },
