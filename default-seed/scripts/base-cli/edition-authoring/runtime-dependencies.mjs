@@ -32,7 +32,7 @@ export function resolve(tree, source, specifier) {
   // TypeScript source commonly uses its emitted JS extension in imports.
   const replacement = {'.js': ['.ts', '.tsx', '.d.ts'], '.mjs': ['.mts', '.d.mts'], '.cjs': ['.cts', '.d.cts']}[path.posix.extname(name)];
   if (replacement) candidates.push(...replacement.map(extension => name.slice(0, -path.posix.extname(name).length) + extension));
-  if (!path.posix.extname(name)) {
+  if (!/\.(?:[cm]?[jt]s|[jt]sx|json)$/.test(name)) {
     for (const suffix of ['.ts', '.tsx', '.mts', '.mjs', '.js', '.jsx', '.cts', '.cjs', '.json']) candidates.push(name + suffix, name + '/index' + suffix);
   }
   const found = candidates.find(candidate => tree.has(candidate));

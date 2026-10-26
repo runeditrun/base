@@ -413,16 +413,16 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
-  for (const row of ['named', 'default', 'type', 'declaration', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'withhold', 'witness', 'unplaceable']) {
+  for (const row of ['named', 'default', 'type', 'declaration', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'withhold', 'witness', 'unplaceable']) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
     try {
       const {base, seed, revision} = fixture(temp);
       const target = 'vendor/sample/index.mjs';
-      ok(seed, 'record-base', row === 'mapped' ? target : 'vendor/sample', row === 'mapped' ? 'modules/sample/index.mjs' : 'modules/sample', revision, '--base', base);
-      const specifier = row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
+      ok(seed, 'record-base', ['mapped', 'extensionless'].includes(row) ? target : 'vendor/sample', ['mapped', 'extensionless'].includes(row) ? 'modules/sample/index.mjs' : 'modules/sample', revision, '--base', base);
+      const specifier = row === 'extensionless' ? './helper.server' : row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
       const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : 'import {missing} from';
       const incoming = `${imported} "${specifier}?raw";\nexport const sample = 2;\n`;
-      write(base, row === 'witness' || row === 'unplaceable' ? 'modules/shared/helper.mjs' : 'modules/sample/helper.mjs', 'export const missing = true;\n');
+      write(base, row === 'extensionless' ? 'modules/sample/helper.server.ts' : row === 'witness' || row === 'unplaceable' ? 'modules/shared/helper.mjs' : 'modules/sample/helper.mjs', 'export const missing = true;\n');
       if (row === 'withhold') {
         write(base, 'modules/sample/new.mjs', 'import {missing} from "../shared/helper.mjs";\n');
         write(base, 'modules/shared/helper.mjs', 'export const missing = true;\n');
@@ -433,7 +433,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         write(seed, 'vendor/shared/witness.mjs', 'export const witness = true;\n');
         ok(seed, 'record-base', 'vendor/shared/witness.mjs', 'modules/shared/witness.mjs', witness, '--base', base);
       }
-      if (!['withhold', 'witness', 'unplaceable'].includes(row)) {
+      if (!['withhold', 'witness', 'unplaceable', 'extensionless'].includes(row)) {
         write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
         if (row === 'mapped') {
           const bytes = 'export const missing = true;\n';
@@ -463,7 +463,8 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       else if (row === 'withhold') {
         assert.equal(fs.existsSync(path.join(seed, 'vendor/sample/new.mjs')), false);
         assert.ok(result.report.withheld.some(item => item.path === 'vendor/sample/new.mjs'));
-      } else if (row === 'witness') assert.ok(fs.existsSync(path.join(seed, 'vendor/shared/helper.mjs')));
+      } else if (row === 'extensionless') assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/helper.server.ts')));
+      else if (row === 'witness') assert.ok(fs.existsSync(path.join(seed, 'vendor/shared/helper.mjs')));
       else assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/helper.mjs'), 'utf8'), before['vendor/sample/helper.mjs'].bytes ? Buffer.from(before['vendor/sample/helper.mjs'].bytes, 'hex').toString() : '');
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
