@@ -33,6 +33,7 @@ export async function buildDemo(root, output, declaration) {
   for (const binding of bindings.objects) if (!entryExports.get(entry)?.has(binding.class_name)) throw new Error(`Loader demo cannot bind ${binding.name}: missing Durable Object export ${binding.class_name}`);
   if (!emitted.has(entry)) throw new Error('Demo Worker entry was not emitted by this build');
   await checkBuildVariables(root, workerConfig.vars ?? {}, declaration.secrets ?? []);
+  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify(workerConfig) + '\n');
   const { unstable_splitSqlQuery: split } = require('wrangler');
   const migrations = Object.fromEntries((workerConfig.d1_databases ?? []).map(db => [db.binding, []]));
   const inventory = withRewrites(await demoMigrationInventory(root, { config: workerConfig, configFile: 'dist/server/wrangler.json' }), await readMigrationRewrites(root));

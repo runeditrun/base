@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Drop empty Wrangler placeholders for declared runtime secrets from container and native demo bundles; keep runtime secret declarations and refuse non-empty secret image values.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
