@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gdc6999ab",
+  "cliVersion": "0.2.83-dev.gdbac13e3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1203,7 +1203,7 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "9d11cbe8243c49be3574e30a43e3478bd99c73ec8b7450926b6550d54e123440"
+      "sha256": "0eba4f7bcbf928d1ebadaef163e87eb5e4544f9c53a0fb7a4902b33bdf150d3d"
     },
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
@@ -1615,7 +1615,7 @@
     },
     "modules/demo/declaration.mjs": {
       "source": "modules/demo/declaration.mjs",
-      "sha256": "18958409eb785ee9c1bdedf60facdfce9ad25dd4ace960bbb38fb6903e3d6ee5"
+      "sha256": "5ae8b487b46ac8483594fa96bd93b3ff1bfdaf8bec6c2d6c8ea945b21cd78c3d"
     },
     "modules/demo/effects.mjs": {
       "source": "modules/demo/effects.mjs",

@@ -19,9 +19,9 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const removedObjects = new Set();
   for (const plan of plans) for (const target of plan.removed) {
     const stat = requirePhysical(root, target, {cache}).stat;
-    if (stat) removedObjects.add(`${stat.dev}:${stat.ino}`);
+    if (stat) removedObjects.add(stat.nlink > 1 ? target : `${stat.dev}:${stat.ino}`);
   }
-  const inspect = target => requirePhysical(root, safe(target), {cache, freed: (relative, stat) => stat.isFile() && removedObjects.has(`${stat.dev}:${stat.ino}`)});
+  const inspect = target => requirePhysical(root, safe(target), {cache, freed: (relative, stat) => stat.isFile() && removedObjects.has(stat.nlink > 1 ? relative : `${stat.dev}:${stat.ino}`)});
   function enqueue(plan, source, entry, adapted = false) {
     const target = mapped(source, plan.copy);
     if (!adapted) planned.set(target, {plan, source, entry});

@@ -515,6 +515,25 @@ test('refresh-base checks file and directory transitions after each plan removes
       }
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-case-distinct-'));
+  try {
+    const {base, seed} = fixture(temporary);
+    write(base, 'modules/sample/part.txt', 'lower before\n');
+    if (!fs.existsSync(path.join(base, 'modules/sample/PART.txt'))) {
+      write(base, 'modules/sample/PART.txt', 'upper before\n');
+      const pin = commit(base);
+      write(seed, 'vendor/sample/part.txt', 'lower before\n');
+      write(seed, 'vendor/sample/PART.txt', 'upper before\n');
+      commit(seed);
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', pin, '--base', base);
+      write(base, 'modules/sample/part.txt', 'lower after\n');
+      write(base, 'modules/sample/PART.txt', 'upper after\n');
+      ok(seed, 'refresh-base', commit(base), '--base', base);
+      assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/part.txt'), 'utf8'), 'lower after\n');
+      assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/PART.txt'), 'utf8'), 'upper after\n');
+    }
+  } finally { fs.rmSync(temporary, {recursive: true, force: true}); }
+
 });
 
 test('refresh-base refuses to rewrite an applied migration and leaves every file as it was', () => {
