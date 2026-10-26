@@ -2,7 +2,7 @@ import { portabilityPlan, ensurePortabilitySchema } from '../modules/container/p
 import { exportArchive, importArchive, fileRecords } from '../modules/portability/files.mjs';
 import { readLegacyArchive } from '../modules/portability/format.mjs';
 import { recoverLegacyArchive } from '../modules/portability/legacy-files.mjs';
-import { legacyTargetState, requireLegacyEmpty } from '../modules/portability/legacy-safety.mjs';
+import { legacyTargetState, requireLegacyEmpty, requireProductEmpty } from '../modules/portability/legacy-safety.mjs';
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
 import { join } from 'node:path';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -48,6 +48,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   if(direction==='migration-preflight')return await nativeMigrationPreflight({root,db:proxy.env[binding],binding,platformMigrations});
   const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery),policy,declaration);
   const options={ db: proxy.env[binding], buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations };
+  if(direction==='schema-recovery-preflight') { await requireProductEmpty(options);return {checkedEmpty:true}; }
   if(direction==='legacy-preflight') {
    await requireLegacyEmpty(options,await legacyTargetState(options.db,options.migrations));
    return {checkedEmpty:true};

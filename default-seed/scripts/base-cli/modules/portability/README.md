@@ -469,7 +469,8 @@ This accepts only the missing inventory. Ordinary import still refuses
 version 1 metadata; that separate recovery still needs both v1 flags below.
 The destination must be empty under the existing product emptiness rule:
 non-migration rows in product tables refuse `target_not_empty:<table>` before
-staging. Finalization repeats the normal emptiness check and atomic guards.
+staging, including before a local runner applies pending product migrations.
+Finalization repeats the normal emptiness check and atomic guards.
 The normal restore maintenance lock remains held throughout staging and restore.
 
 The destination runner must replay its own applied migration files. Every

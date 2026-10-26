@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.g8ee7e94d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -967,11 +967,11 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "dc84a19c54d67511d7e3965683eb9896db75f2353b21bf052170972f541aa5cf"
+      "sha256": "ff46dccc40f5f342a80f599ee436cc5df5ac6f1f55a589a20f09b24f27b44c38"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "9a8927acb35990ee3d54ae2bf4db71046baa305739ad821e7baef10c741424c2"
+      "sha256": "a559c51c8ebe90f926e985e4d8f7827df6d05a6724be77fb0a9009a3877deb48"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -1407,7 +1407,7 @@
     },
     "modules/container/transfer.mjs": {
       "source": "modules/container/transfer.mjs",
-      "sha256": "8e841e74611fb87a86b49d6b7ebb23a1f3ccb0bf8290e7cb689710c7d42db47a"
+      "sha256": "87d1fd0e21dd9b83b3a01af3b3b0280035ef6f3bc0600cc35707debec5b6e3ad"
     },
     "modules/container/websockets.mjs": {
       "source": "modules/container/websockets.mjs",
@@ -1415,7 +1415,7 @@
     },
     "modules/container/worker-engine.mjs": {
       "source": "modules/container/worker-engine.mjs",
-      "sha256": "3dfbc77b8307830c994b24e83f9d19f123c6e6098c0bd07f59d85499cd6985ba"
+      "sha256": "16d51089869eab6c0add27a46233136908530455361f9cd954cb0653acda385b"
     },
     "modules/d1-transport/index.d.mts": {
       "source": "modules/d1-transport/index.d.mts",
@@ -3635,7 +3635,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "c56d7a1124ba0bc5c3e6a3f12912853306c01763bb1115950c00d2a04bb1431e"
+      "sha256": "cdc3b0028ce5dfe341804ab3934917a929a65f85802c6d7bc8288c26263978c5"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -3743,7 +3743,7 @@
     },
     "modules/portability/legacy-safety.mjs": {
       "source": "modules/portability/legacy-safety.mjs",
-      "sha256": "7a7c6a66ade6b303868025fdec0116f111848eacaa712510e271a41e7fe86d80"
+      "sha256": "e3d61016ac811b61e6ce9a5f07582b6879da59656e8d1d5f625b6d40bf102457"
     },
     "modules/portability/lines.mjs": {
       "source": "modules/portability/lines.mjs",
