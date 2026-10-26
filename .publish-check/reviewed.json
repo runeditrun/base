@@ -16,6 +16,22 @@
       "reason": "Intentional non-existent repository identity as a mismatched-repository negative input; no network or publisher use.",
       "reviewer": "gr lane orchestrator (Run Edit Run fleet)",
       "date": "2026-10-24"
+    },
+    {
+      "rule": "hygiene.github-missing",
+      "path": "global/tests/recovery-info.test.mjs",
+      "blob": "1adefc901fb6ba46204739a9c38a21a12d1d4c80",
+      "reason": "Intentional non-existent repository identity as a mismatched-repository negative input; no network or publisher use.",
+      "reviewer": "gr lane orchestrator (Run Edit Run fleet)",
+      "date": "2026-10-26"
+    },
+    {
+      "rule": "hygiene.github-missing",
+      "path": "global/tests/recovery-info.test.mjs",
+      "blob": "5bb88ac410940f0052c1dd9e72e77446f61b006b",
+      "reason": "Intentional non-existent repository identity as a mismatched-repository negative input; no network or publisher use.",
+      "reviewer": "gr lane orchestrator (Run Edit Run fleet)",
+      "date": "2026-10-26"
     }
   ]
 }
