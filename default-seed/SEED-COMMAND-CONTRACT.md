@@ -507,7 +507,11 @@ Base's shared `/run` chooser reads `RunData.paths`: `product` is the app listing
 id or `null` while the seed has no listing; optional `requirementsExtra` adds
 one requirements sentence; optional `assisted.open` and `managed.open` can each
 hold a door closed with `false`. Reference data and newly initialized seeds
-start with `paths: { product: null }`. `RunData` no longer carries `hosted`,
+start with `paths: { product: null }`. `RunData.pricing` carries the Assisted
+and Managed prices and their shared `note`; reference and initialized sites
+read the single `runPricing` value in `run-pricing.ts`. `PATHS` reads that data
+for prices and the label, so changing it changes the built chooser as well.
+`RunData` no longer carries `hosted`,
 `requirements` or `folder`. Name, repository and clone command remain seed data.
 Keep the shared sign-up state and entry URL builder in the single `PATHS`
 constant in `run-site.ts`; seeds do not add their own plan links or sign-up

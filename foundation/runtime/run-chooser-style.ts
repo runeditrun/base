@@ -25,6 +25,7 @@ h2{font-family:var(--rer-font-heading,var(--rer-font-body,inherit));font-weight:
 .paste-panel h3{margin:0;color:var(--site-ink);font-size:16px;line-height:1.3;font-weight:600}
 .self[data-copied] .paste-panel{display:block;animation:reveal 150ms ease-out}.self[data-copied] .timeline{display:none}
 @keyframes reveal{from{opacity:0}to{opacity:1}}@media(prefers-reduced-motion:reduce){.self[data-copied] .paste-panel{animation:none}}
+.other-ways{margin-top:16px}.other-ways pre{margin:0;max-width:100%;overflow-x:auto}.chooser .self .other-ways pre code{white-space:pre}.other-ways summary{cursor:pointer;color:var(--site-body);font-size:15px;text-decoration:underline;text-underline-offset:3px}
 .alt{display:grid;gap:2px;margin-top:16px;color:var(--site-body);font-size:15px;line-height:1.5}.alt code{font:400 15px/1.5 var(--site-mono);color:var(--site-ink)}
 .chooser .self .alt code{width:auto;overflow:visible;white-space:normal}
 .requirements,.email-note{margin-top:8px;color:var(--site-body);font-size:14px;line-height:1.5}

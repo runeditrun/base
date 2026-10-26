@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
+
+- Show Assisted at US$10/month and Managed at US$100/month, labelled early access, with global billing on the Run chooser.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.

@@ -30,6 +30,8 @@ export interface RunData {
   /** Whether the run site carries /docs. */
   docs: boolean
   paths: RunPaths
+  /** The one price per paid door and their shared label, used by PATHS. */
+  pricing: { assisted: string; managed: string; note: string }
 }
 export interface RunPaths {
   /** The app listing id; null holds both paid doors closed. */
@@ -60,7 +62,7 @@ export const runRequirements = 'git is required; rer brings Node and pnpm.'
 
 export const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))
 
-/** All chooser copy and destinations live here, shared with /docs/hosting. */
+/** Chooser copy and destinations, reading prices from RunData; shared with /docs/hosting. */
 export const PATHS = {
   title: (n: string) => `Run ${n}`,
   heading: (n: string) => `Run ${n}.`,
@@ -79,17 +81,16 @@ export const PATHS = {
     pasteTitle: 'Now paste it into your terminal.', note: 'A first start takes a few minutes.',
   },
   assisted: { title: 'Assisted', lead: 'We set it up with you and keep it updated.',
-    rest: 'It stays yours, on your computer or your own cloud.', price: 'US$11 a month, GST included', action: 'Set it up with us' },
+    rest: 'It stays yours, on your computer or your own cloud.', price: (run: RunData) => run.pricing.assisted, action: 'Set it up with us' },
   managed: { title: 'Managed', lead: 'We run it for you.',
-    rest: 'Nothing to install.', price: 'US$110 a month, GST included', action: 'Have us run it' },
+    rest: 'Nothing to install.', price: (run: RunData) => run.pricing.managed, action: 'Have us run it' },
   entry: (plan: 'assisted' | 'managed', product: string) =>
     `https://app.runeditrun.com/?${new URLSearchParams({ product, plan })}`,
   closed: { chip: 'By request', line: 'For now, sign-ups are by request.', action: 'Request access' },
   signups: 'request' as 'request' | 'app',
-  paidNote: 'Paid plans need an Australian billing address for now.',
+  priceNote: (run: RunData) => run.pricing.note,
   business: { lead: 'Setting up several tools?', action: 'Set up your business once',
-    href: (seed: string, hosting?: 'free' | 'assisted' | 'managed') =>
-      `https://app.runeditrun.com/business/new?${new URLSearchParams({ seed, ...(hosting ? { hosting } : {}) })}` },
+    href: 'https://app.runeditrun.com/business' },
   facts: { source: 'Source:', licence: 'license' },
 }
 
@@ -101,6 +102,9 @@ export function checkRunData(run: RunData): RunData {
   if (!run.clone.startsWith(repoStart) || repositoryId.exec(repo)?.[0] !== repo) throw new Error(`Run data clone must be ${repoStart}<owner>/<repo> with a valid repository id.`)
   if (!/^https:\/\/[^\s"<>]+$/.test(run.repository)) throw new Error('Run data repository is an https URL.')
   if (typeof run.docs !== 'boolean') throw new Error('Run data declares docs.')
+  for (const key of ['assisted', 'managed', 'note'] as const) {
+    if (typeof run.pricing?.[key] !== 'string' || !run.pricing[key].trim()) throw new Error(`Run data needs pricing.${key}.`)
+  }
   const { product, requirementsExtra } = run.paths
   if (product !== null && (typeof product !== 'string' || /^[a-z0-9][a-z0-9-]*$/.exec(product)?.[0] !== product)) throw new Error('Run data paths.product is a listing id or null.')
   if (requirementsExtra !== undefined && (typeof requirementsExtra !== 'string' || !requirementsExtra.trim() || /free|\$0/i.test(requirementsExtra))) throw new Error('Run data paths.requirementsExtra is a sentence without free or $0.')
@@ -188,16 +192,16 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
   const doors = (['assisted', 'managed'] as const).map(id => {
     const path = PATHS[id], closed = PATHS.signups === 'request' || run.paths.product === null || run.paths[id]?.open === false
     return `<section class="door ${id}" aria-labelledby="${id}"><div class="door-heading"><h2 id="${id}">${escape(path.title)}</h2>${closed ? `<span class="chip">${escape(PATHS.closed.chip)}</span>` : ''}</div>`
-      + `<p class="door-body">${escape(path.lead + ' ' + (closed ? PATHS.closed.line : path.rest))}</p><p class="price">${escape(path.price)}</p><p class="door-action">${action(PATHS.entry(id, product), closed ? PATHS.closed.action : path.action)}</p></section>`
+      + `<p class="door-body">${escape(path.lead + ' ' + (closed ? PATHS.closed.line : path.rest))}</p><p class="price">${escape(path.price(run))} · ${escape(PATHS.priceNote(run))}</p><p class="door-action">${action(PATHS.entry(id, product), closed ? PATHS.closed.action : path.action)}</p></section>`
   }).join('')
   const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>${escape(PATHS.heading(run.name))}</h1></div><div class="chooser">`
     + `<section class="self" aria-labelledby="self"><div class="self-heading"><span class="badge">${escape(self.badge)}</span><h2 id="self">${escape(self.title)}</h2><p class="self-body">${escape(self.body(run.name))}</p></div>`
-    + codeBlock(self.command(repo), self.title)
+    + codeBlock(startLine(run), self.title)
     + `<section class="paste-panel" aria-labelledby="paste-title"><h3 id="paste-title">${escape(self.pasteTitle)}</h3><div class="paste-track">${stops(steps, true)}<p class="track-note">${escape(self.note)}</p></div></section>`
-    + `<p class="alt"><span>${escape(self.alt)}</span>${inlineStart(run)}</p><p class="requirements">${escape(self.requirements)}${run.paths.requirementsExtra ? ' ' + escape(run.paths.requirementsExtra) : ''}</p><p class="email-note">${escape(self.email)}</p>`
+    + `<details class="other-ways"><summary>Other ways to run locally</summary><p class="alt"><span>${escape(self.alt)}</span>${inlineStart(run)}</p><div class="alt"><span>To install rer separately:</span><pre><code>curl -fsSL https://runeditrun.com/install.sh | sh</code></pre><span>Then run:</span><pre><code>$HOME/.local/bin/rer dev ${escape(repo)}</code></pre></div><p class="alt"><span>Optional, for future terminals: add <code>$HOME/.local/bin</code> to your shell’s PATH. The one-line launch above already finds rer for this run; you can do this later.</span></p></details><p class="requirements">${escape(self.requirements)}${run.paths.requirementsExtra ? ' ' + escape(run.paths.requirementsExtra) : ''}</p><p class="email-note">${escape(self.email)}</p>`
     + `<div class="timeline">${stops([self.start, ...steps])}<span class="track-divider" aria-hidden="true"></span><p class="track-note">${escape(self.note)}</p></div>`
     + (run.docs ? `<p class="guide">${action(self.guide.href(slug), self.guide.label)}</p>` : '')
-    + `</section><div class="doors">${doors}</div><div class="quiet"><p>${escape(PATHS.paidNote)}</p><p>${escape(PATHS.business.lead)} ${action(PATHS.business.href(product), PATHS.business.action)}</p></div>`
+    + `</section><div class="doors">${doors}</div><div class="quiet"><p>${escape(PATHS.business.lead)} ${action(PATHS.business.href, PATHS.business.action)}</p></div>`
     + `<footer class="facts"><p>${escape(PATHS.facts.source)} <a href="${escape(run.repository)}">${escape(run.repository.replace(/^https:\/\//, ''))}</a> · ${escape(run.licence)} ${escape(PATHS.facts.licence)}</p></footer></div></main>`
   return document(identity, PATHS.title(run.name), PATHS.meta(run.name), RUN_CHOOSER, body, COPY_SCRIPT, homepage?.styles)
 }
