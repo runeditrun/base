@@ -347,7 +347,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
   const files = seedFiles(root);
   requireMaterializedCopies(root, record, files);
   const origin = open(record, base, root, offline);
-  let writing = false;
+  let writing = false, notices = [];
   try {
     const read = reader(origin);
     const next = read.tree(revision);
@@ -402,6 +402,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
     const templates = adoptWorkflowTemplates(root, plans, {tree: next, read, revision, files});
+    notices = templates.notices;
     completeWorkflowHelpers(root, plans, {tree: next, read, revision});
     const withheld = completeModuleCopies(root, plans, {tree: next, read, revision, base: origin.repository,
       deliveries: migrations.flatMap(step => step.deliver.map(source => ({source, origin: step.origin, importers: step.copies})))});
@@ -444,6 +445,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, withheld, editionMigrations: migrations.map(({id, guide, edit, copies}) => ({id, guide, edit, copies})), ...templates, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } catch (error) {
     if (!writing && !/no files were refreshed/i.test(error.message)) error.message += ' No files were refreshed.';
+    if (!writing && notices.length) error.message += '\n' + notices.join('\n');
     throw error;
   } finally { origin.close(); }
 }

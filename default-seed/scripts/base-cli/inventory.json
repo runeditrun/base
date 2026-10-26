@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g8d125e53",
+  "cliVersion": "0.2.83-dev.gd27459c4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1175,7 +1175,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "0760eae8b0e80b3da1eabbdfcd4f5435ab722e90e77b24302c88516e64f518be"
+      "sha256": "2a4a3a238d7b22f9d807a3dca394c1c5de483e38dd8365994151459196372084"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
