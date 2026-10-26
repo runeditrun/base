@@ -124,7 +124,7 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   commit(seed);
   // Neither helper name is special to the implementation. Cache-only and
   // commented script names must not become dependencies.
-  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: |\n          # python3 scripts/comment.py\n          sudo env X=yes python3 scripts/new-helper.py\n          node scripts/another-helper.mjs\n          env -u X node scripts/env.mjs\n          sudo -u nobody node scripts/sudo.mjs\n          node --import scripts/bootstrap.mjs scripts/entry.mjs\n          node \"scripts/with space.mjs\"\n          bash -c 'node scripts/shell.mjs'\n          echo $(node scripts/substitution.mjs)\n          echo scripts/not-invoked.py\n      - uses: actions/cache@v4\n        with:\n          path: scripts/cache-only.py\n');
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: |\n          # python3 scripts/comment.py\n          sudo env X=yes python3 scripts/new-helper.py\n          node scripts/another-helper.mjs\n          env -u X node scripts/env.mjs\n          sudo -u nobody node scripts/sudo.mjs\n          node --import scripts/bootstrap.mjs scripts/entry.mjs\n          node \"scripts/with space.mjs\"\n          bash -c \'node scripts/shell.mjs\'\n          echo $(node scripts/substitution.mjs)\n          echo scripts/not-invoked.py\n      - uses: actions/cache@v4\n        with:\n          path: scripts/cache-only.py\n');
   write(source, 'default-seed/scripts/new-helper.py', 'print("workflow helper")\n');
   write(source, 'export/new-helper.py', 'print("workflow helper")\n');
   write(source, 'default-seed/scripts/another-helper.mjs', 'console.log("second helper");\n');
