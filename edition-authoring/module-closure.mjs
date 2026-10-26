@@ -76,10 +76,23 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       include(source, target);
     }
   }
+  // Template files can refer to another recorded copy whose Base origin is
+  // elsewhere (for example foundation/template -> foundation/runtime). Existing
+  // records and plans satisfy that local edge before looking for a new source.
+  function edge(source, target, specifier) {
+    const destination = resolve({has: name => planned.has(name) || recorded.has(name) || index.has(name) && disk.has(name)}, target, specifier);
+    if (destination) {
+      const owner = recorded.get(destination);
+      const dependency = planned.get(destination)?.source ?? (owner && owner.copy.originPath + destination.slice(owner.copy.path.length)) ?? resolve(tree, source, specifier);
+      return {specifier, dependency, destination, satisfied: true};
+    }
+    const dependency = resolve(tree, source, specifier);
+    return {specifier, dependency, destination: dependency && path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))};
+  }
   const incoming = new Set();
   for (const item of queue) for (const specifier of specifiers(item.adapted ? local(item.target) : blob(item.entry))) {
-    const dependency = resolve(tree, item.source, specifier);
-    if (dependency) incoming.add(path.posix.join(path.posix.dirname(item.target), path.posix.relative(path.posix.dirname(item.source), dependency)));
+    const {destination} = edge(item.source, item.target, specifier);
+    if (destination) incoming.add(destination);
   }
   function exportsAt(target, seen = new Set()) {
     if (seen.has(target)) return new Set();
@@ -107,16 +120,16 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const before = Object.hasOwn(plan.copy.files, target) && disk.has(target) ? local(target) : '';
     const baseline = new Set(specifiers(before));
     const imports = bindings(bytes), oldBindings = bindings(before);
-    const edges = specifiers(bytes).map(specifier => ({specifier, dependency: resolve(tree, source, specifier)}));
+    const edges = specifiers(bytes).map(specifier => edge(source, target, specifier));
     const declaration = source.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts');
-    if (declaration !== source && tree.has(declaration)) edges.push({dependency: declaration});
+    if (declaration !== source && tree.has(declaration)) edges.push({dependency: declaration, destination: target.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts')});
     const novel = directoryAdditions.has(target) && !required.has(target) && !incoming.has(target);
     let hold;
     for (const edge of edges) {
-      const {specifier, dependency} = edge;
+      const {specifier, dependency, destination, satisfied} = edge;
       if (specifier && baseline.has(specifier) && !resolve(disk, target, specifier)) continue;
+      if (satisfied) continue;
       if (!dependency) refuse(target, `no Base source for ${specifier}`, `\${EDITOR:-vi} ${quote(target)}`);
-      const destination = path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency));
       if (!witness(destination, dependency)) {
         if (novel) { hold = {path: target, originPath: source, dependency}; break; }
         refuse(target, `no copy mapping witnesses ${destination} from ${dependency}`, '${EDITOR:-vi} base-copies.json');
@@ -126,9 +139,8 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       plan.sources = plan.sources.filter(([name]) => name !== source);
       planned.delete(target); withheld.push(hold); continue;
     }
-    for (const {specifier, dependency} of edges) {
+    for (const {specifier, dependency, destination} of edges) {
       if (specifier && baseline.has(specifier) && !resolve(disk, target, specifier)) continue;
-      const destination = path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency));
       include(dependency, destination);
       const owner = recorded.get(destination);
       if (!adapted && !planned.has(destination) && (index.has(destination) || owner?.copy.adapted?.[destination])) {
