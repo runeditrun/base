@@ -333,13 +333,14 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       const leaf = 'scripts/edition-authoring/leaf.mjs';
       const rootBytes = 'export const refresh = "synthetic-base";\n';
       const incomingBytes = 'import {helper} from "./helper.mjs";\nexport const refresh = helper;\n';
+      const initialHelper = 'export const helper = true;\n';
       const helperBytes = 'export {leaf as helper} from "./leaf.mjs";\n';
       const leafBytes = 'export const leaf = "synthetic-base-leaf";\n';
       const customBytes = 'import "./seed-private.mjs";\nexport const helper = "synthetic-edition-helper";\n';
       init(base);
       for (const directory of new Set([origin, ...(row.mirrorRecord ? [mirror] : [])])) {
         write(base, `${directory}/refresh.mjs`, rootBytes);
-        write(base, `${directory}/helper.mjs`, helperBytes);
+        write(base, `${directory}/helper.mjs`, initialHelper);
         write(base, `${directory}/leaf.mjs`, leafBytes);
         write(base, `${directory}/unrelated.mjs`, 'export const unrelated = "synthetic-unselected";\n');
       }
@@ -353,8 +354,8 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       commit(seed);
       ok(seed, 'record-base', root, `${origin}/refresh.mjs`, revision, '--base', base);
       ok(seed, 'record-base', 'aaa/earlier.mjs', 'tools/earlier.mjs', revision, '--base', base);
-      if (row.mirrorRecord || row.removed) {
-        write(seed, helper, helperBytes);
+      if (row.mirrorRecord || row.removed || row.adapted) {
+        write(seed, helper, initialHelper);
         ok(seed, 'record-base', helper, `${row.mirrorRecord ? mirror : origin}/helper.mjs`, revision, '--base', base);
         git(seed, 'add', '--', helper);
       }
@@ -369,6 +370,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         write(seed, root, adaptedBytes);
         ok(seed, 'adapt-base', root);
       }
+      for (const directory of new Set([origin, ...(row.mirrorRecord ? [mirror] : [])])) write(base, `${directory}/helper.mjs`, helperBytes);
       write(base, `${origin}/refresh.mjs`, `${incomingBytes}// synthetic incoming root\n`);
       write(base, 'tools/earlier.mjs', 'export const earlier = "synthetic-after";\n');
       const next = commit(base);
@@ -439,10 +441,9 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
           write(base, 'modules/sample/index.mjs', incoming);
           const baseline = commit(base);
           write(seed, target, incoming);
-          ok(seed, 'record-base', target, 'modules/sample/index.mjs', baseline, '--base', base);
-          // Keep just the singleton mapping, preserving the helper as seed owned.
           const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
-          record.copies = record.copies.filter(copy => copy.path !== 'vendor/sample');
+          record.copies[0].revision = baseline;
+          record.copies[0].files[target] = sha(incoming);
           write(seed, 'base-copies.json', JSON.stringify(record));
         }
         commit(seed);

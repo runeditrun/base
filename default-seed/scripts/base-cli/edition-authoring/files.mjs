@@ -48,7 +48,7 @@ export function physicalEntry(root, name, {cache = new Map(), freed = () => fals
     let stat;
     try { stat = fs.lstatSync(target); }
     catch (error) { if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error; }
-    if (!stat || freed(relative, stat)) return {absent: true, parent, parentStat};
+    if (!stat || freed(relative, stat, i < parts.length - 1)) return {absent: true, parent, parentStat};
     if (!cache.has(parent)) cache.set(parent, fs.readdirSync(parent));
     const entries = cache.get(parent);
     if (!entries.includes(part)) {

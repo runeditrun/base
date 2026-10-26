@@ -80,9 +80,9 @@ export function preflightRefresh(root, plans, recordPath, seedFiles) {
     fs.accessSync(target, fs.constants.W_OK | (directory ? fs.constants.X_OK : 0));
   };
   const cache = new Map();
-  function freedEntry(relative, stat) {
+  function freedEntry(relative, stat, parent) {
     if (stat.isFile()) return freed.has(identity(relative, stat));
-    if (!stat.isDirectory() || !freed.size) return false;
+    if (!parent || !stat.isDirectory() || !freed.size) return false;
     let found = false;
     const empty = directory => fs.readdirSync(directory).every(name => {
       const absolute = path.join(directory, name), child = fs.lstatSync(absolute);

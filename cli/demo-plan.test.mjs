@@ -7,6 +7,9 @@ import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { isolatedQueue } from './fixtures/queue.mjs';
+import { demoPreflight } from './demo.mjs';
+import { resolveProject } from './project.mjs';
+import { developmentTarget } from '../onboarding/operator-installer.mjs';
 import { demoSockets } from '../modules/demo/vite.mjs';
 
 const execute = promisify(execFile);
@@ -39,7 +42,8 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
  await writeFile(join(root, 'src/server.ts'), "export default {fetch(request) { return Response.json({ok:true,origin:new URL(request.url).origin}); }};");
  await writeFile(join(root, 'vite.config.mjs'), `
   import {cloudflare} from '@cloudflare/vite-plugin';
-  export default {logLevel:'silent',plugins:[cloudflare({viteEnvironment:{name:'ssr'}})],
+  import {demoSockets} from ${JSON.stringify(new URL('../modules/demo/vite.mjs', import.meta.url).href)};
+  export default {logLevel:'silent',plugins:[demoSockets(),cloudflare({persistState:{path:process.env.RER_STATE_DIR ?? '.wrangler/state'},viteEnvironment:{name:'ssr'}})],
    environments:{ssr:{build:{outDir:'dist/server'}},client:{build:{outDir:'dist/client',rolldownOptions:{input:'src/client.js'}}}},
    builder:{buildApp:async builder=>{await builder.build(builder.environments.client);await builder.build(builder.environments.ssr);}}};
  `);
@@ -60,7 +64,15 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
    { cwd: root, encoding: 'utf8', env: { ...env, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_NO_UPDATE_CHECK: '1' }, timeout: 120000, maxBuffer: 1024 * 1024 }) }; }
   catch (error) { return { code: error.code, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }; }
  };
- const localExit = async (command = 'serve') => JSON.parse((await demoSockets().config({ root }, { command })).define['import.meta.rerDemo']);
+ const localExit = async (command = 'serve') => {
+  const project = await resolveProject(root);
+  const demo = await demoPreflight(project, {OWNER_EMAIL: 'demo-owner@example.test', AUTH_ORIGIN: 'http://127.0.0.1:3210'}, 3600);
+  const [, , {env}] = developmentTarget({root, origin: 'http://127.0.0.1:3210', runtimePort: 3211, demo});
+  const previous = process.env.RER_DEMO_RUN_URL;
+  process.env.RER_DEMO_RUN_URL = env.RER_DEMO_RUN_URL;
+  try { return JSON.parse((await demoSockets().config({root}, {command})).define['import.meta.rerDemo']); }
+  finally { if (previous === undefined) delete process.env.RER_DEMO_RUN_URL; else process.env.RER_DEMO_RUN_URL = previous; }
+ };
  const built = await rer();
  assert.equal(built.code, 0, built.stdout + built.stderr);
  const config = JSON.parse(await readFile(join(root, '.rer/demo-host/wrangler.json'), 'utf8'));

@@ -20,7 +20,7 @@ export async function demoPreflight(project, vars, seconds) {
  await demoAdopted(project.root);
  const declaration = JSON.parse(await readFile(await contained(project.root, 'deploy-demo.json'), 'utf8'));
  const resolved = await demoRunDeclaration(declaration, {root: project.root, adapter: project.adapter});
- return {...await demoState(project.root, seconds), runUrl: demoRunUrl(resolved.runUrl ?? `https://${resolved.domain}/run`)};
+ return {...await demoState(project.root, seconds), runUrl: demoRunUrl(resolved.runUrl === undefined ? `https://${resolved.domain}/run` : resolved.runUrl)};
 }
 
 // Before anything starts: the seed's Vite persists where rer says, so the
