@@ -408,15 +408,20 @@ test('built Roadmap preserves product prose while removing explicit source citat
 test('built chooser keeps self first and carries each paid plan through the shared entry', async t => {
  const f = await seed(t), data = join(f.root, 'src/site/run.ts'), renderer = join(f.root, 'src/base/run-site.ts');
  const original = await readFile(data, 'utf8'), source = await readFile(renderer, 'utf8');
+ // Read the route data through the same site build as the visible chooser.
+ const pages = await readFile(f.pages, 'utf8');
+ await writeFile(f.pages, pages.replace('import { runPageHtml,', 'import { PATHS, runPageHtml,').replace('pages: [', `pages: [{ path: '/pricing', html: '<!doctype html><body>' + encodeURIComponent(JSON.stringify({ assisted: PATHS.assisted.price(run), managed: PATHS.managed.price(run), note: PATHS.priceNote(run) })) + '</body>' },`));
  const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const page = await browser.newPage();
   for (const [mode, product, managed] of [['request', 'errors-workbench', true], ['app', 'errors-workbench', true], ['app', 'errors-workbench', false], ['app', null, true]]) {
-   await writeFile(data, original.replaceAll("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`));
+   const pricing = { assisted: `assisted-${mode}-${product} <&>`, managed: `managed-${mode}-${managed} <&>`, note: `note-${mode} <&>` };
+   await writeFile(data, original.replaceAll("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`).replace('pricing: runPricing', `pricing: ${JSON.stringify(pricing)}`));
    await writeFile(renderer, source.replace("signups: 'request' as", `signups: '${mode}' as`));
    const result = await f.build();
    assert.equal(result.code, 0, result.stdout + result.stderr);
    await page.goto(preview.url + '/run');
+   for (const plan of ['assisted', 'managed']) assert.equal(await page.locator(`.${plan} .price`).textContent(), `${pricing[plan]} · ${pricing.note}`, 'the built chooser reads and escapes RunData pricing');
    assert.deepEqual(await page.locator('.chooser section[aria-labelledby]').evaluateAll(sections => sections.filter(s => !s.closest('.paste-panel')).map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', 'managed']);
    assert.equal(await page.locator('button').count(), 1);
    assert.equal(await page.locator('.code pre').textContent(), 'curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-spool');
@@ -435,6 +440,8 @@ test('built chooser keeps self first and carries each paid plan through the shar
    await page.goto(preview.url + '/docs/hosting');
    assert.equal(await page.locator('.assisted a').getAttribute('href'), entry);
    assert.equal(await page.locator('.assisted .go p').count(), Number(closed), 'hosting follows the same sign-ups and listing state');
+   await page.goto(preview.url + '/pricing');
+   assert.deepEqual(JSON.parse(decodeURIComponent(await page.locator('body').textContent())), pricing, 'PATHS route data reads the same RunData pricing');
   }
  } finally { await browser.close(); await preview.close(); }
 });
