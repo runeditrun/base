@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Include the GitHub CLI exit status and bounded, redacted stderr in unavailable release verification receipts; retain authentication guidance when stderr is empty.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
