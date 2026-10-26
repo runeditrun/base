@@ -68,15 +68,13 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     plan.sources.push([source, entry]);
     enqueue(plan, source, entry);
   }
-  for (const source of deliveries) {
-    const targets = plans.flatMap(({copy}) => {
-      const file = tree.has(copy.originPath);
-      const from = file ? path.posix.dirname(copy.originPath) : copy.originPath;
-      const to = file ? path.posix.dirname(copy.path) : copy.path;
-      return inside(source, from) ? [path.posix.join(to, path.posix.relative(from, source))] : [];
-    }).filter(target => witness(target, source));
-    if (!targets.length || !tree.has(source)) refuse(source, 'migration delivery has no witnessed destination', '${EDITOR:-vi} base-copies.json');
-    for (const target of new Set(targets)) include(source, target);
+  for (const {source, origin, importers} of deliveries) {
+    const targets = importers.map(importer => path.posix.join(path.posix.dirname(importer), path.posix.relative(path.posix.dirname(origin), source)));
+    if (!tree.has(source)) refuse(source, 'migration delivery has no Base source', '${EDITOR:-vi} base-copies.json');
+    for (const target of new Set(targets)) {
+      if (!witness(target, source)) refuse(target, 'migration delivery has no witnessed destination', '${EDITOR:-vi} base-copies.json');
+      include(source, target);
+    }
   }
   const incoming = new Set();
   for (const item of queue) for (const specifier of specifiers(item.adapted ? local(item.target) : blob(item.entry))) {
