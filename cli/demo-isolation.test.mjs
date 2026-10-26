@@ -1,3 +1,4 @@
+import { retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { access, readFile, readdir, stat, writeFile } from 'node:fs/promises';
@@ -77,6 +78,7 @@ commandAdapter.localPrerequisites = async ({root, email}) => {
   const deadline = Date.now() + 180_000;
   while (!child.stdoutText.includes('"event":"ready"') && child.exitCode === null && child.signalCode === null && Date.now() < deadline) await pause(100);
   const ready = events(child).find(event => event.event === 'ready');
+  if (!child.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, child);
   assert.ok(ready, 'the real demo reaches readiness');
   assert.equal((await fetch(ready.url + '/health')).status, 200);
   const directory = join(ready.demo.state, 'v3/d1/miniflare-D1DatabaseObject');

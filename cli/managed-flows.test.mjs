@@ -11,6 +11,7 @@ import {processTree, remainingProcesses} from './fixtures/process-tree.mjs';
 import {queuedCommands} from './fixtures/queued-commands.mjs';
 import {serverResources} from './server-resources.mjs';
 import {createHash} from 'node:crypto';
+import {retainStartupFailure} from './fixtures/command-diagnostic.mjs';
 
 // Three seed-author journeys. Exercise the public dispatcher and real reference;
 // deadlines bound a broken test, never assert operating-system scheduling speed.
@@ -37,16 +38,7 @@ async function ready(child, {root = f.root, origin = url} = {}) {
  if (!child.stdoutText.includes('"event":"ready"')) {
   if (child.exitCode !== null || child.signalCode !== null) await child.done;
   const rows = events(child), error = rows.find(row => row.event === 'error'), result = rows.find(row => row.event === 'result');
-  const evidenceDirectory = process.env.RER_TEST_EVIDENCE_DIRECTORY;
-  if (evidenceDirectory) {
-   // Keep the CLI's already-redacted failure before teardown or another
-   // command replaces its log. Ready events contain credentials: omit them.
-   await mkdir(evidenceDirectory, {recursive: true});
-   const evidence = await mkdtemp(join(evidenceDirectory, 'managed-ready-'));
-   const log = await readFile(join(root, '.seed/installer/install.log'), 'utf8').catch(() => '');
-   const messages = rows.filter(row => row.event === 'error').map(row => `${row.code}: ${row.message}`);
-   await writeFile(join(evidence, 'failure.log'), [...messages, log].join('\n'), {mode: 0o600});
-  }
+  await retainStartupFailure(root, child);
   const codes = new Set(['safety_refusal', 'missing_input', 'command_failed', 'app_exited', 'cancelled']);
   // Print only fixed classifications and numbers, never private app output,
   // generated settings, sign-in messages, command arguments or log paths.

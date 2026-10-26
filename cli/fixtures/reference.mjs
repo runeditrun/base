@@ -1,4 +1,4 @@
-import { commandDiagnostic } from './command-diagnostic.mjs';
+import { commandDiagnostic, retainStartupFailure } from './command-diagnostic.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, readFile, writeFile, rm, stat, access, symlink } from 'node:fs/promises';
@@ -98,15 +98,14 @@ export async function fixture(kind,t) {
     try{const row=JSON.parse(line);return row.event==='error'?[`${row.code}: ${row.message}`]:[];}catch{return [];}
    });
    const installLog=await readFile(join(root,'.seed/installer/install.log'),'utf8').catch(()=>'');
-   const log=[...reasons,child.stderrText,installLog].join('\n');
-   if(process.env.RER_TEST_EVIDENCE_DIRECTORY)await writeFile(join(process.env.RER_TEST_EVIDENCE_DIRECTORY,kind+'-failure.log'),log,{mode:0o600});
+   await retainStartupFailure(root, child);
    diagnostic=[...reasons,child.stderrText.slice(-2500),...installLog.split('\n').filter(line=>/error TS|ERROR|Error|ERR_PNPM|HTTP [45]|did not|First owner|already claimed|sign-in|health status|not ok|ENOENT|failureType:/.test(line)).slice(-20)].join('\n').replace(/https?:\/\/\S+/g,'[URL]');
    t.diagnostic(diagnostic);
   }
   assert.equal(code,expected,`Safe command outcome: ${args[0]} exited ${code}; ${JSON.stringify(commandDiagnostic(child))}\n${args[0]==='install'?child.stdoutText.slice(-2500):diagnostic}`);
   return child;
  }
- async function documented(line,overrides={}) {const [program,...args]=documentedCommand(line);const child=launch(args,program,overrides);const code=await child.done;assert.equal(code,0,`documented command succeeds: ${line} exited ${code}; ${JSON.stringify(commandDiagnostic(child))}\n${(child.stdoutText+child.stderrText).split('\n').filter(text=>/error TS|ERROR|Error|ERR_PNPM|HTTP [45]|did not|ENOENT|failed/.test(text)).map(text=>text.replace(/https?:\/\/\S+/g,'[URL]')).slice(-20).join('\n')}`);return child;}
+ async function documented(line,overrides={}) {const [program,...args]=documentedCommand(line);const child=launch(args,program,overrides);const code=await child.done;if(code!==0)await retainStartupFailure(root,child);assert.equal(code,0,`documented command succeeds: ${line} exited ${code}; ${JSON.stringify(commandDiagnostic(child))}\n${(child.stdoutText+child.stderrText).split('\n').filter(text=>/error TS|ERROR|Error|ERR_PNPM|HTTP [45]|did not|ENOENT|failed/.test(text)).map(text=>text.replace(/https?:\/\/\S+/g,'[URL]')).slice(-20).join('\n')}`);return child;}
  const sql=query=>localD1(root,query);
  return {root,registry:env.RER_SERVERS_DIR,run,start,stop,data,sql,documented,launch,timingSummary};
 }

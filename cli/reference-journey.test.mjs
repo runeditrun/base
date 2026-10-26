@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { localVariables } from '../onboarding/local/environment.mjs';
 import { personaLinks } from './fixtures/persona-links.mjs';
-import { commandDiagnostic } from './fixtures/command-diagnostic.mjs';
+import { commandDiagnostic, retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 import { productionSender } from './fixtures/production-sender.mjs';
 import { originalArchiveIdentity, recoverArchiveIdentity } from './fixtures/archive-identity.mjs';
 import { archiveRecords, archiveRows, archiveItems, remakeArchive } from './fixtures/archive-records.mjs';
@@ -100,6 +100,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  port=await freePort();while(port===setupPort)port=await freePort();url=`http://127.0.0.1:${port}`;
  const dev=f.start(['dev','--port',String(port),'--json','--non-interactive']);local.after(()=>f.stop(dev));
  const deadline=Date.now()+120000;while(!dev.stdoutText.includes('"event":"ready"')&&dev.exitCode===null&&Date.now()<deadline)await pause(100);
+ if (!dev.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, dev);
  assert.ok(dev.stdoutText.includes('"event":"ready"'),'actual dev health must precede ready');
  await privateRuntime(url,f.root,{kind,runtime:'dev'});
  const ready=events(dev).find(e=>e.event==='ready');assert.equal(ready.url,url);assert.equal(ready.signInUrl,undefined);
@@ -158,6 +159,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  await f.stop(dev);assert.equal(dev.exitCode,143);assert.ok(await fetch(ready.siteUrl).then(()=>false,()=>true),'the run site preview stops with dev');assert.equal(events(dev).filter(e=>e.event==='ready').length,1);assert.equal(events(dev).at(-1).event,'result');
  const login=f.start(['dev','--login','--port',String(port),'--json','--non-interactive']);
  const loginDeadline=Date.now()+120000;while(!login.stdoutText.includes('"event":"ready"')&&login.exitCode===null&&Date.now()<loginDeadline)await pause(100);
+ if (!login.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, login);
  assert.ok(login.stdoutText.includes('"event":"ready"'),JSON.stringify({requirement:'legacy rer dev --login starts automatic owner entry',...commandDiagnostic(login)}));
  const loginReady=events(login).find(e=>e.event==='ready'),loginBrowser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
@@ -167,6 +169,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  } finally {await loginBrowser.close();await f.stop(login);}
  const preview=f.start(['preview','--port',String(port),'--json','--non-interactive']);
  const previewDeadline=Date.now()+120000;while(!preview.stdoutText.includes('"event":"ready"')&&preview.exitCode===null&&Date.now()<previewDeadline)await pause(100);
+ if (!preview.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, preview);
  assert.ok(preview.stdoutText.includes('"event":"ready"'),'real preview starts');
  await privateRuntime(url,f.root,{kind,runtime:'preview'});await f.stop(preview);
  assert.deepEqual((await f.data('SELECT email FROM oa_first_run JOIN oa_operators ON completed_by = id'))[0].results,[{email:'cli-owner@example.test'}],'first-run completion persists in real D1 after app shutdown');

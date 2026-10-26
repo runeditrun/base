@@ -1,4 +1,5 @@
 import { productionSender } from './production-sender.mjs';
+import { retainStartupFailure } from './command-diagnostic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -40,6 +41,7 @@ export async function portabilityFixture(t,{generated=true}={}) {
   let stdout='',stderr='';child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);
   child.done=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
   const code=await child.done;
+  if(code!==expected)await retainStartupFailure(root,{stdoutText:stdout,exitCode:child.exitCode,signalCode:child.signalCode});
   assert.equal(code,expected,`Fixture command ${args[0]} exited ${code}: ${stdout}\n${stderr}`);
   return {stdout,stderr};
  }

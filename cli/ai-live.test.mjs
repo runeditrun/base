@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
+import { retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 
 test('rer dev selects the double or a stdin-keyed Models dev app explicitly; live outbox contains receipts only', { timeout: 5 * 60_000 }, async t => {
   const seed = await portabilityFixture(t, { generated: false });
@@ -28,7 +29,8 @@ test('rer dev selects the double or a stdin-keyed Models dev app explicitly; liv
   async function start(flags, stdin = '') {
     child = spawn(process.execPath, ['scripts/rer.mjs', 'dev', '--json', ...flags], { cwd: seed.root, env: { ...process.env, CI: 'true', RER_NODE_AUTO: '0', WRANGLER_SEND_METRICS: 'false' }, stdio: ['pipe', 'pipe', 'pipe'] });
     let text = '';
-    child.stdout.on('data', chunk => { text += chunk; }); child.stderr.on('data', () => {});
+    child.stdoutText = ''; child.stderrText = '';
+    child.stdout.on('data', chunk => { text += chunk; child.stdoutText += chunk; }); child.stderr.on('data', chunk => { child.stderrText += chunk; });
     child.done = new Promise(resolve => child.once('close', resolve)); child.stdin.end(stdin);
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline && child.exitCode === null) {
@@ -36,6 +38,7 @@ test('rer dev selects the double or a stdin-keyed Models dev app explicitly; liv
       if (ready) return ready.url;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
+    await retainStartupFailure(seed.root, child);
     throw Error('Dev did not become ready; captured private diagnostics suppressed.');
   }
   async function stop() { child.kill('SIGTERM'); await child.done; child = undefined; }

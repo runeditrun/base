@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {serverRegistry} from './server-registry.mjs';
 import { liveServers } from '../global/registry.mjs';
 import { checkCapacity } from '../global/launch/capacity.mjs';
+import { retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 
 // Several checkouts share one machine registry. People keep the cap; a declared
 // journey on its own port does not count; no checkout ever stops another's server.
@@ -168,10 +169,12 @@ test('dev and demo stop only their checkout, preserving a caller-group sleeper a
   for(const f of [a,b]){
    const child=run(f,[mode,'--json',...(mode==='demo'?['--foreground']:[])]);
    const deadline=Date.now()+180_000;
-   while(!child.stdoutText.includes('"event":"ready"')){
-    assert.equal(child.exitCode,null,'server reaches readiness');
-    assert.ok(Date.now()<deadline,'server readiness deadline');await pause(50);
-   }
+   try {
+    while(!child.stdoutText.includes('"event":"ready"')){
+     assert.equal(child.exitCode,null,'server reaches readiness');
+     assert.ok(Date.now()<deadline,'server readiness deadline');await pause(50);
+    }
+   } catch (error) { await retainStartupFailure(f.root, child); throw error; }
    if(mode==='dev')assert.equal(await child.done,0,'piped dev detaches after readiness');
    const records=(await read()).running;
    for(const item of records)if(roots.includes(item.checkout)&&!owners.some(owner=>owner.pid===item.owner.pid))owners.push(item.owner);

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { retainStartupFailure } from './command-diagnostic.mjs';
 
 // Follow only links emitted by the real CLI, with the browser's own cookies.
 // A badge switch or signInAs helper would bypass the link exchange under test.
@@ -6,6 +7,7 @@ export async function personaLinks({fixture, browser, context, page, origin, own
  async function emitted(as) {
   const result=await fixture.run(['dev','--as',as,'--port',new URL(origin).port,'--json']);
   const ready=result.stdoutText.trim().split('\n').map(JSON.parse).find(event=>event.event==='ready');
+  if (!ready?.openUrl) await retainStartupFailure(fixture.root, result);
   assert.ok(ready?.openUrl,'reused dev emits a browser link');
   return ready.openUrl;
  }
