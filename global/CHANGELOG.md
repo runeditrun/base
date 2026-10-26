@@ -1,12 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
 - Show Assisted at US$10/month and Managed at US$100/month, labelled early access, with global billing on the Run chooser.
-
 - Keep seed CI Chromium and apt caches under the runner temporary directory, prepare them before sudo, and require the apt helper cache directory to exist so it cannot create runner HOME directories as root.
 - Pin every seed workflow example to Ubuntu 24.04 so Ubuntu 26.04 adoption requires deliberate qualification.
+- Print setup refusal reasons from the command itself in reference-journey failure diagnostics, including refusals before a setup log is opened.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries. Their corrected refusal text moves to 0.2.84.
 
 ## 0.2.82
 
