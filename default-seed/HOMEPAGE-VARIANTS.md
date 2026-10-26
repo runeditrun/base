@@ -312,3 +312,22 @@ are checked. The SVG is the seed's small icon artwork, not its full mark.
 Only when none of those icons exists is `brand/mark.svg` linked, and only if
 that file exists too. The site export includes every selected icon even when
 its asset list omits it. Keep the plugin when adopting these Base copies.
+
+### Shared Run chooser entry and local recipe
+
+`PATHS.business` in `foundation/runtime/run-site.ts` is the single shared entry:
+lead `Setting up several tools?`, action `Set up your business once`, and href
+`https://app.runeditrun.com/business`. Today that hosted door requires sign-in;
+it is not an anonymous local Business setup. When the Business journey publishes
+at that same address, the chooser needs no destination change. The working CLI
+pairing command is `rer business connect --code CODE`; obtain the code in the
+hosted Business journey and approve the pairing there.
+
+The primary local recipe is `startLine(run)`, derived from the repository in
+`RunData.clone`, not from setup form fields in `rer-setup.json`. Use this same
+helper for homepage and getting-started snippets when adopting the shared Run
+renderer. Node and separate-install instructions live in the collapsed “Other
+ways to run locally” disclosure; PATH setup is optional for future terminals,
+not a step in the primary launch. Re-sync the shared `run-site.ts` and
+`run-chooser-style.ts` runtime copies and update any homepage/docs recipe
+template to consume `startLine(run)`. Approved homepages remain seed-owned.

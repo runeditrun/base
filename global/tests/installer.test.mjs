@@ -34,7 +34,13 @@ async function runPageCommands() {
  const html = sitePages({ styles: [], clients: {} }).pages.find(page => page.path === '/run').html;
  const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
  // A block's command is its text: inline spans only keep words together when it wraps.
- return [...html.matchAll(/<pre[^>]*><code>([\s\S]*?)<\/code><\/pre>/g)].map(match => match[1].replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39);/g, entity => entities[entity]));
+ const commands = source => [...source.matchAll(/<pre[^>]*><code>([\s\S]*?)<\/code><\/pre>/g)].map(match => match[1].replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39);/g, entity => entities[entity]));
+ const disclosure = /<details class="other-ways"([^>]*)>([\s\S]*?)<\/details>/.exec(html);
+ return {
+  primary: commands(html.replace(disclosure?.[0] ?? '', '')),
+  secondary: commands(disclosure?.[2] ?? ''),
+  secondaryClosed: !!disclosure && !/\bopen(?:[\s=]|$)/.test(disclosure[1]),
+ };
 }
 
 // The built package again under another version, optionally with extra raw entries.
@@ -103,8 +109,10 @@ if (execFileSync('npm', [], { env: { ...process.env, NODE_OPTIONS: '' }, encodin
  const managed = await run(rer, ['--version'], callerTools);
  assert.equal(managed.code, 0, managed.stderr);
  await rm(join(bin, 'npm'));
- const commands = await runPageCommands();
- assert.equal(commands.length, 1, 'the Run page installs and starts with one command');
+ const { primary: commands, secondary, secondaryClosed } = await runPageCommands();
+ assert.equal(commands.length, 1, 'the Run page installs and starts with one primary command');
+ assert.equal(secondary.length, 2, 'the separate install and launch commands stay in other ways');
+ assert.equal(secondaryClosed, true, 'secondary commands are disclosed only on request');
  const pipeline = commands[0].split('|');
  assert.equal(pipeline.length, 2, 'the downloaded installer is piped to the shell');
  const [program, ...scriptArguments] = pipeline[1].trim().split(/\s+/);
