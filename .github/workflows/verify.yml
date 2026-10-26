@@ -95,7 +95,7 @@ jobs:
       options: --init
       volumes:
         - /usr/local/lib/android:/runner-preinstalled/android
-    timeout-minutes: ${{ matrix.group == 'journeys' && 60 || 25 }}
+    timeout-minutes: ${{ matrix.group == 'journeys' && 60 || matrix.group == 'launcher' && 40 || 25 }}
     env:
       TZ: UTC
       RER_VERIFY_WORKERS: '1'
