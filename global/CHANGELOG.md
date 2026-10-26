@@ -2,9 +2,12 @@
 
 ## Unreleased
 
-- Fix the Verify template's unavailable job-level runner context, lint delivered workflows in Base Verify, and upgrade unchanged 0.2.83 templates and their helper closure during refresh.
-- Close delivered workflows over the local scripts they invoke, recording newly supplied helpers in the same preflighted refresh plan.
-- Adopt tracked, unrecorded Verify workflows and guides only when their bytes match a historical Base template; preserve seed adaptations and print an explicit adoption notice for workflows that need a manual merge.
+- Fix the Verify template's unavailable job-level runner context, lint delivered workflows in Base Verify, and upgrade unchanged historical Verify templates and their helper closure during refresh.
+- Close every recorded code module over relative imports and declarations using existing copy namespaces, preserving seed-owned dependencies and pre-existing unresolved imports; withhold optional directory additions without a witnessed destination and refuse missing seed-owned bindings atomically.
+- Declare edition migrations `run-data-paths` and `run-data-pricing`; repeat `--edition-migration ID` to consent to refresh while leaving the documented edition-owned edits owed.
+- Check physical spelling before refresh writes or relies on a path; preserve unrecorded template aliases with a notice and refuse aliases on recorded paths and dependencies.
+- Discover workflow helpers across shell wrappers, quoted paths, command substitutions and interpreter options, using the caller's template namespace.
+- Pass the resolved demo Run exit from the CLI to Vite without loading adapters from copied demo modules, remove an empty authoring catch, and keep the Run guide link lint-clean.
 
 ## 0.2.83
 
@@ -16,7 +19,7 @@
 
 ### Known issues
 
-- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries. Their corrected refusal text moves to 0.2.84.
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries. Use the manual recoveries below.
 
 ## 0.2.82
 
@@ -28,8 +31,8 @@
 
 ### Known issues
 
-- For a Base-equal untracked, ignored or excluded authoring helper, the suggested `git add -f` followed by refresh can leave `verify-base` reporting `unrecordedCopies`; from the seed root, run `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base LOCAL_PATH ORIGIN_PATH FULL_40_HEX_COMMIT --base /absolute/base-checkout`, then the same entry's `verify-base --base /absolute/base-checkout`. Corrected refusal text ships in 0.2.83.
-- On case-insensitive APFS, the suggested `mv -i` for a Base-equal committed `Copy-Checkout.mjs` can leave the old Git index spelling, so refresh succeeds but verification fails; move its `.refresh-backup` outside the checkout, run `git rm --cached -- PATH/Copy-Checkout.mjs` and `git add -- PATH/copy-checkout.mjs base-copies.json`, then verify again. This preserves both the backup and delivered bytes; corrected refusal text ships in 0.2.83.
+- For a Base-equal untracked, ignored or excluded authoring helper, the suggested `git add -f` followed by refresh can leave `verify-base` reporting `unrecordedCopies`; from the seed root, run `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base LOCAL_PATH ORIGIN_PATH FULL_40_HEX_COMMIT --base /absolute/base-checkout`, then the same entry's `verify-base --base /absolute/base-checkout`. The manual recovery remains necessary.
+- On case-insensitive APFS, the suggested `mv -i` for a Base-equal committed `Copy-Checkout.mjs` can leave the old Git index spelling, so refresh succeeds but verification fails; move its `.refresh-backup` outside the checkout, run `git rm --cached -- PATH/Copy-Checkout.mjs` and `git add -- PATH/copy-checkout.mjs base-copies.json`, then verify again. This preserves both the backup and delivered bytes; the manual recovery remains necessary.
 
 ## 0.2.81
 
