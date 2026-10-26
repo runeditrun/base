@@ -47,29 +47,40 @@ test('resume and restore keep running intent while respecting later owner stops'
  assert.equal(result(refused).outcome, 'refused');
  assert.deepEqual(await stateManifest(records), beforeRefusal);
  assert.equal((await running()).length, 0);
- for (const [index, phase] of ['get', 'ready'].entries()) {
+ for (const [index, phase] of ['get', 'ready', 'start', 'check'].entries()) {
   assert.equal((await f.run(['dev', '--detach', '--json'])).code, 0);
   const baseline = await f.publish(`4.${index * 2}.0`);
   assert.equal(result(await f.run(['upgrade', '--to', baseline.commit, '--anchors', f.anchors, '--json'])).outcome, 'updated');
   const backup = (await readJournal(f.root)).backup;
   const release = await f.publish(`4.${index * 2 + 1}.0`);
-  const child = f.start(['upgrade', '--to', release.commit, '--anchors', f.anchors, '--json']);
-  const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
-  let killed = false;
-  child.stdout.on('data', () => {
-   if (!killed && child.stdoutText.split('\n').some(line => {
-    try { const e = JSON.parse(line); return e.event === 'phase' && e.phase === phase; } catch { return false; }
-   })) { killed = true; child.kill('SIGKILL'); }
-  });
-  assert.equal((await exited).signal, 'SIGKILL');
+  const args = ['upgrade', '--to', release.commit, '--anchors', f.anchors, '--json'];
+  let killedPid = null;
+  if (phase === 'check') assert.equal((await f.run([...args, '--check'])).code, 0);
+  else {
+   const child = f.start(args);
+   const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
+   let killed = false;
+   child.stdout.on('data', () => {
+    if (!killed && child.stdoutText.split('\n').some(line => {
+     try { const e = JSON.parse(line); return e.event === 'phase' && e.phase === phase; } catch { return false; }
+    })) { killed = true; child.kill('SIGKILL'); }
+   });
+   assert.equal((await exited).signal, 'SIGKILL'); killedPid = child.pid;
+  }
   await stopOwnedApp(f.env, f.root);
   assert.equal((await f.run(['dev', '--detach', '--json'])).code, 0);
   await stopOwnedApp(f.env, f.root);
   await f.ownerCommit(`owner-stopped-before-restore-${phase}.md`, 'The owner stopped the app after the crash.\n');
-  const restored = await f.run(['upgrade', '--restore', backup, '--json']);
+  const selected = phase === 'start' ? (await readJournal(f.root)).backup : backup;
+  const restored = await f.run(['upgrade', '--restore', selected, '--json']);
   assert.equal(result(restored).outcome, 'rolled_back', restored.stderr);
   assert.equal((await running()).length, 0);
   assert.deepEqual((await f.sql('SELECT id, body FROM upgrade_records'))[0].results, [ownerRow]);
-  t.diagnostic(JSON.stringify({ phase, laterOwnerStop: true, killedPid: child.pid, restore: result(restored), running: 0 }));
+  if (phase === 'check') {
+   const upgraded = await f.run(args);
+   assert.equal(result(upgraded).outcome, 'updated', upgraded.stderr);
+   assert.equal((await running()).length, 0);
+  }
+  t.diagnostic(JSON.stringify({ phase, laterOwnerStop: true, killedPid, restore: result(restored), running: 0 }));
  }
 });

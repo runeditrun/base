@@ -216,7 +216,7 @@ Durable artifacts have one closed outcome table:
 
 | Artifact / journal stages | What it protects | Next upgrade, `--check`, or `--restore` |
 | --- | --- | --- |
-| PRE-SWITCH: `intent.json`, `preparing`, `needs_integration`, `prepared`, `stopping` | Running-state intent and a disposable integration; no tracked source or database needs undoing | Discard and prepare again at today's HEAD, even after owner commits or branch changes. A matching `needs_integration` can still be resolved with `--continue`. |
+| PRE-SWITCH: `intent.json`, `preparing`, `needs_integration`, `prepared`, `stopping` | Running-state intent and a disposable integration; no tracked source or database needs undoing | Discard and prepare again at today's HEAD, even after owner commits or branch changes. Restore removes the abandoned preparation's unchanged update ref and worktree. A matching `needs_integration` can still be resolved with `--continue`. |
 | PROTECTED: `switch_pending`, `switched`, `installed`, `started`, `verified`, `rolling_back`, `rollback_failed` | A possibly switched checkout and its original data snapshot | Keep the journal, integration and referenced snapshot until verification or restore completes. `switch_pending` also covers a kill between Git switching and the next journal write. |
 | TERMINAL: `complete`, `rolled_back` | Settled source and data | Discardable at any HEAD. If `runtimeSettled` is false, first settle the earlier running-state intent; a matching request may return the saved outcome. |
 
@@ -235,6 +235,12 @@ reset or hand deletion of either control file is needed for stale preparations;
 a successful explicit restore also removes the intent. An interrupted completed
 verdict can be acknowledged after an owner commit when the committed release
 record still names that target, preserving the new commit.
+
+Restore moves the current branch back to the snapshot HEAD and replaces local
+data. Before moving a different HEAD, rer preserves it on the named branch
+`rer/recovery-<full-commit>` and prints that branch. Committed owner edits remain
+reachable there; recover the desired edits from it after restore. An existing
+recovery branch containing different work is never overwritten.
 
 A protected journal is retained when HEAD moves, including an owner commit or
 reset. Rer refuses a different target or `--check` until the interrupted update
@@ -258,9 +264,13 @@ backups and ask your agent to recover them. An unreadable Git HEAD can return
 actual failed or interrupted rollback, not these precondition failures.
 
 For a protected journal, safe local guidance names the journal, snapshot and
-previous HEAD. Satisfy its preconditions first: commit or stash changes and
-check out the original branch. Run the printed `rer upgrade --restore BACKUP
---cwd CHECKOUT`; if you stashed changes, reapply them after restore. Guidance
+previous HEAD, and warns that restore moves HEAD and replaces local data.
+Satisfy its preconditions first: commit or stash changes and check out the
+original branch. For an unborn HEAD, the printed commands create a recovery
+branch and commit all files there before returning to the original branch;
+Git cannot stash an unborn HEAD. Run the printed `rer upgrade --restore BACKUP
+--cwd CHECKOUT`; restore prints the recovery branch retaining committed work.
+If you stashed changes, reapply them after restore. Guidance
 never asks for a hard reset or a separate stop command. Recovery commands appear
 only for a verified backup and safe checkout identity. A healthy concurrent
 updater receives no recovery advice.

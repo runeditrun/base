@@ -33,8 +33,7 @@ export function intendedRunning(record, custody, running) {
 // during rollback cannot replace it with the backup's older running state.
 export function restoredRunning(journal, intent, metadata, running) {
  const outcome = artifactOutcome(journal ?? {});
- if (outcome === 'protected') return journal.backup === metadata.name && typeof journal.wasRunning === 'boolean' ? journal.wasRunning : metadata.wasRunning;
- return intent || outcome === 'pre-switch' || outcome === 'terminal' && journal.runtimeSettled === false ? running : metadata.wasRunning;
+ return intent || outcome === 'protected' || outcome === 'pre-switch' || outcome === 'terminal' && journal.runtimeSettled === false ? running : metadata.wasRunning;
 }
 export async function rememberIntent(checkout, current, wasRunning, custody) {
  // With a running server, contenders share the same custody witness before

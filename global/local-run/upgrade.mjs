@@ -22,8 +22,16 @@ function output(outcome, journal, started, error_code) {
   owner_changes_kept: journal.prepared?.owner_changes_kept ?? 0,
   conflicts: journal.prepared?.conflicts ?? emptyConflicts(), ...(error_code ? { error_code } : {}), duration_ms: Date.now() - started };
 }
-async function rollback(checkout, journal, operation) {
+async function rollback(checkout, journal, operation, onDiagnostic) {
  const { metadata } = await backup(checkout, journal.backup);
+ const head = await text(checkout, ['rev-parse', '--verify', 'HEAD^{commit}']);
+ if (head !== metadata.head) {
+  const branch = `rer/recovery-${head}`, ref = `refs/heads/${branch}`;
+  const saved = await git(checkout, ['rev-parse', '--verify', ref], { allow: [1, 128] });
+  if (saved.code) await git(checkout, ['update-ref', ref, head, '']);
+  else if (saved.stdout.trim() !== head) throw failure('refused', `Recovery branch ${branch} contains different work; keep it and resolve the name before restoring.`);
+  onDiagnostic?.(`Source before restore is preserved on branch ${branch}. Restore moves HEAD to ${metadata.head}; recover committed edits from that branch after restore.`);
+ }
  journal.wasRunning ??= metadata.wasRunning;
  // The repair intent must outlive this process before any checkout, state or
  // runtime mutation. A retry may never mistake the old HEAD for restored data.
@@ -93,7 +101,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
    (journal.stage === 'complete' ? installed?.commit === journal.target?.commit : current.branch === journal.branch && current.head === journal.head) &&
    (!to || [journal.target?.commit, journal.target?.tag].includes(to)) && (!journalKey || journalKey === journal.journalKey);
   operation = await acquireOperation(checkout, async custody => {
-   wasRunning = protectedJournal ? journal.wasRunning : intendedRunning(intent ?? loaded, custody, await runningApp(checkout));
+   wasRunning = intendedRunning(intent ?? loaded, custody, await runningApp(checkout));
    if (!protectedJournal && !restore) await rememberIntent(checkout, current, wasRunning, custody);
   });
   if (!protectedJournal) { preserveJournal = false; journal.wasRunning = wasRunning; }
@@ -115,11 +123,11 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   }
   if (restore) {
    preserveJournal = true;
-   const repairPreparation = needsRecovery(journal) ? journal.prepared : undefined;
+   const repairPreparation = journal.prepared;
    const { metadata } = await backup(checkout, restore);
    journal = { ...journal, version: 1, head: metadata.head, branch: current.branch, from: metadata.from, target: metadata.target, backup: restore, wasRunning: restoredRunning(journal, intent, metadata, wasRunning) };
    restoring = true;
-   await rollback(checkout, journal, operation);
+   await rollback(checkout, journal, operation, onDiagnostic);
    if (repairPreparation) {
     const ref = await git(checkout, ['show-ref', '--verify', '--quiet', `refs/heads/${repairPreparation.branch}`], { allow: [1] });
     if (!ref.code) await cleanupMerge(checkout, repairPreparation);
@@ -235,7 +243,7 @@ export async function upgrade({ checkout, to, journalKey, anchors, onPhase, onDi
   }
   if (switched) {
    try {
-    await rollback(checkout, journal, operation);
+    await rollback(checkout, journal, operation, onDiagnostic);
     if (journal.prepared) await cleanupMerge(checkout, journal.prepared);
     const result = output('rolled_back', journal, started, code);
     journal.result = result; await writeJournal(checkout, journal); settleJournal = true; await phase('failed', code);

@@ -17,7 +17,7 @@ test('printed recovery restores owner data and preserves dirty, detached and oth
  const bin = join(f.directory, 'recovery-bin'); await mkdir(bin);
  await writeFile(join(bin, 'rer'), `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(f.rer)} "$@"\n`);
  await chmod(join(bin, 'rer'), 0o755); f.env.PATH = `${bin}:${f.env.PATH}`;
- for (const fixture of ['dirty', 'detached', 'other-branch']) {
+ for (const fixture of ['dirty', 'detached', 'other-branch', 'unborn']) {
   const child = f.start(['upgrade', '--to', broken.commit, '--anchors', f.anchors, '--json']);
   let reached = false;
   for (let i = 0; i < 60_000 && !reached; i++) {
@@ -35,22 +35,67 @@ test('printed recovery restores owner data and preserves dirty, detached and oth
   await writeFile(join(f.root, 'owner-untracked.md'), 'Untracked owner edit\n');
   if (fixture === 'detached') await f.git(f.root, 'checkout', '-q', '--detach');
   else if (fixture === 'other-branch') await f.git(f.root, 'checkout', '-q', '-b', 'owner-other-branch');
+  else if (fixture === 'unborn') await f.git(f.root, 'symbolic-ref', 'HEAD', 'refs/heads/owner-unborn');
   const refused = await f.run(['upgrade', '--to', broken.commit, '--anchors', f.anchors, '--json']);
-  assert.equal(result(refused).error_code, fixture === 'detached' ? 'not_on_branch' : 'worktree_dirty');
+  assert.equal(result(refused).error_code, ['detached', 'unborn'].includes(fixture) ? 'not_on_branch' : 'worktree_dirty');
   assert.doesNotMatch(refused.stderr, /git\s+reset\s+--hard|rer\s+dev\s+--stop|&&/);
   assert.deepEqual(await readFile(join(f.root, '.rer/upgrade/journal.json')), saved);
-  const commands = refused.stderr.split('\n').filter(line => /^(git stash push |git checkout |rer upgrade --restore |git stash pop$)/.test(line));
+  const lines = refused.stderr.split('\n');
+  const commands = lines.filter((line, i) => i > 0 && lines[i - 1].endsWith(':') && /^(git |rer )/.test(line));
   assert.ok(commands.some(line => line.startsWith('rer upgrade --restore ')));
   for (const command of commands) await f.command('sh', ['-c', command], f.root);
   assert.equal(await f.git(f.root, 'rev-parse', 'HEAD'), journal.head);
   assert.equal((await readJournal(f.root)).stage, 'rolled_back');
   assert.deepEqual((await f.sql('SELECT id, body FROM upgrade_records'))[0].results, [ownerRow]);
-  assert.equal(await readFile(join(f.root, owner.path), 'utf8'), owner.contents + 'Uncommitted owner edit\n');
-  assert.equal(await readFile(join(f.root, 'owner-untracked.md'), 'utf8'), 'Untracked owner edit\n');
+  if (fixture === 'unborn') {
+   const saved = await f.git(f.root, 'for-each-ref', '--format=%(refname)', 'refs/heads/rer/recovery-unborn-*');
+   assert.ok(saved);
+   assert.equal(await f.git(f.root, 'show', `${saved}:${owner.path}`), (owner.contents + 'Uncommitted owner edit\n').trim());
+   assert.equal(await f.git(f.root, 'show', `${saved}:owner-untracked.md`), 'Untracked owner edit');
+  } else {
+   assert.equal(await readFile(join(f.root, owner.path), 'utf8'), owner.contents + 'Uncommitted owner edit\n');
+   assert.equal(await readFile(join(f.root, 'owner-untracked.md'), 'utf8'), 'Untracked owner edit\n');
+  }
   await writeFile(join(f.root, owner.path), owner.contents);
-  await rm(join(f.root, 'owner-untracked.md'));
+  await rm(join(f.root, 'owner-untracked.md'), { force: true });
   assert.equal((await fetch(f.url + '/health')).status, 200);
   t.diagnostic(JSON.stringify({ fixture, killedPid: child.pid, refusal: result(refused), commands, ownerRowRestored: true, editsKept: true }));
  }
  await stopOwnedApp(f.env, f.root);
+});
+
+test('restore keeps an owner commit and both edited files on a printed recovery branch', { timeout: 10 * 60_000 }, async t => {
+ const f = await upgradeFixture(t, { checkoutName: 'committed-recovery' });
+ await f.launch(); const owner = await f.ownerCommit(); await f.addRow();
+ const child = f.start(['upgrade', '--to', f.v2.commit, '--anchors', f.anchors, '--json']);
+ const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
+ let killed = false;
+ child.stdout.on('data', () => {
+  if (!killed && child.stdoutText.split('\n').some(line => {
+   try { const e = JSON.parse(line); return e.event === 'phase' && e.phase === 'start'; } catch { return false; }
+  })) { killed = true; child.kill('SIGKILL'); }
+ });
+ assert.equal((await exited).signal, 'SIGKILL');
+ const journal = await readJournal(f.root);
+ await writeFile(join(f.root, owner.path), owner.contents + 'Committed owner edit\n');
+ await writeFile(join(f.root, 'owner-new.md'), 'New owner file\n');
+ const dirty = await f.run(['upgrade', '--json']);
+ assert.equal(result(dirty).error_code, 'worktree_dirty');
+ await f.git(f.root, 'add', '-A'); await f.git(f.root, 'commit', '-qm', 'Preserve owner work');
+ const commit = await f.git(f.root, 'rev-parse', 'HEAD');
+ const refused = await f.run(['upgrade', '--json']);
+ assert.equal(result(refused).error_code, 'refused');
+ const command = refused.stderr.split('\n').find(line => line.startsWith('rer upgrade --restore '));
+ assert.ok(command);
+ const restored = await f.run(['upgrade', '--restore', journal.backup, '--cwd', f.root, '--json']);
+ assert.equal(result(restored).outcome, 'rolled_back', restored.stderr);
+ assert.equal(await f.git(f.root, 'rev-parse', 'HEAD'), journal.head);
+ const refs = (await f.git(f.root, 'for-each-ref', '--contains', commit, '--format=%(refname:short)', 'refs/heads')).split('\n').filter(Boolean);
+ assert.ok(refs.length);
+ const ref = refs.find(name => restored.stderr.includes(name));
+ assert.ok(ref, 'restore must print the ref retaining the owner commit');
+ assert.equal(await f.git(f.root, 'show', `${ref}:${owner.path}`), (owner.contents + 'Committed owner edit\n').trim());
+ assert.equal(await f.git(f.root, 'show', `${ref}:owner-new.md`), 'New owner file');
+ assert.deepEqual((await f.sql('SELECT id, body FROM upgrade_records'))[0].results, [ownerRow]);
+ t.diagnostic(JSON.stringify({ killedPid: child.pid, ownerCommit: commit, recoveryBranch: ref, editsKept: true }));
 });

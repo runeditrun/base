@@ -6,7 +6,7 @@ import {text as checkoutText} from './process.mjs';
 import {recordPath, recordTree} from './upstream-record.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
-const fail = (error_code, message = error_code, prepared) => Object.assign(new Error(message), {error_code, ...(prepared ? {prepared, result: prepared} : {})});
+const fail = (error_code, message = error_code, prepared) => Object.assign(new Error(message), {error_code, ...(message !== error_code ? {diagnostic: message} : {}), ...(prepared ? {prepared, result: prepared} : {})});
 const environment = cwd => ({PATH: process.env.PATH ?? '/usr/bin:/bin', ...(process.env.TMPDIR ? {TMPDIR: process.env.TMPDIR} : {}), HOME: join(cwd, '.rer/upgrade-tools'), LANG: 'C.UTF-8', CI: '1', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0'});
 
 function command(cwd, executable, args, {input, allow = [], binary = false, env = {}} = {}) {
