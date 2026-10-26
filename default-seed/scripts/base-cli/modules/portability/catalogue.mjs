@@ -64,8 +64,8 @@ async function archived(db,config) {
   return {objects,kinds,excluded,schemaObjects,entries:objects.filter(x=>x.type==='table' && !excluded.some(y=>y.name===x.name))};
 }
 // The archive schema identity alone, for databases that need not satisfy the policy.
-export async function schemaIdentity(db,config) {
-  const {entries,schemaObjects}=await archived(db,config);return schemaIdentityOf(entries,schemaObjects);
+export async function schemaIdentity(db,config,{tablesOnly=false}={}) {
+  const {entries,schemaObjects}=await archived(db,config);return schemaIdentityOf(entries,tablesOnly?[]:schemaObjects);
 }
 export async function catalogue(db,config) {
   const {objects,kinds,excluded,entries,schemaObjects}=await archived(db,config);

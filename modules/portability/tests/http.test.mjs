@@ -14,9 +14,9 @@ async function setup(t,{maxBodyBytes,authorize,policy=fixturePolicy}={}) {
 test('HTTP returns null for paths owned by other dispatchers',async t=>{const {handler}=await setup(t);assert.equal(await handler(new Request('https://app.test/other')),null);assert.equal(await handler(new Request('https://app.test/api/portability-other')),null);});
 test('HTTP checks authorization on every route; null actors receive 401 and no-store',async t=>{
   const source=await runtime(t);await seed(source);const bundle=await archive(await source.connect()),{call,calls,setActor}=await setup(t);
-  const exportId=(await (await call('exports','POST',{})).json()).id,importId=(await (await call('imports','POST',{confirmed:true,manifest:bundle.manifest})).json()).id;
+  const exportId=(await (await call('exports','POST',{})).json()).id,importId=(await (await call('imports','POST',{confirmed:true,manifest:bundle.manifest,acknowledgeUnverifiedSchemaObjects:true})).json()).id;
   const routes=[['exports','POST',{}],['exports/'+exportId,'GET'],['exports/'+exportId+'/advance','POST',{}],['exports/'+exportId+'/download','GET'],['exports/'+exportId+'/abort','POST',{}],
-    ['imports','POST',{confirmed:true,manifest:bundle.manifest}],['imports/'+importId,'GET'],['imports/'+importId+'/parts/0','PUT',bundle.parts[0]],['imports/'+importId+'/finalize','POST',{}],['imports/'+importId+'/abort','POST',{}]];
+    ['imports','POST',{confirmed:true,manifest:bundle.manifest,acknowledgeUnverifiedSchemaObjects:true}],['imports/'+importId,'GET'],['imports/'+importId+'/parts/0','PUT',bundle.parts[0]],['imports/'+importId+'/finalize','POST',{}],['imports/'+importId+'/abort','POST',{}]];
   setActor(null);for(const route of routes){const before=calls.length,response=await call(...route);assert.equal(response.status,401);assert.equal(calls.length,before+1);assert.equal(response.headers.get('Cache-Control'),'no-store');assert.deepEqual(await response.json(),{error:'unauthorized'});}
 });
 
@@ -66,7 +66,7 @@ test('HTTP publishes genuine import lease details after authorization and suppre
  const source=await runtime(t),bundle=await archive(await source.connect()),{call,f}=await setup(t,{
   authorize:()=>{if(failure)throw failure;return actor;},policy:{...fixturePolicy,validateStaged:()=>{if(validationFailure)throw validationFailure;}},
  });
- const body={confirmed:true,manifest:bundle.manifest},created=await call('imports','POST',body),id=(await created.json()).id;
+ const body={confirmed:true,manifest:bundle.manifest,acknowledgeUnverifiedSchemaObjects:true},created=await call('imports','POST',body),id=(await created.json()).id;
  assert.equal(created.status,201);
  const status=await (await call('imports/'+id)).json(),blocked=await call('imports','POST',body);
  assert.equal(blocked.status,409);assert.deepEqual(await blocked.json(),{error:'import_running',jobId:id,abortableAt:status.abortableAt});
@@ -99,7 +99,7 @@ test('HTTP publishes genuine import lease details after authorization and suppre
 test('HTTP hides another actors jobs with 404',async t=>{const {call,setActor}=await setup(t);const id=(await (await call('exports','POST',{})).json()).id;setActor('other');for(const route of [[`exports/${id}`,'GET'],[`exports/${id}/advance`,'POST',{}]]){const r=await call(...route);assert.equal(r.status,404);assert.deepEqual(await r.json(),{error:'job_not_found'});}});
 test('HTTP rejects wrong and missing Origin on unsafe methods',async t=>{const {call}=await setup(t);for(const origin of ['https://wrong.test',null]){const r=await call('exports','POST',{},origin);assert.equal(r.status,403);assert.deepEqual(await r.json(),{error:'origin_refused'});}});
 test('HTTP bounds streamed bodies before JSON parsing',async t=>{const {call}=await setup(t,{maxBodyBytes:32});const r=await call('exports','POST',JSON.stringify({padding:'x'.repeat(33)}));assert.equal(r.status,413);assert.deepEqual(await r.json(),{error:'body_too_large'});});
-test('HTTP requires explicit import confirmation',async t=>{const source=await runtime(t);const a=await archive(await source.connect()),{call}=await setup(t);const r=await call('imports','POST',{manifest:a.manifest});assert.equal(r.status,400);assert.deepEqual(await r.json(),{error:'confirmation_required'});});
+test('HTTP requires explicit import confirmation',async t=>{const source=await runtime(t);const a=await archive(await source.connect()),{call}=await setup(t);const r=await call('imports','POST',{manifest:a.manifest,acknowledgeUnverifiedSchemaObjects:true});assert.equal(r.status,400);assert.deepEqual(await r.json(),{error:'confirmation_required'});});
 test('HTTP success, download and error responses all prevent caching',async t=>{
   const {call}=await setup(t);const created=await call('exports','POST',{});assert.equal(created.headers.get('Cache-Control'),'no-store');const id=(await created.json()).id;
   let r;do{r=await call(`exports/${id}/advance`,'POST',{maxParts:100});}while((await r.clone().json()).phase==='building');

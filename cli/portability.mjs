@@ -14,7 +14,7 @@ const reExport = 'Re-export from the original installation with rer export --out
 // Seeds declare their real bindings and data policy. The shared module owns the
 // archive format and atomic restore; the shared runner owns its native children.
 export function localPortability({ database, binding = 'DB', buckets = {}, policy, policyModule, transient = [], platformMigrations }) {
- async function run({ root, path, journal, store, signal, operationToken, platform, legacyRecovery }, direction) {
+ async function run({ root, path, journal, store, signal, operationToken, platform, legacyRecovery, acknowledgeUnverifiedSchemaObjects }, direction) {
   if (direction === 'export') {
    if (await lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) throw refuse('Export requires a new archive path.');
   }
@@ -48,8 +48,8 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
    if (!(error instanceof PortabilityError)) throw error;
    throw refuse(`Local portability policy refused (${error.code}). Executable policies require a seed-owned policyModule with a valid default policy export; policyModule requires native local transport.`);
   }
-  if(platform==='container') return (await import('./container-transfer.mjs')).containerTransfer({root,path,journal,store,signal,direction,binding,buckets,policy:declaration.policy,transient});
-  const input={ root, path, journal, binding, buckets, ...declaration, transient, legacyRecovery, platformMigrations };
+  if(platform==='container') return (await import('./container-transfer.mjs')).containerTransfer({root,path,journal,store,signal,direction,binding,buckets,policy:declaration.policy,transient,acknowledgeUnverifiedSchemaObjects});
+  const input={ root, path, journal, binding, buckets, ...declaration, transient, legacyRecovery, acknowledgeUnverifiedSchemaObjects, platformMigrations };
   // Check the executable policy before migrations; the transfer worker imports
   // it again in its own process so module closures are retained during restore.
   if (policyModule !== undefined) await nativeWorker(store,'policy-preflight',input,signal);

@@ -20,7 +20,7 @@ try {
   for(const [name,binding]of Object.entries(spec.buckets))buckets[name]=worker.objects[binding];
  }
  const service=await createPortability({db,buckets,policy:spec.policy,migrations:async()=>migrationReplay(manifest.migrations[spec.binding],spec.policy)});
- const receipt=await(spec.direction==='export'?exportArchive:importArchive)(service,'/archive/'+spec.file,spec.transient,spec.journal);
+ const receipt=await(spec.direction==='export'?exportArchive(service,'/archive/'+spec.file,spec.transient):importArchive(service,'/archive/'+spec.file,spec.transient,spec.journal,undefined,{acknowledgeUnverifiedSchemaObjects:spec.acknowledgeUnverifiedSchemaObjects}));
  console.log(JSON.stringify(receipt));
 }catch(cause){console.error('Container transfer refused or failed:',cause.name);process.exitCode=1;}
 finally{await worker?.close();await db?.close?.();platform?.close();}

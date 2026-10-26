@@ -152,6 +152,26 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
   assert.deepEqual(await stagingTables(seed), [], 'a completed import drops every staging copy and sidecar');
   assert.deepEqual((await seed.data(query))[0].results, rows);
  }
+ // Retained table-only v2 backups use an explicit schema acknowledgment.
+ const {schemaIdentityOf}=await import('../modules/portability/schema-identity.mjs');
+ const {ContentVerifier,ArchiveVerifier}=await import('../modules/portability/format.mjs');
+ const {canonicalJson}=await import('../modules/portability/hash.mjs');
+ const retained=(await readFile(join(seed.root,'exports/round-1.rer'),'utf8')).trim().split('\n').map(JSON.parse);
+ delete retained[0].schemaObjects;retained[0].schema=await schemaIdentityOf(retained[0].tables);
+ const content=new ContentVerifier(retained[0]),integrity=new ArchiveVerifier(retained[0]);
+ for(const part of retained.slice(1,-1)){integrity.add(part);for(const item of part.items)content.add(item);}
+ retained.at(-1).contentHash=content.digest();retained.at(-1).archiveHash=integrity.digest();
+ await writeFile(join(seed.root,'exports/retained.rer'),retained.map(canonicalJson).join('\n')+'\n',{mode:0o600});
+ await seed.run(['reset','--yes']);
+ const recovery=['import','--input','exports/retained.rer','--acknowledge-unverified-schema-objects'];
+ const confirmation=await seed.text(recovery,4);assert.match(confirmation.stderr,/explicit --yes/);
+ await seed.run(['import','--input','exports/retained.rer','--yes'],4);
+ assert.equal((await seed.data('SELECT COUNT(*) AS n FROM computed_entries'))[0].results[0].n,0);
+ const recovered=await seed.text([...recovery,'--yes']);assert.match(recovered.stderr,/Schema unverified:/);
+ assert.deepEqual((await seed.data(query))[0].results,rows);
+ const audit=(await seed.data("SELECT metadata FROM rer_portability_jobs WHERE kind='import' AND phase='complete'"))[0].results.map(row=>JSON.parse(row.metadata));
+ assert.equal(audit.length,1);assert.equal(audit[0].schemaUnverified.archiveHash,retained.at(-1).archiveHash);
+ console.log('public rer import => missing confirmation refuses; ordinary legacy schema refuses; acknowledged rows and schema-unverified receipt restored');
  const after = (await seed.run(['export', '--output', 'exports/after.rer'])).at(-1);
  assert.equal(after.contentHash, previous);
  assert.deepEqual((await manifest(seed, 'exports/after.rer')).excludedTables, excludedTables);

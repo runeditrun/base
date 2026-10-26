@@ -25,7 +25,7 @@ async function dataConfiguration(root) {
  return path;
 }
 
-async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery, platformMigrations }) {
+async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery, acknowledgeUnverifiedSchemaObjects, platformMigrations }) {
  // Lines for the person go to the CLI over IPC, which prints them as the command's progress.
  const progress = transferProgress(line => process.send({ progress: line }));
  if (!legacyRecovery && ['export', 'import'].includes(direction)) progress({ phase: 'start', direction, bytes: direction === 'export' ? await stateBytes(join(root, '.wrangler/state')) : (await stat(path)).size });
@@ -59,7 +59,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   // the recorded abandoned job, dropping only its exact staging copies and
   // sidecars before the replacement import creates its own scratch tables.
   if (direction === 'import' && await service.imports.abortAbandoned()) process.send({ progress: 'Cleaned up an unfinished earlier import: a restore that stopped part-way left its staged data here. Its staging is removed and this import starts from the beginning.' });
-  return await (direction === 'export' ? exportArchive(service,path,transient,progress) : importArchive(service,path,transient,journal,progress));
+  return await (direction === 'export' ? exportArchive(service,path,transient,progress) : importArchive(service,path,transient,journal,progress,{acknowledgeUnverifiedSchemaObjects}));
  } finally { await proxy?.dispose(); await rm(configPath, { force: true }); }
 }
 

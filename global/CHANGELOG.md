@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add explicit `--acknowledge-unverified-schema-objects` recovery for version 2 backups without a schema object inventory. Destination migration replay, an empty target and all existing restore fences remain required; completed receipts record the acknowledged schema uncertainty. Current archives restore without acknowledgment.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

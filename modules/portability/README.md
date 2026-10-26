@@ -417,6 +417,7 @@ Re-export from the original installation to carry the complete definitions.
 A new archive explicitly records even an empty object inventory, so later
 additive migrations can still be placed normally. The separate acknowledged
 v1 recovery path remains an explicitly unverified recovery, as documented below.
+Version 2 backups without that inventory have their own acknowledged recovery below.
 
 New exports use archive version 2. The closing `archiveHash` is SHA-256 of
 canonical JSON `{manifest,parts}`, where `manifest` is the complete manifest
@@ -450,6 +451,49 @@ Changing an old archive's version or recomputing its part checksums cannot
 authenticate it. If the original installation is unavailable, use the explicit
 [backup-only v1 recovery](#backup-only-v1-recovery) below. Normal import still
 requires version 2 integrity.
+
+## Acknowledged recovery of older version 2 backups
+
+A fresh export from a current rer is preferred whenever the original installation
+is available. Current archives carry the complete schema inventory and restore
+without any acknowledgment. Version 2 backups written by rer 0.2.79 or earlier
+can lack `schemaObjects`. If only such a backup remains, the owner can explicitly
+accept that its schema objects are unverified:
+
+```sh
+rer import --input exports/retained.rer --yes --acknowledge-unverified-schema-objects
+```
+
+This accepts only the missing inventory. Ordinary import still refuses
+`schema_mismatch:legacy_schema` before staging. The acknowledgment never accepts
+version 1 metadata; that separate recovery still needs both v1 flags below.
+The destination must be empty under the existing product emptiness rule:
+non-migration rows in product tables refuse `target_not_empty:<table>` before
+staging. Finalization repeats the normal emptiness check and atomic guards.
+The normal restore maintenance lock remains held throughout staging and restore.
+
+The destination runner must replay its own applied migration files. Every
+archived table, column, dependency and table definition must match a compatible
+point in that history, with only the supported later additive changes. Recorded
+migration names must form an ordered compatible subset of the destination's
+history; unknown names, incompatible columns or definitions, uncertain migrations
+and unsafe later data changes refuse before staging, naming the mismatch.
+Older name-only migration ledger rows are accepted for this acknowledged path;
+ledger hashes, when present, must still match. Platform ledger rows are verified
+against the archive parts and skipped, never installed over destination history.
+
+Indexes, views and triggers come only from the destination's migrations, never
+from archive SQL. Recovery writes rows and assets through the normal integrity,
+authentication, explicit confirmation, safety and final erasure-fencing checks.
+Seed-owned authority checks, including private-key matching, remain the seed's
+responsibility and are unchanged.
+
+The completed restore job and returned receipt carry `schemaUnverified`, with
+its reason (acknowledged recovery of a version 2 archive without schemaObjects),
+source identity, export time, acknowledgment time and archive hash. The local
+command prints this secret-free receipt. A current archive records no such
+receipt, even when the flag was supplied. Preserve the original backup and the
+receipt; export a new current archive after recovery.
 
 ## Archives across later additive migrations
 
