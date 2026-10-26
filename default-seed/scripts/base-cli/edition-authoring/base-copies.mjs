@@ -388,7 +388,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       const pinned = read.tree(copy.revision);
       if (retired) return {copy, sources: [], retired, removed: [copy.path]};
       const tests = Object.keys(copy.files).some(name => testSource(mapped(name, copy.path, copy.originPath)));
-      const sources = [...next].filter(([name, {object}]) => {
+      const sources = [...next].filter(([name]) => {
         if (!within(name, copy.originPath)) return false;
         const target = mapped(name, copy.originPath, copy.path), actual = local(target);
         if (Object.hasOwn(copy.adapted || {}, target)) return false;

@@ -413,12 +413,12 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
-  for (const row of ['named', 'default', 'type', 'declaration', 'multi', 'star', 'unknown', 'baseline', 'withhold', 'witness', 'unplaceable']) {
+  for (const row of ['named', 'default', 'type', 'declaration', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'withhold', 'witness', 'unplaceable']) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
     try {
       const {base, seed, revision} = fixture(temp);
       const target = 'vendor/sample/index.mjs';
-      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+      ok(seed, 'record-base', row === 'mapped' ? target : 'vendor/sample', row === 'mapped' ? 'modules/sample/index.mjs' : 'modules/sample', revision, '--base', base);
       const specifier = row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
       const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : 'import {missing} from';
       const incoming = `${imported} "${specifier}?raw";\nexport const sample = 2;\n`;
@@ -435,6 +435,12 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       }
       if (!['withhold', 'witness', 'unplaceable'].includes(row)) {
         write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
+        if (row === 'mapped') {
+          const bytes = 'export const missing = true;\n';
+          write(base, 'other/helper.mjs', bytes);
+          write(seed, 'vendor/sample/helper.mjs', bytes);
+          ok(seed, 'record-base', 'vendor/sample/helper.mjs', 'other/helper.mjs', commit(base), '--base', base);
+        }
         if (row === 'star') write(seed, 'vendor/sample/leaf.mjs', 'export const missing = true;\n');
         if (row === 'declaration') write(seed, 'vendor/sample/helper.d.mts', 'export const missing: boolean;\n');
         if (row === 'baseline') {
