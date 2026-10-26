@@ -1,3 +1,4 @@
+import { startCarryRefresh } from './carry.mjs';
 import { randomUUID } from 'node:crypto';
 import { access, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -19,8 +20,10 @@ export async function run({ once = false } = {}) {
  const interrupted = () => stop.abort(Error('Business supervisor stopped.'));
  process.once('SIGTERM', interrupted); process.once('SIGINT', interrupted);
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(interrupted, () => {}); }, 250);
- let progress;
+ let progress, stopCarry;
+
  try {
+  stopCarry = await startCarryRefresh(api, state, stop.signal);
   progress = await loadProgress();
   await unlink(join(directory, 'disconnect')).catch(error => { if (error.code !== 'ENOENT') throw error; });
   do {
@@ -87,6 +90,7 @@ export async function run({ once = false } = {}) {
    process.stderr.write('Business pairing expired or was revoked. Supervisor stopped.\n');
   } else if (!stop.signal.aborted) throw error;
  } finally {
+  await stopCarry?.();
   clearInterval(monitor); process.off('SIGTERM', interrupted); process.off('SIGINT', interrupted); await unlock();
  }
 }

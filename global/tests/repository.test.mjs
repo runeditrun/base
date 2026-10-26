@@ -2,14 +2,16 @@
 // on one reused checkout. Every source and dependency below is local.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildPackage } from '../../scripts/rer-package.mjs';
 import { run } from './harness.mjs';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 import { offlineRepository } from './fixtures/offline-repository.mjs';
+import { server } from '../../cli/fixtures/business/server.mjs';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const base = resolve(import.meta.dirname, '../..');
 
@@ -48,13 +50,15 @@ test('rer dev <repo> clones every release tag, so git checkout <tag> works in th
 test('rer install <repo> then rer setup stop at their phases offline, reuse the clone and refuse another origin', { timeout: 60000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-phases-'));
  const source = join(directory, 'source'), home = join(directory, 'home'), app = join(directory, 'app');
+ const platform = await server(t); platform.state.pollSeconds = 1;
  t.after(() => rm(directory, { recursive: true, force: true }));
  await Promise.all([mkdir(source), mkdir(home)]);
  const env = await isolatedQueue(t, { PATH: process.env.PATH, HOME: home, CI: 'true',
+  NODE_OPTIONS: `--import=${fileURLToPath(new URL('../../cli/fixtures/business/register.mjs', import.meta.url))}`,
   RER_NO_UPDATE_CHECK: '1', RER_NODE_AUTO: '0', RER_DOOR_DIR: join(directory, 'door'),
   GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
   npm_config_store_dir: join(directory, 'store'), npm_config_offline: 'true',
-  ...Object.fromEntries(['NODE_OPTIONS', 'TMPDIR', 'COREPACK_HOME'].filter(name => process.env[name]).map(name => [name, process.env[name]])),
+  ...Object.fromEntries(['TMPDIR', 'COREPACK_HOME'].filter(name => process.env[name]).map(name => [name, process.env[name]])),
  });
  const checked = async (program, args, cwd = directory) => {
   const result = await run(program, args, { cwd, env });
@@ -82,7 +86,28 @@ test('rer install <repo> then rer setup stop at their phases offline, reuse the 
  const head = await git(app, 'rev-parse', 'HEAD');
  await writeFile(join(app, 'untracked-marker.txt'), 'kept');
 
+ const carry = join(app, '.rer/local/business.json'), observed = join(app, 'carry-observed.json');
+ await appendFile(join(app, 'adapter.mjs'), `
+import { readFile, writeFile } from 'node:fs/promises';
+if (process.argv.includes('setup')) await writeFile('carry-observed.json', await readFile('.rer/local/business.json', 'utf8').catch(error => { if (error.code === 'ENOENT') return 'null'; throw error; }));
+`);
+ const pairing = run(rer, ['business', 'connect', '--code', 'ABCD-1234', '--origin', platform.origin], { cwd: directory, env });
+ const until = Date.now() + 10000;
+ while (!platform.state.requests.some(item => item.body.code) && Date.now() < until) await delay(25);
+ assert.equal((await fetch(platform.origin + '/api/business/biz/pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, confirmation_number: '246810' }) })).status, 200);
+ const paired = await pairing; assert.equal(paired.code, 0, paired.stderr);
+ assert.ok(!await exists(carry), 'connect has no carry to write without a live checkout');
+ const selfReads = () => platform.state.requests.filter(item => item.route === '/api/business/executors/self' && item.method === 'GET').length;
+ const beforeSetup = selfReads();
  await checked(rer, ['setup', remote, '--dir', app, '--owner-email', 'owner@example.test']);
+ assert.equal(selfReads(), beforeSetup + 1, 'installed repository setup makes one self read');
+ const firstCarry = await readFile(carry, 'utf8');
+ assert.equal(await readFile(observed, 'utf8'), firstCarry, 'the pinned setup sees the carry before it loads its adapter');
+ assert.equal(JSON.parse(firstCarry).name, 'synthetic-base-1');
+ assert.equal((await stat(carry)).mode & 0o777, 0o600);
+ assert.equal((await stat(join(app, '.rer/local'))).mode & 0o777, 0o700);
+ t.diagnostic(await checked('ls', ['-ld', join(app, '.rer/local'), carry])); t.diagnostic(firstCarry.trim());
+
  assert.equal(await readFile(join(app, 'untracked-marker.txt'), 'utf8'), 'kept', 'setup reuses the clone');
  assert.equal(await git(app, 'rev-parse', 'HEAD'), head);
  assert.equal((await stat(join(app, '.dev.vars'))).mode & 0o777, 0o600);
@@ -95,6 +120,34 @@ test('rer install <repo> then rer setup stop at their phases offline, reuse the 
  const settings = await readFile(join(app, '.dev.vars'), 'utf8');
  await checked(rer, ['setup', remote, '--dir', app]);
  assert.equal(await readFile(join(app, '.dev.vars'), 'utf8'), settings, 'repeat setup keeps saved settings');
+ assert.equal(await readFile(carry, 'utf8'), firstCarry, 'unchanged repository setup leaves carry byte-identical');
+ platform.state.business.name = 'synthetic-base-2';
+ const beforeLocalSetup = selfReads();
+ await checked(rer, ['setup', '--cwd', app]);
+ assert.equal(selfReads(), beforeLocalSetup + 1, 'installed checkout setup reads once even when delegated to a pinned launcher');
+ const changedCarry = await readFile(carry, 'utf8');
+ assert.equal(JSON.parse(changedCarry).name, 'synthetic-base-2');
+ assert.equal(await readFile(observed, 'utf8'), changedCarry, 'checkout setup sees the refresh before the pinned verb runs');
+ t.diagnostic(await checked('ls', ['-ld', join(app, '.rer/local'), carry])); t.diagnostic(changedCarry.trim());
+ const beforeHelp = selfReads();
+ await checked(rer, ['setup', '--help', '--cwd', app]);
+ await checked(rer, ['dev', '--help', '--cwd', app]);
+ await checked(rer, ['demo', '--help', '--cwd', app]);
+ assert.equal(selfReads(), beforeHelp, 'help and demo help never refresh');
+ await platform.close();
+ const unreachable = await run(rer, ['setup', '--cwd', app], { cwd: directory, env });
+ assert.equal(unreachable.code, 0, unreachable.stderr);
+ assert.equal(await readFile(carry, 'utf8'), changedCarry, 'unreachable platform leaves carry byte-identical');
+ const warnings = unreachable.stderr.trim().split('\n').filter(line => line.startsWith('Business carry at '));
+ assert.equal(warnings.length, 1); assert.ok(warnings[0].includes(platform.origin));
+ assert.ok(!unreachable.stderr.includes(platform.device)); t.diagnostic(warnings[0]);
+ await rm(carry);
+ const unpaired = await run(rer, ['setup', '--cwd', app], { cwd: directory, env: { ...env, RER_BUSINESS_STATE_DIR: join(directory, 'unpaired') } });
+ assert.equal(unpaired.code, 0, unpaired.stderr);
+ assert.ok(!await exists(carry), 'unpaired launch writes nothing');
+ assert.equal(await readFile(observed, 'utf8'), 'null');
+ t.diagnostic('unpaired setup: no carry; unreachable setup: exit 0 and unchanged bytes; repeated setup: unchanged bytes');
+
 
  const other = join(directory, 'other.git');
  await git(source, 'clone', '--quiet', '--bare', source, other);

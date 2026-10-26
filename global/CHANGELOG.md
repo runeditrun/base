@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Carry the paired Business name and display settings into local first-party apps at connect, setup and dev; refresh live apps while Business runs and remove the local carry on disconnect.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

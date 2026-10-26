@@ -145,6 +145,9 @@ export async function main(argv) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
   if (code !== undefined) return code;
  }
+ if (first && ['setup', 'dev'].includes(verb) && !argv.some(arg => ['--help', '-h', '--stop', '--demo'].includes(arg))) {
+  await (await import('../cli/business/carry.mjs')).refreshCheckout(target.root);
+ }
  if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target);
  // Every other server start or queued job on a vendored pin gets the person
  // defaults too (a pinned package applies its own).

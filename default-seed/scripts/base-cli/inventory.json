@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge628089b",
+  "cliVersion": "0.2.83",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -413,9 +413,13 @@
       "source": "cli/business/api.mjs",
       "sha256": "5848496a76ef1bf8b011bbeff66187ec75a5a7674a5860a91854acb489da47f9"
     },
+    "cli/business/carry.mjs": {
+      "source": "cli/business/carry.mjs",
+      "sha256": "2859b308dcaa3630b7dda94072fa4e35c5f7554d560090414a6bfcb9cb873fa8"
+    },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "791897875d8d1c5b8159cd35e33ee556e45d8674bea3e7643ae7c7b79b3fffcf"
+      "sha256": "3d134416a37796acfba0cbda5af9c5cc42c0b0946d3292346c4839fdc597cde3"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -459,11 +463,11 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "d11825b2f97efdd4fa806e82f79500ce1b2d77de34d0ae5c458028a6a74b8905"
+      "sha256": "ccb39bde44bd1c5fd7f531555de5b7cddf1ff05a701154d4ed876e37d812101e"
     },
     "cli/business/opt-ins.mjs": {
       "source": "cli/business/opt-ins.mjs",
-      "sha256": "c967f339730c8c9bb1d9b1a59ab7fb6d66486b73488596bd557ddc647b42f3b8"
+      "sha256": "07740c214d31aed13bbf190a86450b6abc817a85ccb95dab8bd464451aafcdfa"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -531,11 +535,11 @@
     },
     "cli/business/state.mjs": {
       "source": "cli/business/state.mjs",
-      "sha256": "8ef081cd97c3f1253703318974fed6e0013d5fee30fbda0d39eb2bf2febc1115"
+      "sha256": "c9d453fb281eabb9eb7f091975571e128cbb2e0d667605b112fe6b7f3307e958"
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "aba5214e581d25e50bc25b6b6588ef4f6a575873c86e877e449ada53d69a892b"
+      "sha256": "17fd57f5ed93781912e1d5bba7fa085da46ddc5b38a77896a683cb682532b57b"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

@@ -13,6 +13,7 @@ const later = seconds => new Date(Date.now() + seconds * 1000).toISOString();
 /** Network edge from platform b64ab7f5: executors/{pairing,tokens,tasks,mcp}.ts. */
 export async function server(t) {
  const state = { approved: false, requests: [], tasks: [], released: null, checkpoint: {}, uploads: [], phase: 'ready', fence: 0, grants: new Map(), claims: new Map() };
+ state.business = { id: 'biz', name: 'synthetic-base-1', legal_name: null, brand_color: '#264F45', logo_url: null };
  const device = 'bz_device_fixture-credential';
  const tokens = new Map(), tasks = taskStore(state);
  let redeemed = false, issued = false, tokenSequence = 0, origin, pairingExpires = 0;
@@ -136,7 +137,7 @@ export async function server(t) {
     if (request.method === 'GET') await state.onSelf?.();
     state.active = true;
     if (state.selfMissing) return send({}, 403);
-    if (request.method === 'GET') return send({ optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
+    if (request.method === 'GET') return send({ business: state.business, optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
     requireValue(request.method === 'DELETE', 405);
     if (state.revokeRefused) return send({}, 503);
     state.revoked = true; return send({ revoked: true });
@@ -166,6 +167,7 @@ export async function server(t) {
  });
  await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
  origin = `http://127.0.0.1:${http.address().port}`;
- t.after(() => new Promise(resolve => { http.close(resolve); http.closeAllConnections(); }));
- return { state, origin, device };
+ const close = () => !http.listening ? Promise.resolve() : new Promise(resolve => { http.close(resolve); http.closeAllConnections(); });
+ t.after(close);
+ return { state, origin, device, close };
 }
