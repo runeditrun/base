@@ -490,3 +490,19 @@ test('vendor exports strip credential values before upload, keeping every record
  const emitted = JSON.stringify([text, bundle, uptime.map(item => item.checkpoint), pagerduty.map(item => item.checkpoint)]);
  for (const secret of secrets) assert.ok(!emitted.includes(secret), 'no credential value is emitted for upload');
 });
+
+for (const [name, code, diagnostic, expected] of [
+ ['locked-keychain-status', 36, '', /locked/i],
+ ['missing-default-keychain', 155, 'security: SecKeychainItemCreateFromContent (<default>): The authorization was denied. (-60005)', /\$HOME/],
+]) test(`packed connect explains ${name} before redeeming a code`, async () => {
+ const home = join(directory, name), bin = join(home, 'bin');
+ await mkdir(bin, { recursive: true });
+ await writeFile(join(bin, 'security'), `#!/bin/sh\n${code === 155 ? '[ "$1" = find-generic-password ] && exit 44\n' : ''}cat >/dev/null\nprintf '%s' '${diagnostic}' >&2\nexit ${code}\n`, { mode: 0o755 });
+ const result = await cli(home, ['business', 'connect', '--code', 'ABCD-1234', '--origin', 'http://127.0.0.1:9'], {
+  env: { TEST_MACOS_KEYCHAIN: '1' }, path: `${bin}:${process.env.PATH}`,
+ });
+ assert.equal(result.code, 1);
+ assert.match(result.stderr, expected);
+ assert.match(result.stderr, /Nothing was sent/);
+ assert.deepEqual(await readdir(home), ['bin']);
+});
