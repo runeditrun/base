@@ -155,7 +155,12 @@ test('a fresh clone installs dependencies without credentials, and its deploy st
  for (const seen of scripts) {
   for (const name of Object.keys({ ...credentials, ...others })) assert.ok(!(name in seen), `${name} never reaches a dependency build script`);
   assert.ok(seen.PATH?.includes(process.env.PATH), 'PATH reaches the dependency build script');
-  for (const [name, value] of Object.entries({ HOME: environment().HOME, ...kept })) assert.equal(seen[name], value, `${name} reaches the dependency build script`);
+  for (const [name, value] of Object.entries({ HOME: environment().HOME, ...kept })) {
+   if (/^no_proxy$/i.test(name)) {
+    assert.deepEqual(new Set(seen[name].split(',')), new Set([...value.split(','), '127.0.0.1', 'localhost', '::1']), `${name} preserves entries and bypasses loopback`);
+   } else assert.equal(seen[name], value, `${name} reaches the dependency build script`);
+  }
+  assert.equal(seen.NODE_USE_ENV_PROXY, '1', 'child Node downloads retain environment proxy support');
   for (const [name, , stripped] of proxies) assert.equal(seen[name], stripped, `${name} reaches the install without its user:password`);
  }
 

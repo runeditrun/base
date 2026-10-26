@@ -9,7 +9,7 @@ import { credentialName, credentialValue } from './redaction.mjs';
 // The shell, locale, terminal and temporary folders, Node's own settings, and
 // the SSH agent a git+ssh dependency is fetched through. Kept whatever their
 // value looks like: a directory may resemble a token.
-const system = /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TMP|TEMP|TERM|LANG|LANGUAGE|LC_[A-Z]+|TZ|CI|SSH_AUTH_SOCK|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|XDG_[A-Z_]+)$/;
+const system = /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TMP|TEMP|TERM|LANG|LANGUAGE|LC_[A-Z]+|TZ|CI|SSH_AUTH_SOCK|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|NODE_USE_ENV_PROXY|XDG_[A-Z_]+)$/;
 // The install reaches its registry through these; any user:password is dropped.
 const proxy = /^(https?_proxy|all_proxy|no_proxy)$/i;
 // Package manager settings and rer's control variables, except credentials.
