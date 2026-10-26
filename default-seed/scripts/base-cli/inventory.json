@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.82-dev.gdbc68960",
+  "cliVersion": "0.2.82",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {

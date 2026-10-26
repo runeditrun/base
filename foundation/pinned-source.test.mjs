@@ -35,6 +35,11 @@ test('public foundation CLI preserves pinned workflows and requires their commit
     return output
   }
   try {
+    for (const name of await readdir(resolve(root, 'export'))) {
+      if (/\.ya?ml$/.test(name) || name === 'VERIFY-WORKFLOW.md') {
+        assert.doesNotMatch(await readFile(resolve(root, 'export', name), 'utf8'), /^\s*runs-on:\s*ubuntu-latest\b/m, name)
+      }
+    }
     for (const path of new Set([...sourceRoots, 'foundation', 'onboarding', 'export'])) {
       await cp(resolve(root, path), resolve(base, path), { recursive: true })
     }

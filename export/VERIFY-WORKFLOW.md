@@ -16,6 +16,9 @@ The two workflows use the same declared shards:
 
 Release tags use Nightly journeys' full coverage. The nightly workflow calls Verify with the full tier. Verify plans its matrix
 from `verification.json`, then runs the shards in parallel on Ubuntu 24.04.
+Seed workflow images are pinned to `ubuntu-24.04` because the Ubuntu 26.04 default
+changed the free-volume floor, Playwright's Chromium set and Android SDK paths;
+moving to 26.04 requires deliberate qualification, not a default-image upgrade.
 Push shards have a 12-minute timeout; the nightly workflow allows longer for the
 full installation journeys. The final `verify` aggregate remains the stable
 required check as shard names change. It succeeds only when planning and every
@@ -448,7 +451,7 @@ the helper requires to have succeeded, already ran it on that SHA's lanes:
   verify:
     if: always()
     needs: [main-verify, checks, runtime, browser, admission, hosted, journeys]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every verification lane or the authorized main skip

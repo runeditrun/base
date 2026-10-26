@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Pin every seed workflow example to Ubuntu 24.04 so Ubuntu 26.04 adoption requires deliberate qualification.
+
 ## 0.2.82
 
 - Deliver the accepted import-door intake implementation and its runtime and type dependencies at `@runeditrun/rer/modules/import-kit/door`, preserving the D1 entry.
