@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Honour environment proxies for Node and pnpm downloads, preserve proxy bypass entries and always bypass loopback; clearly refuse proxy downloads on Node versions without native proxy support.
+- Treat zombie children as exited during bounded process cleanup, allowing living parents to finish cleanup.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.

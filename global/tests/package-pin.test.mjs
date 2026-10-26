@@ -49,7 +49,7 @@ const proxies = [
  ['HTTPS_PROXY', 'http://fixture:synthetic-password@proxy.invalid:3128', 'http://proxy.invalid:3128'],
  ['http_proxy', 'http://fixture:synthetic pass word@proxy.invalid:3128', 'http://proxy.invalid:3128'],
  ['ALL_PROXY', '  socks5://fixture:synthetic@password@proxy.invalid:1080', 'socks5://proxy.invalid:1080'],
- ['https_proxy', 'fixture:synthetic-password@proxy.invalid:3128', 'proxy.invalid:3128'],
+ ['https_proxy', 'http://fixture:synthetic-password@proxy.invalid:3128', 'http://proxy.invalid:3128'],
 ];
 const proxy = Object.fromEntries(proxies.map(([name, value]) => [name, value]));
 
@@ -147,16 +147,43 @@ test('offline release file operations skip checkout installation while the produ
 
 test('a fresh clone installs dependencies without credentials, and its deploy still receives them', { timeout: 240_000 }, async () => {
  const { root, records } = await seed('fresh', versions.first);
+ // Exercise this runtime's proxy contract rather than switching to the seed pin.
+ const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+ pkg.engines.node = process.versions.node;
+ await writeFile(join(root, 'package.json'), JSON.stringify(pkg));
+ await writeFile(join(root, '.node-version'), process.versions.node + '\n');
  assert.ok(!existsSync(join(root, 'node_modules')), 'nothing is installed yet');
- const installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment({ ...credentials, ...others, ...kept, ...proxy }) });
+ const [major, minor] = process.versions.node.split('.').map(Number);
+ const nativeProxy = (major === 22 && minor >= 21) || major >= 24;
+ let installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment({ ...credentials, ...others, ...kept, ...proxy }) });
+ if (!nativeProxy) {
+  assert.notEqual(installed.code, 0);
+  assert.match(installed.stderr, /Proxy downloads require Node/);
+  assert.equal((await recorded(records, 'install')).length, 0, 'unsupported Node refuses before dependency scripts run');
+  assert.ok(!existsSync(join(root, 'node_modules')), 'refusal precedes dependency installation');
+  const setup = await run(process.execPath, [launcher, 'setup', '--owner-email', 'fixture@example.test', '--non-interactive'], { cwd: root, env: environment({ ...proxy }) });
+  assert.notEqual(setup.code, 0);
+  assert.match(setup.stderr, /Proxy downloads require Node/);
+  assert.equal((await recorded(records, 'install')).length, 0, 'setup also refuses before dependency scripts run');
+  installed = await run(process.execPath, [launcher, 'install', '--non-interactive'], { cwd: root, env: environment({ ...credentials, ...others, ...kept }) });
+ }
  assert.equal(installed.code, 0, installed.stderr);
  const scripts = await recorded(records, 'install');
  assert.ok(scripts.length >= 1, 'the dependency build script ran');
  for (const seen of scripts) {
   for (const name of Object.keys({ ...credentials, ...others })) assert.ok(!(name in seen), `${name} never reaches a dependency build script`);
   assert.ok(seen.PATH?.includes(process.env.PATH), 'PATH reaches the dependency build script');
-  for (const [name, value] of Object.entries({ HOME: environment().HOME, ...kept })) assert.equal(seen[name], value, `${name} reaches the dependency build script`);
-  for (const [name, , stripped] of proxies) assert.equal(seen[name], stripped, `${name} reaches the install without its user:password`);
+  for (const [name, value] of Object.entries({ HOME: environment().HOME, ...kept })) {
+   if (nativeProxy && /^no_proxy$/i.test(name)) {
+    assert.deepEqual(new Set(seen[name].split(',')), new Set([...value.split(','), '127.0.0.1', 'localhost', '::1']), `${name} preserves entries and bypasses loopback`);
+   } else assert.equal(seen[name], value, `${name} reaches the dependency build script`);
+  }
+  if (nativeProxy) {
+   assert.equal(seen.NODE_USE_ENV_PROXY, '1', 'child Node downloads retain environment proxy support');
+   for (const [name, , stripped] of proxies) assert.equal(seen[name], stripped, `${name} reaches the install without its user:password`);
+  } else {
+   for (const [name] of proxies) assert.ok(!(name in seen), `${name} stays unset for the unproxied install`);
+  }
  }
 
  const deployed = await run(process.execPath, [launcher, 'deploy', '--non-interactive'], { cwd: root, env: environment(credentials) });

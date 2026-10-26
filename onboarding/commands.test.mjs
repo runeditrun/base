@@ -1,3 +1,4 @@
+import { readProcessIdentity } from './process-table.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -174,7 +175,7 @@ test('closing a command after a buffered credential prefix keeps every sink priv
  }
 });
 
-test('supervisor exit during descendant cancellation succeeds only after the owned group disappears', async t=>{
+test('supervisor exit during descendant cancellation succeeds only after owned processes have exited', async t=>{
  const f=await fixture(t);
  // Reparenting must never turn the fixture's supervisor signal into a signal
  // to the host/container init process.
@@ -185,5 +186,8 @@ test('supervisor exit during descendant cancellation succeeds only after the own
  while(!f.terminal().includes('LEAF_READY')&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));
  const pid=Number(/LEAF_READY (\d+)/.exec(f.terminal())?.[1]);assert.ok(pid);
  await f.store.stop(child);
- for(const owned of [child.pid,pid])assert.throws(()=>process.kill(owned,0),error=>error.code==='ESRCH');
+ for(const owned of [child.pid,pid]){
+  const member=await readProcessIdentity(owned);
+  assert.ok(!member||member.state.startsWith('Z'),'owned process has exited');
+ }
 });
