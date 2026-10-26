@@ -446,12 +446,14 @@ The owner chooses three things on the computer's row in the browser: "Add rules
 so Claude Code never reads your secret files" (Claude Code user Read deny
 rules), "Keep this computer awake while it works" (export-scoped macOS wake
 prevention) and "Install the background service" (a launchd or systemd user
-service). Connect reads them as `optIns` from device-authenticated
+service). Connect, run and next read them as `optIns` from device-authenticated
 `GET /api/business/executors/self`, with keys `installPermissions`,
 `awakeConsent` and `installService`; the CLI prints only the sentences. Only
 `true` enables an option. Undecided (`null`) options are listed with a browser
 link; an older server without this route (it answers 403 or 404) leaves all
-options undecided. Run connect again after the owner decides. The first
+options undecided. After the owner decides, run `rer business next` to apply
+the choices and see the next task. `rer business run` also applies the latest
+choices before working tasks. The first
 device-authenticated request happens after both the credential and local
 pairing state are stored, so a storage failure cannot activate the computer.
 A service installed with `RER_BUSINESS_STATE_DIR` set keeps that folder. Background
