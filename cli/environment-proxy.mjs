@@ -13,18 +13,24 @@ export function proxyEnvironment(env = process.env) {
 }
 
 // NODE_USE_ENV_PROXY is unavailable on the project's 22.20.0 pin. Do not
-// silently attempt direct downloads on that runtime. No pin is changed here.
-export function requireDownloadProxySupport() {
- if (!proxied(process.env)) return;
+// silently attempt direct downloads on that runtime. Node documents support
+// from 22.21.0 and 24.0.0; no project pin is changed here.
+export function requireDownloadProxySupport(env = process.env) {
+ if (!proxied(env)) return;
  const [major, minor] = process.versions.node.split('.').map(Number);
  if (!((major === 22 && minor >= 21) || major >= 24)) {
-  throw Error('Proxy downloads require Node 22.21.0 or Node 24 or later; this Node does not support NODE_USE_ENV_PROXY. Install a supported Node runtime before retrying, or preinstall the project tools.');
+  throw Error('Proxy downloads require Node 22.21.0 or Node 24 or later; this Node does not support NODE_USE_ENV_PROXY. Install a supported Node runtime before retrying.');
  }
- if (process.env.NODE_USE_ENV_PROXY !== '1') throw Error('Proxy downloads must start through the rer command with NODE_USE_ENV_PROXY=1.');
+ if (env.NODE_USE_ENV_PROXY !== '1') throw Error('Proxy downloads must start through the rer command with NODE_USE_ENV_PROXY=1.');
 }
 
 export async function startWithEnvironmentProxy(argv) {
  const env = proxyEnvironment();
+ // Both public dispatchers enter here before tool probes, installer scripts,
+ // dependency installs or project commands can launch a downloading child.
+ // Check even when the tools are already cached and no restart is needed.
+ try { requireDownloadProxySupport(env); }
+ catch (error) { process.stderr.write(error.message + '\n'); return { exitCode: 1 }; }
  if (env === process.env || ['NODE_USE_ENV_PROXY', 'NO_PROXY', 'no_proxy'].every(name => env[name] === process.env[name])) return;
  const child = spawn(process.execPath, [...process.execArgv, process.argv[1], ...argv], { env, stdio: 'inherit' });
  const handlers = new Map(['SIGINT', 'SIGTERM'].map(signal => [signal, () => child.kill(signal)]));

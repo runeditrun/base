@@ -6,7 +6,7 @@ import { connect } from 'node:net';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { exportReference } from '../scripts/export-reference.mjs';
@@ -40,8 +40,11 @@ test('rer downloads use the environment proxy and its child Node bypasses loopba
  const local = httpServer((_req, res) => { localRequests++; res.end('loopback'); });
  const localPort = await listen(local);
  t.after(async () => { for (const socket of sockets) socket.destroy(); for (const server of [edge, proxy, local]) { server.closeAllConnections?.(); await new Promise(resolve => server.close(resolve)); } });
- const clean = { ...process.env, CI: 'true', RER_NO_UPDATE_CHECK: '1', NODE_EXTRA_CA_CERTS: join(directory, 'cert.pem') };
- for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'NO_PROXY', 'no_proxy', 'NODE_USE_ENV_PROXY']) delete clean[name];
+ // Only real, required executables are visible: never inherit a matching pnpm,
+ // runtime cache selectors, package-manager settings or Node startup flags.
+ const tools = join(directory, 'bin'); await mkdir(tools);
+ for (const [name, binary] of [['node', process.execPath], ['sh', '/bin/sh'], ['tar', '/usr/bin/tar']]) await symlink(binary, join(tools, name));
+ const clean = { PATH: tools, TMPDIR: directory, CI: 'true', RER_NO_UPDATE_CHECK: '1', NODE_EXTRA_CA_CERTS: join(directory, 'cert.pem') };
  async function run(args, proxyOn) {
   const home = join(directory, 'home-' + Math.random()); await mkdir(home);
   const env = { ...clean, HOME: home, ...(proxyOn ? { HTTPS_PROXY: `http://127.0.0.1:${proxyPort}`, NO_PROXY: 'example.invalid', no_proxy: 'another.invalid' } : {}) };
@@ -49,6 +52,7 @@ test('rer downloads use the environment proxy and its child Node bypasses loopba
   let output = ''; child.stdout.on('data', data => { output += data; }); child.stderr.on('data', data => { output += data; });
   const timer = setTimeout(() => child.kill('SIGTERM'), 20000);
   const [code] = await once(child, 'exit'); clearTimeout(timer);
+  t.diagnostic(`${args[0]} proxy=${proxyOn ? 'set' : 'unset'} Node=${process.versions.node} exit=${code} CONNECTs=${tunnels.length}; ${output.trim().replaceAll('\n', ' | ').slice(-1200)}`);
   return { code, output };
  }
  async function nodePin(version) {
@@ -66,24 +70,47 @@ test('rer downloads use the environment proxy and its child Node bypasses loopba
  if (!((major === 22 && minor >= 21) || major >= 24)) {
   assert.match(selected.output, /Proxy downloads require Node/);
   assert.equal(tunnels.length, before, 'unsupported Node refuses instead of silently fetching directly');
-  return;
+ } else {
+  assert.match(selected.output, /checksum/i);
+  assert.ok(paths.some(path => path.endsWith('SHASUMS256.txt')));
+  assert.ok(paths.some(path => path.endsWith('.tar.gz')));
+  assert.ok(tunnels.includes('nodejs.org:443'));
+  await nodePin(process.versions.node);
+  const pnpm = await run(['install'], true);
+  assert.notEqual(pnpm.code, 0);
+  assert.ok(paths.some(path => path.startsWith('/pnpm/') && !path.endsWith('.tgz')), pnpm.output);
+  assert.ok(paths.some(path => path.endsWith('.tgz')), pnpm.output);
+  assert.match(pnpm.output, /integrity verification failed/);
+  assert.ok(tunnels.includes('registry.npmjs.org:443'));
  }
- assert.match(selected.output, /checksum/i);
- assert.ok(paths.some(path => path.endsWith('SHASUMS256.txt')));
- assert.ok(paths.some(path => path.endsWith('.tar.gz')));
- assert.ok(tunnels.includes('nodejs.org:443'));
- await nodePin(process.versions.node);
- const pnpm = await run(['install'], true);
- assert.notEqual(pnpm.code, 0);
- assert.ok(paths.some(path => path.startsWith('/pnpm/') && !path.endsWith('.tgz')), pnpm.output);
- assert.ok(paths.some(path => path.endsWith('.tgz')), pnpm.output);
- assert.match(pnpm.output, /integrity verification failed/);
- assert.ok(tunnels.includes('registry.npmjs.org:443'));
  // A genuine independently authored operation exercises the same rer child
  // environment, including the two preserved bypass lists and local fetch.
  const descriptor = { version: 2, project: 'example/proxy', runtime: { requirements: [] }, requiredEnvironment: [], commands: { setup: { argv: ['node', 'loopback.mjs'], inputs: ['loopback.mjs'], effects: 'Fetch loopback through a real Node child.' } } };
  await writeFile(join(root, 'loopback.mjs'), `const r=await fetch('http://127.0.0.1:${localPort}');if(await r.text()!=='loopback')process.exit(1);for(const name of ['NO_PROXY','no_proxy'])for(const host of ['127.0.0.1','localhost','::1','example.invalid','another.invalid'])if(!process.env[name].split(',').includes(host))process.exit(2);`);
  // The independent descriptor runs the operation without acquiring project pnpm.
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(descriptor));
+ await nodePin(process.versions.node);
+ // A warm runtime must not let setup dispatch an unguarded downloading child.
+ await writeFile(join(root, 'download.mjs'), `console.log('CHILD_DOWNLOAD_STARTED');try{const r=await fetch('https://registry.npmjs.org/child-download',{signal:AbortSignal.timeout(2000)});console.log('CHILD_DOWNLOAD_COMPLETE',r.status)}catch{console.error('CHILD_DOWNLOAD_FAILED');process.exitCode=9}`);
+ descriptor.commands.setup.argv = ['node', 'download.mjs'];
+ descriptor.commands.setup.inputs = ['download.mjs'];
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(descriptor));
+ const setupBefore = tunnels.length;
+ const setupAbsent = await run(['setup'], false);
+ assert.match(setupAbsent.output, /CHILD_DOWNLOAD_STARTED/);
+ assert.equal(tunnels.length, setupBefore, 'unset setup sends no traffic to the logging proxy');
+ const setup = await run(['setup'], true);
+ if (!((major === 22 && minor >= 21) || major >= 24)) {
+  assert.match(setup.output, /Proxy downloads require Node/);
+  assert.doesNotMatch(setup.output, /CHILD_DOWNLOAD_STARTED/, 'unsupported setup refuses before starting a child download');
+  assert.equal(tunnels.length, setupBefore);
+  return;
+ }
+ assert.equal(setup.code, 0, setup.output);
+ assert.match(setup.output, /CHILD_DOWNLOAD_COMPLETE/);
+ assert.ok(tunnels.length > setupBefore, 'setup child download reaches the proxy');
+ descriptor.commands.setup.argv = ['node', 'loopback.mjs'];
+ descriptor.commands.setup.inputs = ['loopback.mjs'];
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(descriptor));
  const prior = tunnels.length;
  const loopback = await run(['setup'], true);
