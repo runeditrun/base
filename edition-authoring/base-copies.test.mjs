@@ -451,6 +451,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
           record.copies[0].revision = baseline;
           record.copies[0].files[target] = sha(incoming);
           write(seed, 'base-copies.json', JSON.stringify(record));
+          write(base, 'modules/sample/index.mjs', incoming.replace('?raw', '?changed'));
         }
         commit(seed);
       }

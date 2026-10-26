@@ -21,7 +21,7 @@ export function specifiers(source) {
         if (tokens[j] === 'from') { value = literal(tokens[j + 1]); break; }
       }
     }
-    if (value) result.push(value);
+    if (value) result.push(value.split('?')[0]);
   }
   return result;
 }
@@ -50,7 +50,7 @@ export function bindings(source) {
     let end = i + 1;
     while (end < t.length && ![';', 'import', 'export'].includes(t[end]) && t[end] !== 'from') end++;
     if (t[end] !== 'from') continue;
-    const specifier = unquote(t[end + 1]);
+    const specifier = unquote(t[end + 1])?.split('?')[0];
     if (!specifier?.startsWith('.')) continue;
     const names = new Set(result.get(specifier) ?? []);
     let start = i + 1;

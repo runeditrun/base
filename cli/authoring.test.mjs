@@ -215,12 +215,13 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   old('record-base', 'vendor', 'module', pin, '--base', source);
   old('record-base', 'one.mjs', 'singleton.mjs', pin, '--base', source);
   if (alias === 'namespace') {
-   write(source, 'export/caller.yml', 'jobs:\n  check:\n    uses: ./.github/workflows/verify.yml\n');
+   write(source, 'export/caller.yml', 'jobs:\n  check:\n    uses: ./.github/workflows/verify.yml\n  paths:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: echo scripts/.github/workflows/verify.yml\n');
    const next = commit(source);
    write(seed, '.github/workflows/caller.yml', fs.readFileSync(path.join(source, 'export/caller.yml')));
    old('record-base', '.github/workflows/caller.yml', 'export/caller.yml', next, '--base', source);
    result('refresh-base', '--ref', next, '--base', source);
    assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), original);
+   assert.equal(fs.existsSync(path.join(seed, 'scripts/.github/workflows/verify.yml')), false);
    continue;
   }
   write(seed, workflow, original);

@@ -98,7 +98,7 @@ function candidates(source, invoked) {
   if (invoked.startsWith('.github/workflows/')) return ['export/' + path.posix.basename(invoked), 'default-seed/' + invoked];
   if (source.startsWith('default-seed/')) return ['default-seed/' + invoked];
   if (source.startsWith('export/')) return ['export/' + invoked.replace(/^scripts\//, ''), 'default-seed/' + invoked,
-    ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])].filter(name => !name.startsWith('scripts/'));
+    ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])].filter(name => !name.startsWith('scripts/') && !name.startsWith('.github/workflows/'));
   return [];
 }
 
