@@ -13,13 +13,17 @@ function save(address: string) {
     providerId: 'receiver', destinationId: 'events', destinationUrl: literalUrl(address), secrets: {},
   });
 }
-for (const address of deniedAddresses) {
-  test(`public-address policy rejects ${address}`, () => assert.equal(isPublicAddress(address), false));
-  test(`literal configuration rejects ${address}`, () => {
-    assert.throws(() => validateDestination(literalUrl(address)), /not public/);
-    assert.throws(() => save(address), /Invalid public HTTPS egress destination/);
-  });
-}
+// Every range endpoint and spelling remains a security assertion. Register each
+// boundary once; the address table is one refusal behaviour, not separate flows.
+test('public-address policy rejects every denied range endpoint and spelling', () => {
+  for (const address of deniedAddresses) assert.equal(isPublicAddress(address), false, address);
+});
+test('literal configuration rejects every denied range endpoint and spelling', () => {
+  for (const address of deniedAddresses) {
+    assert.throws(() => validateDestination(literalUrl(address)), /not public/, address);
+    assert.throws(() => save(address), /Invalid public HTTPS egress destination/, address);
+  }
+});
 test('public controls remain valid for the portable guard and saved egress configuration', () => {
   for (const address of publicAddresses) {
     assert.equal(isPublicAddress(address), true, address);
@@ -27,13 +31,13 @@ test('public controls remain valid for the portable guard and saved egress confi
     assert.equal(save(address).destinationId, 'events');
   }
 });
-for (const address of ['0177.0.0.1', '010.0.0.1', '08.8.8.8', '8.08.8.8', '8.8.08.8',
-  '8.8.8.08', '8.00.0.1', '8.0.000.1', '8.8.8.0000', '0008.8.8.8', '８.８.８.８',
-  '8\n.8.8.8', '8.8\n.8.8', '8.8.8\n.8', '8.8.8.8\n', '8.8.8.8\r']) {
-  test(`portable guard rejects noncanonical IPv4 ${address}`, () => {
-    assert.equal(isPublicAddress(address), false);
-  });
-}
+test('portable guard rejects noncanonical IPv4 spellings', () => {
+  for (const address of ['0177.0.0.1', '010.0.0.1', '08.8.8.8', '8.08.8.8', '8.8.08.8',
+    '8.8.8.08', '8.00.0.1', '8.0.000.1', '8.8.8.0000', '0008.8.8.8', '８.８.８.８',
+    '8\n.8.8.8', '8.8\n.8.8', '8.8.8\n.8', '8.8.8.8\n', '8.8.8.8\r']) {
+    assert.equal(isPublicAddress(address), false, address);
+  }
+});
 test('canonical decimal IPv4 and single-zero octets retain their public/private policy', () => {
   for (const address of ['177.0.0.1', '8.0.0.1', '8.8.8.0']) {
     assert.equal(isPublicAddress(address), true, address);
