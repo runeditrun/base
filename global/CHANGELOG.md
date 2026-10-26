@@ -8,6 +8,11 @@
 - Check the packed door lifecycle and refresh pinned Pegboard, Pencil, Dial, Placemat and Envelope checkouts before package publication, resolving every direct authoring module's relative imports, running local and package verification and requiring byte-identical records on repeat.
 - To adopt with a copied authoring CLI predating 0.2.82, update the installed package and run `rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout` through that package.
 
+### Known issues
+
+- For a Base-equal untracked, ignored or excluded authoring helper, the suggested `git add -f` followed by refresh can leave `verify-base` reporting `unrecordedCopies`; from the seed root, run `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base LOCAL_PATH ORIGIN_PATH FULL_40_HEX_COMMIT --base /absolute/base-checkout`, then the same entry's `verify-base --base /absolute/base-checkout`. Corrected refusal text ships in 0.2.83.
+- On case-insensitive APFS, the suggested `mv -i` for a Base-equal committed `Copy-Checkout.mjs` can leave the old Git index spelling, so refresh succeeds but verification fails; move its `.refresh-backup` outside the checkout, run `git rm --cached -- PATH/Copy-Checkout.mjs` and `git add -- PATH/copy-checkout.mjs base-copies.json`, then verify again. This preserves both the backup and delivered bytes; corrected refusal text ships in 0.2.83.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.
