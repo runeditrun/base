@@ -10,7 +10,7 @@ async function setup(t,options={}) {
   const source=await runtime(t);await seed(source);const bundle=await archive(await source.connect()),target=await runtime(t,options),service=await target.connect();
   return {source,bundle,target,service};
 }
-async function stage(service,bundle) {const id=await service.imports.create(bundle.manifest);for(const p of bundle.parts)await service.imports.uploadPart(id,p.index,p);return id;}
+async function stage(service,bundle) {const id=await service.imports.create(bundle.manifest,undefined,{acknowledgeUnverifiedSchemaObjects:true});for(const p of bundle.parts)await service.imports.uploadPart(id,p.index,p);return id;}
 async function interruptedLedger(db) {
   await db.batch([db.prepare(createLedger),db.prepare("INSERT INTO d1_migrations(name,sha256,state) VALUES('001_schema.sql',?,'applying')").bind('a'.repeat(64))]);
 }
@@ -21,7 +21,7 @@ async function refusesUncertainImport(service,bundle,target) {
     ...tables.map(table=>target.db.prepare('SELECT * FROM "'+table+'"')),
   ])).map(result=>result.results);
   const before=await snapshot();
-  await assert.rejects(service.imports.create(bundle.manifest),e=>e.code==='schema_mismatch:uncertain_migrations' && e.status===409);
+  await assert.rejects(service.imports.create(bundle.manifest,undefined,{acknowledgeUnverifiedSchemaObjects:true}),e=>e.code==='schema_mismatch:uncertain_migrations' && e.status===409);
   assert.deepEqual(await snapshot(),before,'refusal preserves schema, ledger, jobs, lock and data');
   assert.equal((await target.bucket.list()).objects.length,0);
 }
@@ -37,7 +37,7 @@ test('import refuses a non-empty bucket without claiming or deleting keys',async
   await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/bucket_not_empty/);assert.equal(await (await target.bucket.get('small')).text(),'foreign');
   assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_owned').first()).n,0);
 });
-test('wrong products are refused',async t=>{const {bundle,service}=await setup(t);const m={...bundle.manifest,product:'other'};await assert.rejects(service.imports.create(m),/wrong_product/);});
+test('wrong products are refused',async t=>{const {bundle,service}=await setup(t);const m={...bundle.manifest,product:'other'};await assert.rejects(service.imports.create(m,undefined,{acknowledgeUnverifiedSchemaObjects:true}),/wrong_product/);});
 test('schema mismatches are refused and an explicit earlier schema upgrades rows',async t=>{
   const source=await runtime(t);await seed(source);await source.db.prepare('ALTER TABLE heap ADD COLUMN extra TEXT').run();const bundle=await archive(await source.connect()),target=await runtime(t);
   await assert.rejects((await target.connect()).imports.create(bundle.manifest),/schema_mismatch/);
@@ -69,7 +69,7 @@ test('uploads enforce order, checksums, declared columns, types and NOT NULL',as
   await assert.rejects(service.imports.uploadPart(id,0,await makePart(0,[{...item,row:{...item.row,enabled:'x'}}])),/unsafe_integer/);
 });
 test('finalize requires all parts and the archive binding before publishing',async t=>{
-  const {bundle,service,target}=await setup(t),manifest={...bundle.manifest,sourceIdentity:bundle.manifest.sourceIdentity+'-altered'},id=await service.imports.create(manifest);await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/parts_missing/);
+  const {bundle,service,target}=await setup(t),manifest={...bundle.manifest,sourceIdentity:bundle.manifest.sourceIdentity+'-altered'},id=await service.imports.create(manifest,undefined,{acknowledgeUnverifiedSchemaObjects:true});await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/parts_missing/);
   for(const p of bundle.parts)await service.imports.uploadPart(id,p.index,p);
   await assert.rejects(service.imports.finalize(id),/archive_checksum/);
   await assert.rejects(service.imports.finalize(id,{archiveHash:'0'.repeat(64)}),/archive_checksum/);
