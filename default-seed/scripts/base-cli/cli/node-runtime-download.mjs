@@ -1,3 +1,4 @@
+import { requireDownloadProxySupport } from './environment-proxy.mjs';
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { chmod, mkdtemp, readFile, rename, rm } from 'node:fs/promises';
@@ -9,6 +10,7 @@ import { matchesRuntime } from './node-runtime-discovery.mjs';
 import { prepareNodeCache, runtimeBinary, runtimeName, recordRuntime, cachedRuntime, tidyRuntime } from './node-runtime-cache.mjs';
 
 async function download(url, destination, limit, signal) {
+ requireDownloadProxySupport();
  const response = await fetch(url, { signal, redirect: 'error' });
  if (!response.ok || !response.body) throw Error('The official Node release could not be downloaded.');
  let bytes = 0;

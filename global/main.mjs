@@ -1,3 +1,4 @@
+import { startWithEnvironmentProxy } from '../cli/environment-proxy.mjs';
 import { checkoutBootstrap, checkoutVerbs } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
@@ -49,6 +50,8 @@ Checkout verbs: ${Object.keys(checkoutVerbs).join(', ')}, listing. Run rer VERB 
 `;
 
 export async function main(argv) {
+ const proxyChild = await startWithEnvironmentProxy(argv);
+ if (proxyChild) return proxyChild.exitCode;
  handleBrokenPipes();
  const [verb] = argv;
  const installsFirst = checkoutBootstrap(argv) === 'before';

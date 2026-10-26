@@ -31,7 +31,7 @@ export async function selectNodeRuntime(options, argv, out) {
    catch (error) {
     if (termination) return { exitCode: termination === 'SIGINT' ? 130 : 143 };
     if (error instanceof RerError) throw error;
-    const reason = /unavailable on this platform/.test(error.message) ? error.message : /checksum/.test(error.message) ? 'Official release checksum verification failed.' : 'The exact official release could not be acquired within 60 seconds; check the connection and available disk space.';
+    const reason = /unavailable on this platform|Proxy downloads/.test(error.message) ? error.message : /checksum/.test(error.message) ? 'Official release checksum verification failed.' : 'The exact official release could not be acquired within 60 seconds; check the connection and available disk space.';
     throw missing(`Node ${version} is required. ${reason} With network access, run: ${command} (repeat any original options privately).`);
    }
   }

@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
-import { readProcessTable, sameBirth } from './process-table.mjs'
+import { readProcessIdentity, readProcessTable, sameBirth } from './process-table.mjs'
 
 const transient = () => Object.assign(new Error('Could not read process identities.'), { transient: true })
 const table = [{ pid: 4242, ppid: 1, pgid: 4242, uid: 501, state: 'S', birth: 'Thu Oct 15 12:30:00 2026' }]
@@ -47,7 +47,8 @@ test('a slow process table does not fail a passing run and its stray child is st
     for (const row of (await readProcessTable(100, undefined, slow, 10000)).filter(row => owned.some(old => sameBirth(old, row)))) process.kill(row.pid, 'SIGTERM')
     const gone = Date.now() + 10000
     while ((await readProcessTable(100, undefined, slow, 10000)).some(row => owned.some(old => sameBirth(old, row)) && !row.state.startsWith('Z')) && Date.now() < gone) await delay(50)
-    assert.throws(() => process.kill(stray, 0), { code: 'ESRCH' }, 'the stray child was stopped')
+    const stopped = await readProcessIdentity(stray)
+    assert.ok(!stopped || stopped.state.startsWith('Z'), 'the stray child has exited')
     await delay(0)
     assert.ok(warnings.length > 0, 'the slow inspection was reported as a warning')
   } finally {

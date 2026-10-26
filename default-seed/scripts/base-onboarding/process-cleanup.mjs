@@ -38,12 +38,14 @@ export async function stopOwnedGroup(child, signal, ownership) {
   const snapshot = async () => {
     const current = await inspect(inspectionMs)
     lastGroup = current
-    return current
+    // Zombies have exited; only a living parent can reap them. They must not
+    // block completion or keep a living parent from becoming a cleanup leaf.
+    return current.filter(member => !isZombie(member))
   }
   const send = async (member, name, requireLeaf = true) => {
     // Recheck both identity and children immediately before each numeric PID
     // signal. Never send a negative/group signal that can kill parents first.
-    const current = requireLeaf ? await readProcessTable(inspectionMs) : []
+    const current = requireLeaf ? (await readProcessTable(inspectionMs)).filter(member => !isZombie(member)) : []
     const target = await readProcessIdentity(member.pid, inspectionMs)
     if (!sameBirth(member, target) || isZombie(target)) return false
     if (requireLeaf && !isLeaf(target, current)) return false
