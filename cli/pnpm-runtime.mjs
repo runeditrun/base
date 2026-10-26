@@ -1,3 +1,4 @@
+import { requireDownloadProxySupport } from './environment-proxy.mjs';
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -53,6 +54,7 @@ export async function cachedPnpm(version, env = process.env) {
 }
 
 async function download(url, destination, limit, signal) {
+ requireDownloadProxySupport();
  const response = await fetch(url, { signal, redirect: 'error' });
  if (!response.ok || !response.body) throw Error('The pnpm release could not be downloaded.');
  let bytes = 0;
