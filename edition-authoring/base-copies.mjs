@@ -347,6 +347,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
   const files = seedFiles(root);
   requireMaterializedCopies(root, record, files);
   const origin = open(record, base, root, offline);
+  let writing = false;
   try {
     const read = reader(origin);
     const next = read.tree(revision);
@@ -415,6 +416,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
     preflightRefresh(root, plans, recordPath, files);
     const changes = [];
+    writing = true;
     for (const {copy, sources, removed} of plans) {
       for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }
       const recorded = {}, modes = {}, added = [];
@@ -440,5 +442,8 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     validate(record);
     fs.writeFileSync(filename, json(record));
     return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, withheld, editionMigrations: migrations.map(({id, guide, edit, copies}) => ({id, guide, edit, copies})), ...templates, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+  } catch (error) {
+    if (!writing && !/no files were refreshed/i.test(error.message)) error.message += ' No files were refreshed.';
+    throw error;
   } finally { origin.close(); }
 }

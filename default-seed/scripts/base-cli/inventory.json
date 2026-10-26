@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g3d708286",
+  "cliVersion": "0.2.83-dev.gdc6999ab",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1175,7 +1175,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "f10b03daca5918f6069fde4e5b693460c3c991867abc8113ec776c09a3368a35"
+      "sha256": "ff2e056b6db7aaa482b41c162da180d39619431905f4674ac34bac7fcdf6fb88"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1191,7 +1191,7 @@
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
-      "sha256": "e55778bc0210721db25c8783e9934335498549eb72986ff9b26abc064857d3aa"
+      "sha256": "d7ae0e5dc877e9ac307f52809ea830591b078a2891afd85be9663ee74d9884f9"
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",

@@ -66,9 +66,13 @@ export function physicalEntry(root, name, {cache = new Map(), freed = () => fals
 }
 export function requirePhysical(root, name, options) {
   const entry = physicalEntry(root, name, options);
-  if (entry.kind === 'symlink') throw Error(`Symlink in destination path: ${name} (${entry.path}); move the link outside the checkout and restore its indexed path before repeating refresh-base; no files were refreshed.`);
-  if (entry.kind === 'non-regular') throw Error(`Base copy record or destination is not a regular file: ${name}; move it outside the checkout and restore its indexed path before repeating refresh-base; no files were refreshed.`);
-  if (entry.kind) throw Error(`Cannot refresh ${name}: ${entry.kind} at ${entry.physical ?? entry.path}. Move that physical entry aside, then run git restore -- ${JSON.stringify(name)} and repeat refresh-base; no files were refreshed.`);
+  if (entry.kind) {
+    const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+    const indexed = raw(root, '--literal-pathspecs', 'ls-files', '--', entry.path).length > 0;
+    const command = `backup=$(mktemp -d) && mv -- ${quote(entry.physical ?? entry.path)} "$backup/"${indexed ? ' && git restore -- ' + quote(entry.path) : ''}`;
+    const reason = entry.kind === 'symlink' ? 'Symlink in destination path' : entry.kind === 'non-regular' ? 'destination is not a regular file' : entry.kind;
+    throw Error(`Cannot refresh ${name}: ${reason} at ${entry.physical ?? entry.path}. Run ${command}, then repeat refresh-base; no files were refreshed.`);
+  }
   return entry;
 }
 export function noLinks(root, relative) {
