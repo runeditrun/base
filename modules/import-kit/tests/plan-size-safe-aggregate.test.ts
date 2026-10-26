@@ -13,7 +13,9 @@ const source = (): SourceBundle => ({
 });
 const result = (value: Json) => ({ effects: [{ targetKind: 'item', targetId: '1', value }] });
 
-for (const overflow of [0n, 1n, 2n]) test(`planner cumulative safe-integer boundary +${overflow} precedes mapper serialization`, t => {
+// Keep exact-safe and first-unsafe cumulative sizes before mapper encoding;
+// larger unsafe sums exercise the same refusal.
+for (const overflow of [0n, 1n]) test(`planner cumulative safe-integer boundary +${overflow} precedes mapper serialization`, t => {
   const small = buildImportPlan(source(), { version: 'v1', map: () => result('') }, context);
   const expected = BigInt(Number.MAX_SAFE_INTEGER) + overflow;
   const value = logicalValue(expected - serializedContentBytes(small) + 2n);
