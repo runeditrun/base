@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g8896b657",
+  "cliVersion": "0.2.83-dev.g7b5d9924",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1235,7 +1235,7 @@
     },
     "edition-authoring/workflow-copies.mjs": {
       "source": "edition-authoring/workflow-copies.mjs",
-      "sha256": "74053e3350fdb8a1a4d1e734a4ec0be8df059b1a027758ef68a75e1e7fcfadfd"
+      "sha256": "222c8935098b344ac3ad4d8a49ed39c08adbc877a295a7263d2227881d6df01a"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",

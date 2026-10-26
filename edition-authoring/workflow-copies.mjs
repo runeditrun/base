@@ -65,8 +65,9 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
 function invocations(text) {
   const names = new Set();
   const add = word => {
+    const relative = word.startsWith('./');
     word = word.replace(/^\.\//, '');
-    if (!word.includes('/') || /[$*:]|^\//.test(word)) return;
+    if (!(relative || word.includes('/') || /\.[a-z0-9]+$/i.test(word)) || /[$*:]|^\//.test(word)) return;
     try { names.add(safe(word)); } catch { /* Not a literal relative path. */ }
   };
   let blockIndent = null;
