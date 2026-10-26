@@ -54,23 +54,23 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
   if (options.setSecret || options.unsetSecret) secretChangeInputs(declaration, options, env, again);
   const kept = keptSecrets(declaration, setupManifest);
-  if (cloudflareCredentials.some(name => !env[name]?.trim())) throw missing(missingCredentialsMessage(declaration, env, {dryRun:options.dryRun,signIn}));
+  if (!options.dryRun && cloudflareCredentials.some(name => !env[name]?.trim())) throw missing(missingCredentialsMessage(declaration, env, {dryRun:options.dryRun,signIn}));
   const { main } = await import('../modules/deploy-kit/owner-cli.mjs');
   const { createRedaction } = await shared('redaction.mjs');
   const redaction = createRedaction();
   redaction.addSecrets([...(await settingKinds({ declaration, setupManifest })).privateValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment]).filter(Boolean)]);
   const claim = setupManifest?.steps?.find(item => item.type === 'owner-claim');
   const declared = binding => (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(item => item?.binding === binding);
-  const owner = async (command, extra = [], values = env, more = {}) => main([command, '--declaration', declarationPath, '--environment', environment, ...(['dry-run', 'deploy', 'health'].includes(command) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
+  const owner = async (command, extra = [], values = env, more = {}) => main([command, '--declaration', declarationPath, '--environment', environment, ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(command) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
   // Keep confirmed creation events across deploy and the independent health call.
   const created = [];
   let step = 'deploy', deployed;
   try {
    if (options.dryRun) {
-    const {optionalUnset} = await owner('dry-run');
-    if (optionalUnset.length) store.report(`deploy: optional secrets not supplied: ${optionalUnset.join(', ')}. A Worker that does not hold one deploys without it.`);
-    store.report('deploy: dry run complete; target secret bindings checked; no deployment occurred.');
-    return { dryRun: true, deployed: false };
+    const {plan} = await owner('local-plan');
+    store.report(`Would deploy: ${JSON.stringify(plan)}`);
+    store.report('deploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.');
+    return { dryRun: true, deployed: false, plan };
    }
    // A custom hook's own state file, when its deploy named one.
    const state = change.length ? recordedState : await hookState(root, environment);

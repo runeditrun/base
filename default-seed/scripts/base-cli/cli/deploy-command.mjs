@@ -84,7 +84,7 @@ export async function deployCommand(context) {
  const dryRun = async result => {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
   const { signIn } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
-  const needed = neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: true });
+  const needed = neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false });
   reportNeeded(store, needed);
   if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
   return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
@@ -95,7 +95,8 @@ export async function deployCommand(context) {
  if (options.rotateSecret?.split(',').includes('INSTALLATION_KEY')) return ownerDeploy(path, adapter)(context);
  // A hook that deployed through the kit keeps what its Worker holds: rotate there as a secret change.
  if (options.rotateSecret && !adapter.deploy.managesHostedOwner && await hookState(root, options.environment ?? 'production')) return ownerDeploy(path, adapter)(context);
- if (adapter.deploy.managesHostedOwner) { const result = await adapter.deploy(context); return options.dryRun ? dryRun(result) : result; }
+ if (options.dryRun) return dryRun(await ownerDeploy(path, adapter)(context));
+ if (adapter.deploy.managesHostedOwner) return adapter.deploy(context);
  const productDirectory = deployProductDirectory(declaration);
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });

@@ -189,7 +189,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  try {
   declaration.vars.MAIL_FROM=productionSender;await writeFile(deployPath,JSON.stringify(declaration));
   await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
-  const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json'],3);assert.equal(events(dry).at(-1).ok,false);assert.match(events(dry).find(event=>event.event==='error').message,/cannot read the target secret bindings/);
+  const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json']);assert.equal(events(dry).at(-1).ok,true);assert.equal(events(dry).at(-1).plan.d1[0].binding,'DB');assert.match(dry.stdoutText,/no credentials were needed/);
  } finally {await writeFile(deployPath,deployment);await rm(deploySettings,{force:true});}
  // The run site builds from edition identity alone, even in a set-up checkout.
  const site=events(await f.run(['build','--site','--json'])).at(-1).site,siteRoot=join(f.root,site.path);

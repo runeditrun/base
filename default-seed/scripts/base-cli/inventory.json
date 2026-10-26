@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge628089b",
+  "cliVersion": "0.2.83",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -371,7 +371,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "65c73bb486d2ef124b4cd64e16f0374623546b53af9a89feeddcf0ac8e02af3f"
+      "sha256": "ee82cf2accaf2406e302c4251d451733e67eb5f9853762f5ac8e36d25d830f28"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -655,7 +655,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "9b1b0dbd375a311a07d60b6cde973c4a3e1584ff26da4655008ae23977959624"
+      "sha256": "110d149e0bffc2818324e5934569dd4c20de863135fe1b7e357a433defbd84df"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -707,7 +707,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "0f660f125f95f0ee960c2c68bdf6b705b09f717759c409a8d59543a02fbb3ec4"
+      "sha256": "743f1e84044ea33e6ad8b2dd81c06a0c9e73bb630751ff325d8b9a3c486aacae"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -775,7 +775,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "f500dfb514e1042c39ab987b016effd8a398a178cc35e66914e139710ddb7dea"
+      "sha256": "bb82b24701ce81c4ffd15f0e6b896966efc7af52a81ae6359876f28f6e0d3e91"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -1719,7 +1719,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "90391f25bf6c43e94d98733f218c21e9c372c0cc9a199abc017d0c5e635459a9"
+      "sha256": "72e0aeeec84ce9521aefd5f0f3ed674f19f37d4eaf9d5b43e0b6154d26dff12d"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1795,7 +1795,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "fb6c421b35bd4e8227a8d1debb734661305a0433f9266f9c9f9c6f538bb619be"
+      "sha256": "b35564e7b55d4bec3e90394e8b4b12e41a5251bbe67071d22ca9961b8d525076"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",

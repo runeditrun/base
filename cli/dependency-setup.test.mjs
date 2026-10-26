@@ -20,7 +20,7 @@ for(const kind of kinds)test(`${kind}: public noninteractive setup links Auth af
 // Each checkpoint reads the seed's local D1 store in place; a wrangler launch costs seconds on CI.
  const [people,enabled]=await f.sql('SELECT email FROM oa_operators; SELECT idp_sign_in FROM oa_auth_settings');assert.deepEqual(people.results,[{email:'cli-owner@example.test'}]);assert.equal(enabled.results[0].idp_sign_in,1);
  await linkedBrowser(f,origin,provider,{...env,...bare},kind,{setUnavailable(value){state.unavailable=value;}});
- const beforeDry=edge.length,dry=f.launch(['scripts/rer.mjs','deploy','--dry-run','--json','--no-queue'],process.execPath,{...env,...bare});assert.equal(await dry.done,3,'deploy dry-run refuses without target credentials');assert.match(dry.stdoutText,/cannot read the target secret bindings/);assert.equal(edge.length,beforeDry);
+ const beforeDry=edge.length,dry=f.launch(['scripts/rer.mjs','deploy','--dry-run','--json','--no-queue'],process.execPath,{...env,...bare});assert.equal(await dry.done,0,'deploy dry-run completes without target credentials');assert.match(dry.stdoutText,/no credentials were needed/);assert.equal(edge.length,beforeDry);
  state.offline=true;const doctor=f.launch(['scripts/rer.mjs','doctor','--json'],process.execPath,{...env,...bare});assert.equal(await doctor.done,3);assert.ok(JSON.parse(doctor.stdoutText.trim().split('\n').at(-1)).diagnostics.dependencies.some(d=>d.status==='dangling_provider'));state.offline=false;
 });
 

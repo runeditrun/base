@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Make application deploy dry runs build and validate the local plan without Cloudflare credentials or requests. Print target, binding and migration names and reserve remote readiness checks for a real deploy.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
