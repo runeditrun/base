@@ -2,6 +2,7 @@
 // on one reused checkout. Every source and dependency below is local.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { watch } from 'node:fs';
 import { access, appendFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -118,7 +119,12 @@ if (process.argv.includes('setup')) await writeFile('carry-observed.json', await
  const checkout = await listed();
  assert.deepEqual([checkout.prepared, checkout.url], [true, null], 'setup starts no server');
  const settings = await readFile(join(app, '.dev.vars'), 'utf8');
- await checked(rer, ['setup', remote, '--dir', app]);
+ const changes = [], watcher = watch(carry, event => changes.push(event));
+ try {
+  await checked(rer, ['setup', remote, '--dir', app]);
+  await delay(100);
+  assert.deepEqual(changes, [], 'an unchanged carry must not restart a watching seed');
+ } finally { watcher.close(); }
  assert.equal(await readFile(join(app, '.dev.vars'), 'utf8'), settings, 'repeat setup keeps saved settings');
  assert.equal(await readFile(carry, 'utf8'), firstCarry, 'unchanged repository setup leaves carry byte-identical');
  platform.state.business.name = 'synthetic-base-2';

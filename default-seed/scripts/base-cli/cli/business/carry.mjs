@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Api } from './api.mjs';
@@ -21,6 +21,7 @@ async function atomicJson(path, value) {
  await chmod(directory, 0o700);
  try {
   await writeFile(temporary, JSON.stringify(value) + '\n', { flag: 'wx', mode: 0o600 });
+  await chmod(temporary, 0o600);
   await rename(temporary, path);
  } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
@@ -53,7 +54,9 @@ export async function writeCarry(checkout, carry) {
  const values = { ...prior };
  delete values.refreshed_at;
  if (Object.keys(values).length === Object.keys(carry).length && Object.keys(carry).every(key => values[key] === carry[key])) {
-  await chmod(dirname(path), 0o700); await chmod(path, 0o600);
+  for (const [file, mode] of [[dirname(path), 0o700], [path, 0o600]]) {
+   if (((await stat(file)).mode & 0o777) !== mode) await chmod(file, mode);
+  }
   return false;
  }
  await atomicJson(path, { ...carry, refreshed_at: new Date().toISOString() });

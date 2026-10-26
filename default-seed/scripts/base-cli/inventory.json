@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.g4f3eb84e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -415,7 +415,7 @@
     },
     "cli/business/carry.mjs": {
       "source": "cli/business/carry.mjs",
-      "sha256": "2859b308dcaa3630b7dda94072fa4e35c5f7554d560090414a6bfcb9cb873fa8"
+      "sha256": "0f9aac94424af612f94a269006c661d3c76fb7bcbab1204dbece745e05a5f12d"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
