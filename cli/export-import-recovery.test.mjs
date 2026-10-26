@@ -184,13 +184,13 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
  await copyFile(join(seed.root, 'exports/round-1.rer'), join(seed.root, 'shared.rer'));
  await chmod(join(seed.root, 'shared.rer'), 0o600);
  await link(join(seed.root, 'shared.rer'), join(seed.root, 'shared.rer.partial'));
- await seed.run(['import', '--input', 'shared.rer', '--yes'], 4);
+ await seed.run(['import', '--input', 'shared.rer', '--yes', '--acknowledge-unverified-schema-objects'], 4);
  await copyFile(join(seed.root, 'exports/round-1.rer'), join(seed.root, 'group.rer'));
  await chmod(join(seed.root, 'group.rer'), 0o640);
- await seed.run(['import', '--input', 'group.rer', '--yes'], 4);
+ await seed.run(['import', '--input', 'group.rer', '--yes', '--acknowledge-unverified-schema-objects'], 4);
  const corrupt = await readFile(join(seed.root, 'exports/round-1.rer'), 'utf8');
  await writeFile(join(seed.root, 'corrupt.rer'), corrupt.replace('café', 'changed'), { mode: 0o600 });
- await seed.run(['import', '--input', 'corrupt.rer', '--yes'], 1);
+ await seed.run(['import', '--input', 'corrupt.rer', '--yes', '--acknowledge-unverified-schema-objects'], 1);
  assert.deepEqual(await stagingTables(seed), [], 'a corrupt archive leaves no staging');
 });
 
