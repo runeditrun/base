@@ -10,6 +10,7 @@ const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 
 export function completeModuleCopies(root, plans, {tree, read, revision, base, deliveries = []}) {
   const index = new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
+  const required = new Set();
   const cache = new Map(), planned = new Map(), recorded = new Map(), queue = [], withheld = [];
   const disk = {has: name => fs.existsSync(path.join(root, name))};
   const blob = entry => read.blobs([entry.object]).get(entry.object).toString('utf8');
@@ -31,6 +32,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     for (const [source, entry] of plan.sources) enqueue(plan, source, entry);
     for (const target of Object.keys(plan.copy.adapted ?? {})) enqueue(plan, plan.copy.originPath + target.slice(plan.copy.path.length), null, true);
   }
+  const directoryAdditions = new Set([...planned].filter(([target, {plan}]) => !Object.hasOwn(plan.copy.files, target) && !tree.has(plan.copy.originPath)).map(([target]) => target));
   function witness(target, source) {
     return plans.some(({copy}) => {
       const file = Object.hasOwn(copy.files, copy.path) || tree.has(copy.originPath);
@@ -41,6 +43,8 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     });
   }
   function include(source, target) {
+    required.add(target);
+    if (withheld.some(item => item.path === target)) refuse(target, 'a required module has an unplaceable dependency', '${EDITOR:-vi} base-copies.json');
     const physical = inspect(target), owner = recorded.get(target);
     if (owner?.removed.includes(target)) {
       const origin = owner.copy.originPath + target.slice(owner.copy.path.length);
@@ -108,7 +112,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const edges = specifiers(bytes).map(specifier => ({specifier, dependency: resolve(tree, source, specifier)}));
     const declaration = source.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts');
     if (declaration !== source && tree.has(declaration)) edges.push({dependency: declaration});
-    const novel = !adapted && !Object.hasOwn(plan.copy.files, target) && !tree.has(plan.copy.originPath) && !incoming.has(target);
+    const novel = directoryAdditions.has(target) && !required.has(target) && !incoming.has(target);
     let hold;
     for (const edge of edges) {
       const {specifier, dependency} = edge;
