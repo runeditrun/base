@@ -14,6 +14,7 @@ import {hash, json, git, raw, gitReader, safe, noLinks, testSource} from './file
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
 import {completeAuthoringImports, requireMaterializedCopies, preflightRefresh} from './copy-checkout.mjs';
 import {completeRuntimeCopies} from './runtime-dependencies.mjs';
+import {adoptWorkflowTemplates, completeWorkflowHelpers} from './workflow-copies.mjs';
 
 export const RECORD = 'base-copies.json';
 const commit = /^[a-f0-9]{40}$/, sha256 = /^[a-f0-9]{64}$/;
@@ -176,6 +177,10 @@ function reader(origin) {
     },
     digests(objects) {
       return new Map([...this.blobs(objects)].map(([object, bytes]) => [object, hash(bytes)]));
+    },
+    history(revision, name) {
+      return source.git('log', '--format=%H', revision, '--', name).split('\n').filter(Boolean)
+        .flatMap(pin => { const entry = this.tree(pin).get(name); return entry ? [{revision: pin, ...entry}] : []; });
     },
   };
 }
@@ -383,6 +388,8 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
       return {copy, sources, retired, removed: Object.keys(copy.files).filter(name => !Object.hasOwn(copy.adapted || {}, name) && !sources.some(([source]) => mapped(source, copy.originPath, copy.path) === name))};
     });
+    const templates = adoptWorkflowTemplates(root, plans, {tree: next, read, revision, files});
+    completeWorkflowHelpers(root, plans, {tree: next, read, revision});
     completeAuthoringImports(root, plans, {tree: next, read, revision, base: origin.repository});
     completeRuntimeCopies(plans, {tree: next, read, local, upstream, revision, checkTarget(name) {
       safe(name); noLinks(root, name);
@@ -424,6 +431,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     delete record.repository;
     validate(record);
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, ...templates, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } finally { origin.close(); }
 }

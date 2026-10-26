@@ -556,9 +556,17 @@ package's source refresh, including when the seed's copied CLI predates 0.2.82:
 rer refresh-base --ref <release-commit> --base <base-checkout>
 ```
 
-Copy or merge the workflows and helper above in that same adoption commit,
-preserving product adaptations and updating the existing copy and source-lock
-records. New foundation compositions and standalone reference exports take
+Refresh delivers the local helper scripts invoked by every delivered workflow
+in the same preflighted plan and records their Base origins. It also adopts
+tracked, unrecorded Verify workflows and this guide when their bytes exactly
+match a version in Base's template history; these templates have no seed-specific
+substitutions. Untracked or ignored files never qualify by equality alone.
+Seed-adapted workflows remain unchanged. Refresh prints one notice per retained
+workflow naming the Ubuntu 24.04 pin, runner temporary cache locations and the
+manual merge and record command. Review that merge explicitly and preserve
+product-specific jobs. Review the diff, run local and package `verify-base`,
+update the source lock and run the edition's Verify steps before committing.
+New foundation compositions and standalone reference exports take
 `export/verify.yml`, `export/verify-nightly.yml` and the maintained helper
 copies automatically. The Base release owner ships these source templates with
 the next rer release; this change does not bump, publish or release rer.

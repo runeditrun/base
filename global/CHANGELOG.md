@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Close delivered workflows over the local scripts they invoke, recording newly supplied helpers in the same preflighted refresh plan.
+- Adopt tracked, unrecorded Verify workflows and guides only when their bytes match a historical Base template; preserve seed adaptations and print an explicit adoption notice for workflows that need a manual merge.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

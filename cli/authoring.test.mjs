@@ -112,3 +112,83 @@ test('packed authoring preserves source and provenance on invalid adoption and r
  assert.equal(run('adopt-edition').status, 4);
  assert.deepEqual(fs.readFileSync(path.join(seed, 'edition.json')), recipe);
 });
+
+test('packed refresh delivers invoked workflow helpers in the same atomic plan', async t => {
+ const {seed, source, old, result, run} = await fixture(t);
+ const workflow = '.github/workflows/custom.yml';
+ for (const origin of ['export/custom.yml', 'default-seed/.github/workflows/custom.yml']) {
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: echo before\n');
+  const pin = commit(source);
+  write(seed, workflow, fs.readFileSync(path.join(source, origin)));
+  old('record-base', workflow, origin, pin, '--base', source);
+  commit(seed);
+  // Neither helper name is special to the implementation. Cache-only and
+  // commented script names must not become dependencies.
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: |\n          # python3 scripts/comment.py\n          sudo env X=yes python3 scripts/new-helper.py\n          node scripts/another-helper.mjs\n          echo scripts/not-invoked.py\n      - uses: actions/cache@v4\n        with:\n          path: scripts/cache-only.py\n');
+  write(source, 'export/new-helper.py', 'print("workflow helper")\n');
+  write(source, 'default-seed/scripts/another-helper.mjs', 'console.log("second helper");\n');
+  const next = commit(source);
+  const before = fs.readFileSync(path.join(seed, workflow)), record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  write(seed, 'scripts/new-helper.py', 'print("workflow helper")\n');
+  assert.equal(run('refresh-base', '--ref', next, '--base', source).status, 4, 'untracked equality cannot transfer ownership');
+  assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  fs.rmSync(path.join(seed, 'scripts/new-helper.py'));
+  execFileSync('mkfifo', [path.join(seed, 'scripts/new-helper.py')]);
+  assert.equal(run('refresh-base', '--ref', next, '--base', source).status, 4);
+  assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
+  fs.rmSync(path.join(seed, 'scripts/new-helper.py'));
+  result('refresh-base', '--ref', next, '--base', source);
+  for (const name of ['new-helper.py', 'another-helper.mjs']) assert.ok(fs.existsSync(path.join(seed, 'scripts', name)));
+  assert.equal(old('verify-base', '--base', source).ok, true);
+  const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  result('refresh-base', '--ref', next, '--base', source, '--offline');
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+  // Remove this iteration's helper records to exercise both origin layouts.
+  const copies = JSON.parse(after); copies.copies = copies.copies.filter(copy => !copy.path.startsWith('scripts/'));
+  write(seed, 'base-copies.json', JSON.stringify(copies));
+  for (const name of ['new-helper.py', 'another-helper.mjs']) fs.rmSync(path.join(seed, 'scripts', name));
+  git(seed, 'add', '-A');
+ }
+});
+
+test('packed refresh adopts only tracked known historical workflow and companion bytes', async t => {
+ for (const ownership of ['tracked', 'diverged', 'untracked', 'ignored', 'adapted']) {
+  const {seed, source, old, result} = await fixture(t);
+  const workflow = '.github/workflows/verify.yml', guide = 'VERIFY-WORKFLOW.md';
+  const historical = 'jobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo old\n';
+  write(source, 'export/verify.yml', historical);
+  write(source, 'export/VERIFY-WORKFLOW.md', 'Historical workflow guide with enough bytes.\n');
+  const pin = commit(source);
+  for (const [target, origin] of [[workflow, 'export/verify.yml'], [guide, 'export/VERIFY-WORKFLOW.md']]) write(seed, target, fs.readFileSync(path.join(source, origin)));
+  if (ownership === 'diverged') write(seed, workflow, historical + '# product adaptation\n');
+  if (ownership === 'ignored') write(seed, '.gitignore', 'node_modules/\n.github/\nVERIFY-WORKFLOW.md\n');
+  if (['tracked', 'diverged', 'adapted'].includes(ownership)) commit(seed);
+  if (ownership === 'adapted') {
+   old('record-base', workflow, 'export/verify.yml', pin, '--base', source);
+   old('adapt-base', workflow);
+  }
+  const before = fs.readFileSync(path.join(seed, workflow));
+  const current = 'jobs:\n  check:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: python3 scripts/future-helper.py\n';
+  write(source, 'export/verify.yml', current);
+  write(source, 'export/VERIFY-WORKFLOW.md', 'Current workflow guide with enough bytes.\n');
+  write(source, 'export/future-helper.py', 'print("new dependency")\n');
+  const next = commit(source);
+  const refreshed = result('refresh-base', '--ref', next, '--base', source);
+  if (ownership === 'tracked') {
+   assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), current);
+   assert.equal(refreshed.templateAdoptions.find(item => item.path === workflow).from, pin);
+   assert.equal(fs.readFileSync(path.join(seed, guide), 'utf8'), 'Current workflow guide with enough bytes.\n');
+   assert.ok(fs.existsSync(path.join(seed, 'scripts/future-helper.py')));
+  } else {
+   assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
+   assert.equal(refreshed.notices.length, 1);
+   assert.ok(refreshed.notices[0].includes(workflow));
+   assert.ok(refreshed.notices[0].includes('record-base'));
+   assert.equal(fs.existsSync(path.join(seed, 'scripts/future-helper.py')), false);
+  }
+  const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  result('refresh-base', '--ref', next, '--base', source, '--offline');
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+ }
+});

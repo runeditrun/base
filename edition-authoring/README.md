@@ -364,6 +364,17 @@ read as ordinary Git and never inherits the projection identity. Lamp's
 `scripts/public-projections/` is the reference producer.
 
 
+Workflow refresh also supplies and records local scripts invoked in delivered
+workflows, deriving the paths from their run steps. Helpers and workflows share
+the existing preflight: a refused destination prevents every planned write.
+Tracked unrecorded helpers remain seed-owned; untracked or ignored collisions
+refuse even when their bytes match Base. Tracked unrecorded Verify workflows
+and `VERIFY-WORKFLOW.md` can be adopted when their exact bytes match a template
+in the requested Base commit's history (there are no seed substitutions).
+Acknowledged adaptations and divergent workflows stay untouched and receive a
+notice with the template changes and explicit merge/record instructions.
+An absent workflow is not automatically installed by this adoption step.
+
 Authoring refresh closes relative imports from every recorded authoring module,
 including singleton copies and modules whose Base origin is another maintained
 authoring mirror. It follows the bytes that will remain in the seed, including
