@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix the Verify template's unavailable job-level runner context, lint delivered workflows in Base Verify, and upgrade unchanged 0.2.83 templates and their helper closure during refresh.
 - Close delivered workflows over the local scripts they invoke, recording newly supplied helpers in the same preflighted refresh plan.
 - Adopt tracked, unrecorded Verify workflows and guides only when their bytes match a historical Base template; preserve seed adaptations and print an explicit adoption notice for workflows that need a manual merge.
 

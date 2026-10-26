@@ -60,9 +60,10 @@ jobs:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
       PLAYWRIGHT_SKIP_BROWSER_GC: '1'
-      # Keep browser downloads independent of HOME and sudo's apt ownership.
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
+      # Job env is evaluated before the runner context is available.
+      - name: Set runner-owned browser cache
+        run: printf 'PLAYWRIGHT_BROWSERS_PATH=%s/ms-playwright\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -92,7 +93,7 @@ jobs:
         with:
           path: |
             ~/.local/share/pnpm/store
-            ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+            ${{ runner.temp }}/ms-playwright
             ${{ runner.temp }}/rer-apt/archives/*.deb
           # Old snapshots contain absolute HOME paths; do not restore them here.
           key: seed-ubuntu24-temp-${{ runner.arch }}-browser-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}

@@ -1,12 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdtemp, mkdir, writeFile, rm, symlink, copyFile } from 'node:fs/promises';
+import { readFile, readdir, mkdtemp, mkdir, writeFile, rm, symlink, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { lookupMainVerification } from '../export/verify-ci.mjs';
 
 const helper = resolve(import.meta.dirname, '../export/verify-ci.mjs');
+
+test('Base and delivered workflow templates parse with their local reusable workflows', async t => {
+ const root = resolve(import.meta.dirname, '..');
+ const temporary = await mkdtemp(join(tmpdir(), 'rer-workflow-lint-'));
+ t.after(() => rm(temporary, { recursive: true, force: true }));
+ for (const [index, source] of ['.github/workflows', 'export', 'default-seed/.github/workflows', 'foundation/template/.github/workflows'].entries()) {
+  let entries;
+  try { entries = await readdir(join(root, source)); }
+  catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+  const files = entries.filter(name => /\.ya?ml$/.test(name));
+  assert.ok(files.length, `${source}: expected workflows`);
+  const project = join(temporary, String(index)), workflows = join(project, '.github/workflows');
+  await mkdir(workflows, { recursive: true });
+  const initialized = spawnSync('git', ['init', '--quiet', project], { encoding: 'utf8' });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  for (const name of files) await copyFile(join(root, source, name), join(workflows, name));
+  // Shell/Python lint are separate tools. Keep this check portable and focused
+  // on Actions YAML, expressions, contexts and reusable-workflow contracts.
+  const result = spawnSync('actionlint', ['-shellcheck=', '-pyflakes=', ...files.map(name => join(workflows, name))], { cwd: project, encoding: 'utf8' });
+  assert.equal(result.status, 0, `${source}: ${result.error?.message ?? ''}\n${result.stdout ?? ''}${result.stderr ?? ''}\nInstall with bash scripts/install-actionlint.sh and add its directory to PATH.`);
+ }
+});
 // Public GitHub responses recorded 2026-10-23: runeditrun/base Verify run
 // 39821100223 (the rer-v0.2.79 tag push) and its jobs. Only fields consumed by
 // the decision are retained. Cases below vary those response fields; the only

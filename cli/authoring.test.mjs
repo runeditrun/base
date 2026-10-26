@@ -153,19 +153,22 @@ test('packed refresh delivers invoked workflow helpers in the same atomic plan',
 });
 
 test('packed refresh adopts only tracked known historical workflow and companion bytes', async t => {
+ for (const historyRoot of ['export', 'default-seed']) {
  for (const ownership of ['tracked', 'diverged', 'untracked', 'ignored', 'adapted']) {
   const {seed, source, old, result} = await fixture(t);
   const workflow = '.github/workflows/verify.yml', guide = 'VERIFY-WORKFLOW.md';
-  const historical = 'jobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo old\n';
-  write(source, 'export/verify.yml', historical);
-  write(source, 'export/VERIFY-WORKFLOW.md', 'Historical workflow guide with enough bytes.\n');
+  const historical = 'jobs:\n  check:\n    runs-on: ubuntu-24.04\n    env:\n      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright\n    steps:\n      - run: echo old\n';
+  const origin = historyRoot === 'export' ? 'export/verify.yml' : 'default-seed/' + workflow;
+  const guideOrigin = historyRoot + '/' + guide;
+  write(source, origin, historical);
+  write(source, guideOrigin, 'Historical workflow guide with enough bytes.\n');
   const pin = commit(source);
-  for (const [target, origin] of [[workflow, 'export/verify.yml'], [guide, 'export/VERIFY-WORKFLOW.md']]) write(seed, target, fs.readFileSync(path.join(source, origin)));
+  for (const [target, sourcePath] of [[workflow, origin], [guide, guideOrigin]]) write(seed, target, fs.readFileSync(path.join(source, sourcePath)));
   if (ownership === 'diverged') write(seed, workflow, historical + '# product adaptation\n');
   if (ownership === 'ignored') write(seed, '.gitignore', 'node_modules/\n.github/\nVERIFY-WORKFLOW.md\n');
   if (['tracked', 'diverged', 'adapted'].includes(ownership)) commit(seed);
   if (ownership === 'adapted') {
-   old('record-base', workflow, 'export/verify.yml', pin, '--base', source);
+   old('record-base', workflow, origin, pin, '--base', source);
    old('adapt-base', workflow);
   }
   const before = fs.readFileSync(path.join(seed, workflow));
@@ -190,5 +193,6 @@ test('packed refresh adopts only tracked known historical workflow and companion
   const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
   result('refresh-base', '--ref', next, '--base', source, '--offline');
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+ }
  }
 });

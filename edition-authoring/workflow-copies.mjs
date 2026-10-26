@@ -8,9 +8,9 @@ import {raw, safe, noLinks} from './files.mjs';
 const inside = (name, prefix) => name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
 const templates = [
-  ['.github/workflows/verify.yml', 'export/verify.yml'],
-  ['.github/workflows/verify-nightly.yml', 'export/verify-nightly.yml'],
-  ['VERIFY-WORKFLOW.md', 'export/VERIFY-WORKFLOW.md'],
+  ['.github/workflows/verify.yml', ['export/verify.yml', 'default-seed/.github/workflows/verify.yml']],
+  ['.github/workflows/verify-nightly.yml', ['export/verify-nightly.yml', 'default-seed/.github/workflows/verify-nightly.yml']],
+  ['VERIFY-WORKFLOW.md', ['export/VERIFY-WORKFLOW.md', 'default-seed/VERIFY-WORKFLOW.md']],
 ];
 const tracked = root => new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
 
@@ -28,7 +28,8 @@ function include(plans, target, source, entry, revision) {
 
 export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files}) {
   const index = tracked(root), templateAdoptions = [], notices = [];
-  for (const [target, source] of templates) {
+  for (const [target, historySources] of templates) {
+    const [source] = historySources;
     if (!tree.has(source)) continue;
     const owner = plans.find(plan => inside(target, plan.copy.path));
     if (owner && !owner.copy.adapted?.[target]) continue;
@@ -43,7 +44,11 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
     let match;
     if (!owner && index.has(target)) {
       const bytes = file.read();
-      match = read.history(revision, source).find(entry => read.blobs([entry.object]).get(entry.object).equals(bytes));
+      // Full committed history includes the published 0.2.83 runner.temp
+      // template as well as earlier default-seed mirrors. No release pins or
+      // guessed structural equality can transfer a seed's ownership.
+      match = historySources.flatMap(name => read.history(revision, name))
+        .find(entry => read.blobs([entry.object]).get(entry.object).equals(bytes));
     }
     if (match) {
       include(plans, target, source, tree.get(source), revision);
