@@ -100,9 +100,9 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   for (let i = 0; i < queue.length; i++) {
     const item = queue[i], {plan, source, target, entry, adapted} = item;
     if (seen.has(target)) continue;
-    seen.add(target); inspect(target);
+    seen.add(target);
     const bytes = adapted ? local(target) : blob(entry);
-    const before = inspect(target).stat ? local(target) : '';
+    const before = Object.hasOwn(plan.copy.files, target) && disk.has(target) ? local(target) : '';
     const baseline = new Set(specifiers(before));
     const imports = bindings(bytes), oldBindings = bindings(before);
     const edges = specifiers(bytes).map(specifier => ({specifier, dependency: resolve(tree, source, specifier)}));

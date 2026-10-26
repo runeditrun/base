@@ -80,8 +80,20 @@ export function preflightRefresh(root, plans, recordPath, seedFiles) {
     fs.accessSync(target, fs.constants.W_OK | (directory ? fs.constants.X_OK : 0));
   };
   const cache = new Map();
+  function freedEntry(relative, stat) {
+    if (stat.isFile()) return freed.has(identity(relative, stat));
+    if (!stat.isDirectory() || !freed.size) return false;
+    let found = false;
+    const empty = directory => fs.readdirSync(directory).every(name => {
+      const absolute = path.join(directory, name), child = fs.lstatSync(absolute);
+      if (child.isDirectory()) return empty(absolute);
+      const removed = child.isFile() && freed.has(identity(path.relative(root, absolute), child));
+      found ||= removed; return removed;
+    });
+    return empty(path.join(root, relative)) && found;
+  }
   function inspect(name) {
-    return requirePhysical(root, name, {cache, freed: (relative, stat) => stat.isFile() && freed.has(identity(relative, stat))});
+    return requirePhysical(root, name, {cache, freed: freedEntry});
   }
   function check(name, operation) {
     try {

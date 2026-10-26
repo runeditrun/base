@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g28b2d25a",
+  "cliVersion": "0.2.83-dev.g396cd6b4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1183,7 +1183,7 @@
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
-      "sha256": "8d519dbbc4122b2ffc8dea0ef731ea3ddbe2816d7efe6fa55aa750fea3968506"
+      "sha256": "432f849c3f3b97ef3864d53b1995eaf6fd625b92ad38c3227e8494f8cc92440c"
     },
     "edition-authoring/edition-migrations.mjs": {
       "source": "edition-authoring/edition-migrations.mjs",
@@ -1203,7 +1203,7 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "6e271f44041cda3dcbb8ac9c13574c2ebd97648bf48be0fe2670e92a11512a40"
+      "sha256": "a391cf23cca83d7a48bc683c835784caad7d5297ee155249194f93f3e6af396c"
     },
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
