@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Explain locked macOS Keychain reads and a missing default keychain for $HOME when Business pairing cannot store credentials.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.

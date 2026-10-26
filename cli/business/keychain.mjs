@@ -10,7 +10,8 @@ function cause(binary, result) {
  if (result?.spawnFailed) return binary === 'secret-tool' ? 'secret-tool is not installed. Install it and unlock a Secret Service session' : `${binary} could not start`;
  if (/Operation not permitted/.test(text)) return `macOS Keychain refused the write (Operation not permitted); ${sandboxed}`;
  if (/Unable to obtain authorization/.test(text)) return `macOS Keychain refused authorization; ${sandboxed}`;
- if (/User interaction is not allowed|interaction is not allowed/i.test(text)) return 'the keychain is locked and cannot ask for its password here. Unlock it, then try again';
+ if (binary === 'security' && result?.code === 155 && /\(<default>\): The authorization was denied/.test(text)) return 'this $HOME has no default macOS keychain. Create or unlock a keychain for this $HOME, or run with your normal HOME';
+ if ((binary === 'security' && result?.code === 36 && !text.trim()) || /User interaction is not allowed|interaction is not allowed/i.test(text)) return 'the keychain is locked and cannot ask for its password here. Unlock it, then try again';
  if (/autolaunch D-Bus|Cannot spawn a message bus|org\.freedesktop\.secrets/.test(text)) return 'no unlocked Secret Service session is running. Unlock one, then try again';
  if (result?.timedOut) return `${binary} did not answer within 30 seconds`;
  return `${binary} exited with status ${result?.code ?? 'unknown'}. Unlock macOS Keychain, or install and unlock Linux Secret Service (secret-tool), then try again`;
