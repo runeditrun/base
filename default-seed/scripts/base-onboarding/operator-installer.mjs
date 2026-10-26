@@ -36,10 +36,10 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
 // without the key. trafficProxy also refuses /cdn-cgi/* on the public listener.
 const devBindings = devKey => devKey ? { RER_DEV_KEY: devKey, RER_DEV_IDENTITY: 'on' } : {};
 const internalPort = port => { if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('A local runtime requires the traffic proxy internal port.'); return String(port); };
-const developmentEnvironment = () => { const { RER_MODELS_SERVICE, RER_MODELS_KEY, RER_DEMO, RER_DEMO_EXPIRES, RER_STATE_DIR, ...env } = process.env; return env; };
+const developmentEnvironment = () => { const { RER_MODELS_SERVICE, RER_MODELS_KEY, RER_DEMO, RER_DEMO_EXPIRES, RER_STATE_DIR, RER_DEMO_RUN_URL, ...env } = process.env; return env; };
 // A demo's Vite persists to its own folder (the seed's vite.config reads RER_STATE_DIR)
 // and its Worker sees RER_DEMO=1 and the demo's end (modules/demo).
-const demoBindings = demo => demo ? { RER_DEMO: '1', RER_DEMO_EXPIRES: demo.ends, RER_STATE_DIR: demo.state } : {};
+const demoBindings = demo => demo ? { RER_DEMO: '1', RER_DEMO_EXPIRES: demo.ends, RER_STATE_DIR: demo.state, RER_DEMO_RUN_URL: demo.runUrl } : {};
 export const developmentTarget = ({ root, origin, runtimePort, devKey, modelsLive, demo }) => [process.execPath, [projectViteBinary(root), 'dev', '--host', '127.0.0.1', '--port', internalPort(runtimePort), '--strictPort'], { env: { ...developmentEnvironment(), PATH: [process.env.PATH, join(root, 'node_modules', '.bin')].filter(value => value !== undefined).join(delimiter), RER_DEV_ORIGIN: origin, WRANGLER_SEND_METRICS: 'false', X_LOCAL_EXPLORER: 'false', ...devBindings(devKey), ...(modelsLive ? { RER_MODELS_SERVICE: modelsLive.baseUrl, RER_MODELS_KEY: modelsLive.apiKey } : {}), ...demoBindings(demo) } }];
 
 export const previewTarget = ({ origin, runtimePort, devKey, scheduled }) => [process.execPath, [fileURLToPath(new URL('./production-runtime.mjs', import.meta.url))], { env: { ...process.env, RER_DEV_ORIGIN: origin, RER_RUNTIME_HOST: '127.0.0.1', RER_RUNTIME_PORT: internalPort(runtimePort), WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false', X_LOCAL_EXPLORER: 'false', RER_RUNTIME_TRIGGERS: scheduled ? '1' : '0', ...(devKey ? { RER_DEV_KEY: devKey } : {}) } }];

@@ -4,6 +4,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { missing, refuse } from './errors.mjs';
 import { shared } from './shared.mjs';
 import { requiredLocalSettings } from './settings.mjs';
+import { contained } from './project.mjs';
+import { demoRunDeclaration } from '../modules/demo/declaration.mjs';
+import { demoRunUrl } from '../modules/demo/run-url.mjs';
 
 // `rer demo` (dev --demo) state and its two adoption checks (export/DEMO.md).
 const adopt = 'See DEMO.md: a seed adopts demo mode with src/demo.ts, withDemo as the first import of its Worker entry, and three vite.config changes.';
@@ -15,7 +18,9 @@ const adopt = 'See DEMO.md: a seed adopts demo mode with src/demo.ts, withDemo a
 export async function demoPreflight(project, vars, seconds) {
  if (requiredLocalSettings(project, vars).length) throw missing('Private owner settings are missing. Run rer setup first.');
  await demoAdopted(project.root);
- return demoState(project.root, seconds);
+ const declaration = JSON.parse(await readFile(await contained(project.root, 'deploy-demo.json'), 'utf8'));
+ const resolved = await demoRunDeclaration(declaration, {root: project.root, adapter: project.adapter});
+ return {...await demoState(project.root, seconds), runUrl: demoRunUrl(resolved.runUrl ?? `https://${resolved.domain}/run`)};
 }
 
 // Before anything starts: the seed's Vite persists where rer says, so the

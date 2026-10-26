@@ -208,6 +208,8 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   write(source, 'export/helper.mjs', 'export const helper = true;\n');
   write(source, '.github/workflows/verify.yml', 'root CI must never ship\n');
   const pin = commit(source);
+  old('record-base', 'vendor', 'module', pin, '--base', source);
+  old('record-base', 'one.mjs', 'singleton.mjs', pin, '--base', source);
   if (alias === 'namespace') {
    write(source, 'export/caller.yml', 'jobs:\n  check:\n    uses: ./.github/workflows/verify.yml\n');
    const next = commit(source);

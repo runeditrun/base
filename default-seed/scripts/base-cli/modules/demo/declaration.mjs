@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { containedInput } from './input-path.mjs';
-import { pathToFileURL } from 'node:url';
 
 export async function demoRunDeclaration(declaration, { root, adapter, read } = {}) {
   if (declaration.runUrl !== undefined) return declaration;
@@ -10,7 +9,7 @@ export async function demoRunDeclaration(declaration, { root, adapter, read } = 
     let operations;
     try { operations = await read('OPERATIONS.json'); }
     catch (error) { if (error.code !== 'ENOENT') throw error; bare = true; }
-    if (operations?.seedContract) adapter = (await import(pathToFileURL(await containedInput(root, operations.seedContract.adapter)).href)).commandAdapter;
+    bare = !operations?.seedContract;
   }
   const path = adapter?.site?.declaration ?? (bare ? 'deploy-site.json' : undefined);
   if (!path) return declaration;

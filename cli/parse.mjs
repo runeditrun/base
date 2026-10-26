@@ -40,7 +40,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
    throw invalid(`Unsupported flag ${/^--[a-zA-Z-]{1,40}$/.test(flag)?flag:'(invalid)'} for ${verb}.${suggestion?` Did you mean ${suggestion}?`:''} Run rer ${verb} --help.`);
   }
   // Several secrets change in one deploy: --set-secret A --set-secret B is --set-secret A,B.
-  const listed = ['--set-secret', '--unset-secret'].includes(flag);
+  const listed = ['--set-secret', '--unset-secret', '--edition-migration'].includes(flag);
   if (options.supplied.has(flag) && !listed) throw invalid(`Repeated flag ${flag} for ${verb}. Run rer ${verb} --help.`);
   options.supplied.add(flag);
   const key = flag.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());

@@ -39,7 +39,7 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
       continue;
     }
     requirePhysical(root, target);
-    const file = files.get(target);
+    const file = files.get(target) ?? (physical.stat && {regular: true, read: () => fs.readFileSync(physical.target)});
     if (!file?.regular) continue;
     let match;
     if (!owner && index.has(target)) {

@@ -4,7 +4,7 @@ import path from 'node:path';
 import {raw, safe, requirePhysical, testSource} from './files.mjs';
 import {specifiers, resolve, bindings, lexicalExports} from './runtime-dependencies.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
-const inside = (name, prefix) => name === prefix || name.startsWith(prefix + '/');
+const inside = (name, prefix) => prefix === '.' ? !name.startsWith('../') && !path.posix.isAbsolute(name) : name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 
@@ -15,7 +15,12 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const blob = entry => read.blobs([entry.object]).get(entry.object).toString('utf8');
   const local = target => fs.readFileSync(path.join(root, target), 'utf8');
   const refuse = (target, reason, recovery) => { throw Error(`Cannot refresh module ${target}: ${reason}. Run ${recovery}, then repeat refresh-base; no files were refreshed.`); };
-  const inspect = target => requirePhysical(root, safe(target), {cache});
+  const removedObjects = new Set();
+  for (const plan of plans) for (const target of plan.removed) {
+    const stat = requirePhysical(root, target, {cache}).stat;
+    if (stat) removedObjects.add(`${stat.dev}:${stat.ino}`);
+  }
+  const inspect = target => requirePhysical(root, safe(target), {cache, freed: (relative, stat) => stat.isFile() && removedObjects.has(`${stat.dev}:${stat.ino}`)});
   function enqueue(plan, source, entry, adapted = false) {
     const target = mapped(source, plan.copy);
     if (!adapted) planned.set(target, {plan, source, entry});
@@ -41,10 +46,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       const origin = owner.copy.originPath + target.slice(owner.copy.path.length);
       refuse(target, 'recorded dependency was removed but is still imported', index.has(target) ? `git restore -- ${quote(target)}` : `git -C ${quote(base)} show ${quote(owner.copy.revision + ':' + origin)} > ${quote(target)}`);
     }
-    if (planned.has(target)) {
-      if (planned.get(target).source !== source) refuse(target, 'conflicting source mapping', '${EDITOR:-vi} base-copies.json');
-      return;
-    }
+    if (planned.has(target)) return;
     if (owner) return;
     if (index.has(target)) {
       if (!physical.stat) refuse(target, 'tracked edition source is missing', `git restore -- ${quote(target)}`);
@@ -100,7 +102,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     if (seen.has(target)) continue;
     seen.add(target); inspect(target);
     const bytes = adapted ? local(target) : blob(entry);
-    const before = disk.has(target) ? local(target) : '';
+    const before = inspect(target).stat ? local(target) : '';
     const baseline = new Set(specifiers(before));
     const imports = bindings(bytes), oldBindings = bindings(before);
     const edges = specifiers(bytes).map(specifier => ({specifier, dependency: resolve(tree, source, specifier)}));
