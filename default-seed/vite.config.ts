@@ -3,7 +3,6 @@ import { cloudflare } from '@cloudflare/vite-plugin'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, normalizePath } from 'vite'
-import { resolve } from 'node:path'
 import { excludeLocalVariables } from './scripts/base-onboarding/local-variables-output.mjs'
 import { archiveOutputGuard } from './scripts/base-onboarding/archive-output.mjs'
 import { demoSockets } from '../modules/demo/vite.mjs'
@@ -27,7 +26,7 @@ export default defineConfig(({ command, isPreview }) => ({
   // `vite dev` serves only the folders the app is built from (and what they
   // import, plus the public run site declaration its identity reads), never the rest of the checkout: not rer's private folders (the dev
   // key, installer state), export archives, settings or local data.
-  server: { fs: { allow: ['src', 'public', 'node_modules', 'deploy-site.json'], deny: ['**/.rer/**', '**/.seed/**', normalizePath(resolve(process.cwd(), 'exports')) + '/**', '**/*.rer'] } },
+  server: { fs: { allow: ['src', 'public', 'node_modules', 'deploy-site.json'], deny: ['**/.rer/**', '**/.seed/**', normalizePath(process.cwd() + '/exports') + '/**', '**/*.rer'] } },
   plugins: [seedIcons(),
     demoSockets(),
     cloudflare({ inspectorPort: false, viteEnvironment: { name: 'ssr' }, persistState: { path: process.env.RER_STATE_DIR ?? '.wrangler/state' },
