@@ -113,7 +113,7 @@ test('packed authoring preserves source and provenance on invalid adoption and r
  assert.deepEqual(fs.readFileSync(path.join(seed, 'edition.json')), recipe);
 });
 
-test('packed refresh delivers invoked workflow helpers in the same atomic plan', async t => {
+test('packed refresh delivers and adopts templates with their helpers atomically', async t => {
  const {seed, source, old, result, run} = await fixture(t);
  const workflow = '.github/workflows/custom.yml';
  for (const origin of ['export/custom.yml', 'default-seed/.github/workflows/custom.yml']) {
@@ -124,9 +124,14 @@ test('packed refresh delivers invoked workflow helpers in the same atomic plan',
   commit(seed);
   // Neither helper name is special to the implementation. Cache-only and
   // commented script names must not become dependencies.
-  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: |\n          # python3 scripts/comment.py\n          sudo env X=yes python3 scripts/new-helper.py\n          node scripts/another-helper.mjs\n          echo scripts/not-invoked.py\n      - uses: actions/cache@v4\n        with:\n          path: scripts/cache-only.py\n');
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: |\n          # python3 scripts/comment.py\n          sudo env X=yes python3 scripts/new-helper.py\n          node scripts/another-helper.mjs\n          env -u X node scripts/env.mjs\n          sudo -u nobody node scripts/sudo.mjs\n          node --import scripts/bootstrap.mjs scripts/entry.mjs\n          node \"scripts/with space.mjs\"\n          bash -c 'node scripts/shell.mjs'\n          echo $(node scripts/substitution.mjs)\n          echo scripts/not-invoked.py\n      - uses: actions/cache@v4\n        with:\n          path: scripts/cache-only.py\n');
+  write(source, 'default-seed/scripts/new-helper.py', 'print("workflow helper")\n');
   write(source, 'export/new-helper.py', 'print("workflow helper")\n');
   write(source, 'default-seed/scripts/another-helper.mjs', 'console.log("second helper");\n');
+  for (const name of ['env', 'sudo', 'bootstrap', 'entry', 'with space', 'shell', 'substitution']) {
+   for (const prefix of ['export', 'default-seed/scripts']) write(source, `${prefix}/${name}.mjs`, 'export {leaf} from \"./leaf.mjs\";\n');
+  }
+  for (const prefix of ['export', 'default-seed/scripts']) write(source, `${prefix}/leaf.mjs`, 'export const leaf = true;\n');
   const next = commit(source);
   const before = fs.readFileSync(path.join(seed, workflow)), record = fs.readFileSync(path.join(seed, 'base-copies.json'));
   write(seed, 'scripts/new-helper.py', 'print("workflow helper")\n');
@@ -140,6 +145,7 @@ test('packed refresh delivers invoked workflow helpers in the same atomic plan',
   fs.rmSync(path.join(seed, 'scripts/new-helper.py'));
   result('refresh-base', '--ref', next, '--base', source);
   for (const name of ['new-helper.py', 'another-helper.mjs']) assert.ok(fs.existsSync(path.join(seed, 'scripts', name)));
+  for (const name of ['env', 'sudo', 'bootstrap', 'entry', 'with space', 'shell', 'substitution', 'leaf']) assert.ok(fs.existsSync(path.join(seed, `scripts/${name}.mjs`)));
   assert.equal(old('verify-base', '--base', source).ok, true);
   const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
   result('refresh-base', '--ref', next, '--base', source, '--offline');
@@ -147,12 +153,11 @@ test('packed refresh delivers invoked workflow helpers in the same atomic plan',
   // Remove this iteration's helper records to exercise both origin layouts.
   const copies = JSON.parse(after); copies.copies = copies.copies.filter(copy => !copy.path.startsWith('scripts/'));
   write(seed, 'base-copies.json', JSON.stringify(copies));
-  for (const name of ['new-helper.py', 'another-helper.mjs']) fs.rmSync(path.join(seed, 'scripts', name));
+  fs.rmSync(path.join(seed, 'scripts'), {recursive: true});
   git(seed, 'add', '-A');
  }
-});
 
-test('packed refresh adopts only tracked known historical workflow and companion bytes', async t => {
+
  for (const historyRoot of ['export', 'default-seed']) {
  for (const ownership of ['tracked', 'diverged', 'untracked', 'ignored', 'adapted']) {
   const {seed, source, old, result} = await fixture(t);
@@ -195,4 +200,38 @@ test('packed refresh adopts only tracked known historical workflow and companion
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
  }
  }
+ for (const alias of ['adoption', 'recorded', 'helper', 'namespace']) {
+  const {seed, source, old, result, run} = await fixture(t);
+  const workflow = '.github/workflows/verify.yml';
+  const original = 'jobs:\n  check:\n    steps:\n      - run: node scripts/helper.mjs\n';
+  write(source, 'export/verify.yml', original);
+  write(source, 'export/helper.mjs', 'export const helper = true;\n');
+  write(source, '.github/workflows/verify.yml', 'root CI must never ship\n');
+  const pin = commit(source);
+  if (alias === 'namespace') {
+   write(source, 'export/caller.yml', 'jobs:\n  check:\n    uses: ./.github/workflows/verify.yml\n');
+   const next = commit(source);
+   write(seed, '.github/workflows/caller.yml', fs.readFileSync(path.join(source, 'export/caller.yml')));
+   old('record-base', '.github/workflows/caller.yml', 'export/caller.yml', next, '--base', source);
+   result('refresh-base', '--ref', next, '--base', source);
+   assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), original);
+   continue;
+  }
+  write(seed, workflow, original);
+  if (alias === 'helper') write(seed, 'scripts/helper.mjs', 'export const helper = "seed-owned";\n');
+  commit(seed);
+  if (alias !== 'adoption') old('record-base', workflow, 'export/verify.yml', pin, '--base', source);
+  const target = alias === 'helper' ? 'scripts/helper.mjs' : workflow;
+  const renamed = path.join(path.dirname(target), path.basename(target).toUpperCase());
+  fs.renameSync(path.join(seed, target), path.join(seed, target + '.middle'));
+  fs.renameSync(path.join(seed, target + '.middle'), path.join(seed, renamed));
+  if (!fs.existsSync(path.join(seed, target))) continue; // Case-sensitive volume.
+  const before = fs.readFileSync(path.join(seed, renamed)), record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const refreshed = run('refresh-base', '--ref', pin, '--base', source);
+  assert.equal(refreshed.status, alias === 'adoption' ? 0 : 4, refreshed.stdout + refreshed.stderr);
+  assert.deepEqual(fs.readFileSync(path.join(seed, renamed)), before);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  if (alias === 'adoption') assert.equal(JSON.parse(refreshed.stdout.trim().split('\n').at(-1)).notices.length, 1);
+ }
+
 });

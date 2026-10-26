@@ -75,7 +75,7 @@ export const PATHS = {
     alt: 'Have Node 22 or later?',
     requirements: `macOS, Linux or Windows with WSL2. ${runRequirements}`,
     email: 'This free copy runs only on your computer: nobody else can open it, and it sends no email until you set up a mail provider.',
-    guide: { label: 'Walk me through it', href: (_slug: string) => '/docs/getting-started' },
+    guide: { label: 'Walk me through it', href: '/docs/getting-started' },
     start: 'You paste the line',
     steps: (n: string) => ['rer installs itself', `Gets ${n}`, 'Sets up its database', `Starts ${n} and prints a link that signs you in`],
     pasteTitle: 'Now paste it into your terminal.', note: 'A first start takes a few minutes.',
@@ -200,7 +200,7 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
     + `<section class="paste-panel" aria-labelledby="paste-title"><h3 id="paste-title">${escape(self.pasteTitle)}</h3><div class="paste-track">${stops(steps, true)}<p class="track-note">${escape(self.note)}</p></div></section>`
     + `<details class="other-ways"><summary>Other ways to run locally</summary><p class="alt"><span>${escape(self.alt)}</span>${inlineStart(run)}</p><div class="alt"><span>To install rer separately:</span><pre><code>curl -fsSL https://runeditrun.com/install.sh | sh</code></pre><span>Then run:</span><pre><code>$HOME/.local/bin/rer dev ${escape(repo)}</code></pre></div><p class="alt"><span>Optional, for future terminals: add <code>$HOME/.local/bin</code> to your shell’s PATH. The one-line launch above already finds rer for this run; you can do this later.</span></p></details><p class="requirements">${escape(self.requirements)}${run.paths.requirementsExtra ? ' ' + escape(run.paths.requirementsExtra) : ''}</p><p class="email-note">${escape(self.email)}</p>`
     + `<div class="timeline">${stops([self.start, ...steps])}<span class="track-divider" aria-hidden="true"></span><p class="track-note">${escape(self.note)}</p></div>`
-    + (run.docs ? `<p class="guide">${action(self.guide.href(slug), self.guide.label)}</p>` : '')
+    + (run.docs ? `<p class="guide">${action(self.guide.href, self.guide.label)}</p>` : '')
     + `</section><div class="doors">${doors}</div><div class="quiet"><p>${escape(PATHS.business.lead)} ${action(PATHS.business.href, PATHS.business.action)}</p></div>`
     + `<footer class="facts"><p>${escape(PATHS.facts.source)} <a href="${escape(run.repository)}">${escape(run.repository.replace(/^https:\/\//, ''))}</a> · ${escape(run.licence)} ${escape(PATHS.facts.licence)}</p></footer></div></main>`
   return document(identity, PATHS.title(run.name), PATHS.meta(run.name), RUN_CHOOSER, body, COPY_SCRIPT, homepage?.styles)

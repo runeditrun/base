@@ -3,7 +3,7 @@
 // preflight and share the workflow's all-or-nothing write plan.
 import fs from 'node:fs';
 import path from 'node:path';
-import {raw, safe, noLinks} from './files.mjs';
+import {raw, safe, physicalEntry, requirePhysical} from './files.mjs';
 
 const inside = (name, prefix) => name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
@@ -33,14 +33,14 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
     if (!tree.has(source)) continue;
     const owner = plans.find(plan => inside(target, plan.copy.path));
     if (owner && !owner.copy.adapted?.[target]) continue;
-    let file = files.get(target);
-    if (!file) {
-      noLinks(root, target);
-      try { file = {regular: fs.lstatSync(path.join(root, target)).isFile()}; }
-      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const physical = physicalEntry(root, target);
+    if (physical.kind === 'alias') {
+      notices.push(`${target}: preserved physical entry ${physical.physical}; indexed spelling differs. Move it aside and restore ${target} before adopting the template.`);
+      continue;
     }
+    requirePhysical(root, target);
+    const file = files.get(target);
     if (!file?.regular) continue;
-    noLinks(root, target);
     let match;
     if (!owner && index.has(target)) {
       const bytes = file.read();
@@ -60,47 +60,45 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
   return {templateAdoptions, notices};
 }
 
-// Read run scalars/blocks, rather than all YAML text (cache paths and comments
-// are not invoked scripts). Literal local reusable workflows are dependencies
-// too. Recognize interpreter arguments and direct local commands, including
-// commands nested in $(...) and env/sudo wrappers; echo/cache arguments do not
-// acquire ownership merely because they look like script names.
+// Over-approximate shell words, then require a source in the caller's template
+// namespace. Command position cannot hide helpers behind wrappers or flags.
 function invocations(text) {
   const names = new Set();
+  const add = word => {
+    word = word.replace(/^\.\//, '');
+    if (!word.includes('/') || /[$*:]|^\//.test(word)) return;
+    try { names.add(safe(word)); } catch { /* Not a literal relative path. */ }
+  };
   let blockIndent = null;
   for (const line of text.split('\n')) {
     const indent = line.search(/\S/);
     if (indent < 0) continue;
-    const run = /^\s*(?:-\s*)?run:\s*(.*)$/.exec(line);
     if (blockIndent !== null && indent <= blockIndent) blockIndent = null;
+    const run = /^\s*(?:-\s*)?run:\s*(.*)$/.exec(line);
     let command = blockIndent !== null ? line : '';
     if (run) {
       if (/^[|>][-+]?\s*(?:#.*)?$/.test(run[1])) blockIndent = line.indexOf('run:');
       else command = run[1];
     }
-    const uses = /^\s*(?:-\s*)?uses:\s*['"]?\.\/(\S+?)['"]?\s*$/.exec(line);
-    if (uses) names.add(uses[1]);
-    if (/^(['"])[\s\S]*\1$/.test(command)) command = command.slice(1, -1);
-    command += [...command.matchAll(/\$\(([^)]*)\)|`([^`]*)`/g)].map(match => ';' + (match[1] ?? match[2])).join('');
-    const tokens = [...command.matchAll(/#[^\n]*|'(?:[^']*)'|"(?:\\.|[^"\\])*"|[\w./=:+-]+|[^\s]/g)].map(match => match[0]);
-    const word = token => /^(['"])[\s\S]*\1$/.test(token || '') ? token.slice(1, -1) : token;
-    let expectingCommand = true;
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      if (token.startsWith('#')) break;
-      if ([';', '|', '&', '('].includes(token)) { expectingCommand = true; continue; }
-      if (!expectingCommand) continue;
-      if (['sudo', 'env', 'exec', 'command'].includes(token) || token.startsWith('-') || /^\w+=/.test(word(token))) continue;
-      expectingCommand = false;
-      if (/^(?:node|python[\d.]*|bash|sh|deno|bun)$/.test(token)) {
-        let j = i + 1;
-        while (tokens[j]?.startsWith('-')) j++;
-        const script = word(tokens[j]);
-        if (/^(?:\.\/)?(?:[\w.-]+\/)+[\w.-]+$/.test(script || '')) names.add(script.replace(/^\.\//, ''));
-      } else if (/^(?:\.\/)?(?:[\w.-]+\/)+[\w.-]+$/.test(token)) names.add(token.replace(/^\.\//, ''));
+    const uses = /^\s*(?:-\s*)?uses:\s*['"]?\.\/(.*?)['"]?\s*(?:#.*)?$/.exec(line);
+    if (uses) add(uses[1]);
+    command = command.replace(/\$\(([^)]*)\)|`([^`]*)`/g, (_, a, b) => ' ' + (a ?? b) + ' ');
+    for (const match of command.matchAll(/#[^\n]*|'([^']*)'|"((?:\\.|[^"\\])*)"|[^\s;|&()<>]+/g)) {
+      if (match[0].startsWith('#')) break;
+      const word = match[1] ?? match[2] ?? match[0];
+      add(word);
+      for (const part of word.split(/\s+/)) add(part);
     }
   }
-  return [...names].map(safe);
+  return [...names];
+}
+
+function candidates(source, invoked) {
+  if (invoked.startsWith('.github/workflows/')) return ['export/' + path.posix.basename(invoked), 'default-seed/' + invoked];
+  if (source.startsWith('default-seed/')) return ['default-seed/' + invoked];
+  if (source.startsWith('export/')) return ['export/' + invoked.replace(/^scripts\//, ''), 'default-seed/' + invoked,
+    ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])].filter(name => !name.startsWith('scripts/'));
+  return [];
 }
 
 export function completeWorkflowHelpers(root, plans, {tree, read, revision}) {
@@ -112,17 +110,15 @@ export function completeWorkflowHelpers(root, plans, {tree, read, revision}) {
     const {source, entry, target} = queue[i];
     if (seen.has(target)) continue;
     seen.add(target);
-    const sourceRoot = source.startsWith('default-seed/') ? 'default-seed/' : '';
     const destinationRoot = target.includes('.github/workflows/') ? target.slice(0, target.indexOf('.github/workflows/')) : '';
     const text = read.blobs([entry.object]).get(entry.object).toString('utf8');
     for (const invoked of invocations(text)) {
+      const dependency = candidates(source, invoked).find(name => tree.has(name));
+      if (!dependency) continue;
       const destination = safe(destinationRoot + invoked);
-      noLinks(root, destination);
+      const {stat} = requirePhysical(root, destination);
       const owner = plans.find(plan => inside(destination, plan.copy.path));
       if (owner?.removed.includes(destination)) throw Error(`Workflow dependency ${destination} was removed locally but is still invoked; restore it before refresh-base; no files were refreshed.`);
-      let stat;
-      try { stat = fs.lstatSync(path.join(root, destination)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-      if (stat && !stat.isFile()) throw Error(`Workflow dependency is not a regular file: ${destination}`);
       const planned = owner?.sources.find(([name]) => mapped(name, owner.copy) === destination);
       if (planned) {
         if (/\.ya?ml$/.test(planned[0])) queue.push({source: planned[0], entry: planned[1], target: destination});
@@ -133,11 +129,6 @@ export function completeWorkflowHelpers(root, plans, {tree, read, revision}) {
       if (stat && (index.has(destination) || owner?.copy.adapted?.[destination])) continue;
       if (!stat && index.has(destination)) throw Error(`Workflow dependency ${destination} is tracked but missing; restore it before refresh-base; no files were refreshed.`);
       if (stat) throw Error(`Cannot refresh workflow dependency ${destination}: existing file has no Base copy record or Git index entry. Move it aside or explicitly record-base it before refresh-base; no files were refreshed.`);
-      const candidates = [sourceRoot + invoked, 'default-seed/' + invoked,
-        'export/' + (invoked.startsWith('.github/workflows/') ? path.posix.basename(invoked) : invoked.replace(/^scripts\//, '')),
-        invoked.replace(/^scripts\//, '')];
-      const dependency = candidates.find(name => tree.has(name));
-      if (!dependency) throw Error(`No Base source for workflow dependency ${destination} invoked by ${target}; no files were refreshed.`);
       include(plans, destination, dependency, tree.get(dependency), revision);
       if (/\.ya?ml$/.test(dependency)) queue.push({source: dependency, entry: tree.get(dependency), target: destination});
     }

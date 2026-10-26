@@ -1,0 +1,139 @@
+// All recorded code uses the same source graph and seed ownership boundary.
+import fs from 'node:fs';
+import path from 'node:path';
+import {raw, safe, requirePhysical, testSource} from './files.mjs';
+import {specifiers, resolve, bindings, lexicalExports} from './runtime-dependencies.mjs';
+const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
+const inside = (name, prefix) => name === prefix || name.startsWith(prefix + '/');
+const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
+const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+
+export function completeModuleCopies(root, plans, {tree, read, revision, base, deliveries = []}) {
+  const index = new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
+  const cache = new Map(), planned = new Map(), recorded = new Map(), queue = [], withheld = [];
+  const disk = {has: name => fs.existsSync(path.join(root, name))};
+  const blob = entry => read.blobs([entry.object]).get(entry.object).toString('utf8');
+  const local = target => fs.readFileSync(path.join(root, target), 'utf8');
+  const refuse = (target, reason, recovery) => { throw Error(`Cannot refresh module ${target}: ${reason}. Run ${recovery}, then repeat refresh-base; no files were refreshed.`); };
+  const inspect = target => requirePhysical(root, safe(target), {cache});
+  function enqueue(plan, source, entry, adapted = false) {
+    const target = mapped(source, plan.copy);
+    if (!adapted) planned.set(target, {plan, source, entry});
+    if (code(source)) queue.push({plan, source, target, entry, adapted});
+  }
+  for (const plan of plans) {
+    for (const target of Object.keys(plan.copy.files)) recorded.set(target, plan);
+    for (const [source, entry] of plan.sources) enqueue(plan, source, entry);
+    for (const target of Object.keys(plan.copy.adapted ?? {})) enqueue(plan, plan.copy.originPath + target.slice(plan.copy.path.length), null, true);
+  }
+  function witness(target, source) {
+    return plans.some(({copy}) => {
+      const file = Object.hasOwn(copy.files, copy.path) || tree.has(copy.originPath);
+      if (file && path.posix.basename(copy.path) !== path.posix.basename(copy.originPath)) return false;
+      const to = file ? path.posix.dirname(copy.path) : copy.path;
+      const from = file ? path.posix.dirname(copy.originPath) : copy.originPath;
+      return inside(target, to) && path.posix.join(from, path.posix.relative(to, target)) === source;
+    });
+  }
+  function include(source, target) {
+    const physical = inspect(target), owner = recorded.get(target);
+    if (owner?.removed.includes(target)) {
+      const origin = owner.copy.originPath + target.slice(owner.copy.path.length);
+      refuse(target, 'recorded dependency was removed but is still imported', index.has(target) ? `git restore -- ${quote(target)}` : `git -C ${quote(base)} show ${quote(owner.copy.revision + ':' + origin)} > ${quote(target)}`);
+    }
+    if (planned.has(target)) {
+      if (planned.get(target).source !== source) refuse(target, 'conflicting source mapping', '${EDITOR:-vi} base-copies.json');
+      return;
+    }
+    if (owner) return;
+    if (index.has(target)) {
+      if (!physical.stat) refuse(target, 'tracked edition source is missing', `git restore -- ${quote(target)}`);
+      return;
+    }
+    if (physical.stat) refuse(target, 'existing file has no Base copy record or Git index entry', `git add -f -- ${quote(target)}`);
+    let plan = plans.find(plan => inside(target, plan.copy.path));
+    if (plan && mapped(source, plan.copy) !== target) refuse(target, 'conflicting directory mapping', '${EDITOR:-vi} base-copies.json');
+    if (!plan) {
+      if (plans.some(plan => inside(plan.copy.path, target))) refuse(target, 'overlapping copy mapping', '${EDITOR:-vi} base-copies.json');
+      plan = {copy: {path: target, originPath: source, revision, files: {}, modes: {}}, sources: [], removed: []};
+      plans.push(plan);
+    }
+    const entry = tree.get(source);
+    plan.sources.push([source, entry]);
+    enqueue(plan, source, entry);
+  }
+  for (const source of deliveries) {
+    const targets = plans.flatMap(({copy}) => {
+      const file = tree.has(copy.originPath);
+      const from = file ? path.posix.dirname(copy.originPath) : copy.originPath;
+      const to = file ? path.posix.dirname(copy.path) : copy.path;
+      return inside(source, from) ? [path.posix.join(to, path.posix.relative(from, source))] : [];
+    }).filter(target => witness(target, source));
+    if (!targets.length || !tree.has(source)) refuse(source, 'migration delivery has no witnessed destination', '${EDITOR:-vi} base-copies.json');
+    for (const target of new Set(targets)) include(source, target);
+  }
+  const incoming = new Set();
+  for (const item of queue) for (const specifier of specifiers(item.adapted ? local(item.target) : blob(item.entry))) {
+    const dependency = resolve(tree, item.source, specifier);
+    if (dependency) incoming.add(path.posix.join(path.posix.dirname(item.target), path.posix.relative(path.posix.dirname(item.source), dependency)));
+  }
+  function exportsAt(target, seen = new Set()) {
+    if (seen.has(target)) return new Set();
+    seen.add(target); inspect(target);
+    if (!disk.has(target)) return null;
+    const result = lexicalExports(local(target), specifier => {
+      const next = resolve(disk, target, specifier);
+      return next ? exportsAt(next, seen) : null;
+    });
+    if (result === null) return null;
+    const declaration = target.replace(/\.mjs$/, '.d.mts').replace(/\.js$/, '.d.ts');
+    if (declaration !== target && disk.has(declaration)) {
+      const types = exportsAt(declaration, seen);
+      if (types === null) return null;
+      for (const name of types) result.add(name);
+    }
+    return result;
+  }
+  const seen = new Set();
+  for (let i = 0; i < queue.length; i++) {
+    const item = queue[i], {plan, source, target, entry, adapted} = item;
+    if (seen.has(target)) continue;
+    seen.add(target); inspect(target);
+    const bytes = adapted ? local(target) : blob(entry);
+    const before = disk.has(target) ? local(target) : '';
+    const baseline = new Set(specifiers(before));
+    const imports = bindings(bytes), oldBindings = bindings(before);
+    const edges = specifiers(bytes).map(specifier => ({specifier, dependency: resolve(tree, source, specifier)}));
+    const declaration = source.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts');
+    if (declaration !== source && tree.has(declaration)) edges.push({dependency: declaration});
+    const novel = !adapted && !Object.hasOwn(plan.copy.files, target) && !tree.has(plan.copy.originPath) && !incoming.has(target);
+    let hold;
+    for (const edge of edges) {
+      const {specifier, dependency} = edge;
+      if (specifier && baseline.has(specifier) && !resolve(disk, target, specifier)) continue;
+      if (!dependency) refuse(target, `no Base source for ${specifier}`, `\${EDITOR:-vi} ${quote(target)}`);
+      const destination = path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency));
+      if (!witness(destination, dependency)) {
+        if (novel) { hold = {path: target, originPath: source, dependency}; break; }
+        refuse(target, `no copy mapping witnesses ${destination} from ${dependency}`, '${EDITOR:-vi} base-copies.json');
+      }
+    }
+    if (hold) {
+      plan.sources = plan.sources.filter(([name]) => name !== source);
+      planned.delete(target); withheld.push(hold); continue;
+    }
+    for (const {specifier, dependency} of edges) {
+      if (specifier && baseline.has(specifier) && !resolve(disk, target, specifier)) continue;
+      const destination = path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency));
+      include(dependency, destination);
+      const owner = recorded.get(destination);
+      if (!adapted && !planned.has(destination) && (index.has(destination) || owner?.copy.adapted?.[destination])) {
+        const exported = exportsAt(destination);
+        for (const name of imports.get(specifier) ?? []) if (exported && !exported.has(name) && !oldBindings.get(specifier)?.has(name)) {
+          refuse(target, `${destination} does not export ${name}; merge Base ${dependency} at ${revision} into that seed-owned file`, `git -C ${quote(base)} show ${quote(revision + ':' + dependency)} > ${quote(destination + '.base')}`);
+        }
+      }
+    }
+  }
+  return withheld;
+}

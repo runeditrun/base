@@ -38,6 +38,37 @@ export function safe(name) {
   }
   return name;
 }
+// One physical spelling/type check for refresh writes and dependencies. Cache
+// directory entries only for one read-only planning pass; removals take priority.
+export function physicalEntry(root, name, {cache = new Map(), freed = () => false} = {}) {
+  let parent = root, parentStat = fs.lstatSync(root);
+  const parts = safe(name).split('/');
+  for (const [i, part] of parts.entries()) {
+    const target = path.join(parent, part), relative = parts.slice(0, i + 1).join('/');
+    let stat;
+    try { stat = fs.lstatSync(target); }
+    catch (error) { if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error; }
+    if (!stat || freed(relative, stat)) return {absent: true, parent, parentStat};
+    if (!cache.has(parent)) cache.set(parent, fs.readdirSync(parent));
+    const entries = cache.get(parent);
+    if (!entries.includes(part)) {
+      const physical = entries.find(entry => {
+        const other = fs.lstatSync(path.join(parent, entry));
+        return other.dev === stat.dev && other.ino === stat.ino;
+      });
+      return {kind: 'alias', path: relative, physical: path.relative(root, path.join(parent, physical ?? part))};
+    }
+    if (stat.isSymbolicLink()) return {kind: 'symlink', path: relative};
+    if (i < parts.length - 1 && !stat.isDirectory()) return {kind: 'non-directory parent', path: relative};
+    if (i === parts.length - 1) return stat.isFile() ? {stat, target, parent, parentStat} : {kind: 'non-regular', path: relative};
+    parent = target; parentStat = stat;
+  }
+}
+export function requirePhysical(root, name, options) {
+  const entry = physicalEntry(root, name, options);
+  if (entry.kind) throw Error(`Cannot refresh ${name}: ${entry.kind} at ${entry.physical ?? entry.path}. Move that physical entry aside, then run git restore -- ${JSON.stringify(name)} and repeat refresh-base; no files were refreshed.`);
+  return entry;
+}
 export function noLinks(root, relative) {
   let current = root;
   for (const part of relative.split('/')) {

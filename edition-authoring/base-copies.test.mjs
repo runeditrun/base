@@ -329,8 +329,8 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       const root = 'scripts/edition-authoring/refresh.mjs';
       const helper = 'scripts/edition-authoring/helper.mjs';
       const leaf = 'scripts/edition-authoring/leaf.mjs';
-      const rootBytes = row.adapted ? 'export const refresh = "synthetic-base";\n' :
-        'import {helper} from "./helper.mjs";\nexport const refresh = helper;\n';
+      const rootBytes = 'export const refresh = "synthetic-base";\n';
+      const incomingBytes = 'import {helper} from "./helper.mjs";\nexport const refresh = helper;\n';
       const helperBytes = 'export {leaf as helper} from "./leaf.mjs";\n';
       const leafBytes = 'export const leaf = "synthetic-base-leaf";\n';
       const customBytes = 'import "./seed-private.mjs";\nexport const helper = "synthetic-edition-helper";\n';
@@ -367,7 +367,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         write(seed, root, adaptedBytes);
         ok(seed, 'adapt-base', root);
       }
-      write(base, `${origin}/refresh.mjs`, `${rootBytes}// synthetic incoming root\n`);
+      write(base, `${origin}/refresh.mjs`, `${incomingBytes}// synthetic incoming root\n`);
       write(base, 'tools/earlier.mjs', 'export const earlier = "synthetic-after";\n');
       const next = commit(base);
       const before = snapshotTree(seed);
@@ -388,7 +388,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json'), 'utf8'));
       const records = name => record.copies.filter(copy => Object.hasOwn(copy.files, name));
       assert.equal(fs.readFileSync(path.join(seed, 'aaa/earlier.mjs'), 'utf8'), 'export const earlier = "synthetic-after";\n');
-      assert.equal(fs.readFileSync(path.join(seed, root), 'utf8'), row.adapted ? adaptedBytes : `${rootBytes}// synthetic incoming root\n`);
+      assert.equal(fs.readFileSync(path.join(seed, root), 'utf8'), row.adapted ? adaptedBytes : `${incomingBytes}// synthetic incoming root\n`);
       assert.equal(fs.existsSync(path.join(seed, 'scripts/edition-authoring/unrelated.mjs')), false, row.name);
       if (row.custom) {
         assert.equal(fs.readFileSync(path.join(seed, helper), 'utf8'), customBytes, row.name);
