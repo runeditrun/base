@@ -1,3 +1,4 @@
+import { startWithEnvironmentProxy } from './environment-proxy.mjs';
 import './sqlite-notice.mjs';
 import {authoringVerbs} from './contract.mjs';
 import { parse, help } from './parse.mjs';
@@ -8,6 +9,8 @@ import { check, describe, doctorSummary } from './inspect.mjs';
 import { selectNodeRuntime } from './node-runtime.mjs';
 
 export async function main(argv = process.argv.slice(2)) {
+ const proxyChild = await startWithEnvironmentProxy(argv);
+ if (proxyChild) return proxyChild.exitCode;
  if (argv[0] === 'business') return (await import('./business/command.mjs')).businessCommand(argv.slice(1));
  if (argv[0] === 'companion') return (await import('./companion/command.mjs')).companionCommand(argv.slice(1));
  // Every runtime a seed's hooks start inherits this: Wrangler and the Cloudflare

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.81-dev.g277ff07e",
+  "cliVersion": "0.2.81-dev.g1beafb92",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -73,7 +73,7 @@
     },
     "dependency-environment.mjs": {
       "source": "onboarding/dependency-environment.mjs",
-      "sha256": "428f148b7472ca7a847f7c95ddcb3237c953df80bf770c748e7203592eac4e49"
+      "sha256": "723ab7a445ed3b7f8bb57fa7e1bb8e202aa02241ff8742de6f1e09ee1dd610f4"
     },
     "dev-identity.mjs": {
       "source": "onboarding/dev-identity.mjs",
@@ -201,7 +201,7 @@
     },
     "process-cleanup.mjs": {
       "source": "onboarding/process-cleanup.mjs",
-      "sha256": "7a51918592c1f241434d22b2813c9c3cb0945df056719803a0ba991ccff8eaba"
+      "sha256": "5ceee8e42ac1acac3adf2e068de146037490870aaf27c66b46a5056be12549fa"
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
@@ -797,6 +797,10 @@
       "source": "cli/door.mjs",
       "sha256": "b433729e93a41b2691109bb71d78179cbb4fcaa591b75d868de49150d03e29b2"
     },
+    "cli/environment-proxy.mjs": {
+      "source": "cli/environment-proxy.mjs",
+      "sha256": "256b4cb0fc730aeaabdece22a9f7bfe07fbb84fd99d53573305a5a79925f87fe"
+    },
     "cli/errors.mjs": {
       "source": "cli/errors.mjs",
       "sha256": "aed5b5be4faab90d7901154d02d547685d2a5543788bfa7ca13fff38dddb31f1"
@@ -899,7 +903,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "5a0c1a005d051031c539d4bae486bce0091268a47799d00d094aa0674831b66f"
+      "sha256": "5a8e8920f311fd1f61aee4606a2e1d44548dfce05ae98036f8de50d356b78cb1"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -915,11 +919,11 @@
     },
     "cli/node-runtime-download.mjs": {
       "source": "cli/node-runtime-download.mjs",
-      "sha256": "474e9222cc714c007c8be7707b83c7703af8df37d4634fe89ac61e5ff713860e"
+      "sha256": "28189435da77b5f081ec326cb82fae095a405b9379009350990da4323d48275d"
     },
     "cli/node-runtime.mjs": {
       "source": "cli/node-runtime.mjs",
-      "sha256": "d5edabd45812203ed9315bfe3fb3be4b1eb1f6fe5a2d30551d4e39f7226b0293"
+      "sha256": "b34d3e8c8abb6efe81fab5f19fa1fbf841d3220e2416d30ae487e69e918eb97f"
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
@@ -947,7 +951,7 @@
     },
     "cli/pnpm-runtime.mjs": {
       "source": "cli/pnpm-runtime.mjs",
-      "sha256": "027370fa7929d5b19c79eb1fe41938b00416fefccea15b6f6c7d25ece8c5008e"
+      "sha256": "4d0d99bd4d3c143fdac00413a9e7b3640508296adabc2d0aa5ca3338e4713a99"
     },
     "cli/port.mjs": {
       "source": "cli/port.mjs",
