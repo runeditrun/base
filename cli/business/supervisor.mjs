@@ -9,6 +9,7 @@ import { lockSupervisor, stateDirectory, credentialHandle } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
+import { applyOptIns } from './opt-ins.mjs';
 
 const kinds = new Set(['discover.local', 'export.vendor']);
 const unavailableReasons = new Set(['ambiguous-target-installation', 'no-linked-installation', 'installation-import-origin-unavailable', 'installation-owner-claim-unconfigured', 'connected-seed-import-required']);
@@ -21,6 +22,7 @@ export async function run({ once = false } = {}) {
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(interrupted, () => {}); }, 250);
  let progress;
  try {
+  await applyOptIns(api, state, { report: false });
   progress = await loadProgress();
   await unlink(join(directory, 'disconnect')).catch(error => { if (error.code !== 'ENOENT') throw error; });
   do {

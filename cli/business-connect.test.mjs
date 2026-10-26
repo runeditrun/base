@@ -441,6 +441,35 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
  }
 });
 
+test('paired guidance names one applying command and run and next apply later browser choices without reconnecting', async t => {
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  for (const command of ['next', 'run']) {
+   const home = join(directory, `later-choices-${command}-${terminal}`);
+   remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+   const paired = await connect(home, remote, { terminal });
+   assert.match(paired.stdout, /\bbusiness next\b/);
+   // An already-paired invocation emits just the successful connection guidance,
+   // without the earlier instruction for resuming a pending approval.
+   const connected = await cli(home, ['business', 'connect'], { terminal });
+   assert.equal(connected.code, 0, connected.stderr);
+   assert.deepEqual([...new Set(Array.from(connected.stdout.matchAll(/\bbusiness (\w+)\b/g), match => match[1]))], ['next']);
+   assert.doesNotMatch(connected.stdout + connected.stderr, /\bconnect\b/);
+   assert.ok(!(await readdir(home)).includes('.claude'));
+   remote.state.optIns = { installPermissions: true, awakeConsent: true, installService: true };
+   const applied = await cli(home, ['business', command, ...(command === 'run' ? ['--once'] : [])], { terminal });
+   assert.equal(applied.code, 0, applied.stderr);
+   assert.equal(JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8')).awakeConsent, true);
+   assert.ok((await readdir(join(home, '.claude'))).includes('settings.json'));
+   const status = await cli(home, ['business', 'status', '--json']);
+   assert.equal(JSON.parse(status.stdout).service, 'running');
+   assert.equal(remote.state.requests.filter(entry => entry.body.code).length, 1, 'applying choices never redeems another code');
+   assert.equal((await cli(home, ['business', 'disconnect'])).code, 0);
+   remote.state.requests.length = 0;
+  }
+ }
+});
+
 test('vendor exports strip credential values before upload, keeping every record, empty credential fields and pagination', async t => {
  const { exportVendor } = await import('./business/vendors/index.mjs');
  const key = 'fixture-vendor-read-key', apiKey = 'synthetic-fixture-account-api-key-value', password = 'synthetic-fixture-basic-auth-pass';
