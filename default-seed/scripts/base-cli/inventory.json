@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gdbac13e3",
+  "cliVersion": "0.2.83-dev.g4f3663c7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1223,7 +1223,7 @@
     },
     "edition-authoring/runtime-dependencies.mjs": {
       "source": "edition-authoring/runtime-dependencies.mjs",
-      "sha256": "a5e0b7e14dad1c7c5f743e2ce95a532673b05bee9080878e8a9a7f1840a7f290"
+      "sha256": "200181117b750f9f8244b1d1af1b266f966e7401f04a8fa40a12677e59fd6928"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",

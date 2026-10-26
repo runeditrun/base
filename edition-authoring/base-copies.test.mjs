@@ -413,7 +413,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
-  for (const row of ['named', 'default', 'type', 'declaration', 'star', 'unknown', 'baseline', 'withhold', 'witness', 'unplaceable']) {
+  for (const row of ['named', 'default', 'type', 'declaration', 'multi', 'star', 'unknown', 'baseline', 'withhold', 'witness', 'unplaceable']) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
     try {
       const {base, seed, revision} = fixture(temp);
@@ -434,7 +434,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         ok(seed, 'record-base', 'vendor/shared/witness.mjs', 'modules/shared/witness.mjs', witness, '--base', base);
       }
       if (!['withhold', 'witness', 'unplaceable'].includes(row)) {
-        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
+        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
         if (row === 'star') write(seed, 'vendor/sample/leaf.mjs', 'export const missing = true;\n');
         if (row === 'declaration') write(seed, 'vendor/sample/helper.d.mts', 'export const missing: boolean;\n');
         if (row === 'baseline') {

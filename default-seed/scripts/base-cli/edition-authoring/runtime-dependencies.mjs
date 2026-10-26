@@ -76,7 +76,20 @@ export function lexicalExports(source, star) {
     if (t[j] === 'async') j++;
     if (['const', 'let', 'var'].includes(t[j]) && ['{', '['].includes(t[j + 1])) return null;
     if (['const', 'let', 'var', 'function', 'class', 'interface', 'type', 'enum', 'namespace'].includes(t[j]) && t[j + 1] !== '{') {
-      names.add(t[j + 1]); continue;
+      names.add(t[j + 1]);
+      if (['const', 'let', 'var'].includes(t[j])) {
+        let depth = 0;
+        for (let k = j + 2; k < t.length; k++) {
+          if (!depth && [';', 'export', 'import'].includes(t[k])) break;
+          if (['(', '[', '{'].includes(t[k])) depth++;
+          if ([')', ']', '}'].includes(t[k])) depth--;
+          if (!depth && t[k] === ',') {
+            if (!/^[\w$]+$/.test(t[k + 1] ?? '') || !['=', ':'].includes(t[k + 2])) return null;
+            names.add(t[k + 1]);
+          }
+        }
+      }
+      continue;
     }
     if (t[j] === 'type') j++;
     if (t[j] === '*') {
