@@ -313,6 +313,8 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
   const mirror = 'export/scripts/base-cli/edition-authoring';
   const cases = [
     {name: 'singleton transitive imports'},
+    {name: 'runtime singleton imports', origin: 'foundation/runtime'},
+    {name: 'ordinary module imports', origin: 'modules/demo'},
     {name: 'exported mirror root', origin: mirror},
     {name: 'tracked custom helper', custom: 'tracked'},
     {name: 'untracked custom helper', custom: 'untracked'},
@@ -409,6 +411,55 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
+  for (const row of ['named', 'default', 'type', 'declaration', 'star', 'unknown', 'baseline', 'withhold', 'witness', 'unplaceable']) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
+    try {
+      const {base, seed, revision} = fixture(temp);
+      const target = 'vendor/sample/index.mjs';
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+      const specifier = row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
+      const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : 'import {missing} from';
+      const incoming = `${imported} "${specifier}?raw";\nexport const sample = 2;\n`;
+      write(base, row === 'witness' || row === 'unplaceable' ? 'modules/shared/helper.mjs' : 'modules/sample/helper.mjs', 'export const missing = true;\n');
+      if (row === 'withhold') {
+        write(base, 'modules/sample/new.mjs', 'import {missing} from "../shared/helper.mjs";\n');
+        write(base, 'modules/shared/helper.mjs', 'export const missing = true;\n');
+      } else write(base, 'modules/sample/index.mjs', incoming);
+      if (row === 'witness') {
+        write(base, 'modules/shared/witness.mjs', 'export const witness = true;\n');
+        const witness = commit(base);
+        write(seed, 'vendor/shared/witness.mjs', 'export const witness = true;\n');
+        ok(seed, 'record-base', 'vendor/shared/witness.mjs', 'modules/shared/witness.mjs', witness, '--base', base);
+      }
+      if (!['withhold', 'witness', 'unplaceable'].includes(row)) {
+        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
+        if (row === 'star') write(seed, 'vendor/sample/leaf.mjs', 'export const missing = true;\n');
+        if (row === 'declaration') write(seed, 'vendor/sample/helper.d.mts', 'export const missing: boolean;\n');
+        if (row === 'baseline') {
+          write(base, 'modules/sample/index.mjs', incoming);
+          const baseline = commit(base);
+          write(seed, target, incoming);
+          ok(seed, 'record-base', target, 'modules/sample/index.mjs', baseline, '--base', base);
+          // Keep just the singleton mapping, preserving the helper as seed owned.
+          const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
+          record.copies = record.copies.filter(copy => copy.path !== 'vendor/sample');
+          write(seed, 'base-copies.json', JSON.stringify(record));
+        }
+        commit(seed);
+      }
+      const next = commit(base), before = snapshotTree(seed);
+      const result = run(seed, 'refresh-base', next, '--base', base);
+      const refused = ['named', 'default', 'type', 'unplaceable'].includes(row);
+      assert.equal(result.status, refused ? 1 : 0, `${row}: ${result.error}`);
+      if (refused) assert.deepEqual(snapshotTree(seed), before, row);
+      else if (row === 'withhold') {
+        assert.equal(fs.existsSync(path.join(seed, 'vendor/sample/new.mjs')), false);
+        assert.ok(result.report.withheld.some(item => item.path === 'vendor/sample/new.mjs'));
+      } else if (row === 'witness') assert.ok(fs.existsSync(path.join(seed, 'vendor/shared/helper.mjs')));
+      else assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/helper.mjs'), 'utf8'), before['vendor/sample/helper.mjs'].bytes ? Buffer.from(before['vendor/sample/helper.mjs'].bytes, 'hex').toString() : '');
+    } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  }
+
 });
 
 test('refresh-base checks file and directory transitions after each plan removes its old files', () => {
@@ -484,6 +535,39 @@ test('refresh-base refuses to rewrite an applied migration and leaves every file
     assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), 'export const sample = 1;\n');
     assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  for (const row of ['consent', 'adapted', 'already', 'unknown', 'invalid']) {
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-edition-migration-'));
+    try {
+      const {base, seed, revision} = fixture(temporary);
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+      write(base, 'modules/sample/index.mjs', 'export const sample = 2;\n');
+      write(base, 'modules/sample/pricing.mjs', 'export const pricing = true;\n');
+      const introduced = commit(base);
+      const steps = [{id: 'synthetic-contract', introduced, origin: 'modules/sample/index.mjs', guide: 'export/guide.md', edit: 'Add edition-owned pricing.', deliver: ['modules/sample/pricing.mjs']}];
+      write(base, 'foundation/edition-migrations.json', row === 'invalid' ? '{invalid' : JSON.stringify({schemaVersion: 1, migrations: steps}));
+      if (row === 'adapted') ok(seed, 'adapt-base', 'vendor/sample/index.mjs');
+      if (row === 'already') {
+        write(seed, 'vendor/sample/index.mjs', 'export const sample = 2;\n');
+        ok(seed, 'record-base', 'vendor/sample', 'modules/sample', introduced, '--base', base);
+      }
+      const next = commit(base), before = snapshotTree(seed);
+      const flags = row === 'unknown' ? ['--edition-migration', 'unknown'] : [];
+      const result = run(seed, 'refresh-base', next, '--base', base, ...flags);
+      const refused = !['adapted', 'already'].includes(row);
+      assert.equal(result.status, refused ? 1 : 0, `${row}: ${result.error}`);
+      if (refused) assert.deepEqual(snapshotTree(seed), before, row);
+      if (row === 'consent') {
+        const refreshed = ok(seed, 'refresh-base', next, '--base', base, '--edition-migration', steps[0].id);
+        assert.ok(refreshed.editionMigrations.some(step => step.id === steps[0].id));
+        assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/pricing.mjs')));
+        const stable = snapshotTree(seed);
+        ok(seed, 'refresh-base', next, '--base', base);
+        assert.deepEqual(snapshotTree(seed), stable);
+      }
+      if (!refused) assert.deepEqual(result.report.editionMigrations, []);
+    } finally { fs.rmSync(temporary, {recursive: true, force: true}); }
+  }
+
 });
 
 test('record-base records each file mode and verify-base reports mode drift locally and against Base', () => {
