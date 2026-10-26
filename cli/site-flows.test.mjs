@@ -75,8 +75,9 @@ test('built run-site uses US dates and keeps the one-line command start together
   await page.evaluate(() => document.fonts.ready);
   assert.deepEqual(await page.locator('link[rel=icon], link[rel=apple-touch-icon]').evaluateAll(links => links.map(link => ({ href: link.getAttribute('href'), sizes: link.getAttribute('sizes') }))), [{ href: '/favicon.svg', sizes: 'any' }], 'the built shared head selects the existing small icon instead of the full mark');
   assert.equal((await context.request.get(preview.url + '/favicon.svg')).status(), 200, 'the selected icon is exported with the site');
+  await page.locator('.other-ways').evaluate(element => { element.open = true; });
   assert.ok(await page.locator('p code').count(), 'the built page has inline commands');
-  const commandStartLines = () => page.locator('.alt code').evaluate(code => {
+  const commandStartLines = () => page.locator('.alt code').first().evaluate(code => {
    const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT), tops = new Set();
    let offset = 0;
    for (let node = walker.nextNode(); node; node = walker.nextNode()) for (let i = 0; i < node.length; i++, offset++) {
@@ -418,6 +419,11 @@ test('built chooser keeps self first and carries each paid plan through the shar
    await page.goto(preview.url + '/run');
    assert.deepEqual(await page.locator('.chooser section[aria-labelledby]').evaluateAll(sections => sections.filter(s => !s.closest('.paste-panel')).map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', 'managed']);
    assert.equal(await page.locator('button').count(), 1);
+   assert.equal(await page.locator('.code pre').textContent(), 'curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-spool');
+   assert.equal(await page.locator('.other-ways').getAttribute('open'), null, 'secondary recipes stay collapsed during the one-line run');
+   assert.equal(await page.locator('.alt:visible').count(), 0);
+   assert.equal(await page.locator('.quiet a').count(), 1);
+   assert.equal(await page.locator('.quiet a').getAttribute('href'), 'https://app.runeditrun.com/business');
    const closed = mode === 'request' || product === null;
    assert.equal(await page.locator('.assisted .chip').count(), Number(closed));
    assert.equal(await page.locator('.managed .chip').count(), Number(closed || !managed));

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
+
 - Show Assisted at US$10/month and Managed at US$100/month, labelled early access, with global billing on the Run chooser.
 
 ## 0.2.81

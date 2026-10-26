@@ -88,8 +88,7 @@ export const PATHS = {
   signups: 'request' as 'request' | 'app',
   priceNote: 'early access',
   business: { lead: 'Setting up several tools?', action: 'Set up your business once',
-    href: (seed: string, hosting?: 'free' | 'assisted' | 'managed') =>
-      `https://app.runeditrun.com/business/new?${new URLSearchParams({ seed, ...(hosting ? { hosting } : {}) })}` },
+    href: 'https://app.runeditrun.com/business' },
   facts: { source: 'Source:', licence: 'license' },
 }
 
@@ -192,12 +191,12 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
   }).join('')
   const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>${escape(PATHS.heading(run.name))}</h1></div><div class="chooser">`
     + `<section class="self" aria-labelledby="self"><div class="self-heading"><span class="badge">${escape(self.badge)}</span><h2 id="self">${escape(self.title)}</h2><p class="self-body">${escape(self.body(run.name))}</p></div>`
-    + codeBlock(self.command(repo), self.title)
+    + codeBlock(startLine(run), self.title)
     + `<section class="paste-panel" aria-labelledby="paste-title"><h3 id="paste-title">${escape(self.pasteTitle)}</h3><div class="paste-track">${stops(steps, true)}<p class="track-note">${escape(self.note)}</p></div></section>`
-    + `<p class="alt"><span>${escape(self.alt)}</span>${inlineStart(run)}</p><p class="requirements">${escape(self.requirements)}${run.paths.requirementsExtra ? ' ' + escape(run.paths.requirementsExtra) : ''}</p><p class="email-note">${escape(self.email)}</p>`
+    + `<details class="other-ways"><summary>Other ways to run locally</summary><p class="alt"><span>${escape(self.alt)}</span>${inlineStart(run)}</p><div class="alt"><span>To install rer separately:</span><pre><code>curl -fsSL https://runeditrun.com/install.sh | sh</code></pre><span>Then run:</span><pre><code>$HOME/.local/bin/rer dev ${escape(repo)}</code></pre></div><p class="alt"><span>Optional, for future terminals: add <code>$HOME/.local/bin</code> to your shell’s PATH. The one-line launch above already finds rer for this run; you can do this later.</span></p></details><p class="requirements">${escape(self.requirements)}${run.paths.requirementsExtra ? ' ' + escape(run.paths.requirementsExtra) : ''}</p><p class="email-note">${escape(self.email)}</p>`
     + `<div class="timeline">${stops([self.start, ...steps])}<span class="track-divider" aria-hidden="true"></span><p class="track-note">${escape(self.note)}</p></div>`
     + (run.docs ? `<p class="guide">${action(self.guide.href(slug), self.guide.label)}</p>` : '')
-    + `</section><div class="doors">${doors}</div><div class="quiet"><p>${escape(PATHS.business.lead)} ${action(PATHS.business.href(product), PATHS.business.action)}</p></div>`
+    + `</section><div class="doors">${doors}</div><div class="quiet"><p>${escape(PATHS.business.lead)} ${action(PATHS.business.href, PATHS.business.action)}</p></div>`
     + `<footer class="facts"><p>${escape(PATHS.facts.source)} <a href="${escape(run.repository)}">${escape(run.repository.replace(/^https:\/\//, ''))}</a> · ${escape(run.licence)} ${escape(PATHS.facts.licence)}</p></footer></div></main>`
   return document(identity, PATHS.title(run.name), PATHS.meta(run.name), RUN_CHOOSER, body, COPY_SCRIPT, homepage?.styles)
 }
