@@ -43,7 +43,7 @@ function repack(entries, version, extra = []) {
  return tarball([...files, ...extra], 0);
 }
 
-test('install.sh and rer update install verified registry releases, the Run page starts an app on what install.sh installed and its last line puts rer on PATH for new shells, and a bad download leaves the current one', { timeout: 5 * 60_000 }, async t => {
+test('install.sh and rer update install verified registry releases, the Run page starts an app on what install.sh installed and optional shell setup makes rer available in new shells, and a bad download leaves the current one', { timeout: 5 * 60_000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-installer-')), home = join(directory, 'home');
  const registry = await localRegistry();
  t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true }); });
@@ -80,10 +80,13 @@ test('install.sh and rer update install verified registry releases, the Run page
  assert.equal(installed.code, 0, installed.stderr);
  assert.equal(await selected(), manifest.version);
  assert.deepEqual(await readdir(bin), ['node'], 'installation never writes into another writable PATH directory');
- // The installer's last line puts rer on PATH: in the shell that runs it, and
- // in a new login shell of the person's SHELL that starts without it.
- const activate = output => { const last = output.trimEnd().split('\n').at(-1).trim(); return last.includes('.local/bin') ? last : undefined; };
- const hint = activate(installed.stdout);
+ // Installation starts with its absolute launcher; shell modification advice
+ // is available only through the person's separate optional command.
+ const activate = output => { const last = output.trimEnd().split('\n').at(-1).trim(); return /^(?:echo |fish_add_path )/.test(last) ? last : undefined; };
+ assert.doesNotMatch(installed.stdout + installed.stderr, />>|export PATH/);
+ const advice = await run(rer, ['cli', 'path'], env);
+ assert.equal(advice.code, 0, advice.stderr);
+ const hint = activate(advice.stdout);
  assert.ok(hint, installed.stdout);
  assert.equal(installed.stdout.match(/^Next, /gm)?.length, 1, `one next step, not two: ${installed.stdout}`);
  assert.equal((await run('sh', ['-c', `${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
@@ -162,7 +165,7 @@ if (execFileSync('npm', [], { env: { ...process.env, NODE_OPTIONS: '' }, encodin
  const isolated = { ...env, HOME: join(directory, 'activation-home'), PATH: `${foreignBin}:${join(directory, 'activation-home/.local/bin')}:${env.PATH}` };
  const activation = await run('sh', [installer], isolated);
  assert.equal(activation.code, 0, activation.stderr);
- const line = activate(activation.stdout);
+ const line = activate((await run(join(isolated.HOME, '.local/bin/rer'), ['cli', 'path'], isolated)).stdout);
  assert.ok(line, activation.stdout);
  assert.ok(activation.stdout.includes(join(foreignBin, 'rer')), 'installation names the existing command it leaves alone');
  assert.equal((await run('sh', ['-c', `${line}\nrer --version`], isolated)).stdout.trim(), release);
@@ -171,7 +174,7 @@ if (execFileSync('npm', [], { env: { ...process.env, NODE_OPTIONS: '' }, encodin
  const activeEnv = { ...isolated, PATH: `${join(isolated.HOME, '.local/bin')}:${isolated.PATH}` };
  const active = await run('sh', [installer], activeEnv);
  assert.equal(active.code, 0, active.stderr);
- assert.equal(activate(active.stdout), undefined, 'no line when the installed launcher is first now and in new shells');
+ assert.equal(activate((await run(join(isolated.HOME, '.local/bin/rer'), ['cli', 'path'], activeEnv)).stdout), undefined, 'no line when the installed launcher is first now and in new shells');
  assert.ok(active.stdout.includes(join(foreignBin, 'rer')), 'a later existing command is also named and preserved');
  assert.deepEqual(await readdir(bin), ['node']);
  // Uninstall removes only recorded links still pointing at this canonical launcher.

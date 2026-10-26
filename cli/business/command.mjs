@@ -5,7 +5,11 @@ import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
 
-const usage = `Usage: rer business VERB
+const usage = `Set up your business: rer business connect
+Business keeps your business name, logo and brand colour together for the apps
+that support shared Business settings. Choose what to share in your browser.
+
+Advanced commands (Usage: rer business VERB)
   scan [DIR...] [--json]          Names-only local discovery
   connect [--code CODE] [--origin URL]
                                  Pair this computer, waiting until the owner approves in the browser

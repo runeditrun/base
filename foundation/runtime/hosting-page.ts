@@ -6,6 +6,7 @@
 // declarations, the ones `rer deploy` reads (cli/site-hosting.mjs); the page
 // adds only Base's wording. This file is copied unchanged to src/base by both
 // maintained exporters.
+import { coldRunBudget } from './run-data.mjs'
 import { checkIdentity, type EditionIdentity } from './identity'
 import { PATHS, checkRunData, document, escape, header, type HomepageHeader, type RunData } from './run-site'
 import type { SeedContract } from './seed-contract.mjs'
@@ -116,7 +117,7 @@ export function hostingPageHtml(identity: EditionIdentity, run: RunData, hosting
     + `<div class="go"><a class="btn" href="${escape(PATHS.entry('assisted', product))}">${closed ? 'Request access' : 'Set it up with us'}</a>`
     + (closed ? `<p>For now, sign-ups are by request. The link asks for access with ${name} and Assisted already chosen, and we email you about the next steps.</p>` : '')
     + '</div></section>'
-  const body = (sections: string) => `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>Put ${name} online</h1><p class="sub">${name} runs on your own computer first. To use it from anywhere, put it online: ${hosting ? 'Run Edit Run can do it with you, or you can do it yourself on your own Cloudflare account.' : 'Run Edit Run can do it with you.'}</p></div>${sections}</main>`
+  const body = (sections: string) => `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>Put ${name} online</h1><p class="sub">${name} runs on your own computer first. To use it from anywhere, put it online: ${hosting ? 'Run Edit Run can do it with you, or you can do it yourself on your own Cloudflare account.' : 'Run Edit Run can do it with you.'}</p><p class="sub">${escape(coldRunBudget)}</p></div>${sections}</main>`
   const page = (sections: string) => document(identity, `Put ${run.name} online`, `Put ${run.name} online${hosting ? ': let Run Edit Run do it, or deploy it yourself to your own Cloudflare account' : ' with Run Edit Run'}.`, STYLE, body(sections), COPY, homepage?.styles)
   if (!hosting) return page(assisted)
 

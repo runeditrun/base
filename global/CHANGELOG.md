@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Lead Business setup and local launch with one plain next step, defer optional shell setup until ready, and show a shared cold-run budget plus measured archive downloads and disk use.
+
 ## 0.2.81
 
 - Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.

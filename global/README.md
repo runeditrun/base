@@ -1,5 +1,9 @@
 # rer
 
+<!-- BEGIN COLD RUN BUDGET -->
+Allow roughly 500 MB–1 GB of downloads and 1–3 GB of disk space for a first run, including Node, rer, the app and its dependencies. The app and your computer can need more; later runs reuse downloads.
+<!-- END COLD RUN BUDGET -->
+
 `rer` is the Run Edit Run command. Install it once, then run `rer <verb>` in any
 Run Edit Run checkout: every verb runs that checkout's own pinned copy, so a
 checkout always gets the behaviour it was built and tested with.
@@ -21,13 +25,13 @@ Start a seed from an empty folder, with or without Node:
 
 ```sh
 curl -fsSL https://runeditrun.com/install.sh | sh
-rer dev just-every/run-inkwell
+"$HOME/.local/bin/rer" dev just-every/run-inkwell
 ```
 
-The installer needs no Node: without Node 22 or later on PATH it installs a
-private one for `rer` (see below). It edits no shell profile: it names the next
-command, `rer dev <owner>/<repo>`, and when `~/.local/bin` is not on PATH for new
-terminals its last line is the one to run first, which adds it for your shell.
+The installer needs no Node: without Node 22 or later it installs a private one.
+It edits no shell profile. The absolute launcher it prints works immediately;
+after the app opens, an optional `rer cli path` step explains how to make `rer`
+available in future terminals.
 The same start also fits on one line:
 
 ```sh
@@ -66,24 +70,13 @@ With no Node 22 or later on PATH, the script installs Node 22.20.0 from
 `nodejs.org` into `~/.local/share/rer/runtimes` (under `XDG_DATA_HOME` when set),
 verifies the tarball against that release's published `SHASUMS256.txt`, and
 prints its location. The launcher uses this private runtime on later runs.
-System Node and other PATH directories are left alone: the private runtime's
-`node`, `npm` and `npx` are not put on PATH, because `rer` is the one command
-the installer provides. With no arguments the script names the next command,
-`rer dev <owner>/<repo>`, and ends with the PATH line below when one is needed.
-
-No installer edits shell profiles. The canonical launcher is `~/.local/bin/rer`.
-Installation creates that directory if needed and never writes into another
-PATH directory. It names any existing `rer` elsewhere on PATH and leaves it
-unchanged. If `~/.local/bin` is absent from PATH, another command shadows it,
-or no startup file of your shell adds it for new terminals, its last line is
-one command to run: it appends `export PATH="$HOME/.local/bin:$PATH"` to that
-startup file (`~/.zshrc` for zsh; `~/.bash_profile` for bash on macOS and
-`~/.bashrc` elsewhere; `~/.profile` otherwise) and runs it in the current shell.
-For fish it is `fish_add_path ~/.local/bin`. Without a private runtime, the
-launcher uses `node` from PATH. A re-run with the same build changes
-nothing; a different build is installed beside the current one, the previous one
-is kept and older ones are removed. It refuses to replace a `~/.local/bin/rer`
-that it did not write.
+System Node is left alone. With no arguments, the installer prints an app-start
+command using its absolute launcher. After a first launch, `rer cli path` shows
+an optional shell-specific line to make `rer` available in future terminals.
+Only running that line changes a shell startup file; `rer` never edits one.
+A re-run with the same build changes nothing; a different build keeps the
+previous version and removes older ones. It refuses to replace a launcher it
+did not write.
 
 `rer --version` prints this rer's version; inside a checkout a second line
 names the version the checkout pins, or says that its vendored copy is

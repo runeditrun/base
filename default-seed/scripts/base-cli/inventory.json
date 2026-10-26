@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.81-dev.g277ff07e",
+  "cliVersion": "0.2.81-dev.g252f2d03",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -415,7 +415,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "791897875d8d1c5b8159cd35e33ee556e45d8674bea3e7643ae7c7b79b3fffcf"
+      "sha256": "3c7b6b9b1c5f44463a8a77c5657de39073c5d11aa05523c9c43749c8c8b44c79"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -423,7 +423,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "9577b46cdf50a9415a58e791920b029193e019ff3e74c7eef60791fb17239e3f"
+      "sha256": "c465492e86abb1350029abf58f9492769761528bf9a94013a6127aaab9b103f1"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "371851b14598095f8195ff3cec8b547c874848f07fd2b5479dfb1b049724b0da"
+      "sha256": "eb58b8a0f4e5cc860cd78b0fe1d89d6e38dc40e2f51894b616ed8c0bc991aeac"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -903,7 +903,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
+      "sha256": "25ca78341a426445796bc426263a2fd34c329d3cc8fbd1c9da4ffc6bdde0fb6d"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -993,9 +993,17 @@
       "source": "cli/project.mjs",
       "sha256": "bbe4232614d2b9033932ecad4d758521c64975dc697a93fed2cfa34b511c0f91"
     },
+    "cli/ready-summary.mjs": {
+      "source": "cli/ready-summary.mjs",
+      "sha256": "654b7c1ff472ca9cb79551cee9b07cd3cec2e6d97952019eab2dd9dccaef3056"
+    },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
       "sha256": "a6a76c05fe5d0bb3e1c203aa293e514d9bc47e19bfea4a1c5819dec8a6e3ad3f"
+    },
+    "cli/run-transfers.mjs": {
+      "source": "cli/run-transfers.mjs",
+      "sha256": "e03e7012353ffe2ea81c86d98ff3c033f9bcda4b429c43ec305972a6e61d6a48"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -1224,6 +1232,14 @@
     "edition-authoring/updates.mjs": {
       "source": "edition-authoring/updates.mjs",
       "sha256": "54e7246025a618ed16ee042c22dc9a8dc27b06175c30f81c4c6568992ed04799"
+    },
+    "foundation/runtime/run-data.d.mts": {
+      "source": "foundation/runtime/run-data.d.mts",
+      "sha256": "8b8f8e6b6030abe061027eef4b1b1560fdc77f54b25c82048839887da4fe56c1"
+    },
+    "foundation/runtime/run-data.mjs": {
+      "source": "foundation/runtime/run-data.mjs",
+      "sha256": "e27f7c181fe17f54771893a0988098f49395511a8264b4fd3b848ecda1f5c1c9"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",

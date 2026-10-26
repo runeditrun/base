@@ -41,6 +41,27 @@ async function cli(home, args, { terminal = false, input = '', columns = 120, on
   child.stdin.end(input);
  });
 }
+test('Business entry points expose setup before advanced commands and preserve the selected pairing destination', async t => {
+ const home = join(directory, 'handoff-home');
+ const outputs = await Promise.all([['business'], ['business', '--help']].map(args => cli(home, args)));
+ for (const result of outputs) {
+  assert.equal(result.code, 0);
+  const lead = result.stdout.split('\n\n')[0];
+  assert.ok(lead.includes('rer business connect'));
+  assert.ok(result.stdout.indexOf('rer business connect') < result.stdout.indexOf('headersHelper'));
+ }
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  const result = await cli(home, ['business', 'connect', '--origin', remote.origin], { terminal });
+  assert.equal(result.code, 1, 'the no-code handoff does not redeem or alter pairing');
+  const text = result.stdout + result.stderr;
+  const urls = text.match(/https?:\/\/[^\s;]+/g);
+  assert.deepEqual(urls, [remote.origin + '/business'], 'one browser link, for the selected app');
+  assert.ok(!text.includes('app.runeditrun.com'), 'an explicitly selected app is preserved');
+  assert.equal(remote.state.requests.length, 0);
+ }
+});
+
 // The fixture answers polls every second instead of the platform's five.
 async function fixtureServer(t) {
  const remote = await server(t);

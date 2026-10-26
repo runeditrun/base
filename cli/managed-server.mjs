@@ -1,3 +1,5 @@
+import { launchSummary } from './run-transfers.mjs';
+import { readySummary } from './ready-summary.mjs';
 import { prepareLiveModels } from './ai-local.mjs';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
@@ -19,14 +21,19 @@ import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openU
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
 
 // Dev opens through the local identity exchange. Preview serves production output.
-export function ready(out,url,dev,json=false,siteUrl,demo){
+export async function ready(out,url,dev,json=false,siteUrl,demo,root){
  if(json){out.event('ready',{url,...(dev?{signedInAs:dev.signedInAs??null,openUrl:dev.openUrl}:{}),...(siteUrl?{siteUrl}:{}),...(demo?{demo}:{})});return;}
+ if (root) {
+  for (const line of readySummary({ url, ...dev, siteUrl })) out.human(line);
+  for (const line of await launchSummary(root)) out.human(line);
+  out.human('Details for tools and troubleshooting:');
+ }
  out.human(`RER_READY ${url}`);
  if(dev){
   if(dev.signedInAs)out.human(`RER_SIGNED_IN ${dev.signedInAs}`);
   else if(dev.ownerLeft)out.human('No active owner remains in this app. Use rer dev --as PERSONA with an active operator, or rer reset --yes and rer setup for a new owner.');
   out.human(`RER_OPEN ${dev.openUrl}`);
-  out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
+  if (!root) out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
  }
  if(siteUrl)out.human(`RER_SITE ${siteUrl}`);
  if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real. This checkout's own data is untouched.`);}
@@ -169,7 +176,7 @@ async function emitReady(out,options,root,url,dev,siteUrl,demo){
   const {privateDirectory,writePrivateFile}=await shared('private-files.mjs');
   await writePrivateFile(join(await privateDirectory(root,['.rer','local']),'open-url'),dev.openUrl+'\n');
  }
- ready(out,url,dev||undefined,options.json,siteUrl,demo);
+ await ready(out,url,dev||undefined,options.json,siteUrl,demo,options.verb === 'dev' && !options.demo ? root : undefined);
 }
 async function devReady(url,key,options,signal){
  const as=options.as??'owner',persona=await resolvePersona(url,key,as,signal);
