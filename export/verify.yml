@@ -60,6 +60,8 @@ jobs:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
       PLAYWRIGHT_SKIP_BROWSER_GC: '1'
+      # Keep browser downloads independent of HOME and sudo's apt ownership.
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -72,22 +74,37 @@ jobs:
         if: ${{ hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
       - run: npm install --global pnpm@10.12.4
+      - name: Prepare runner-owned browser and apt caches
+        if: matrix.browser
+        run: |
+          set -euo pipefail
+          id
+          printf 'Runner HOME=%s\n' "$HOME"
+          if [ -e "$HOME/.cache" ]; then
+            stat -c 'Home cache: %n uid=%u gid=%g mode=%a' "$HOME/.cache"
+          else
+            printf 'Home cache: absent\n'
+          fi
+          mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
       # Save completed packages; apt keeps partial downloads private to _apt.
       - name: Cache frozen dependencies and Chromium
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
         with:
           path: |
             ~/.local/share/pnpm/store
-            ~/.cache/ms-playwright
-            ~/.cache/rer-apt/archives/*.deb
-          key: seed-ubuntu24-${{ runner.arch }}-browser-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+            ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+            ${{ runner.temp }}/rer-apt/archives/*.deb
+          # Old snapshots contain absolute HOME paths; do not restore them here.
+          key: seed-ubuntu24-temp-${{ runner.arch }}-browser-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Install Chromium and system libraries
         if: matrix.browser
         run: |
           set -euo pipefail
-          sudo env "PATH=$PATH" "APT_ARCHIVES=$HOME/.cache/rer-apt/archives" python3 scripts/install-chromium-deps.py
+          stat -c 'Before apt: %n uid=%u gid=%g mode=%a' "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
+          sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
+          stat -c 'After apt: %n uid=%u gid=%g mode=%a' "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
           pnpm exec playwright install chromium
       - name: Reserve disk for native runtime journeys
         if: matrix.browser

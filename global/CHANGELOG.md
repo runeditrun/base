@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep seed CI Chromium and apt caches under the runner temporary directory, prepare them before sudo, and require the apt helper cache directory to exist so it cannot create runner HOME directories as root.
 - Pin every seed workflow example to Ubuntu 24.04 so Ubuntu 26.04 adoption requires deliberate qualification.
 
 ## 0.2.82
