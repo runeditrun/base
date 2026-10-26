@@ -48,7 +48,7 @@ test('rer dev <repo> clones every release tag, so git checkout <tag> works in th
 });
 
 test('rer install <repo> then rer setup stop at their phases offline, reuse the clone and refuse another origin', { timeout: 60000 }, async t => {
- const directory = await mkdtemp(join(tmpdir(), 'rer-phases-'));
+ const directory = await mkdtemp(join(tmpdir(), '.business-connect-repository-'));
  const source = join(directory, 'source'), home = join(directory, 'home'), app = join(directory, 'app');
  const platform = await server(t); platform.state.pollSeconds = 1;
  t.after(() => rm(directory, { recursive: true, force: true }));
