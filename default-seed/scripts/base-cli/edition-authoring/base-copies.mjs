@@ -351,7 +351,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
   try {
     const read = reader(origin);
     const next = read.tree(revision);
-    const migrations = editionMigrations(record, {tree: next, read, revision, base: origin.repository, recordPath, consent: editionMigration});
+    const migrations = editionMigrations(record, {tree: next, read, revision, base: origin.repository, recordPath, offline, consent: editionMigration});
     for (const name of record.copies.flatMap(copy => Object.keys(copy.files))) requirePhysical(root, name);
     const upstream = read.digests([...next.values()].map(({object}) => object));
     const local = name => files.get(name)?.regular ? hash(files.get(name).read()) : null;
