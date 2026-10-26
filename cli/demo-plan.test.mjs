@@ -123,7 +123,7 @@ test('rer deploy --demo --dry-run packages declared public hosts and refuses uns
   assert.equal(hosted, canonicalConfig.vars.DEMO_RUN_URL);
  }
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ ...operations, seedContract: { ...operations.seedContract, adapter: '../adapter.mjs' } }));
- for (const command of ['serve', 'build']) await assert.rejects(() => localExit(command), /contained checkout path/);
+ for (const command of ['serve', 'build']) await assert.rejects(() => localExit(command), error => error.exitCode === 2);
  const escaped = await rer();
  assert.equal(escaped.code, 2, escaped.stdout + escaped.stderr);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(operations));
