@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Allow seed source folders named exports in development while keeping generated top-level export output and installation archives private.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
