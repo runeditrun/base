@@ -448,6 +448,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         }
         commit(seed);
       }
+      write(base, 'modules/sample/index.mjs', fs.readFileSync(path.join(base, 'modules/sample/index.mjs'), 'utf8') + '// incoming revision\n');
       const next = commit(base), before = snapshotTree(seed);
       const result = run(seed, 'refresh-base', next, '--base', base);
       const refused = ['named', 'default', 'type', 'unplaceable'].includes(row);
@@ -551,6 +552,7 @@ test('refresh-base refuses to rewrite an applied migration and leaves every file
         write(seed, 'vendor/sample/index.mjs', 'export const sample = 2;\n');
         ok(seed, 'record-base', 'vendor/sample', 'modules/sample', introduced, '--base', base);
       }
+      write(base, 'modules/sample/index.mjs', fs.readFileSync(path.join(base, 'modules/sample/index.mjs'), 'utf8') + '// incoming revision\n');
       const next = commit(base), before = snapshotTree(seed);
       const flags = row === 'unknown' ? ['--edition-migration', 'unknown'] : [];
       const result = run(seed, 'refresh-base', next, '--base', base, ...flags);

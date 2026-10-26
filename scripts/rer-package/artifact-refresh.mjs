@@ -35,9 +35,8 @@ export async function refreshSmoke({root, installed, base, ref, run, output}) {
  const consent = data.migrations.flatMap(step => ['--edition-migration', step.id]);
  return seeds.map(([seedRepository, seedRevision]) => {
   const name = new URL(seedRepository).pathname.split('/').at(-1).slice('run-'.length, -'.git'.length), seed = join(root, name);
-  run('git', ['init', '--quiet', seed]);
-  run('git', ['-C', seed, 'fetch', '--quiet', '--filter=blob:none', seedRepository, seedRevision]);
-  run('git', ['-C', seed, 'checkout', '--quiet', '--detach', 'FETCH_HEAD']);
+  run('git', ['clone', '--quiet', '--filter=blob:none', '--no-checkout', seedRepository, seed]);
+  run('git', ['-C', seed, 'checkout', '--quiet', '--detach', seedRevision]);
   const recordPath = join(seed, 'base-copies.json');
   const record = () => JSON.parse(readFileSync(recordPath));
   const unresolved = new Set(imports(seed, record(), specifiers, resolve).filter(edge => !edge.target).map(edge => edge.path + '\0' + edge.specifier));
