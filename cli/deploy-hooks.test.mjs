@@ -258,7 +258,7 @@ async function fixture(t, { declared = false, selfClaim = false, existing = fals
 test('conventional legacy function hook claims actual bootstrap, retires re-uploaded tokens, and bypasses hooks for changes', async t => {
  const f = await fixture(t);
  const original = { ...process.env };
- const dry = await f.run({ dryRun: true }); assert.equal(dry.deployed, false); assert.ok(f.requests.length>0); assert.ok(f.requests.every(call=>call.startsWith('GET '))); assert.equal(f.provider.state.writes.length,0);
+ const dry = await f.run({ dryRun: true }); assert.equal(dry.deployed, false); assert.equal(f.requests.length,0,'a local dry run makes no provider request'); assert.equal(f.provider.state.writes.length,0); assert.equal(f.builds(),0,'a local dry run bypasses the custom upload hook');
  const first = await f.run(); assert.equal(first.owner, 'claimed'); assert.equal(f.claims.length, 1);
  assert.equal(f.requests.filter(call => call === 'POST /auth/signout').length, 1, 'the unused claim session is retired once');
  assert.ok(Object.keys(process.env).length === Object.keys(original).length && Object.entries(original).every(([key, value]) => process.env[key] === value), 'caller environment restored');
