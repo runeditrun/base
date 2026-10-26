@@ -46,9 +46,11 @@ test('Business entry points expose setup before advanced commands and preserve t
  const outputs = await Promise.all([['business'], ['business', '--help']].map(args => cli(home, args)));
  for (const result of outputs) {
   assert.equal(result.code, 0);
-  const lead = result.stdout.split('\n\n')[0];
-  assert.ok(lead.includes('rer business connect'));
-  assert.ok(result.stdout.indexOf('rer business connect') < result.stdout.indexOf('headersHelper'));
+  const [lead, ...secondary] = result.stdout.trim().split(/\n\s*\n/);
+  assert.equal(lead.match(/\brer business connect\b/g)?.length, 1, 'one setup action leads help');
+  assert.ok(!/^\s*token(?:\s|$)/m.test(lead), 'advanced commands stay out of the lead');
+  assert.ok(secondary.some(section => /^\S[^\n]*\n/.test(section) && /^ +token(?:\s|$)/m.test(section)),
+   'the token command remains in a separate, headed section after setup');
  }
  const remote = await fixtureServer(t);
  for (const terminal of [false, true]) {
