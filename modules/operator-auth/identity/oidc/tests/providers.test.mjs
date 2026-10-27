@@ -402,15 +402,28 @@ foldedCases.push(['a provider below the minimum interface version is refused and
 
 
 test('sign-in hooks: beforeMagicLink can hold a link back and afterConfirm can redirect or refuse a sign-in', async t => {
-  const setup = { ...presets(), hooks: { quietFor: 'quiet@example.com', reviewFor: 'restored@example.com', refuseFor: 'forged@example.com' } };
+
+  const setup = { ...presets(), hooks: { quietFor: 'quiet@example.com', reviewFor: 'restored@example.com', refuseFor: 'forged@example.com' } };const fixture=async t=>{
   const r = await runtime(t, setup); await r.bootstrap();
   for (const email of ['quiet@example.com', 'restored@example.com', 'forged@example.com']) await r.operator(email);
+return r; };
+await runCases(t, [
+['held magic link', async t => {
+const r=await fixture(t);
   assert.equal((await r.call('/auth/magic-link', { method: 'POST', input: { email: 'quiet@example.com' } })).status, 202);
   assert.equal((await r.mails()).length, 0, 'the seed held this link back');
+}],
+['reviewed magic link', async t => {
+const r=await fixture(t);
   assert.equal((await r.call('/auth/magic-link', { method: 'POST', input: { email: 'restored@example.com' } })).status, 202);
   const restored = await r.call('/auth/confirm', { method: 'POST', input: { token: await r.link() } });
   assert.equal(restored.status, 303); assert.equal(restored.headers.get('location'), '/app/review');
+}],
+['refused magic link', async t => {
+const r=await fixture(t);
   assert.equal((await r.call('/auth/magic-link', { method: 'POST', input: { email: 'forged@example.com' } })).status, 202);
   await refused(r, await r.call('/auth/confirm', { method: 'POST', input: { token: await r.link() } }), 403, 'restored_operator_review');
   assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM oa_sessions s JOIN oa_operators o ON o.id=s.operator_id WHERE o.email='forged@example.com' AND s.revoked_at IS NULL").first()).n, 0);
+}]
+]);
 });

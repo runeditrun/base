@@ -109,13 +109,20 @@ test('timeoutMilliseconds bounds the single attempt', { timeout: 10_000 }, async
   assert.ok(performance.now() - start < 5_000);
 });
 
-test('the mail facade accepts the same optional timeout and rejects invalid values', { timeout: 10_000 }, async (t) => {
+test('the mail facade accepts the same optional timeout and rejects invalid values', { timeout: 10_000 }, async t => {
+
   const config = { provider: 'sendgrid', mode: 'test', apiKey: 'fixture-key' };
+  await runCases(t, [
+['bounded optional transport timeout', async t => {
   const start = performance.now();
   const result = await createMailSender(config, { timeoutMilliseconds: 50, fetch: () => new Promise(() => {}) }).send(message());
   assert.equal(result.status, 'uncertain');
   assert.ok(performance.now() - start < 5_000);
+}],
+['invalid timeout variants', async t => {
   await runCases(t, Array.from([0, -1, 1.5, '50', Number.NaN], (timeoutMilliseconds, rowIndex) => [`${t.name}: timeoutMilliseconds row ${rowIndex + 1}`, async t => {
     assert.throws(() => createMailSender(config, { timeoutMilliseconds, fetch: accept }), error => error instanceof MailValidationError && error.code === 'invalid_timeout');
 }]));
+}]
+  ]);
 });

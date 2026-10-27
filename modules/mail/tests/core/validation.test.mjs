@@ -6,17 +6,32 @@ import { MailValidationError } from '../../src/core/errors.mjs';
 const message = () => ({ deliveryId: 'command-7', from: 'Équipe <help@example.com>', to: ['reader@example.net'], subject: '', text: 'Hello' });
 const rejects = (operation, code) => assert.throws(operation, error => error instanceof MailValidationError && error.code === code && !error.message.includes('SENSITIVE'));
 
-test('explicit provider configuration never falls back to development', async (t) => {
+test('explicit provider configuration never falls back to development', async t => {
+
+  await runCases(t, [
+['production provider credentials', async t => {
   await runCases(t, Array.from(['sendgrid', 'resend', 'cloudflare'], (provider, rowIndex) => [`${t.name}: provider row ${rowIndex + 1}`, async t => {
     rejects(() => validateConfig({ provider, mode: 'production' }), 'api_key_required');
     const config = { provider, mode: 'test', apiKey: 'test-token', ...(provider === 'cloudflare' ? { accountId: 'a'.repeat(32) } : {}) };
     assert.equal(validateConfig(config), config);
 }]));
+}],
+['unknown provider refuses', async t => {
   rejects(() => validateConfig({ provider: 'fixture', mode: 'test' }), 'invalid_provider');
+}],
+['development requires explicit mode', async t => {
   rejects(() => validateConfig({ provider: 'development', mode: 'production' }), 'development_mode_required');
+}],
+['explicit development mode', async t => {
   assert.doesNotThrow(() => validateConfig({ provider: 'development', mode: 'development' }));
+}],
+['development outbox configuration', async t => {
   assert.equal(validateConfig({ provider: 'development', mode: 'development' }, { outbox: { async put() {} } }).provider, 'development');
+}],
+['header injection key refuses', async t => {
   rejects(() => validateConfig({ provider: 'sendgrid', mode: 'production', apiKey: 'SENSITIVE\r\nInjected:x' }), 'invalid_api_key');
+}]
+  ]);
 });
 
 test("mail message validation preserves exact supported content and refuses unsafe inputs", async t => {

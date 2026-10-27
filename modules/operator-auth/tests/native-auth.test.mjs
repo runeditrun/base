@@ -169,7 +169,10 @@ assert.equal((await post(r,path,input,cookie)).status,501,path);
   await runCases(t, foldedCases);
 });
 
-test('direct lifecycle and composed native/OA services run one completion hook and durably revoke a refused session',async t=>{
+test('direct lifecycle and composed native/OA services run one completion hook and durably revoke a refused session',async t => {
+
+  await runCases(t, [
+['completion hook modes', async t => {
   await runCases(t, Array.from(['direct','native','oa'], (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
     const native=mode==='oa'?{}:{native:{standaloneEmail:mode==='direct'}};
     const hooks={reviewFor:'owner@example.com',refuseFor:'owner@example.com'};
@@ -185,10 +188,14 @@ test('direct lifecycle and composed native/OA services run one completion hook a
       assert.ok((await r.db.prepare(`SELECT revoked_at FROM ${table} WHERE id=?`).bind(calls[0].session_id).first()).revoked_at,`${mode} ${method} persisted revocation`);
 }]));
 }]));
+}],
+['completion hook return destination', async t => {
   const r=await runtime(t,setup({native:{standaloneEmail:true},hooks:{reviewFor:'owner@example.com',returnTo:'https://foreign.example'}}));
   const response=await post(r,'/auth/confirm',{token:await email(r)});
   assert.equal(response.status,303);assert.equal(response.headers.get('location'),'/app');assert.equal(await count(r,'fixture_hook_calls'),1);
   assert.equal((await r.call('/auth/session',{cookie:r.session(response)})).status,200);
+}]
+  ]);
 });
 
 test("native server-verified seams preserve association, policy and binding authority without an OIDC transaction pin", async t => {

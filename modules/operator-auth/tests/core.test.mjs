@@ -245,7 +245,11 @@ foldedCases.push(['invitation retries invalidate older links; role changes and c
 
 
 
-test('trusted external and password seams share native policy and subject binding; custom policy restricts management', async (t) => {
+test('trusted external and password seams share native policy and subject binding; custom policy restricts management', async t => {
+
+await runCases(t, [
+['native policy and subject binding', async t => {
+
   const r = await runtime({ externalIssuers: ['https://idp.example.com'] });
   try {
     const ownerCookie = await r.bootstrap();
@@ -273,10 +277,15 @@ assert.equal((await r.call('/test/external', post({ identity: { ...identity, ...
     assert.equal((await r.call('/test/external', post({ identity }))).status, 403);
     assert.equal((await r.call('/auth/session', { cookie: cookie(external) })).status, 401);
   } finally { await r.close(); }
+}],
+['custom invitation policy', async t => {
+
   const variation = await runtime({}, { denyInvites: true });
   try {
     const owner = await variation.bootstrap();
     assert.equal((await variation.call('/auth/invite', post({ email: 'staff@example.com', displayName: 'Staff' }, owner))).status, 403);
     assert.equal((await variation.call('/auth/operators', { cookie: owner })).status, 200);
   } finally { await variation.close(); }
+}]
+]);
 });

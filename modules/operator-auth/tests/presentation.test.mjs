@@ -13,11 +13,18 @@ import { runtime, presets } from '../identity/oidc/tests/fake-runtime.mjs';
 const base = { origin: 'https://auth.test', OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'test-only-session-secret-at-least-32-characters' };
 const branding = { productName: '<A & "B">', accentColor: '#fffFFF', signInPath: '/signin?next=%2Fapp&from=auth' };
 
-test('branding validates all optional fields and snapshots only public presentation', async (t) => {
+test('branding validates all optional fields and snapshots only public presentation', async t => {
+
+  await runCases(t, [
+['default public branding', async t => {
   assert.deepEqual(configure(base).branding, { productName: 'your workspace', accentColor: '#334155', signInPath: '/signin' });
+}],
+['invalid public branding variants', async t => {
   await runCases(t, Array.from([null, [], '', 1, true, { productName: '' }, { productName: '   ' }, { productName: 1 }, { productName: 'a'.repeat(81) }, { productName: 'a\nB' }, { productName: 'a\u0085B' }, { accentColor: '#fff' }, { accentColor: 'red' }, { accentColor: '#112233; color:red' }, { accentColor: null }, { signInPath: null }, ...['//evil.test', '/\\evil.test', 'https://evil.test', 'javascript:alert(1)', '/\nroute', '/%2fevil.test', '/%252fevil.test', '/%5cevil.test', '/%00', '/%zz', '/%25250a'].map(signInPath => ({ signInPath }))], (invalid, rowIndex) => [`${t.name}: invalid row ${rowIndex + 1}`, async t => {
     assert.throws(() => configure({ ...base, branding: invalid }), { code: 'invalid_configuration', status: 503 });
 }]));
+}],
+['immutable public branding snapshot', async t => {
   const input = { ...branding, SESSION_SECRET: 'test-must-not-copy-extra-fields' };
   const auth = createOperatorAuth({ db: {}, config: { ...base, branding: input }, clientIp: () => '192.0.2.1' });
   assert.deepEqual(auth.presentation, branding);
@@ -25,7 +32,11 @@ test('branding validates all optional fields and snapshots only public presentat
   assert.equal(auth.presentation.productName, branding.productName);
   assert.ok(Object.isFrozen(auth.presentation));
   assert.throws(() => { auth.presentation.productName = 'Changed'; }, TypeError);
+}],
+['maximum product name boundary', async t => {
   assert.equal(configure({ ...base, branding: { productName: 'a'.repeat(80), signInPath: '/signin?q=one%20two#start' } }).branding.productName.length, 80);
+}]
+  ]);
 });
 
 test("product names preserve visible Unicode while refusing unsafe or misplaced scalars", async t => {
@@ -193,10 +204,17 @@ test('HTML confirmation has one exact-byte stylesheet hash and a minimal credent
   }]]);
 });
 
-test('a declared seed theme links its served stylesheet and the CSP admits only same-origin theme files', async (t) => {
+test('a declared seed theme links its served stylesheet and the CSP admits only same-origin theme files', async t => {
+
+await runCases(t, [
+['invalid seed theme variants', async t => {
+
   await runCases(t, Array.from(['//evil.test/x.css', 'https://evil.test/x.css', '/x.js', '/a/../x.css', '/.x.css', '/x.css?y', '/x".css', 1], (theme, rowIndex) => [`${t.name}: theme row ${rowIndex + 1}`, async t => {
     assert.throws(() => configure({ ...base, branding: { theme } }), { code: 'invalid_configuration', status: 503 });
 }]));
+}],
+['served seed theme and policy', async t => {
+
   const themed = configure({ ...base, branding: { ...branding, theme: '/rer-theme.css' } }).branding;
   assert.equal(themed.theme, '/rer-theme.css');
   const response = await confirmationResponse({ branding: themed, preview: { kind: 'magic', expiresInMinutes: 15 }, token: 'test-only-opaque-token', method: 'GET' });
@@ -206,6 +224,8 @@ test('a declared seed theme links its served stylesheet and the CSP admits only 
   const style = html.match(/<style>([\s\S]*?)<\/style>/)[1];
   const hash = createHash('sha256').update(style).digest('base64');
   assert.equal(response.headers.get('Content-Security-Policy'), `${securityHeaders()['Content-Security-Policy']}; style-src 'self' 'sha256-${hash}'; font-src 'self'; img-src 'self'`);
+}]
+]);
 });
 
 test('the owner sign-in settings page wears the declared seed theme, as sign-in does', async t => {

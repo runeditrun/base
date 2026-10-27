@@ -49,11 +49,14 @@ foldedCases.push(['invitation rate limits precede mail side effects and reinvita
 
 
 
-test('the development CLI sign-in proof never spends a person\'s sign-in budget, and only a local server honours it', async () => {
+test('the development CLI sign-in proof never spends a person\'s sign-in budget, and only a local server honours it', async t => {
+
   const proof = createHmac('sha256', SECRET).update('local-cli\0sign-in').digest('hex');
   const cli = { 'x-rer-local-cli': proof };
   const owner = { email: 'owner@example.com' };
-  const now = Date.now(); // Every request in this budget proof uses one rate window.
+  const now = Date.now();
+  await runCases(t, [
+['local development proof budget', async t => { // Every request in this budget proof uses one rate window.
   const local = await runtime({ origin: 'http://127.0.0.1:8787', local: true, emailLimit: 2, ipLimit: 3 }, { now });
   try {
     for (let i = 0; i < 6; i++) assert.equal((await local.call('/auth/magic-link', post(owner, undefined, { headers: cli }))).status, 202);
@@ -61,9 +64,13 @@ test('the development CLI sign-in proof never spends a person\'s sign-in budget,
     assert.equal((await local.call('/auth/magic-link', post(owner))).status, 202);
     assert.equal((await local.call('/auth/magic-link', post(owner))).status, 429);
   } finally { await local.close(); }
+}],
+['hosted server ignores development proof', async t => {
   const production = await runtime({ emailLimit: 2 }, { now });
   try {
     for (let i = 0; i < 2; i++) assert.equal((await production.call('/auth/magic-link', post(owner, undefined, { headers: cli }))).status, 202);
     assert.equal((await production.call('/auth/magic-link', post(owner, undefined, { headers: cli }))).status, 429);
   } finally { await production.close(); }
+}]
+  ]);
 });

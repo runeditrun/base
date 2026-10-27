@@ -16,7 +16,8 @@ async function states(db, tenant = 'tenant', namespace = 'events') {
   return (await db.prepare('SELECT recipient, status, event_id FROM rer_mail_event_states WHERE tenant_id = ? AND event_namespace = ? ORDER BY recipient').bind(tenant, namespace).all()).results;
 }
 
-test('signed public intake uses real atomic D1 for races, isolation, full rollback and restart', { timeout: 60000 }, async (t) => {
+test('signed public intake uses real atomic D1 for races, isolation, full rollback and restart', { timeout: 60000 }, async t => {
+  await runCases(t, [['atomic mail intake journey', async t => {
   const path = await mkdtemp(join(tmpdir(), 'messaging-d1-'));
   let runtime;
   try {
@@ -110,4 +111,6 @@ await runCases(t, Array.from(['events', 'other'], (eventNamespace, rowIndex) => 
 }]));
     assert.deepEqual(await counts(db), baseline);
   } finally { await runtime?.dispose(); await rm(path, { recursive: true, force: true }); }
+
+  }]]);
 });

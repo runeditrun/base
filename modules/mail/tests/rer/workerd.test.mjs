@@ -11,7 +11,8 @@ const notice = { deliveryId: 'notice-1', from: 'News <news@example.test>', to: [
     'List-Id': 'Subscriber notices <notices.example.test>', 'List-Archive': '<https://app.example.test/notices>', 'List-Help': '<mailto:help@example.test>',
     'In-Reply-To': '<post.42@example.test>', References: '<post.41@example.test> <post.42@example.test>' } };
 
-test('a Worker sends sign-in and threaded subscriber notices through the rer relay and refuses invalid headers locally', async (t) => {
+test('a Worker sends sign-in and threaded subscriber notices through the rer relay and refuses invalid headers locally', async t => {
+  await runCases(t, [['relay worker transcript', async t => {
   const relay = [];
   let status = 202;
   const worker = await createWorker('tests/rer/relay-worker.mjs', ['index.mjs'], async request => {
@@ -73,6 +74,8 @@ await runCases(t, Array.from(values, (value, rowIndex) => [`${t.name}: value row
       inReplyTo: headers['in-reply-to'], references: headers.references });
     assert.equal(relay.length, 4);
   } finally { await worker.dispose(); }
+
+  }]]);
 });
 
 // Platform c1e3ade's keyed Message-ID: RFC 4648 base32 of sha256(installation + ':' + key), first 32 characters.

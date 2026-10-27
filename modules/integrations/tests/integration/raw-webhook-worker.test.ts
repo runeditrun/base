@@ -9,6 +9,7 @@ import { key, tenant, destinationId, signedWebhook, byteMutations, receiverWorke
 const { Miniflare } = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 'miniflare');
 
 test('documented Fetch receiver runs in workerd with raw-byte authentication and durable D1 replay protection', async t => {
+  await runCases(t, [['raw Fetch receiver journey', async t => {
   const now = Math.floor(Date.now() / 1000) * 1000;
   const originalNow = Date.now;
   Date.now = () => now;
@@ -66,4 +67,6 @@ test('documented Fetch receiver runs in workerd with raw-byte authentication and
     assert.equal((await send(signedWebhook('\ufeff{"text":"signed BOM"}', { id: 'signed-bom' }))).status, 204);
     assert.equal((await rows()).results.length, 4);
   } finally { await runtime.dispose(); await rm(directory, { recursive: true, force: true }); }
+
+  }]]);
 });
