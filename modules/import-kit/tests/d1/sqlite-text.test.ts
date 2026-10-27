@@ -12,6 +12,8 @@ test('SQLite test port decodes complete TEXT bytes, types and bindings on Node 2
   assert.equal((await limits.prepare(`SELECT max(${Array(32).fill(1).join(',')}) AS n`).first())!.n, 1);
   await assert.rejects(limits.prepare(`SELECT max(${Array(33).fill(1).join(',')})`).first(), /D1 limit exceeded: SQL function arguments maximum 32, measured 33/);
   await limits.batch([limits.prepare(`CREATE TABLE main.synthetic_base_columns(${Array.from({length:100},(_,i)=>`c${i} TEXT`).join(',')})`)]);
+  await limits.batch([limits.prepare(`CREATE VIRTUAL TABLE synthetic_base_search USING fts5(${Array.from({length:33},(_,i)=>`c${i}`).join(',')})`)]);
+  assert.equal((await limits.prepare('PRAGMA table_info(synthetic_base_search)').all()).results.length, 33, 'virtual-table module arguments are not SQL function arguments');
   assert.ok(await limits.prepare('SELECT ' + 'NOT '.repeat(99) + '1 AS n').first());
   await assert.rejects(limits.prepare('SELECT ' + 'NOT '.repeat(100) + '1').first(), /expression depth estimate.*maximum 100, measured 101/);
   t.diagnostic('D1 public SQLite port: bound parameters 100 PASS, 101 rejected; function arguments 32 PASS, 33 rejected (preflight only on Node 22)');

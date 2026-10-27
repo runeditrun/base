@@ -73,7 +73,7 @@ export function d1Preflight(sql, values = [], tableColumns) {
     const token = tokens[i], close = pairs.get(i + 1);
     const call = close !== undefined && /^[\p{L}_][\p{L}\p{N}_$]*$/u.test(token.text) && !structural.has(token.word);
     // A table name following CREATE TABLE or INSERT INTO is not a function.
-    const table = ['TABLE', 'INTO', 'EXISTS', 'REFERENCES', 'VIEW'].includes(tokens[i - 1]?.word)
+    const table = ['TABLE', 'INTO', 'EXISTS', 'REFERENCES', 'VIEW', 'USING'].includes(tokens[i - 1]?.word)
       || tokens[i - 1]?.text === '.' && ['TABLE', 'INTO', 'EXISTS', 'REFERENCES', 'VIEW'].includes(tokens[i - 3]?.word)
       || tokens[i - 1]?.word === 'ON' && tokens.slice(0, i).some(t => t.word === 'INDEX')
       || tokens[close + 1]?.word === 'AS' && ['(', 'MATERIALIZED', 'NOT'].includes(tokens[close + 2]?.word);
@@ -90,7 +90,7 @@ export function d1Preflight(sql, values = [], tableColumns) {
       if (count !== undefined && action === 'DROP') projectedColumns.set(key(name), count - 1);
       if (count !== undefined && action === 'RENAME' && tokens[nameIndex + 2]?.word === 'TO') projectedColumns.set(key(identifier(tokens[nameIndex + 3])), count);
     }
-    if (token.word === 'TABLE' && tokens.slice(Math.max(0, i - 2), i).some(t => t.word === 'CREATE')) {
+    if (token.word === 'TABLE' && tokens[i - 1]?.word !== 'VIRTUAL' && tokens.slice(Math.max(0, i - 2), i).some(t => t.word === 'CREATE')) {
       let open = i + 1;
       while (open < tokens.length && tokens[open].text !== '(') open++;
       const end = pairs.get(open);
