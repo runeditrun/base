@@ -1,7 +1,9 @@
 // Proven runner copied byte-identically from runeditrun/base commit
-// db43e31e48e6796354479019fade1390aad1ec46, import-kit/tests/helpers/case-row.ts.
-// Arbitrary fulfilled orphan promises cannot be detected; use row.defer() for
-// detached work beyond the runner's bounded rejection-observation window.
+// db43e31e48e6796354479019fade1390aad1ec46, modules/import-kit/tests/helpers/case-row.ts.
+// Returned work and unawaited nested runner calls are drained automatically.
+// Detached rejections are observed through two event-loop turns and microtasks;
+// later or unrelated failures retain the test runner's handling. Arbitrary
+// fulfilled orphan promises cannot be detected. Use row.defer() beyond that window.
 import { caseRow as runRow, caseRows as runRows } from './case-row.ts';
 
 // Signal proxies must retain the copied runner's context identity in nested calls.
