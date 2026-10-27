@@ -20,6 +20,10 @@ test('plain packed CLI failures preserve machine diagnostics and large JSON repo
  assert.equal(stderr.join(''), 'Synthetic failure\nRun the same command with --json for details.\n');
  assert.equal(humanError({ code: 'launch_failed', message: 'TypeError: Synthetic failure\n    at synthetic-base-1:1' }), 'Synthetic failure\nRun the same command with --json for details.');
  assert.equal(humanError({ code: 'command_failed', message: 'Synthetic failure' }), 'Synthetic failure\nRun the same command with --json for details.');
+ const detail = 'Command: synthetic-base-1\nExit code: 27\nLast output:\nTypeError: Synthetic failure\n    at synthetic-base-1:1\nLog: synthetic-base-2';
+ assert.equal(humanError({ code: 'command_failed', message: `Synthetic cause\n${detail}` }), 'Synthetic cause\nCommand: synthetic-base-1\nExit code: 27\nLast output:\nSynthetic failure\nLog: synthetic-base-2');
+ assert.equal(humanError({ code: 'launch_failed', message: 'Synthetic cause\n    at synthetic-base-1:1' }), 'Synthetic cause\nRun the same command with --json for details.');
+ assert.equal(humanError({ code: 'command_failed', message: 'Synthetic cause. It holds:\n  synthetic-base-1: rer deploy --environment synthetic-base-1' }), 'Synthetic cause. It holds:\n  synthetic-base-1: rer deploy --environment synthetic-base-1');
  const root = await mkdtemp(join(tmpdir(), 'rer-output-'));
  t.after(() => rm(root, { recursive: true, force: true }));
  const effects = 'Read the complete description: café 日本語. '.repeat(16384);

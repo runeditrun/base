@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g605e9186",
+  "cliVersion": "0.2.83-dev.ga6dffa10",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -831,7 +831,7 @@
     },
     "cli/human-error.mjs": {
       "source": "cli/human-error.mjs",
-      "sha256": "80fbe5d0219adfe51c15276c5d83af92aafccdc1273b982045120cd2a741fae8"
+      "sha256": "29a67b0d4967d3ad493f8afeb1a4baaeb187b55e0313f801f923d43c369d9776"
     },
     "cli/hydration/browser.mjs": {
       "source": "cli/hydration/browser.mjs",

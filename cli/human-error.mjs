@@ -10,8 +10,11 @@ export function humanError(error, { retry } = {}) {
  }
  const technical = /(?:^|\n)\s*(?:at |[A-Za-z]*Error:)/.test(text);
  if (technical || ['command_failed', 'launch_failed'].includes(error.code ?? error.event?.code)) {
-  const message = text.split('\n')[0].replace(/^[A-Za-z]*Error:\s*/, '').trim();
-  return `${message || 'The command failed.'}\nRun ${retry ?? 'the same command'} with --json for details.`;
+  const lines = text.split('\n').filter(line => !/^\s*at /.test(line))
+   .map(line => line.replace(/^(\s*)[A-Za-z]*Error:\s*/, '$1'));
+  const message = lines.shift()?.trim() || 'The command failed.';
+  const detail = lines.join('\n').trimEnd();
+  return `${message}\n${detail.trim() ? detail : `Run ${retry ?? 'the same command'} with --json for details.`}`;
  }
  return text;
 }
