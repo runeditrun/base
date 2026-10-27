@@ -391,10 +391,6 @@ operationRows.push(['a lock left by a killed setup or build is taken over, a liv
   await assert.rejects(stat(lock), { code: 'ENOENT' })
 }])
 
-test("build keeps credentials private on success and failure", async t => {
-  await runRows(t, buildRows)
-})
-
 test("dev preflight refuses missing credentials and reports occupied ports", async t => {
   await runRows(t, [...devRows, ...nativeBindingRows])
 })
@@ -404,5 +400,5 @@ test("local operation ownership excludes overlap and recovers stale locks", asyn
 })
 
 test("setup admission and credential lifecycle validate safe inputs before private publication", async t => {
-  await runRows(t, [...optionRows, ...lifecycleRows, ...unsafeFileRows, ...setupRerunRows])
+  await runRows(t, [...optionRows, ...lifecycleRows, ...unsafeFileRows, ...setupRerunRows, ...buildRows])
 })

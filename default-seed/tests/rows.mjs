@@ -7,7 +7,7 @@ export async function runRows(t, rows) {
     const errors = []
     let timer
     try {
-      const pending = run({ after: hook => cleanup.push(hook), mock: t.mock })
+      const pending = run({ after: hook => cleanup.push(hook), mock: t.mock, diagnostic: message => t.diagnostic(`${name}: ${message}`) })
       if (options.timeout) {
         await Promise.race([pending, new Promise((_, reject) => {
           timer = setTimeout(() => reject(new Error(`Row exceeded ${options.timeout} ms`)), options.timeout)

@@ -1,3 +1,5 @@
+import { maintenanceRows } from '../operator-auth/scheduled-maintenance.mjs'
+import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createReadStream } from 'node:fs'
@@ -9,6 +11,8 @@ import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { freshLocalProject } from './runtime.mjs'
 import { door, planPeople, applyDoor, finishDoor, assertWithdrawn } from './import-door.mjs'
+
+const erasureRows = []
 
 const tag = Math.random().toString(36).slice(2, 10)
 const canary = { name: `Name${tag}`, email: `mail-${tag}@example.test`, note: `Note${tag}`, detail: `Detail${tag}`, filename: `File${tag}.txt`, body: `Body${tag}` }
@@ -81,7 +85,7 @@ const sql = (root, query) => {
 }
 const refused = (run) => assert.rejects(run, /failed \(4\)/)
 
-test('BASE-DATA-003 a person with 300 notes and 300 reactions across 30 imports erases through bounded, continued steps that survive a server restart, while pending door custody is withdrawn and unrelated imported peers survive', { timeout: 30 * 60_000 }, async (t) => {
+erasureRows.push(['BASE-DATA-003 a person with 300 notes and 300 reactions across 30 imports erases through bounded, continued steps that survive a server restart, while pending door custody is withdrawn and unrelated imported peers survive', { timeout: 30 * 60_000 }, async (t) => {
   const runtime = await freshLocalProject('large-erasure-owner@example.test')
   try {
     let owner = api(runtime.origin, await session(runtime.origin, runtime.vars.RER_DEV_KEY, 'owner'))
@@ -153,9 +157,9 @@ test('BASE-DATA-003 a person with 300 notes and 300 reactions across 30 imports 
     assert.equal((await sql(runtime.root, "SELECT count(*) AS n FROM people WHERE details LIKE '%U-KEPT%'"))[0].n, 300, 'all 300 reacted peers keep their other reactions')
     t.diagnostic('300 notes + 300 reactions over 30 imports: 202 then queued steps; people=1, person_notes=300; no identifier left; withdrawn pending plan rolled back and all 300 unrelated imported peers preserved')
   } finally { await runtime.close() }
-})
+}])
 
-test('BASE-DATA-003 person erasure leaves no planted value anywhere, keeps anonymised audit, and old archives are fenced', { timeout: 30 * 60_000 }, async () => {
+erasureRows.push(['BASE-DATA-003 person erasure leaves no planted value anywhere, keeps anonymised audit, and old archives are fenced', { timeout: 30 * 60_000 }, async () => {
   const runtime = await freshLocalProject('erasure-owner@example.test')
   try {
     const { root, origin } = runtime, cli = (verb, ...args) => runtime.command(['run', verb, '--', ...args, '--non-interactive'])
@@ -227,9 +231,9 @@ test('BASE-DATA-003 person erasure leaves no planted value anywhere, keeps anony
     await refused(cli('import', '--input', 'exports/pre.rer', '--journal', 'exports/post.rer', '--yes'))
     assert.deepEqual(await sql(root, 'SELECT id FROM people'), [], 'nothing restored past the supplied journal')
   } finally { await runtime.close() }
-})
+}])
 
-test('BASE-DATA-003 an imported person is erased from import custody; a withdrawn pending door refuses apply and a clean replan applies and undoes; old archives stay fenced', { timeout: 30 * 60_000 }, async (t) => {
+erasureRows.push(['BASE-DATA-003 an imported person is erased from import custody; a withdrawn pending door refuses apply and a clean replan applies and undoes; old archives stay fenced', { timeout: 30 * 60_000 }, async (t) => {
   const alice = { name: `Alice${tag}`, email: `alice-${tag}@example.test`, detail: `Phone${tag}`, note: `Note${tag}` }
   const actor = `U-ERASE-${tag}`
   const reactions = Array.from({ length: 15 }, (_, index) => ({ name: `reaction-${index}`, count: 2, users: [actor, 'U-PEER'] }))
@@ -321,4 +325,8 @@ test('BASE-DATA-003 an imported person is erased from import custody; a withdraw
     t.diagnostic(`Journey body failed before cleanup: ${error.code ?? error.name}`)
     throw error
   } finally { await runtime.close() }
+}])
+
+test('person erasure clears native and import custody, fences archives and resumes through interrupted or broken cron work', async t => {
+  await runRows(t, [...erasureRows, ...maintenanceRows])
 })

@@ -1,3 +1,4 @@
+import { startupRows } from './browser-startup.mjs'
 import { runRows } from '../../default-seed/tests/rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -113,10 +114,6 @@ test('accepted provider send still fails when its durable mail row is missing', 
     observe() { assert.fail('No successful mail observation without durable provider association'); } }), /sendgrid-durable-readback-failed/);
 });
 
-test("browser replay boundary: exact delivery, replay and visible reloads", async t => {
-  await runRows(t, replayRows)
-})
-
-test("durable transcript boundary: persisted identities, roles and content", async t => {
-  await runRows(t, transcriptRows)
+test("reply delivery requires exact socket replay, visible reloads and a durable transcript", async t => {
+  await runRows(t, [...replayRows, ...transcriptRows, ...startupRows])
 })

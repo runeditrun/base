@@ -141,12 +141,12 @@ admissionRows.push(['emitted Worker: prior data survives additive migration and 
   } finally { await runtime.close() }
 }])
 
-test('emitted Worker browser: owner setup, POST magic confirmation and revoke at desktop/mobile widths', async () => {
+admissionRows.push(['emitted Worker browser: owner setup, POST magic confirmation and revoke at desktop/mobile widths', {}, async () => {
   const { browserProof } = await import('./browser.mjs')
   await browserProof()
-})
+}])
 
-test('emitted Worker browser: native sessions stay separate across loopback ports', async () => {
+admissionRows.push(['emitted Worker browser: native sessions stay separate across loopback ports', {}, async () => {
   // Browsers keep cookies per host, not per port: one browser holds both apps'
   // cookies for 127.0.0.1 and sends all of them to each port.
   const keys = ['a', 'b'].map((letter) => letter.repeat(43))
@@ -191,7 +191,7 @@ test('emitted Worker browser: native sessions stay separate across loopback port
     await pageB.reload(); await signedIn(pageB)
     assert.equal(await admits(b), 200, 'sign-out on A leaves B signed in')
   } finally { await Promise.allSettled([browser?.close(), a.close(), b.close()]) }
-})
+}])
 
 admissionRows.push(['emitted Worker: a linked Auth provider verifies a signed callback and shares revoked session admission', {}, async () => {
   const runtime = await emittedRuntime({ oidc: true, noMail: true })

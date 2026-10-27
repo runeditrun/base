@@ -103,11 +103,11 @@ for (const fault of [undefined, 'install', 'build', 'ignored-build-failure', 'ar
   assert.equal(calls.filter(args => args[0] === 'remove').length, 2);
   assert(!existsSync(join(work, 'broker')));
 }]);
-test('generic runner refuses missing Linux attestation before source or adapter execution', async () => {
+authorityRows.push(['generic runner refuses missing Linux attestation before source or adapter execution', {}, async () => {
   await assert.rejects(runStandalone({}, {}), /live-environment-required/);
   await assert.rejects(runStandalone({}, { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'runeditrun/base', GITHUB_REF: 'refs/heads/main',
     GITHUB_EVENT_NAME: 'workflow_dispatch', T016_CONTROLLER_IMAGE: images.controller, T016_BUILD_IMAGE: images.build, T016_BROWSER_IMAGE: images.browser }), /isolation-unqualified/);
-});
+}]);
 
 test("reviewed executor routes literal commands through isolated build and artifact custody", async t => {
   await runRows(t, executorRows)

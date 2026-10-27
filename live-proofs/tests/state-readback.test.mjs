@@ -1,3 +1,4 @@
+import { upgradeRows } from './upgrade-readback.mjs'
 import { runRows } from '../../default-seed/tests/rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -111,10 +112,6 @@ continuityRows.push(['recheck retains applied migration byte immutability before
     browser: () => assert.fail('Changed history must fail before browser/login') }), /applied-migration-bytes-changed/);
 }]);
 
-test("snapshot binds exact journey messages before accepting a continuity baseline", async t => {
-  await runRows(t, messageRows)
-})
-
-test("snapshot and recheck refuse lost data, media and applied history", async t => {
-  await runRows(t, continuityRows)
+test("snapshot and recheck bind the exact journey and preserve data, media and applied history", async t => {
+  await runRows(t, [...messageRows, ...continuityRows, ...upgradeRows])
 })

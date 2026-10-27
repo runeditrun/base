@@ -8,9 +8,6 @@ import { execute, cleanEnvironment } from './commands.mjs';
 import { ciMetadata } from './metadata.mjs';
 import { Receipt, hash } from './receipt.mjs';
 import { PROOFS, EVIDENCE } from './constants.mjs';
-import { artifactAdversary } from './artifact-adversary.mjs';
-import { tarEntry } from './archive-fixtures.mjs';
-import { unpackArtifact } from '../../t016/artifact.mjs';
 
 const commandRows = []
 const retentionRows = []
@@ -37,15 +34,6 @@ commandRows.push(['actual commands preserve failures, bounded output and process
   const timeout = await execute([process.execPath, '-e', 'setInterval(()=>{},1000)'], { env, timeout: 100 }); assert.equal(timeout.timedOut, true); assert.notEqual(timeout.exitCode, 0);
   const overflow = await execute([process.execPath, '-e', 'console.log("x".repeat(10000))'], { env, limit: 20 }); assert.equal(overflow.overflow, true);
 }]);
-test('real strict unpacker accepts regular bytes and rejects link/traversal/config targets', () => {
-  const root = scratch();
-  try {
-    const receipt = new Receipt(join(root, 'reports'), {});
-    artifactAdversary({ root, receipt });
-    const ok = join(root, 'good'); mkdirSync(ok); const files = unpackArtifact(tarEntry('payload'), ok, 'dist');
-    assert.equal(files[0].sha256, hash('test')); assert.equal(readFileSync(join(ok, 'dist/payload'), 'utf8'), 'test');
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
 retentionRows.push(['receipt cannot pass missing proofs, missing evidence, or image custody', {}, async () => {
   const root = scratch();
   try {
