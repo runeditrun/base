@@ -1,6 +1,9 @@
 import path from 'node:path';
 import {packageTarget} from './package-target.mjs';
 export const external = Symbol('external package target');
+export function canonical(specifier, kind = 'import') {
+  return kind !== 'require' && specifier?.startsWith('.') ? specifier.split(/[?#]/)[0] : specifier;
+}
 
 const declaration = name => /\.d\.[cm]?ts$/.test(name);
 const sourceExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs', '.json'];
@@ -15,7 +18,7 @@ export function resolve(tree, source, specifier, {types = false, kind = 'import'
   const packagePath = packaged && packageTarget(tree, source, specifier, {kind, types, package: packageState});
   if (packageState.external) return external;
   if (packaged && !packagePath) return;
-  const relative = kind === 'require' ? specifier : specifier.split(/[?#]/)[0];
+  const relative = canonical(specifier, kind);
   if (kind !== 'require' && /%2f|%5c/i.test(relative)) throw Error(`Invalid encoded separator in module specifier ${specifier}`);
   const name = packaged ? packagePath : path.posix.normalize(path.posix.join(path.posix.dirname(source), kind === 'require' ? relative : decodeURIComponent(relative)));
   const sourceModule = /\.(?:[cm]?ts|[jt]sx)$/.test(source);

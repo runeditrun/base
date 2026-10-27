@@ -39,4 +39,24 @@ export function packageClasses({fixture, write, commit, ok, run, snapshotTree}) 
     assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
     assert.equal(spawnSync(process.execPath, [path.join(seed, 'vendor', entry)]).status, 0);
   });
+  for (const specifier of ['#b', 'fixture-self/b?query']) fixture(({base, seed}) => {
+    const metadata = JSON.stringify({name: 'fixture-self', type: 'module',
+      imports: {'#b': {types: './b.d.mts', default: './b.mjs'}},
+      exports: {'./b?query': {types: './b.d.mts', default: './b.mjs'}}});
+    for (const [name, bytes] of [['a.mjs', 'export const a=1;\n'], ['package.json', metadata],
+      ['b.mjs', 'export const value=731;\n'], ['b.d.mts', 'export declare const value:number;\n']]) write(base, 'modules/package/' + name, bytes);
+    const original = commit(base);
+    for (const [name, bytes] of [['a.mjs', 'export const a=1;\n'], ['package.json', metadata], ['b.d.mts', 'export declare const value:number;\n']]) {
+      write(seed, 'vendor/' + name, bytes);
+      ok(seed, 'record-base', 'vendor/' + name, 'modules/package/' + name, original, '--base', base);
+    }
+    write(seed, 'vendor/b.mjs', 'export const custom=1;\n'); commit(seed);
+    write(base, 'modules/package/a.mjs', `import {value} from '${specifier}';export const a=value;\n`);
+    const next = commit(base), before = snapshotTree(seed);
+    assert.equal(run(seed, 'refresh-base', next, '--base', base).status, 1);
+    assert.deepEqual(snapshotTree(seed), before);
+    assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+    assert.equal(spawnSync(process.execPath, [path.join(seed, 'vendor/a.mjs')]).status, 0);
+  });
+
 }

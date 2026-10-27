@@ -1,3 +1,4 @@
+import {canonical} from './module-resolution.mjs';
 import {parse} from './vendor/babel-parser/babel-parser/index.mjs';
 
 const literal = node => node?.type === 'StringLiteral' ? node.value :
@@ -66,7 +67,7 @@ export function dependencies(source, filename = 'module.mjs') {
   } while (changed);
   const add = (node, kind, types = false) => {
     const specifier = literal(unwrap(node));
-    if (specifier) result.push({specifier: kind !== 'require' && specifier.startsWith('.') ? specifier.split(/[?#]/)[0] : specifier, kind, types});
+    if (specifier) result.push({specifier: canonical(specifier, kind), kind, types});
   };
   for (const node of all) {
     if (node.type === 'ImportDeclaration') {
