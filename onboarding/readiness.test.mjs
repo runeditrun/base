@@ -1,3 +1,6 @@
+import {caseRows} from './test-fixture.mjs';
+const readinessCases = [];
+const readinessCase = (name, check) => readinessCases.push([name, check]);
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -20,7 +23,7 @@ function readiness(f, health, options = {}) {
  return waitForReadiness('Start', f.child, health, { timeoutMs: 1000, intervalMs: 5, probeTimeoutMs: 20, ...options }, f.capture, () => {}, failure);
 }
 
-test('hung HTTP request times out and a later healthy response retains the owned app', async t => {
+readinessCase('hung HTTP request times out and a later healthy response retains the owned app', async t => {
  const root = await mkdtemp(join(tmpdir(), 'readiness-http-'));
  const store = await createCommands(root, { logs: [] }, { terminal: () => {} });
  let requests = 0;
@@ -57,7 +60,7 @@ test('hung HTTP request times out and a later healthy response retains the owned
  assert.doesNotThrow(() => process.kill(child.pid, 0), 'healthy app was terminated');
 });
 
-test('a callback ignoring its abort signal cannot block later probes', async () => {
+readinessCase('a callback ignoring its abort signal cannot block later probes', async () => {
  const f = fixture();
  let attempts = 0, firstSignal;
  const result = await readiness(f, signal => {
@@ -70,7 +73,7 @@ test('a callback ignoring its abort signal cannot block later probes', async () 
  assert.equal(f.child.exitCode, null);
 });
 
-for (const reason of ['cancel', 'deadline', 'exit', 'error']) test(`${reason} promptly aborts an active uncooperative probe`, async () => {
+for (const reason of ['cancel', 'deadline', 'exit', 'error']) readinessCase(`${reason} promptly aborts an active uncooperative probe`, async () => {
  const f = fixture(), controller = new AbortController();
  let begin;
  const entered = new Promise(resolve => { begin = resolve; });
@@ -95,7 +98,7 @@ for (const reason of ['cancel', 'deadline', 'exit', 'error']) test(`${reason} pr
  assert.ok(Date.now() - start < 500, 'outer event waited for the per-probe timeout');
 });
 
-test('probe, progress and deadline waits clean up with an injected clock', async () => {
+readinessCase('probe, progress and deadline waits clean up with an injected clock', async () => {
  let now = 0;
  const timers = new Set();
  const wait = (ms, signal) => new Promise(resolve => {
@@ -121,7 +124,7 @@ test('probe, progress and deadline waits clean up with an injected clock', async
  for (const value of [0, -1, NaN, Infinity]) await assert.rejects(readiness(f, () => true, { probeTimeoutMs: value }), /positive/);
 });
 
-for (const [intervalMs, expected] of [[1, 5000], [2000, 6000]]) test(`default probe timeout follows interval ${intervalMs}`, async () => {
+for (const [intervalMs, expected] of [[1, 5000], [2000, 6000]]) readinessCase(`default probe timeout follows interval ${intervalMs}`, async () => {
  const durations = [], pending = new Set();
  const wait = (ms, signal) => new Promise(resolve => {
   durations.push(ms);
@@ -134,3 +137,5 @@ for (const [intervalMs, expected] of [[1, 5000], [2000, 6000]]) test(`default pr
  assert.ok(durations.includes(expected));
  assert.equal(pending.size, 0);
 });
+
+test('readiness retries probes and resolves promptly with bounded waits and cleanup', t => caseRows(t, readinessCases));

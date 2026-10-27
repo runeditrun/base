@@ -1,3 +1,4 @@
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile, chmod } from 'node:fs/promises';
@@ -87,7 +88,8 @@ test('feature flags must describe the hooks the adapter really runs', () => {
  assert.throws(() => localInstaller({ migrations: [] }), /Unknown installer hook: migrations/);
 });
 
-test('a complete install generates private settings, hides them from the build, claims the owner and opens the application', async t => {
+test("local installation and reruns preserve private settings, claim the owner and open the declared application", t => caseRows(t, [
+  ['a complete install generates private settings, hides them from the build, claims the owner and opens the application', async t => {
  const f = await fixture(t);
  const { store, app } = await installOnce(f, localInstaller(hooks()));
  t.after(async () => { if (app) await store.stop(app); });
@@ -109,9 +111,8 @@ test('a complete install generates private settings, hides them from the build, 
  assert.match(log, /First owner claimed/); assert.match(log, /Opening your application/);
  assert.deepEqual(await proofs(f), [localCliProof(vars.SESSION_SECRET)], 'the default session secret setting is SESSION_SECRET');
  assert.deepEqual(await readdirSafe(join(f.root, '.wrangler/local-build')), [], 'the build restored .dev.vars and removed its run folder');
-});
-
-test('a devIdentity seed\'s install gives the temporary app the dev key and offers the key-gated way in', async t => {
+}],
+  ['a devIdentity seed\'s install gives the temporary app the dev key and offers the key-gated way in', async t => {
  const f = await fixture(t);
  await mkdir(join(f.root, 'scripts/installer'), { recursive: true });
  await writeFile(join(f.root, 'OPERATIONS.json'), JSON.stringify({ seedContract: { adapter: 'scripts/installer/local.mjs' } }));
@@ -125,12 +126,8 @@ test('a devIdentity seed\'s install gives the temporary app the dev key and offe
  const keyFile = join(f.root, '.rer/local/dev-key.env'), key = /^RER_DEV_KEY=(\S+)$/m.exec(await readFile(keyFile, 'utf8'))[1];
  assert.equal((await stat(keyFile)).mode & 0o777, 0o600);
  assert.ok(!JSON.stringify(store.state).includes(key) && !(await readFile(store.logPath, 'utf8')).includes(key));
-});
-
-const proofs = async f => (await readFile(join(f.root, 'proofs.log'), 'utf8')).trim().split('\n');
-const localCliProof = secret => createHmac('sha256', secret).update('local-cli\0sign-in').digest('hex');
-
-test('the CLI\'s local sign-in proof comes from the setting the adapter declares as its session secret', async t => {
+}],
+  ['the CLI\'s local sign-in proof comes from the setting the adapter declares as its session secret', async t => {
  const f = await fixture(t);
  const { store, app } = await installOnce(f, localInstaller(hooks({ sessionSecretKey: 'AUTH_SECRET', secrets: { ...hooks().secrets, generate: ['AUTH_SECRET', 'SETUP_TOKEN'] } })));
  t.after(async () => { if (app) await store.stop(app); });
@@ -139,27 +136,8 @@ test('the CLI\'s local sign-in proof comes from the setting the adapter declares
  assert.equal(vars.SESSION_SECRET, undefined);
  assert.deepEqual(await proofs(f), [localCliProof(vars.AUTH_SECRET)], 'owner claim carries the proof');
  assert.throws(() => localInstaller({ sessionSecretKey: 'auth secret' }), /sessionSecretKey must name a setting/);
-});
-
-test('setup stops before the claim when another process answers on the port the application did not bind', async t => {
- const f = await fixture(t);
- const requests = [];
- const foreign = http.createServer((request, response) => { requests.push(request.method + ' ' + request.url); response.writeHead(request.url === '/health' ? 200 : 404); response.end('{"status":"ok"}'); });
- foreign.listen(0, '127.0.0.1'); await once(foreign, 'listening');
- t.after(() => foreign.close());
- const origin = 'http://127.0.0.1:' + foreign.address().port;
- // The started application never binds the port, as when the foreign app wins the race for it.
- const kit = localInstaller(hooks({ origin: () => origin, start: [node, ['-e', 'setInterval(() => {}, 1000)']] }));
- const store = await f.open();
- let app;
- await kit.install(f.root, input, store, child => { app = child; });
- assert.equal(store.state.phase, 'failed');
- assert.match(store.state.error.split('\n')[0], /Another process answered on port \d+; the application did not bind it/);
- assert.deepEqual(requests.filter(request => request.startsWith('POST')), [], 'no claim or sign-in request reached the other app');
- assert.notEqual(app.exitCode ?? app.signalCode, null, 'the started application was stopped');
-});
-
-test('a rerun keeps the owner\'s settings, origin and claimed owner', async t => {
+}],
+  ['a rerun keeps the owner\'s settings, origin and claimed owner', async t => {
  const f = await fixture(t);
  const first = await installOnce(f, localInstaller(hooks()));
  assert.equal(first.store.state.phase, 'complete', first.store.state.error);
@@ -175,9 +153,8 @@ test('a rerun keeps the owner\'s settings, origin and claimed owner', async t =>
  assert.equal(new URL(second.store.state.appUrl).origin, localVariables(before.toString()).AUTH_ORIGIN, 'the saved origin was reused');
  assert.match(await readFile(second.store.logPath, 'utf8'), /An owner is already claimed; the existing owner was kept/);
  assert.equal(new URL(second.store.state.appUrl).pathname, '/');
-});
-
-test('missing settings are added after the owner\'s exact existing lines', async t => {
+}],
+  ['missing settings are added after the owner\'s exact existing lines', async t => {
  const f = await fixture(t);
  const existing = '# private comment\nOWNER_EMAIL=kept@example.test\nAUTH_ORIGIN=http://127.0.0.1:1\n';
  await writeFile(join(f.root, '.dev.vars'), existing, { mode: 0o640 });
@@ -190,9 +167,8 @@ test('missing settings are added after the owner\'s exact existing lines', async
  assert.deepEqual(Object.keys(vars).sort(), ['AUTH_LOCAL', 'AUTH_ORIGIN', 'MAIL_PROVIDER', 'OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN']);
  assert.deepEqual(text.slice(existing.length).split('\n').map(line => line.split('=')[0]), ['AUTH_LOCAL', 'MAIL_PROVIDER', 'SESSION_SECRET', 'SETUP_TOKEN', '']);
  assert.equal((await stat(join(f.root, '.dev.vars'))).mode & 0o777, 0o600);
-});
-
-test('JSON settings files are generated with the requested encoding and kept on rerun', async t => {
+}],
+  ['JSON settings files are generated with the requested encoding and kept on rerun', async t => {
  const f = await fixture(t);
  const kit = localInstaller(hooks({ secrets: { file: 'data/local-secrets.json', format: 'json', encoding: 'base64url', generate: ['SESSION_SECRET', 'RUNNER_KEY'] }, build: false, migrate: false, start: false, owner: false, signIn: false, features: {} }));
  const first = await installOnce(f, kit);
@@ -204,9 +180,35 @@ test('JSON settings files are generated with the requested encoding and kept on 
  assert.equal((await stat(path)).mode & 0o777, 0o600);
  await installOnce(f, kit);
  assert.ok((await readFile(path)).equals(saved));
-});
+}]
+ ]));
 
-test('a failed build is a canned failure with the captured diagnostic, restores .dev.vars and starts nothing', async t => {
+
+
+const proofs = async f => (await readFile(join(f.root, 'proofs.log'), 'utf8')).trim().split('\n');
+const localCliProof = secret => createHmac('sha256', secret).update('local-cli\0sign-in').digest('hex');
+
+
+
+test("local installation refuses unmet prerequisites, failed builds and rejected or cancelled startup before reporting failure", t => caseRows(t, [
+  ['setup stops before the claim when another process answers on the port the application did not bind', async t => {
+ const f = await fixture(t);
+ const requests = [];
+ const foreign = http.createServer((request, response) => { requests.push(request.method + ' ' + request.url); response.writeHead(request.url === '/health' ? 200 : 404); response.end('{"status":"ok"}'); });
+ foreign.listen(0, '127.0.0.1'); await once(foreign, 'listening');
+ t.after(() => foreign.close());
+ const origin = 'http://127.0.0.1:' + foreign.address().port;
+ // The started application never binds the port, as when the foreign app wins the race for it.
+ const kit = localInstaller(hooks({ origin: () => origin, start: [node, ['-e', 'setInterval(() => {}, 1000)']] }));
+ const store = await f.open();
+ let app;
+ await kit.install(f.root, input, store, child => { app = child; });
+ assert.equal(store.state.phase, 'failed');
+ assert.match(store.state.error.split('\n')[0], /Another process answered on port \d+; the application did not bind it/);
+ assert.deepEqual(requests.filter(request => request.startsWith('POST')), [], 'no claim or sign-in request reached the other app');
+ assert.notEqual(app.exitCode ?? app.signalCode, null, 'the started application was stopped');
+}],
+  ['a failed build is a canned failure with the captured diagnostic, restores .dev.vars and starts nothing', async t => {
  const f = await fixture(t);
  const kit = localInstaller(hooks({ build: [node, ['build.mjs'], { env: { ...process.env, FAIL_BUILD: '1' } }] }));
  let started = false;
@@ -220,9 +222,8 @@ test('a failed build is a canned failure with the captured diagnostic, restores 
  assert.equal(started, false);
  assert.ok(localVariables(await readFile(join(f.root, '.dev.vars'), 'utf8')).SETUP_TOKEN, '.dev.vars restored after the failed build');
  assert.deepEqual(await readdirSafe(join(f.root, '.wrangler/local-build')), []);
-});
-
-test('requirements fail with canned Node and tool messages before any command', async t => {
+}],
+  ['requirements fail with canned Node and tool messages before any command', async t => {
  const f = await fixture(t);
  assert.throws(() => localInstaller({ tools: ['definitely-not-a-supported-tool'] }), /Unsupported required tool/);
  for (const [extra, expected] of [[{ node: '999.0.0' }, /^Install Node\.js 999\.0\.0/], [{ tools: ['npm'] }, /^npm was not found/]]) {
@@ -234,9 +235,8 @@ test('requirements fail with canned Node and tool messages before any command', 
   assert.match(store.state.error, expected);
   await assert.rejects(stat(join(f.root, '.dev.vars')), { code: 'ENOENT' }, 'nothing ran');
  }
-});
-
-test('a rejected owner claim stops the started application before reporting failure', async t => {
+}],
+  ['a rejected owner claim stops the started application before reporting failure', async t => {
  const f = await fixture(t);
  const kit = localInstaller(hooks({ owner: { tokenKey: 'SESSION_SECRET' } }));
  const store = await f.open();
@@ -252,9 +252,8 @@ test('a rejected owner claim stops the started application before reporting fail
  await assert.rejects(stat(join(f.root, 'outbox.json')), { code: 'ENOENT' }, 'a rejected claim issues no sign-in message');
  const vars = localVariables(await readFile(join(f.root, '.dev.vars'), 'utf8'));
  await assert.rejects(fetch(vars.AUTH_ORIGIN + '/health'), 'the rejected claim leaves no application listener');
-});
-
-test('cancelling while the application starts stops it and reports a stop, not a failure', async t => {
+}],
+  ['cancelling while the application starts stops it and reports a stop, not a failure', async t => {
  const f = await fixture(t);
  const abort = new AbortController();
  const kit = localInstaller(hooks({ start: ({ origin }) => [node, ['-e', "setInterval(()=>{},1000)"], { health: '/never' }] }));
@@ -266,7 +265,22 @@ test('cancelling while the application starts stops it and reports a stop, not a
  assert.equal(store.state.phase, 'failed');
  assert.match(store.state.error.split('\n')[0], /cancelled/);
  if (app.exitCode === null && app.signalCode === null) await once(app, 'close');
-});
+}]
+ ]));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Test-only stand-in for deploy-kit owner-cli.mjs: records the command and
 // which inputs it received (never their values) and writes the owner state.
@@ -357,7 +371,8 @@ async function devRun(t, f, { load, migrate }) {
  return { store, outcome, app };
 }
 
-test('a dev start held by the machine-load queue says the computer is busy, not that migrations failed', async t => {
+test("dev start distinguishes queue refusal, migration failure and a healthy application", t => caseRows(t, [
+  ['a dev start held by the machine-load queue says the computer is busy, not that migrations failed', async t => {
  const f = await fixture(t);
  const { store, outcome, app } = await devRun(t, f, { load: 40 });
  assert.ok(outcome, 'the dev start is refused');
@@ -367,24 +382,27 @@ test('a dev start held by the machine-load queue says the computer is busy, not 
  assert.doesNotMatch(message, /Local migrations failed|Installation stopped/);
  assert.equal(app, undefined, 'nothing started');
  assert.equal(await readFile(join(f.root, 'migrations.log'), 'utf8'), 'applied\n', 'the held migration did not run again');
-});
-
-test('a dev start whose migration really fails keeps its own message with the command output', async t => {
+}],
+  ['a dev start whose migration really fails keeps its own message with the command output', async t => {
  const f = await fixture(t);
  const { outcome } = await devRun(t, f, { load: 1, migrate: [node, ['-e', "console.error('no such table: widgets'); process.exit(1)"]] });
  assert.match(outcome.message, /Applying database migrations: exit 1, signal none\./);
  assert.match(outcome.message, /no such table: widgets/);
  assert.match(outcome.message, /Local migrations failed\. Fix the error and run rer setup/);
  assert.doesNotMatch(outcome.message, /machine is busy|this computer is busy/);
-});
-
-test('a dev start under the load limit applies migrations and starts the application', async t => {
+}],
+  ['a dev start under the load limit applies migrations and starts the application', async t => {
  const f = await fixture(t);
  const { store, outcome, app } = await devRun(t, f, { load: 1 });
  assert.equal(outcome, null);
  assert.equal(await readFile(join(f.root, 'migrations.log'), 'utf8'), 'applied\napplied\n');
  assert.equal(app.exitCode, null);
-});
+}]
+ ]));
+
+
+
+
 
 async function readdirSafe(path) {
  const { readdir } = await import('node:fs/promises');

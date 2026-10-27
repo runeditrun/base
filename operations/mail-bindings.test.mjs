@@ -1,3 +1,4 @@
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
@@ -36,7 +37,8 @@ async function fixture(t, selected = binding()) {
   return { root, descriptor, save, run };
 }
 
-test('mail binding checks the selected runtime inputs, preserves foundation validation, and guides the CLI without values', async t => {
+test("declared mail inputs select hosted or development bindings and refuse malformed declarations", t => caseRows(t, [
+  ['mail binding checks the selected runtime inputs, preserves foundation validation, and guides the CLI without values', async t => {
   const { root, descriptor, save, run } = await fixture(t);
   descriptor.environmentSources = { MAIL_API_KEY: 'Owner vault, active mail account', RESEND_API_KEY: 'Owner vault, legacy mail account' };
   await save();
@@ -79,9 +81,8 @@ test('mail binding checks the selected runtime inputs, preserves foundation vali
   assert.equal(JSON.parse(invalid.stdout).configuration, 'invalid');
   assert.equal(`${invalid.stdout}${invalid.stderr}`.includes('synthetic-validator-private-value'), false);
   for (const name of ['MAIL_API_KEY', 'MAIL_FROM', 'RESEND_FROM_EMAIL', 'APP_URL']) assert.ok(invalid.stderr.includes(name));
-});
-
-test('development mail is explicit and confined to canonical loopback origins in development mode', async t => {
+}],
+  ['development mail is explicit and confined to canonical loopback origins in development mode', async t => {
   const { root, descriptor, save } = await fixture(t);
   const local = { MAIL_PROVIDER: 'development', ENVIRONMENT: 'development', MAIL_FROM: 'noreply@example.test' };
   for (const origin of ['http://localhost', 'https://localhost:8787', 'http://127.0.0.1:8787', 'http://[::1]:8787/']) {
@@ -106,9 +107,8 @@ test('development mail is explicit and confined to canonical loopback origins in
   descriptor.loops[0].required = false;
   await save();
   assert.equal((await inspectOperations(root, {})).ok, true);
-});
-
-test('another project binds its own selector, hosted credentials, sender, account and development guard names', async t => {
+}],
+  ['another project binds its own selector, hosted credentials, sender, account and development guard names', async t => {
   const alternate = {
     providerEnvironment: 'DELIVERY_DRIVER',
     providers: {
@@ -136,9 +136,8 @@ test('another project binds its own selector, hosted credentials, sender, accoun
   descriptor.environmentSources.MAIL_API_KEY = 'Undeclared input source';
   await save();
   await assert.rejects(describeOperations(root));
-});
-
-test('malformed bindings fail describe and check even while disabled and never disclose malformed values', async t => {
+}],
+  ['malformed bindings fail describe and check even while disabled and never disclose malformed values', async t => {
   const { root, descriptor, save, run } = await fixture(t);
   const pristine = structuredClone(descriptor.loops[0]);
   const mutations = [
@@ -197,9 +196,8 @@ test('malformed bindings fail describe and check even while disabled and never d
     await assert.rejects(describeOperations(root));
     await assert.rejects(inspectOperations(root, {}));
   }
-});
-
-test('fixed hosted declarations retain credential selection, Cloudflare validation and mismatch behavior', async t => {
+}],
+  ['fixed hosted declarations retain credential selection, Cloudflare validation and mismatch behavior', async t => {
   const { root, descriptor, save } = await fixture(t);
   delete descriptor.loops[0].binding;
   for (const [provider, key, account] of [
@@ -214,4 +212,5 @@ test('fixed hosted declarations retain credential selection, Cloudflare validati
     assert.equal((await inspectOperations(root, { ...env, MAIL_PROVIDER: 'other' })).loops[0].status, 'mail-provider-mismatch');
     if (account) assert.equal((await inspectOperations(root, { ...env, [account]: 'invalid' })).ok, false);
   }
-});
+}]
+]));
