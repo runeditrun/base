@@ -91,10 +91,18 @@ test('shared D1 reset removes prior-case state and restores seeded schema and pr
         await assert.rejects(connection.prepare('INSERT INTO synthetic_base_row VALUES(?,?)').bind('a'.repeat(999996), 'b'.repeat(999998)).run(), /table row bytes maximum 2000000, measured 2000001|string or blob too big/i);
         assert.equal((await connection.prepare('SELECT count(*) AS n FROM synthetic_base_row').first())?.n, 1);
         await connection.prepare('CREATE TABLE synthetic_base_source(a TEXT,b TEXT)').run();
-        await connection.prepare('CREATE TRIGGER synthetic_base_copy AFTER INSERT ON synthetic_base_source BEGIN INSERT INTO synthetic_base_row VALUES(NEW.a,NEW.b); END').run();
-        await assert.rejects(connection.prepare('INSERT INTO synthetic_base_source VALUES(?,?)').bind('a'.repeat(999996), 'b'.repeat(999998)).run(), /table row bytes maximum 2000000, measured 2000001/);
+        await connection.prepare('CREATE TRIGGER synthetic_base_copy AFTER INSERT ON synthetic_base_source BEGIN INSERT INTO SYNTHETIC_BASE_ROW VALUES(NEW.a,NEW.b||\'x\'); END').run();
+        await assert.rejects(connection.prepare('INSERT INTO SYNTHETIC_BASE_SOURCE VALUES(?,?)').bind('a'.repeat(999996), 'b'.repeat(999997)).run(), /table row bytes maximum 2000000, measured 2000001/);
         assert.equal((await connection.prepare('SELECT count(*) AS n FROM synthetic_base_source').first())?.n, 0);
         assert.equal((await connection.prepare('SELECT count(*) AS n FROM synthetic_base_row').first())?.n, 1);
+        await connection.prepare('CREATE TABLE synthetic_base_alias(id INTEGER PRIMARY KEY,value TEXT)').run();
+        await connection.prepare('INSERT INTO synthetic_base_alias VALUES(?,?)').bind(2,'x'.repeat(1999994)).run();
+        for (const [name, declaration] of [['synthetic_base_stored','id INTEGER PRIMARY KEY DESC,value TEXT'],['sqlitedata','id INTEGER PRIMARY KEY DESC,value TEXT'],['synthetic_base_stored_Ω','id INTEGER PRIMARY KEY DESC,value TEXT'],['synthetic_base_without','id INTEGER PRIMARY KEY,value TEXT']]) {
+          await connection.prepare(`CREATE TABLE ${name}(${declaration})${name === 'synthetic_base_without' ? ' WITHOUT ROWID' : ''}`).run();
+          const insert = `INSERT INTO ${name.toUpperCase()} VALUES(?,?)`;
+          await connection.prepare(insert).bind(2,'x'.repeat(1999993)).run();
+          await assert.rejects(connection.prepare(insert).bind(3,'x'.repeat(1999994)).run(), /table row bytes maximum 2000000, measured 2000001/);
+        }
         assert.equal((await connection.prepare(`SELECT max(${Array(32).fill(1).join(',')}) AS value`).first())?.value, 1);
         await assert.rejects(connection.prepare(`SELECT max(${Array(33).fill(1).join(',')})`).first(), /D1 limit exceeded: SQL function arguments maximum 32, measured 33/);
       }

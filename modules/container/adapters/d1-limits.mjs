@@ -162,17 +162,18 @@ export function createD1RowGuard() {
   const sum = terms => terms.length === 0 ? '0' : terms.length === 1 ? terms[0]
     : `(${sum(terms.slice(0, terms.length >> 1))}+${sum(terms.slice(terms.length >> 1))})`;
   const state = new WeakMap();
+  const key = name => name.replace(/[A-Z]/g, char => char.toLowerCase());
   return function guardD1Rows(db, prepare, exec, query) {
     const version = exec ? prepare('PRAGMA main.schema_version').get().schema_version : undefined;
     if (exec && state.get(db) === version) return;
-    const tables = prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
+    const tables = prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").all();
     let touched;
     if (query) {
       // Read only the tables this statement and its SQL triggers can change.
       // Quoted strings are opaque; quoted table identifiers are decoded only
       // after a mutation keyword. This avoids rescanning unrelated large stores.
       const targets = sql => {
-        const tokens = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[[^\]]*\]|[a-zA-Z_][a-zA-Z_0-9$]*|[.;]/g)]
+        const tokens = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[[^\]]*\]|[a-zA-Z_\u0080-\uFFFF][a-zA-Z_0-9$\u0080-\uFFFF]*|[.;]/g)]
           .map(match => match[0]).filter(text => !text.startsWith('--') && !text.startsWith('/*'));
         const names = [];
         const word = index => /^[a-zA-Z_]/.test(tokens[index] ?? '') ? tokens[index].toUpperCase() : '';
@@ -189,26 +190,29 @@ export function createD1RowGuard() {
         }
         return names;
       };
-      touched = new Set(targets(query));
+      touched = new Set(targets(query).map(key));
       const triggers = prepare("SELECT tbl_name,sql FROM sqlite_master WHERE type='trigger'").all();
       let previous;
       do {
         previous = touched.size;
-        for (const trigger of triggers) if (touched.has(trigger.tbl_name)) for (const name of targets(trigger.sql)) touched.add(name);
+        for (const trigger of triggers) if (touched.has(key(trigger.tbl_name))) for (const name of targets(trigger.sql)) touched.add(key(name));
       } while (previous !== touched.size);
-      for (const table of tables) if (touched.has(table.name) && /^CREATE\s+VIRTUAL\s+TABLE\b/i.test(table.sql))
-        for (const shadow of tables) if (shadow.name.startsWith(table.name + '_')) touched.add(shadow.name);
+      for (const table of tables) if (touched.has(key(table.name)) && /^CREATE\s+VIRTUAL\s+TABLE\b/i.test(table.sql))
+        for (const shadow of tables) if (key(shadow.name).startsWith(key(table.name) + '_')) touched.add(key(shadow.name));
     }
     for (const table of tables) {
-      if (touched && !touched.has(table.name)) continue;
+      if (touched && !touched.has(key(table.name))) continue;
       // Cloudflare owns reserved metadata; its authorizer forbids user access.
       if (table.name.startsWith('_cf_')) continue;
       // Virtual indexes store their data in ordinary shadow tables below.
       if (/^CREATE\s+VIRTUAL\s+TABLE\b/i.test(table.sql)) continue;
       const columns = prepare(`PRAGMA ${exec ? 'main.table_xinfo' : 'table_info'}(${quote(table.name)})`).all().filter(column => column.hidden !== 2);
       if (columns.length > d1NativeLimits.column) throw new Error(`D1 limit exceeded: columns per table maximum ${d1NativeLimits.column}, measured ${columns.length}`);
-      const rowidAlias = !/WITHOUT\s+ROWID/i.test(table.sql) && columns.filter(c => c.pk).length === 1
-        ? columns.find(c => c.pk && c.type.toUpperCase() === 'INTEGER')?.name : undefined;
+      const primary = columns.filter(column => column.pk);
+      // The primary-key index distinguishes stored INTEGER keys (including
+      // inline DESC and WITHOUT ROWID) from SQLite's rowid alias.
+      const integerPrimary = primary.length === 1 && primary[0].type.toUpperCase() === 'INTEGER';
+      const rowidAlias = integerPrimary && !prepare(`PRAGMA index_list(${quote(table.name)})`).all().some(index => index.origin === 'pk') ? primary[0].name : undefined;
       const body = [], header = [], projection = [];
       for (const [index, column] of columns.entries()) {
         const value = `v${index}`, length = `length(CAST(${value} AS BLOB))`, type = `typeof(${value})`;
