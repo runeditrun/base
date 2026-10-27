@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge628089b",
+  "cliVersion": "0.2.83",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4137,6 +4137,10 @@
       "source": "scripts/publish-check/png_text.py",
       "sha256": "9d54e109c80761fee250d12ab69aaf345754c7b20224f918f6cde96ac4ff944e"
     },
+    "scripts/publish-check/pnpm_lock.py": {
+      "source": "scripts/publish-check/pnpm_lock.py",
+      "sha256": "cdad167f83281141e731541b0ccd6f9e2dbec1085f763a8cbbc57ee7d3349e8c"
+    },
     "scripts/publish-check/policy.py": {
       "source": "scripts/publish-check/policy.py",
       "sha256": "02166aca1594dcd590cdfdfc402c46af9792d38298eda3d224ca19cd162457bb"
@@ -4159,7 +4163,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "985cbf70e00667c744fce9b75496d8fda95d59f29f33e774332ad579d7826347"
+      "sha256": "738c1b89cfb0026514744b68a377a1b9350600c5766d46e40d35a1e1581bfccc"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",

@@ -85,6 +85,11 @@ repository mentions fail. Commit and annotated-tag messages are scanned, excludi
 Git author/committer identity headers. Matched values and messages are never printed;
 sensitive paths receive opaque SHA-256 handles.
 
+In files with the exact basename `pnpm-lock.yaml`, `hygiene.email` ignores only
+the quoted value on a four-space `deprecated:` line beneath a two-space package
+entry in the top-level `packages:` section. Comments, other keys and sections,
+unquoted values and other filenames remain inspected, as do all other rules.
+
 In actual commit messages only, `hygiene.email` accepts the address in a complete,
 case-insensitive `Co-Authored-By: Name <address>` line in the final trailer
 paragraph when its local part is
@@ -95,7 +100,7 @@ other trailers, annotated tags or files, and does not affect secret or other
 hygiene rules. A trailer-looking line followed by ordinary prose remains body
 text; the final paragraph must consist entirely of trailer lines.
 
-Classification is by content shape, never by path or filename. A package manager's patch filename, consisting of a package name, an at sign
+Other classifications use content shape. A package manager's patch filename, consisting of a package name, an at sign
 and a semantic version with the `.patch` suffix, is not a mailbox. Inside binary data (control bytes or
 invalid UTF-8), a mailbox whose host name has mixed-case letters within a label
 (`iM.jDe`) is not one; stored host names are lower case, upper case or
