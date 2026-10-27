@@ -1,4 +1,4 @@
-import { caseRows } from './fold-case.mjs';
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -75,24 +75,30 @@ ledgerCase('unchanged deployment upgrades verified old kit history once, retaini
 });
 
 ledgerCase('ledger transition requires exact hashes, completed states and ordered Wrangler prefix before any mutation', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {args,state,api,plan}=setup(t);await deploy(args);const db=state.databases[0].db;legacyLedger(db);
   const migration=plan.d1[0].migrations[0], id=state.databases[0].uuid;
   db.exec('CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,applied_at TEXT)');
+  let rowAt81 = 0;
   for (const sql of [
     "UPDATE _rer_deploy_migrations SET state='applying'",
     "UPDATE _rer_deploy_migrations SET sha256='changed'",
     "INSERT INTO d1_migrations(name) VALUES ('unattested.sql')",
     `INSERT INTO d1_migrations(name) VALUES ('${migration.name}'),('${migration.name}')`,
   ]) {
+    await caseRow(t, 'table at line 81 row ' + rowAt81++, async () => {
+
     db.exec(sql);const before=state.writes.length;
     await assert.rejects(migrate(api,id,[migration]),/history/);assert.equal(state.writes.length,before);
     db.prepare("UPDATE _rer_deploy_migrations SET state='applied',sha256=?").run(migration.sha256);db.exec('DELETE FROM d1_migrations');
+      });
   }
   db.prepare('INSERT INTO d1_migrations(id,name,applied_at) VALUES (7,?,?)').run(migration.name,'retained timestamp');
   await migrate(api,id,[migration]);
-  assert.deepEqual({...db.prepare('SELECT id,applied_at,sha256,state FROM d1_migrations').get()},{id:7,applied_at:'retained timestamp',sha256:migration.sha256,state:'applied'});
+  await caseRow(t, 'following assertion at line 93', async () => { assert.deepEqual({...db.prepare('SELECT id,applied_at,sha256,state FROM d1_migrations').get()},{id:7,applied_at:'retained timestamp',sha256:migration.sha256,state:'applied'}); });
   db.exec('ALTER TABLE d1_migrations DROP COLUMN sha256; ALTER TABLE d1_migrations DROP COLUMN state;');
-  const before=state.writes.length;await assert.rejects(migrate(api,id,[migration]),/reviewed-hash-adoption/);assert.equal(state.writes.length,before);
+  const before=state.writes.length;await caseRow(t, 'following assertion at line 95', async () => { await assert.rejects(migrate(api,id,[migration]),/reviewed-hash-adoption/);await caseRow(t, 'following assertion at line 95', async () => {  });assert.equal(state.writes.length,before); });
+  }]]);
 });
 
 ledgerCase('failed ledger transition rolls back metadata without replaying product SQL or losing prior rows', async t => {

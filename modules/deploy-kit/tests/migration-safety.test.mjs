@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { caseRows } from './fold-case.mjs';
+import { caseRow, caseRows } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { validateMigrations, migrate } from '../migrations.mjs';
@@ -87,11 +87,18 @@ admission('a real COMMIT after a trigger would escape a SQLite transaction, and 
 });
 
 for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
-  admission(`reserves ${name} across SQLite name quoting and schema qualification`, t => {
+  admission(`reserves ${name} across SQLite name quoting and schema qualification`, async t => {
+  await caseRows(t, [['independent checks', async t => {
     const db = database(t);
     db.exec(`CREATE TABLE ${name}(value INTEGER); INSERT INTO ${name} VALUES (7);`);
-    for (const quoted of [name, name.toUpperCase(), `"${name}"`, `[${name}]`, `\`${name}\``, `'${name}'`]) {
-      for (const reference of [quoted, `main.${quoted}`, `"main"./* schema boundary */${quoted}`]) {
+    let rowAt93 = 0;
+  for (const quoted of [name, name.toUpperCase(), `"${name}"`, `[${name}]`, `\`${name}\``, `'${name}'`]) {
+    await caseRow(t, 'table at line 93 row ' + rowAt93++, async () => {
+
+      let rowAt94 = 0;
+  for (const reference of [quoted, `main.${quoted}`, `"main"./* schema boundary */${quoted}`]) {
+    await caseRow(t, 'table at line 94 row ' + rowAt94++, async () => {
+
         const sql = `SELECT value FROM ${reference};`;
         assert.equal(db.prepare(sql).get().value, 7, reference);
         assert.throws(() => validate(sql), /unsafe-migration-control/, reference);
@@ -99,15 +106,18 @@ for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
           `UPDATE ${reference} SET value=8;`, `DELETE FROM ${reference};`,
           `DROP TABLE ${reference};`, `ALTER TABLE ${reference} RENAME TO stolen;`,
         ]) assert.throws(() => validate(mutation), /unsafe-migration-control/, mutation);
-      }
-      assert.throws(() => validate(`CREATE TABLE source(value); CREATE TRIGGER attack AFTER INSERT ON source BEGIN DELETE FROM ${quoted}; END;`), /unsafe-migration-control/);
-      assert.throws(() => validate(`ALTER TABLE source RENAME TO ${quoted};`), /unsafe-migration-control/);
-    }
+          });
+  }
+      await caseRow(t, 'following assertion at line 103', async () => { assert.throws(() => validate(`CREATE TABLE source(value); CREATE TRIGGER attack AFTER INSERT ON source BEGIN DELETE FROM ${quoted}; END;`), /unsafe-migration-control/); });
+      await caseRow(t, 'following assertion at line 104', async () => { assert.throws(() => validate(`ALTER TABLE source RENAME TO ${quoted};`), /unsafe-migration-control/); });
+        });
+  }
     // Single quotes can become identifiers in SQLite, so the exact reserved
     // names are conservatively unavailable even as string values.
-    assert.throws(() => validate(`SELECT '${name}';`), /unsafe-migration-control/);
+    await caseRow(t, 'following assertion at line 108', async () => { assert.throws(() => validate(`SELECT '${name}';`), /unsafe-migration-control/); });
     validate(`SELECT 'documentation mentions ${name} here'; -- ${name}\n`);
-  });
+    }]]);
+});
 }
 
 admission('incomplete quotes/comments/triggers and NUL cannot swallow controller completion SQL', () => {
@@ -230,12 +240,16 @@ admission('legacy quoted ledger relations cannot hide after FROM commas, joins o
   }
 });
 
-admission('legacy single quotes remain ledger identifiers in writes, DDL and trigger targets', t => {
+admission('legacy single quotes remain ledger identifiers in writes, DDL and trigger targets', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const db = database(t);
   db.exec(schema);
   for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
     db.exec(`CREATE TABLE ${name}(value);`);
-    for (const reference of [`'${name}'`, `main.'${name}'`, `'main'.'${name}'`]) {
+    let rowAt238 = 0;
+  for (const reference of [`'${name}'`, `main.'${name}'`, `'main'.'${name}'`]) {
+    await caseRow(t, 'table at line 238 row ' + rowAt238++, async () => {
+
       for (const sql of [
         `INSERT INTO ${reference} VALUES (1);`,
         `REPLACE INTO ${reference} VALUES (1);`,
@@ -246,7 +260,8 @@ admission('legacy single quotes remain ledger identifiers in writes, DDL and tri
         assert.doesNotThrow(() => db.prepare(sql), sql);
         assert.throws(() => validate(sql), /unsafe-migration-control/, sql);
       }
-    }
+        });
+  }
     for (const sql of [
       `CREATE INDEX lookup ON '${name}'(value);`,
       `CREATE TABLE child(value REFERENCES '${name}'(value));`,
@@ -257,6 +272,7 @@ admission('legacy single quotes remain ledger identifiers in writes, DDL and tri
       `CREATE TRIGGER read_ledger AFTER INSERT ON source BEGIN SELECT * FROM source, main.'${name}'; END;`,
     ]) assert.throws(() => validate(sql), /unsafe-migration-control/, sql);
   }
+  }]]);
 });
 
 admission('incomplete or crossing CASE and parenthesis scopes never become a trigger terminator', t => {

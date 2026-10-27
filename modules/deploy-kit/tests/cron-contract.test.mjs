@@ -1,4 +1,4 @@
-import { caseRows } from './fold-case.mjs';
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -25,6 +25,7 @@ function setup(t) {
 }
 
 cronCase('Cron deployment reapplies changed releases, checks capability and schedule readback, and retains no-write repeats', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {state,args,api,plan} = setup(t);
   plan.crons = ['* * * * *'];
   plan.r2 = [{binding:'FILES',name:'cron-proof-files'}];
@@ -60,15 +61,22 @@ cronCase('Cron deployment reapplies changed releases, checks capability and sche
   assert.equal(state.secrets[0].value,'test-only-retained-value');
   assert(!JSON.stringify(second).includes('test-only-retained-value'));
   const handlers = state.version.resources.script.handlers;
+  let rowAt63 = 0;
   for (const reported of [undefined,null,{},[],['fetch']]) {
+    await caseRow(t, 'table at line 63 row ' + rowAt63++, async () => {
+
     state.version.resources.script.handlers = reported;
     await assert.rejects(verifyHealth({api,plan,receipt:upgraded,fetch:args.fetch}),/missing-scheduled-handler/);
     await assert.rejects(deploy({...upgradedArgs,previousReceipt:upgraded,repeatOnly:true}),/missing-scheduled-handler/);
+      });
   }
   state.version.resources.script.handlers = handlers;
-  assert.equal(state.writes.length,writes);
+  await caseRow(t, 'following assertion at line 69', async () => { assert.equal(state.writes.length,writes); });
   const request = api.request;
+  let rowAt71 = 0;
   for (const schedules of [[],[{cron:'0 12 * * *'}]]) {
+    await caseRow(t, 'table at line 71 row ' + rowAt71++, async () => {
+
     state.schedules = plan.crons.map(cron => ({cron}));
     api.request = async (path,options) => {
       const result = await request(path,options);
@@ -78,6 +86,7 @@ cronCase('Cron deployment reapplies changed releases, checks capability and sche
     let receipt;
     await assert.rejects(deploy({...upgradedArgs,plan:{...plan,vars:{RELEASE:`bad-readback-${schedules.length}`}},previousReceipt:upgraded,onReceipt:value => {receipt=value;}}),/cron-drift/);
     assert.equal(receipt,undefined,'a successful write with failed readback must not produce a deployment receipt');
+      });
   }
   state.schedules = plan.crons.map(cron => ({cron}));
   api.request = async (path,options) => {
@@ -85,15 +94,16 @@ cronCase('Cron deployment reapplies changed releases, checks capability and sche
     if (path.endsWith('/schedules') && options?.method === 'PUT') state.deployments[0].id = crypto.randomUUID();
     return result;
   };
-  await assert.rejects(deploy({...upgradedArgs,plan:{...plan,vars:{RELEASE:'concurrent-deployment'}},previousReceipt:upgraded}),/deployment-changed-during-triggers/);
+  await caseRow(t, 'following assertion at line 88', async () => { await assert.rejects(deploy({...upgradedArgs,plan:{...plan,vars:{RELEASE:'concurrent-deployment'}},previousReceipt:upgraded}),/deployment-changed-during-triggers/); });
   api.request = request;
   state.schedules = plan.crons.map(cron => ({cron}));
   const cronWrites = state.writes.filter(x => x.path.endsWith('/schedules')).length;
   const code = 'export default {fetch() {return new Response("missing scheduled handler");}};';
   const artifact = {...upgradedArgs.artifact,modules:[{path:'index.js',base64:Buffer.from(code).toString('base64'),sha256:hash(code)}]};
   state.uploadHandlers = ['fetch'];
-  await assert.rejects(deploy({...upgradedArgs,artifact,artifactSha256:hash(artifact),previousReceipt:upgraded}),/missing-scheduled-handler/);
-  assert.equal(state.writes.filter(x => x.path.endsWith('/schedules')).length,cronWrites,'a Worker without a scheduled handler cannot publish Cron triggers');
+  await caseRow(t, 'following assertion at line 95', async () => { await assert.rejects(deploy({...upgradedArgs,artifact,artifactSha256:hash(artifact),previousReceipt:upgraded}),/missing-scheduled-handler/); });
+  await caseRow(t, 'following assertion at line 96', async () => { assert.equal(state.writes.filter(x => x.path.endsWith('/schedules')).length,cronWrites,'a Worker without a scheduled handler cannot publish Cron triggers'); });
+  }]]);
 });
 
 test('bare-array, missing, malformed, empty-string and duplicate schedule results fail closed', async () => {

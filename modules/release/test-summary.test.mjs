@@ -1,4 +1,4 @@
-import { caseRows } from '../deploy-kit/tests/fold-case.mjs';
+import { caseRow, caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testSummary } from './test-summary.mjs';
@@ -44,19 +44,25 @@ summaryCase('sequential Node and Playwright suites accumulate without double cou
     counts({ tests: 360, passed: 357, failed: 1, skipped: 1, flaky: 1 }));
 });
 
-summaryCase('all byte boundaries preserve Unicode, ANSI, CRLF and final unterminated lines', () => {
+summaryCase('all byte boundaries preserve Unicode, ANSI, CRLF and final unterminated lines', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const bytes = Buffer.from('\x1b[36mℹ tests 2\x1b[39m\r\nℹ pass 2\r\n\x1b[32m  349 passed\x1b[39m\x1b[2m (3m)\x1b[22m');
   const expected = counts({ tests: 351, passed: 351 });
+  let rowAt50 = 0;
   for (let split = 0; split <= bytes.length; split++) {
+    await caseRow(t, 'table at line 50 row ' + rowAt50++, async () => {
+
     const summary = testSummary();
     summary.write(bytes.subarray(0, split));
     summary.write(bytes.subarray(split));
     assert.deepEqual(summary.finish(), expected, `byte boundary ${split}`);
     assert.deepEqual(summary.finish(), expected, 'finalizing again cannot duplicate a summary');
+      });
   }
   const summary = testSummary();
   for (const byte of bytes) summary.write(Buffer.from([byte]));
-  assert.deepEqual(summary.finish(), expected);
+  await caseRow(t, 'following assertion at line 59', async () => { assert.deepEqual(summary.finish(), expected); });
+  }]]);
 });
 
 summaryCase('only anchored numeric summaries survive, never diagnostics or arbitrary digits', () => {
@@ -81,12 +87,18 @@ summaryCase('oversized lines are discarded whole, including a summary-shaped suf
   assert.deepEqual(summary.finish(), counts({ tests: 2, passed: 2 }));
 });
 
-summaryCase('duration units stay numeric and counters remain safe integers', () => {
+summaryCase('duration units stay numeric and counters remain safe integers', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
+  let rowAt85 = 0;
   for (const duration of ['0ms', '1.2s', '3m', '2.1h', '1d']) {
+    await caseRow(t, 'table at line 85 row ' + rowAt85++, async () => {
+
     assert.deepEqual(parse(`  1 passed (${duration})\n`), counts({ tests: 1, passed: 1 }));
+      });
   }
-  assert.deepEqual(parse(`# tests ${Number.MAX_SAFE_INTEGER}\n# tests 1\n  1 passed (1ms)\n`),
-    counts({ tests: Number.MAX_SAFE_INTEGER }));
+  await caseRow(t, 'following assertion at line 88', async () => { assert.deepEqual(parse(`# tests ${Number.MAX_SAFE_INTEGER}\n# tests 1\n  1 passed (1ms)\n`),
+    counts({ tests: Number.MAX_SAFE_INTEGER })); });
+  }]]);
 });
 
 test('release test summaries count only bounded reporter outcomes across byte boundaries', async (t) => {

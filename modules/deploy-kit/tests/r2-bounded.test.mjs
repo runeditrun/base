@@ -1,4 +1,4 @@
-import { caseRows } from './fold-case.mjs';
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -22,25 +22,37 @@ function fixture(pages, config = {}) {
   return {api, calls, list:() => api.list('/r2/buckets', options)};
 }
 
-boundedCase('R2 bounded mode accepts absent or null metadata only on a short requested-limit page', async () => {
+boundedCase('R2 bounded mode accepts absent or null metadata only on a short requested-limit page', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   for (const info of [undefined, null]) {
-    for (const count of [0, 6, 999]) {
+    let rowAt27 = 0;
+  for (const count of [0, 6, 999]) {
+    await caseRow(t, 'table at line 27 row ' + rowAt27++, async () => {
+
       const rows = buckets(count); const f = fixture([page(rows, info)]);
       assert.deepEqual(await f.list(), rows);
       assert.deepEqual(f.calls, [{url:`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets?per_page=1000`, method:'GET'}]);
-    }
-    const f = fixture([page(buckets(1000), info)]);
-    await assert.rejects(f.list(), /provider-incomplete-pagination/);
-    assert.equal(f.calls.length, 1);
+        });
   }
+    const f = fixture([page(buckets(1000), info)]);
+    await caseRow(t, 'following assertion at line 33', async () => { await assert.rejects(f.list(), /provider-incomplete-pagination/); });
+    await caseRow(t, 'following assertion at line 34', async () => { assert.equal(f.calls.length, 1); });
+  }
+  }]]);
 });
 
-boundedCase('R2 bounded mode rejects incorrect endpoints and fields before any request', async () => {
+boundedCase('R2 bounded mode rejects incorrect endpoints and fields before any request', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const f = fixture([]);
+  let rowAt40 = 0;
   for (const [path, field] of [['/queues','buckets'], ['/r2/buckets/','buckets'], ['/r2/buckets?per_page=1','buckets'], ['/r2/buckets','other'], ['/r2/buckets',undefined]]) {
+    await caseRow(t, 'table at line 40 row ' + rowAt40++, async () => {
+
     await assert.rejects(f.api.list(path, {field, pagination:'r2-bounded'}), /invalid-r2-bounded-list/);
+      });
   }
-  assert.equal(f.calls.length, 0);
+  await caseRow(t, 'following assertion at line 43', async () => { assert.equal(f.calls.length, 0); });
+  }]]);
 });
 
 boundedCase('R2 bounded mode follows encoded cursors through full pages and accepts a short terminal page', async () => {
@@ -63,45 +75,83 @@ boundedCase('R2 bounded mode respects a smaller reported page bound and follows 
   }
 });
 
-boundedCase('R2 bounded mode rejects malformed metadata, lists and oversized pages', async () => {
+boundedCase('R2 bounded mode rejects malformed metadata, lists and oversized pages', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
+  let rowAt67 = 0;
   for (const info of [[], false, '', {per_page:0}, {per_page:-1}, {per_page:1.5}, {per_page:'1000'}, {per_page:1001}, {per_page:null}]) {
+    await caseRow(t, 'table at line 67 row ' + rowAt67++, async () => {
+
     const f = fixture([page([], info)]);
     await assert.rejects(f.list(), /provider-incomplete-pagination/);
     assert.equal(f.calls.length, 1);
+      });
   }
+  let rowAt72 = 0;
   for (const rows of [undefined, {}, null]) {
+    await caseRow(t, 'table at line 72 row ' + rowAt72++, async () => {
+
     await assert.rejects(fixture([page(rows)]).list(), /provider-invalid-list/);
+      });
   }
+  let rowAt75 = 0;
   for (const info of [undefined, null, {per_page:1000,cursor:'next'}]) {
+    await caseRow(t, 'table at line 75 row ' + rowAt75++, async () => {
+
     await assert.rejects(fixture([page(buckets(1001), info)]).list(), /provider-partial-list/);
+      });
   }
-  await assert.rejects(fixture([page(buckets(2), {per_page:1,cursor:'next'})]).list(), /provider-partial-list/);
+  await caseRow(t, 'following assertion at line 78', async () => { await assert.rejects(fixture([page(buckets(2), {per_page:1,cursor:'next'})]).list(), /provider-partial-list/); });
+  }]]);
 });
 
-boundedCase('R2 bounded mode rejects invalid cursors and repeated continuation tokens', async () => {
+boundedCase('R2 bounded mode rejects invalid cursors and repeated continuation tokens', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
+  let rowAt82 = 0;
   for (const cursor of [0, false, {}, [], 'bad&cursor', 'white space']) {
+    await caseRow(t, 'table at line 82 row ' + rowAt82++, async () => {
+
     await assert.rejects(fixture([page([], {per_page:1000,cursor})]).list(), /provider-invalid-cursor/);
+      });
   }
   const f = fixture([page([], {per_page:1000,cursor:'same'}), page([], {per_page:1000,cursor:'same'})]);
-  await assert.rejects(f.list(), /provider-invalid-cursor/);
-  assert.equal(f.calls.length, 2);
+  await caseRow(t, 'following assertion at line 86', async () => { await assert.rejects(f.list(), /provider-invalid-cursor/); });
+  await caseRow(t, 'following assertion at line 87', async () => { assert.equal(f.calls.length, 2); });
+  }]]);
 });
 
-boundedCase('R2 bounded mode validates optional totals and count evidence without hiding contradictions', async () => {
+boundedCase('R2 bounded mode validates optional totals and count evidence without hiding contradictions', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const first = page([{name:'first'}], {per_page:2,cursor:'next',total_count:2,count:1});
+  let rowAt92 = 0;
   for (const terminal of [undefined, null, {per_page:2,total_count:2,count:1}]) {
+    await caseRow(t, 'table at line 92 row ' + rowAt92++, async () => {
+
     assert.equal((await fixture([first, page([{name:'last'}], terminal)]).list()).length, 2);
+      });
   }
+  let rowAt95 = 0;
   for (const info of [{per_page:2,total_count:0}, {per_page:2,total_count:2}, {per_page:2,count:0}, {per_page:2,count:'1'}, {per_page:2,total_count:1,cursor:'next'}]) {
+    await caseRow(t, 'table at line 95 row ' + rowAt95++, async () => {
+
     await assert.rejects(fixture([page([{name:'first'}], info)]).list(), /provider-partial-list/);
+      });
   }
+  let rowAt98 = 0;
   for (const total_count of [-1, null, '1', 1.5]) {
+    await caseRow(t, 'table at line 98 row ' + rowAt98++, async () => {
+
     await assert.rejects(fixture([page([], {per_page:1000,total_count})]).list(), /provider-incomplete-pagination/);
+      });
   }
+  let rowAt101 = 0;
   for (const terminal of [undefined, null, {per_page:2}]) {
+    await caseRow(t, 'table at line 101 row ' + rowAt101++, async () => {
+
     await assert.rejects(fixture([first, page([], terminal)]).list(), /provider-partial-list/);
+      });
   }
-  await assert.rejects(fixture([first, page([{name:'last'}], {per_page:2,total_count:3})]).list(), /provider-pagination-changed/);
+  await caseRow(t, 'following assertion at line 104', async () => { await assert.rejects(fixture([first, page([{name:'last'}], {per_page:2,total_count:3})]).list(), /provider-pagination-changed/); });
+  }]]);
 });
 
 boundedCase('R2 bounded mode retains row, page and request budgets', async () => {

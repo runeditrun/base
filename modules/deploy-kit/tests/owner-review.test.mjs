@@ -1,4 +1,4 @@
-import { caseRows } from './fold-case.mjs';
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile, access } from 'node:fs/promises';
@@ -73,6 +73,7 @@ ownedCase('a Worker replaced before the first receipt is refused too', async t =
 });
 
 ownedCase('an interrupted upgrade of the kit\'s own Worker resumes; it is not mistaken for a replacement', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {args,state,fail,foreign,target,statePath} = await setup(t);
   const first = await ownerDeploy(args);
   // Cloudflare can activate an upload before its own read of that version finds it (code 100146).
@@ -102,17 +103,22 @@ ownedCase('an interrupted upgrade of the kit\'s own Worker resumes; it is not mi
   assert.equal(interrupted.pendingUpload.fingerprint,state.settings.bindings.find(x => x.name === 'RER_DEPLOY_FINGERPRINT').text);
   // Only a live version carrying that fingerprint as binding and annotation is this deploy's own.
   const live = {settings:state.settings,version:state.version,deployments:state.deployments}, annotation = state.version.annotations['workers/message'];
+  let rowAt105 = 0;
   for (const replace of [() => { state.version.annotations['workers/message'] = 'Deploy from the dashboard'; }, () => foreign.replaceWorker()]) {
+    await caseRow(t, 'table at line 105 row ' + rowAt105++, async () => {
+
     replace();
     const writes = state.writes.length, bytes = await readFile(statePath);
     await assert.rejects(ownerDeploy(laterArgs),error => error.message === 'owned-resource-replaced' && error.resource === 'worker:penny-production');
     assert.equal(state.writes.length,writes); assert.deepEqual(await readFile(statePath),bytes);
     Object.assign(state,live); state.version.annotations['workers/message'] = annotation;
+      });
   }
   const resumed = await ownerDeploy(laterArgs);
-  assert.equal(resumed.receipt.changed,true); assert.equal(resumed.receipt.provider.versionId,state.version.id);
+  await caseRow(t, 'following assertion at line 113', async () => { assert.equal(resumed.receipt.changed,true); }); await caseRow(t, 'following assertion at line 113', async () => { assert.equal(resumed.receipt.provider.versionId,state.version.id); });
   const saved = await readOwnerState(statePath,target);
-  assert.deepEqual(saved.receipt,resumed.receipt); assert.equal(saved.pendingUpload,undefined);
+  await caseRow(t, 'following assertion at line 115', async () => { assert.deepEqual(saved.receipt,resumed.receipt); }); await caseRow(t, 'following assertion at line 115', async () => { assert.equal(saved.pendingUpload,undefined); });
+  }]]);
 });
 
 ownedCase('a bucket replaced under the same name is refused, never adopted', async t => {
@@ -173,7 +179,7 @@ ownedCase('a pending Worker that does not carry a recorded build is still refuse
 });
 
 test('a token missing a scope names the scope, not just the status', async t => {
-  await caseRows(t, ([['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
+  await caseRows(t, [...([['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
       ['GET',/^\/workers\/scripts\/penny-production\/settings$/,'workers'],['POST',/^\/r2\/buckets$/,'r2'],['PUT',/^\/workers\/scripts\/penny-production$/,'workers']]).map(([method,path,scope]) => [`${method} ${scope}`, async t => {
       const declared = declaration({kv:[{binding:'CACHE'}],queues:[{binding:'JOBS'}]});
       const {args,state,fail} = await setup(t,{declared});
@@ -184,11 +190,14 @@ test('a token missing a scope names the scope, not just the status', async t => 
         state.kv.splice(0); state.queues.splice(0); state.databases.splice(0); state.buckets.splice(0); state.settings = null;
         await rm(args.statePath,{force:true});
       }
-    }]));
+    }]),
+    ['subdomain scope refusal', async t => {
   const provider = ownerProvider(); t.after(() => provider.close());
   provider.fail('GET',/^\/workers\/subdomain$/,{status:403});
   await assert.rejects(ownerTarget(cloudflare(provider),{project:'runeditrun/penny',environment:'production'}),/token-scope-missing-workers/);
-  assert.deepEqual(report(new Error('token-scope-missing-d1')),{ok:false,code:'token-scope-missing-d1'});
+    }],
+    ['scope error report', () => { assert.deepEqual(report(new Error('token-scope-missing-d1')),{ok:false,code:'token-scope-missing-d1'}); }],
+  ]);
 });
 
 test('a path the kit does not map keeps the plain status code', async () => {

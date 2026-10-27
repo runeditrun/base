@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -78,6 +79,7 @@ test('live local cat-file overlaps rev-parse without creating transport state', 
 });
 
 test('local commands preserve state bytes and bypass another transport lock', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
   success(await runGit(f, ...remoteArgs(f)));
   const path = statePath(f), lock = path + '.lock';
@@ -85,24 +87,30 @@ test('local commands preserve state bytes and bypass another transport lock', as
   writeFileSync(path, original);
   mkdirSync(lock);
   writeFileSync(resolve(lock, 'owner'), 'another invocation');
+  let rowAt88 = 0;
   for (const args of [['rev-parse', 'HEAD'], ['cat-file', '-t', f.parent], ['write-tree']]) {
+    await caseRow(t, 'table at line 88 row ' + rowAt88++, async () => {
+
     const result = spawnSync('git', ['-C', f.repo, ...args], { encoding: 'utf8', timeout: 3000 });
     success(result);
     assert.deepEqual(readFileSync(path), original);
     assert.equal(readFileSync(resolve(lock, 'owner'), 'utf8'), 'another invocation');
+      });
   }
   // A crashed owner's lock has a bounded, explicit failure and remains its own.
   const result = spawnSync('git', ['-C', f.repo, ...remoteArgs(f)], { encoding: 'utf8', timeout: 15000 });
-  assert.equal(result.error, undefined);
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Timed out waiting for fixture transport state lock/);
-  assert.deepEqual(readFileSync(path), original);
-  assert.equal(readFileSync(resolve(lock, 'owner'), 'utf8'), 'another invocation');
+  await caseRow(t, 'following assertion at line 96', async () => { assert.equal(result.error, undefined); });
+  await caseRow(t, 'following assertion at line 97', async () => { assert.notEqual(result.status, 0); });
+  await caseRow(t, 'following assertion at line 98', async () => { assert.match(result.stderr, /Timed out waiting for fixture transport state lock/); });
+  await caseRow(t, 'following assertion at line 99', async () => { assert.deepEqual(readFileSync(path), original); });
+  await caseRow(t, 'following assertion at line 100', async () => { assert.equal(readFileSync(resolve(lock, 'owner'), 'utf8'), 'another invocation'); });
   rmSync(lock, { recursive: true });
   noStateDebris(f);
+  }]]);
 });
 
 test('keyword remote names and global option values stay local with mapped URLs', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t), path = statePath(f), lock = path + '.lock';
   const prefixes = [
     [], ['-C', f.repo, '-c', 'fixture.command=fetch', '-c', 'fixture.query=ls-remote'],
@@ -114,7 +122,10 @@ test('keyword remote names and global option values stay local with mapped URLs'
     ['--exec-path=' + git(f.repo, '--exec-path')],
   ];
   let original;
+  let rowAt117 = 0;
   for (const heldLock of [false, true]) {
+    await caseRow(t, 'table at line 117 row ' + rowAt117++, async () => {
+
     if (heldLock) {
       success(await runGit(f, ...remoteArgs(f)));
       original = readFileSync(path);
@@ -139,12 +150,15 @@ test('keyword remote names and global option values stay local with mapped URLs'
       }
     }
     if (heldLock) rmSync(lock, { recursive: true });
+      });
   }
-  assert.deepEqual(f.state(), { heads: 1, fetches: 0 });
+  await caseRow(t, 'following assertion at line 143', async () => { assert.deepEqual(f.state(), { heads: 1, fetches: 0 }); });
   noStateDebris(f);
+  }]]);
 });
 
 test('ls-remote URL queries bypass transport state and locks using native option semantics', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t), path = statePath(f), lock = path + '.lock';
   const queries = [
     ['--get-url', f.options.repository], ['--get', f.options.repository],
@@ -155,7 +169,10 @@ test('ls-remote URL queries bypass transport state and locks using native option
     ['--get-url', '--', f.options.repository, '--no-get-url'],
   ];
   let original;
+  let rowAt158 = 0;
   for (const heldLock of [false, true]) {
+    await caseRow(t, 'table at line 158 row ' + rowAt158++, async () => {
+
     if (heldLock) {
       success(await runGit(f, ...remoteArgs(f)));
       original = readFileSync(path);
@@ -174,38 +191,47 @@ test('ls-remote URL queries bypass transport state and locks using native option
       }
     }
     if (heldLock) rmSync(lock, { recursive: true });
+      });
   }
-  assert.deepEqual(f.state(), { heads: 1, fetches: 0 });
+  await caseRow(t, 'following assertion at line 178', async () => { assert.deepEqual(f.state(), { heads: 1, fetches: 0 }); });
   noStateDebris(f);
+  }]]);
 });
 
 test('global prefixes retain mapped transport counts and URL-query-looking patterns stay remote', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
   const prefixes = [
     ['-C', f.repo, '-c', 'fixture.command=fetch', '--no-replace-objects'],
     ['--git-dir=' + resolve(f.repo, '.git'), '--work-tree', f.repo],
     ['--config-env', 'fixture.command=PATH', '--namespace', 'ls-remote', '--namespace='],
   ];
+  let rowAt189 = 0;
   for (const prefix of prefixes) {
+    await caseRow(t, 'table at line 189 row ' + rowAt189++, async () => {
+
     assert.equal(success(await runGit(f, ...prefix, ...remoteArgs(f))), `${f.parent}\trefs/heads/main\n`);
     success(await runGit(f, ...prefix, 'fetch', '--quiet', '--no-write-fetch-head', f.options.repository, 'refs/heads/main'));
+      });
   }
-  assert.deepEqual(f.state(), { heads: 3, fetches: 3 });
-  assert.equal(success(await runGit(f, 'ls-remote', '--get-url', '--no-get-url', f.options.repository, 'refs/heads/main')), `${f.parent}\trefs/heads/main\n`);
-  assert.equal(success(await runGit(f, 'ls-remote', f.options.repository, '--get-url')), '');
-  assert.equal(success(await runGit(f, 'ls-remote', '--', f.options.repository, '--get-url')), '');
-  assert.deepEqual(f.state(), { heads: 6, fetches: 3 });
+  await caseRow(t, 'following assertion at line 193', async () => { assert.deepEqual(f.state(), { heads: 3, fetches: 3 }); });
+  await caseRow(t, 'following assertion at line 194', async () => { assert.equal(success(await runGit(f, 'ls-remote', '--get-url', '--no-get-url', f.options.repository, 'refs/heads/main')), `${f.parent}\trefs/heads/main\n`); });
+  await caseRow(t, 'following assertion at line 195', async () => { assert.equal(success(await runGit(f, 'ls-remote', f.options.repository, '--get-url')), ''); });
+  await caseRow(t, 'following assertion at line 196', async () => { assert.equal(success(await runGit(f, 'ls-remote', '--', f.options.repository, '--get-url')), ''); });
+  await caseRow(t, 'following assertion at line 197', async () => { assert.deepEqual(f.state(), { heads: 6, fetches: 3 }); });
   // -h is the native heads selector here, and a pattern/refspec can itself be
   // called fetch or ls-remote without changing which counter owns the request.
-  assert.equal(success(await runGit(f, 'ls-remote', '-h', f.options.repository, 'refs/heads/main')), `${f.parent}\trefs/heads/main\n`);
-  assert.equal(success(await runGit(f, 'ls-remote', f.options.repository, 'fetch')), '');
+  await caseRow(t, 'following assertion at line 200', async () => { assert.equal(success(await runGit(f, 'ls-remote', '-h', f.options.repository, 'refs/heads/main')), `${f.parent}\trefs/heads/main\n`); });
+  await caseRow(t, 'following assertion at line 201', async () => { assert.equal(success(await runGit(f, 'ls-remote', f.options.repository, 'fetch')), ''); });
   git(f.bare, 'update-ref', 'refs/heads/ls-remote', f.parent);
   success(await runGit(f, 'fetch', '--quiet', '--no-write-fetch-head', f.options.repository, 'ls-remote'));
-  assert.deepEqual(f.state(), { heads: 8, fetches: 4 });
+  await caseRow(t, 'following assertion at line 204', async () => { assert.deepEqual(f.state(), { heads: 8, fetches: 4 }); });
   noStateDebris(f);
+  }]]);
 });
 
 test('concurrent mapped heads and fetches preserve counts and publish atomic JSON', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
   success(await runGit(f, ...remoteArgs(f)));
   const path = statePath(f), original = readFileSync(path);
@@ -232,15 +258,20 @@ test('concurrent mapped heads and fetches preserve counts and publish atomic JSO
   assert.deepEqual(readErrors, []);
   assert.ok(snapshots.length > 3, 'read JSON while the native operations run');
   let previous = { heads: 1, fetches: 0 };
+  let rowAt235 = 0;
   for (const snapshot of snapshots) {
+    await caseRow(t, 'table at line 235 row ' + rowAt235++, async () => {
+
     assert.ok(Number.isInteger(snapshot.heads) && Number.isInteger(snapshot.fetches));
     assert.ok(snapshot.heads >= previous.heads && snapshot.fetches >= previous.fetches);
     previous = snapshot;
+      });
   }
-  assert.deepEqual(f.state(), { heads: 7, fetches: 6 });
+  await caseRow(t, 'following assertion at line 240', async () => { assert.deepEqual(f.state(), { heads: 7, fetches: 6 }); });
   // An open descriptor must retain the old inode's bytes across every update.
-  assert.deepEqual(readFileSync(oldFile), original);
+  await caseRow(t, 'following assertion at line 242', async () => { assert.deepEqual(readFileSync(oldFile), original); });
   noStateDebris(f);
+  }]]);
 });
 
 test('concurrent head hooks use their own snapshot and release owned locks', async t => {

@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { caseRows } from './fold-case.mjs';
+import { caseRow, caseRows } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, realpath, rm, stat, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -44,6 +44,7 @@ const posts = (state, path) => state.writes.filter(x => x.method === 'POST' && x
 const exists = path => access(path).then(() => true,() => false);
 
 test('names derive from the project id and the owner environment only', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {plan,target} = await setup(t);
   assert.equal(target.worker,'penny-production');
   assert.equal(target.origin,'https://penny-production.fixture-account.workers.dev');
@@ -54,11 +55,17 @@ test('names derive from the project id and the owner environment only', async t 
   assert.deepEqual(plan.d1[0].migrations,[{name:'0001_notes.sql',sql,sha256:hash(sql)}]);
   assert.equal(ownerWorkerName('penny','staging'),'penny-staging');
   assert.equal(ownerResourceName('penny-staging','JOBS_DEAD'),'penny-staging-jobs-dead');
+  let rowAt57 = 0;
   for (const [project,environment] of [['runeditrun/penny','Production'],['runeditrun/penny','prod-'],['runeditrun/Penny','production'],['../penny','production'],['runeditrun/penny','x'.repeat(33)],['runeditrun/'+'p'.repeat(50),'production-environment']])
-    assert.throws(() => ownerWorkerName(project,environment),/invalid-owner|too-long/);
-  assert.throws(() => ownerPlan(target,{...declaration(),d1:[{binding:'DB',name:'chosen-name'}]},artifact),/invalid-owner-declaration/);
-  assert.throws(() => ownerPlan(target,{...declaration(),project:'runeditrun/other'},artifact),/owner-project-mismatch/);
-  assert.throws(() => ownerPlan(target,{...declaration(),d1:[]},artifact),/undeclared-migration-binding/);
+    {
+    await caseRow(t, 'table at line 57 row ' + rowAt57++, async () => {
+assert.throws(() => ownerWorkerName(project,environment),/invalid-owner|too-long/);
+    });
+  }
+  await caseRow(t, 'following assertion at line 59', async () => { assert.throws(() => ownerPlan(target,{...declaration(),d1:[{binding:'DB',name:'chosen-name'}]},artifact),/invalid-owner-declaration/); });
+  await caseRow(t, 'following assertion at line 60', async () => { assert.throws(() => ownerPlan(target,{...declaration(),project:'runeditrun/other'},artifact),/owner-project-mismatch/); });
+  await caseRow(t, 'following assertion at line 61', async () => { assert.throws(() => ownerPlan(target,{...declaration(),d1:[]},artifact),/undeclared-migration-binding/); });
+  }]]);
 });
 
 reconcileCase('first deploy creates every declared resource under the owner account, migrates and passes health', async t => {
@@ -86,20 +93,26 @@ reconcileCase('first deploy creates every declared resource under the owner acco
 });
 
 reconcileCase('a re-run of the same build changes nothing: no provider writes and a byte-identical state file', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {args,state,statePath,api,plan,target} = await setup(t);
   await ownerDeploy(args);
   state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('owner data')");
   const writes = state.writes.length, bytes = await readFile(statePath), secret = state.secrets[0].value;
+  let rowAt93 = 0;
   for (let i = 0; i < 2; i++) {
+    await caseRow(t, 'table at line 93 row ' + rowAt93++, async () => {
+
     const {receipt,created} = await ownerDeploy({...args,env:{AUTH_SECRET:'test-only-new-value-is-not-written'}});
     assert.equal(receipt.changed,false); assert.deepEqual(created,[]);
+      });
   }
-  assert.equal(state.writes.length,writes);
-  assert.deepEqual(await readFile(statePath),bytes);
-  assert.equal(state.secrets[0].value,secret);
-  assert.equal(state.databases[0].db.prepare('SELECT body FROM notes').get().body,'owner data');
-  assert.equal((await ownerHealth({api,target,plan,statePath,fetch:args.fetch})).ok,true);
-  assert.equal(state.writes.length,writes);
+  await caseRow(t, 'following assertion at line 97', async () => { assert.equal(state.writes.length,writes); });
+  await caseRow(t, 'following assertion at line 98', async () => { assert.deepEqual(await readFile(statePath),bytes); });
+  await caseRow(t, 'following assertion at line 99', async () => { assert.equal(state.secrets[0].value,secret); });
+  await caseRow(t, 'following assertion at line 100', async () => { assert.equal(state.databases[0].db.prepare('SELECT body FROM notes').get().body,'owner data'); });
+  await caseRow(t, 'following assertion at line 101', async () => { assert.equal((await ownerHealth({api,target,plan,statePath,fetch:args.fetch})).ok,true); });
+  await caseRow(t, 'following assertion at line 102', async () => { assert.equal(state.writes.length,writes); });
+  }]]);
 });
 
 reconcileCase('a resource failure stops the run; the next run resumes without creating anything twice', async t => {
@@ -274,6 +287,7 @@ settlementCase('secret writes settle ambiguous answers within their window and c
 });
 
 settlementCase('interrupted secret settlement requires its recorded immediate successor, and a new upload clears old intent', async t => {
+  await caseRows(t, [['independent checks', async t => {
   await caseRows(t, (['inspect','deploy','secret','remove']).map((command) => [`unchanged preflight ${command}`, async t => {
     const {args,api,target,statePath,state} = await setup(t);
     await ownerDeploy(args);
@@ -332,6 +346,7 @@ settlementCase('interrupted secret settlement requires its recorded immediate su
       assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined);
     }
   }]));
+  }]]);
 });
 
 settlementCase('secret settlement polls delayed or failed reads, preserves unconfirmed intent and refuses drift', async t => {
@@ -403,6 +418,7 @@ settlementCase('secret settlement polls delayed or failed reads, preserves uncon
 
 settlementCase('stale preflight retains intent until deployment and versions agree, then retries safely', async t => {
   await caseRows(t, (['newer','missing','empty','malformed','malformed-tail','failed']).map((listing) => [listing, async t => {
+  await caseRows(t, [['independent checks', async t => {
     const {args,api,target,statePath,state} = await setup(t);
     await ownerDeploy(args);
     const deployments = await api.request(`/workers/scripts/${target.worker}/deployments`);
@@ -419,23 +435,29 @@ settlementCase('stale preflight retains intent until deployment and versions agr
     }};
     await assert.rejects(ownerSecret({api:stale,target,statePath,fetch:args.fetch,changes:[{binding:'AUTH_SECRET',value:'test-only-new-value'}],windowMs:0}),/secret-change-unsettled|provider/);
     const bytes = await readFile(statePath), writes = state.writes.length;
-    for (const command of [() => settleOwnerState({api:stale,target,statePath}),
+    let rowAt422 = 0;
+  for (const command of [() => settleOwnerState({api:stale,target,statePath}),
       () => ownerSecret({api:stale,target,statePath,fetch:args.fetch,changes:[{binding:'AUTH_SECRET',value:'test-only-retry'}]}),
       () => ownerSecret({api:stale,target,statePath,fetch:args.fetch,changes:[{binding:'OTHER',value:'test-only-new-intent'}]}),
       () => ownerDeploy({...args,api:stale}), () => ownerRemove({api:stale,target,statePath})]) {
+    await caseRow(t, 'table at line 422 row ' + rowAt422++, async () => {
+
       try { await command(); } catch (error) { assert.match(error.message,/secret-change-unsettled|provider/); }
       assert.deepEqual(await readFile(statePath),bytes);
       assert.equal(state.writes.length,writes, 'unconfirmed intent blocks every further mutation');
-    }
+        });
+  }
     await ownerSecret({api,target,statePath,fetch:args.fetch,changes:[{binding:'AUTH_SECRET',value:'test-only-retry'}]});
-    assert.equal((await ownerDeploy(args)).receipt.changed,false);
-    assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined);
-  }]));
+    await caseRow(t, 'following assertion at line 431', async () => { assert.equal((await ownerDeploy(args)).receipt.changed,false); });
+    await caseRow(t, 'following assertion at line 432', async () => { assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined); });
+    }]]);
+}]));
 });
 
 settlementCase('pending name snapshots use live names before writes and only adopt unchanged other-name sets', async t => {
   const malformedTypes = {'legacy-blank-type':' ','legacy-padded-type':'secret_text ','legacy-unknown-type':'unknown_binding','legacy-inherit-type':'inherit'};
   await caseRows(t, (['add','remove','rename','order','empty','set','unset','legacy-own','legacy-add','legacy-unset','legacy-missing','legacy-unavailable','legacy-malformed','legacy-wrong-id','legacy-wrong-etag','legacy-wrong-fingerprint',...Object.keys(malformedTypes)]).map((scenario) => [scenario, async t => {
+  await caseRows(t, [['independent checks', async t => {
     const {args,api,target,statePath,state} = await setup(t);
     await ownerDeploy(args);
     const path = `/workers/scripts/${target.worker}/secrets`;
@@ -488,10 +510,15 @@ settlementCase('pending name snapshots use live names before writes and only ado
     const writes = state.writes.length;
     const refused = Object.hasOwn(malformedTypes,scenario) || ['add','remove','rename','legacy-add','legacy-missing','legacy-unavailable','legacy-malformed','legacy-wrong-id','legacy-wrong-etag','legacy-wrong-fingerprint'].includes(scenario);
     if (refused) {
-      for (const command of [() => ownerDeploy({...args,api:observed}), () => ownerRemove({api:observed,target,statePath}),
-        () => ownerSecret({api:observed,target,statePath,changes:[{binding:'AUTH_SECRET',value:'test-only-retry'}]})]) await assert.rejects(command(),/owned-resource-replaced/);
-      assert.equal(state.writes.length,writes);
-      assert.deepEqual(await readOwnerState(statePath,target),saved);
+      let rowAt491 = 0;
+  for (const command of [() => ownerDeploy({...args,api:observed}), () => ownerRemove({api:observed,target,statePath}),
+        () => ownerSecret({api:observed,target,statePath,changes:[{binding:'AUTH_SECRET',value:'test-only-retry'}]})]) {
+    await caseRow(t, 'table at line 491 row ' + rowAt491++, async () => {
+await assert.rejects(command(),/owned-resource-replaced/);
+    });
+  }
+      await caseRow(t, 'following assertion at line 493', async () => { assert.equal(state.writes.length,writes); });
+      await caseRow(t, 'following assertion at line 494', async () => { assert.deepEqual(await readOwnerState(statePath,target),saved); });
     } else {
       const settled = await settleOwnerState({api:observed,target,statePath});
       assert.equal(settled.pendingSecret,undefined);
@@ -499,7 +526,8 @@ settlementCase('pending name snapshots use live names before writes and only ado
       if (unset) assert.ok(settled.retiredSecrets.includes(binding));
       assert.equal(state.writes.length,writes);
     }
-  }]));
+    }]]);
+}]));
 });
 
 settlementCase('legacy own secret addition recovers with every supported declared binding family', async t => {

@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, mkdir, symlink, link, rm, readFile, realpath } from 'node:fs/promises';
@@ -89,18 +90,31 @@ test('artifact rejects symlink, hardlink, directory, symlink parent and custody/
   const data={version:1,source:{sha:'1'.repeat(40),tree:'2'.repeat(40)},run:{id:'1',attempt:'1'},main:'index.js',modules:[{path:'index.js',base64:'',sha256:hash('')}],assets:[],migrations:[]};const path=join(dir,'artifact.json');const bytes=JSON.stringify(data);await writeFile(path,bytes);const expected={sha256:hash(bytes),sourceSha:data.source.sha,runId:'1',runAttempt:'1'};
   assert.equal((await readArtifact(path,expected)).main,'index.js');await assert.rejects(readArtifact(path,{...expected,runAttempt:'2'}),/custody/);await assert.rejects(readArtifact(path,{...expected,sha256:'0'.repeat(64)}),/digest/);
 });
-test('prepare refuses provider/mail/evidence credentials and Node injection before project execution',()=>{
-  for(const name of ['CF_THROWAWAY_API_TOKEN','RESEND_API_KEY','SENDGRID_API_KEY','EVIDENCE_WRITE_TOKEN','GITHUB_TOKEN','ACTIONS_RUNTIME_TOKEN','NODE_OPTIONS','NODE_PATH']) assert.throws(()=>assertCredentialFree({[name]:'value'}));
-  assert.doesNotThrow(()=>assertCredentialFree({PATH:'/usr/bin',CI:'true'}));
+test('prepare refuses provider/mail/evidence credentials and Node injection before project execution',async (t)=>{
+  await caseRows(t, [['independent checks', async t => {
+  let rowAt93 = 0;
+  for(const name of ['CF_THROWAWAY_API_TOKEN','RESEND_API_KEY','SENDGRID_API_KEY','EVIDENCE_WRITE_TOKEN','GITHUB_TOKEN','ACTIONS_RUNTIME_TOKEN','NODE_OPTIONS','NODE_PATH']) {
+    await caseRow(t, 'table at line 93 row ' + rowAt93++, async () => {
+assert.throws(()=>assertCredentialFree({[name]:'value'}));
+    });
+  }
+  await caseRow(t, 'following assertion at line 94', async () => { assert.doesNotThrow(()=>assertCredentialFree({PATH:'/usr/bin',CI:'true'})); });
+  }]]);
 });
 test('operations v2 required mail fails with missing, blank or wrong selected key; optional loops remain optional',async t=>{
+  await caseRows(t, [['independent checks', async t => {
   const dir=await temporary(t);await writeFile(join(dir,'verify.mjs'),'');
   const descriptor={version:2,project:'example/edition',runtime:{requirements:[]},requiredEnvironment:[],commands:{verify:{argv:['node','verify.mjs'],inputs:['verify.mjs'],effects:'Local validation'}},loops:[{id:'ticket-replies',type:'mail',required:true,enabled:true,provider:'resend'}]};
   await writeFile(join(dir,'OPERATIONS.json'),JSON.stringify(descriptor));
-  for(const env of [{},{RESEND_API_KEY:' '},{SENDGRID_API_KEY:'fixture'},{RESEND_API_KEY:'fixture',MAIL_PROVIDER:'sendgrid'}]){const result=await inspectOperations(dir,env);assert.equal(result.ok,false);assert(!JSON.stringify(result).includes('fixture'));}
-  assert.equal((await inspectOperations(dir,{RESEND_API_KEY:'fixture'})).ok,true);
-  descriptor.loops[0].enabled=false;descriptor.loops[0].required=false;await writeFile(join(dir,'OPERATIONS.json'),JSON.stringify(descriptor));assert.equal((await inspectOperations(dir,{})).ok,true);
-  descriptor.loops[0].required=true;await writeFile(join(dir,'OPERATIONS.json'),JSON.stringify(descriptor));assert.equal((await inspectOperations(dir,{RESEND_API_KEY:'fixture'})).ok,false);
+  let rowAt100 = 0;
+  for(const env of [{},{RESEND_API_KEY:' '},{SENDGRID_API_KEY:'fixture'},{RESEND_API_KEY:'fixture',MAIL_PROVIDER:'sendgrid'}]){
+    await caseRow(t, 'table at line 100 row ' + rowAt100++, async () => {
+const result=await inspectOperations(dir,env);assert.equal(result.ok,false);assert(!JSON.stringify(result).includes('fixture'));    });
+  }
+  await caseRow(t, 'following assertion at line 101', async () => { assert.equal((await inspectOperations(dir,{RESEND_API_KEY:'fixture'})).ok,true); });
+  descriptor.loops[0].enabled=false;descriptor.loops[0].required=false;await writeFile(join(dir,'OPERATIONS.json'),JSON.stringify(descriptor));await caseRow(t, 'following assertion at line 102', async () => { assert.equal((await inspectOperations(dir,{})).ok,true); });
+  descriptor.loops[0].required=true;await writeFile(join(dir,'OPERATIONS.json'),JSON.stringify(descriptor));await caseRow(t, 'following assertion at line 103', async () => { assert.equal((await inspectOperations(dir,{RESEND_API_KEY:'fixture'})).ok,false); });
+  }]]);
 });
 test('new template calls real authoring lock/check and refuses any existing destination/lock',async t=>{
   const dir=await temporary(t);const root=join(dir,'edition');const args={destination:root,project:'example/edition',sourcePaths:['app.mjs'],commands:{verify:{argv:['node','app.mjs'],inputs:['app.mjs'],effects:'Local app validation'}}};
@@ -125,13 +139,17 @@ test('actual packer reads Vite-shaped regular output and binds file hashes; esca
   await writeFile(join(root,'default-seed/dist/server/wrangler.json'),JSON.stringify({main:'../../outside.js'}));await assert.rejects(packageBuild(args),/local-path/);
 });
 
-test('D1 file import confines signed uploads, verifies bytes and polls without forwarding account credentials', async () => {
+test('D1 file import confines signed uploads, verifies bytes and polls without forwarding account credentials', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const {createHash}=await import('node:crypto');
   const id='12345678-1234-1234-1234-123456789abc', sql="CREATE TRIGGER audit AFTER INSERT ON source BEGIN SELECT 1; SELECT 2; END;";
   const etag=createHash('md5').update(sql).digest('hex');
   const uploadURL=`https://${'b'.repeat(32)}.r2.cloudflarestorage.com/import.sql?signature=test-signed-secret`;
   // The REST schema has envelope errors only; Wrangler also accepts nested errors.
+  let rowAt134 = 0;
   for(const nestedErrors of [{},{errors:[]}]){
+    await caseRow(t, 'table at line 134 row ' + rowAt134++, async () => {
+
     const actions=[];
     const api=cloudflare({accountId,token:'test-account-secret',fetch:async(url,init)=>{
       assert.equal(init.redirect,'error');
@@ -143,16 +161,22 @@ test('D1 file import confines signed uploads, verifies bytes and polls without f
       assert.deepEqual(body,{action:'poll',current_bookmark:'bookmark'});return response({success:true,type:'import',status:'complete',...nestedErrors,result:{num_queries:1,final_bookmark:'finished'}});
     }});
     await api.importSql(id,sql);assert.deepEqual(actions,['init','ingest','poll']);
+      });
   }
   for(const url of ['http://127.0.0.1/file?sig=x',`https://${accountId}.r2.cloudflarestorage.com.evil.test/file?sig=x`,`https://u:p@${accountId}.r2.cloudflarestorage.com/file?sig=x`,`https://${accountId}.r2.cloudflarestorage.com:8443/file?sig=x`,`https://${accountId}.r2.cloudflarestorage.com/file?sig=x#secret`]){
     let calls=0;const rejected=cloudflare({accountId,token:'test',fetch:async()=>{calls++;return response({upload_url:url,filename:'import.sql'});}});
     await assert.rejects(rejected.importSql(id,sql),/invalid-d1-import-upload-url/);assert.equal(calls,1);
   }
+  }]]);
 });
 
-test('D1 import failures keep Cloudflare\'s reason without upload secrets or credentials and never retry uncertain ingestion', async () => {
+test('D1 import failures keep Cloudflare\'s reason without upload secrets or credentials and never retry uncertain ingestion', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const id='12345678-1234-1234-1234-123456789abc';
+  let rowAt155 = 0;
   for(const mode of ['etag','redirect','transport','poll','envelope','limit','cached']){
+    await caseRow(t, 'table at line 155 row ' + rowAt155++, async () => {
+
     let calls=0;
     const api=cloudflare({accountId,token:'test-token',maxRequests:5,fetch:async(url,init)=>{
       calls++;
@@ -165,13 +189,14 @@ test('D1 import failures keep Cloudflare\'s reason without upload secrets or cre
       if(mode==='poll')return response({...result,status:'error',errors:[`no such table: lookup; upload https://${accountId}.r2.cloudflarestorage.com/sql?sig=secret-upload with test-token`]});
       return response(result);
     }});
-    if(mode==='cached'){await api.importSql(id,'SELECT 1;');assert.equal(calls,1);continue;}
+    if(mode==='cached'){await api.importSql(id,'SELECT 1;');assert.equal(calls,1);return;}
     await assert.rejects(api.importSql(id,'SELECT 1;'),error=>{
       const kept=JSON.stringify([deployDiagnostic(error,String),error.providerRefusal,error.message]);
       for(const secret of ['secret-upload','test-token',accountId])assert(!kept.includes(secret));
       if(['envelope','poll'].includes(mode))assert.match(providerRefusal(error),/no such table: lookup; upload \[URL omitted\] with \[REDACTED\]/);
       return /d1-import|provider-http|budget/.test(error.message);});
     assert.equal(calls,mode==='limit'?5:2);
+      });
   }
   const complete={success:true,type:'import',status:'complete',result:{num_queries:1,final_bookmark:'finished'}};
   const malformed=[
@@ -191,4 +216,5 @@ test('D1 import failures keep Cloudflare\'s reason without upload secrets or cre
     await assert.rejects(api.importSql(id,'SELECT 1;'),/^Error: d1-import-(failed|invalid-result|uncertain)$/);
     assert.deepEqual(actions,['init','poll']);
   }
+  }]]);
 });
