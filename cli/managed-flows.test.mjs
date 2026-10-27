@@ -303,8 +303,11 @@ test('managed startup reports a real misbound application port and stops its des
    assert.equal((await healthStatus(url)).healthy,true,'the application binds a free socket while the assigned port is squatted');
   }finally{try{if(collision)await f.stop(collision);}finally{await writeFile(adapter,original);}}
   const target=mode==='dev'?'developmentTarget':'previewTarget';
-  const portsFile=join(f.root,`.rer-misbound-${mode}-ports.json`),partialPortsFile=portsFile+'.partial';
-  const replacement=`${mode}: async context=>{const fs=await import('node:fs/promises'),wrongPort=await (await import(${loopbackPorts})).runtimeLoopbackPort(context.runtimePort);await fs.writeFile(${JSON.stringify(partialPortsFile)},JSON.stringify({assigned:context.runtimePort,wrong:wrongPort}),{mode:0o600});await fs.rename(${JSON.stringify(partialPortsFile)},${JSON.stringify(portsFile)});const target=${target}(context);${mode==='dev'?`target[1][target[1].indexOf('--port')+1]=String(wrongPort);`:`target[2].env.RER_RUNTIME_PORT=String(wrongPort);`}delete target[2].runtimePortHandshake;return target;}`;
+  const portsFile=join(f.root,`.rer-misbound-${mode}-ports.json`),partialPortsFile=portsFile+'.partial',observedFile=portsFile+'.observed';
+  const replacement=`${mode}: async context=>{const fs=await import('node:fs/promises'),wrongPort=await (await import(${loopbackPorts})).runtimeLoopbackPort(context.runtimePort);await fs.writeFile(${JSON.stringify(partialPortsFile)},JSON.stringify({assigned:context.runtimePort,wrong:wrongPort}),{mode:0o600});await fs.rename(${JSON.stringify(partialPortsFile)},${JSON.stringify(portsFile)});const target=${target}(context);${mode==='dev'?`target[1][target[1].indexOf('--port')+1]=String(wrongPort);`:`target[2].env.RER_RUNTIME_PORT=String(wrongPort);`}delete target[2].runtimePortHandshake;target[2].ready=async(_url,signal)=>{while(!signal.aborted){try{await fs.access(${JSON.stringify(observedFile)});return {ready:false,message:'synthetic-base-1 independently observed'};}catch(error){if(error.code!=='ENOENT')throw error;}await new Promise(done=>setTimeout(done,10));}signal.throwIfAborted();};return target;}`;
+  // Hold the fixture's readiness callback until the independent observer has
+  // confirmed both health and the failed proxy. Fast refusal must not race the
+  // test's evidence collection; this callback never declares the app ready.
   const observed=new Map(),controls=new Set();let child,ports,listener,expectedPort,wrongPort,healthyWrongPort=false,proxyFailed=false,primaryFailure,observedAt;
   try{
    await writeFile(adapter,original.replace(`${mode}: ${target}`,replacement));
@@ -327,6 +330,7 @@ test('managed startup reports a real misbound application port and stops its des
      healthyWrongPort=(await healthStatus(`http://127.0.0.1:${ports.wrong}`)).healthy;
      if(healthyWrongPort)observedAt??=Date.now();
      if(healthyWrongPort)proxyFailed=(await healthStatus(url)).status===404;
+     if(healthyWrongPort&&proxyFailed)await writeFile(observedFile,'synthetic-base-1',{mode:0o600});
     }
     await pause(250);
    }
@@ -358,7 +362,7 @@ test('managed startup reports a real misbound application port and stops its des
    primaryFailure=error;throw error;
   }finally{
    try{await writeFile(adapter,original);}
-   finally{try{if(child)try{await f.stop(child);}catch(error){if(!primaryFailure)throw error;t.diagnostic('Owned teardown also failed after the reported startup failure');}}finally{await rm(portsFile,{force:true});await rm(partialPortsFile,{force:true});}}
+   finally{try{if(child)try{await f.stop(child);}catch(error){if(!primaryFailure)throw error;t.diagnostic('Owned teardown also failed after the reported startup failure');}}finally{await rm(portsFile,{force:true});await rm(partialPortsFile,{force:true});await rm(observedFile,{force:true});}}
   }
  }
 });
