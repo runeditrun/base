@@ -170,6 +170,7 @@ class ExpressionParser extends LValParser {
     }
     return this.parseConditional(expr, startLoc, refExpressionErrors);
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseConditional(expr, startLoc, refExpressionErrors) {
     if (this.eat(tt.question)) {
       const node = this.startNodeAt(startLoc);
@@ -263,6 +264,7 @@ class ExpressionParser extends LValParser {
             return this.parseSmartPipelineBodyInStyle(this.parseExprOpBaseRightExpr(op, prec), startLoc);
           });
         }
+      // falls through (upstream parser grammar)
       default:
         return this.parseExprOpBaseRightExpr(op, prec);
     }
@@ -626,6 +628,7 @@ class ExpressionParser extends LValParser {
         return this.parseFunctionOrFunctionSent();
       case tt.at:
         decorators = this.parseDecorators();
+      // falls through (upstream parser grammar)
       case tt._class:
         return this.parseClass(this.maybeTakeDecorators(decorators, this.startNode()), false);
       case tt._new:
@@ -1000,6 +1003,7 @@ class ExpressionParser extends LValParser {
     parenExpression.expression = expression;
     return this.finishNode(parenExpression, "ParenthesizedExpression");
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   shouldParseArrow(params) {
     return !this.canInsertSemicolon();
   }
@@ -1008,6 +1012,7 @@ class ExpressionParser extends LValParser {
       return node;
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseParenItem(node, startLoc) {
     return node;
   }
@@ -1590,6 +1595,7 @@ class ExpressionParser extends LValParser {
         case tt.colon:
         case tt.comma:
           if (!delegating) break;
+        // falls through (upstream parser grammar)
         default:
           argument = this.parseMaybeAssign();
       }
@@ -1779,6 +1785,7 @@ class ExpressionParser extends LValParser {
     }
     return this.parseMaybeAssignAllowIn(refExpressionErrors, afterLeftParse);
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parsePropertyNamePrefixOperator(prop) {
   }
 }

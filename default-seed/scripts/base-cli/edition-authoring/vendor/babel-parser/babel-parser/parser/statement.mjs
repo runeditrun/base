@@ -371,11 +371,13 @@ class StatementParser extends ExpressionParser {
           }
         }
       }
+      // falls through (upstream parser grammar)
       case tt._const: {
         if (!allowDeclaration) {
           this.raise(Errors.UnexpectedLexicalDeclaration, this.state.startLoc);
         }
       }
+      // falls through (upstream parser grammar)
       case tt._var: {
         const kind = this.state.value;
         return this.parseVarStatement(node, kind);
@@ -394,6 +396,7 @@ class StatementParser extends ExpressionParser {
           break;
         }
       }
+      // falls through (upstream parser grammar)
       case tt._export: {
         if (!(this.optionFlags & OptionFlags.AllowImportExportEverywhere) && !topLevel) {
           this.raise(Errors.UnexpectedImportExport, this.state.startLoc);
@@ -806,6 +809,7 @@ class StatementParser extends ExpressionParser {
     node.label = expr;
     return this.finishNode(node, "LabeledStatement");
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseExpressionStatement(node, expr, decorators) {
     node.expression = expr;
     this.semicolon();
@@ -1260,6 +1264,7 @@ class StatementParser extends ExpressionParser {
   declareClassPrivateMethodInScope(node, kind) {
     this.classScope.declarePrivateName(this.getPrivateNameSV(node.key), kind, node.key.loc.start);
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parsePostMemberNameModifiers(methodOrProp) {
   }
   parseClassPrivateProperty(node) {
@@ -1363,6 +1368,7 @@ class StatementParser extends ExpressionParser {
     }
     throw this.unexpected(null, tt.braceL);
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   eatExportStar(node) {
     return this.eat(tt.star);
   }
@@ -1450,6 +1456,7 @@ class StatementParser extends ExpressionParser {
     this.semicolon();
     return res;
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseExportDeclaration(node) {
     if (this.match(tt._class)) {
       const node2 = this.parseClass(this.startNode(), true, false);
@@ -1621,6 +1628,7 @@ class StatementParser extends ExpressionParser {
     }
     return nodes;
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseExportSpecifier(node, isString, isInTypeExport, isMaybeTypeOnly) {
     if (this.eatContextual(tt._as)) {
       node.exported = this.parseModuleExportName();
@@ -1743,6 +1751,7 @@ class StatementParser extends ExpressionParser {
       return this.createIdentifier(phaseIdentifier, phaseIdentifierName);
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   isPrecedingIdImportPhase(phase) {
     const {
       type

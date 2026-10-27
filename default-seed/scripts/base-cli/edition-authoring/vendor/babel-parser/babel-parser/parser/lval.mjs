@@ -155,6 +155,7 @@ class LValParser extends NodeUtils {
         return false;
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   toReferencedList(exprList, isParenthesizedExpr) {
     return exprList;
   }
@@ -293,6 +294,7 @@ class LValParser extends NodeUtils {
     node.right = this.parseMaybeAssignAllowIn();
     return this.finishNode(node, "AssignmentPattern");
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   isValidLVal(type, disallowCallExpression, isUnparenthesizedInAssign, binding) {
     switch (type) {
       case "AssignmentPattern":
@@ -418,6 +420,7 @@ class LValParser extends NodeUtils {
       case "ArrayExpression":
       case "ObjectExpression":
         if (allowPattern) break;
+      // falls through (upstream parser grammar)
       default:
         this.raise(Errors.InvalidRestAssignmentPattern, node);
     }

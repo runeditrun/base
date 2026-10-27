@@ -1,12 +1,14 @@
 // Generated from Babel v7.29.8 (MIT); see README.md.
 import { tokenIsIdentifier, tokenIsTSDeclarationStart, tokenIsTSTypeOperator, tokenOperatorPrecedence, tokenIsKeywordOrIdentifier, tt, tokenIsTemplate, tokenCanStartExpression } from "../../tokenizer/types.mjs";
 import { types as tc } from "../../tokenizer/context.mjs";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
 import { createPositionWithColumnOffset } from "../../util/location.mjs";
 import { ScopeFlag, BindingFlag } from "../../util/scopeflags.mjs";
 import TypeScriptScopeHandler from "./scope.mjs";
 import { ParamKind } from "../../util/production-parameter.mjs";
 import { Errors, ParseErrorEnum } from "../../parse-error.mjs";
 import { ParseBindingListFlags } from "../../parser/lval.mjs";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
 import { OptionFlags } from "../../options.mjs";
 import { isIdentifierChar, isIdentifierStart } from "../../util/identifier.mjs";
 const keywordAndTSRelationalOperator = /in(?:stanceof)?|as|satisfies/y;
@@ -152,6 +154,7 @@ function tsIsAccessModifier(modifier) {
 function tsIsVarianceAnnotations(modifier) {
   return modifier === "in" || modifier === "out";
 }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
 function tsIsEntityName(node) {
   if (node.extra?.parenthesized) {
     return false;
@@ -1442,6 +1445,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
           if (this.state.containsEsc) {
             return;
           }
+        // falls through (upstream parser grammar)
         case tt._const:
         case tt._var:
           if (!this.match(tt._const) || !this.isLookaheadContextual("enum")) {
@@ -1474,6 +1478,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
           });
           if (result) return result;
         }
+        // falls through (upstream parser grammar)
         default:
           if (tokenIsIdentifier(startType)) {
             return this.tsParseDeclaration(node, this.state.type, true, null);
@@ -1644,6 +1649,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
       }
     });
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   toReferencedList(exprList, isInParens) {
     this.tsCheckForInvalidTypeCasts(exprList);
     return exprList;
@@ -2099,6 +2105,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
     }
     return declaration;
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseClassId(node, isStatement, optionalId, bindingType) {
     if ((!isStatement || optionalId) && this.isContextual(tt._implements)) {
       return;
@@ -2351,6 +2358,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
         if (!isLHS && node.left.type === "TSTypeCastExpression") {
           node.left = this.typeCastToParameter(node.left);
         }
+      // falls through (upstream parser grammar)
       default:
         super.toAssignable(node, isLHS);
     }
@@ -2604,6 +2612,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
     node.exportKind = "value";
     return super.parseExportSpecifier(node, isString, isInTypeExport, isMaybeTypeOnly);
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseImportSpecifier(specifier, importedIsString, isInTypeOnlyImport, isMaybeTypeOnly, bindingType) {
     if (!importedIsString && isMaybeTypeOnly) {
       this.parseTypeOnlyImportExportSpecifier(specifier, true, isInTypeOnlyImport);
@@ -2675,6 +2684,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
         return;
       case "RestElement":
         node.value = void 0;
+      // falls through (upstream parser grammar)
       case "Identifier":
       case "ArrayPattern":
       case "AssignmentPattern":
@@ -2692,6 +2702,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
         return;
       case "TSEmptyBodyFunctionExpression":
         node.body = null;
+      // falls through (upstream parser grammar)
       case "TSDeclareFunction":
       case "FunctionDeclaration":
       case "FunctionExpression":
@@ -2707,6 +2718,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
       case "TSMethodSignature":
       case "TSPropertySignature":
         node.optional ??= false;
+      // falls through (upstream parser grammar)
       case "TSIndexSignature":
         node.accessibility ??= void 0;
         node.readonly ??= false;
@@ -2720,6 +2732,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
         node.definite ??= false;
         node.readonly ??= false;
         node.typeAnnotation ??= void 0;
+      // falls through (upstream parser grammar)
       case "TSAbstractMethodDefinition":
       case "MethodDefinition":
         node.accessibility ??= void 0;
@@ -2729,6 +2742,7 @@ var stdin_default = (superClass) => class TypeScriptParserMixin extends superCla
         return;
       case "ClassExpression":
         node.id ??= null;
+      // falls through (upstream parser grammar)
       case "ClassDeclaration":
         node.abstract ??= false;
         node.declare ??= false;

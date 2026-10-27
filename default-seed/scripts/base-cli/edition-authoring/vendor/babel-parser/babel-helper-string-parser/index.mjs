@@ -129,9 +129,11 @@ function readEscapedChar(input, pos, lineStart, curLine, inTemplate, errors) {
       if (input.charCodeAt(pos) === 10) {
         ++pos;
       }
+    // falls through (upstream parser grammar)
     case 10:
       lineStart = pos;
       ++curLine;
+    // falls through (upstream parser grammar)
     case 8232:
     case 8233:
       return res("");
@@ -142,6 +144,7 @@ function readEscapedChar(input, pos, lineStart, curLine, inTemplate, errors) {
       } else {
         errors.strictNumericEscape(pos - 1, lineStart, curLine);
       }
+    // falls through (upstream parser grammar)
     default:
       if (ch >= 48 && ch <= 55) {
         const startPos = pos - 1;

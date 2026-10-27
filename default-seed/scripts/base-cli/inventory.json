@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gc58d4cda",
+  "cliVersion": "0.2.83-dev.g541ca435",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1251,11 +1251,11 @@
     },
     "edition-authoring/vendor/babel-parser/README.md": {
       "source": "edition-authoring/vendor/babel-parser/README.md",
-      "sha256": "40239f07f6e276a0cd688965b8deb83a8023ba1ef2e9241270a04b764bafa83f"
+      "sha256": "e7ee8625baac8ac14c2d458dd719de1551317ba8b640614bfcadd6dc4b6af857"
     },
     "edition-authoring/vendor/babel-parser/babel-helper-string-parser/index.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-helper-string-parser/index.mjs",
-      "sha256": "7e0f35d0d3503193f29222219f4881333e0a6046d974a43319fe32bfa47e8ebb"
+      "sha256": "79c5329b757f4aef92ab32e701f0587b0b469bb73fcfc8b4387b07572103903b"
     },
     "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/identifier.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/identifier.mjs",
@@ -1271,7 +1271,7 @@
     },
     "edition-authoring/vendor/babel-parser/babel-parser/index.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/index.mjs",
-      "sha256": "908736dfe1ff9345bf18b99fa330753850f8560b36918fc2071434511aa53d2b"
+      "sha256": "fb528c027ed1afa7bf7318f44c82f23dd54a03646c247b51ef4eab3b9b327a90"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/options.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/options.mjs",
@@ -1319,7 +1319,7 @@
     },
     "edition-authoring/vendor/babel-parser/babel-parser/parser/expression.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/expression.mjs",
-      "sha256": "c92d7643f1e9f7592da10488a404396007dc300d96184a51fb0ae0e5f730beec"
+      "sha256": "854a6d320bf64245f456068c5680cc063b2932d5bc7d618e8b61ea353601319c"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/parser/index.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/index.mjs",
@@ -1327,7 +1327,7 @@
     },
     "edition-authoring/vendor/babel-parser/babel-parser/parser/lval.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/lval.mjs",
-      "sha256": "e42b94773232172a3d35dc90fd66e2b34e88ebf364eeb53ac615ad0a03d14b25"
+      "sha256": "c9152a612afe62cae2a6dbd9f90c142cb51751770cba7539824b46da2e91aed1"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/parser/node.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/node.mjs",
@@ -1335,7 +1335,7 @@
     },
     "edition-authoring/vendor/babel-parser/babel-parser/parser/statement.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/statement.mjs",
-      "sha256": "1b8d27616e8e8b0a2f163434c2f7ebe24e1fcada58d7b623601461391b60ca2d"
+      "sha256": "d7c74eca0b0ef263d860070d0dc1d5dfd7fa5a0fe2727c6d9c1fb697ed3082fd"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/parser/util.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/util.mjs",
@@ -1343,15 +1343,15 @@
     },
     "edition-authoring/vendor/babel-parser/babel-parser/plugin-utils.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/plugin-utils.mjs",
-      "sha256": "59fa8783491813132ee1cb78f22149181db2cf6d8da9e590230e5091df596c71"
+      "sha256": "3dc924773d500f909b3b3caa582f571526a4b1c544a3604e3267830cfdbfbfe2"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/plugins/estree.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/estree.mjs",
-      "sha256": "d5de1bb879f5d1664fa03bb2af5fea6519c307abb264d19fafce94eba430d7e8"
+      "sha256": "3f0758e14f0745614496042baa4865f8a7a61569dc16f5d3246224706ac0d03c"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/index.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/index.mjs",
-      "sha256": "143b07dfa06710b1598cd59a54d613bc7a426aacc1e504830d326726c4b7a1da"
+      "sha256": "d15a7c4741f12c167119913ec147ec828d3e25bb237671be2d96594faaa7f39e"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/scope.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/scope.mjs",
@@ -1371,7 +1371,7 @@
     },
     "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/index.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/index.mjs",
-      "sha256": "bcaa7735e4e732276bb480fd439ea622d4ec8a64a26e3e8224c3195a2b684255"
+      "sha256": "075fd3d378600b13db9ae7c89cab8a6c3d0f5d1e6921eae02faf2fc502b7720c"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/scope.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/scope.mjs",
@@ -1387,7 +1387,7 @@
     },
     "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/index.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/index.mjs",
-      "sha256": "e84933502fbc3e3993ec2407556af33d92b782d6a8f2474e367964c5b72df742"
+      "sha256": "c3eb5b431ed4ccd0f3727e9cb32f90f99f5f9c1e2e24f7aaaaeb2f8a4453c00b"
     },
     "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/state.mjs": {
       "source": "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/state.mjs",

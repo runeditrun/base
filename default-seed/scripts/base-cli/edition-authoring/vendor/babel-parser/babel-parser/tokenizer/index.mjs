@@ -201,6 +201,7 @@ class Tokenizer extends CommentsParser {
           if (this.input.charCodeAt(this.state.pos + 1) === 10) {
             ++this.state.pos;
           }
+        // falls through (upstream parser grammar)
         case 10:
         case 8232:
         case 8233:
@@ -596,6 +597,7 @@ class Tokenizer extends CommentsParser {
           return;
         }
       }
+      // falls through (upstream parser grammar)
       case 49:
       case 50:
       case 51:
@@ -968,6 +970,7 @@ class Tokenizer extends CommentsParser {
     }
     return this.raise(toParseError, at, details);
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   updateContext(prevType) {
   }
   unexpected(loc, type) {

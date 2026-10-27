@@ -15,3 +15,7 @@ The source files were checked against the Git blob identifiers in the official
 v7.29.8 tree. Compiled ASTs were compared with the published @babel/parser 7.29.8
 for JavaScript, optional calls, templates, TypeScript and TSX. Parser behavior is
 unchanged; runtime dependency policy is in ../../module-edges.mjs.
+
+Grammar fallthrough and empty-probe comments are restored for linting. Narrow
+inline unused-binding annotations preserve upstream parser method/callback
+interfaces. These annotations apply only to the generated upstream modules.

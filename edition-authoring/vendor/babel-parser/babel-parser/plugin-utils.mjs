@@ -65,6 +65,7 @@ function validatePlugins(pluginsMap) {
     }
   }
   if (pluginsMap.has("deprecatedImportAssert")) {
+    // An unsuccessful grammar probe intentionally leaves no result.
   } else if (pluginsMap.has("importAttributes") && pluginsMap.get("importAttributes").deprecatedAssertSyntax) {
     {
       pluginsMap.set("deprecatedImportAssert", {});

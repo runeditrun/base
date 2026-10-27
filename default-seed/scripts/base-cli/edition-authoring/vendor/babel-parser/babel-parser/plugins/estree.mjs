@@ -32,7 +32,9 @@ var stdin_default = (superClass) => class ESTreeParserMixin extends superClass {
     let regex = null;
     try {
       regex = new RegExp(pattern, flags);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
     } catch (_) {
+      // An unsuccessful grammar probe intentionally leaves no result.
     }
     const node = this.estreeParseLiteral(regex);
     node.regex = {
@@ -90,6 +92,7 @@ var stdin_default = (superClass) => class ESTreeParserMixin extends superClass {
     delete expression.extra;
     return stmt;
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   fillOptionalPropertiesForTSESLint(node) {
   }
   cloneEstreeStringLiteral(node) {
@@ -328,6 +331,7 @@ var stdin_default = (superClass) => class ESTreeParserMixin extends superClass {
           node.exported = node.specifiers[0].exported;
           delete node.specifiers;
         }
+      // falls through (upstream parser grammar)
       case "ExportDefaultDeclaration":
         {
           const {

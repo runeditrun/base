@@ -141,6 +141,7 @@ var stdin_default = (superClass) => class FlowParserMixin extends superClass {
     if (this.flowPragma === void 0) {
       const matches = FLOW_PRAGMA_REGEX.exec(comment.value);
       if (!matches) {
+        // An unsuccessful grammar probe intentionally leaves no result.
       } else if (matches[1] === "flow") {
         this.flowPragma = "flow";
       } else if (matches[1] === "noflow") {
@@ -1716,6 +1717,7 @@ var stdin_default = (superClass) => class FlowParserMixin extends superClass {
       node.importKind = phase === "type" || phase === "typeof" ? phase : "value";
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retain the upstream parser interface and bindings.
   parseImportSpecifier(specifier, importedIsString, isInTypeOnlyImport, isMaybeTypeOnly, bindingType) {
     const firstIdent = specifier.imported;
     let specifierTypeKind = null;

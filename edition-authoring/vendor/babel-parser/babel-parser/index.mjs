@@ -19,6 +19,7 @@ function parse(input, options) {
           options.sourceType = "script";
           return getParser(options, input).parse();
         } catch {
+          // An unsuccessful grammar probe intentionally leaves no result.
         }
       } else {
         ast.program.sourceType = "script";
@@ -29,6 +30,7 @@ function parse(input, options) {
         options.sourceType = "script";
         return getParser(options, input).parse();
       } catch {
+        // An unsuccessful grammar probe intentionally leaves no result.
       }
       throw moduleError;
     }
