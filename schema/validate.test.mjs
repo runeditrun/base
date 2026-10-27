@@ -204,14 +204,14 @@ const setupProbes = [
   ])
 ];
 
-for (const [name, fields, message] of setupProbes) {
-  test(`the setup manifest ${message ? 'rejects' : 'accepts'} ${name}`, () => {
+test("duplicate Business field claims are refused with both input names and their shared field", () => checkCases([
+  ...setupProbes.map([name, fields, message] => [`the setup manifest ${message ? 'rejects' : 'accepts'} ${name}`, () => {
     const manifest = { schema: 1, title: 'Settings', groups: [], fields, steps: [{ type: 'extension', id: 'workspace' }] };
     const errors = validateSetupManifest(setupSchema, manifest);
     if (message) assert.ok(errors.some(error => message.test(error)), `expected ${message}, got ${JSON.stringify(errors)}`);
     else assert.deepEqual(errors, []);
-  });
-}
+  }])
+]));
 
 test('required is satisfied only by own properties', () => {
   const own = { type: 'object', required: ['constructor'], properties: {}, additionalProperties: false };

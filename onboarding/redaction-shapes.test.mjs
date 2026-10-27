@@ -215,18 +215,16 @@ outputCase('step labels, reports and a final unterminated child line reach every
  }
 });
 
-test('credential variable names are whole word parts, so ordinary variables are not registered', () => {
+test("redaction preserves public diagnostics and bounds while protecting credential names, shapes and stream fragments", () => checkCases([
+  ['credential variable names are whole word parts, so ordinary variables are not registered', () => {
  const ordinary = { PATH: '/usr/local/bin:/usr/bin:/bin', DESIGN_MODE: 'production-mode', SIGNAL_NAME: 'termination', KEYBOARD_LAYOUT: 'english-us', COMPASS_DIR: '/opt/compass', AUTHOR_NAME: 'Fixture Author' };
  assert.deepEqual(credentialValues(ordinary), []);
  const credentials = { GITHUB_TOKEN: 'test-synthetic-1', DB_PASSWORD: 'test-synthetic-2', apiKey: 'test-synthetic-3', clientSecret: 'test-synthetic-4', AWS_SECRET_ACCESS_KEY: 'test-synthetic-5', APIKEY: 'test-synthetic-6', PASSWD: 'test-synthetic-7', SESSION_COOKIE: 'test-synthetic-8', SECRETS: 'test-synthetic-9', TOKEN: 'test-synthetic-10' };
  assert.deepEqual(credentialValues(credentials), Object.values(credentials));
  const redaction = createRedaction(); redaction.addSecrets(credentialValues(ordinary));
  assert.equal(redaction.redact('Building in production-mode for english-us'), 'Building in production-mode for english-us');
-});
-
-// Pathological 4 MiB inputs must cost about as much as ordinary output of the
-// same size: adjacent \s* runs and JWT runs used to backtrack quadratically.
-test('4 MiB pathological inputs redact in time comparable to ordinary output', () => {
+}],
+  ['4 MiB pathological inputs redact in time comparable to ordinary output', () => {
  const size = 4 * 1024 * 1024;
  const time = text => {
   const redaction = createRedaction(); let started = Date.now();
@@ -245,13 +243,20 @@ test('4 MiB pathological inputs redact in time comparable to ordinary output', (
   const elapsed = time(text);
   assert.ok(elapsed < budget, `${name}: ${elapsed} ms against ${budget} ms (ordinary ${ordinary} ms)`);
  }
-});
-
-
-test('acronym-prefixed credential variables register their values', () => {
+}],
+  ['acronym-prefixed credential variables register their values', () => {
  const values = { APIToken: 'test-synthetic-api-token', AWSSecretKey: 'test-synthetic-aws-key', APISecret: 'test-synthetic-api-secret', APIPassword: 'test-synthetic-api-password' };
  assert.deepEqual(credentialValues(values), Object.values(values));
-});
+}],
+  ['redacted output preserves public diagnostics across input shapes and stream boundaries', () => checkCases(outputCases)]
+]));
+
+// Pathological 4 MiB inputs must cost about as much as ordinary output of the
+// same size: adjacent \s* runs and JWT runs used to backtrack quadratically.
+
+
+
+
 
 outputCase('camelCase prefix and JWT holds protect long values split beyond the output window', () => {
  for (const [name, prefix, value, suffix, privatePart] of [
@@ -291,5 +296,3 @@ outputCase('oversized quoted credentials stay bounded and private until their cl
   assert.ok(!output.includes('opaque-synthetic-fragment'));
  }
 });
-
-test('redacted output preserves public diagnostics across input shapes and stream boundaries', () => checkCases(outputCases));

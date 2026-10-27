@@ -1,3 +1,4 @@
+import { checkCases } from './test-fixture.mjs';
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -10,26 +11,22 @@ const table = [{ pid: 4242, ppid: 1, pgid: 4242, uid: 501, state: 'S', birth: 'T
 
 // The process edge is the reader: ps can hand back a half-written row while a
 // process exits, which must not end a cleanup whose own processes are known.
-test('a transient process-table read is retried until it succeeds', async () => {
+test("process inspection retries transient reads within bounds and preserves slow successful cleanup", () => checkCases([
+  ['a transient process-table read is retried until it succeeds', async () => {
   let reads = 0
   const read = async () => { if (++reads < 4) throw transient(); return table }
   assert.deepEqual(await readProcessTable(5000, undefined, read), table)
   assert.equal(reads, 4)
-})
-
-test('a process table that never reads fails after its bound and extension, not before', async () => {
+}],
+  ['a process table that never reads fails after its bound and extension, not before', async () => {
   let reads = 0
   const started = Date.now()
   await assert.rejects(readProcessTable(100, undefined, async () => { reads++; throw transient() }, 200), /Could not read process identities/)
   assert.ok(reads > 3, 'kept retrying')
   assert.ok(Date.now() - started > 200, 'retried through the extension')
   assert.ok(Date.now() - started < 1500, 'stayed within the extension')
-})
-
-// A seed's test cleanup (Uptime's browser suites) reads the table to find what
-// its run left behind. A busy machine reading slower than the bound must not
-// fail a run that passed, and cleanup still stops the stray it found.
-test('a slow process table does not fail a passing run and its stray child is still stopped', async () => {
+}],
+  ['a slow process table does not fail a passing run and its stray child is still stopped', async () => {
   const warnings = []
   const warned = (warning) => { if (warning.code === 'RER_PROCESS_INSPECTION_SLOW') warnings.push(warning) }
   process.on('warning', warned)
@@ -54,10 +51,16 @@ test('a slow process table does not fail a passing run and its stray child is st
     process.off('warning', warned)
     for (const pid of [-run.pid, stray]) try { process.kill(pid, 'SIGKILL') } catch {}
   }
-})
-
-test('a failure that is not transient is reported at once', async () => {
+}],
+  ['a failure that is not transient is reported at once', async () => {
   let reads = 0
   await assert.rejects(readProcessTable(5000, undefined, async () => { reads++; throw new Error('boom') }), /boom/)
   assert.equal(reads, 1)
-})
+}]
+]));
+
+
+
+// A seed's test cleanup (Uptime's browser suites) reads the table to find what
+// its run left behind. A busy machine reading slower than the bound must not
+// fail a run that passed, and cleanup still stops the stray it found.

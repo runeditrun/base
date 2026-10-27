@@ -1,3 +1,4 @@
+import { checkCases } from '../test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
@@ -7,7 +8,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 const execute=promisify(execFile);
-for(const pathValue of [false,true])for(const ending of ['success','failure'])test(`table: CLI manifest secrets are excluded from every command and redacted on a saved ${ending} rerun${pathValue?' including private path metadata':''}`,async t=>{
+test("CLI manifest secrets remain private across saved success and failure reruns including path metadata", () => checkCases([
+  ...[false,true].flatMap(pathValue => ['success','failure'].map(ending => [`table: CLI manifest secrets are excluded from every command and redacted on a saved ${ending} rerun${pathValue?' including private path metadata':''}`, async t=>{
  const root=await mkdtemp(join(tmpdir(),'cli-gate-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const declaredNames=['COOKIE_KEY','BOOTSTRAP_KEY','OPAQUE_VALUE'];
  // Installation keys must stay private even for older manifests that never declared them.
@@ -41,4 +43,5 @@ for(const pathValue of [false,true])for(const ending of ['success','failure'])te
  assert.equal(await readFile(join(root,'.dev.vars'),'utf8'),original);
  if(ending==='success')assert.match(result.stdout,/Owner already claimed/);
  else assert.match(result.stderr,/exit 7/);
-});
+}]))
+]));

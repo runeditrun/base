@@ -1,3 +1,4 @@
+import { checkCases } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,12 +27,12 @@ async function session(t, changes = {}) {
  return { root, server, call, headers };
 }
 
-test('distinct seed accepts only declared public fields and never invents H2H modes', () => {
+test("declared installer inputs preserve owner control, authentication and secret custody through Start", () => checkCases([
+  ['distinct seed accepts only declared public fields and never invents H2H modes', () => {
  assert.deepEqual(validateAnswers({ SERVICE_NAME: 'API', PREFIX: 'status' }, model), { SERVICE_NAME: 'API', PREFIX: 'status' });
  for (const input of [{ password: 'not-public' }, { MONITOR_TOKEN: 'test-private-token' }, { allowedOrigin: 'https://example.com' }]) assert.throws(() => validateAnswers(input, model));
-});
-
-test('saved details reject another product and strip undeclared or secret draft keys', async t => {
+}],
+  ['saved details reject another product and strip undeclared or secret draft keys', async t => {
  const root = await directory(t), path = join(root, '.seed/installer/state.json');
  await mkdir(join(root, '.seed/installer'), { recursive: true });
  await writeFile(path, JSON.stringify({ product: seed.product, draft: { SERVICE_NAME: 'API', MONITOR_TOKEN: 'TEST_SECRET_SENTINEL', alien: 'wrong' } }));
@@ -40,9 +41,8 @@ test('saved details reject another product and strip undeclared or secret draft 
  await store.draft(store.state.draft);
  assert.equal(JSON.parse(await readFile(path, 'utf8')).product, seed.product);
  await assert.rejects(createState(root, { ...seed, product: 'Other seed' }), /another seed/);
-});
-
-test('sparse seed rejects unsupported capabilities and requires authenticated same-origin writes', async t => {
+}],
+  ['sparse seed rejects unsupported capabilities and requires authenticated same-origin writes', async t => {
  const { server, call, headers } = await session(t);
  assert.equal((await fetch(server.origin + '/api/state')).status, 403);
  assert.equal((await fetch(server.origin + '/api/draft', { method: 'POST', headers: { ...headers, Origin: 'https://other.example' }, body: JSON.stringify({ SERVICE_NAME: 'Cross origin' }) })).status, 403);
@@ -50,9 +50,8 @@ test('sparse seed rejects unsupported capabilities and requires authenticated sa
  for (const provider of ['cloudflare', 'github']) assert.equal((await call('/api/connect', { provider })).status, 400);
  assert.deepEqual((await call('/api/state')).body.known.providers, {});
  assert.equal((await call('/api/draft', { MONITOR_TOKEN: 'TEST_SECRET_SENTINEL' })).status, 400);
-});
-
-test('custom credential stays private, follows its scope, and agent activity reflects actual reports', async t => {
+}],
+  ['custom credential stays private, follows its scope, and agent activity reflects actual reports', async t => {
  const { root, call } = await session(t);
  let state = (await call('/api/state')).body;
  assert.equal(state.agent.attached, false);
@@ -72,24 +71,8 @@ test('custom credential stays private, follows its scope, and agent activity ref
  assert.ok(!(await readFile(join(root, '.seed/installer/state.json'), 'utf8')).includes('SECRET_SENTINEL'));
  await call('/api/draft', { SERVICE_NAME: 'Website' });
  assert.equal((await call('/api/state')).body.known.secretReadiness.MONITOR_TOKEN, false);
-});
-
-test('adapter rejection produces a safe failed state without exposing provider errors', async t => {
- let signalFailure;
- const failed = new Promise(resolve => { signalFailure = resolve; });
- const { call } = await session(t, { install: async (_root, _input, store) => {
-  const phase = store.phase;
-  store.phase = async value => { const result = await phase(value); if (value === 'failed') signalFailure(); return result; };
-  throw Error('SECRET_SENTINEL');
- } });
- assert.equal((await call('/api/start', { SERVICE_NAME: 'API' })).status, 202);
- await new Promise((resolve, reject) => { const timer = setTimeout(() => reject(Error('Installer failure did not settle.')), 1000); failed.then(() => { clearTimeout(timer); resolve(); }); });
- const state = (await call('/api/state')).body;
- assert.equal(state.phase, 'failed');
- assert.ok(!JSON.stringify(state).includes('SECRET_SENTINEL'));
-});
-
-test('agent inference preserves owner overrides and their provenance', async t => {
+}],
+  ['agent inference preserves owner overrides and their provenance', async t => {
  const { call } = await session(t);
  await call('/api/prefill', { SERVICE_NAME: 'Inferred API', PREFIX: 'api' });
  await call('/api/draft', { SERVICE_NAME: 'Owner service' });
@@ -99,9 +82,8 @@ test('agent inference preserves owner overrides and their provenance', async t =
  assert.equal(state.sources.SERVICE_NAME, 'browser');
  assert.equal(state.draft.PREFIX, 'new-PREFIX');
  assert.equal(state.sources.PREFIX, 'agent');
-});
-
-test('only explicit start invokes the seed adapter with its custom credential', async t => {
+}],
+  ['only explicit start invokes the seed adapter with its custom credential', async t => {
  let installs = 0, received, signalComplete;
  const completed = new Promise(resolve => { signalComplete = resolve; });
  const { call } = await session(t, { install: async (_root, input, store) => {
@@ -123,4 +105,26 @@ test('only explicit start invokes the seed adapter with its custom credential', 
  assert.equal(state.phase, 'complete');
  assert.ok(!JSON.stringify(state).includes('SECRET_SENTINEL'));
  assert.equal((await call('/api/start', { SERVICE_NAME: 'API' })).status, 409);
+}]
+]));
+
+
+
+
+
+
+
+test('adapter rejection produces a safe failed state without exposing provider errors', async t => {
+ let signalFailure;
+ const failed = new Promise(resolve => { signalFailure = resolve; });
+ const { call } = await session(t, { install: async (_root, _input, store) => {
+  const phase = store.phase;
+  store.phase = async value => { const result = await phase(value); if (value === 'failed') signalFailure(); return result; };
+  throw Error('SECRET_SENTINEL');
+ } });
+ assert.equal((await call('/api/start', { SERVICE_NAME: 'API' })).status, 202);
+ await new Promise((resolve, reject) => { const timer = setTimeout(() => reject(Error('Installer failure did not settle.')), 1000); failed.then(() => { clearTimeout(timer); resolve(); }); });
+ const state = (await call('/api/state')).body;
+ assert.equal(state.phase, 'failed');
+ assert.ok(!JSON.stringify(state).includes('SECRET_SENTINEL'));
 });

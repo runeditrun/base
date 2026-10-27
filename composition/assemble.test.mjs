@@ -1,3 +1,4 @@
+import { checkCases } from '../onboarding/test-fixture.mjs';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -124,7 +125,8 @@ function run(f, output, extra = []) {
 function succeeds(result) {
   assert.equal(result.status, 0, result.stderr);
 }
-test("committed export relocates byte-identically and ignores explicit-ref dirty bytes", async (t) => {
+test("committed exports preserve selected source bytes, provenance and portable consumer instructions", () => checkCases([
+  ["committed export relocates byte-identically and ignores explicit-ref dirty bytes", async (t) => {
   const f = await fixture(t);
   const out = resolve(f.root, "one");
   succeeds(run(f, out));
@@ -169,8 +171,8 @@ test("committed export relocates byte-identically and ignores explicit-ref dirty
       await readFile(resolve(f.root, "two", path)),
     );
   assert.notEqual(run(f, out, ["--ref", "HEAD"]).status, 0);
-});
-test("pinned tooling ignores working base edits", async (t) => {
+}],
+  ["pinned tooling ignores working base edits", async (t) => {
   const f = await fixture(t);
   await put(
     f.base,
@@ -178,16 +180,102 @@ test("pinned tooling ignores working base edits", async (t) => {
     'throw new Error("DIRTY TOOL");',
   );
   succeeds(run(f, resolve(f.root, "out")));
-});
-for (const kind of [
+}],
+  ["Git replacement objects cannot change pinned source", async (t) => {
+  const f = await fixture(t);
+  const original = git(f.family, "rev-parse", "HEAD");
+  await put(f.family, "core/src/domain.ts", "replacement");
+  const replacement = checkpoint(f.family);
+  git(f.family, "replace", original, replacement);
+  succeeds(run(f, resolve(f.root, "out"), ["--ref", original]));
+  assert.equal(
+    await readFile(resolve(f.root, "out/src/family/support/domain.ts"), "utf8"),
+    "export const domain = true;\n",
+  );
+}],
+  ["consumer instructions are explicitly emitted without governing author source", async (t) => {
+  const f = await fixture(t);
+  await put(
+    f.family,
+    "editions/lily/AGENTS.consumer.md",
+    "Owner may edit any source.\n",
+  );
+  const path = resolve(f.family, "compositions/lily.json");
+  const d = JSON.parse(await readFile(path));
+  d.copies.push({
+    repository: "family",
+    component: "lily",
+    source: "editions/lily/AGENTS.consumer.md",
+    target: "AGENTS.md",
+  });
+  await writeFile(path, JSON.stringify(d));
+  checkpoint(f.family);
+  succeeds(run(f, resolve(f.root, "out")));
+  assert.equal(
+    await readFile(resolve(f.root, "out/AGENTS.md"), "utf8"),
+    "Owner may edit any source.\n",
+  );
+  const lock = JSON.parse(
+    await readFile(resolve(f.root, "out/composition.lock.json")),
+  );
+  assert.equal(
+    lock.files["AGENTS.md"].source,
+    "editions/lily/AGENTS.consumer.md",
+  );
+}],
+  ["bootstrap ignores uncommitted family schema and validator changes", async (t) => {
+  const f = await fixture(t);
+  await put(f.base, "schema/FAMILY.schema.json", {
+    type: "object",
+    required: ["futureField"],
+  });
+  await put(
+    f.base,
+    "schema/json-schema.mjs",
+    'throw new Error("UNPINNED VALIDATOR");',
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      resolve(f.base, "composition/cli.mjs"),
+      "lily",
+      "--family-repo",
+      f.family,
+      "--base-repo",
+      f.base,
+      "--output",
+      resolve(f.root, "out"),
+    ],
+    { encoding: "utf8" },
+  );
+  succeeds(result);
+}],
+  ["selected cross-family module exports from base; omitted modules stay absent", async (t) => {
+  const f = await baseModuleFixture(t);
+  checkpoint(f.family);
+  const out = resolve(f.root, "out");
+  succeeds(run(f, out));
+  const lock = JSON.parse(
+    await readFile(resolve(out, "composition.lock.json")),
+  );
+  assert.equal(
+    await readFile(resolve(out, "src/modules/mail/mail.ts"), "utf8"),
+    "export const sharedMail = true;\n",
+  );
+  assert.equal(lock.files["src/modules/mail/mail.ts"].repository, "base");
+  assert.ok(!Object.keys(lock.files).some((path) => path.includes("omitted")));
+}]
+ ]));
+
+test("composition refuses unsafe sources, destinations and component selections", () => checkCases([
+  ...[
   "collision",
   "symlink",
   "state",
   "escape",
   "missing-pin",
   "unselected",
-])
-  test(`rejects ${kind}`, async (t) => {
+].map(kind => [`rejects ${kind}`, async (t) => {
     const f = await fixture(t);
     if (kind === "collision")
       await put(
@@ -219,86 +307,48 @@ for (const kind of [
     }
     checkpoint(f.family);
     assert.notEqual(run(f, resolve(f.root, "out")).status, 0);
-  });
-test("Git replacement objects cannot change pinned source", async (t) => {
-  const f = await fixture(t);
-  const original = git(f.family, "rev-parse", "HEAD");
-  await put(f.family, "core/src/domain.ts", "replacement");
-  const replacement = checkpoint(f.family);
-  git(f.family, "replace", original, replacement);
-  succeeds(run(f, resolve(f.root, "out"), ["--ref", original]));
-  assert.equal(
-    await readFile(resolve(f.root, "out/src/family/support/domain.ts"), "utf8"),
-    "export const domain = true;\n",
-  );
-});
-test("control characters in committed paths are rejected", async (t) => {
+  }]),
+  ["control characters in committed paths are rejected", async (t) => {
   const f = await fixture(t);
   await put(f.family, "core/src/tab\tname.ts", "bad path");
   checkpoint(f.family);
   assert.notEqual(run(f, resolve(f.root, "out")).status, 0);
-});
-test("output whose name starts with dots still cannot be inside an input", async (t) => {
+}],
+  ["output whose name starts with dots still cannot be inside an input", async (t) => {
   const f = await fixture(t);
   assert.notEqual(run(f, resolve(f.family, "..export")).status, 0);
-});
-test("consumer instructions are explicitly emitted without governing author source", async (t) => {
-  const f = await fixture(t);
-  await put(
-    f.family,
-    "editions/lily/AGENTS.consumer.md",
-    "Owner may edit any source.\n",
-  );
-  const path = resolve(f.family, "compositions/lily.json");
-  const d = JSON.parse(await readFile(path));
-  d.copies.push({
-    repository: "family",
-    component: "lily",
-    source: "editions/lily/AGENTS.consumer.md",
-    target: "AGENTS.md",
-  });
-  await writeFile(path, JSON.stringify(d));
-  checkpoint(f.family);
-  succeeds(run(f, resolve(f.root, "out")));
-  assert.equal(
-    await readFile(resolve(f.root, "out/AGENTS.md"), "utf8"),
-    "Owner may edit any source.\n",
-  );
-  const lock = JSON.parse(
-    await readFile(resolve(f.root, "out/composition.lock.json")),
-  );
-  assert.equal(
-    lock.files["AGENTS.md"].source,
-    "editions/lily/AGENTS.consumer.md",
-  );
-});
-test("bootstrap ignores uncommitted family schema and validator changes", async (t) => {
-  const f = await fixture(t);
-  await put(f.base, "schema/FAMILY.schema.json", {
-    type: "object",
-    required: ["futureField"],
-  });
-  await put(
-    f.base,
-    "schema/json-schema.mjs",
-    'throw new Error("UNPINNED VALIDATOR");',
-  );
-  const result = spawnSync(
-    process.execPath,
-    [
-      resolve(f.base, "composition/cli.mjs"),
-      "lily",
-      "--family-repo",
-      f.family,
-      "--base-repo",
-      f.base,
-      "--output",
-      resolve(f.root, "out"),
-    ],
-    { encoding: "utf8" },
-  );
-  succeeds(result);
-});
+}],
+  ...[
+  "mixed-origin",
+  "wrong-module-path",
+  "unselected-base-module",
+  "core-from-base",
+  "module-as-base",
+].map(kind => [`rejects ${kind}`, async (t) => {
+    const f = await baseModuleFixture(t);
+    const d = f.descriptor;
+    if (kind === "mixed-origin")
+      d.copies.push({
+        repository: "family",
+        component: "mail",
+        source: "modules/mail/src",
+        target: "another-mail",
+      });
+    if (kind === "wrong-module-path")
+      d.copies[1].source = "modules/omitted/src";
+    if (kind === "unselected-base-module") d.copies[1].component = "omitted";
+    if (kind === "core-from-base") d.copies[0].repository = "base";
+    if (kind === "module-as-base") d.copies[1].component = "base";
+    await put(f.family, "compositions/lily.json", d);
+    checkpoint(f.family);
+    assert.notEqual(run(f, resolve(f.root, "out")).status, 0);
+  }])
+ ]));
+
+
+
+
+
 async function baseModuleFixture(t) {
   const f = await fixture(t);
   await put(
@@ -318,44 +368,3 @@ async function baseModuleFixture(t) {
   await put(f.family, "compositions/lily.json", descriptor);
   return { ...f, descriptor };
 }
-test("selected cross-family module exports from base; omitted modules stay absent", async (t) => {
-  const f = await baseModuleFixture(t);
-  checkpoint(f.family);
-  const out = resolve(f.root, "out");
-  succeeds(run(f, out));
-  const lock = JSON.parse(
-    await readFile(resolve(out, "composition.lock.json")),
-  );
-  assert.equal(
-    await readFile(resolve(out, "src/modules/mail/mail.ts"), "utf8"),
-    "export const sharedMail = true;\n",
-  );
-  assert.equal(lock.files["src/modules/mail/mail.ts"].repository, "base");
-  assert.ok(!Object.keys(lock.files).some((path) => path.includes("omitted")));
-});
-for (const kind of [
-  "mixed-origin",
-  "wrong-module-path",
-  "unselected-base-module",
-  "core-from-base",
-  "module-as-base",
-])
-  test(`rejects ${kind}`, async (t) => {
-    const f = await baseModuleFixture(t);
-    const d = f.descriptor;
-    if (kind === "mixed-origin")
-      d.copies.push({
-        repository: "family",
-        component: "mail",
-        source: "modules/mail/src",
-        target: "another-mail",
-      });
-    if (kind === "wrong-module-path")
-      d.copies[1].source = "modules/omitted/src";
-    if (kind === "unselected-base-module") d.copies[1].component = "omitted";
-    if (kind === "core-from-base") d.copies[0].repository = "base";
-    if (kind === "module-as-base") d.copies[1].component = "base";
-    await put(f.family, "compositions/lily.json", d);
-    checkpoint(f.family);
-    assert.notEqual(run(f, resolve(f.root, "out")).status, 0);
-  });
