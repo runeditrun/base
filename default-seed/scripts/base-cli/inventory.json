@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g109bce35",
+  "cliVersion": "0.2.83-dev.g7f8d8d51",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3655,7 +3655,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "7ede6c07cd7ebac91f2cf96ab9eae996ee51eb7f833baabe18d18db0f37de9ca"
+      "sha256": "d2a96acd145068121ca17baa7c6974b1227920de2e41d67291914c123fcb4eb3"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -3667,11 +3667,11 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "dda545e304946606c71e39501c769281cc07d2f2852986c66c9bcd43ba793442"
+      "sha256": "1f38e1db76ffc4d0ee587f085de3db958814e57fe640739f99ca3eef46fe1a26"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
-      "sha256": "fc326fe8a42f0c1bd8a5826a91b7453c4b2874e0742466280b452c6dae9a5c30"
+      "sha256": "5009def3d42bc6da46a5c65daab070226d566edb5938d7c054cf0e5240c273cd"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
@@ -3739,7 +3739,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "b60cc9006e8bbb4e757369202ffffd1ffcb360b73ad9a9e936f8a31abee4c4b2"
+      "sha256": "83099f99317ab93e92606d20d17597ea38d543d7585c6da568f8b6c2470af8ce"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
@@ -3771,7 +3771,7 @@
     },
     "modules/portability/migration-history.mjs": {
       "source": "modules/portability/migration-history.mjs",
-      "sha256": "424f6c388e95a969b06a5b18e1aba76de039024778a5849c91a7b6a9596f8ec4"
+      "sha256": "e707aeef373b3aee903ea3680f456f520be0ac15c56cdeeabc8f5b3b64c95677"
     },
     "modules/portability/migration-sql.mjs": {
       "source": "modules/portability/migration-sql.mjs",

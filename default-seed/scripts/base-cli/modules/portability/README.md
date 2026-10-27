@@ -382,7 +382,10 @@ expressions), explicit indexes (including uniqueness and partial predicates),
 views and triggers. Row exclusions do not omit indexes and triggers attached
 to excluded tables, including platform bookkeeping tables. Names with the literal
 internal prefixes `sqlite_` and `_cf_` remain exempt. The complete additional
-definitions travel in `schemaObjects`. A single SQLite lexer reads the original
+definitions travel in `schemaObjects`. Explicitly acknowledged v1 recovery uses
+the historical exclusion projection only when placing its old backup within
+native migration history; the live destination and ordinary v2 inventories
+still use the complete catalogue. A single SQLite lexer reads the original
 SQL before removing trivia. Identity records each token's class and canonical
 value, plus a deterministic spelling: a single space separates neighbours
 exactly when concatenating them would change their tokenization. The complete

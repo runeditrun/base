@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Compare internal schema prefixes literally during Managed data intake, retain indexes and triggers on excluded tables in archive accounting, and check native schema compatibility in scratch storage before opening the destination.
+- Compare internal schema prefixes literally during Managed data intake, retain indexes and triggers on excluded tables in archive accounting, and check native schema compatibility in scratch storage before opening the destination. Keep the historical schema projection only for explicitly acknowledged v1 recovery.
 
 - Refuse unknown source tables during Managed data intake even when row policy excludes them; account excluded tables only against native schema or a matching retirement in destination migrations.
 
