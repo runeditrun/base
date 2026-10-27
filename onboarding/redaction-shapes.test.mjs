@@ -159,22 +159,31 @@ function eachRow(rows, check) {
  assert.deepEqual(failures, []);
 }
 
-outputCase('table: secret-bearing shapes redact in complete text, byte-split streams and long lines', () => {
+outputCase('table: secret-bearing shapes redact in complete text, byte-split streams and long lines', t => {
  assert.ok(secretShapes.length + registeredShapes.length + prose.length >= 110);
- eachRow(secretShapes, (shape, text, privateParts, exactOutput) => {
-  const redaction = createRedaction();
-  const outputs = [redaction.redact(`BEFORE_MARKER ${text} AFTER_MARKER`), redaction.redact(text)];
-  // Whole, byte-split, and on a line long enough to leave the line hold window.
-  for (const unit of [1, 3, 4096]) outputs.push(streamed(redaction, `BEFORE_MARKER\n${text}\nAFTER_MARKER\n`, unit), streamed(redaction, text, unit));
-  outputs.push(streamed(redaction, 'context '.repeat(60) + text + '\n', 1));
-  for (const output of outputs) privateOutput(output, privateParts);
-  // The JWT regression matrix shares these whole-text and stream calls. Keep
-  // its stronger assertion: redact the token without changing adjacent text.
-  if (exactOutput !== undefined) {
-   for (const index of [1, 3, 5, 7]) assert.equal(outputs[index], exactOutput, `${shape}: JWT leaked or nearby diagnostics changed (${index === 1 ? 'whole text' : [1, 3, 4096][(index - 3) / 2] + '-byte stream'})`);
-  }
-  for (const output of [outputs[0], outputs[2]]) { assert.match(output, /BEFORE_MARKER/); assert.match(output, /AFTER_MARKER/); }
- });
+ return caseRows(t, secretShapes.flatMap(([shape, text, privateParts, exactOutput]) => [
+  [`${shape}: whole text`, () => {
+   const redaction = createRedaction();
+   const output = redaction.redact(`BEFORE_MARKER ${text} AFTER_MARKER`);
+   privateOutput(output, privateParts);
+   assert.match(output, /BEFORE_MARKER/); assert.match(output, /AFTER_MARKER/);
+   const bare = redaction.redact(text);
+   privateOutput(bare, privateParts);
+   if (exactOutput !== undefined) assert.equal(bare, exactOutput, `${shape}: JWT leaked or nearby diagnostics changed (whole text)`);
+  }],
+  ...[1, 3, 4096].map(unit => [`${shape}: ${unit}-byte stream`, () => {
+   const redaction = createRedaction();
+   const output = streamed(redaction, `BEFORE_MARKER\n${text}\nAFTER_MARKER\n`, unit);
+   privateOutput(output, privateParts);
+   if (unit === 1) { assert.match(output, /BEFORE_MARKER/); assert.match(output, /AFTER_MARKER/); }
+   const bare = streamed(redaction, text, unit);
+   privateOutput(bare, privateParts);
+   if (exactOutput !== undefined) assert.equal(bare, exactOutput, `${shape}: JWT leaked or nearby diagnostics changed (${unit}-byte stream)`);
+  }]),
+  [`${shape}: long line`, () => {
+   privateOutput(streamed(createRedaction(), 'context '.repeat(60) + text + '\n', 1), privateParts);
+  }],
+ ]));
 });
 
 outputCase('table: re-encodings and parts of registered values redact', () => {

@@ -11,10 +11,11 @@ import { startInstaller } from './server.mjs';
 const pause=()=>new Promise(resolve=>setTimeout(resolve,5));
 async function setup(t,install){
  const root=await mkdtemp(join(tmpdir(),'command-server-'));
+ let server;
+ t.after(async()=>{try { await server?.close(); } finally { await rm(root,{recursive:true,force:true}); }});
  const seed={product:'Command server fixture',model:{fields:{NAME:{valid:()=>true},PRIVATE_CREDENTIAL:{valid:()=>true}},safeKeys:['NAME'],secretScopes:{PRIVATE_CREDENTIAL:['NAME']}},validateInput:value=>value,install};
  await writeTestManifest(root,[{name:'NAME',label:'Name',kind:'text'},{name:'PRIVATE_CREDENTIAL',label:'Private credential',kind:'secret',input:'entered',ownerVisible:true,required:false,when:{field:'NAME',nonEmpty:true}},{name:'NESTED_KEY',label:'Direct credential',kind:'secret',input:'entered',ownerVisible:true,required:false}]);
- const server=await startInstaller(root,{seed:manifestContract(seed),noPrefill:true});
- t.after(async()=>{await server.close();await rm(root,{recursive:true,force:true});});
+ server=await startInstaller(root,{seed:manifestContract(seed),noPrefill:true});
  const response=await fetch(server.origin),page=await response.text();const cookie=response.headers.get('set-cookie').split(';')[0],token=page.match(/name="installer-token" content="([a-f0-9]+)"/)[1];
  const headers={Origin:server.origin,Cookie:cookie,'X-Installer-Token':token,'Content-Type':'application/json'};
  const call=(path,value,extra={})=>fetch(server.origin+path,{method:'POST',headers:{...headers,...extra},body:JSON.stringify(value)});
@@ -89,16 +90,17 @@ test("failed command group cleanup closes descendants and leaves the retry log w
 test("uncooperative command group cleanup escalates before permitting retry", {skip:process.platform==='win32'}, t => caseRows(t, [
   ...['readiness exit','core failure','hard deadline','owner stop'].map(reason => [`${reason} cleans a group that ignores SIGTERM before permitting retry`, async t=>{
  let attempts=0,child,closed=false;
+ t.after(()=>{if(child&&!closed){try{process.kill(-child.pid,'SIGKILL');}catch{}}});
  const client=await setup(t,async(_root,_input,store,onApp)=>{
   if(++attempts>1){await store.run('Retry after escalation',process.execPath,['-e',"console.log('ESCALATION_RETRY_OUTPUT')"]);await store.phase('complete');return;}
   const exits=reason==='readiness exit'||reason==='core failure';
   const script=`const {spawn}=require('node:child_process');process.on('SIGTERM',()=>{});const descendant=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});process.send('ready');setInterval(()=>{},1000)"],{stdio:['ignore','inherit','inherit','ipc']});descendant.on('message',()=>{console.log('ESCALATION_GROUP_READY');${exits?'setTimeout(()=>process.exit(40),30)':''}});`;
   child=store.spawn('Uncooperative application',process.execPath,['-e',script]);onApp(child);child.once('close',()=>{closed=true;});
-  await once(child.stdout,'data');
+  await Promise.race([once(child.stdout,'data'), once(child,'close').then(()=>{throw Error('Application closed before startup output');})]);
   if(reason==='core failure'){await once(child,'exit');throw Error('Core operation failed');}
   await store.waitForReady('Uncooperative application',child,()=>({ready:false,message:'HTTP 503 waiting for startup'}),{timeoutMs:reason==='hard deadline'?25:10000,intervalMs:5});
  });
- try {
+ {
   assert.equal((await client.call('/api/start',{})).status,202);
   if(reason==='owner stop'){
    for(let n=0;n<200&&!client.server.state.logs.join('\n').includes('ESCALATION_GROUP_READY');n++)await pause();
@@ -113,6 +115,6 @@ test("uncooperative command group cleanup escalates before permitting retry", {s
   if(reason==='owner stop')assert.match(client.server.state.error,/cancelled/);
   assert.equal((await client.call('/api/start',{})).status,202);await client.phase('complete');
   assert.match(await readFile(join(client.root,'.seed/installer/install.log'),'utf8'),/ESCALATION_RETRY_OUTPUT/);
- } finally {if(child&&!closed){try{process.kill(-child.pid,'SIGKILL');}catch{}}}
+ }
 }])
 ]));
