@@ -23,7 +23,7 @@ async function managedFixture(t) {
 async function managedSource(t) {
  const source=await managedFixture(t);
  await source.run(['export','--output','exports/empty.rer']);
- await source.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('synthetic-base-1',3,125,'synthetic-base-2'); INSERT INTO synthetic_facts VALUES('synthetic-base-10','synthetic-base-11')");
+ await source.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('synthetic-base-1',3,125,'synthetic-base-2'); INSERT INTO synthetic_facts VALUES('synthetic-base-10','synthetic-base-11'); INSERT INTO synthetic_excluded_present VALUES('synthetic-base-12'); INSERT INTO synthetic_excluded_retired VALUES('synthetic-base-13')");
  const directory=join(source.root,'migrations/core');
  const rows=await Promise.all((await readdir(directory)).filter(name=>name.endsWith('.sql')).sort().map(async name=>`('delivered-${name}','${createHash('sha256').update(await readFile(join(directory,name))).digest('hex')}')`));
  await source.data(`CREATE TABLE rer_migrations (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
@@ -48,7 +48,7 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  const again=(await target.run(['export','--output','exports/again.rer'])).at(-1);
  assert.equal(again.contentHash,restored.contentHash,'the native re-export carries the same data');
  const zipTarget=await managedFixture(t);
- await writeFile(join(zipTarget.root,'migrations/core/1000_retire_synthetic.sql'),'DROP TRIGGER synthetic_facts_legacy;');
+ await writeFile(join(zipTarget.root,'migrations/core/1000_retire_synthetic.sql'),'DROP TRIGGER synthetic_facts_legacy; DROP TABLE synthetic_excluded_retired;');
  const entries=await managedEntries(source),zip=managedZip(entries),input=join(zipTarget.root,'exports/managed.zip');
  const wrongKind=entries.map(([name,value])=>[name,name==='manifest.json'?JSON.stringify({...JSON.parse(value),kind:'synthetic-base-1'}):value]);
  const wrongVersion=entries.map(([name,value])=>[name,name==='manifest.json'?JSON.stringify({...JSON.parse(value),schema:2}):value]);
@@ -57,8 +57,8 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  const compressed=Buffer.from(zip);compressed.writeUInt16LE(8,8);
  const central=compressed.readUInt32LE(compressed.length-6);compressed.writeUInt16LE(8,central+10);
  const ratio=Buffer.from(zip);ratio.writeUInt32LE(1,central+20);ratio.writeUInt32LE(managedDataLimits.entryBytes+1,central+24);
- const withSQL = suffix => {
-  const changed=entries.map(([name,value])=>[name,name==='data/d1/DB.sql'?Buffer.concat([value,Buffer.from(suffix)]):value]);
+ const withSQL = (suffix, rewrite = sql => sql) => {
+  const changed=entries.map(([name,value])=>[name,name==='data/d1/DB.sql'?Buffer.from(rewrite(value.toString())+suffix):value]);
   const sql=changed.find(([name])=>name==='data/d1/DB.sql')[1];
   for(const entry of changed)if(entry[0]==='manifest.json'||entry[0]==='data/d1/DB.json') {
    const metadata=JSON.parse(entry[1]),database=entry[0]==='manifest.json'?metadata.databases[0]:metadata;
@@ -82,6 +82,8 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
   ['non-insert',withSQL('\nSELECT 1;'),'sql_refused'],
   ['unknown-object',withSQL('\nCREATE TRIGGER synthetic_facts_unknown AFTER INSERT ON synthetic_facts BEGIN SELECT 1; END;'),'schema_object_unknown'],
   ['missing-table',withSQL('\nCREATE TABLE synthetic_portable(id TEXT);'),'schema_table_missing'],
+  ['missing-excluded-table',withSQL('\nCREATE TABLE synthetic_excluded_unknown(id TEXT);'),'schema_table_missing'],
+  ['retired-excluded-wrong-schema',withSQL('',sql=>sql.replace('CREATE TABLE synthetic_excluded_retired (id TEXT PRIMARY KEY)', 'CREATE TABLE synthetic_excluded_retired (id BLOB PRIMARY KEY)')),'schema_table_missing'],
  ]) {
   await writeFile(input,bytes,{mode:0o600});
   const refusal=await zipTarget.text(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'],4);
@@ -94,10 +96,34 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  await writeFile(input,zip,{mode:0o600});
  assert.match((await zipTarget.text(['import','--input','exports/managed.zip'],4)).stderr,/explicit --yes/);
  await assert.rejects(stat(join(zipTarget.root,'.wrangler/state')),{code:'ENOENT'});
+ // Materialize the empty native destination so the unknown excluded table
+ // refusal also proves its existing migration history remains byte-identical.
+ await zipTarget.run(['export','--output','exports/empty.rer']);
+ const databaseBytes=async()=>{
+  const directory=join(zipTarget.root,'.wrangler/state');
+  const files=(await readdir(directory,{recursive:true})).filter(name=>name.endsWith('.sqlite')||name.endsWith('.sqlite-wal')).sort();
+  return Promise.all(files.map(async name=>[name,await readFile(join(directory,name))]));
+ };
+ const beforeRefusals=await databaseBytes();
+ assert.ok(beforeRefusals.length>0);
+ await writeFile(input,withSQL('\nCREATE TABLE synthetic_excluded_unknown(id TEXT);'),{mode:0o600});
+ const unknownExcluded=await zipTarget.text(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'],4);
+ assert.match(unknownExcluded.stderr,/managed_data_schema_table_missing/);
+ assert.deepEqual(await databaseBytes(),beforeRefusals,'unknown excluded table refusal leaves existing database bytes unchanged');
+ await writeFile(input,zip,{mode:0o600});
  const imported=(await zipTarget.run(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'])).at(-1);
  assert.equal(imported.ok,true);
+ const nameHash=names=>createHash('sha256').update(JSON.stringify(names.sort())).digest('hex');
+ assert.ok(imported.managedSchema.accounted.some(group=>group.type==='table' && group.disposition==='retired' && group.migration==='1000_retire_synthetic.sql' && group.count===1 && group.namesSha256===nameHash(['synthetic_excluded_retired'])));
+ const presentExclusions=records[0].excludedTables.filter(name=>!name.startsWith('sqlite_') && !name.startsWith('_cf_') && !['rer_migrations','synthetic_excluded_retired'].includes(name));
+ assert.ok(imported.managedSchema.accounted.some(group=>group.type==='table' && group.disposition==='excluded-by-policy' && group.count===presentExclusions.length && group.namesSha256===nameHash(presentExclusions)));
+ assert.deepEqual((await zipTarget.data('SELECT * FROM synthetic_excluded_present'))[0].results,[],'present excluded table rows are not restored');
+ assert.deepEqual((await zipTarget.data("SELECT name FROM sqlite_master WHERE name='synthetic_excluded_retired'"))[0].results,[],'retired table is never recreated');
  assert.ok(imported.managedSchema.accounted.some(group=>group.type==='trigger' && group.disposition==='retired' && group.migration==='1000_retire_synthetic.sql' && group.count===1));
  assert.ok(!JSON.stringify(imported.managedSchema).includes('synthetic_facts_legacy'));
+ t.diagnostic('Managed schema inventory: '+JSON.stringify(imported.managedSchema.inventory));
+ t.diagnostic('Managed schema accounting: '+JSON.stringify(imported.managedSchema.accounted));
+ t.diagnostic('Refusal matrix: 17 ZIP cases plus oversized file, confirmation, initialized unknown excluded and occupied destination');
  const facts='SELECT * FROM synthetic_facts ORDER BY id';
  assert.deepEqual((await zipTarget.data(facts))[0].results,(await source.data(facts))[0].results,'database-bound payloads preserve policy-excluded facts');
  assert.ok(!records[0].tables.some(table=>table.name==='synthetic_facts'));
@@ -108,11 +134,6 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  assert.deepEqual((await zipTarget.data('SELECT id FROM computed_entries_view'))[0].results,[{id:'synthetic-base-1'}]);
  assert.deepEqual((await zipTarget.data("SELECT name FROM sqlite_master WHERE name='rer_migrations'"))[0].results,[]);
  assert.equal((await zipTarget.data('SELECT count(*) AS n FROM d1_migrations'))[0].results[0].n,records[0].migrations.length+1);
- const databaseBytes=async()=>{
-  const directory=join(zipTarget.root,'.wrangler/state');
-  const files=(await readdir(directory,{recursive:true})).filter(name=>name.endsWith('.sqlite')||name.endsWith('.sqlite-wal')).sort();
-  return Promise.all(files.map(async name=>[name,await readFile(join(directory,name))]));
- };
  const beforeOccupied=await databaseBytes();
  const occupied=await zipTarget.text(['import','--input','exports/managed.zip','--yes'],4);
  assert.match(occupied.stderr,/target_not_empty/);
@@ -139,4 +160,17 @@ test('a Platform history that is not this checkout\'s refuses with its migration
  await writeFile(join(directory,'1000_pending.sql'),'CREATE TABLE pending_items(id TEXT PRIMARY KEY);');
  const unapplied=await source.text(['export','--output','exports/pending.rer'],4);
  assert.match(unapplied.stderr,/migration_ledger:unapplied.*1000_pending\.sql.*Platform/);
+ // An adopting adapter keeps its own legacy JSON reader alongside ZIP intake.
+ // Exercise selection through the public command, with no database mutation.
+ await appendFile(join(target.root,'scripts/installer/local.mjs'),`
+commandAdapter.portability.import = async ({ path }) => {
+ const { readFile } = await import('node:fs/promises');
+ const value = JSON.parse(await readFile(path,'utf8'));
+ if (value.kind !== 'synthetic-base-14') throw new Error('synthetic legacy format');
+ return { legacyJSON: value.kind };
+};
+`);
+ await writeFile(join(target.root,'exports/legacy.json'),JSON.stringify({kind:'synthetic-base-14'}),{mode:0o600});
+ assert.equal((await target.run(['import','--input','exports/legacy.json','--yes'])).at(-1).legacyJSON,'synthetic-base-14');
+ t.diagnostic('Legacy JSON reader: public rer import exit=0');
 });

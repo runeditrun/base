@@ -12,6 +12,8 @@ BEGIN
  /* The body continues after its first semicolon. */
  UPDATE computed_entries SET label='synthetic-base-6' WHERE id=NEW.id;
 END;
+CREATE TABLE synthetic_excluded_present (id TEXT PRIMARY KEY);
+CREATE TABLE synthetic_excluded_retired (id TEXT PRIMARY KEY);
 CREATE TABLE synthetic_facts (id TEXT PRIMARY KEY, fact TEXT NOT NULL);
 CREATE TRIGGER synthetic_facts_legacy AFTER INSERT ON synthetic_facts BEGIN SELECT 1; END;
 CREATE VIEW computed_entries_view AS SELECT id,label || ';synthetic-base-8' AS label FROM computed_entries;
@@ -60,7 +62,7 @@ export async function managedEntries(source) {
 
 export const managedPolicyModule = `
 import { portabilityPolicy } from '../../src/core/platform/portability-policy.mjs';
-const policy = { ...portabilityPolicy, excludeTables: [...portabilityPolicy.excludeTables, 'synthetic_facts'] };
+const policy = { ...portabilityPolicy, excludeTables: [...portabilityPolicy.excludeTables, 'synthetic_facts', 'synthetic_excluded_%'] };
 export default policy;
 export function createPolicy({ db }) {
  return { ...policy, extraPayloads: { 'synthetic-base-9': {

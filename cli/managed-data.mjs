@@ -90,7 +90,7 @@ async function intake(context, declaration, restore) {
   }
   const boundBuckets = Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]]));
   policy = await loadPolicy(root, inputPolicy, policyModule, { db, buckets: boundBuckets });
-  const schema = await managedSchema(db, await migrationInventory(root, binding, platformMigrationDeclaration(platformMigrations), unstable_splitSqlQuery), policy);
+  const schema = await managedSchema(db, await migrationInventory(root, binding, platformMigrationDeclaration(platformMigrations), unstable_splitSqlQuery), policy, ledger);
   await ensurePortabilitySchema(db, await portabilityPlan(unstable_splitSqlQuery));
   const migrations = async () => migrationReplay(await appliedMigrations(root, db, binding, platformMigrationDeclaration(platformMigrations), unstable_splitSqlQuery), policy, platformMigrationDeclaration(platformMigrations));
   const service = await createPortability({ db, buckets: boundBuckets, policy, migrations });
