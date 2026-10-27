@@ -277,8 +277,16 @@ all layers. An import still applying or reversing cannot be superseded
 The bounds below follow [D1 limits](https://developers.cloudflare.com/d1/platform/limits/).
 Bulk text insertion uses the supported [D1 JSON SQL functions](https://developers.cloudflare.com/d1/sql-api/query-json/).
 
-The port counts SQL executions over the entire public invocation (including
-nested resume reads and every atomic batch statement), caps them at 1,000 and
+The port assumes Workers Paid: one Worker invocation allows 1,000 D1 queries;
+Workers Free allows only 50 and is not supported by this budget. Each direct
+read and each `batch()` call counts as one query, independent of batch members.
+Statement length, bound-parameter and value guards still check every member.
+The door shares one budget across all its kit calls in one HTTP request; later
+apply, resume and undo requests are distinct Worker invocations. An explicit
+erasure `maxStatements` ceiling additionally counts every batch member.
+
+The port counts queries over the entire public invocation (including
+nested resume reads and atomic batches), caps them at 1,000 and
 returns durable partial progress as the budget approaches exhaustion. Explicit
 `IMPORT_D1_REQUEST_LIMIT`, `IMPORT_D1_STATEMENT_LIMIT` and
 `IMPORT_D1_VALUE_LIMIT` failures publish no portion of the rejected batch.

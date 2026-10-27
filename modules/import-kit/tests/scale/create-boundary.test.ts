@@ -27,7 +27,8 @@ test('real D1: a plan one byte over PLAN_BYTES_LIMIT is refused with IMPORT_PLAN
 
   const atCap = await m.request('at-cap-plan', () => planD1Import(bundleFor(bytes, base64, 'n'.repeat(nameLength - 1)), mapping, ctx));
   assert.equal(encodedBytes(atCap), PLAN_BYTES_LIMIT, 'a plan of exactly PLAN_BYTES_LIMIT bytes is accepted');
-  assert.ok(preflightD1ImportJob(atCap, { ...ctx, reviewedFingerprint: atCap.fingerprint }).totalExecutions <= 1000);
+  const admission = preflightD1ImportJob(atCap, { ...ctx, reviewedFingerprint: atCap.fingerprint });
+  assert.ok(admission.totalExecutions <= 1000);
 
   // One more name byte. The size check runs before the fingerprint, which
   // would otherwise encode the whole plan, so the refusal names the size.
@@ -39,5 +40,12 @@ test('real D1: a plan one byte over PLAN_BYTES_LIMIT is refused with IMPORT_PLAN
   const { results: tables } = await r.db().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ik\\_%' ESCAPE '\\'").all();
   assert.ok(tables.length >= 10, 'the kit schema is installed');
   for (const { name } of tables as { name: string }[]) assert.equal((await r.db().prepare(`SELECT COUNT(*) AS n FROM ${name}`).first())?.n, 0, `${name} must remain empty`);
+  const job = await m.request('at-cap-create', () => createD1ImportJob(atCap, { ...ctx, reviewedFingerprint: atCap.fingerprint }));
+  assert.equal(job.state, 'queued');
+  assert.equal(m.snapshots.at(-1).count, admission.totalExecutions);
+  assert.equal(m.snapshots.at(-1).statements, admission.totalStatements);
+  const [original] = await m.request('at-cap-originals', () => readD1ImportOriginals(job.id, ctx));
+  assert.deepEqual(original.original, { status: 'retained', base64 });
   assert.ok(m.snapshots.every(s => s.count <= 1000));
+  t.diagnostic(JSON.stringify({ admission, requests: m.snapshots }));
 });

@@ -7,7 +7,7 @@ import { loadPlans, planBody, planGuards, planChunkReads, retainPlan, creationCo
 import { randomUUID } from 'node:crypto';
 import type { ImportJob, ImportPlan, ImportMapping, SourceBundle, ImportAction } from '../types.ts';
 import { buildImportPlan, planFingerprint } from '../plan/index.ts';
-import { creationStatements, validateCreation } from './creation.ts';
+import { creationStatements, preflightD1ImportJob, validateCreation } from './creation.ts';
 import { planStagedCreation, runStagedCreation, stagedSize } from './staged-creation.ts';
 import type { D1ImportContext, D1Sql } from './types.ts';
 import { atomic, readAtomic, authorize, guard, sql } from './database.ts';
@@ -47,6 +47,7 @@ export async function planD1Import(source: SourceBundle, mapping: ImportMapping,
   context = requestContext(context);
   await authorize(context, 'plan');
   const plan = buildImportPlan(source, mapping, context);
+  preflightD1ImportJob(plan, { ...context, reviewedFingerprint: plan.fingerprint });
   await authorize(context, 'plan');
   return plan;
 }

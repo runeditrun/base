@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge628089b",
+  "cliVersion": "0.2.83",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2003,7 +2003,7 @@
     },
     "modules/import-kit/src/d1/README.md": {
       "source": "modules/import-kit/src/d1/README.md",
-      "sha256": "6e51fac6d853b9273d312d0953378e9592c4f46b78f9dd7e4f0dc0b7d32e6f9d"
+      "sha256": "e792f076a69b8cea544e9fc8591556f7a6057a7cebc73ac769ef57cf41aae5de"
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
@@ -2015,11 +2015,11 @@
     },
     "modules/import-kit/src/d1/atomic-prefix.ts": {
       "source": "modules/import-kit/src/d1/atomic-prefix.ts",
-      "sha256": "eb558b7887fd51cf9d84d0f6984e93646ac5c04b67417f9a2002da7737a66b10"
+      "sha256": "1be9a47574fb33666d0e5e6f1a71e8c50cfb923cc3214c7642ea0358b0e505b5"
     },
     "modules/import-kit/src/d1/budget.ts": {
       "source": "modules/import-kit/src/d1/budget.ts",
-      "sha256": "1c9b901688227f2dddfd341e959f324ad0762c5e9df2154c0a5334bf86b4fab4"
+      "sha256": "8cfffa91cb317f031e832ab8496675d4f8518d4d99ce476f6a41f3e022fb7c0d"
     },
     "modules/import-kit/src/d1/compressed-plan.ts": {
       "source": "modules/import-kit/src/d1/compressed-plan.ts",
@@ -2027,7 +2027,7 @@
     },
     "modules/import-kit/src/d1/creation.ts": {
       "source": "modules/import-kit/src/d1/creation.ts",
-      "sha256": "022381b439e034cd994d2264711dc9ab45b6303a265c3ab326e1888b040683e7"
+      "sha256": "5ad68786733d5d13ab72820ddcad35f80b73988d29658adb515e37754e81f65e"
     },
     "modules/import-kit/src/d1/custody-fence.ts": {
       "source": "modules/import-kit/src/d1/custody-fence.ts",
@@ -2039,7 +2039,7 @@
     },
     "modules/import-kit/src/d1/database.ts": {
       "source": "modules/import-kit/src/d1/database.ts",
-      "sha256": "b082fc258c00f02913787363da88b996b8e47a6fd2af094d2121673c2bb9d4e0"
+      "sha256": "8551fc65186feffbfcd65662f0ce7caa3625efb1b1c5309f4870a7b552b57fd7"
     },
     "modules/import-kit/src/d1/entry-locator.ts": {
       "source": "modules/import-kit/src/d1/entry-locator.ts",
@@ -2175,7 +2175,7 @@
     },
     "modules/import-kit/src/d1/jobs.ts": {
       "source": "modules/import-kit/src/d1/jobs.ts",
-      "sha256": "16829dafad31d6a6efcc538ceeb3f2f75f18f9b8f6d6bf7206ca9447cd1dd14f"
+      "sha256": "f93021f5e4d1188d526bd65d3ef8cd3acfc63a44e05a4ecf86a91f79bc8411bd"
     },
     "modules/import-kit/src/d1/native-set.ts": {
       "source": "modules/import-kit/src/d1/native-set.ts",
@@ -2399,7 +2399,7 @@
     },
     "modules/import-kit/src/d1/staged-creation.ts": {
       "source": "modules/import-kit/src/d1/staged-creation.ts",
-      "sha256": "69430dfb9a34f555c53e229b789c7919f6a73805540d17df16595c403f2e1796"
+      "sha256": "4bdca5668ea08f7c275498fcdd272e979307343623b638aa909b5267e216bf2a"
     },
     "modules/import-kit/src/d1/staging-admission.ts": {
       "source": "modules/import-kit/src/d1/staging-admission.ts",
@@ -2615,7 +2615,7 @@
     },
     "modules/import-kit/src/door/limits.ts": {
       "source": "modules/import-kit/src/door/limits.ts",
-      "sha256": "3838303bd3d8521eb44b237c51aac838aef0e88f6ab3172a2df9c5d6de52f016"
+      "sha256": "3e9c4c9d6ff062c94531dfb1e8621e9a30983aa23e4893ae664f1cb2bc074b5d"
     },
     "modules/import-kit/src/door/operator.ts": {
       "source": "modules/import-kit/src/door/operator.ts",

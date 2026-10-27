@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix an import at the planner's accepted cap failing part-way with `IMPORT_D1_REQUEST_LIMIT`: count each D1 batch call as one paid-plan query, share creation admission with execution, and keep explicit erasure statement ceilings separate. The canonical plan byte cap stays unchanged.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
