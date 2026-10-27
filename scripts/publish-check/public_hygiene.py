@@ -11,6 +11,7 @@ from trust_bundle import anchor_values
 from png_text import text_chunks
 from media import sample_spans
 from c2pa import certificate_spans
+from pnpm_lock import without_deprecation_values
 URI_AUTHORITY = re.compile(r'''//(?P<authority>[^/?#\s<>"']+)''')
 ACTION_REFERENCE = re.compile(r'''uses:\s*["']?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[^\s"']+''')
 SCHEME_CHARACTERS = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+.-')
@@ -188,7 +189,8 @@ def inspect_text(data, path, config, *, commit_message=False, binary_content=Non
     if any(pattern.search(text) for pattern in config['internalReferencePatterns']):
         rules.add('hygiene.internal-reference')
     if '@' in text:
-        email_text = decoded_text(without_public_coauthor_addresses(data)) if commit_message else text
+        email_data = without_public_coauthor_addresses(data) if commit_message else data
+        email_text = decoded_text(without_deprecation_values(email_data, path))
         emails = private_emails(email_text, config)
         bundle = config.get('trustBundles', {}).get(path)
         if emails and not (bundle and certificate_metadata(data, bundle, emails, config)):
