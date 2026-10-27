@@ -140,8 +140,23 @@ including requirements intended for another edition. A family-wide incumbent
 superset is not a prerequisite for shipping a useful edition.
 
 A change that ships or alters a contract clause updates that clause's row in
-`CONTRACT.md`'s Status table in the same PR; `rer check` refuses a table that
-disagrees with the contract.
+`CONTRACT.md`'s Status table in the same PR. Follow the contract standard in
+`SEED-COMMAND-CONTRACT.md` under "Contract status". Keep acceptance text and
+status only in `CONTRACT.md`; never hand-edit `ACCEPTANCE.md`,
+`docs/CLAIMS.md` or the generated Status summary rows. Run
+`node src/base/contract-docs.mjs write` after every contract edit, then run
+`node src/base/contract-docs.mjs check` and `rer check`. CI runs the generator's
+`check` command. Keep the generator beside this edition's parser and use its
+actual path if different. Report Core done and full-target done together.
+
+Landers regenerate after a rebase, then refresh the edition source lock. When
+producing an edition's guide, use its actual generator and lock paths; the lock
+line applies when the edition carries that tool and lock:
+
+```text
+Lander-Regenerate: node src/base/contract-docs.mjs write
+Lander-Regenerate: node scripts/edition-authoring/cli.mjs lock
+```
 
 Optimise total work, cost, elapsed time and owner attention to reach and keep the
 accepted product as capable agent development approaches zero cost. Trust the
@@ -176,7 +191,7 @@ changes can adapt the architecture itself.
 ## Stack and runtime
 
 For this optional authoring path, the maintained default uses TypeScript, Hono and Hono RPC, Vite + React + TanStack Start, TanStack Router,
-shadcn/ui + Tailwind, and Drizzle on D1. Owners may adapt this stack and infrastructure while verifying
+`shadcn/ui` + Tailwind, and Drizzle on D1. Owners may adapt this stack and infrastructure while verifying
 applicable product guarantees. One Cloudflare Worker serves documents,
 HTTP surfaces and event handlers; additional Workers need a concrete reason.
 Before migrating an existing app, follow the
@@ -241,7 +256,7 @@ required secrets and identify missing configuration without fabricating behaviou
 ## Verification and distribution
 
 Document the exact install, local run, verify, provision, deploy and data
-export/import commands implemented by each edition. Use the declared
+export and import commands implemented by each edition. Use the declared
 `rer setup` command to provision a first-party seed. Do not
 promise deploy-on-push, PR previews, account-free provider
 behaviour or sample-data loading unless those paths are implemented and checked.

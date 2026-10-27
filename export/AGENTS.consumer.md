@@ -79,7 +79,7 @@ Read `rer-setup.json` and pass a private, mode-0600 JSON object keyed by those
 names using `rer setup --answers PATH --non-interactive`,
 for example `{"OWNER_EMAIL":"owner@example.com"}`. Secret values stay in
 private inputs and never go in command arguments. A setup rerun with the saved
-owner and origin preserves existing owner/data and exact private settings.
+owner and origin preserves the existing owner, data and exact private settings.
 Conflicting saved identity or origin reports an actionable recovery path.
 Review reset's exact removal inventory before confirmation. If data must be
 kept, back up this installation first; restore that archive
@@ -142,8 +142,23 @@ credentials, bindings and migrations before running an operation. Use the
 configured health endpoint and real application journeys to establish what works.
 
 A change that ships or alters a contract clause updates that clause's row in
-`CONTRACT.md`'s Status table in the same PR; `rer check` refuses a table that
-disagrees with the contract.
+`CONTRACT.md`'s Status table in the same PR. Follow the contract standard in
+`SEED-COMMAND-CONTRACT.md` under "Contract status". Keep acceptance text and
+status only in `CONTRACT.md`; never hand-edit `ACCEPTANCE.md`,
+`docs/CLAIMS.md` or the generated Status summary rows. Run
+`node src/base/contract-docs.mjs write` after every contract edit, then run
+`node src/base/contract-docs.mjs check` and `rer check`. CI runs the generator's
+`check` command. Use the actual generator path when this edition keeps its
+parser elsewhere. Report Core done and full-target done together.
+
+Landers regenerate after a rebase, then refresh the edition source lock. Use
+this edition's actual paths; the lock line applies when the edition carries
+that tool and lock:
+
+```text
+Lander-Regenerate: node src/base/contract-docs.mjs write
+Lander-Regenerate: node scripts/edition-authoring/cli.mjs lock
+```
 
 Do not infer provisioning from a command named `setup`, deployment from a push,
 or previews from a pull request. Those behaviours require actual scripts or
