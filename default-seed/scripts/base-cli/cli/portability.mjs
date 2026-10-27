@@ -7,6 +7,7 @@ import { fileRecords } from '../modules/portability/files.mjs';
 import { RerError, refuse } from './errors.mjs';
 import { policyModuleURL, serializablePolicy } from './portability-policy.mjs';
 import { shared } from './shared.mjs';
+import { emptyNativePreflight } from './portability-empty.mjs';
 import { withManagedDataImport } from './managed-data.mjs';
 import { ledgerRefusal } from './ledger-refusal.mjs';
 
@@ -59,6 +60,10 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   // Do not apply pending product migrations to a populated recovery target.
   // Check real existing bindings first; finalize repeats this under the lock.
   if(legacyRecovery)await nativeWorker(store,'legacy-preflight',input,signal);
+  if(direction==='import' && !legacyRecovery) {
+   try { await emptyNativePreflight(input); }
+   catch(error) { if(error instanceof PortabilityError)throw refuse(`Local restore refused (${error.code}).`);throw error; }
+  }
   const {nativeApply}=await nativeWorker(store,'migration-preflight',input,signal);
   // Local migrations need no provider account: wrangler runs without credentials.
   // Its info lines (the local location and "Use --remote if you want to access

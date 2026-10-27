@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gc7aca155",
+  "cliVersion": "0.2.83-dev.g3157c0d2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -965,6 +965,10 @@
       "source": "cli/port.mjs",
       "sha256": "0295871a1cde053267a3ef4589b2e6bebaafc6423b49032a9e80942f691ef8ae"
     },
+    "cli/portability-empty.mjs": {
+      "source": "cli/portability-empty.mjs",
+      "sha256": "7d60605f7ac9b093d3c6c28f1a5eafee5c9492185fd3c3e4086f4086d5695420"
+    },
     "cli/portability-migrations.mjs": {
       "source": "cli/portability-migrations.mjs",
       "sha256": "3f51fed91269136f18d72b63ad06b820edab8017d1973f95d8e80f5490670c50"
@@ -983,7 +987,7 @@
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "dc91366e250a2d4463ed5d646f2bf3cb46a235c84f0545b4e60327246847f39a"
+      "sha256": "ac1b30ccc4e1cc5feb90510d4271706685bd26fa917f8e9d425131b30442c413"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
