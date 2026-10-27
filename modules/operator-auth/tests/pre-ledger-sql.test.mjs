@@ -1,10 +1,13 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { runtime } from './pre-ledger-runtime.mjs';
 import { applySql, countStatements } from './apply-sql.mjs';
 
-test('prior-data SQL runner executes data changes and compound triggers without skipping statements', async () => {
+test("migration fixture execution counts and applies every SQL statement before claiming success", async t => {
+  const foldedCases = [];
+foldedCases.push(['prior-data SQL runner executes data changes and compound triggers without skipping statements', async () => {
   const r = await runtime();
   try {
     const db = await r.db;
@@ -28,18 +31,16 @@ test('prior-data SQL runner executes data changes and compound triggers without 
     await assert.rejects(applySql(db, 'UPDATE migration_probe SET value=\'changed\' WHERE id=2; NOT_VALID_SQL;'),
       /syntax error/);
   } finally { await r.close(); }
-});
-
-test('the statement count is independent of the splitter and covers every statement form', async () => {
+}]);
+foldedCases.push(['the statement count is independent of the splitter and covers every statement form', async () => {
   assert.equal(countStatements(await readFile(new URL('../accounts/schema/invitation-cancellation.sql', import.meta.url), 'utf8')), 3);
   assert.equal(countStatements('-- only a comment; with a semicolon\n/* and; another */'), 0);
   assert.equal(countStatements("INSERT INTO t VALUES('a;b', \"c;d\"); UPDATE t SET v=1"), 2);
   assert.equal(countStatements(`CREATE TRIGGER t_case AFTER INSERT ON t BEGIN
     UPDATE t SET v=CASE WHEN NEW.v>0 THEN 'end;' ELSE CASE WHEN 1 THEN 2 END END; DELETE FROM t WHERE 0;
   END; DROP TRIGGER t_case; SELECT CASE WHEN 1 THEN 2 END;`), 3);
-});
-
-test('a splitter that drops a data-changing statement fails before any statement runs', async () => {
+}]);
+foldedCases.push(['a splitter that drops a data-changing statement fails before any statement runs', async () => {
   const r = await runtime();
   try {
     const db = await r.db;
@@ -51,4 +52,6 @@ test('a splitter that drops a data-changing statement fails before any statement
     assert.deepEqual(await applySql(db, sql), { appliedStatements: 2, statementCount: 2 });
     assert.equal((await db.prepare('SELECT count(*) AS n FROM dropped_probe').first()).n, 1);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

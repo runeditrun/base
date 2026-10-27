@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, post, cookie } from './regression-runtime.mjs';
@@ -23,7 +24,9 @@ async function unconsumed(r, email) {
   assert.ok(tokens.results.every((row) => row.consumed_at === null));
 }
 
-for (const change of ['deactivate', 'demote']) test(`an administrator's unused invitation cannot survive issuer ${change} and restoration`, async () => {
+test("invitation redemption requires current issuer authority and policy", async t => {
+  const foldedCases = [];
+for (const change of ['deactivate', 'demote']) foldedCases.push([`an administrator's unused invitation cannot survive issuer ${change} and restoration`, async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -47,9 +50,8 @@ for (const change of ['deactivate', 'demote']) test(`an administrator's unused i
     assert.equal((await r.call('/auth/confirm', post({ token: fresh }))).status, 303);
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
   } finally { await r.close(); }
-});
-
-test('configured product policy can grant members admin invitations and is re-evaluated for existing links', async () => {
+}]);
+foldedCases.push(['configured product policy can grant members admin invitations and is re-evaluated for existing links', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -76,9 +78,8 @@ test('configured product policy can grant members admin invitations and is re-ev
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 303);
     assert.equal((await r.call('/auth/confirm', post({ token: ownerToken }))).status, 303);
   } finally { await r.close(); }
-});
-
-test('invitation authority follows issuer admission and is independent of its issuing browser session', async () => {
+}]);
+foldedCases.push(['invitation authority follows issuer admission and is independent of its issuing browser session', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -94,17 +95,9 @@ test('invitation authority follows issuer admission and is independent of its is
     assert.equal((await r.call('/auth/signout', post({}, admin.cookie))).status, 204);
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 303);
   } finally { await r.close(); }
-});
-
-async function awaitBarrier(db, id) {
-  const deadline = Date.now() + 5000;
-  while (!await db.prepare('SELECT id FROM test_barriers WHERE id=?').bind(id).first()) {
-    if (Date.now() > deadline) throw new Error('Confirmation never reached role policy');
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-}
+}]);
 for (const change of ['deactivate', 'demote', 'deactivate-restore', 'demote-restore', 'none']) {
-  test(`D1 redemption fences the policy snapshot while issuer changes concurrently: ${change}`, async () => {
+  foldedCases.push([`D1 redemption fences the policy snapshot while issuer changes concurrently: ${change}`, async () => {
     const r = await runtime();
     let pending;
     let barrier;
@@ -137,5 +130,19 @@ for (const change of ['deactivate', 'demote', 'deactivate-restore', 'demote-rest
         if (pending) await pending;
       } finally { await r.close(); }
     }
-  });
+  }]);
+}
+  await runCases(t, foldedCases);
+});
+
+
+
+
+
+async function awaitBarrier(db, id) {
+  const deadline = Date.now() + 5000;
+  while (!await db.prepare('SELECT id FROM test_barriers WHERE id=?').bind(id).first()) {
+    if (Date.now() > deadline) throw new Error('Confirmation never reached role policy');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }

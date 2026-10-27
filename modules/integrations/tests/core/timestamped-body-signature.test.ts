@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -20,7 +21,9 @@ function baseHeaders(body: string) {
     'webhook-timestamp': timestamp, 'webhook-signature': `v1=${createHmac('sha256', key).update(canonical, 'utf8').digest('hex')}` };
 }
 
-test('omitting timestamped-body signing preserves the exact default webhook request and classifier', async () => {
+test("optional timestamped-body signing preserves exact bytes and protected header authority", async t => {
+  const foldedCases: Case[] = [];
+foldedCases.push(['omitting timestamped-body signing preserves the exact default webhook request and classifier', async () => {
   const protocol = createWebhookProtocol({ resolveDestination: async () => url, signingKey: async () => key });
   const expected = { url, body: envelope.body, headers: baseHeaders(envelope.body) };
   assert.equal(JSON.stringify(await protocol.prepare(envelope, now)), JSON.stringify(expected));
@@ -32,9 +35,8 @@ test('omitting timestamped-body signing preserves the exact default webhook requ
   }
   for (const status of [302, 408, 500, 503])
     assert.equal(signed.classify({ status, headers: {}, body: '' }, now).kind, 'uncertain');
-});
-
-test('timestamped-body signature matches independent HMAC over exact Unicode, newlines, BOM and empty body', async () => {
+}]);
+foldedCases.push(['timestamped-body signature matches independent HMAC over exact Unicode, newlines, BOM and empty body', async () => {
   const protocol = makeProtocol(additional);
   const bodies = ['', '{}', '{\r\n "text": "Café λ 🚀 e\u0301 �", "number": 1\n}\n', '\ufeff{"text":"signed BOM"}'];
   for (const body of bodies) {
@@ -52,9 +54,8 @@ test('timestamped-body signature matches independent HMAC over exact Unicode, ne
     const verified = await verifyWebhook({ ...wire, body: Buffer.from(body, 'utf8'), key, tenant: envelope.tenant, destinationId: envelope.destinationId, now });
     assert.equal(verified.envelope.body, body);
   }
-});
-
-test('a configured body signing resolver can use a separate key while Base verification retains its own key', async () => {
+}]);
+foldedCases.push(['a configured body signing resolver can use a separate key while Base verification retains its own key', async () => {
   const bodyKey = new Uint8Array(32).fill(91);
   let baseCalls = 0, bodyCalls = 0;
   const protocol = createWebhookProtocol({ resolveDestination: async () => url,
@@ -68,9 +69,8 @@ test('a configured body signing resolver can use a separate key while Base verif
   assert.notEqual(wire.headers[additional.signatureHeader], createHmac('sha256', key).update(input).digest('base64url'));
   assert.equal(wire.headers['webhook-signature'], baseHeaders(envelope.body)['webhook-signature']);
   await verifyWebhook({ ...wire, key, tenant: envelope.tenant, destinationId: envelope.destinationId, now });
-});
-
-test('both signatures retain one key snapshot when caller-owned bytes rotate during real WebCrypto signing', async () => {
+}]);
+foldedCases.push(['both signatures retain one key snapshot when caller-owned bytes rotate during real WebCrypto signing', async () => {
   for (const buffer of [false, true]) {
     const storage = buffer ? Buffer.alloc(48, 37) : new Uint8Array(48).fill(37);
     const shared = storage.subarray(8, 40);
@@ -97,9 +97,8 @@ test('both signatures retain one key snapshot when caller-owned bytes rotate dur
     assert.equal(wire.headers[additional.signatureHeader], createHmac('sha256', original).update(bodyInput, 'utf8').digest('base64url'));
     assert.notEqual(wire.headers[additional.signatureHeader], createHmac('sha256', shared).update(bodyInput, 'utf8').digest('base64url'));
   }
-});
-
-test('timestamped-body signing refuses short or non-byte keys from either resolver', async () => {
+}]);
+foldedCases.push(['timestamped-body signing refuses short or non-byte keys from either resolver', async () => {
   for (const invalid of [new Uint8Array(0), new Uint8Array(31), 'a'.repeat(32), new Array(32).fill(1), null, undefined]) {
     const invalidKey = invalid as Uint8Array;
     await assert.rejects(makeProtocol({ ...additional, signingKey: async () => invalidKey }).prepare(envelope, now), /at least 32 bytes/);
@@ -111,9 +110,8 @@ test('timestamped-body signing refuses short or non-byte keys from either resolv
   const failure = new Error('fixture resolver failure');
   await assert.rejects(makeProtocol({ ...additional, signingKey: async () => { throw failure; } }).prepare(envelope, now), error => error === failure);
   await assert.rejects(makeProtocol(additional).prepare({ ...envelope, body: '\ud800' }, now), /valid UTF-8/);
-});
-
-test('timestamped-body headers reject illegal tokens, duplicates and case-insensitive Base or transport header overrides', () => {
+}]);
+foldedCases.push(['timestamped-body headers reject illegal tokens, duplicates and case-insensitive Base or transport header overrides', () => {
   const invalidNames = ['', 'x space', ' x-leading', 'x-trailing ', 'x:colon', 'x\r\ninjected', 'x\n', 'café', 'x\t', 'x/invalid', null, undefined, 42];
   for (const name of invalidNames) {
     assert.throws(() => makeProtocol({ ...additional, timestampHeader: name as string }), /header name/);
@@ -127,9 +125,8 @@ test('timestamped-body headers reject illegal tokens, duplicates and case-insens
   for (const signatureHeader of ['X-Same', 'x-same'])
     assert.throws(() => makeProtocol({ timestampHeader: 'X-Same', signatureHeader }), /distinct/);
   assert.throws(() => makeProtocol({ ...additional, signingKey: null as unknown as TimestampedBodySignature['signingKey'] }), /key resolver/);
-});
-
-test('all legal token punctuation works and later option mutation cannot replace Base headers', async () => {
+}]);
+foldedCases.push(['all legal token punctuation works and later option mutation cannot replace Base headers', async () => {
   const options = { timestampHeader: "X-!#$%&'*+.^_`|~", signatureHeader: '__proto__' };
   const protocol = makeProtocol(options);
   const names = { ...options };
@@ -140,4 +137,6 @@ test('all legal token punctuation works and later option mutation cannot replace
   assert.equal(wire.headers['webhook-timestamp'], baseHeaders(envelope.body)['webhook-timestamp']);
   assert.equal(wire.headers['content-type'], 'application/json');
   assert.equal(Object.getPrototypeOf(wire.headers), Object.prototype);
+}]);
+  await runCases(t, foldedCases);
 });

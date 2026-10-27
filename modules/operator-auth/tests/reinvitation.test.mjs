@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime } from './runtime.mjs';
@@ -19,7 +20,9 @@ async function guarded(r, owner, id) {
   assert.equal((await (await r.db).prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(id).first()).n, 0);
 }
 
-test('cancelled identity can receive a new invitation for the same normalized email', async () => {
+test("reinvitation preserves identity and history while replacing only authorized credentials", async t => {
+  const foldedCases = [];
+foldedCases.push(['cancelled identity can receive a new invitation for the same normalized email', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -28,9 +31,8 @@ test('cancelled identity can receive a new invitation for the same normalized em
     assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: operator.id }, owner))).status, 200);
     assert.equal((await r.call('/auth/invite', post(invitation('  PENDING@EXAMPLE.COM  '), owner))).status, 202);
   } finally { await r.close(); }
-});
-
-test('two cancellation cycles preserve identity/history and admission guard through reissue, pruning and restart', async () => {
+}]);
+foldedCases.push(['two cancellation cycles preserve identity/history and admission guard through reissue, pruning and restart', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -86,9 +88,8 @@ test('two cancellation cycles preserve identity/history and admission guard thro
     assert.equal((await r.call('/auth/invite', post(invitation(), owner))).status, 409);
     assert.equal((await r.call('/auth/operator/status', post({ operatorId: initial.id, status: 'active' }, owner))).status, 200);
   } finally { await r.close(); }
-});
-
-test('expired and same-role pending invites resend, role conflicts do not send, and cancelled role changes need current authority', async () => {
+}]);
+foldedCases.push(['expired and same-role pending invites resend, role conflicts do not send, and cancelled role changes need current authority', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -114,4 +115,6 @@ test('expired and same-role pending invites resend, role conflicts do not send, 
     assert.equal(joined.role, 'admin');
     assert.equal(joined.created_at, initial.created_at);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

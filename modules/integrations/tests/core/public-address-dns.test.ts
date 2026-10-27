@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import dns from 'node:dns/promises';
@@ -35,27 +36,27 @@ test('production transport checks every DNS answer before any HTTPS connection',
   const answer = (address: string) => ({ address, family: address.includes(':') ? 6 : 4 });
   const send = () => new NodePinnedTransport().send({ url: `https://${host}/events`, headers: {}, body: '{}' });
   try {
-    await t.test('DNS rejects every denied address alone and in either mixed order', async () => {
+    await runCases(t, [['DNS rejects every denied address alone and in either mixed order', async () => {
       for (const address of deniedAddresses) for (const values of [[address], ['8.8.8.8', address], [address, '2606:4700:4700::1111']]) {
         answers = values.map(answer); const before = connects;
         await assert.rejects(send(), /Destination DNS is not public/, JSON.stringify(values));
         assert.equal(connects, before, JSON.stringify(values));
       }
-    });
-    await t.test('empty and malformed answers reject', async () => {
+    }]]);
+    await runCases(t, [['empty and malformed answers reject', async () => {
       for (const values of [[], ['bad-address'], ['2606:::1'], ['8.8.8.256']]) {
         answers = values.map(answer); const before = connects;
         await assert.rejects(send(), /Destination DNS is not public/, JSON.stringify(values));
         assert.equal(connects, before, JSON.stringify(values));
       }
-    });
-    await t.test('public answers pin the first address with the original TLS hostname and no second resolution', async () => {
+    }]]);
+    await runCases(t, [['public answers pin the first address with the original TLS hostname and no second resolution', async () => {
       for (const address of publicAddresses) {
         answers = [answer(address), answer('8.8.4.4')]; const before = lookups;
         await assert.rejects(send(), error => error === reachedConnection);
         assert.equal(lookups, before + 1);
       }
-    });
+    }]]);
   } finally {
     dns.lookup = originalLookup; https.request = originalRequest; syncBuiltinESMExports();
   }

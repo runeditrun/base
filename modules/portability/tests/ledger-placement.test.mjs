@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -59,7 +60,9 @@ async function retainedArchive(t,{policies=[],ledger=archived.map(name=>plan.fin
 }
 const all=async(db,sql)=>(await db.prepare(sql).all()).results;
 
-test('an old archive carrying its Platform ledger restores into a Platform-installed destination whose history orders a new migration mid-way',async t=>{
+test("restore locates archived migration history and refuses ambiguous or conflicting evidence", async t => {
+  const foldedCases = [];
+foldedCases.push(['an old archive carrying its Platform ledger restores into a Platform-installed destination whose history orders a new migration mid-way', async t=>{
   const target=await platformDestination(t),before=await ledgerRows(target.db);
   const {path,source}=await retainedArchive(t);
   const receipt=await importArchive(target.service,path,[]);
@@ -69,9 +72,8 @@ test('an old archive carrying its Platform ledger restores into a Platform-insta
   for(const table of ['items','jobs','policies'])assert.deepEqual(await all(target.db,`SELECT * FROM ${table} ORDER BY id`),await all(source.db,`SELECT * FROM ${table} ORDER BY id`));
   assert.deepEqual(await all(target.db,'SELECT * FROM roles'),[]);
   assert.deepEqual(await ledgerRows(target.db),before);
-});
-
-test('an archived ledger whose hash differs from the applied migration refuses, naming it, and leaves the destination untouched',async t=>{
+}]);
+foldedCases.push(['an archived ledger whose hash differs from the applied migration refuses, naming it, and leaves the destination untouched', async t=>{
   const target=await platformDestination(t),before=await ledgerRows(target.db);
   const ledger=archived.map(name=>plan.find(m=>m.name===name)).map(m=>m.name==='0900_jobs.sql'?{...m,sha256:createHash('sha256').update(m.sql+'\n-- edited').digest('hex')}:m);
   const {path}=await retainedArchive(t,{ledger});
@@ -79,19 +81,16 @@ test('an archived ledger whose hash differs from the applied migration refuses, 
   assert.deepEqual(await all(target.db,'SELECT * FROM items'),[]);
   assert.deepEqual(await all(target.db,'SELECT id FROM rer_portability_jobs'),[]);
   assert.deepEqual(await ledgerRows(target.db),before);
-});
-
-test('a later UPDATE refuses when the archive holds rows of its table',async t=>{
+}]);
+foldedCases.push(['a later UPDATE refuses when the archive holds rows of its table', async t=>{
   const target=await platformDestination(t),before=await ledgerRows(target.db);
   const {path}=await retainedArchive(t,{policies:['policy-1']});
   await assert.rejects(importArchive(target.service,path,[]),error=>error.code==='schema_mismatch:migration_data:1280_policy_rules.sql');
   assert.deepEqual(await all(target.db,'SELECT * FROM policies'),[]);
   assert.deepEqual(await ledgerRows(target.db),before);
-});
-
-
-test('Platform-prefixed and native ledgers place the same files in either direction, including native to native',async t=>{
-  for(const sourceNative of [false,true])for(const targetNative of [false,true])await t.test(`${sourceNative?'native':'Platform'} to ${targetNative?'native':'Platform'}`,async t=>{
+}]);
+foldedCases.push(['Platform-prefixed and native ledgers place the same files in either direction, including native to native', async t=>{
+  for(const sourceNative of [false,true])for(const targetNative of [false,true])await runCases(t, [[`${sourceNative?'native':'Platform'} to ${targetNative?'native':'Platform'}`, async t=>{
     const target=await platformDestination(t,{native:targetNative,prefix:targetNative?'':'core-'});
     const ledgerTable=targetNative?'d1_migrations':'rer_migrations';
     const before=await all(target.db,`SELECT * FROM ${ledgerTable} ORDER BY rowid`);
@@ -100,11 +99,10 @@ test('Platform-prefixed and native ledgers place the same files in either direct
     assert.deepEqual(receipt.bridged.migrations,['1270_roles.sql','1280_policy_rules.sql']);
     for(const table of ['items','jobs','policies'])assert.deepEqual(await all(target.db,`SELECT * FROM ${table} ORDER BY id`),await all(source.db,`SELECT * FROM ${table} ORDER BY id`));
     assert.deepEqual(await all(target.db,`SELECT * FROM ${ledgerTable} ORDER BY rowid`),before);
-  });
-});
-
-test('ambiguous file hashes, conflicting names and the first unknown hashless entry refuse without staging rows',async t=>{
-  for(const kind of ['ambiguous','conflict','unknown'])await t.test(kind,async t=>{
+  }]]);
+}]);
+foldedCases.push(['ambiguous file hashes, conflicting names and the first unknown hashless entry refuse without staging rows', async t=>{
+  for(const kind of ['ambiguous','conflict','unknown'])await runCases(t, [[kind, async t=>{
     const jobs=plan.find(m=>m.name==='0900_jobs.sql');
     const files=kind==='ambiguous'?[...plan,{...jobs,name:'1290_jobs_copy.sql'}]:plan;
     const target=await platformDestination(t,{native:true,files});
@@ -115,11 +113,10 @@ test('ambiguous file hashes, conflicting names and the first unknown hashless en
     await assert.rejects(importArchive(target.service,path,[]),error=>error.code===`migration_ledger:${kind}:${name}`);
     assert.deepEqual(await all(target.db,'SELECT * FROM items'),[]);
     assert.deepEqual(await all(target.db,'SELECT id FROM rer_portability_jobs'),[]);
-  });
-});
-
-test('name-only archives use declared deployment names and refuse an ambiguous alias before staging',async t=>{
-  for(const ambiguous of [false,true])await t.test(ambiguous?'ambiguous':'declared',async t=>{
+  }]]);
+}]);
+foldedCases.push(['name-only archives use declared deployment names and refuse an ambiguous alias before staging', async t=>{
+  for(const ambiguous of [false,true])await runCases(t, [[ambiguous?'ambiguous':'declared', async t=>{
     const files=plan.map(m=>({...m,aliases:['delivered-'+m.name]}));
     if(ambiguous)files[1].aliases.push('delivered-'+files[0].name);
     const target=await platformDestination(t,{native:true,files});
@@ -131,5 +128,7 @@ test('name-only archives use declared deployment names and refuse an ambiguous a
       await importArchive(target.service,path,[]);
       assert.deepEqual(await all(target.db,'SELECT * FROM items'),await all(source.db,'SELECT * FROM items'));
     }
-  });
+  }]]);
+}]);
+  await runCases(t, foldedCases);
 });

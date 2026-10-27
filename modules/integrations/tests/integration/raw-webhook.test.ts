@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -5,7 +6,9 @@ import { verifyWebhook } from '../../index.ts';
 import { store } from './support.ts';
 import { key, tenant, destinationId, signedWebhook, byteMutations } from './raw-webhook-fixture.ts';
 
-test('raw webhook bytes reject UTF-8 replacement and BOM mutations hidden by Request.text()', async () => {
+test("raw webhook verification binds exact bytes to audience, freshness and durable replay identity", async t => {
+  const foldedCases: Case[] = [];
+foldedCases.push(['raw webhook bytes reject UTF-8 replacement and BOM mutations hidden by Request.text()', async () => {
   for (const mutation of byteMutations) {
     const signed = signedWebhook(mutation.original);
     const request = new Request('https://receiver.example.com/', { method: 'POST', headers: signed.headers, body: mutation.body });
@@ -13,9 +16,8 @@ test('raw webhook bytes reject UTF-8 replacement and BOM mutations hidden by Req
     await assert.rejects(verifyWebhook({ body: new Uint8Array(await request.arrayBuffer()), headers: request.headers, key, tenant, destinationId }), mutation.name);
     assert.equal((await verifyWebhook({ ...signed, key, tenant, destinationId })).envelope.body, mutation.original);
   }
-});
-
-test('raw verifier preserves exact Unicode, byte views and owned strings without normalization', async () => {
+}]);
+foldedCases.push(['raw verifier preserves exact Unicode, byte views and owned strings without normalization', async () => {
   for (const body of ['', '{"text":"Café λ 🚀 𐐷 e\u0301 \ufffd \\uFEFF"}', '\ufeff{"text":"signed BOM"}']) {
     const signed = signedWebhook(body);
     const storage = new Uint8Array(signed.body.length + 2).fill(0xff);
@@ -32,9 +34,8 @@ test('raw verifier preserves exact Unicode, byte views and owned strings without
   await assert.rejects(verifyWebhook({ ...composed, body: new TextEncoder().encode('{"text":"e\u0301"}'), key, tenant, destinationId }), /signature/);
   const unpaired = '\ud800';
   await assert.rejects(verifyWebhook({ ...signedWebhook(unpaired), body: unpaired, key, tenant, destinationId }), /UTF-8/);
-});
-
-test('native HTTP raw receiver protects its durable inbox across invalid bytes, audience, freshness and restart', async t => {
+}]);
+foldedCases.push(['native HTTP raw receiver protects its durable inbox across invalid bytes, audience, freshness and restart', async t => {
   const now = Math.floor(Date.now() / 1000) * 1000;
   t.mock.method(Date, 'now', () => now);
   const inbox = await store(t);
@@ -82,9 +83,8 @@ test('native HTTP raw receiver protects its durable inbox across invalid bytes, 
     assert.equal((await send(signedWebhook(body, { id: `boundary-${offset}`, now: now + offset }))).status, 204, 'exact five-minute boundary is accepted');
   }
   assert.equal((await rows()).length, 3);
-});
-
-test('loopback receiver rejects signature tampering and replay with explicit HTTP errors after restart', async t => {
+}]);
+foldedCases.push(['loopback receiver rejects signature tampering and replay with explicit HTTP errors after restart', async t => {
   const inbox = await store(t); let effects = 0;
   const server = createServer(async (request, response) => {
     try {
@@ -115,4 +115,6 @@ test('loopback receiver rejects signature tampering and replay with explicit HTT
   assert.equal((await send(signed)).status, 409);
   assert.equal(effects, 1);
   assert.equal((await inbox.repo().query('SELECT id FROM integration_replays WHERE namespace=?')).length, 1);
+}]);
+  await runCases(t, foldedCases);
 });

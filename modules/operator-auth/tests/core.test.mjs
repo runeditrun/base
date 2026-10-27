@@ -1,3 +1,5 @@
+import { conformanceGroups } from './conformance-cases.mjs';
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, SETUP } from './runtime.mjs';
@@ -47,7 +49,9 @@ test('fresh real D1 bootstrap is mail-independent, one owner/session, atomic acr
   } finally { await r.close(); }
 });
 
-test('scanner GET/HEAD do not consume; same-origin POST wins once, preserves returnTo, and replay fails', async () => {
+test("email sign-in admits only fresh, single-use credentials under current admission policy", async t => {
+  const foldedCases = [];
+foldedCases.push(['scanner GET/HEAD do not consume; same-origin POST wins once, preserves returnTo, and replay fails', async () => {
   const r = await runtime();
   try {
     await r.bootstrap();
@@ -76,9 +80,8 @@ test('scanner GET/HEAD do not consume; same-origin POST wins once, preserves ret
     const stored = await db.prepare('SELECT token_hash FROM oa_tokens').first();
     assert.notEqual(stored.token_hash, token); assert.match(stored.token_hash, /^[0-9a-f]{64}$/);
   } finally { await r.close(); }
-});
-
-test('expiry, duplicate cookies, missing cookie and revocation deny both known and unknown private paths', async () => {
+}]);
+foldedCases.push(['expiry, duplicate cookies, missing cookie and revocation deny both known and unknown private paths', async () => {
   const r = await runtime();
   try {
     const first = await r.bootstrap();
@@ -96,9 +99,8 @@ test('expiry, duplicate cookies, missing cookie and revocation deny both known a
     await db.prepare('UPDATE oa_sessions SET expires_at=? WHERE id=?').bind(Date.now() - 1, secondSession.id).run();
     for (const path of ['/private/known', '/private/unknown']) assert.equal((await r.call(path, { cookie: second })).status, 401);
   } finally { await r.close(); }
-});
-
-test('durable IP and normalized email limits are independent, atomic, and persist on restart', async () => {
+}]);
+foldedCases.push(['durable IP and normalized email limits are independent, atomic, and persist on restart', async () => {
   const r = await runtime({ ipLimit: 3, emailLimit: 2 });
   try {
     await r.bootstrap();
@@ -114,9 +116,8 @@ test('durable IP and normalized email limits are independent, atomic, and persis
     const rows = await (await r.db).prepare('SELECT key FROM oa_limits').all();
     assert.ok(rows.results.every((v) => /^[0-9a-f]{64}$/.test(v.key)));
   } finally { await r.close(); }
-});
-
-test('allow-list filters issuance, confirmation, and existing-session admission', async () => {
+}]);
+foldedCases.push(['allow-list filters issuance, confirmation, and existing-session admission', async () => {
   const r = await runtime({ allowList: ['owner@example.com'] });
   try {
     const owner = await r.bootstrap();
@@ -126,9 +127,48 @@ test('allow-list filters issuance, confirmation, and existing-session admission'
     assert.equal((await r.call('/auth/magic-link', post({ email: 'owner@example.com' }))).status, 202);
     assert.equal((await r.mails()).length, 1);
   } finally { await r.close(); }
+}]);
+foldedCases.push(['mail failures revoke outstanding credentials; unavailable mail is never silently replaced', async () => {
+  for (const options of [{ noMail: true }, { mailStatus: 'uncertain' }, { mailThrows: true }, { mailStatus: 'development' }]) {
+    const r = await runtime({}, options);
+    try {
+      await r.bootstrap();
+      assert.equal((await r.call('/auth/magic-link', post({ email: 'owner@example.com' }))).status, 503);
+      const rows = await (await r.db).prepare('SELECT revoked_at FROM oa_tokens').all();
+      assert.ok(rows.results.every((v) => v.revoked_at !== null));
+    } finally { await r.close(); }
+  }
+}]);
+foldedCases.push(['review issuance/admission enforce literal loopback Host independent of forwarded headers', async () => {
+  const r = await runtime({ origin: 'http://localhost:8787', local: true, review: { enabled: true, operatorEmail: 'owner@example.com' } });
+  try {
+    assert.equal((await r.call('/auth/review-session', post({}))).status, 403); // no fixture owner
+    await r.bootstrap();
+    for (const host of ['evil.test', 'localhost.evil.test', '127.0.0.2:8787']) {
+      const bad = await r.call('/auth/review-session', post({}, undefined, { host, headers: { 'X-Forwarded-Host': 'localhost:8787', Forwarded: 'host=localhost:8787' } }));
+      assert.equal(bad.status, 403);
+    }
+    const valid = await r.call('/auth/review-session', post({ returnTo: '/app/review' }));
+    assert.equal(valid.status, 303);
+    const c = cookie(valid); assert.match(c, /^operator_session_local_8787=/);
+    assert.equal((await session(r, c)).kind, 'review');
+    assert.equal((await r.call('/auth/session', { cookie: c, host: 'evil.test', headers: { 'X-Forwarded-Host': 'localhost:8787' } })).status, 403);
+    assert.equal((await r.call('/auth/session', { cookie: c })).status, 200);
+  } finally { await r.close(); }
+}]);
+  foldedCases.push(...conformanceGroups.email);
+  await runCases(t, foldedCases);
 });
 
-test('invitation acceptance, default role policy, deactivate/reactivate, session metadata and final owner invariants', async () => {
+
+
+
+
+
+
+test("invitation lifecycle preserves role authority and the final owner", async t => {
+  const foldedCases = [];
+foldedCases.push(['invitation acceptance, default role policy, deactivate/reactivate, session metadata and final owner invariants', async () => {
   const r = await runtime();
   try {
     const ownerCookie = await r.bootstrap();
@@ -163,9 +203,8 @@ test('invitation acceptance, default role policy, deactivate/reactivate, session
     assert.equal(logout.status, 204); assert.match(logout.headers.get('set-cookie'), /Max-Age=0/);
     assert.equal((await r.call('/auth/operators', { cookie: adminCookie })).status, 401);
   } finally { await r.close(); }
-});
-
-test('invitation retries invalidate older links; role changes and competing owner deactivation preserve one active owner', async () => {
+}]);
+foldedCases.push(['invitation retries invalidate older links; role changes and competing owner deactivation preserve one active owner', async () => {
   const r = await runtime();
   try {
     const first = await r.bootstrap();
@@ -189,37 +228,16 @@ test('invitation retries invalidate older links; role changes and competing owne
     assert.equal(deactivated.filter((v) => v.status === 409).length, 1);
     assert.equal((await (await r.db).prepare("SELECT count(*) AS n FROM oa_operators WHERE role='owner' AND status='active'").first()).n, 1);
   } finally { await r.close(); }
+}]);
+  foldedCases.push(...conformanceGroups.invitation);
+  await runCases(t, foldedCases);
 });
 
-test('mail failures revoke outstanding credentials; unavailable mail is never silently replaced', async () => {
-  for (const options of [{ noMail: true }, { mailStatus: 'uncertain' }, { mailThrows: true }, { mailStatus: 'development' }]) {
-    const r = await runtime({}, options);
-    try {
-      await r.bootstrap();
-      assert.equal((await r.call('/auth/magic-link', post({ email: 'owner@example.com' }))).status, 503);
-      const rows = await (await r.db).prepare('SELECT revoked_at FROM oa_tokens').all();
-      assert.ok(rows.results.every((v) => v.revoked_at !== null));
-    } finally { await r.close(); }
-  }
-});
 
-test('review issuance/admission enforce literal loopback Host independent of forwarded headers', async () => {
-  const r = await runtime({ origin: 'http://localhost:8787', local: true, review: { enabled: true, operatorEmail: 'owner@example.com' } });
-  try {
-    assert.equal((await r.call('/auth/review-session', post({}))).status, 403); // no fixture owner
-    await r.bootstrap();
-    for (const host of ['evil.test', 'localhost.evil.test', '127.0.0.2:8787']) {
-      const bad = await r.call('/auth/review-session', post({}, undefined, { host, headers: { 'X-Forwarded-Host': 'localhost:8787', Forwarded: 'host=localhost:8787' } }));
-      assert.equal(bad.status, 403);
-    }
-    const valid = await r.call('/auth/review-session', post({ returnTo: '/app/review' }));
-    assert.equal(valid.status, 303);
-    const c = cookie(valid); assert.match(c, /^operator_session_local_8787=/);
-    assert.equal((await session(r, c)).kind, 'review');
-    assert.equal((await r.call('/auth/session', { cookie: c, host: 'evil.test', headers: { 'X-Forwarded-Host': 'localhost:8787' } })).status, 403);
-    assert.equal((await r.call('/auth/session', { cookie: c })).status, 200);
-  } finally { await r.close(); }
-});
+
+
+
+
 
 test('trusted external and password seams share native policy and subject binding; custom policy restricts management', async () => {
   const r = await runtime({ externalIssuers: ['https://idp.example.com'] });

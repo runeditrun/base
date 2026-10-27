@@ -1,3 +1,5 @@
+import { conformanceGroups } from './conformance-cases.mjs';
+import { runCases } from './cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, ORIGIN, KEYS, presets, SETUP } from '../identity/oidc/tests/fake-runtime.mjs';
@@ -23,7 +25,9 @@ async function login(r,address='owner@example.com') {
 const count=async(r,table)=>(await r.db.prepare(`SELECT count(*) AS n FROM ${table}`).first()).n;
 async function noOa(r) {const rows=(await r.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'oa_%'").all()).results;for(const name of ['oa_operators','oa_sessions','oa_external_identities','oa_tokens','oa_step_up_challenges','oa_provider_sessions','oa_auth_settings','oa_setup_links'])assert.ok(!rows.some(row=>row.name===name),`${name} must not be installed`);}
 
-test('native email uses native cookie/roles/IDs, inert previews, atomic one-use, restart and signout without OA accounts',async t=>{
+test("native email admission preserves identity and refuses invalid proofs", async t => {
+  const foldedCases = [];
+foldedCases.push(['native email uses native cookie/roles/IDs, inert previews, atomic one-use, restart and signout without OA accounts', async t=>{
   const r=await runtime(t,setup());
   const oldToken='prior-native-session-token';
   await r.db.prepare("INSERT INTO sessions(id,person_id,token_hash,version,kind,created_at,expires_at) VALUES('prior-session','native-owner',?,1,'native',?,?)").bind(await hashToken('fixture-native-session-secret-32-bytes','session',oldToken),Date.now()-86400000,Date.now()+86400000).run();
@@ -43,9 +47,8 @@ test('native email uses native cookie/roles/IDs, inert previews, atomic one-use,
   await r.restart();assert.equal((await r.call('/auth/session',{cookie})).status,200);
   assert.equal((await post(r,'/auth/signout',{},cookie)).status,204);assert.equal((await r.call('/auth/session',{cookie})).status,401);
   assert.equal((await post(r,'/auth/confirm',{token})).status,400);assert.equal((await r.call('/auth/session',{cookie:oldCookie})).status,200);await noOa(r);
-});
-
-test('native proof lifecycle refuses failed mail, stale authority, domain changes and expired links; keeps uniform rate limits',async t=>{
+}]);
+foldedCases.push(['native proof lifecycle refuses failed mail, stale authority, domain changes and expired links; keeps uniform rate limits', async t=>{
   const r=await runtime(t,setup());
   for(const status of ['rejected','uncertain','exception']) {
     await post(r,'/__fake/mail',{status});assert.equal((await post(r,'/auth/magic-link',{email:'owner@example.com'})).status,503);
@@ -60,7 +63,11 @@ test('native proof lifecycle refuses failed mail, stale authority, domain change
   const limited=await runtime(t,setup({core:{ipLimit:2,emailLimit:2}}));
   for(const address of ['unknown@example.com','owner@example.com'])assert.equal((await post(limited,'/auth/magic-link',{email:address})).status,202);
   assert.equal((await post(limited,'/auth/magic-link',{email:'another@example.com'})).status,429);await noOa(r);
+}]);
+  await runCases(t, foldedCases);
 });
+
+
 
 test('native step-up binds the asking session and current account version, expires and cannot come from provider authentication',async t=>{
   const r=await runtime(t,setup());const first=await login(r),second=await login(r);
@@ -83,7 +90,9 @@ test('native step-up binds the asking session and current account version, expir
   await r.db.prepare("UPDATE people SET status='inactive' WHERE id='native-owner'").run();assert.equal((await r.call('/test/guard/export',{cookie})).status,401);await noOa(r);
 });
 
-test('native pinned RS256 incumbent signs in at its selected callback, preserves sessions and binding, revokes passwords and caps provider sessions',async t=>{
+test("native OIDC admission binds its configured protocol and current authority", async t => {
+  const foldedCases = [];
+foldedCases.push(['native pinned RS256 incumbent signs in at its selected callback, preserves sessions and binding, revokes passwords and caps provider sessions', async t=>{
   const r=await runtime(t,setup());const contactPassword=await post(r,'/test/password',{operatorId:'native-contact'});assert.equal(contactPassword.status,204,'unbound native password is retained');
   const password=await post(r,'/test/password',{operatorId:'native-owner'});assert.equal(password.status,204);const passwordCookie=r.session(password);
   assert.equal((await r.call('/auth/session',{cookie:passwordCookie})).status,200);
@@ -97,6 +106,55 @@ test('native pinned RS256 incumbent signs in at its selected callback, preserves
   assert.equal((await r.db.prepare("SELECT password FROM people WHERE id='native-owner'").first()).password,0);
   await r.db.prepare("INSERT INTO bindings VALUES(?,'another','native-owner')").bind(issuer).run();assert.equal((await r.call('/test/editor',{cookie})).status,403);
   await r.clock(86400001);assert.equal((await r.call('/auth/session',{cookie})).status,401);assert.equal((await r.call('/auth/session',{cookie:old})).status,200);await noOa(r);
+}]);
+foldedCases.push(['native provider proof/mix-up/signature matrix and URI/policy changes fail closed before any session', async t=>{
+  const r=await runtime(t,setup());
+  for(const claims of [{email_verified:false},{email_verified_at:Math.floor(Date.now()/1000)-31*86400},{email_verified_at:Math.floor(Date.now()/1000)+601},{email_verified_at:'yesterday'},{email_verified_at:null},{iss:'https://wrong.example'},{aud:'wrong'},{nonce:'$other'},{email:'outside@example.com'}]) {
+    const response=await r.login('incumbent',claims);assert.equal(response.status,('iss' in claims||'aud' in claims||'nonce' in claims)?400:403,JSON.stringify(claims));
+  }
+  await r.set(issuer,{corruptSignature:true});assert.equal((await r.login('incumbent')).status,400);await r.set(issuer,{corruptSignature:false});
+  for(const alg of ['none','HS256','ES256']) {await r.set(issuer,{header:{alg}});assert.equal((await r.login('incumbent')).status,400);}await r.set(issuer,{header:{}});
+  const wrong=await r.flow('incumbent');assert.equal((await r.call('/auth/oidc/incumbent/callback?state='+wrong.state+'&code='+wrong.code,{cookie:wrong.cookie})).status,404);assert.equal((await r.finish(wrong,{cookie:undefined})).status,400);
+  const changed=await r.flow('incumbent');await r.configure('incumbent',{redirectUri:ORIGIN+'/another/callback'});assert.equal((await r.finish(changed)).status,404);assert.equal((await r.call('/another/callback?state='+changed.state+'&code='+changed.code,{cookie:changed.cookie})).status,400);
+  await r.configure('incumbent',{redirectUri:ORIGIN+callback});const policy=await r.flow('incumbent');await r.db.prepare('UPDATE settings SET generation=generation+1').run();assert.equal((await r.finish(policy)).status,403);
+  assert.equal(await count(r,'sessions'),0);
+  const fresh=await r.login('incumbent');assert.equal(fresh.status,303);const staleBound=await r.login('incumbent',{email_verified_at:Math.floor(Date.now()/1000)-31*86400});assert.equal(staleBound.status,403);
+  const owner=await login(r);assert.equal((await post(r,'/auth/settings/identity',{idpSignIn:false},owner)).status,200);assert.equal((await r.call('/auth/session',{cookie:r.session(fresh)})).status,401);await noOa(r);
+}]);
+foldedCases.push(['native opt-in and explicit callback configuration refuse partial adapters, unsupported capabilities and conflicting/foreign URLs', async t=>{
+  const options={db:{prepare(){throw new Error('No account DB query allowed');}},clientIp:()=> 'test',config:{origin:ORIGIN,OWNER_EMAIL:'owner@example.com',SESSION_SECRET:'test-session-secret-32-bytes-value'}};
+  for(const injection of [{accounts:{}},{proofs:{}},{accounts:null,proofs:null},{accounts:undefined},{proofs:undefined}])assert.throws(()=>createOperatorAuth({...options,...injection}),/adapter/);
+  const partial=nativeFixture(options.db,Date.now,{noDependencies:true});
+  const nativeAuth=createOperatorAuth({...options,...partial});
+  await assert.rejects(nativeAuth.authorizeDependencySetup(new Request(ORIGIN),{token:SETUP}),{code:'native_capability_unavailable',status:501});
+  assert.throws(()=>createOperatorAuth({...options,...partial,config:{...options.config,dependencies:true}}),/native_dependency_capability_required/);
+  assert.throws(()=>createOperatorAuth({...options,...partial,accounts:{...partial.accounts,bootstrap:'invalid'}}),/invalid_native_adapter/);
+  assert.throws(()=>createOperatorAuth({...options,...partial,proofs:{...partial.proofs,consumeLink:null}}),/invalid_native_adapter/);
+  const persistence={...partial.proofs,authenticate(){},requiredProvider(){},byEmail(){},authorizedLink(){}};
+  const direct={...options,persistence,hash:async()=> 'digest',hooks:{afterConfirm(){throw new Error('veto');}}};
+  assert.throws(()=>createEmailLinkLifecycle(direct),/invalid_confirmation_hooks/,'a veto without revocation authority refuses construction');
+  assert.throws(()=>createEmailLinkLifecycle({...direct,afterConfirm:async(_request,value)=>value}),/invalid_confirmation_hooks/,'a wrapper cannot silently replace a supplied veto');
+  for(const redirectUri of ['https://foreign.example/callback','https://user:pass@app.example/callback',ORIGIN+'/callback?q=1',ORIGIN+'/callback#hash',ORIGIN+'/auth/oidc/incumbent/start',ORIGIN+'/auth/owner-claim',ORIGIN+'/auth/dev/enter',ORIGIN+'/__dev/personas',ORIGIN+'/__dev/key']) {
+    assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[{...provider,redirectUri}]}}),/configuration/);
+  }
+  assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[provider,{...provider,id:'other'}]}}),/configuration/);
+  const oidc=createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[provider]}});
+  assert.equal(await createOidcHandler(oidc)(new Request(ORIGIN+'/unconfigured/callback')),null);
+  const r=await runtime(t,setup({native:{noLocal:true,noSettings:true}}));const cookie=await login(r);
+  for(const [path,input] of [['/auth/bootstrap',{}],['/auth/invite',{email:'x@example.com',role:'owner'}],['/auth/operator/role',{operatorId:'native-contact',role:'owner'}],['/auth/setup-complete',{}],['/auth/settings/identity',{idpSignIn:true}],['/test/password',{operatorId:'native-contact'}]])assert.equal((await post(r,path,input,cookie)).status,501,path);
+  const local=await runtime(t,setup({providers:[],fakes:[],core:{local:true,origin:'http://127.0.0.1:8787',review:{enabled:true,operatorEmail:'contact@example.com'}}}));
+  const review=await post(local,'/auth/review-session');assert.equal(review.status,303);assert.equal((await local.call('/auth/session',{cookie:local.session(review)})).status,200);
+  await local.db.prepare("INSERT INTO domains VALUES('example.com','incumbent')").run();assert.equal((await post(local,'/auth/review-session')).status,403);
+  const custom=await runtime(t,setup({native:{ownerRole:'workspace-owner'},providers:[],fakes:[],hooks:{reviewFor:'owner@example.com',returnTo:'https://foreign.example/steal'}}));
+  await custom.db.prepare("UPDATE people SET role='workspace-owner' WHERE id='native-owner'").run();
+  await custom.db.prepare("INSERT INTO domains VALUES('example.com','incumbent')").run();
+  const customReply=await post(custom,'/auth/confirm',{token:await email(custom)});assert.equal(customReply.headers.get('location'),'/app','hook return remains same-origin');const customCookie=custom.session(customReply);const nativeOwner=await (await custom.call('/auth/session',{cookie:customCookie})).json();assert.equal(nativeOwner.operator.role,'workspace-owner');
+  const bootstrap=await runtime(t,setup({native:{bootstrap:true},providers:[],fakes:[]}));await bootstrap.db.prepare('DELETE FROM people').run();await bootstrap.db.prepare('UPDATE settings SET first_setup=1,idp_sign_in=0').run();
+  const claims=await Promise.all([post(bootstrap,'/auth/bootstrap',{token:SETUP,displayName:'Owner'}),post(bootstrap,'/auth/bootstrap',{token:SETUP,displayName:'Owner'})]);assert.deepEqual(claims.map(r=>r.status).sort(),[303,409]);assert.equal(await count(bootstrap,'people'),1);assert.equal(await count(bootstrap,'sessions'),1);
+  assert.deepEqual(await bootstrap.db.prepare('SELECT first_setup,idp_sign_in FROM settings').first(),{first_setup:0,idp_sign_in:0},'bootstrap without setup provenance closes eligibility');
+  await noOa(r);
+}]);
+  await runCases(t, foldedCases);
 });
 
 test('direct lifecycle and composed native/OA services run one completion hook and durably revoke a refused session',async t=>{
@@ -121,7 +179,8 @@ test('direct lifecycle and composed native/OA services run one completion hook a
   assert.equal((await r.call('/auth/session',{cookie:r.session(response)})).status,200);
 });
 
-test('native server-verified seams preserve association, policy and binding authority without an OIDC transaction pin',async t=>{
+test("native server-verified seams preserve association, policy and binding authority without an OIDC transaction pin", async t => {
+  await runCases(t, [["native server-verified seams preserve association, policy and binding authority without an OIDC transaction pin", async t=>{
   const legacyIssuer='https://legacy.example';
   const r=await runtime(t,setup({providers:[],fakes:[],core:{externalIssuers:[legacyIssuer]},legacy:{issuer:legacyIssuer,subjectEmails:{'legacy-contact':'contact@example.com'}}}));
   const old=await login(r);
@@ -163,56 +222,12 @@ test('native server-verified seams preserve association, policy and binding auth
   for(const [path,principal] of [['/test/association',associated],['/test/verified',verified]])assert.equal((await post(r,path,principal)).status,403);
   assert.equal((await r.call('/auth/session',{cookie:old})).status,200);
   await noOa(r);
+}], ...conformanceGroups.oidc]);
 });
 
-test('native provider proof/mix-up/signature matrix and URI/policy changes fail closed before any session',async t=>{
-  const r=await runtime(t,setup());
-  for(const claims of [{email_verified:false},{email_verified_at:Math.floor(Date.now()/1000)-31*86400},{email_verified_at:Math.floor(Date.now()/1000)+601},{email_verified_at:'yesterday'},{email_verified_at:null},{iss:'https://wrong.example'},{aud:'wrong'},{nonce:'$other'},{email:'outside@example.com'}]) {
-    const response=await r.login('incumbent',claims);assert.equal(response.status,('iss' in claims||'aud' in claims||'nonce' in claims)?400:403,JSON.stringify(claims));
-  }
-  await r.set(issuer,{corruptSignature:true});assert.equal((await r.login('incumbent')).status,400);await r.set(issuer,{corruptSignature:false});
-  for(const alg of ['none','HS256','ES256']) {await r.set(issuer,{header:{alg}});assert.equal((await r.login('incumbent')).status,400);}await r.set(issuer,{header:{}});
-  const wrong=await r.flow('incumbent');assert.equal((await r.call('/auth/oidc/incumbent/callback?state='+wrong.state+'&code='+wrong.code,{cookie:wrong.cookie})).status,404);assert.equal((await r.finish(wrong,{cookie:undefined})).status,400);
-  const changed=await r.flow('incumbent');await r.configure('incumbent',{redirectUri:ORIGIN+'/another/callback'});assert.equal((await r.finish(changed)).status,404);assert.equal((await r.call('/another/callback?state='+changed.state+'&code='+changed.code,{cookie:changed.cookie})).status,400);
-  await r.configure('incumbent',{redirectUri:ORIGIN+callback});const policy=await r.flow('incumbent');await r.db.prepare('UPDATE settings SET generation=generation+1').run();assert.equal((await r.finish(policy)).status,403);
-  assert.equal(await count(r,'sessions'),0);
-  const fresh=await r.login('incumbent');assert.equal(fresh.status,303);const staleBound=await r.login('incumbent',{email_verified_at:Math.floor(Date.now()/1000)-31*86400});assert.equal(staleBound.status,403);
-  const owner=await login(r);assert.equal((await post(r,'/auth/settings/identity',{idpSignIn:false},owner)).status,200);assert.equal((await r.call('/auth/session',{cookie:r.session(fresh)})).status,401);await noOa(r);
-});
 
-test('native opt-in and explicit callback configuration refuse partial adapters, unsupported capabilities and conflicting/foreign URLs',async t=>{
-  const options={db:{prepare(){throw new Error('No account DB query allowed');}},clientIp:()=> 'test',config:{origin:ORIGIN,OWNER_EMAIL:'owner@example.com',SESSION_SECRET:'test-session-secret-32-bytes-value'}};
-  for(const injection of [{accounts:{}},{proofs:{}},{accounts:null,proofs:null},{accounts:undefined},{proofs:undefined}])assert.throws(()=>createOperatorAuth({...options,...injection}),/adapter/);
-  const partial=nativeFixture(options.db,Date.now,{noDependencies:true});
-  const nativeAuth=createOperatorAuth({...options,...partial});
-  await assert.rejects(nativeAuth.authorizeDependencySetup(new Request(ORIGIN),{token:SETUP}),{code:'native_capability_unavailable',status:501});
-  assert.throws(()=>createOperatorAuth({...options,...partial,config:{...options.config,dependencies:true}}),/native_dependency_capability_required/);
-  assert.throws(()=>createOperatorAuth({...options,...partial,accounts:{...partial.accounts,bootstrap:'invalid'}}),/invalid_native_adapter/);
-  assert.throws(()=>createOperatorAuth({...options,...partial,proofs:{...partial.proofs,consumeLink:null}}),/invalid_native_adapter/);
-  const persistence={...partial.proofs,authenticate(){},requiredProvider(){},byEmail(){},authorizedLink(){}};
-  const direct={...options,persistence,hash:async()=> 'digest',hooks:{afterConfirm(){throw new Error('veto');}}};
-  assert.throws(()=>createEmailLinkLifecycle(direct),/invalid_confirmation_hooks/,'a veto without revocation authority refuses construction');
-  assert.throws(()=>createEmailLinkLifecycle({...direct,afterConfirm:async(_request,value)=>value}),/invalid_confirmation_hooks/,'a wrapper cannot silently replace a supplied veto');
-  for(const redirectUri of ['https://foreign.example/callback','https://user:pass@app.example/callback',ORIGIN+'/callback?q=1',ORIGIN+'/callback#hash',ORIGIN+'/auth/oidc/incumbent/start',ORIGIN+'/auth/owner-claim',ORIGIN+'/auth/dev/enter',ORIGIN+'/__dev/personas',ORIGIN+'/__dev/key']) {
-    assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[{...provider,redirectUri}]}}),/configuration/);
-  }
-  assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[provider,{...provider,id:'other'}]}}),/configuration/);
-  const oidc=createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[provider]}});
-  assert.equal(await createOidcHandler(oidc)(new Request(ORIGIN+'/unconfigured/callback')),null);
-  const r=await runtime(t,setup({native:{noLocal:true,noSettings:true}}));const cookie=await login(r);
-  for(const [path,input] of [['/auth/bootstrap',{}],['/auth/invite',{email:'x@example.com',role:'owner'}],['/auth/operator/role',{operatorId:'native-contact',role:'owner'}],['/auth/setup-complete',{}],['/auth/settings/identity',{idpSignIn:true}],['/test/password',{operatorId:'native-contact'}]])assert.equal((await post(r,path,input,cookie)).status,501,path);
-  const local=await runtime(t,setup({providers:[],fakes:[],core:{local:true,origin:'http://127.0.0.1:8787',review:{enabled:true,operatorEmail:'contact@example.com'}}}));
-  const review=await post(local,'/auth/review-session');assert.equal(review.status,303);assert.equal((await local.call('/auth/session',{cookie:local.session(review)})).status,200);
-  await local.db.prepare("INSERT INTO domains VALUES('example.com','incumbent')").run();assert.equal((await post(local,'/auth/review-session')).status,403);
-  const custom=await runtime(t,setup({native:{ownerRole:'workspace-owner'},providers:[],fakes:[],hooks:{reviewFor:'owner@example.com',returnTo:'https://foreign.example/steal'}}));
-  await custom.db.prepare("UPDATE people SET role='workspace-owner' WHERE id='native-owner'").run();
-  await custom.db.prepare("INSERT INTO domains VALUES('example.com','incumbent')").run();
-  const customReply=await post(custom,'/auth/confirm',{token:await email(custom)});assert.equal(customReply.headers.get('location'),'/app','hook return remains same-origin');const customCookie=custom.session(customReply);const nativeOwner=await (await custom.call('/auth/session',{cookie:customCookie})).json();assert.equal(nativeOwner.operator.role,'workspace-owner');
-  const bootstrap=await runtime(t,setup({native:{bootstrap:true},providers:[],fakes:[]}));await bootstrap.db.prepare('DELETE FROM people').run();await bootstrap.db.prepare('UPDATE settings SET first_setup=1,idp_sign_in=0').run();
-  const claims=await Promise.all([post(bootstrap,'/auth/bootstrap',{token:SETUP,displayName:'Owner'}),post(bootstrap,'/auth/bootstrap',{token:SETUP,displayName:'Owner'})]);assert.deepEqual(claims.map(r=>r.status).sort(),[303,409]);assert.equal(await count(bootstrap,'people'),1);assert.equal(await count(bootstrap,'sessions'),1);
-  assert.deepEqual(await bootstrap.db.prepare('SELECT first_setup,idp_sign_in FROM settings').first(),{first_setup:0,idp_sign_in:0},'bootstrap without setup provenance closes eligibility');
-  await noOa(r);
-});
+
+
 
 test('native linked Auth uses selected native owner roles and local proof for settings, approval and unlink, and logout/fence reach native sessions',async t=>{
   for(const ownerRole of ['owner','workspace-owner']) await t.test(ownerRole,async t=>{
