@@ -62,7 +62,11 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   if(legacyRecovery)await nativeWorker(store,'legacy-preflight',input,signal);
   if(direction==='import' && !legacyRecovery) {
    try { await emptyNativePreflight(input); }
-   catch(error) { if(error instanceof PortabilityError)throw refuse(`Local restore refused (${error.code}).`);throw error; }
+   catch(error) {
+    if(error instanceof PortabilityError && error.code.startsWith('target_not_empty:'))throw new RerError('restore_refused',occupiedRefusal(input,'target_not_empty',error.code.slice(error.code.indexOf(':')+1)),4);
+    if(error instanceof PortabilityError)throw refuse(`Local restore refused (${error.code}).`);
+    throw error;
+   }
   }
   const {nativeApply}=await nativeWorker(store,'migration-preflight',input,signal);
   // Local migrations need no provider account: wrangler runs without credentials.
@@ -101,8 +105,12 @@ async function nativeWorker(store,direction,input,signal) {
    : receipt.safety ? `Restore refused (${receipt.reason}): safety normalization for ${receipt.safety} violates the declared import policy.`
    : receipt.reason?.startsWith('migration_ledger:') ? ledgerRefusal(receipt)
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`
-   : receipt.occupied ? `Restore refused (${receipt.reason}): ${receipt.reason === 'bucket_not_empty' ? `storage bucket ${receipt.occupied} in this installation already holds files` : `table ${receipt.occupied} in this installation already holds rows its migrations did not insert`}, and a restore only goes into an empty installation. To replace this installation's data with the archive, keep a copy with rer export --output exports/before-restore.rer, then run rer reset --yes and rer import --input ${relative(input.root, input.path)} --yes again.`
+   : receipt.occupied ? occupiedRefusal(input,receipt.reason,receipt.occupied)
    : `The portability module refused or failed the archive operation (${receipt.reason ?? 'incomplete'}${receipt.native ? `: ${receipt.native.class}${receipt.native.code && receipt.native.code !== receipt.reason ? `, code ${receipt.native.code}` : ''}` : ''}).${receipt.native && receipt.exitCode === 1 ? ' Run the same command again; it starts over.' : ''}`, receipt.exitCode ?? 1);
   delete receipt.ok;
   return receipt;
+}
+
+function occupiedRefusal(input,reason,occupied) {
+ return `Restore refused (${reason}): ${reason === 'bucket_not_empty' ? `storage bucket ${occupied} in this installation already holds files` : `table ${occupied} in this installation already holds rows its migrations did not insert`}, and a restore only goes into an empty installation. To replace this installation's data with the archive, keep a copy with rer export --output exports/before-restore.rer, then run rer reset --yes and rer import --input ${relative(input.root, input.path)} --yes again.`;
 }
