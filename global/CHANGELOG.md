@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Compare internal schema prefixes literally during Managed data intake, retain indexes and triggers on excluded tables in archive accounting, and check native schema compatibility in scratch storage before opening the destination.
+
 - Refuse unknown source tables during Managed data intake even when row policy excludes them; account excluded tables only against native schema or a matching retirement in destination migrations.
 
 - **Import the Platform data download natively.** The Managed data ZIP previously failed as a damaged archive. The reference adapter now opts into a bounded ZIP intake that stages the source in isolation, translates its Platform migration ledger and uses the existing empty-install restore. Malformed downloads report a specific refusal before destination data changes. Adapters can opt in with `managedData: true` or wrap their native restore with `withManagedDataImport`.

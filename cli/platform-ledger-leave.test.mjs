@@ -40,6 +40,7 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  assert.equal(records[0].migrationLedger.origin,'rer_migrations');
  assert.ok(records[0].migrations.every(name=>!name.startsWith('delivered-')),'entries are named by the checkout files that have their hashes');
  assert.ok(!records[0].tables.some(table=>table.name==='rer_migrations'));
+ for(const name of ['synthetic_excluded_present_id','synthetic_facts_legacy'])assert.ok(records[0].schemaObjects.some(object=>object.name===name),'excluded-table schema object remains in the archive: '+name);
  await copyFile(join(source.root,'exports/managed.rer'),join(target.root,'exports/managed.rer'));
  const restored=(await target.run(['import','--input','exports/managed.rer','--yes'])).at(-1);
  assert.deepEqual((await target.data('SELECT id,total FROM computed_entries'))[0].results,[{id:'synthetic-base-1',total:375}]);
@@ -58,7 +59,12 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  const central=compressed.readUInt32LE(compressed.length-6);compressed.writeUInt16LE(8,central+10);
  const ratio=Buffer.from(zip);ratio.writeUInt32LE(1,central+20);ratio.writeUInt32LE(managedDataLimits.entryBytes+1,central+24);
  const withSQL = (suffix, rewrite = sql => sql) => {
-  const changed=entries.map(([name,value])=>[name,name==='data/d1/DB.sql'?Buffer.from(rewrite(value.toString())+suffix):value]);
+  const changed=entries.map(([name,value])=>{
+   if(name!=='data/d1/DB.sql')return [name,value];
+   const original=value.toString(),changed=rewrite(original)+suffix;
+   assert.notEqual(changed,original,'synthetic refusal must change the source SQL');
+   return [name,Buffer.from(changed)];
+  });
   const sql=changed.find(([name])=>name==='data/d1/DB.sql')[1];
   for(const entry of changed)if(entry[0]==='manifest.json'||entry[0]==='data/d1/DB.json') {
    const metadata=JSON.parse(entry[1]),database=entry[0]==='manifest.json'?metadata.databases[0]:metadata;
@@ -66,7 +72,23 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
   }
   return managedZip(changed);
  };
- for(const [name,bytes,reason] of [
+ const schemaCases=[];
+ for(const stem of ['acf_unknown_', 'synthetic_cf_', 'synthetic%_', 'sqliteX_']) {
+  schemaCases.push(
+   [stem+'index',withSQL(`\nCREATE INDEX "${stem}index" ON computed_entries(label);`),'schema_object_unknown'],
+   [stem+'trigger',withSQL(`\nCREATE TRIGGER "${stem}trigger" AFTER INSERT ON computed_entries BEGIN SELECT 1; END;`),'schema_object_unknown'],
+   [stem+'table',withSQL(`\nCREATE TABLE "${stem}table"(id TEXT);`),'schema_table_missing'],
+   [stem+'view',withSQL(`\nCREATE VIEW "${stem}view" AS SELECT id FROM computed_entries;`),'schema_object_unknown'],
+  );
+ }
+ schemaCases.push(
+  ['excluded-index',withSQL('\nCREATE INDEX synthetic_excluded_index ON synthetic_excluded_present(id);'),'schema_object_unknown'],
+  ['excluded-trigger',withSQL('\nCREATE TRIGGER synthetic_excluded_trigger AFTER INSERT ON synthetic_excluded_present BEGIN SELECT 1; END;'),'schema_object_unknown'],
+  ['replacement-index',withSQL('',sql=>sql.replace(/^CREATE INDEX computed_entries_total ON computed_entries\(total\);$/m,'CREATE INDEX computed_entries_total ON computed_entries(label);')),'schema_object_unaccounted_replacement'],
+  ['missing-native-index',withSQL('',sql=>sql.replace(/^CREATE INDEX computed_entries_total ON computed_entries\(total\);$/m,'')),'schema_incompatible'],
+  ['replacement-table',withSQL('',sql=>sql.replace(/^(\s*quantity )INTEGER( NOT NULL)/m,'$1TEXT$2')),'schema_incompatible'],
+ );
+ const refusalCases=[
   ['wrong-kind',managedZip(wrongKind),'wrong_kind'],
   ['wrong-version',managedZip(wrongVersion),'unsupported_version'],
   ['malformed',managedZip(malformed),'invalid_manifest'],
@@ -83,10 +105,13 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
   ['unknown-object',withSQL('\nCREATE TRIGGER synthetic_facts_unknown AFTER INSERT ON synthetic_facts BEGIN SELECT 1; END;'),'schema_object_unknown'],
   ['missing-table',withSQL('\nCREATE TABLE synthetic_portable(id TEXT);'),'schema_table_missing'],
   ['missing-excluded-table',withSQL('\nCREATE TABLE synthetic_excluded_unknown(id TEXT);'),'schema_table_missing'],
-  ['retired-excluded-wrong-schema',withSQL('',sql=>sql.replace('CREATE TABLE synthetic_excluded_retired (id TEXT PRIMARY KEY)', 'CREATE TABLE synthetic_excluded_retired (id BLOB PRIMARY KEY)')),'schema_table_missing'],
- ]) {
+  ['retired-excluded-wrong-schema',withSQL('',sql=>sql.replace(/^CREATE TABLE synthetic_excluded_retired \(id TEXT PRIMARY KEY\);$/m, 'CREATE TABLE synthetic_excluded_retired (id BLOB PRIMARY KEY);')),'schema_table_missing'],
+  ...schemaCases,
+ ];
+ for(const [name,bytes,reason] of refusalCases) {
   await writeFile(input,bytes,{mode:0o600});
-  const refusal=await zipTarget.text(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'],4);
+  t.diagnostic('Refusal case: '+name);
+  const refusal=await zipTarget.text(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'],4).catch(error=>{error.message=name+': '+error.message;throw error;});
   assert.match(refusal.stderr,new RegExp('managed_data_'+reason),name);
   await assert.rejects(stat(join(zipTarget.root,'.wrangler/state')),{code:'ENOENT'},name+': target untouched');
  }
@@ -101,15 +126,22 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  await zipTarget.run(['export','--output','exports/empty.rer']);
  const databaseBytes=async()=>{
   const directory=join(zipTarget.root,'.wrangler/state');
-  const files=(await readdir(directory,{recursive:true})).filter(name=>name.endsWith('.sqlite')||name.endsWith('.sqlite-wal')).sort();
-  return Promise.all(files.map(async name=>[name,await readFile(join(directory,name))]));
+  const files=(await readdir(directory,{recursive:true})).filter(name=>/\.sqlite(?:-wal|-shm)?$/.test(name)).sort();
+  return Promise.all(files.map(async name=>[name,createHash('sha256').update(await readFile(join(directory,name))).digest('hex')]));
  };
  const beforeRefusals=await databaseBytes();
  assert.ok(beforeRefusals.length>0);
- await writeFile(input,withSQL('\nCREATE TABLE synthetic_excluded_unknown(id TEXT);'),{mode:0o600});
- const unknownExcluded=await zipTarget.text(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'],4);
- assert.match(unknownExcluded.stderr,/managed_data_schema_table_missing/);
- assert.deepEqual(await databaseBytes(),beforeRefusals,'unknown excluded table refusal leaves existing database bytes unchanged');
+ for(const [name,bytes,reason] of refusalCases.filter(([, , reason])=>reason.startsWith('schema_'))) {
+  await writeFile(input,bytes,{mode:0o600});
+  const refused=await zipTarget.text(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'],4);
+  assert.match(refused.stderr,new RegExp('managed_data_'+reason),name);
+  assert.deepEqual(await databaseBytes(),beforeRefusals,name+': existing database and sidecars retain their hashes');
+ }
+ // D1 reserves the literal prefix: explicit source DDL using it is denied
+ // by its authorizer. Its own internal table exists in every staging sandbox
+ // and must stay exempt from source accounting through the public ZIP door.
+ const internals=(await source.data("SELECT name FROM sqlite_master WHERE sql IS NOT NULL AND substr(lower(name),1,4)='_cf_' ORDER BY name"))[0].results;
+ assert.ok(internals.length>0,'the actual source contains literal internal names');
  await writeFile(input,zip,{mode:0o600});
  const imported=(await zipTarget.run(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'])).at(-1);
  assert.equal(imported.ok,true);
@@ -121,9 +153,11 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  assert.deepEqual((await zipTarget.data("SELECT name FROM sqlite_master WHERE name='synthetic_excluded_retired'"))[0].results,[],'retired table is never recreated');
  assert.ok(imported.managedSchema.accounted.some(group=>group.type==='trigger' && group.disposition==='retired' && group.migration==='1000_retire_synthetic.sql' && group.count===1));
  assert.ok(!JSON.stringify(imported.managedSchema).includes('synthetic_facts_legacy'));
+ assert.deepEqual((await zipTarget.data("SELECT name FROM sqlite_master WHERE sql IS NOT NULL AND substr(lower(name),1,4)='_cf_' ORDER BY name"))[0].results,internals,'only native engine internals remain');
+ t.diagnostic('Literal internal prefix exempt through public ZIP import: '+internals.map(row=>row.name).join(', '));
  t.diagnostic('Managed schema inventory: '+JSON.stringify(imported.managedSchema.inventory));
  t.diagnostic('Managed schema accounting: '+JSON.stringify(imported.managedSchema.accounted));
- t.diagnostic('Refusal matrix: 17 ZIP cases plus oversized file, confirmation, initialized unknown excluded and occupied destination');
+ t.diagnostic('Refusal matrix: '+refusalCases.length+' ZIP cases on absent destination; '+refusalCases.filter(([, , reason])=>reason.startsWith('schema_')).length+' schema cases on initialized destination; literal internal objects exempt; oversized file, confirmation and occupied destination also checked');
  const facts='SELECT * FROM synthetic_facts ORDER BY id';
  assert.deepEqual((await zipTarget.data(facts))[0].results,(await source.data(facts))[0].results,'database-bound payloads preserve policy-excluded facts');
  assert.ok(!records[0].tables.some(table=>table.name==='synthetic_facts'));
@@ -138,7 +172,7 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  const occupied=await zipTarget.text(['import','--input','exports/managed.zip','--yes'],4);
  assert.match(occupied.stderr,/target_not_empty/);
  const afterOccupied=await databaseBytes();
- assert.ok(afterOccupied.length===beforeOccupied.length && afterOccupied.every(([name,bytes],i)=>name===beforeOccupied[i][0] && bytes.equals(beforeOccupied[i][1])),'occupied refusal leaves database bytes unchanged');
+ assert.ok(afterOccupied.length===beforeOccupied.length && afterOccupied.every(([name,bytes],i)=>name===beforeOccupied[i][0] && bytes===beforeOccupied[i][1]),'occupied refusal leaves database bytes unchanged');
  assert.deepEqual((await zipTarget.data('SELECT id,total FROM computed_entries'))[0].results,[{id:'synthetic-base-1',total:375}]);
  await zipTarget.data("UPDATE computed_entries SET quantity=4 WHERE id='synthetic-base-1'");
  assert.deepEqual((await zipTarget.data('SELECT id,label,total FROM computed_entries ORDER BY id'))[0].results,[

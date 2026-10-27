@@ -6,11 +6,11 @@ import { RerError } from './errors.mjs';
 import { randomUUID } from 'node:crypto';
 import { isManagedDataZip, readManagedDataZip } from './managed-data-zip.mjs';
 import { loadPolicy } from './portability-policy.mjs';
-import { managedSchema } from './managed-data-schema.mjs';
+import { managedSchema, managedCompatibility } from './managed-data-schema.mjs';
 import { mapMigrationLedger, appliedMigrations, platformMigrationDeclaration, migrationInventory } from './portability-migrations.mjs';
 import { createPortability, PortabilityError } from '../modules/portability/index.mjs';
 import { readLedger } from '../modules/portability/ledgers.mjs';
-import { exportArchive } from '../modules/portability/files.mjs';
+import { exportArchive, fileRecords } from '../modules/portability/files.mjs';
 import { portabilityPlan, ensurePortabilitySchema } from '../modules/container/portability-schema.mjs';
 import { splitStatements } from '../modules/portability/sql-text.mjs';
 import { sqliteTokens } from '../modules/portability/sqlite-tokens.mjs';
@@ -90,12 +90,18 @@ async function intake(context, declaration, restore) {
   }
   const boundBuckets = Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]]));
   policy = await loadPolicy(root, inputPolicy, policyModule, { db, buckets: boundBuckets });
-  const schema = await managedSchema(db, await migrationInventory(root, binding, platformMigrationDeclaration(platformMigrations), unstable_splitSqlQuery), policy, ledger);
+  const migrationDeclaration = platformMigrationDeclaration(platformMigrations);
+  const plan = await migrationInventory(root, binding, migrationDeclaration, unstable_splitSqlQuery);
+  const schema = await managedSchema(db, plan, policy, ledger);
   await ensurePortabilitySchema(db, await portabilityPlan(unstable_splitSqlQuery));
   const migrations = async () => migrationReplay(await appliedMigrations(root, db, binding, platformMigrationDeclaration(platformMigrations), unstable_splitSqlQuery), policy, platformMigrationDeclaration(platformMigrations));
   const service = await createPortability({ db, buckets: boundBuckets, policy, migrations });
   const path = join(directory, 'native.rer');
   await exportArchive(service, path, transient);
+  for await (const record of fileRecords(path)) if (record.kind === 'manifest') {
+   await managedCompatibility(plan, policy, record, migrationDeclaration, boundBuckets);
+   break;
+  }
   // Native import rechecks the complete archive and keeps all destination
   // emptiness, migration, erasure, row-safety and atomic publication checks.
   const result = await restore({ ...context, path });

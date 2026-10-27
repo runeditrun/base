@@ -379,8 +379,9 @@ source identity, job ids and boundaries do not affect equivalence.
 
 Schema identity covers table definitions (including constraints and generated
 expressions), explicit indexes (including uniqueness and partial predicates),
-views and triggers. Indexes and triggers on excluded tables are excluded with
-their tables, including platform bookkeeping tables. The complete additional
+views and triggers. Row exclusions do not omit indexes and triggers attached
+to excluded tables, including platform bookkeeping tables. Names with the literal
+internal prefixes `sqlite_` and `_cf_` remain exempt. The complete additional
 definitions travel in `schemaObjects`. A single SQLite lexer reads the original
 SQL before removing trivia. Identity records each token's class and canonical
 value, plus a deterministic spelling: a single space separates neighbours
@@ -1054,7 +1055,11 @@ workerd D1 sandbox. The existing exporter preserves its erasure journal, exclude
 identity and secret data, maps migration identities using the same hash matching
 as native Platform-ledger archives, and emits a verified native archive. Native
 restore still checks emptiness, migration compatibility, erasure and row safety.
-No source SQL runs against the destination.
+No source SQL runs against the destination. The intake accounts every non-internal
+source table, index, trigger and view against native schema or a named retirement
+in destination migrations, including objects attached to excluded tables. Internal
+prefixes are compared literally. A scratch native import preflight checks the
+projected archive before native restore can open the destination.
 
 The current intake supports one database and declared buckets, local Workers
 transport, stored ZIP members, at most 10,000 entries and statements, a 128 MiB

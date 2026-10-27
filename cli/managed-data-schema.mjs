@@ -1,13 +1,15 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
-import { all, insist } from '../modules/portability/storage.mjs';
+import { all, insist, PortabilityError } from '../modules/portability/storage.mjs';
 import { excludedTable } from '../modules/portability/catalogue.mjs';
 import { schemaSQL } from '../modules/portability/schema-identity.mjs';
 import { ensurePortabilitySchema, portabilityPlan } from '../modules/container/portability-schema.mjs';
 import { ensureImportLeases } from '../modules/portability/import-lease.mjs';
 import { splitStatements } from '../modules/portability/sql-text.mjs';
+import { createPortability } from '../modules/portability/index.mjs';
+import { migrationReplay } from '../modules/portability/migration-history.mjs';
 
-const query = "SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'";
+const query = "SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL AND substr(lower(name), 1, 7) <> 'sqlite_' AND substr(lower(name), 1, 4) <> '_cf_'";
 const key = object => JSON.stringify([object.type, object.name]);
 const namesHash = names => createHash('sha256').update(JSON.stringify(names.sort())).digest('hex');
 
@@ -37,19 +39,7 @@ export async function managedSchema(db, plan, policy, ledger) {
   }
   // Native restore also installs runtime-owned bookkeeping. Derive it with
   // the same destination helpers, never a source name or a policy wildcard.
-  const native = {
-   prepare(sql) {
-    const statement = scratch.prepare(sql);
-    let values = [];
-    return {
-     bind(...args) { values = args; return this; },
-     async first() { return statement.get(...values) ?? null; },
-     async all() { return { results: statement.all(...values) }; },
-     async run() { return statement.run(...values); },
-    };
-   },
-   async batch(statements) { return Promise.all(statements.map(statement => statement.run())); },
-  };
+  const native = nativeDatabase(scratch);
   await ensurePortabilitySchema(native, await portabilityPlan(splitStatements));
   await ensureImportLeases(native);
   previous = new Map((await all(native, query)).map(object => [key(object), object]));
@@ -87,4 +77,38 @@ export async function managedSchema(db, plan, policy, ledger) {
   }
   return { inventory, accounted: [...groups.values()].map(({ names, ...group }) => ({ ...group, count: names.length, namesSha256: namesHash(names) })) };
  } finally { scratch.close(); }
+}
+
+// Use the native import checker against a disposable destination, including its
+// migration placement and table-definition checks. The real destination has
+// not been opened yet. Source schema accounting above must succeed first.
+export async function managedCompatibility(plan, inputPolicy, manifest, declaration, buckets) {
+ const scratch = new DatabaseSync(':memory:');
+ try {
+  for (const migration of plan) for (const sql of migration.statements) scratch.exec(sql);
+  const db = nativeDatabase(scratch);
+  await ensurePortabilitySchema(db, await portabilityPlan(splitStatements));
+  scratch.exec('CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+  for (const migration of plan) scratch.prepare('INSERT INTO d1_migrations(name) VALUES(?)').run(migration.name);
+  const service = await createPortability({ db, buckets, policy: inputPolicy, migrations: async () => migrationReplay(plan, inputPolicy, declaration) });
+  await service.imports.create(manifest);
+ } catch (error) {
+  if (!(error instanceof PortabilityError)) throw error;
+  throw new PortabilityError('managed_data_schema_incompatible', 409);
+ } finally { scratch.close(); }
+}
+
+function nativeDatabase(scratch) {
+ return {
+  prepare(sql) {
+   let values = [];
+   return {
+    bind(...args) { values = args; return this; },
+    async first() { return scratch.prepare(sql).get(...values) ?? null; },
+    async all() { return { results: scratch.prepare(sql).all(...values) }; },
+    async run() { return scratch.prepare(sql).run(...values); },
+   };
+  },
+  async batch(statements) { return Promise.all(statements.map(statement => statement.run())); },
+ };
 }

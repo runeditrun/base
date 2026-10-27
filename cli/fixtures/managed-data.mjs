@@ -13,6 +13,7 @@ BEGIN
  UPDATE computed_entries SET label='synthetic-base-6' WHERE id=NEW.id;
 END;
 CREATE TABLE synthetic_excluded_present (id TEXT PRIMARY KEY);
+CREATE INDEX synthetic_excluded_present_id ON synthetic_excluded_present(id);
 CREATE TABLE synthetic_excluded_retired (id TEXT PRIMARY KEY);
 CREATE TABLE synthetic_facts (id TEXT PRIMARY KEY, fact TEXT NOT NULL);
 CREATE TRIGGER synthetic_facts_legacy AFTER INSERT ON synthetic_facts BEGIN SELECT 1; END;
@@ -45,7 +46,7 @@ export function managedZip(entries) {
 // are read through its database command, in the same SQL shape as the producer.
 export async function managedEntries(source) {
  const query = async sql => (await localD1(source.root, sql))[0].results;
- const schema = await query("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name");
+ const schema = await query("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND substr(lower(name), 1, 7) <> 'sqlite_' AND substr(lower(name), 1, 4) <> '_cf_' ORDER BY name");
  let sql = 'PRAGMA defer_foreign_keys=ON;\n';
  for (const table of schema.filter(row => row.type === 'table')) {
   sql += table.sql + ';\n';
