@@ -17,7 +17,7 @@ test("setup consumers bind identical committed canonical manifest bytes and thei
    await assert.rejects(loadSetupManifest(root,{manifestFile:'rer-setup.json'}),/rer-setup.json.*canonical.*JSON.stringify/);
    await writeFile(join(root,'other.json'),JSON.stringify(value));assert.deepEqual((await loadSetupManifest(root,{manifestFile:'other.json'})).manifest,value);
   });
-  
+
   await step('default-seed installer and package bind identical committed manifest bytes',async t=>{
    const scratch=await mkdtemp(join(tmpdir(),'cross-consumer-'));t.after(()=>rm(scratch,{recursive:true,force:true}));
    const root=join(scratch,'default-seed');
@@ -35,5 +35,3 @@ test("setup consumers bind identical committed canonical manifest bytes and thei
    assert.equal(JSON.parse(await readFile(output.project)).setup.sha256,createHash('sha256').update(bytes).digest('hex'));
   });
 })
-
-

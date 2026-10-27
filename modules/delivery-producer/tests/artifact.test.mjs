@@ -68,7 +68,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     assert.equal(data.assets.find(a => a.path === '/picture.png').contentType, 'image/png');
     assert.ok(!(await readdir(dirname(first))).includes('release-provenance.json'));
   });
-  
+
   await step('refuses missing inputs, missing main, duplicate modules and malformed declarations', async t => {
     const root = await fixture(t);
     await assert.rejects(build(root, { workerDirectory: 'absent' }), /ENOENT/);
@@ -77,7 +77,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     for (const entry of [{ name: 'index.js', path: 'dist/server/index.js', type: 'esm' }, { name: 'extra.js', path: 'dist/server/index.js', type: 'unknown' }, { name: 'extra.js', path: 'dist/server/index.js', type: 'esm', unexpected: true }, { name: 'extra.js', path: 'dist/server/wrangler.json', type: 'text' }]) await assert.rejects(build(root, { additionalModules: [entry] }), /Duplicate|Invalid additional|not deployable/);
     await assert.rejects(build(root, { additionalModules: [{ name: 'extra.js', path: 'absent.js', type: 'esm' }] }), /ENOENT/);
   });
-  
+
   await step('refuses private and reserved files at every nesting level', async t => {
     const root = await fixture(t);
     for (const path of ['.env', '.env.production', '.dev.vars', '.npmrc', '.yarnrc.yml', '.netrc', '_netrc', '.pypirc', '.git-credentials', '.git/config', '.seed/state', '.wrangler/state', 'node_modules/private.js', 'owner.json', 'credentials.json', 'providers.json', 'secret.pem', 'secret.key', 'release-provenance.json', 'rer-broker-entry.js']) {
@@ -92,7 +92,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     await assert.rejects(build(root, { additionalModules: [{ name: 'data.txt', type: 'text', path: 'private/.env' }] }), /Private or reserved/);
     for (const name of ['payload/module.js', 'rer-broker-entry.js', '../escape.js', '/absolute.js', 'a//b.js', 'a\\b.js', 'a"b.js', 'a\nb.js']) await assert.rejects(build(root, { mainModule: name }), /Invalid|Private|Reserved/);
   });
-  
+
   await step('rejects file, directory, ancestor and excluded-file symlinks', async t => {
     const root = await fixture(t);
     for (const [link, target] of [['dist/server/link.js', 'index.js'], ['dist/server/index.map', 'index.js'], ['dist/server/folder', '../client'], ['dist/client/link', '../server/index.js']]) {
@@ -106,7 +106,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     await symlink(root, join(root, 'root-link'));
     await assert.rejects(build(join(root, 'root-link')), /real directory/);
   });
-  
+
   await step('output freshness, traversal and separation preserve owner files', async t => {
     const root = await fixture(t);
     await put(root, 'occupied/owner.txt', 'keep');
@@ -119,7 +119,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     await assert.rejects(build(root), /fresh/);
     assert.deepEqual(await snapshot(dirname(first)), before);
   });
-  
+
   await step('enforces inclusive entry/count/total bounds and rejects oversized real inputs before output', async t => {
     const entries = Array.from({ length: 4 }, () => ({ size: MAX_ARTIFACT_ENTRY_BYTES }));
     assert.equal(entries.reduce((n, e) => n + e.size, 0), MAX_ARTIFACT_PAYLOAD_BYTES);
@@ -133,7 +133,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     await assert.rejects(build(root), /entry exceeds/);
     await assert.rejects(lstat(join(root, 'delivery-artifact')), { code: 'ENOENT' });
   });
-  
+
   await step('rejects manifest overflow using real SQL and enforces total/count limits on real files', async t => {
     const root = await fixture(t);
     await put(root, 'dist/server/wrangler.json', JSON.stringify({ compatibility_date: '2026-09-01', d1_databases: [{ binding: 'DB', database_name: 'test-database', database_id: 'test-only-id', migrations_dir: '../../migrations' }] }));
@@ -152,7 +152,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     for (let i = 0; i < MAX_ARTIFACT_ENTRIES; i++) await put(root, `dist/client/file-${i}.txt`, '');
     await assert.rejects(build(root), /too many/);
   });
-  
+
   await step('supports explicitly typed binary modules and custom build locations', async t => {
     const root = await fixture(t);
     await put(root, 'worker/entry.cjs', 'module.exports = {};');
@@ -163,7 +163,7 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
     assert.deepEqual(data.modules.map(m => m.type), ['buffer', 'commonjs']);
     assert.equal(data.assets[0].contentType, 'application/octet-stream');
   });
-  
+
   ;
 })
 

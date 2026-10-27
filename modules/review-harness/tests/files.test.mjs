@@ -19,7 +19,7 @@ test("private evidence writes preserve mode and atomically replace previous byte
     assert.equal((await stat(directory)).mode & 0o777, 0o700);
     assert.equal((await stat(join(directory, '..'))).mode & 0o777, 0o700);
   });
-  
+
   await step('later evidence writes atomically replace old files with private bytes', async t => {
     const root = await temporary(t);
     const file = join(root, 'evidence');

@@ -37,7 +37,7 @@ test("development AI calls preserve deterministic answers, captures, protocol li
     await f.restart();
     assert.deepEqual(await (await f.call('/__dev/ai')).json(), before);
   });
-  
+
   await step('dev embeddings depend on each input and preserve batch order', async t => {
     const f = await runtime(t), path = '/__dev/ai/v1/embeddings';
     const embed = async input => (await (await f.call(path, { body: { model: 'embedding', input, dimensions: 12 } })).json()).data;
@@ -46,7 +46,7 @@ test("development AI calls preserve deterministic answers, captures, protocol li
     assert.notDeepEqual(batch[0].embedding, batch[1].embedding);
     assert.ok(batch.every(x => x.embedding.length === 12 && x.embedding.every(Number.isFinite)));
   });
-  
+
   await step('schema output and forced tools fail visibly and enter the outbox', async t => {
     const f = await runtime(t);
     for (const [path, body] of [
@@ -59,7 +59,7 @@ test("development AI calls preserve deterministic answers, captures, protocol li
     }
     assert.ok((await (await f.call('/__dev/ai')).json()).every(x => x.error?.code === 'dev_fake_cannot_answer' && !x.response));
   });
-  
+
   await step('every dev HTTP surface and product dev call needs the key, including behind a forwarding proxy', async t => {
     const f = await runtime(t), target = await f.url;
     const proxy = createServer((req, res) => {
@@ -85,7 +85,7 @@ test("development AI calls preserve deterministic answers, captures, protocol li
     const client = createDevAiClient({ enabled: true }, { request: new Request('http://127.0.0.1/app'), key: DEV_KEY, origin: 'http://127.0.0.1', local: true, outbox });
     await assert.rejects(client.chat({ model: 'test' }), error => error instanceof AiError && error.status === 404);
   });
-  
+
   await step('live dev accepts schema calls and captures only receipt metadata; scripted fake supplies exact fixtures', async t => {
     const f = await runtime(t), db = await f.db, outbox = createAiOutbox({ db });
     const key = DEV_KEY, request = new Request('http://127.0.0.1/app', { headers: { 'x-rer-dev-key': key } });
@@ -143,7 +143,7 @@ test("AI provider calls preserve wire content, cancellation, selected transport 
       assert.equal(hits, before + 1, 'redirect is refused without a second credential-bearing request');
     }
   });
-  
+
   await step('the caller aborts an in-flight provider stream without a second attempt', async t => {
     let hits = 0, disconnected;
     const closed = new Promise(resolve => { disconnected = resolve; });
@@ -156,7 +156,7 @@ test("AI provider calls preserve wire content, cancellation, selected transport 
     await assert.rejects(reader.read()); await closed;
     assert.equal(hits, 1);
   });
-  
+
   await step('AI remains off until enabled and ambiguous feature transports fail without dispatch; explicit direct features work', async () => {
     let hits = 0;
     const transport = { baseUrl: 'https://provider.example/v1', apiKey: 'fixture-key' };
@@ -174,7 +174,7 @@ test("AI provider calls preserve wire content, cancellation, selected transport 
     }
     assert.equal(urls.length, 2); assert.equal(urls[0], urls[1], 'blank optional URL is equivalent to omitted');
   });
-  
+
   await step('pinned targets cannot be silently substituted and failed sends never retry or expose provider errors', async () => {
     const config = { enabled: true, models: { baseUrl: 'https://models.example', apiKey: 'fixture-key' } };
     let hits = 0, cancelled = false;
@@ -189,12 +189,3 @@ test("AI provider calls preserve wire content, cancellation, selected transport 
     }
   });
 })
-
-
-
-
-
-
-
-
-

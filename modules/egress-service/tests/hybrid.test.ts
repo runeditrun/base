@@ -115,7 +115,7 @@ test("hybrid send preserves route selection, ownership exclusion and bounded res
       } finally { await runtime.dispose(); await Promise.all([receiver.close(), modules.cleanup(), certs.cleanup()]); }
     });
   })
-  
+
   await step('fetch send enforces head/body caps, cancels on failure, and exposes only fixed errors', async () => {
     for (const [response, code] of [
       [() => new Response('x', { headers: { huge: 'x'.repeat(RESPONSE_HEAD_LIMIT) } }), 'egress_response_head_too_large'],
@@ -136,7 +136,7 @@ test("hybrid send preserves route selection, ownership exclusion and bounded res
     assert.equal(canceled, 1); assert.equal(calls, 1);
     await assert.rejects(fetchTransport(async () => { throw new Error('secret URL provider detail'); }).send(wire()), { message: 'egress_connection_failed' });
   });
-  
+
   await step('fetch deadline cancels stalled and late response bodies without awaiting peer cancellation', async () => {
     for (const late of [false, true]) {
       let canceled = 0, calls = 0;
@@ -164,7 +164,3 @@ function fetchTransport(fetch: (url: string, init: RequestInit) => Promise<Respo
     connect() { assert.fail('no raw connection or fallback'); }, fetch,
   }, { tls, ownership, requestTimeoutMs });
 }
-
-
-
-

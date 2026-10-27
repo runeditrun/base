@@ -38,7 +38,7 @@ test("erasure graph admission and resumption preserve retained history and fence
     const source = (await db.prepare('SELECT source_identity FROM rer_portability_state').first<any>())!.source_identity;
     assert.ok(await db.prepare('SELECT 1 FROM rer_portability_journal WHERE tombstone=?').bind(await sha256(canonicalJson([source, 'files', { id: 'file' }]))).first());
   });
-  
+
   await step('resumption scrubs late audit rows for both newly reached and already deleted dependents', async t => {
     const { db, erasure } = await fixture(t, [
       'CREATE TABLE people(id TEXT PRIMARY KEY)', 'CREATE TABLE notes(id TEXT PRIMARY KEY,person_id TEXT REFERENCES people(id) ON DELETE CASCADE,body TEXT)',
@@ -85,14 +85,14 @@ test("erasure graph admission and resumption preserve retained history and fence
     assert.deepEqual(completed.blobs, { total: 2, deleted: 2 });
     assert.equal((await boundary.db.prepare('SELECT count(*) n FROM rer_erasure_scope').first<any>())!.n, 0);
   });
-  
+
   await step('rer product tables cannot bypass undeclared foreign-key admission', async t => {
     const { db, erasure } = await fixture(t, ['CREATE TABLE people(id TEXT PRIMARY KEY)', 'CREATE TABLE rer_person_invoices(id TEXT PRIMARY KEY,person_id TEXT REFERENCES people(id) ON DELETE CASCADE)', "INSERT INTO people VALUES('target')", "INSERT INTO rer_person_invoices VALUES('invoice','target')"], { entity: 'person', root: { table: 'people' } });
     for (const method of ['preview', 'start'] as const) await assert.rejects(erasure[method]('person', { id: 'target' }), { code: 'undeclared_dependent:rer_person_invoices:people' });
     assert.ok(await db.prepare("SELECT 1 FROM rer_person_invoices WHERE id='invoice'").first());
     assert.equal((await db.prepare('SELECT count(*) n FROM rer_erasure_operations').first<any>())!.n, 0);
   });
-  
+
   await step('retained exceptions refuse destructive foreign keys before changing any person', async t => {
     const { db, erasure } = await fixture(t, ['CREATE TABLE people(id TEXT PRIMARY KEY)', 'CREATE TABLE opt_outs(hash TEXT PRIMARY KEY,person_id TEXT REFERENCES people(id) ON DELETE CASCADE)', "INSERT INTO people VALUES('target'),('peer')", "INSERT INTO opt_outs VALUES('suppression','target'),('peer-suppression','peer')"], { entity: 'person', root: { table: 'people' }, retain: [{ table: 'opt_outs', reason: 'prevent re-contact' }] });
     for (const method of ['preview', 'start'] as const) await assert.rejects(erasure[method]('person', { id: 'target' }), { code: 'unsafe_retained_fk:opt_outs:people' });
@@ -114,7 +114,7 @@ test("erasure graph admission and resumption preserve retained history and fence
     await boundary.db.prepare("INSERT INTO opt_outs VALUES('suppression')").run();
     assert.equal((await boundary.erasure.deleteBlobs(pending.id)).phase, 'complete');
   });
-  
+
   await step('a value-free redacted root preserves attribution and fences its pre-erasure row', async t => {
    for (const withChild of [false, true]) {
     const sql = ['CREATE TABLE workspaces(id TEXT PRIMARY KEY)', "INSERT INTO workspaces VALUES('opaque-workspace')", 'CREATE TABLE operators(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL REFERENCES workspaces(id),email TEXT UNIQUE,name TEXT,status TEXT)', 'CREATE TABLE sessions(id TEXT PRIMARY KEY,operator_id TEXT REFERENCES operators(id) ON DELETE CASCADE)', "INSERT INTO operators VALUES('target','opaque-workspace','personal@example.test','Personal','removed'),('peer','opaque-workspace','peer@example.test','Peer','active')"];
@@ -148,7 +148,7 @@ test("erasure graph admission and resumption preserve retained history and fence
     assert.deepEqual(await destination.db.prepare("SELECT * FROM operators WHERE id='target'").first(), kept);
    }
   });
-  
+
   await step('pre-deletion policy copies surviving history once before bounded child deletion', async t => {
     const { db, erasure } = await fixture(t, ['CREATE TABLE bookings(id TEXT PRIMARY KEY)', 'CREATE TABLE history(id TEXT PRIMARY KEY,booking_id TEXT REFERENCES bookings(id) ON DELETE CASCADE,action TEXT)', 'CREATE TABLE anonymized_audit(action TEXT)', "INSERT INTO bookings VALUES('target')", "INSERT INTO history VALUES('h1','target','created'),('h2','target','moved')"], { entity: 'booking', root: { table: 'bookings' }, edges: [{ table: 'history', from: 'bookings', on: { booking_id: 'id' } }], beforeStatements: ({ db, subject }: any) => [db.prepare('INSERT INTO anonymized_audit SELECT action FROM history WHERE booking_id=?').bind(subject.id)] });
     const done = await erasure.run((await erasure.start('booking', { id: 'target' })).id, { rows: 1 });
@@ -156,9 +156,3 @@ test("erasure graph admission and resumption preserve retained history and fence
     assert.deepEqual((await db.prepare('SELECT action FROM anonymized_audit ORDER BY action').all()).results, [{ action: 'created' }, { action: 'moved' }]);
   });
 })
-
-
-
-
-
-

@@ -69,7 +69,7 @@ test("managed-mail packaging binds provider setup to declared public fields and 
     const artifact = JSON.parse(await readFile(join(root, 'delivery-artifact/app.json')));
     assert.deepEqual(artifact.deploymentSpec.mail, {providers: ['rer']});
   });
-  
+
   await step('managed mail refuses missing or public credentials and undeclared public bindings before artifact output', async t => {
     const {root, config, save, run} = await fixture(t);
     for (const name of Object.keys(publicVariables)) {
@@ -90,7 +90,7 @@ test("managed-mail packaging binds provider setup to declared public fields and 
       await assert.rejects(run('artifact', 'bad-declaration/app.json'));
     }
   });
-  
+
   await step('package and artifact commands reject setup fields that cannot supply required managed mail inputs', async t => {
     const {root, save, run} = await fixture(t);
     const mutations = [
@@ -109,8 +109,3 @@ test("managed-mail packaging binds provider setup to declared public fields and 
     }
   });
 })
-
-
-
-
-

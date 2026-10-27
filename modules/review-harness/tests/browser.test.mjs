@@ -77,7 +77,7 @@ test("browser captures record exact gate failures, preserve evidence and honour 
     assert.equal(json.includes('synthetic-url-token'), false);
     assert.equal(json.includes(syntheticSecret), false);
   });
-  
+
   await step('capture throws on a gate failure after recording evidence; expected document status is configurable', async t => {
     const runtime = await fixture(t);
     const result = await reviewed(runtime, async ({ page, capture }) => {
@@ -92,7 +92,7 @@ test("browser captures record exact gate failures, preserve evidence and honour 
     assert.deepEqual(result.report.errors, []);
     await verifyFiles(result);
   });
-  
+
   await step('keyboard is on by default; disabling it needs a recorded reason', async t => {
     const runtime = await fixture(t);
     const result = await reviewed(runtime, async ({ page, capture }) => {
@@ -103,7 +103,7 @@ test("browser captures record exact gate failures, preserve evidence and honour 
     });
     assert.equal(result.report.passed, true);
   });
-  
+
   await step('per-capture secrets are checked alongside journey secrets', async t => {
     const runtime = await fixture(t);
     const result = await reviewed(runtime, async ({ page, capture }) => {
@@ -152,7 +152,7 @@ test("browser settling awaits fonts, frames, animations, network and bounded bus
     }, { widths: [{ width: 390, height: 700 }] });
     assert.equal(result.report.passed, true);
   });
-  
+
   await step('a page that stays busy fails within the settle bound', async t => {
     const runtime = await fixture(t);
     const result = await reviewed(runtime, async ({ page, capture }) => {
@@ -164,7 +164,7 @@ test("browser settling awaits fonts, frames, animations, network and bounded bus
     assert.deepEqual(result.report.errors, []);
     assert.deepEqual(result.report.captures[0].gate.failures, ['settle']);
   });
-  
+
   await step('settle primitive waits for fonts and two real frames before returning', async t => {
     const runtime = await fixture(t);
     const result = await reviewed(runtime, async ({ page }) => {
@@ -181,7 +181,7 @@ test("browser settling awaits fonts, frames, animations, network and bounded bus
     }, { widths: [390] });
     assert.equal(result.report.passed, true);
   });
-  
+
   await step('settle primitive awaits finite animations and busy state before returning', async t => {
     const runtime = await fixture(t);
     const result = await reviewed(runtime, async ({ page }) => {
@@ -194,7 +194,7 @@ test("browser settling awaits fonts, frames, animations, network and bounded bus
     }, { widths: [390] });
     assert.equal(result.report.passed, true);
   });
-  
+
   await step('settle primitive waits for network idle before returning', async t => {
     const runtime = await fixture(t);
     const result = await reviewed(runtime, async ({ page }) => {
@@ -205,9 +205,3 @@ test("browser settling awaits fonts, frames, animations, network and bounded bus
     assert.equal(result.report.passed, true);
   });
 })
-
-
-
-
-
-

@@ -96,7 +96,7 @@ test("dependency admission retains captured provider and owner authority through
       } finally { for (const cleanup of cleanups.reverse()) await cleanup(); }
     }
   });
-  
+
   await step('pending approval retains the approving session pin through provider redemption', async t => {
     const r = await runtime(t); await r.bootstrap(); await r.link();
     const signed = await (await flow(r))(), cookie = signed.headers.get('set-cookie');
@@ -120,7 +120,7 @@ test("dependency admission retains captured provider and owner authority through
     assert.equal((await r.call('/auth/session', { cookie })).status, 401);
     assert.equal((await r.call('/auth/session', { cookie: proof })).status, 200);
   });
-  
+
   await step('owner claim retains its captured pin through token and signing-key network waits', async () => {
     for (const door of ['oidc', 'claim']) {
       const cleanups = [], r = await runtime({ after(fn) { cleanups.push(fn); } });
@@ -146,10 +146,3 @@ test("dependency admission retains captured provider and owner authority through
     }
   });
 })
-
-
-
-
-
-
-

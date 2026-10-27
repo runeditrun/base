@@ -75,7 +75,7 @@ test("owner claim admission preserves atomic ownership and refuses invalid autho
     const fresh = await mint();
     await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token: fresh } }), 409);
   });
-  
+
   await step('parallel claims commit exactly one owner, session, ledger and client rate increment', async t => {
     const app = await runtime(keys.publicKey); t.after(() => app.close());
     const token = await mint();
@@ -91,7 +91,7 @@ test("owner claim admission preserves atomic ownership and refuses invalid autho
     assert.ok(state.oa_limits.every(row => row.count === 1));
     assert.deepEqual(state.oa_auth_settings.map(({idp_sign_in,first_setup})=>({idp_sign_in,first_setup})),[{idp_sign_in:0,first_setup:0}]);
   });
-  
+
   await step('existing legacy owner cannot be claimed and changes no durable rows', async t => {
     const app = await runtime(keys.publicKey); t.after(() => app.close());
     const bootstrap = await app.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Legacy Owner' } });
@@ -99,14 +99,14 @@ test("owner claim admission preserves atomic ownership and refuses invalid autho
     const token = await mint();
     await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token } }), 409);
   });
-  
+
   await step('real SQL admission failure rolls back claim, bootstrap and deferred limits', async t => {
     const app = await runtime(keys.publicKey); t.after(() => app.close());
     await app.db.prepare("CREATE TRIGGER test_refuse_session BEFORE INSERT ON oa_sessions BEGIN SELECT RAISE(ABORT,'test_session_failure'); END").run();
     const token = await mint();
     await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token } }), 409);
   });
-  
+
   await step('auth limiter is enforced without writes when the real existing counter is exhausted', async t => {
     const app = await runtime(keys.publicKey, { ipLimit: 1 }); t.after(() => app.close());
     const wrong = await app.call('/auth/bootstrap', { method: 'POST', input: { token: 'wrong', displayName: 'Owner' } });
@@ -114,7 +114,7 @@ test("owner claim admission preserves atomic ownership and refuses invalid autho
     const token = await mint();
     await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token } }), 429);
   });
-  
+
   await step('transaction final fence rejects actual counters exceeding policy and rolls back every write', async t => {
     const app = await runtime(keys.publicKey); t.after(() => app.close());
     // Adversarial database fixture changes the real persisted count after auth's
@@ -123,17 +123,10 @@ test("owner claim admission preserves atomic ownership and refuses invalid autho
     const token = await mint();
     await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token } }), 409);
   });
-  
+
   await step('auth allow-list refusal preserves zero writes after limiter projection', async t => {
     const app = await runtime(keys.publicKey, { allowList: ['someoneelse@example.com'] }); t.after(() => app.close());
     const token = await mint();
     await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token } }), 403);
   });
 })
-
-
-
-
-
-
-

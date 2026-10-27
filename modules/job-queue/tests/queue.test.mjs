@@ -47,7 +47,7 @@ test("queue admission retains live leases, priority and requests until resources
       await Promise.allSettled(jobs);
     }
   });
-  
+
   await step('resource recovery admits a waiting real command without a default give-up', async t => {
     let load = 50;
     const { directory, queue } = await setup(t, { loadThreshold: 36, sampler: () => ({ load, availableMemoryBytes: 1024 ** 4 }) });
@@ -69,7 +69,7 @@ test("queue admission retains live leases, priority and requests until resources
       assert.deepEqual((await ledger.read()).running, []);
     } finally { load = 36; await writeFile(release, 'go'); await pending; }
   });
-  
+
   await step('AbortSignal cancels a queued job and releases its request', async t => {
     const { directory, queue } = await setup(t, { loadThreshold: 36, sampler: () => ({ load: 90, availableMemoryBytes: 1024 ** 4 }) });
     const ledger = recordedState(directory);
@@ -84,7 +84,7 @@ test("queue admission retains live leases, priority and requests until resources
       assert.deepEqual(cancelled.queued, []); assert.deepEqual(cancelled.running, []);
     } finally { controller.abort(); await pending; }
   });
-  
+
   await step('a waiting job keeps waiting when the occupying owner is slow to answer its identity probe, and is admitted once the slot frees', async t => {
     const { directory, queue } = await setup(t);
     // The first probe is never answered (a busy owner); later ones are.
@@ -97,7 +97,7 @@ test("queue admission retains live leases, priority and requests until resources
     try { await transaction(directory, releaser.info, state => { state.running = []; }); } finally { await releaser.close(); }
     assert.equal((await pending).code, 0);
   });
-  
+
   await step('a probe that proves the occupying owner gone frees the slot for the waiting job', async t => {
     const { directory, queue } = await setup(t);
     await occupiedBy(t, directory, (connection, token) => connection.end(`not-${token}`));
@@ -124,7 +124,7 @@ test("lease identity distinguishes dead or recycled processes across nonce and t
     assert.deepEqual(reclaimed.running, []); assert.deepEqual(reclaimed.queued, []);
     assert.ok(await processInfo(process.pid));
   });
-  
+
   await step('lifetime nonce distinguishes a reused PID with identical macOS start timestamp', async () => {
     const prior = await identity();
     const lifetime = await identity();
@@ -134,7 +134,7 @@ test("lease identity distinguishes dead or recycled processes across nonce and t
       assert.equal(await alive({ ...lifetime.info, token: prior.info.token }), false);
     } finally { await Promise.all([prior.close(), lifetime.close()]); }
   });
-  
+
   await step('process identity is stable across sessions with different TZ settings', async () => {
     const previous = process.env.TZ;
     try {
@@ -166,7 +166,3 @@ async function occupiedBy(t, directory, answer) {
     running: [{ id: 'busy', label: 'busy', sequence: 1, priority: 'normal', owner: { ...current, pgid: process.pid, token, socket } }] });
   return { connections };
 }
-
-
-
-

@@ -21,21 +21,16 @@ test("dependency provider linking permits HTTP only for local development loopba
     assert.equal((await signIn(r)).status,303,issuer);
    }
   });
-  
+
   await step('a hosted app refuses http loopback providers; production still needs https',async t=>{
    const r=await runtime(t);
    for(const issuer of ['http://127.0.0.1:9787','http://localhost:9788','http://[::1]:9789'])assert.equal((await setup(r,issuer)).status,400,issuer);
    assert.throws(()=>createDependencies({db:r.db,origin:'https://app.example',name:'App',provider:'https://auth.example',local:true,auth:{}}),{code:'invalid_link'});
   });
-  
+
   await step('http to anything but loopback is refused even under rer dev',async t=>{
    const r=await runtime(t,{local:true});
    for(const issuer of ['http://auth.example','http://127.0.0.1.evil.example','http://192.0.2.7:9787','http://user@127.0.0.1:9787'])assert.equal((await setup(r,issuer)).status,400,issuer);
    assert.equal((await setup(r,'https://auth.example')).status,200);
   });
 })
-
-
-
-
-

@@ -76,7 +76,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
         const verified = await verifyWebhook({ body: new Uint8Array(seen.body), headers: seen.headers, key, tenant: 'installation', destinationId: 'dest-1' });
         assert.equal(verified.envelope.id, 'evt-1');
       });
-  
+
       await step('refuses non-public literals, non-HTTPS, credentials, ports and local names before any connection', async () => {
         const literal = denied.map(address => [wire({ url: literalUrl(address) }), 'egress_destination_refused'] as [unknown, string]);
         await refusedBeforeConnect([...literal,
@@ -84,7 +84,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
             'https://hooks.localhost/', 'https://printer.local/', 'https://db.internal/', 'https://x.test/', 'https://receiver.example.com./', 'ftp://receiver.example.com/', 'not a url']
             .map(u => [wire({ url: u }), 'egress_destination_refused'] as [unknown, string])]);
       });
-  
+
       await step('refuses a name whose answers include any non-public address, alone or mixed, before any connection', async () => {
         const rows: [unknown, string][] = [];
         denied.forEach((address, i) => {
@@ -100,7 +100,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
           [wire({ url: 'https://unknown.example.com/' }), 'egress_dns_failed']);
         await refusedBeforeConnect(rows);
       });
-  
+
       await step('public answers connect only to the first validated non-Cloudflare address', async () => {
         const before = edge.state.connects.length;
         const names = publicAddresses.map((address, i) => { const name = `p${i}.example.com`; edge.state.answers.set(name, [[address, '8.8.4.4']]); return name; });
@@ -111,7 +111,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
         const cloudflareCases = new Set(['2606:4700:4700::1111', '2606:4700::5efd:ffff:ffff', '2606:4700::201:5efe:1:1']);
         assert.deepEqual(edge.state.connects.slice(before), publicAddresses.map(address => cloudflareCases.has(address) ? '8.8.4.4' : address.includes(':') ? `[${address}]` : address));
       });
-  
+
       await step('a DNS answer that changes between check and connect: one resolution, socket to the first validated address', async () => {
         edge.state.answers.set('rebind.example.com', [[pinned], ['127.0.0.1']]);
         edge.state.routes.set(pinned, wrongHost.port); // any socket would do; the address is what is checked
@@ -121,7 +121,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
         assert.deepEqual(edge.state.resolutions.slice(before.resolutions), ['rebind.example.com']);
         assert.deepEqual(edge.state.connects.slice(before.connects), [pinned]);
       });
-  
+
       await step('a 302 to a refused address is returned as the response; nothing follows it', async () => {
         reply(() => 'HTTP/1.1 302 Found\r\nLocation: https://169.254.169.254/latest/meta-data\r\nContent-Length: 0\r\n\r\n');
         const before = edge.state.connects.length, requests = receiver.requests.length;
@@ -131,7 +131,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
         assert.equal(edge.state.connects.length, before + 1);
         assert.equal(receiver.requests.length, requests + 1);
       });
-  
+
       await step('a certificate for another hostname from an untrusted authority or expired is refused', async () => {
         try {
           for (const peer of [wrongHost, untrusted, expired]) {
@@ -143,7 +143,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
           }
         } finally { edge.state.routes.set(pinned, receiver.port); }
       });
-  
+
       await step('limits and malformed responses are refused with fixed codes', async () => {
         await refusedBeforeConnect([
           [wire({ body: 'x'.repeat(REQUEST_BODY_LIMIT + 1) }), 'egress_request_too_large'],
@@ -173,7 +173,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
         assert.equal((await one(wire({ url: 'https://slow.example.com/' }))).error, 'egress_dns_timeout');
         edge.state.dnsDelayMs = 0;
       });
-  
+
       await step('callers: the binding is the capability, props only narrow, the public door is 404', async () => {
         assert.deepEqual(await call('stranger', { wires: [wire()] }), { binding: false });
         assert.deepEqual(await call('stranger', { url: 'https://egress.example.workers.dev/' }), { status: 502 });
@@ -200,7 +200,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
           assert.equal((await one(w, 'caller-deployable')).error, code);
         assert.deepEqual(deployedOutbound.urls, []);
       });
-  
+
       await step('timeouts close a late connection, stalled handshake and blocked write without a late request', async () => {
         edge.state.routes.set(pinned, receiver.port);
         const before = receiver.requests.length;
@@ -236,7 +236,7 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
           edge.state.routes.set(pinned, receiver.port);
         }
       });
-  
+
       await step('no fallback: a failing socket fails the call and global fetch is never used', async () => {
         edge.state.failConnect = true;
         const before = edge.state.connects.length;
@@ -252,4 +252,3 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
     }
   });
 })
-

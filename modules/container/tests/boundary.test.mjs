@@ -34,7 +34,7 @@ test("container boundary admits only reachable APIs supported by the selected en
    await writeFile(join(root,'src/server.ts'),"import './core/platform/bindings.server'; import './product';");
    for(const source of ["import * as native from 'cloudflare:workers';", "export {DurableObject} from 'cloudflare:workers';", "const native=await import('cloudflare:workers');", "const ws=new WebSocketPair();", "const cache=caches['default'];"]){await writeFile(join(root,'src/product.ts'),source);await assert.rejects(checkBoundary(root),/import boundary/);}
   });
-  
+
   await step('the boundary admits an exported seed\'s demo guard and no other file or import like it',async t=>{
    const root=await fixture(t);
    await mkdir(join(root,'src/modules/demo'),{recursive:true});
@@ -50,7 +50,7 @@ test("container boundary admits only reachable APIs supported by the selected en
    await writeFile(join(root,'src/server.ts'),"import './modules/demo/index.mjs';");
    for(const source of ["import { env as bindings } from 'cloudflare:workers';","import { env, DurableObject } from 'cloudflare:workers';","import workers, { env } from 'cloudflare:workers';","export { env } from 'cloudflare:workers';","import { env } from 'cloudflare:sockets';"]){await writeFile(demo,source);await assert.rejects(checkBoundary(root),/import boundary/);}
   });
-  
+
   await step('container admission permits HTMLRewriter only for workerd and keeps other API boundaries',async t=>{
    const root=await fixture(t);
    await writeFile(join(root,'src/product.ts'),'export const rewrite = response => new HTMLRewriter().transform(response);');
@@ -63,7 +63,7 @@ test("container boundary admits only reachable APIs supported by the selected en
     for(const engine of ['workerd','node'])await assert.rejects(checkBoundary(root,{engine}),/import boundary/);
    }
   });
-  
+
   await step('container boundary follows reachable source and fresh output graphs, leaving dormant source alone',async t=>{
    const root=await fixture(t);
    await rm(join(root,'wrangler.jsonc'));
@@ -154,7 +154,7 @@ test("container boundary admits only reachable APIs supported by the selected en
    await writeFile(join(root,'package.json'),'{"type":"module"}');
    await writeFile(join(root,'tsconfig.json'),JSON.stringify({compilerOptions:{module:'ESNext',moduleResolution:'Bundler',baseUrl:'.',paths:{'@app/*':['src/*']}}}));
    await writeFile(join(root,'src/server.ts'),"import './type-only'; import {loop} from './cycle/a'; export {default as settings} from '@app/settings'; const runtime=require('./runtime'); void import('./lazy'); export const ready=loop+runtime;");
-  
+
    const server=join(root,'dist/server'), chunks=join(server,'chunks');
    await mkdir(chunks,{recursive:true});
    const output={
@@ -169,7 +169,7 @@ test("container boundary admits only reachable APIs supported by the selected en
    for(const [name,source] of Object.entries(output))await writeFile(join(server,name),source);
    const emitted=new Set(Object.keys(output).filter(name=>name!=='stale.mjs').map(name=>join(server,name)));
    assert.deepEqual(await checkBoundary(root,{engine:'node',entries:['dist/server/index.mjs'],emittedFiles:emitted,outputRoot:server}),{engine:'node',ok:true});
-  
+
    await writeFile(join(server,'lazy.mjs'),"export const lazy=new WebSocketPair();");
    await assert.rejects(checkBoundary(root,{engine:'node',entries:['dist/server/index.mjs'],emittedFiles:emitted,outputRoot:server}),error=>error.failures.some(failure=>failure.path==='dist/server/lazy.mjs'&&failure.api==='WebSocketPair'));
    await writeFile(join(server,'lazy.mjs'),output['lazy.mjs']);
@@ -189,14 +189,14 @@ test("container boundary admits only reachable APIs supported by the selected en
     await assert.rejects(checkBoundary(root,{engine:'node',entries:['dist/server/index.mjs'],emittedFiles:emitted,outputRoot:server}),error=>error.failures.some(failure=>failure.api==='Unresolved local runtime import'&&failure.specifier===specifier));
    }
   });
-  
+
   await step('ordinary calls with cloudflare strings are not module imports',async t=>{
    const root=await fixture(t);
    await writeFile(join(root,'src/product.ts'),"const predicate=specifier=>specifier.startsWith('cloudflare:'); label('cloudflare:workers'); load('cloudflare:workers'); export {predicate};");
    assert.deepEqual(await checkBoundary(root,{engine:'node'}),{engine:'node',ok:true});
    assert.deepEqual(await checkBoundary(root,{engine:'workerd'}),{engine:'workerd',ok:true});
   });
-  
+
   await step('workerd admits exact workers imports and re-exports while Node retains its contracts',async t=>{
    const root=await fixture(t);
    for(const source of [
@@ -218,15 +218,15 @@ test("container boundary admits only reachable APIs supported by the selected en
    await writeFile(join(root,'src/server.ts'),"import './platform/blobs/snapshot-cache-adjacent';");
    await assert.rejects(checkBoundary(root,{engine:'node',cacheContract:'lamp-retained-v1'}),error=>error.failures.some(failure=>failure.path==='src/platform/blobs/snapshot-cache-adjacent.ts'));
   });
-  
+
   await step('workerd admits WebSocketPair while Node refuses it',async t=>{
    await workerdOnly(await fixture(t),'export function pair() { return new WebSocketPair(); }');
   });
-  
+
   await step('workerd admits crypto.subtle.timingSafeEqual while Node refuses it',async t=>{
    await workerdOnly(await fixture(t),'export function equal(a,b) { return crypto.subtle.timingSafeEqual(a,b); }');
   });
-  
+
   await step('workerd admits ctx.passThroughOnException while Node refuses it',async t=>{
    await workerdOnly(await fixture(t),'export default { fetch(request,env,ctx) { ctx.passThroughOnException(); return new Response("ok"); } };');
   });
@@ -285,9 +285,3 @@ test('workerd admits Durable Object definitions and builds only local exported b
   await assert.rejects(access(join(root,'external-image')), {code:'ENOENT'});
  }
 });
-
-
-
-
-
-

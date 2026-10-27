@@ -29,7 +29,7 @@ test("DoH resolution queries both address families, rejects unusable answers and
     assert.deepEqual(edge.requests.map(r => r.url).sort(), [`${DOH_ENDPOINT}?name=hooks.example.com&type=A`, `${DOH_ENDPOINT}?name=hooks.example.com&type=AAAA`]);
     for (const { init } of edge.requests) { assert.equal(init.redirect, 'manual'); assert.deepEqual(init.headers, { accept: 'application/dns-json' }); }
   });
-  
+
   await step('any unusable resolver answer fails the lookup, and a non-public answer refuses the destination', async () => {
     const ok = json({ Status: 0, Answer: [] });
     const failing: [string, () => Response][] = [
@@ -62,7 +62,7 @@ test("DoH resolution queries both address families, rejects unusable answers and
       assert.equal(fetches, 0);
     }
   });
-  
+
   await step('send cancels both DNS requests on early failure, deadline and completed resolution', async () => {
     const tls = rustls(new WebAssembly.Module(await readFile(new URL('../tls/egress.wasm', import.meta.url))));
     for (const mode of ['failure', 'deadline', 'complete']) {
@@ -93,8 +93,3 @@ test("DoH resolution queries both address families, rejects unusable answers and
     }
   });
 })
-
-
-
-
-

@@ -50,7 +50,7 @@ test("shared queue admission reconciles live member requests with authoritative 
       await Promise.allSettled(jobs.map(job => job.done));
     }
   });
-  
+
   await step('central slots override clients, reload live, and closed or dead clients release their requests', async t => {
     const { directory, queue } = await setup(t, { slots: 3 });
     const configFile = join(directory, 'config.json'), release = join(directory, 'release');
@@ -82,6 +82,3 @@ test("shared queue admission reconciles live member requests with authoritative 
     }
   });
 })
-
-
-

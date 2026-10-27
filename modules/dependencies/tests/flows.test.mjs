@@ -42,7 +42,7 @@ test("dependency link redemption authenticates the exact app, issuer, callback a
    assert.equal(r.sqlite.prepare("SELECT count(*) n FROM rer_dependency_keys WHERE interface='oidc-provider@1'").get().n,0);
    assert.equal(r.sqlite.prepare("SELECT needs_relink FROM rer_dependency_link WHERE interface='error-sink@1'").get().needs_relink,0);
   });
-  
+
   await step('redemption requires the app private key and exact code, origin and callback',async t=>{
    const r=await runtime(t);await r.bootstrap();const code=await r.code(),entry=r.codes.get(code);
    const base={code,origin:ORIGIN,callback:entry.callback};
@@ -188,7 +188,7 @@ test("signing-key custody preserves sealed identity across migration, rotation, 
    r.sqlite.prepare("UPDATE rer_dependency_keys SET private_key=? WHERE interface='oidc-provider@1'").run(r.sqlite.prepare("SELECT private_key FROM rer_dependency_keys WHERE interface='error-sink@1'").get().private_key);
    const swapped=await r.call('/auth/oidc/auth/start',{body:{}});assert.deepEqual(await swapped.json(),{error:'installation_key_unavailable'});
   });
-  
+
   await step('an unreadable sibling row leaves healthy sign-in, document, JWKS and link callback working',async t=>{
    for(const damage of ['corrupt','retired']) await step(damage,async t=>{
     const r=await runtime(t);await r.bootstrap();await r.link();await r.link('error-sink@1');
@@ -211,7 +211,7 @@ test("signing-key custody preserves sealed identity across migration, rotation, 
     }
    });
   });
-  
+
   await step('a restored pre-rotation row needs the retired key and reopens without changing its public identity',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();
    const before=r.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key;
@@ -224,7 +224,7 @@ test("signing-key custody preserves sealed identity across migration, rotation, 
    r.config.INSTALLATION_KEY_PREVIOUS=retired;await resealDependencyKeys(r.db,r.config);delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();
    assert.equal((await login(r)).status,303);assert.deepEqual(await (await r.call('/.well-known/rer-link/jwks')).json(),publicBefore);
   });
-  
+
   await step('a whole pre-rotation restore refuses unavailable custody and reports its D1 tail before rekey',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();
    const installation=r.sqlite.prepare('SELECT key_ids FROM rer_dependency_installation').get();
@@ -245,7 +245,7 @@ test("signing-key custody preserves sealed identity across migration, rotation, 
    assert.deepEqual(diagnostics.at(-1).custody,ids.map(kid=>({kid,available:true})));
    delete r.config.INSTALLATION_KEY_PREVIOUS;r.restart();assert.equal((await login(r)).status,303);
   });
-  
+
   await step('a mid-rotation snapshot reopens with all retired custody and relinks both interfaces without unlinking',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();await r.link('error-sink@1');
    const publicBefore=await (await r.call('/.well-known/rer-link/jwks')).json();
@@ -271,25 +271,25 @@ test("signing-key custody preserves sealed identity across migration, rotation, 
     assert.deepEqual(await (await r.call('/.well-known/rer-link/jwks')).json(),publicBefore);
    }
   });
-  
+
   await step('a fully sealed installation refuses a plaintext signing key injected by a database writer',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();
    const key=(await dependencyStore(r.db,r.config).readKey()).key;
    r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=?').run(JSON.stringify(key));
    const refused=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_unavailable'});
   });
-  
+
   await step('plaintext-only signing refuses a sealed key with a typed rollback error',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();
    const envelope=JSON.parse(r.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key);
    await assert.rejects(assertion(envelope,{sub:'rollback'}),e=>e.code==='installation_key_sealed_rollback' && e.status===503);
   });
-  
+
   await step('installation key custody refuses passphrases outside the generated secret format',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();r.config.INSTALLATION_KEY='a guessed passphrase that is comfortably longer than thirty two characters';r.restart();
    const refused=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(refused.status,503);assert.deepEqual(await refused.json(),{error:'installation_key_missing'});
   });
-  
+
   await step('sealed rows authenticate the explicit storage purpose, interface, version and key ID',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();
    const value=JSON.parse(r.sqlite.prepare('SELECT private_key FROM rer_dependency_keys').get().private_key);
@@ -305,21 +305,3 @@ test("signing-key custody preserves sealed identity across migration, rotation, 
    const tampered=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(tampered.status,503);assert.deepEqual(await tampered.json(),{error:'installation_key_unavailable'});
   });
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

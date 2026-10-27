@@ -17,14 +17,14 @@ test("descriptor producer canonicalizes or refuses every repository identity", a
         `https://github.com/${value}`, value);
     }
   });
-  
+
   await step('descriptor producer refuses unrepresentable bare repository identities', () => {
     for (const value of cases.unrepresentableBare) {
       assert.throws(() => generateProjectDescriptor({...descriptor, sourceRepository: value}),
         /literal \.git repository name/, value);
     }
   });
-  
+
   await step('descriptor producer canonicalizes repository URLs idempotently', () => {
     for (const {value, identity, canonicalizable} of cases.acceptedUrls) {
       if (canonicalizable === false) continue;
@@ -33,7 +33,7 @@ test("descriptor producer canonicalizes or refuses every repository identity", a
       assert.deepEqual(generateProjectDescriptor(result), result, value);
     }
   });
-  
+
   await step('descriptor producer refuses unrepresentable URL repository identities', () => {
     for (const {value, canonicalizable} of cases.acceptedUrls) {
       if (canonicalizable !== false) continue;
@@ -41,7 +41,7 @@ test("descriptor producer canonicalizes or refuses every repository identity", a
         /literal \.git repository name/, value);
     }
   });
-  
+
   await step('descriptor producer rejects unsafe repository identities', () => {
     for (const value of [...cases.rejectedUrls, ...cases.rejectedBare]) {
       assert.throws(() => generateProjectDescriptor({...descriptor, sourceRepository: value}),
@@ -49,8 +49,3 @@ test("descriptor producer canonicalizes or refuses every repository identity", a
     }
   });
 })
-
-
-
-
-

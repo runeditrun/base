@@ -15,17 +15,14 @@ test("keyboard admission requires visible focus or an explained opt-out", async 
     assert.equal((await keyboardCheck(page('body', true))).passed, false);
     assert.equal((await keyboardCheck(page('root', true))).passed, false);
   });
-  
+
   await step('keyboard requires focus-visible on the focused element', async () => {
     assert.equal((await keyboardCheck(page('element', false))).passed, false);
     assert.equal((await keyboardCheck(page('element', true))).passed, true);
   });
-  
+
   await step('a keyboard opt-out records its reason and rejects an empty reason', async () => {
     assert.deepEqual(await keyboardCheck(page('body', false), { keyboard: false, keyboardReason: 'Static text' }), { enabled: false, passed: true, reason: 'Static text' });
     await assert.rejects(keyboardCheck(page('body', false), { keyboard: false }), /requires keyboardReason/);
   });
 })
-
-
-

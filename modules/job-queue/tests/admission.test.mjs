@@ -18,7 +18,7 @@ test("job admission respects capacity, resource boundaries and bounded waiting",
     assert.equal(admission(1, config, { load: 36, availableMemoryBytes: 101 }), null);
     assert.match(admission(0, config, { load: NaN, availableMemoryBytes: 101 }), /could not be read/);
   });
-  
+
   for (const [name, sampler, pattern, limits] of [
     ['load', () => ({ load: 37, availableMemoryBytes: 1024 ** 4 }), /load/, { loadThreshold: 36 }],
     ['memory', () => ({ load: 0, availableMemoryBytes: 0 }), /memory/, {}],
@@ -32,7 +32,7 @@ test("job admission respects capacity, resource boundaries and bounded waiting",
     const state = await recordedState(directory).read();
     assert.deepEqual(state.queued, []); assert.deepEqual(state.running, []);
   });
-  
+
   await step('a slow first admission pass still admits a job the machine can run', async t => {
     let sampled = false;
     const { queue } = await setup(t, { sampler: async () => {
@@ -56,7 +56,7 @@ test("job configuration preserves directory precedence and validates overrides",
     await assert.rejects(configuration({ env: {}, directory, slots: 0 }), /Invalid/);
     await assert.rejects(configuration({ env: { RER_JOBS_POLL_MS: 'bad' }, directory }), /Invalid/);
   });
-  
+
   await step('supplied HOME selects its configuration while an explicit jobs directory wins', async t => {
     const { directory } = await setup(t);
     const home = join(directory, 'home'), jobs = join(home, '.rer/jobs');
@@ -83,5 +83,3 @@ test('parser preserves exact argv after separator and rejects malformed invocati
   assert.throws(() => parse(['run', '--label', '--', 'node']), /Missing/);
 });
 // Load is a guard only where a fleet sets a threshold; memory always is.
-
-

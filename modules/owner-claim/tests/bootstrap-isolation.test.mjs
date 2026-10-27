@@ -25,7 +25,7 @@ test("owner bootstrap admission isolates abusive clients and preserves ordinary 
         }
         const attacked = await app.snapshot();
         for (const table of ['oa_operators', 'oa_sessions', 'oa_bootstrap', 'oc_owner_claims']) assert.equal(attacked[table].length, 0, table);
-  
+
         const token = path === '/auth/bootstrap' ? setupToken : await signClaim(keys.privateKey, { iat: now / 1000, exp: now / 1000 + 300 });
         const input = { token, displayName: 'Real Owner', returnTo: '/app' };
         const success = await app.call(path, post(input, '192.0.2.20'));
@@ -40,7 +40,7 @@ test("owner bootstrap admission isolates abusive clients and preserves ordinary 
         const claimed = await app.snapshot();
         for (const table of ['oa_operators', 'oa_sessions', 'oa_bootstrap']) assert.equal(claimed[table].length, 1, table);
         assert.equal(claimed.oc_owner_claims.length, path === '/auth/owner-claim' ? 1 : 0);
-  
+
         const replay = await app.call(path, post({ ...input, displayName: 'Replacement' }, '192.0.2.30'));
         assert.equal(replay.status, 409);
         assert.equal(replay.headers.get('set-cookie'), null);
@@ -49,7 +49,7 @@ test("owner bootstrap admission isolates abusive clients and preserves ordinary 
         assert.equal((await (await app.call('/auth/session', { cookie })).json()).operator.id, operator.id);
       });
     }
-  
+
     await step('ordinary magic-link email and IP budgets', async t => {
       const app = await emailRuntime(policy, { now });
       t.after(() => app.close());
@@ -67,4 +67,3 @@ test("owner bootstrap admission isolates abusive clients and preserves ordinary 
     });
   });
 })
-

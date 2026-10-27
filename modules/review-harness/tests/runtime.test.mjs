@@ -50,24 +50,24 @@ test("runtime start refuses exit, timeout, exposure and fixture failure with pri
     const error = await refused(t, await options(t, 'exit'));
     assert.match(error.message, /exited before ready.*private log:/);
   });
-  
+
   await step('health timeout is bounded and cleans up its process', async t => {
     const started = performance.now();
     const error = await refused(t, await options(t, 'timeout', { readyTimeoutMs: 300 }));
     assert.match(error.message, /health timed out.*private log:/);
     assert.ok(performance.now() - started < 4000);
   });
-  
+
   await step('spawn errors fail promptly with diagnostics', async t => {
     const error = await refused(t, await options(t, 'exit', { command: '/nonexistent-review-command' }));
     assert.match(error.message, /exited before ready.*private log:/);
   });
-  
+
   await step('launcher refuses a command that exposes its port outside loopback', async t => {
     const error = await refused(t, await options(t, 'wide'));
     assert.match(error.message, /listener is exposed outside 127\.0\.0\.1.*private log:/);
   });
-  
+
   await step('fixture failure tears down the healthy process and redacts its diagnostic', async t => {
     const error = await refused(t, await options(t, 'environment', { secrets: ['synthetic-fixture-secret'], fixtures: async () => { throw new Error('synthetic-fixture-secret'); } }));
     assert.equal(error.message.includes('synthetic-fixture-secret'), false);
@@ -139,21 +139,21 @@ test("runtime stop sends TERM then confirms resistant descendants disappear with
     const remaining = states.split('\n').find(line => Number(line.trim().split(/\s+/)[0]) === pid);
     assert.ok(!remaining || remaining.trim().split(/\s+/)[1].startsWith('Z'));
   });
-  
+
   await step('stop sends TERM before escalating', async t => {
     const runtime = await startRuntime(await options(t, 'term'));
     fallbackCleanup(t, runtime);
     await runtime.stop();
     assert.match(await readFile(runtime.logPath, 'utf8'), /received TERM/);
   });
-  
+
   await step('a tiny graceful inspection budget still confirms group disappearance after KILL', async t => {
     const runtime = await startRuntime(await options(t, 'tree', { stopTimeoutMs: 1 }));
     fallbackCleanup(t, runtime);
     await runtime.stop();
     assert.equal(await liveOwnedGroup(runtime.pid, 1000), false);
   });
-  
+
   await step('slow process inspection uses the remaining shutdown budget', async t => {
     const runtime = await startRuntime(await options(t, 'tree'));
     fallbackCleanup(t, runtime);
@@ -185,4 +185,3 @@ test('synthetic fixtures finish before readiness resolves', async t => {
   assert.equal(finished, true);
   assert.equal((await fetch(runtime.origin + '/health')).status, 200);
 });
-

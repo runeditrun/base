@@ -19,7 +19,7 @@ test("sign-in honours callback results, URL confinement and cancellation", async
     } });
     assert.deepEqual(visits, [origin + '/auth/oneclick', origin + '/auth/oneclick?persona=reviewer', origin + '/app']);
   });
-  
+
   await step('refuses foreign or credential-bearing URLs and omits private callback errors', async () => {
     let navigated = false;
     const page = { goto: async () => { navigated = true; } };
@@ -28,7 +28,7 @@ test("sign-in honours callback results, URL confinement and cancellation", async
     }
     assert.equal(navigated, false);
   });
-  
+
   await step('bounds a pending callback and ignores its late URL', async () => {
     let release, hookSignal, navigated = false;
     const page = { goto: async () => { navigated = true; } };
@@ -41,7 +41,7 @@ test("sign-in honours callback results, URL confinement and cancellation", async
     await delay(0);
     assert.equal(navigated, false);
   });
-  
+
   await step('cancellation interrupts a pending callback and prevents late navigation', async () => {
     const controller = new AbortController();
     let release, hookSignal, navigated = false;
@@ -57,19 +57,10 @@ test("sign-in honours callback results, URL confinement and cancellation", async
     await delay(0);
     assert.equal(navigated, false);
   });
-  
+
   await step('an already cancelled sign-in never starts the callback', async () => {
     let started = false;
     await assert.rejects(signIn({}, { origin, signal: AbortSignal.abort(), open: () => { started = true; } }), /Sign-in failed/);
     assert.equal(started, false);
   });
 })
-
-
-
-
-
-
-
-
-

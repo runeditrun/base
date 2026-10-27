@@ -79,7 +79,7 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
     const setupBytes = await readFile(first.setup);
     assert.deepEqual(setupBytes, Buffer.from(`${JSON.stringify(input, null, 2)}\n`));
     assert.equal(first.setup, join(root, 'with-setup/rer-setup.json'));
-  
+
     const descriptorBytes = await readFile(first.project);
     const descriptor = JSON.parse(descriptorBytes);
     assert.deepEqual(descriptor.setup, {
@@ -87,12 +87,12 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
       sha256: createHash('sha256').update(setupBytes).digest('hex')
     });
     assert.equal(descriptor.schema, 1);
-  
+
     const second = await producePackage({root, config: policy, output: 'with-setup-again'});
     assert.deepEqual(await readFile(second.setup), setupBytes);
     assert.deepEqual(await readFile(second.project), descriptorBytes);
   });
-  
+
   await step('no-manifest packaging keeps the prior descriptor shape and adds no setup output', async t => {
     const root = await fixture(t);
     const policy = config();
@@ -118,7 +118,7 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
     ]);
     await assert.rejects(readFile(join(root, 'without-setup/rer-setup.json')));
   });
-  
+
   await step('unsafe, missing, malformed and symlink setup manifests fail without a partial package', async t => {
     const root = await fixture(t);
     const policy = config();
@@ -128,7 +128,7 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
       {manifestFile: 'setup.yaml'},
       {manifestFile: 'setup.json', extra: true}
     ]) assert.throws(() => packagingConfig({...policy, setup: selection}));
-  
+
     for (const [name, setup, expected] of [
       ['missing', {manifestFile: 'missing.json'}, /ENOENT/],
       ['invalid-json', {manifestFile: 'invalid.json'}, /valid JSON/],
@@ -139,12 +139,12 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
       await assert.rejects(producePackage({root, config: config(setup), output: `rejected-${name}`}), expected);
       await assert.rejects(readdir(join(root, `rejected-${name}`)));
     }
-  
+
     await symlink(join(root, 'setup.json'), join(root, 'linked.json'));
     await assert.rejects(producePackage({root, config: config({manifestFile: 'linked.json'}), output: 'rejected-symlink'}), /symlink refused/);
     await assert.rejects(readdir(join(root, 'rejected-symlink')));
   });
-  
+
   await step('semantic-invalid and duplicate-key manifests fail before artifact-only output', async t => {
     const root = await fixture(t);
     const invalid = JSON.parse(await readFile(join(root, 'setup.json'), 'utf8'));
@@ -153,15 +153,15 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
     await writeFile(join(root, 'rer-packaging.json'), JSON.stringify(config({manifestFile: 'setup.json'})));
     await assert.rejects(packaging(['artifact', '--root', root, '--config', 'rer-packaging.json']), /Invalid setup manifest/);
     await assert.rejects(readFile(join(root, 'delivery-artifact/app.json')));
-  
+
     await writeFile(join(root, 'setup.json'), '{"schema":1,"schema":1}');
     await assert.rejects(packaging(['artifact', '--root', root, '--config', 'rer-packaging.json']), /duplicate JSON field/);
     await assert.rejects(readFile(join(root, 'delivery-artifact/app.json')));
-  
+
     await assert.rejects(exportProducer({root, config: config({manifestFile: 'setup.json'}), output: 'rejected-export'}), /duplicate JSON field/);
     await assert.rejects(readdir(join(root, 'rejected-export')));
   });
-  
+
   await step('export vendors the setup schema and validators and its artifact command validates selected manifests', async t => {
     const root = await fixture(t);
     const policy = config({manifestFile: 'setup.json'});
@@ -177,12 +177,3 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
     assert.equal(artifact.schema, 2);
   });
 })
-
-
-
-
-
-
-
-
-

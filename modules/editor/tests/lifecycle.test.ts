@@ -24,7 +24,7 @@ test("owner editor lifecycle admits current grants and retires revoked, stale or
     assert.throws(() => parseGrant({...grant(), expiresAt: Date.now()+120_000}));
     h.editor.dispose();
   });
-  
+
   await step('unauthorized, disabled and disposed controllers never mount', async () => {
     const h = harness(); let loads=0;
     assert.equal(await h.editor.refresh(async () => {loads++;return grant();}), 'unauthorized');
@@ -34,7 +34,7 @@ test("owner editor lifecycle admits current grants and retires revoked, stale or
     assert.equal(await h.editor.refresh(async () => {loads++;return grant();}), 'unauthorized');
     assert.equal(loads,0);assert.deepEqual(h.counts(),{mounts:0,cleanups:0});
   });
-  
+
   await step('owner revocation aborts in-flight config even if loader ignores cancellation', async () => {
     const h=harness();h.editor.setOwner(true);
     let complete!: (value:unknown)=>void, signal!:AbortSignal;
@@ -42,7 +42,7 @@ test("owner editor lifecycle admits current grants and retires revoked, stale or
     h.editor.setOwner(false);assert.equal(signal.aborted,true);complete(grant());
     assert.equal(await result,'stale');assert.deepEqual(h.counts(),{mounts:0,cleanups:0});h.editor.dispose();
   });
-  
+
   await step('new config wins races and failures remove the mount and stay visible', async () => {
     const h=harness();h.editor.setOwner(true);
     let complete!: (value:unknown)=>void;
@@ -53,7 +53,7 @@ test("owner editor lifecycle admits current grants and retires revoked, stale or
     assert.deepEqual(h.counts(),{mounts:1,cleanups:1});h.editor.dispose();h.editor.dispose();
     assert.deepEqual(h.counts(),{mounts:1,cleanups:1});
   });
-  
+
   await step('lease expiry removes private mount; renewal requires another server response', async () => {
     const h=harness();h.editor.setOwner(true);
     await h.editor.refresh(async()=>({...grant(),expiresAt:Date.now()+15}));
@@ -61,8 +61,3 @@ test("owner editor lifecycle admits current grants and retires revoked, stale or
     assert.deepEqual(h.counts(),{mounts:1,cleanups:1});h.editor.dispose();
   });
 })
-
-
-
-
-

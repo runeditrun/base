@@ -29,7 +29,7 @@ test("checker configuration admission refuses malformed values and unavailable i
     const step = namedSteps(t);
     for (const [name, config, message] of bad) await step(`config rejects ${name}`, () => assert.throws(() => validateConfig(config), message))
   })
-  
+
   await step('missing and invalid tsconfig are configuration errors', async t => {
     const root = await project(t)
     await assert.rejects(checkBoundaries({ root, config: { version: 1, tsconfig: 'missing.json' } }), /Cannot read tsconfig missing.json/)
@@ -38,7 +38,7 @@ test("checker configuration admission refuses malformed values and unavailable i
     await put(root, 'bad.json', '{"compilerOptions":{"module":"nonsense"}}')
     await assert.rejects(checkBoundaries({ root, config: { version: 1, tsconfig: 'bad.json' } }), /Invalid tsconfig/)
   })
-  
+
   await step('missing sourceRoot and malformed JSON config are errors', async t => {
     const root = await project(t)
     await assert.rejects(checkBoundaries({ root, config: { version: 1, sourceRoot: 'missing' } }), /Cannot read source root/)
@@ -69,4 +69,3 @@ test("worked config loads across documented consumers", async t => {
     assert.equal((await example(name)).version, 1)
   })
 })
-

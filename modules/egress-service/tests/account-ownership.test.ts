@@ -25,7 +25,7 @@ test("ownership inventory collects the complete selected account and refuses par
     const zeroPages = page(1, 0); zeroPages.result_info.total_pages = 0;
     assert.deepEqual(JSON.parse((await readAccountOwnership({ account, token, target, fetch: async () => Response.json(zeroPages) })).EGRESS_OWNED_ZONES), []);
   });
-  
+
   await step('probe refuses ownership inventories with wrong accounts, incomplete or drifting pages, invalid zones and provider failure', async () => {
     const mutations = [
       (p: any) => { p.result[0].account.id = 'b'.repeat(32); },
@@ -67,6 +67,3 @@ test("ownership inventory collects the complete selected account and refuses par
     }
   });
 })
-
-
-

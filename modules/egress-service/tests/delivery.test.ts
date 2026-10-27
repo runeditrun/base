@@ -81,7 +81,7 @@ test("seed delivery preserves signed bytes, replay handling and refusal policy t
       await Promise.all([seed.close(), modules.cleanup(), rm(persistence, { recursive: true, force: true })]);
     }
   });
-  
+
   await step('the same flow through the dev double, which also applies the service refusal table', async () => {
     const seed = await seedReceiver(), directory = await mkdtemp(join(tmpdir(), 'egress-dev-'));
     const sql = new SqliteDatabase(join(directory, 'outbound.sqlite')); sql.migrate(schema);
@@ -97,7 +97,7 @@ test("seed delivery preserves signed bytes, replay handling and refusal policy t
       assert.equal((await service.dispatch(envelope.id))?.state, 'accepted');
       assert.deepEqual(seed.effects, ['evt-dev-1']);
       assert.equal(seed.receiver.requests[0]?.servername, host);
-  
+
       const receivers = Object.fromEntries(deniedAddresses.flatMap((address, i) => [
         [`d${i}.example.com`, { port: seed.receiver.port, answers: [address] }],
         [`m${i}.example.com`, { port: seed.receiver.port, answers: ['8.8.8.8', address] }],
@@ -114,6 +114,3 @@ test("seed delivery preserves signed bytes, replay handling and refusal policy t
     } finally { sql.close(); await seed.close(); await rm(directory, { recursive: true, force: true }); }
   });
 })
-
-
-

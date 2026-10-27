@@ -27,7 +27,7 @@ test("claim verifier checks signature, binding and exact lifetime for every acce
     await verifyOwnerClaim(next, { ...config, publicKeys: { ...config.publicKeys, 'test-v2': rotated.publicKey } });
     await assert.rejects(verifyOwnerClaim(token, { ...config, publicKeys: { 'test-v2': rotated.publicKey } }));
   });
-  
+
   await step("issuance tolerance and exact expiry share the timing corpus", async t => {
     const step = namedSteps(t);
     for (const ahead of [1, 30, 31]) {
@@ -39,7 +39,7 @@ test("claim verifier checks signature, binding and exact lifetime for every acce
         else await assert.rejects(verification, { code: 'invalid_claim', status: 403 });
       });
     }
-    
+
     await step('issuance tolerance does not relax exact expiry or the 300 second lifetime', async () => {
       const { privateKey, publicKey } = await testKeys();
       const config = { ...claimConfig(publicKey), now: fixedNow };
@@ -54,7 +54,7 @@ test("claim verifier checks signature, binding and exact lifetime for every acce
       }
     });
   })
-  
+
   await step('changing payload audience or email under the original signature is refused', async () => {
     const { privateKey, publicKey } = await testKeys();
     const config = { ...claimConfig(publicKey), now: fixedNow };
@@ -79,9 +79,3 @@ test("claim verifier checks signature, binding and exact lifetime for every acce
 
 
 const fixedNow = 1_800_000_000;
-
-
-
-
-
-

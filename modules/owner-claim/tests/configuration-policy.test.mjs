@@ -32,7 +32,7 @@ test("claim configuration preserves canonical owner binding and refuses malforme
       assert.throws(() => configureClaim({ ...config, expectedEmail }), invalidConfiguration);
     }
   });
-  
+
   await step('public JWK configuration validates every metadata member before Web Crypto receives it', async () => {
     const { privateKey, publicKey } = await testKeys();
     const config = claimConfig(publicKey);
@@ -56,6 +56,3 @@ test("claim configuration preserves canonical owner binding and refuses malforme
     }
   });
 })
-
-
-

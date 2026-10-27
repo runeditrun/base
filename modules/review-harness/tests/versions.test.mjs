@@ -34,10 +34,8 @@ test("dependency resolution refuses mismatched or unavailable packages with guid
       assert.throws(() => resolveVersions(directory), error => Object.entries(PINS).every(([name, version]) => error.message.includes(`${name} ${version}`)) && /mismatch/.test(error.message));
     });
   }
-  
+
   await step('missing dependencies are refused with pin guidance', () => {
     assert.throws(() => resolveVersions('/nonexistent-review-consumer'), /expected @playwright\/test 1\.63\.0, @axe-core\/playwright 4\.13\.0/);
   });
 })
-
-

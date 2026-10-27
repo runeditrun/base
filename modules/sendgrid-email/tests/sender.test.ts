@@ -42,7 +42,7 @@ test("SendGrid submission validates its message, makes one attempt and classifie
     assert.deepEqual(result, { provider: 'sendgrid', providerMessageId: 'provider-receipt', state: 'accepted' })
     assert.equal(calls, 1)
   })
-  
+
   await step('uncertain submission never triggers a duplicate automatic attempt', async () => {
     for (const response of [null, new Response(null, { status: 500 }), new Response(null, { status: 408 }), new Response(null, { status: 200 })]) {
       let calls = 0
@@ -54,14 +54,14 @@ test("SendGrid submission validates its message, makes one attempt and classifie
       assert.equal(calls, 1)
     }
   })
-  
+
   await step('rejection and rate limit are explicit and provider response bodies stay private', async () => {
     for (const [status, outcome] of [[400, 'rejected'], [401, 'rejected'], [429, 'rate_limited']] as const) {
       await assert.rejects(sendSendGrid({ apiKey: 'test', message, fetch: async () => new Response('private-provider-details', { status }) }),
         (error: unknown) => isSendGridError(error) && error.outcome === outcome && error.status === status && !error.message.includes('private-provider-details'))
     }
   })
-  
+
   await step('invalid recipient or reserved headers fail before a provider call', async () => {
     for (const badMessage of [{ ...message, to: [] }, { ...message, to: ['bad\r\n@example.com'] }, { ...message, headers: { From: 'other@example.com' } }]) {
       let calls = 0
@@ -69,7 +69,7 @@ test("SendGrid submission validates its message, makes one attempt and classifie
       assert.equal(calls, 0)
     }
   })
-  
+
   await step('optional provider unsubscribe settings and product marker preserve command correlation', async () => {
     await sendSendGrid({ apiKey: 'test', message: { ...message, asmGroupId: 33984, subscriptionTracking: true, customArgs: { rer_product: 'orbit' } }, fetch: async (_url: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
       const body = JSON.parse(String(init?.body))
@@ -81,7 +81,7 @@ test("SendGrid submission validates its message, makes one attempt and classifie
       return new Response(null, { status: 202, headers: { 'x-message-id': 'accepted' } })
     } })
   })
-  
+
   await step('invalid ASM and reserved correlation are rejected without network activity', async () => {
     for (const extra of [{ asmGroupId: 0 }, { asmGroupId: 1.5 }, { customArgs: { rer_delivery_id: 'override' } }, { customArgs: { metadata: 'x'.repeat(10001) } }]) {
       let called = false
@@ -89,7 +89,7 @@ test("SendGrid submission validates its message, makes one attempt and classifie
       assert.equal(called, false)
     }
   })
-  
+
   await step('native fetch refuses redirects without sending mail to a redirect destination', async () => {
     let destinationCalls = 0
     let providerCalls = 0
@@ -134,7 +134,7 @@ test("SendGrid submission validates its message, makes one attempt and classifie
       await Promise.all([new Promise<void>((resolve) => provider.close(() => resolve())), new Promise<void>((resolve) => destination.close(() => resolve()))])
     }
   })
-  
+
   await step('HTTP 202 without a usable receipt remains accepted with explicitly absent provider evidence', async () => {
     for (const headers of [{}, { 'x-message-id': '   ' }]) {
       let calls = 0
@@ -143,7 +143,7 @@ test("SendGrid submission validates its message, makes one attempt and classifie
       assert.equal(calls, 1)
     }
   })
-  
+
   await step('native fetch interruption and timeout are ambiguous without a second attempt', async () => {
     let calls = 0
     let mode = 'interrupt'
@@ -169,21 +169,3 @@ test("SendGrid submission validates its message, makes one attempt and classifie
     }
   })
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- 
-
-

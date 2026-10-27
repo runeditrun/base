@@ -12,7 +12,7 @@ test("axe severity policy covers every impact and mode", async t => {
     const entry = clean(); entry.axe.violations.push({ impact });
     assert.deepEqual(evaluateGates(entry).failures, ['axe']);
   });
-  
+
   await step('axe any mode catches moderate and minor; default permits them', () => {
     const entry = clean(); entry.axe.violations.push({ impact: 'moderate' }, { impact: 'minor' });
     assert.equal(evaluateGates(entry).passed, true);

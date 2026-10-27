@@ -25,7 +25,7 @@ test("queued CLI execution preserves command results and releases custody after 
     assert.equal((await client(t, directory, ['run', '--kind', 'heavy', '--', process.execPath, worker, 'nice', niceFile]).done).code, 0);
     assert.ok(Number(await readFile(niceFile, 'utf8')) >= 15);
   });
-  
+
   await step('CLI max-wait uses a distinct code and clear reason without starting command', async t => {
     const { directory } = await setup(t);
     const result = await client(t, directory, ['run', '--kind', 'heavy', '--max-wait', '.1', '--', process.execPath,
@@ -33,7 +33,7 @@ test("queued CLI execution preserves command results and releases custody after 
     assert.equal(result.code, 75); assert.match(result.stderr, /max-wait expired.*load/);
     assert.equal(result.stdout, '');
   });
-  
+
   for (const signal of ['SIGINT', 'SIGTERM']) await step(`${signal} stops an ignoring command and grandchild and releases slot`, async t => {
     const { directory } = await setup(t);
     const ledger = recordedState(directory);
@@ -65,7 +65,7 @@ test("queued CLI execution preserves command results and releases custody after 
       await Promise.allSettled([job.done, successor?.done]);
     }
   });
-  
+
   await step('ordinary exit cleans surviving background descendants', async t => {
     const { directory } = await setup(t);
     const file = join(directory, 'leftover');
@@ -75,7 +75,7 @@ test("queued CLI execution preserves command results and releases custody after 
     await until(() => noLivePids(pids));
     assert.deepEqual((await recordedState(directory).read()).running, []);
   });
-  
+
   for (const target of ['caller', 'supervisor']) await step(`SIGKILL of ${target} leaves no live descendants after reclaim`, async t => {
     const { directory, queue } = await setup(t);
     const ledger = recordedState(directory);
@@ -93,20 +93,20 @@ test("queued CLI execution preserves command results and releases custody after 
     assert.deepEqual((await ledger.read()).running, []);
     await until(() => noLivePids([lease.owner.pid, ...pids]));
   });
-  
+
   await step('failure to spawn executable passes 127 and releases slot', async t => {
     const { directory } = await setup(t);
     const result = await client(t, directory, ['run', '--kind', 'heavy', '--', '/no/such/rer-command']).done;
     assert.equal(result.code, 127); assert.deepEqual((await recordedState(directory).read()).running, []);
   });
-  
+
   await step('command self-termination preserves its signal exit status', async t => {
     const { directory } = await setup(t);
     const result = await client(t, directory, ['run', '--kind', 'heavy', '--', process.execPath,
       '-e', 'process.kill(process.pid,"SIGTERM")']).done;
     assert.equal(result.code, 143);
   });
-  
+
   await step('CLI invoked through a symlink executes the requested command', async t => {
     const { directory } = await setup(t);
     const linked = join(directory, 'linked-cli.mjs'); await symlink(cli, linked);
@@ -114,7 +114,7 @@ test("queued CLI execution preserves command results and releases custody after 
       '-e', 'process.exit(29)'], { entrypoint: linked }).done;
     assert.equal(result.code, 29);
   });
-  
+
   await step('a queued command survives probes that close its identity socket mid-write', async t => {
     const { directory } = await setup(t);
     const ledger = recordedState(directory);
@@ -155,7 +155,7 @@ test("group signal permission refusal completes only after independent disappear
     const send = () => { throw Object.assign(Error('Denied'), { code: 'EPERM' }); };
     assert.equal(await deliverGroupSignal(123, 'SIGTERM', { send, live: async () => false }), false);
   });
-  
+
   await step('denied signal remains an error for live members or an unavailable group probe', async () => {
     const send = () => { throw Object.assign(Error('Denied'), { code: 'EPERM' }); };
     await assert.rejects(deliverGroupSignal(123, 'SIGKILL', { send, live: async () => true }), { code: 'EPERM' });

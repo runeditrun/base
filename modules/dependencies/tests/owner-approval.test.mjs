@@ -155,7 +155,7 @@ test("dependency approval is bound to live owner authority and originating first
     assert.equal(setup.sqlite.prepare("SELECT completed FROM oa_setup_links WHERE interface='error-sink@1'").get().completed,0);
    }
   });
-  
+
   await step('only the originating first setup can enable provider sign-in; settings and native claims close eligibility transactionally',async t=>{
    const active=await runtime(t);
    assert.equal((await active.approveSetup()).status,200);
@@ -224,6 +224,3 @@ test("dependency approval is bound to live owner authority and originating first
    assert.equal((await unclaimed.dependencies().handle(request)).status,403);
   });
 })
-
-
-

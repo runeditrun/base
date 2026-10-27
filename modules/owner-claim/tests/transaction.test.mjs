@@ -55,7 +55,7 @@ test("atomic admission rechecks the complete timing boundary corpus", async t =>
       }
     });
   }
-  
+
   for (const elapsed of [299, 300, 301]) {
     await step(`atomic admission rechecks expiry after ${elapsed}s elapsed since verification`, async t => {
       const db = transactionDb(); t.after(() => db.close());
@@ -71,7 +71,7 @@ test("atomic admission rechecks the complete timing boundary corpus", async t =>
       }
     });
   }
-  
+
   await step('atomic admission guard independently refuses a lifetime over 300 seconds', async t => {
     const db = transactionDb(); t.after(() => db.close());
     const claim = { ...await verifiedClaim(now, now + 300), exp: now + 301 };
@@ -80,8 +80,3 @@ test("atomic admission rechecks the complete timing boundary corpus", async t =>
     assert.deepEqual(db.snapshot(), before);
   });
 })
-
-
-
-
-

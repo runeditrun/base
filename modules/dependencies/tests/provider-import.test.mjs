@@ -94,4 +94,3 @@ test("restored provider settings stay off until approved relink and explicit own
     }
   });
 })
-

@@ -44,7 +44,7 @@ test("review evidence retains audited failures, selects passing images and prune
     assert.ok(report.captures[1].axe.violations.length > 0);
     await manifest(runtime.evidence, report);
   });
-  
+
   await step('every policy keeps failures, selects passing images explicitly and records every audited state', async t => {
     const runtime = await fixture(t);
     for (const capturePolicy of [undefined, 'canonical', 'failures', 'exhaustive']) {
@@ -91,7 +91,7 @@ test("review evidence retains audited failures, selects passing images and prune
       await manifest(evidence, report);
     }
   });
-  
+
   await step('repeated public journeys bound owned history and preserve foreign folders, copied markers and symlinks', async t => {
     const runtime = await fixture(t);
     const directory = await temporary(t);
@@ -126,8 +126,3 @@ test("review evidence retains audited failures, selects passing images and prune
     }
   });
 })
-
-
-
-
-

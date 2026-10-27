@@ -66,12 +66,12 @@ test("erasure journey removes only the declared subject graph, fences it and res
     const { db, bucket, erasure, dump } = await fixture(t);
     const before = Object.fromEntries(await Promise.all(['people', 'notes', 'files', 'file_tags'].map(async n => [n, (await db.prepare(`SELECT * FROM ${n} WHERE ${n === 'file_tags' ? "file_id IN ('f0','f1','f2')" : n === 'people' ? "id='p1'" : "person_id='p1'"}`).all()).results])));
     const mentions = (await db.prepare('SELECT rowid AS rowid FROM mentions WHERE instr(body,?)>0').bind(`ada.${CANARY}@example.test`).all()).results;
-  
+
     const preview = await erasure.preview('person', { id: 'p1' });
     assert.deepEqual(preview.deleted, { people: 1, notes: 30, files: 3, file_tags: 3, mentions: 2 });
     assert.deepEqual([preview.blobs, preview.audited.audit_events, preview.retained], [3, 2, [{ table: 'opt_outs', reason: 'keyed opt-out hash prevents re-contact' }]]);
     assert.ok(!JSON.stringify(preview).includes(CANARY));
-  
+
     const opened = await erasure.start('person', { id: 'p1' }, { planHash: preview.planHash });
     assert.equal(opened.phase, 'deleting');
     const done = await erasure.run(opened.id, { rows: 7 });
@@ -79,7 +79,7 @@ test("erasure journey removes only the declared subject graph, fences it and res
     assert.deepEqual(done.deleted, done.planned);
     assert.deepEqual(done.blobs, { total: 3, deleted: 3 });
     assert.ok((await db.prepare('SELECT step FROM rer_erasure_operations WHERE id=?').bind(opened.id).first<{ step: number }>())!.step > 4, 'committed in several bounded steps');
-  
+
     const after = await dump();
     assert.ok(!after.includes(CANARY), 'no planted value survives in any table');
     assert.ok(!JSON.stringify(done).includes('p1') && !JSON.stringify(done).includes(CANARY));
@@ -89,7 +89,7 @@ test("erasure journey removes only the declared subject graph, fences it and res
     for (const [table, n] of [['people', 1], ['notes', 1], ['files', 1], ['opt_outs', 1], ['mentions', 1]] as const) assert.equal((await db.prepare(`SELECT count(*) AS n FROM ${table}`).first<{ n: number }>())!.n, n);
     for (const key of ['obj-0', 'obj-1', 'obj-2']) assert.equal(await bucket.head(key), null);
     assert.ok(await bucket.head('obj-peer'));
-  
+
     const source = (await db.prepare('SELECT source_identity FROM rer_portability_state WHERE id=1').first<{ source_identity: string }>())!.source_identity;
     const journal = new Set((await db.prepare('SELECT tombstone FROM rer_portability_journal').all<{ tombstone: string }>()).results.map(r => r.tombstone));
     const key = (table: string, row: any) => table === 'file_tags' ? { file_id: row.file_id, tag: row.tag } : { id: row.id };
@@ -97,7 +97,7 @@ test("erasure journey removes only the declared subject graph, fences it and res
     assert.equal(expected.length, 39);
     for (const [table, k] of expected) assert.ok(journal.has(await sha256(canonicalJson([source, table, k]))), `${table} row is fenced`);
   });
-  
+
   await step('BASE-DATA-003 erasing one subject takes only its rows from an integer id table, across bounded steps', async t => {
     const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: 'export default {fetch(){return new Response("ok")}}', compatibilityDate: '2026-09-01', d1Databases: { DB: 'integer-id' } }));
     t.after(() => mf.dispose());
@@ -114,7 +114,7 @@ test("erasure journey removes only the declared subject graph, fences it and res
     assert.deepEqual((await db.prepare('SELECT id,project FROM aliases ORDER BY id').all()).results, [{ id: 2, project: 'pa' }, { id: 3, project: 'pb' }, { id: 5, project: 'pa' }]);
     assert.deepEqual((await db.prepare('SELECT id FROM projects ORDER BY id').all()).results, [{ id: 'pa' }, { id: 'pb' }]);
   });
-  
+
   await step('BASE-DATA-003 interruption after the D1 commit reports pending, a repeated request changes nothing, and only the blob phase completes it', async t => {
     const { bucket, erasure, dump } = await fixture(t);
     const opened = await erasure.start('person', { id: 'p1' });
@@ -131,7 +131,7 @@ test("erasure journey removes only the declared subject graph, fences it and res
     assert.equal(complete.phase, 'complete');
     for (const key of ['obj-0', 'obj-1', 'obj-2']) assert.equal(await bucket.head(key), null);
   });
-  
+
   await step('BASE-DATA-003 an undeclared foreign-key dependent refuses the erasure before any change', async t => {
     const { erasure, dump } = await fixture(t, ['CREATE TABLE invoices(id TEXT PRIMARY KEY,person_id TEXT REFERENCES people(id) ON DELETE CASCADE)']);
     const snapshot = await dump();
@@ -139,7 +139,7 @@ test("erasure journey removes only the declared subject graph, fences it and res
     await assert.rejects(erasure.start('person', { id: 'p1' }), { code: 'undeclared_dependent:invoices:people' });
     assert.equal(await dump(), snapshot);
   });
-  
+
   await step('BASE-DATA-003 nativeStatements run inside import-kit erasure: kit custody, product cascade and fence commit in one batch', async t => {
     const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: 'export default {fetch(){return new Response("ok")}}', compatibilityDate: '2026-09-01', d1Databases: { DB: 'kit' } }));
     t.after(() => mf.dispose());
@@ -172,7 +172,7 @@ test("erasure journey removes only the declared subject graph, fences it and res
     const job = await createD1ImportJob(plan, { ...context, operationKey: 'kit-file', reviewedFingerprint: plan.fingerprint });
     await resumeD1Import(job.id, context);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM contacts').first<{ n: number }>())!.n, 2);
-  
+
     const portability = await createPortability({ db, policy: { product: 'kit-test', excludeTables: ['ik_%', 'sessions', 'rer_erasure_blobs', 'rer_erasure_guard'] } });
     const erasure = createErasure({ db, portability, declarations: [defineErasure({ entity: 'contact', root: { table: 'contacts' }, edges: [{ table: 'evidence', from: 'contacts', on: { id: 'id' } }] })] });
     const native = await erasure.nativeStatements('contact', { id: '0' });
@@ -188,12 +188,3 @@ test("erasure journey removes only the declared subject graph, fences it and res
     assert.equal((await erasure.deleteBlobs(native.operationId)).phase, 'complete');
   });
 })
-
-
-
-
-
-
-
-
-

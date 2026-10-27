@@ -64,7 +64,7 @@ test("container WebSocket upgrades preserve the app protocol, authentication and
    const clientClose=connect(t,url,'alice');await once(clientClose,'open');closed=once(clientClose,'close');clientClose.close(1000,'Done');assert.deepEqual(await closed,[1000,Buffer.from('Done')]);
    const shutdown=connect(t,url,'alice');await once(shutdown,'open');closed=once(shutdown,'close');await host.close();await closed;
   });
-  
+
   await step('container upgrade refusals retain HTTP status and use HTTP ingress/auth checks', {timeout:30000}, async t => {
    const {url} = await (await fixture(t))('alice');
    let result=await refused(url+'/refuse',{cookie:'session=alice',upgrade:'WebSocket'});assert.equal(result.status,403);assert.equal(result.body,'Origin denied');
@@ -72,7 +72,7 @@ test("container WebSocket upgrades preserve the app protocol, authentication and
    result=await refused(url,{upgrade:'h2c'});assert.equal(result.status,400);
    result=await refused(url,{cookie:'session=alice',origin:'https://evil.example.com'});assert.equal(result.status,403);
   });
-  
+
   await step('a socket authenticated for one visitor cannot enter another container', {timeout:30000}, async t => {
    const start=await fixture(t), alice=await start('alice'), bob=await start('bob');
    assert.equal((await refused(bob.url,{cookie:'session=alice'})).status,401);
@@ -82,8 +82,3 @@ test("container WebSocket upgrades preserve the app protocol, authentication and
    const echoed=once(a,'message');a.send('alice-only');assert.equal((await echoed)[0].toString(),'alice-only');
   });
 })
-
-
-
-
-

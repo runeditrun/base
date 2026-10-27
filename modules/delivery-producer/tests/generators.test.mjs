@@ -43,7 +43,7 @@ test("descriptor generation preserves identity and verification across valid and
     delete input.deployment.artifactFile;
     assert.equal(generateProjectDescriptor(input).deployment.artifactFile, 'rer-worker-artifact.json');
   });
-  
+
   await step('versioned optional visual permission never replaces required full verification', () => {
     const input = descriptor();
     assert.equal(Object.hasOwn(generateProjectDescriptor(input).operations, 'verificationProfiles'), false);
@@ -58,7 +58,7 @@ test("descriptor generation preserves identity and verification across valid and
     delete input.operations.verify;
     assert.throws(() => generateProjectDescriptor(input), /operations.verify/);
   });
-  
+
   await step('descriptor rejects unagreed shape, self-referential identity and malformed permissions', () => {
     for (const bad of [null, [], true, {}, {schema: 2}, {schema: '1'}, {schema: 1, fast: {}}, {schema: 1, visual: true}, {schema: 1, visual: []}, {schema: 1, visual: null}, {schema: 1, visual: {}}, {schema: 1, visual: {command: ''}}, {schema: 1, visual: {command: ' '.repeat(2)}}, {schema: 1, visual: {command: 'x'.repeat(2001)}}, {schema: 1, visual: {command: 'make visual', enabled: true}}, {schema: 1, visual: undefined}]) {
       const input = descriptor(); input.operations.verificationProfiles = bad;
@@ -95,7 +95,7 @@ test("managed caller generation preserves its ABI and refuses unsafe input", asy
     assert.match(edition, /build_profile: 'edition'/);
     assert.match(edition, /pnpm_version: '10.12.4'/);
   });
-  
+
   await step('caller rejects mutable refs, unsafe YAML or Actions interpolation and unknown inputs', () => {
     const good = {workflowRef, artifactFile: 'app.json'};
     for (const bad of ['main', 'v1', pin.slice(0, 7), pin.toUpperCase(), `${pin}\nname: injected`, '${{ github.sha }}']) assert.throws(() => generateManagedWorkflow({...good, workflowRef: `owner/repo/.github/workflows/trusted-build.yml@${bad}`}));
@@ -139,7 +139,7 @@ test("integration bundle preserves committed bytes and refuses unsafe source or 
     await assert.rejects(generateIntegrationBundle({projectRoot: f.projectRoot, output: f.output, repository: 'octocat/Hello-World', revision}), /fresh/);
     assert.equal(await readFile(join(f.projectRoot, 'management/integration/index.ts'), 'utf8'), 'dirty source');
   });
-  
+
   await step('bundle reads older full revision, supports explicit source path and ignores Git replacement objects', async t => {
     const f = await fixture(t);
     await f.put('adapters/custom/index.ts', 'old source'); const revision = f.commit();
@@ -149,7 +149,7 @@ test("integration bundle preserves committed bytes and refuses unsafe source or 
     assert.equal(manifest.sourcePath, 'adapters/custom');
     assert.equal(await readFile(join(f.output, 'index.ts'), 'utf8'), 'old source');
   });
-  
+
   await step('bundle rejects private, reserved and symlink blobs before creating output', async t => {
     for (const name of ['.env', '.env.example', 'nested/.dev.vars', '.npmrc', 'credentials.json', 'secrets.json', 'private.key', 'adoption.json']) {
       const f = await fixture(t);
@@ -163,7 +163,7 @@ test("integration bundle preserves committed bytes and refuses unsafe source or 
     const revision = f.commit();
     await assert.rejects(generateIntegrationBundle({projectRoot: f.projectRoot, output: f.output, repository: 'octocat/Hello-World', revision}), /symlink/);
   });
-  
+
   await step('bundle rejects path escapes, mutable/mismatched identities, source overwrite and unsafe output ancestors', async t => {
     const f = await fixture(t);
     await f.put('management/integration/index.ts', 'source'); const revision = f.commit();
@@ -181,7 +181,7 @@ test("integration bundle preserves committed bytes and refuses unsafe source or 
     await assert.rejects(generateIntegrationBundle(good), /fresh/);
     assert.equal(await readFile(join(f.projectRoot, 'management/integration/index.ts'), 'utf8'), 'source');
   });
-  
+
   await step('bundle rejects submodule entries and duplicate case-folded paths in committed trees', async t => {
     const f = await fixture(t);
     await f.put('management/integration/index.ts', 'source'); const original = f.commit();
@@ -196,12 +196,3 @@ test("integration bundle preserves committed bytes and refuses unsafe source or 
     await assert.rejects(lstat(f.output), {code: 'ENOENT'});
   });
 })
-
-
-
-
-
-
-
-
-

@@ -23,7 +23,7 @@ test("concurrent queue clients preserve every ledger update and FIFO lease acros
     const state = JSON.parse(await readFile(join(directory, 'state.json'), 'utf8'));
     assert.equal(state.sequence, 96);
   });
-  
+
   await step('8 real CLI clients in two repositories hold at most two leases and grant in FIFO order', async t => {
     const { directory } = await setup(t, { slots: 2 });
     const ledger = recordedState(directory, 2);
@@ -60,7 +60,7 @@ test("concurrent queue clients preserve every ledger update and FIFO lease acros
       await Promise.allSettled(jobs.map(job => job.done));
     }
   });
-  
+
   await step('a crashed lock contender is reclaimed, and a recycled PID cannot keep the lock', async t => {
     const { directory, queue } = await setup(t);
     const locks = join(directory, 'locks'); await mkdir(locks, { recursive: true });
@@ -70,8 +70,3 @@ test("concurrent queue clients preserve every ledger update and FIFO lease acros
     assert.equal((await queue.status()).admissionReason, 'queue empty');
   });
 })
-
-
-
-
-

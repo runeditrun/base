@@ -50,7 +50,7 @@ test("package production retains exact inputs and refuses identity or private-so
     assert.deepEqual(await readFile(again.workflow),await readFile(output.workflow));
     await assert.rejects(producePackage({root,config:policy}),/fresh/);
   });
-  
+
   await step('mismatched identities, invalid manifest selection and unsafe output fail without touching source', async t => {
     const root = await fixture(t);
     const policy = config();
@@ -67,7 +67,7 @@ test("package production retains exact inputs and refuses identity or private-so
     await assert.rejects(producePackage({root,config:policy}),/Private/);
     await assert.rejects(readFile(join(root,'rer-package/rer-project.json')));
   });
-  
+
   await step('SSH and credential-store build entries cannot be packaged', async t => {
     const root = await fixture(t), policy = config();
     for (const name of ['id_rsa','id_ed25519','id_ecdsa.pub','id_dsa','credentials','credentials.ini','credentials.toml','credentials.yaml']) {
@@ -109,5 +109,3 @@ test('workflow profiles are explicit and require full as the default', () => {
   assert.match(generateManagedWorkflow(input),/options: \[full\]/);
   for (const profiles of [[],['visual'],['full','full'],['full','arbitrary']]) assert.throws(() => generateManagedWorkflow({...input,verificationProfiles:profiles}));
 });
-
-

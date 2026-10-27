@@ -29,7 +29,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     assert.deepEqual(await deploymentSpec(root,policy), {schema:1,resources:[{kind:'d1',binding:'DB'},{kind:'queue',binding:'JOBS'}],migrations:[{binding:'DB',name:'001.sql',sha256:hash(sql),sql}],compatibilityDate:'2026-09-08',compatibilityFlags:['nodejs_compat'],durableObjects:[],durableObjectMigrations:[],publicVariables:{},secretNames:[],optionalSecretNames:[],schedules:['*/10 * * * *'],queueConsumers:[{binding:'JOBS',maxBatchSize:10,maxBatchTimeout:5,maxRetries:3}],healthPath:'/health',recovery:policy.recovery});
     assert(!JSON.stringify(await deploymentSpec(root,policy)).includes('source-account-id'));
   });
-  
+
   await step('HappyToHelp/Lamp binding shapes preserve queues, DO migration spelling and optional migrations', async t => {
     const config = emitted();
     config.r2_buckets = [{binding:'FILES',bucket_name:'source-files'}];
@@ -46,7 +46,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     assert.equal(spec.queueConsumers[0].maxRetries,0);
     assert.equal(spec.queueConsumers[0].deadLetterBinding,'JOBS_DEAD_LETTER');
   });
-  
+
   await step('migration hashes preserve BOM, CRLF and code-unit filename order', async t => {
     const root = await project(t);
     const bytes = Buffer.from('\ufeff-- retained bytes\r\nCREATE TABLE crlf(id INTEGER);\r\n');
@@ -58,7 +58,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     assert.equal(first.migrations[1].sha256,hash(bytes));
     assert.deepEqual(Buffer.from(first.migrations[1].sql),bytes);
   });
-  
+
   await step('UTF-8 corruption and migration authority cannot be packaged', async t => {
     const root = await project(t);
     for (const bytes of [Buffer.from([0xff]),Buffer.from('CREATE TABLE rer_migrations(id);')]) {
@@ -66,7 +66,7 @@ test("deployment specification preserves or refuses each emitted configuration",
       await assert.rejects(deploymentSpec(root,policy),/UTF-8|migration authority/);
     }
   });
-  
+
   await step('migration roots, duplicate identity and optional semantics are enforced', async t => {
     const root = await project(t);
     for (const options of [
@@ -83,7 +83,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     await symlink(join(root,'migrations/core/001.sql'),join(root,'migrations/core/linked.sql'));
     await assert.rejects(deploymentSpec(root,policy),/regular SQL/);
   });
-  
+
   await step('Wrangler input must be real, contained, regular JSON and not a symlink', async t => {
     const root = await project(t);
     await writeFile(join(root,'dist/server/invalid.json'),'{bad');
@@ -91,7 +91,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     for (const wranglerFile of ['../outside.json','linked.json','dist/server','dist/server/invalid.json','.env']) await assert.rejects(deploymentSpec(root,{...policy,wranglerFile}));
     await assert.rejects(deploymentSpec(root,{...policy,wranglerFile:'wrangler.toml'}),/ENOENT/);
   });
-  
+
   await step('all three email recipient modes retain independent sender restrictions', async t => {
     const config = emitted();
     config.send_email = [{name:'UNRESTRICTED'},{name:'FIXED',destination_address:'dest@example.test',allowed_sender_addresses:['sender@example.test']},{name:'LIST',allowed_destination_addresses:['one@example.test','two@example.test']}];
@@ -101,7 +101,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     assert(!spec.resources.some(row => row.binding === 'FIXED'));
     assert.equal(portableResourceCapability(spec).complete,true);
   });
-  
+
   await step('malformed or unknown email restrictions never become unrestricted', async t => {
     const root = await project(t);
     for (const item of [
@@ -116,7 +116,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     const config = emitted(); config.send_email = [{name:'EMAIL'},{name:'EMAIL'}]; await save(root,config);
     await assert.rejects(deploymentSpec(root,policy),/Duplicate/);
   });
-  
+
   await step('KV and Analytics are native resources with explicitly incomplete data portability', async t => {
     const config = emitted();
     config.kv_namespaces = [{binding:'CACHE',id:'source-kv'}]; config.analytics_engine_datasets = [{binding:'EVENTS',dataset:'source-events'}];
@@ -129,7 +129,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     assert.deepEqual(capability.retainedProviderData.map(row => row.binding),['EVENTS']);
     assert.throws(() => assertPortableResourceSupport(spec),/CACHE.*EVENTS.*ROOMS/);
   });
-  
+
   await step('unsupported native blocks, unknown future fields and erased nested options fail explicitly', async t => {
     const root = await project(t);
     for (const [field,value] of [
@@ -142,7 +142,7 @@ test("deployment specification preserves or refuses each emitted configuration",
       ['triggers',{crons:[],unknown:true}],['migrations',[{tag:'v1',future_classes:['X']}]],
     ]) { const config = emitted(); config[field] = value; await save(root,config); await assert.rejects(deploymentSpec(root,policy),/Unsupported|External/); }
   });
-  
+
   await step('binding namespace and queue limits are validated before a candidate is returned', async t => {
     const root = await project(t);
     for (const mutate of [
@@ -160,7 +160,7 @@ test("deployment specification preserves or refuses each emitted configuration",
     await assert.rejects(deploymentSpec(root,{...policy,secretNames:['DB']}),/Conflicting/);
     await assert.rejects(deploymentSpec(root,{...policy,secretNames:['KEY'],optionalSecretNames:['KEY']}),/Conflicting/);
   });
-  
+
   await step('duplicate JSON keys cannot erase bindings or recipient restrictions', async t => {
     const root = await project(t);
     for (const text of [
@@ -196,4 +196,3 @@ test('direct candidate schema validation rejects unknown fields and altered hash
     s => {s.queueConsumers[0].extra = true;},
   ]) { const invalid = structuredClone(spec); mutate(invalid); assert.throws(() => validateCandidateSpec(invalid)); }
 });
-

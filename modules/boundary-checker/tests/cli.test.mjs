@@ -18,7 +18,7 @@ test("boundary CLI reports malformed invocation or configuration with exact exit
     assert.equal(result.stdout, '')
     assert.equal(result.stderr, 'Boundary check configuration error: config: unknown key unknown\n')
   })
-  
+
   await step('CLI usage errors have exact output', async t => {
     const root = await project(t)
     for (const args of [['--unknown'], ['--config']]) {
@@ -27,7 +27,7 @@ test("boundary CLI reports malformed invocation or configuration with exact exit
       assert.equal(result.stderr, `Boundary check configuration error: Unknown or incomplete argument: ${args[0]}. Usage: node cli.mjs [--config <path>] [--json]\n`)
     }
   })
-  
+
   await step('CLI missing config and tsconfig exit 2', async t => {
     const root = await project(t)
     let result = run(root)
@@ -66,7 +66,7 @@ test("boundary CLI selects the consumer project for local or external configurat
     assert.equal(result.stdout, passed)
     assert.equal(result.stderr, '')
   })
-  
+
   await step('CLI external config checks the working project without writing into it', async t => {
     const root = await project(t)
     const other = await mkdtemp(resolve(tmpdir(), 'boundary-config-'))
@@ -77,6 +77,3 @@ test("boundary CLI selects the consumer project for local or external configurat
     assert.equal(result.stdout, passed)
   })
 })
-
-
-
