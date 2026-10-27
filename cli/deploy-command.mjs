@@ -17,7 +17,7 @@ import { rememberHookState, hookState } from './deploy-hook-record.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
-import { migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { settingKinds } from './deploy-settings.mjs';
 import { deployGuide, neededForRealDeploy, reportNeeded } from './deploy-needs.mjs';
@@ -189,6 +189,7 @@ export async function deployCommand(context) {
   const refused = [providerFailure(error,redact), assetFailure(error)].filter(Boolean).join('; '), migration = migrationFailure(error, again);
   const exchange = error.ownerExchange ?? (error.message === 'owner-claim-failed' ? observedClaims.lastExchange ?? observedClaims.at(-1) : undefined);
   const ownerCause = ownerExchangeFailure(exchange);
-  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${ownerCause ? ` (${ownerCause})` : ''}${error.cause ? ` (${error.cause})` : ''}.${migration ? ` ${migration}` : ''} Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`));
+  const d1Import = deployDiagnostic(error,redact)?.d1Import;
+  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${ownerCause ? ` (${ownerCause})` : ''}${error.cause ? ` (${error.cause})` : ''}.${migration ? ` ${migration}` : ''} Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`), d1Import ? {d1Import} : {});
  }
 }
