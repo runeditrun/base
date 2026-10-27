@@ -1,4 +1,4 @@
-import { runCases } from '../cases.ts';
+import { caseRow, runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isPublicAddress, validateDestination, declareEgress, validateEgressConfiguration } from '../../index.ts';
@@ -19,14 +19,16 @@ function save(address: string) {
 test("public address policy rejects unsafe aliases and ranges at every save boundary", async t => {
   // Each row keeps its original assertions and reports its own failure name.
   await runCases(t, [
-    ['public-address policy rejects every denied range endpoint and spelling', () => {
-  for (const address of deniedAddresses) assert.equal(isPublicAddress(address), false, address);
+    ['public-address policy rejects every denied range endpoint and spelling', async t => {
+  for (const address of deniedAddresses) await caseRow(t, `public-address policy rejects ${address}`, () => {
+    assert.equal(isPublicAddress(address), false, address);
+  });
 }],
-    ['literal configuration rejects every denied range endpoint and spelling', () => {
-  for (const address of deniedAddresses) {
+    ['literal configuration rejects every denied range endpoint and spelling', async t => {
+  for (const address of deniedAddresses) await caseRow(t, `literal configuration rejects ${address}`, () => {
     assert.throws(() => validateDestination(literalUrl(address)), /not public/, address);
     assert.throws(() => save(address), /Invalid public HTTPS egress destination/, address);
-  }
+  });
 }],
     ['public controls remain valid for the portable guard and saved egress configuration', () => {
   for (const address of publicAddresses) {
@@ -35,12 +37,12 @@ test("public address policy rejects unsafe aliases and ranges at every save boun
     assert.equal(save(address).destinationId, 'events');
   }
 }],
-    ['portable guard rejects noncanonical IPv4 spellings', () => {
+    ['portable guard rejects noncanonical IPv4 spellings', async t => {
   for (const address of ['0177.0.0.1', '010.0.0.1', '08.8.8.8', '8.08.8.8', '8.8.08.8',
     '8.8.8.08', '8.00.0.1', '8.0.000.1', '8.8.8.0000', '0008.8.8.8', '８.８.８.８',
-    '8\n.8.8.8', '8.8\n.8.8', '8.8.8\n.8', '8.8.8.8\n', '8.8.8.8\r']) {
+    '8\n.8.8.8', '8.8\n.8.8', '8.8.8\n.8', '8.8.8.8\n', '8.8.8.8\r']) await caseRow(t, `portable guard rejects noncanonical IPv4 ${address}`, () => {
     assert.equal(isPublicAddress(address), false, address);
-  }
+  });
 }],
     ['canonical decimal IPv4 and single-zero octets retain their public/private policy', () => {
   for (const address of ['177.0.0.1', '8.0.0.1', '8.8.8.0']) {
