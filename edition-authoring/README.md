@@ -214,7 +214,7 @@ own source declaration; the default Base publisher identity uses its public URL.
 **Verify.** `... verify-base` checks three things and exits nonzero on any finding:
 
 - local bytes against the record: `modified`, `missing`, `unrecorded` (a file
-  in a copied path that the record does not name), `not-a-file` and `mode` (a
+  in a copied path that neither the record nor its ownership exceptions name), `not-a-file` and `mode` (a
   script copied without its executable bit, or the reverse);
 - the record against Base at each recorded commit: `origin-missing`,
   `origin-mismatch` and `origin-mode`;
@@ -260,7 +260,16 @@ A delivered `.mjs` also brings its Base declaration sibling. A dependency keeps
 its relative destination only when an existing copy mapping witnesses that
 namespace. Tracked unrecorded dependencies stay seed-owned and stop traversal;
 new imports from refreshed files must find their named, type and default exports.
-Imports already unresolved in that same file before refresh remain untouched.
+Runtime imports of every form resolve independently of declaration-only files;
+only erased type imports may use declarations. Source TypeScript substitutions
+and extensionless bundler indexes remain supported. Relative `require` directory
+lookups use `package.json`'s runtime `main`, never its type metadata.
+Imports already unresolved in that same file before refresh remain untouched,
+except for missing authoring-toolkit bootstrap siblings and recorded removals.
+Refresh compares the retained ordinary unresolved set before writing.
+When a preserved tracked sibling becomes equal to incoming Base bytes, refresh
+adds its path to `ignore` as a discovery exception; it stays unrecorded and keeps
+its bytes and mode. Recorded files continue to receive their incoming Base mode.
 A newly adopted directory-copy module with no incoming planned import is withheld
 when a dependency has no witnessed destination; the result names it in `withheld`.
 A required module with that problem refuses the entire refresh.
@@ -386,7 +395,10 @@ read as ordinary Git and never inherits the projection identity. Lamp's
 Workflow refresh also supplies and records local scripts invoked in delivered
 workflows, deriving the paths from their run steps. Helpers and workflows share
 the existing preflight: a refused destination prevents every planned write.
-Tracked unrecorded helpers remain seed-owned; untracked or ignored collisions
+Workflow run scalars are read from the YAML document AST, including folded and
+continued scalars; literal shell paths use one quote-and-escape-aware scanner.
+Copied, default-seed and preserved seed-authored workflows use the same helper
+source search. Tracked unrecorded helpers remain seed-owned; untracked or ignored collisions
 refuse even when their bytes match Base. Tracked unrecorded Verify workflows
 and `VERIFY-WORKFLOW.md` can be adopted when their exact bytes match a template
 in the requested Base commit's history (there are no seed substitutions).

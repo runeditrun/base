@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {closureClasses} from './tests/closure-cases.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -310,6 +311,7 @@ test('refresh-base checks read-only destinations before updating any copy and pe
 });
 
 test('refresh-base closes authoring sibling imports while preserving edition-owned helpers', () => {
+  closureClasses({init, write, commit, git, run, ok, snapshotTree});
   const mirror = 'export/scripts/base-cli/edition-authoring';
   const cases = [
     {name: 'singleton transitive imports'},

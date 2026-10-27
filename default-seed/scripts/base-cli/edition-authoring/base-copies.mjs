@@ -217,7 +217,9 @@ export function verifyCopies(root, {record: recordPath, base, offline}) {
     for (const [name, file] of files) {
       if (!within(name, copy.path)) continue;
       if (!file.regular) drift.push({kind: 'not-a-file', path: name, copy: copy.path});
-      else if (!Object.hasOwn(copy.files, name)) drift.push({kind: 'unrecorded', path: name, copy: copy.path});
+      else if (!Object.hasOwn(copy.files, name)) {
+        if (!(record.ignore || []).some(p => within(name, p))) drift.push({kind: 'unrecorded', path: name, copy: copy.path});
+      }
       else if (Object.hasOwn(copy.adapted || {}, name)) {
         noLinks(root, name);
         drift.push(...acknowledgementDrift(root, copy, name, file, recordPath));
@@ -379,6 +381,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         ...(conflict ? {note: 'Upstream changed or removed this seed-owned adaptation; review and reconcile explicitly.',
           diffHint: `git -C <base> diff ${baseline} ${revision} -- ${JSON.stringify(originPath)}`} : {})};
     }));
+    const ownerSources = new Map();
     const plans = record.copies.map(copy => {
       // Absence is the existing directory-copy removal signal; there is no
       // separate deletion-intent marker. Only an absent, unadapted singleton
@@ -389,14 +392,17 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       const pinned = read.tree(copy.revision);
       if (retired) return {copy, sources: [], retired, removed: [copy.path]};
       const tests = Object.keys(copy.files).some(name => testSource(mapped(name, copy.path, copy.originPath)));
-      const sources = [...next].filter(([name, entry]) => {
+      const sources = [...next].filter(([name]) => {
         if (!within(name, copy.originPath)) return false;
         const target = mapped(name, copy.originPath, copy.path), actual = local(target);
         if (Object.hasOwn(copy.adapted || {}, target)) return false;
         if (Object.hasOwn(copy.files, target)) {
           return Boolean(actual);
         }
-        if (actual) return index.has(target) && actual === upstream.get(entry.object);
+        if (actual) {
+          if (index.has(target)) ownerSources.set(target, name);
+          return false; // Existing unrecorded source is edition-owned.
+        }
         return !pinned.has(name) && (tests || !testSource(name));
       });
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
@@ -405,7 +411,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     const templates = adoptWorkflowTemplates(root, plans, {tree: next, read, revision, files});
     notices = templates.notices;
     completeWorkflowHelpers(root, plans, {tree: next, read, revision});
-    const withheld = completeModuleCopies(root, plans, {tree: next, read, revision, base: origin.repository,
+    const withheld = completeModuleCopies(root, plans, {tree: next, read, revision, base: origin.repository, ownerSources,
       deliveries: migrations.flatMap(step => step.deliver.map(source => ({source, origin: step.origin, importers: step.copies})))});
     // Closure may add individually recorded siblings when the seed originally
     // selected runtime files one at a time instead of copying the directory.
@@ -414,7 +420,19 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     const applied = plans.flatMap(({copy, sources}) => sources.map(([source, {object}]) => [mapped(source, copy.originPath, copy.path), object])
       .filter(([name, object]) => name.split('/').slice(0, -1).includes('migrations') && local(name) && local(name) !== upstream.get(object)).map(([name]) => name));
     if (applied.length) throw Error(`Refusing to rewrite migrations that may already be applied: ${applied.join(', ')}. Base changed these files after they were copied; keep them as they are, drop them from ${recordPath}, and add a new migration for the change instead.`);
+    // A file already owned by the edition can become byte-equal when Base adds
+    // its own implementation. Preserve ownership explicitly for discovery; it
+    // must never enter the copy write plan merely because the bytes now match.
+    const ownedMatches = [...ownerSources].filter(([target, source]) => {
+      const entry = next.get(source);
+      return entry && local(target) === upstream.get(entry.object);
+    }).map(([target]) => target);
+    if (ownedMatches.length) record.ignore = [...new Set([...(record.ignore || []), ...ownedMatches])].sort();
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
+    const writes = plans.flatMap(({copy, sources}) => sources.map(([source, entry]) => ({
+      name: safe(mapped(source, copy.originPath, copy.path)), ...entry,
+    })));
+    const byName = new Map(writes.map(entry => [entry.name, entry]));
     const changes = [];
     for (const {copy, sources, removed} of plans) {
       const recorded = {}, modes = {}, added = [];
@@ -422,8 +440,9 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         recorded[name] = copy.files[name];
         if (copy.modes?.[name]) modes[name] = copy.modes[name];
       }
-      for (const [source, {object, mode}] of sources.sort(([a], [b]) => a.localeCompare(b))) {
+      for (const [source] of sources.sort(([a], [b]) => a.localeCompare(b))) {
         const name = safe(mapped(source, copy.originPath, copy.path));
+        const {object, mode} = byName.get(name);
         if (!Object.hasOwn(copy.files, name)) added.push(name);
         recorded[name] = upstream.get(object); modes[name] = mode;
       }
@@ -437,8 +456,9 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     writing = true;
     for (const {copy, sources, removed} of plans) {
       for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }
-      for (const [source, {object, mode}] of sources) {
+      for (const [source] of sources) {
         const name = safe(mapped(source, copy.originPath, copy.path));
+        const {object, mode} = byName.get(name);
         noLinks(root, name);
         const target = path.join(root, name);
         fs.mkdirSync(path.dirname(target), {recursive: true});

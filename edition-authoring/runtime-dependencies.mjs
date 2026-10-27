@@ -1,48 +1,46 @@
-import path from 'node:path';
+export {resolve} from './module-resolution.mjs';
 
-
-// Tokenize enough module syntax to ignore comments and quoted page/CSS content.
-// Static imports (including type imports), re-exports and literal import() /
-// require() calls share the same relative resolution below. Templates are page
-// content, never static module declarations.
-export function specifiers(source) {
-  const tokens = [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|[\w$]+|[^\s]/g)]
-    .map(match => match[0]).filter(token => !token.startsWith('//') && !token.startsWith('/*') && !token.startsWith('`'));
-  const result = [];
-  const literal = token => /^['"]\.{1,2}\//.test(token || '') ? token.slice(1, -1) : null;
-  for (let i = 0; i < tokens.length; i++) {
-    if (!['import', 'export', 'require'].includes(tokens[i])) continue;
-    if (tokens[i - 1] === '.' || (tokens[i] === 'require' && tokens[i + 1] !== '(')) continue;
-    if (tokens[i] === 'export' && !['{', '*', 'type'].includes(tokens[i + 1])) continue;
-    let value = literal(tokens[i + 1]);
-    if (tokens[i + 1] === '(') value = literal(tokens[i + 2]);
-    else if (!value) {
-      for (let j = i + 1; j < tokens.length && ![';', 'import', 'export'].includes(tokens[j]); j++) {
-        if (tokens[j] === 'from') { value = literal(tokens[j + 1]); break; }
-      }
+// Module edges retain their import kind and erased-type status before resolving.
+// Bindings are checked separately: a namespace or side-effect edge has no named
+// bindings, but has exactly the same runtime dependency as a named import.
+export function dependencies(source) {
+  const t = tokens(source), result = [];
+  const add = (token, kind, types = false) => {
+    const specifier = unquote(token);
+    if (specifier?.startsWith('.')) result.push({specifier: specifier.split(/[?#]/)[0], kind, types});
+  };
+  for (let i = 0; i < t.length; i++) {
+    const word = t[i];
+    if (!['import', 'export', 'require'].includes(word)) continue;
+    if (t[i - 1] === '.' && !(word === 'require' && t[i - 2] === 'module')) continue;
+    if (word === 'require') {
+      if (t[i + 1] === '(') add(t[i + 2], 'require');
+      else if (t[i + 1] === '.' && t[i + 2] === 'resolve' && t[i + 3] === '(') add(t[i + 4], 'require');
+      continue;
     }
-    if (value) result.push(value.split('?')[0]);
+    if (word === 'import' && t[i + 1] === '(') { add(t[i + 2], 'import'); continue; }
+    if (word === 'import' && unquote(t[i + 1]) !== null) { add(t[i + 1], 'import'); continue; }
+    if (word === 'export' && !['{', '*', 'type'].includes(t[i + 1])) continue;
+    let end = i + 1;
+    while (end < t.length && ![';', 'import', 'export', 'from'].includes(t[end])) end++;
+    if (t[end] !== 'from') continue;
+    const clause = t.slice(i + 1, end);
+    const erased = clause[0] === 'type' || clause[0] === '{' && clause.at(-1) === '}' &&
+      clause.slice(1, -1).length > 0 && clause.slice(1, -1).join(' ').split(' , ').every(item => item.startsWith('type '));
+    add(t[end + 1], 'import', erased);
   }
   return result;
 }
-
-export function resolve(tree, source, specifier) {
-  const name = path.posix.normalize(path.posix.join(path.posix.dirname(source), specifier.split('?')[0]));
-  const candidates = [name];
-  // TypeScript source commonly uses its emitted JS extension in imports.
-  const replacement = {'.js': ['.ts', '.tsx', '.d.ts'], '.mjs': ['.mts', '.d.mts'], '.cjs': ['.cts', '.d.cts']}[path.posix.extname(name)];
-  if (replacement) candidates.push(...replacement.map(extension => name.slice(0, -path.posix.extname(name).length) + extension));
-  if (!/\.(?:[cm]?[jt]s|[jt]sx|json)$/.test(name)) {
-    for (const suffix of ['.ts', '.tsx', '.mts', '.mjs', '.js', '.jsx', '.cts', '.cjs', '.json']) candidates.push(name + suffix, name + '/index' + suffix);
-  }
-  const found = candidates.find(candidate => tree.has(candidate));
-  return found;
-}
+export const specifiers = source => dependencies(source).map(edge => edge.specifier);
 
 // Binding checks are lexical: unknown export forms remain unknown, never absent.
 const tokens = source => [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|[\w$]+|[^\s]/g)]
-  .map(match => match[0]).filter(token => !/^(?:\/\/|\/\*|`)/.test(token));
-const unquote = value => /^['"]/.test(value ?? '') ? value.slice(1, -1) : null;
+  .map(match => match[0]).filter(token => !/^(?:\/\/|\/\*)/.test(token));
+const unquote = value => {
+  if (!/^['"`]/.test(value ?? '') || value[0] === '`' && value.includes('${')) return null;
+  return value.slice(1, -1).replace(/\\(?:x([\da-fA-F]{2})|u([\da-fA-F]{4})|([\s\S]))/g,
+    (_, x, u, character) => x || u ? String.fromCodePoint(parseInt(x ?? u, 16)) : character === '\n' ? '' : character);
+};
 export function bindings(source, types = false) {
   const t = tokens(source), result = new Map();
   for (let i = 0; i < t.length; i++) {

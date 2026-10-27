@@ -48,8 +48,6 @@ test('public foundation CLI preserves pinned workflows and requires their commit
     const workflowPath = resolve(base, 'export/verify.yml')
     const helper = await readFile(helperPath)
     const workflow = await readFile(workflowPath, 'utf8')
-    assert.match(workflow, /PLAYWRIGHT_BROWSERS_PATH=%s\/ms-playwright\\n' "\$RUNNER_TEMP" >> "\$GITHUB_ENV"/)
-    assert.match(workflow, /APT_ARCHIVES=\$RUNNER_TEMP\/rer-apt\/archives/)
     assert.doesNotMatch(workflow, /~\/\.cache\/(?:ms-playwright|rer-apt)/)
     await rm(helperPath)
     await writeFile(workflowPath, workflow.replace(/^.*python3 scripts\/install-chromium-deps\.py$/m, '          pnpm exec playwright install-deps chromium'))

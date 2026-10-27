@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {raw, safe, physicalEntry, requirePhysical} from './files.mjs';
+import {workflowScripts, literalPaths} from './workflow-scripts.mjs';
 
 const inside = (name, prefix) => name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
@@ -60,75 +61,37 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
   return {templateAdoptions, notices};
 }
 
-function runScalar(value) {
-  const single = /^'((?:''|[^'])*)'\s*(?:#.*)?$/.exec(value);
-  if (single) return single[1].replace(/''/g, "'");
-  const double = /^"((?:\\.|[^"\\])*)"\s*(?:#.*)?$/.exec(value);
-  if (!double) return value;
-  const escapes = {'0': '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b',
-    ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\u0085', _: '\u00a0', L: '\u2028', P: '\u2029'};
-  return double[1].replace(/\\(?:x([\da-fA-F]{2})|u([\da-fA-F]{4})|U([\da-fA-F]{8})|([\s\S]))/g, (_, x, u, U, character) => {
-    if (x || u || U) return String.fromCodePoint(parseInt(x ?? u ?? U, 16));
-    if (!Object.hasOwn(escapes, character)) throw Error(`Unsupported YAML escape in workflow run scalar: \\${character}`);
-    return escapes[character];
-  });
-}
-
-// Decode the YAML scalar before over-approximating shell words, then require a
-// source in the caller's template namespace. Wrappers and flags may invoke helpers.
 function invocations(text) {
-  const names = new Set();
-  const add = word => {
-    const relative = word.startsWith('./');
-    word = word.replace(/^\.\//, '');
-    if (!(relative || word.includes('/') || /\.[a-z0-9]+$/i.test(word)) || /[$*:]|^\//.test(word)) return;
-    try { names.add(safe(word)); } catch { /* Not a literal relative path. */ }
-  };
-  let blockIndent = null;
-  for (const line of text.split('\n')) {
-    const indent = line.search(/\S/);
-    if (indent < 0) continue;
-    if (blockIndent !== null && indent <= blockIndent) blockIndent = null;
-    const run = /^\s*(?:-\s*)?run:\s*(.*)$/.exec(line);
-    let command = blockIndent !== null ? line : '';
-    if (run) {
-      if (/^[|>](?:[1-9][-+]?|[-+][1-9]?)?\s*(?:#.*)?$/.test(run[1])) blockIndent = line.indexOf('run:');
-      else command = runScalar(run[1]);
-    }
-    const uses = /^\s*(?:-\s*)?uses:\s*['"]?\.\/(.*?)['"]?\s*(?:#.*)?$/.exec(line);
-    if (uses) add(uses[1]);
-    command = command.replace(/\$\(([^)]*)\)|`([^`]*)`/g, (_, a, b) => ' ' + (a ?? b) + ' ');
-    for (const match of command.matchAll(/#[^\n]*|'([^']*)'|"((?:\\.|[^"\\])*)"|[^\s;|&()<>]+/g)) {
-      if (match[0].startsWith('#')) break;
-      const word = match[1] ?? match[2] ?? match[0];
-      add(word);
-      for (const part of word.split(/\s+/)) add(part);
-    }
-  }
-  return [...names];
+  const {scripts, uses} = workflowScripts(text);
+  return [...new Set([...uses.map(name => safe(name.slice(2))), ...scripts.flatMap(literalPaths).map(safe)])];
 }
 
-function candidates(source, invoked) {
+function candidates(invoked) {
   if (invoked.startsWith('.github/workflows/')) return ['export/' + path.posix.basename(invoked), 'default-seed/' + invoked];
-  if (source.startsWith('default-seed/')) return ['default-seed/' + invoked, 'export/' + invoked.replace(/^scripts\//, '')];
-  if (source.startsWith('export/')) return ['export/' + invoked.replace(/^scripts\//, ''), 'default-seed/' + invoked,
-    ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])].filter(name => !name.startsWith('scripts/') && !name.startsWith('.github/workflows/'));
-  return [];
+  return ['export/' + invoked.replace(/^scripts\//, ''), 'default-seed/' + invoked,
+    ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])];
 }
 
 export function completeWorkflowHelpers(root, plans, {tree, read, revision}) {
   const index = tracked(root);
   const queue = plans.flatMap(plan => plan.sources.filter(([source]) => /(?:^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(mapped(source, plan.copy)))
     .map(([source, entry]) => ({source, entry, target: mapped(source, plan.copy)})));
+  // Preserved and adapted workflows have the same helper requirements as a
+  // copied workflow. Parse the bytes that will actually remain in the seed.
+  const queued = new Set(queue.map(item => item.target));
+  for (const target of index) if (/(?:^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(target) && !queued.has(target)) {
+    const {stat} = requirePhysical(root, target);
+    if (stat) queue.push({target});
+  }
   const seen = new Set();
   for (let i = 0; i < queue.length; i++) {
-    const {source, entry, target} = queue[i];
+    const {entry, target} = queue[i];
     if (seen.has(target)) continue;
     seen.add(target);
     const destinationRoot = target.includes('.github/workflows/') ? target.slice(0, target.indexOf('.github/workflows/')) : '';
-    const text = read.blobs([entry.object]).get(entry.object).toString('utf8');
+    const text = entry ? read.blobs([entry.object]).get(entry.object).toString('utf8') : fs.readFileSync(path.join(root, target), 'utf8');
     for (const invoked of invocations(text)) {
-      const dependency = candidates(source, invoked).find(name => tree.has(name));
+      const dependency = candidates(invoked).find(name => tree.has(name));
       if (!dependency) continue;
       const destination = safe(destinationRoot + invoked);
       const {stat} = requirePhysical(root, destination);
