@@ -1,3 +1,6 @@
+import {checkCases} from './test-fixture.mjs';
+const outputCases = [];
+const outputCase = (name, check) => outputCases.push([name, check]);
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -156,7 +159,7 @@ function eachRow(rows, check) {
  assert.deepEqual(failures, []);
 }
 
-test('table: secret-bearing shapes redact in complete text, byte-split streams and long lines', () => {
+outputCase('table: secret-bearing shapes redact in complete text, byte-split streams and long lines', () => {
  assert.ok(secretShapes.length + registeredShapes.length + prose.length >= 110);
  eachRow(secretShapes, (shape, text, privateParts, exactOutput) => {
   const redaction = createRedaction();
@@ -174,7 +177,7 @@ test('table: secret-bearing shapes redact in complete text, byte-split streams a
  });
 });
 
-test('table: re-encodings and parts of registered values redact', () => {
+outputCase('table: re-encodings and parts of registered values redact', () => {
  eachRow(registeredShapes, (shape, secrets, text, privateParts) => {
   const redaction = createRedaction(); redaction.addSecrets(secrets);
   privateOutput(redaction.redact(`BEFORE_MARKER ${text} AFTER_MARKER`), privateParts);
@@ -185,7 +188,7 @@ test('table: re-encodings and parts of registered values redact', () => {
  });
 });
 
-test('table: diagnostic prose stays intact as complete text and as a final unterminated line', () => {
+outputCase('table: diagnostic prose stays intact as complete text and as a final unterminated line', () => {
  eachRow(prose.map(text => [text]), text => {
   const redaction = createRedaction();
   assert.equal(redaction.redact(text), text);
@@ -196,7 +199,7 @@ test('table: diagnostic prose stays intact as complete text and as a final unter
  });
 });
 
-test('step labels, reports and a final unterminated child line reach every sink unchanged', async t => {
+outputCase('step labels, reports and a final unterminated child line reach every sink unchanged', async t => {
  const root = await mkdtemp(join(tmpdir(), 'redaction-shapes-')); const state = { logs: [] }; let terminal = '';
  const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.exitCode = null; child.signalCode = null;
  const store = await createCommands(root, state, { spawn: () => child, terminal: text => { terminal += text; } });
@@ -250,7 +253,7 @@ test('acronym-prefixed credential variables register their values', () => {
  assert.deepEqual(credentialValues(values), Object.values(values));
 });
 
-test('camelCase prefix and JWT holds protect long values split beyond the output window', () => {
+outputCase('camelCase prefix and JWT holds protect long values split beyond the output window', () => {
  for (const [name, prefix, value, suffix, privatePart] of [
   ['camelCase', 'refreshToken:' + ' '.repeat(700), 'test-synthetic-refresh-' + 'a'.repeat(700), ' end', 'synthetic-refresh'],
   ['acronym', 'APIToken:' + ' '.repeat(700), 'test-synthetic-api-' + 'a'.repeat(700), ' end', 'synthetic-api'],
@@ -265,7 +268,7 @@ test('camelCase prefix and JWT holds protect long values split beyond the output
  }
 });
 
-test('oversized quoted credentials stay bounded and private until their closing quote', () => {
+outputCase('oversized quoted credentials stay bounded and private until their closing quote', () => {
  for (const prefix of ['refreshToken="', "APIToken='", '--token "']) {
   const quote = prefix.at(-1), redaction = createRedaction(); let output = '';
   const stream = redaction.stream(chunk => { output += chunk; });
@@ -288,3 +291,5 @@ test('oversized quoted credentials stay bounded and private until their closing 
   assert.ok(!output.includes('opaque-synthetic-fragment'));
  }
 });
+
+test('redacted output preserves public diagnostics across input shapes and stream boundaries', () => checkCases(outputCases));

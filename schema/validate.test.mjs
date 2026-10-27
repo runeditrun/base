@@ -1,3 +1,4 @@
+import {checkCases} from './test-fixture.mjs';
 // node --test schema/validate.test.mjs
 //
 // Two things are under test: the schemas say what a release and a manifest must
@@ -12,6 +13,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { checkSchema, validate } from './json-schema.mjs';
 import { validateSetupManifest } from './setup-validation.mjs';
+
+const releaseCases = [], seedCases = [], schemaCases = [];
+const releaseCase = (name, check) => releaseCases.push([name, check]);
+const seedCase = (name, check) => seedCases.push([name, check]);
+const schemaCase = (name, check) => schemaCases.push([name, check]);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (name) => JSON.parse(readFileSync(join(here, name), 'utf8'));
@@ -38,11 +44,11 @@ const RELEASE = `{
 const withRoot = (json) => RELEASE.replace('{', `{${json},`);
 const withClause = (json) => RELEASE.replace('"HOME-001": {', `"HOME-001": {${json},`);
 
-test('the release schema states only rules the validator enforces', () => {
+releaseCase('the release schema states only rules the validator enforces', () => {
   assert.doesNotThrow(() => checkSchema(releaseSchema));
 });
 
-test('the minimal release and the worked example validate', () => {
+releaseCase('the minimal release and the worked example validate', () => {
   assert.deepEqual(validate(releaseSchema, JSON.parse(RELEASE)), []);
   assert.deepEqual(validate(releaseSchema, read('RELEASE.example.json')), []);
 });
@@ -73,7 +79,7 @@ const releaseProbes = [
 ];
 
 for (const [name, text, expected] of releaseProbes) {
-  test(`rejects ${name}`, () => {
+  releaseCase(`rejects ${name}`, () => {
     const errors = validate(releaseSchema, JSON.parse(text));
     assert.ok(
       errors.some((error) => error.includes(expected)),
@@ -120,16 +126,16 @@ const SEED = `{
 
 const withSeedRoot = (json) => SEED.replace('{', `{${json},`);
 
-test('the seed schema states only rules the validator enforces', () => {
+seedCase('the seed schema states only rules the validator enforces', () => {
   assert.doesNotThrow(() => checkSchema(seedSchema));
 });
 
-test('the minimal manifest and the worked example validate', () => {
+seedCase('the minimal manifest and the worked example validate', () => {
   assert.deepEqual(validate(seedSchema, JSON.parse(SEED)), []);
   assert.deepEqual(validate(seedSchema, read('SEED.example.json')), []);
 });
 
-test('an edition that exists validates as readily as one that does not', () => {
+seedCase('an edition that exists validates as readily as one that does not', () => {
   const withEdition = SEED.replace('"edition": null', '"edition": "notion"');
   assert.deepEqual(validate(seedSchema, JSON.parse(withEdition)), []);
 });
@@ -177,7 +183,7 @@ const seedProbes = [
 ];
 
 for (const [name, text, expected] of seedProbes) {
-  test(`the manifest rejects ${name}`, () => {
+  seedCase(`the manifest rejects ${name}`, () => {
     const errors = validate(seedSchema, JSON.parse(text));
     assert.ok(
       errors.some((error) => error.includes(expected)),
@@ -215,7 +221,7 @@ test('required is satisfied only by own properties', () => {
 // The schema walk. validate only sees the subschemas a document reaches, so these
 // unsupported keywords are invisible to it and have to be caught before any
 // document is read.
-test('an unsupported keyword in an unused $def throws', () => {
+schemaCase('an unsupported keyword in an unused $def throws', () => {
   const probe = {
     type: 'object',
     properties: { a: { type: 'string' } },
@@ -225,13 +231,13 @@ test('an unsupported keyword in an unused $def throws', () => {
   assert.throws(() => checkSchema(probe), /unsupported schema keyword "maxProperties" at #\/\$defs\/unused/);
 });
 
-test('an unsupported keyword on an absent property throws', () => {
+schemaCase('an unsupported keyword on an absent property throws', () => {
   const probe = { type: 'object', properties: { absent: { type: 'string', maxLength: 3 } } };
   assert.deepEqual(validate(probe, {}), [], 'validate cannot see a property no document carries');
   assert.throws(() => checkSchema(probe), /unsupported schema keyword "maxLength" at #\/properties\/absent/);
 });
 
-test('an unsupported keyword in an untaken conditional branch throws', () => {
+schemaCase('an unsupported keyword in an untaken conditional branch throws', () => {
   const probe = {
     type: 'object',
     allOf: [{
@@ -244,7 +250,7 @@ test('an unsupported keyword in an untaken conditional branch throws', () => {
   assert.throws(() => checkSchema({not: {minProperties: 1}}), /unsupported schema keyword "minProperties" at #\/not/);
 });
 
-test('an unsupported format anywhere in the schema throws', () => {
+schemaCase('an unsupported format anywhere in the schema throws', () => {
   const probe = { type: 'object', properties: { site: { type: 'string', format: 'uri' } } };
   assert.throws(() => checkSchema(probe), /unsupported format "uri" at #\/properties\/site/);
 });
@@ -258,7 +264,7 @@ test('a union type accepts either member and nothing else', () => {
   assert.deepEqual(validate(probe, ''), ['$: must not be empty'], 'the string keywords still apply to the string member');
 });
 
-test('a type name the validator does not know throws, in either form', () => {
+schemaCase('a type name the validator does not know throws, in either form', () => {
   assert.throws(() => checkSchema({ type: 'strng' }), /unsupported type "strng" at #/);
   const union = { type: 'object', properties: { edition: { type: ['string', 'nul'] } } };
   assert.deepEqual(validate(union, JSON.parse('{"edition": null}')), ['$.edition: expected string or nul, got null']);
@@ -266,7 +272,7 @@ test('a type name the validator does not know throws, in either form', () => {
 });
 
 
-test('release authors can declare structured shots and invalid galleries are refused', () => {
+releaseCase('release authors can declare structured shots and invalid galleries are refused', () => {
   const release = JSON.parse(RELEASE);
   const shot = { path: 'shots/workbench.webp', alt: 'The workbench', caption: 'Current work.', width: 1600, height: 1000 };
   release.screenshots = [shot];
@@ -276,3 +282,7 @@ test('release authors can declare structured shots and invalid galleries are ref
   release.screenshots = [{ path: 'shots/incomplete.webp' }];
   assert.ok(validate(releaseSchema, release).length > 0);
 });
+
+test('release schema accepts supported releases and refuses malformed releases', () => checkCases(releaseCases));
+test('seed schema accepts supported manifests and refuses malformed manifests', () => checkCases(seedCases));
+test('schema checking refuses unsupported rules even in unreachable branches', () => checkCases(schemaCases));
