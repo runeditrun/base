@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Make the separate install and start recipe use the installed launcher without a PATH prerequisite. Explain frozen lockfile refusals with one cause and a runnable repair command; retain pnpm codes and captured output in JSON.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

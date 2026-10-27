@@ -14,9 +14,9 @@ import { readPackage } from '../update/archive.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 
-function run(program, args, env, input) {
+function run(program, args, env, input, cwd) {
  return new Promise((resolveRun, reject) => {
-  const child = spawn(program, args, { env, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+  const child = spawn(program, args, { env, cwd, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
   if (input !== undefined) child.stdin.end(input);
   let stdout = '', stderr = '';
   child.stdout.on('data', data => { stdout += data; });
@@ -85,7 +85,55 @@ test('install.sh and rer update install verified registry releases, the Run page
  const installed = await run('sh', [installer], env);
  assert.equal(installed.code, 0, installed.stderr);
  assert.equal(await selected(), manifest.version);
+ const readme = entries.find(entry => entry.path === 'README.md').data.toString();
+ const separate = /```sh\ncurl[^\n]+\n([^\n]+)\n```/.exec(readme)?.[1];
+ assert.ok(separate?.startsWith('"$HOME/.local/bin/rer" dev '), 'the literal README second step names the installed launcher');
+ const literal = await run('sh', ['-c', separate + ' --help'], env);
+ assert.equal(literal.code, 0, literal.stderr);
+ assert.match(literal.stdout, /Usage: rer dev/);
+
  assert.deepEqual(await readdir(bin), ['node'], 'installation never writes into another writable PATH directory');
+ // A stale lockfile reaches the packed CLI, with the real pinned pnpm and a
+ // local dependency, so diagnosis and its next command need no registry.
+ const fixture = join(directory, 'synthetic-base-1');
+ await mkdir(fixture);
+ await writeFile(join(fixture, '.node-version'), process.versions.node + '\n');
+ const packagePath = join(fixture, 'package.json');
+ const pkg = { name: 'synthetic-base-1', private: true, packageManager: 'pnpm@10.12.4', engines: { node: process.versions.node } };
+ await writeFile(packagePath, JSON.stringify(pkg));
+ const pnpmEnv = { ...process.env, HOME: home, CI: 'true' };
+ const locked = await run('pnpm', ['install', '--lockfile-only'], pnpmEnv, undefined, fixture);
+ assert.equal(locked.code, 0, locked.stderr);
+ await mkdir(join(fixture, 'dependency'));
+ await writeFile(join(fixture, 'dependency/package.json'), JSON.stringify({ name: 'synthetic-base-2', version: '1.0.0' }));
+ pkg.dependencies = { 'synthetic-base-2': 'file:./dependency' };
+ await writeFile(packagePath, JSON.stringify(pkg));
+ const current = join(home, '.local/share/rer/current');
+ await writeFile(join(fixture, 'adapter.mjs'), `import { localInstaller } from ${JSON.stringify('file://' + join(current, 'onboarding/adapter.mjs'))};
+import { commandAdapter as declare } from ${JSON.stringify('file://' + join(current, 'cli/adapter.mjs'))};
+export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled: false });
+`);
+ await writeFile(join(fixture, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-base-1', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { install: { argv: ['node', 'adapter.mjs'], inputs: [], effects: 'Install dependencies.' } } }));
+ const failed = await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture);
+ t.diagnostic(`Stale packed install: ${failed.code}\n${failed.stdout}${failed.stderr}`);
+ assert.notEqual(failed.code, 0);
+ assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json/);
+ assert.doesNotMatch(failed.stdout + failed.stderr, /ERR_PNPM_|Last 20|Command:|Exit code:/);
+ const data = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
+ const diagnostic = data.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error');
+ assert.equal(diagnostic.code, 'ERR_PNPM_OUTDATED_LOCKFILE');
+ assert.ok(diagnostic.step.output.some(line => line.includes('ERR_PNPM_OUTDATED_LOCKFILE')));
+ const next = /run (.+) to update it, then retry/.exec(failed.stderr)?.[1];
+ assert.ok(next, failed.stderr);
+ const repaired = await run('sh', ['-c', next], pnpmEnv, undefined, fixture);
+ assert.equal(repaired.code, 0, repaired.stdout + repaired.stderr);
+ assert.equal((await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture)).code, 0);
+ await rm(join(fixture, 'pnpm-lock.yaml'));
+ const absent = await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture);
+ assert.notEqual(absent.code, 0);
+ assert.match(absent.stderr, /pnpm-lock.yaml is missing/);
+ assert.doesNotMatch(absent.stdout + absent.stderr, /ERR_PNPM_/);
+
  // The installer's last line puts rer on PATH: in the shell that runs it, and
  // in a new login shell of the person's SHELL that starts without it.
  const activate = output => { const last = output.trimEnd().split('\n').at(-1).trim(); return last.includes('.local/bin') ? last : undefined; };
