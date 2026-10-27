@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { notFoundResponse, rejectedResponse } from './runtime/rejected-response.ts';
@@ -11,8 +11,8 @@ function streamedRequest(body) {
   });
 }
 
-test('rejected upload draining preserves usable responses and refuses oversized or stalled bodies', { timeout: 5_000 }, () => checkCases([
-  ["rejected uploads drain readable bodies and preserve the supplied response", () => checkCases([
+test('rejected upload draining preserves usable responses and refuses oversized or stalled bodies', { timeout: 5_000 }, t => caseRows(t, [
+  ["rejected uploads drain readable bodies and preserve the supplied response", t => caseRows(t, [
   ['drains ordinary JSON and preserves the supplied response', async () => {
   const request = new Request('https://example.test/missing', {
     method: 'POST',

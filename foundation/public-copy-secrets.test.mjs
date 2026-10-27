@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs'
+import { caseRows } from '../onboarding/test-fixture.mjs'
 import { test } from 'node:test'
 import { randomBytes } from 'node:crypto'
 import assert from 'node:assert/strict'
@@ -76,7 +76,7 @@ process.exitCode = code === 200 ? 0 : 1
   return directory
 }
 
-test("native publication accepts complete copied folders and exact reviewed fictional references with full guarantees", () => checkCases([
+test("native publication accepts complete copied folders and exact reviewed fictional references with full guarantees", t => caseRows(t, [
   ['publish-check passes over a repository holding only the copied folders', t => {
   const work = realpathSync(mkdtempSync(join(tmpdir(), 'public-copy-secrets-')))
   t.after(() => rmSync(work, { recursive: true, force: true }))
@@ -111,7 +111,7 @@ test("native publication accepts complete copied folders and exact reviewed fict
   const modules = [...new Set(files.map(file => file.split('/').slice(0, 2).join('/')))].sort()
   assert.ok(files.length > 600, 'All tracked module files, not just production entry points')
   assert.ok(modules.includes('modules/import-kit'))
-  await checkCases(modules.map(module => [module, t => {
+  await caseRows(t, modules.map(module => [module, t => {
     const copy = files.filter(file => file.startsWith(module + '/'))
     assert.ok(copy.length, module)
     const { run, report, references } = scanModuleCopy(t, copy)
@@ -174,7 +174,7 @@ function scanModuleCopy(t, files, extra = {}, states = {}) {
 
 test('module reference check rejects private, missing and unreviewed repositories', async t => {
   const file = 'src/base/modules/import-kit/future/source.json'
-  await checkCases([
+  await caseRows(t, [
     ['private', 'hygiene.github-private', 'FAIL', 1],
     ['missing', 'hygiene.github-missing', 'FAIL', 1],
     ['unknown', 'scan.github-incomplete', 'INCOMPLETE', 2],
@@ -191,7 +191,7 @@ test('module reference check rejects private, missing and unreviewed repositorie
 
 
 test('relocated copy regressions reject source declarations and stated README repositories', async t => {
-  await checkCases(['js', 'ts'].map(extension => [extension, t => {
+  await caseRows(t, ['js', 'ts'].map(extension => [extension, t => {
     const file = `src/base/modules/import-kit/tests/mutation.${extension}`
     const repository = `fixture-${randomBytes(8).toString('hex')}/source`
     const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'],
@@ -201,7 +201,7 @@ test('relocated copy regressions reject source declarations and stated README re
     assert.equal(report.status, 'FAIL')
     assert.deepEqual(references.map(f => `${f.rule} ${f.path}`), [`hygiene.github-private ${file}`])
   }]));
-  await checkCases([['README relocation: a root path names a repository only with GitHub context', t => {
+  await caseRows(t, [['README relocation: a root path names a repository only with GitHub context', t => {
     const file = 'src/base/modules/sendgrid-email/README.md'
     const original = readFileSync(join(root, 'modules/sendgrid-email/README.md'), 'utf8')
     const states = { 'modules/sendgrid-email': 'missing' }
@@ -220,7 +220,7 @@ test('relocated copy regressions reject source declarations and stated README re
 
 test('fictional examples never exempt nearby names, real private repositories or explicit states', async t => {
   const file = 'src/base/modules/import-kit/future/source.json'
-  await checkCases([
+  await caseRows(t, [
     ['nearby name', 'example-owner/example-repo-nearby', undefined, 'scan.github-incomplete', 'INCOMPLETE', 2],
     ['real private repository', 'runeditrun/base', 'private', 'hygiene.github-private', 'FAIL', 1],
     ['fictional private override', 'example-owner/example-repo', 'private', 'hygiene.github-private', 'FAIL', 1],

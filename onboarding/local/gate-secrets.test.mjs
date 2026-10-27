@@ -1,4 +1,4 @@
-import { checkCases } from '../test-fixture.mjs';
+import { caseRows } from '../test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 const execute=promisify(execFile);
-test("CLI manifest secrets remain private across saved success and failure reruns including path metadata", () => checkCases([
+test("CLI manifest secrets remain private across saved success and failure reruns including path metadata", t => caseRows(t, [
   ...[false,true].flatMap(pathValue => ['success','failure'].map(ending => [`table: CLI manifest secrets are excluded from every command and redacted on a saved ${ending} rerun${pathValue?' including private path metadata':''}`, async t=>{
  const root=await mkdtemp(join(tmpdir(),'cli-gate-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const declaredNames=['COOKIE_KEY','BOOTSTRAP_KEY','OPAQUE_VALUE'];

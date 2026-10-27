@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, readFile, rm} from 'node:fs/promises';
@@ -38,7 +38,7 @@ async function session(t,root,options={}) {
  return {server,call:async(path,value)=>fetch(server.origin+path,{headers,...(value===undefined?{}:{method:'POST',body:JSON.stringify(value)})})};
 }
 
-test("approved settings lifecycle replaces public and entered answers without reviving invalidated secrets", () => checkCases([
+test("approved settings lifecycle replaces public and entered answers without reviving invalidated secrets", t => caseRows(t, [
   ...['dotenv','json'].map(format => [`approved public and entered replacements win over saved ${format} settings, generated values and exact reruns survive`, async t=>{
  const root=await fixture(t);
  const saved={MODE:'first',OPAQUE_VALUE:'synthetic prior private value',COOKIE_KEY:'synthetic generated cookie',BOOTSTRAP_KEY:'synthetic generated bootstrap',UNRELATED:'owner setting'};
@@ -112,7 +112,7 @@ test('saved manifest secrets are redacted before any seed artwork callback captu
  }
 });
 
-test("manifest boundary inputs retain valid values and refuse an external selection before execution", () => checkCases([
+test("manifest boundary inputs retain valid values and refuse an external selection before execution", t => caseRows(t, [
   ['valid manifest values at the shared limit survive defaults, answers files, drafts, secure input, transport and resume', async t=>{
  const publicValue='🙂'.repeat(8192),privateValue='x'.repeat(16384);
  const value={schema:1,title:'Limits',groups:[],fields:[{name:'NOTE',label:'Note',kind:'text',default:publicValue},{name:'PRIVATE_NOTE',label:'Private note',kind:'secret',input:'entered',ownerVisible:true,required:true}],steps:[{type:'extension',id:'limits'}]};

@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -11,7 +11,7 @@ const table = [{ pid: 4242, ppid: 1, pgid: 4242, uid: 501, state: 'S', birth: 'T
 
 // The process edge is the reader: ps can hand back a half-written row while a
 // process exits, which must not end a cleanup whose own processes are known.
-test("process inspection retries transient reads within bounds and preserves slow successful cleanup", () => checkCases([
+test("process inspection retries transient reads within bounds and preserves slow successful cleanup", t => caseRows(t, [
   ['a transient process-table read is retried until it succeeds', async () => {
   let reads = 0
   const read = async () => { if (++reads < 4) throw transient(); return table }

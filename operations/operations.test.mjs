@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +20,7 @@ async function fixture(t) {
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 1, edition: 'test', requiredEnvironment: ['SECRET'], acceptance: { document: 'ACCEPTANCE.md' }, commands: Object.fromEntries(['setup', 'deploy', 'verify'].map(name => [name, { argv: ['pnpm', 'run', name], effects: 'test operation' }])) }));
   return root;
 }
-test("local inspection reports configuration and command availability without executing commands", () => checkCases([
+test("local inspection reports configuration and command availability without executing commands", t => caseRows(t, [
   ['reports all missing inputs without executing operational commands', async t => {
   const report = await inspectOperations(await fixture(t), {});
   assert.equal(report.ok, false);
@@ -93,7 +93,7 @@ test("local inspection reports configuration and command availability without ex
 
 
 
-test("environment source descriptions guide missing-input recovery and reject unsafe values in both descriptor versions", () => checkCases([
+test("environment source descriptions guide missing-input recovery and reject unsafe values in both descriptor versions", t => caseRows(t, [
   ['v1 environment sources describe where missing required inputs come from', async t => {
   const root = await fixture(t);
   const descriptor = JSON.parse(await readFile(join(root, 'OPERATIONS.json'), 'utf8'));
@@ -199,7 +199,7 @@ async function projectFixture(t) {
   return { root, descriptor };
 }
 
-test("independent project inspection validates declared commands, files and configuration", () => checkCases([
+test("independent project inspection validates declared commands, files and configuration", t => caseRows(t, [
   ['independent Python project inspects and runs its own command without edition, seed, package or pnpm files', async t => {
   const { root, descriptor } = await projectFixture(t);
   assert.deepEqual(await describeOperations(root), descriptor);

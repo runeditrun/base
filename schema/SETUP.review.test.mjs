@@ -1,4 +1,4 @@
-import {checkCases} from './test-fixture.mjs';
+import {caseRows} from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -86,4 +86,4 @@ test('portable negative corpus rejects malformed manifests and parser inputs',()
  }
 });
 
-test('setup manifest input policies accept supported forms and reject unsafe forms', () => checkCases(manifestCases));
+test('setup manifest input policies accept supported forms and reject unsafe forms', t => caseRows(t, manifestCases));

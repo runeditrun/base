@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, chmod, stat, symlink, link, rm } from 'node:fs/promises';
@@ -11,7 +11,7 @@ const origin='https://owner.example';
 async function workspace(t){const root=await mkdtemp(join(tmpdir(),'installer-private-'));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
 async function mode(path, expected){assert.equal((await stat(path)).mode&0o777,expected);}
 
-test("installation receipts remain private, exclusive and resumable across updates and interruption", () => checkCases([
+test("installation receipts remain private, exclusive and resumable across updates and interruption", t => caseRows(t, [
   ['resume tightens private directories and receipts without losing credentials or unknown outcome', async t=>{
  const root=await workspace(t),path=join(root,'.seed/installer/private',createHash('sha256').update(origin).digest('hex')+'.json');
  await mkdir(join(root,'.seed/installer/private'),{recursive:true});
@@ -51,7 +51,7 @@ test("installation receipts remain private, exclusive and resumable across updat
 }]
 ]));
 
-test("private local storage preserves owner bytes and refuses unsafe links on writes and resume", () => checkCases([
+test("private local storage preserves owner bytes and refuses unsafe links on writes and resume", t => caseRows(t, [
   ['local email updates and reads tighten existing credentials and preserve unrelated content', async t=>{
  const root=await workspace(t),path=join(root,'.dev.vars');
  await writeFile(path,'# owner configuration\nOTHER_SECRET="keep-me"\nEMAIL_API_KEY="old"\n');await chmod(path,0o644);

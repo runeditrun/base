@@ -1,4 +1,4 @@
-import {checkCases} from './test-fixture.mjs';
+import {caseRows} from './test-fixture.mjs';
 const readinessCases = [];
 const readinessCase = (name, check) => readinessCases.push([name, check]);
 import test from 'node:test';
@@ -138,4 +138,4 @@ for (const [intervalMs, expected] of [[1, 5000], [2000, 6000]]) readinessCase(`d
  assert.equal(pending.size, 0);
 });
 
-test('readiness retries probes and resolves promptly with bounded waits and cleanup', () => checkCases(readinessCases));
+test('readiness retries probes and resolves promptly with bounded waits and cleanup', t => caseRows(t, readinessCases));

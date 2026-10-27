@@ -1,4 +1,4 @@
-import {checkCases} from './test-fixture.mjs';
+import {caseRows} from './test-fixture.mjs';
 // node --test schema/validate.test.mjs
 //
 // Two things are under test: the schemas say what a release and a manifest must
@@ -204,7 +204,7 @@ const setupProbes = [
   ])
 ];
 
-test("duplicate Business field claims are refused with both input names and their shared field", () => checkCases([
+test("duplicate Business field claims are refused with both input names and their shared field", t => caseRows(t, [
   ...setupProbes.map(([name, fields, message]) => [`the setup manifest ${message ? 'rejects' : 'accepts'} ${name}`, () => {
     const manifest = { schema: 1, title: 'Settings', groups: [], fields, steps: [{ type: 'extension', id: 'workspace' }] };
     const errors = validateSetupManifest(setupSchema, manifest);
@@ -283,6 +283,6 @@ releaseCase('release authors can declare structured shots and invalid galleries 
   assert.ok(validate(releaseSchema, release).length > 0);
 });
 
-test('release schema accepts supported releases and refuses malformed releases', () => checkCases(releaseCases));
-test('seed schema accepts supported manifests and refuses malformed manifests', () => checkCases(seedCases));
-test('schema checking refuses unsupported rules even in unreachable branches', () => checkCases(schemaCases));
+test('release schema accepts supported releases and refuses malformed releases', t => caseRows(t, releaseCases));
+test('seed schema accepts supported manifests and refuses malformed manifests', t => caseRows(t, seedCases));
+test('schema checking refuses unsupported rules even in unreachable branches', t => caseRows(t, schemaCases));

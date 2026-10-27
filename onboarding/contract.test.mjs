@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +27,7 @@ async function session(t, changes = {}) {
  return { root, server, call, headers };
 }
 
-test("declared installer inputs preserve owner control, authentication and secret custody through Start", () => checkCases([
+test("declared installer inputs preserve owner control, authentication and secret custody through Start", t => caseRows(t, [
   ['distinct seed accepts only declared public fields and never invents H2H modes', () => {
  assert.deepEqual(validateAnswers({ SERVICE_NAME: 'API', PREFIX: 'status' }, model), { SERVICE_NAME: 'API', PREFIX: 'status' });
  for (const input of [{ password: 'not-public' }, { MONITOR_TOKEN: 'test-private-token' }, { allowedOrigin: 'https://example.com' }]) assert.throws(() => validateAnswers(input, model));

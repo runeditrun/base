@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,7 +29,7 @@ async function client(root, options = {}) {
  return { server, post: (path, input) => fetch(server.origin + path, { method: 'POST', headers, body: JSON.stringify(input) }) };
 }
 
-test("answer provenance distinguishes submitted owner answers from suggestions across API, Start and resume", () => checkCases([
+test("answer provenance distinguishes submitted owner answers from suggestions across API, Start and resume", t => caseRows(t, [
   ...['browser', 'agent'].map(source => [`a partial ${source} answer leaves unrelated suggestions unanswered through resume`, async t => {
  const root = await directory(t), store = await createState(root, seed);
  t.after(() => store.closeCommands());

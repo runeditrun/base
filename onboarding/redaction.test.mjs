@@ -1,4 +1,4 @@
-import {checkCases} from './test-fixture.mjs';
+import {caseRows} from './test-fixture.mjs';
 const outputCases = [];
 const outputCase = (name, check) => outputCases.push([name, check]);
 import { generateKeyPairSync } from 'node:crypto';
@@ -126,4 +126,4 @@ outputCase('deploy secret binding recovery commands remain usable while values r
  }
 });
 
-test('redacted output preserves public diagnostics across input shapes and stream boundaries', () => checkCases(outputCases));
+test('redacted output preserves public diagnostics across input shapes and stream boundaries', t => caseRows(t, outputCases));

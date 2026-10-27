@@ -1,4 +1,4 @@
-import {checkCases} from './test-fixture.mjs';
+import {caseRows} from './test-fixture.mjs';
 const outputCases = [];
 const outputCase = (name, check) => outputCases.push([name, check]);
 import { randomBytes } from 'node:crypto';
@@ -215,7 +215,7 @@ outputCase('step labels, reports and a final unterminated child line reach every
  }
 });
 
-test("redaction preserves public diagnostics and bounds while protecting credential names, shapes and stream fragments", () => checkCases([
+test("redaction preserves public diagnostics and bounds while protecting credential names, shapes and stream fragments", t => caseRows(t, [
   ['credential variable names are whole word parts, so ordinary variables are not registered', () => {
  const ordinary = { PATH: '/usr/local/bin:/usr/bin:/bin', DESIGN_MODE: 'production-mode', SIGNAL_NAME: 'termination', KEYBOARD_LAYOUT: 'english-us', COMPASS_DIR: '/opt/compass', AUTHOR_NAME: 'Fixture Author' };
  assert.deepEqual(credentialValues(ordinary), []);
@@ -248,7 +248,7 @@ test("redaction preserves public diagnostics and bounds while protecting credent
  const values = { APIToken: 'test-synthetic-api-token', AWSSecretKey: 'test-synthetic-aws-key', APISecret: 'test-synthetic-api-secret', APIPassword: 'test-synthetic-api-password' };
  assert.deepEqual(credentialValues(values), Object.values(values));
 }],
-  ['redacted output preserves public diagnostics across input shapes and stream boundaries', () => checkCases(outputCases)]
+  ['redacted output preserves public diagnostics across input shapes and stream boundaries', t => caseRows(t, outputCases)]
 ]));
 
 // Pathological 4 MiB inputs must cost about as much as ordinary output of the

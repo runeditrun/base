@@ -1,10 +1,10 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateSetupManifest} from './setup-validation.mjs';
 
-test("extension-only setup supports safe local defaults without inventing owner inputs or secret literals", () => checkCases([
+test("extension-only setup supports safe local defaults without inventing owner inputs or secret literals", t => caseRows(t, [
   ['extension-only setup needs no invented owner input and still needs a step', async () => {
  const schema = JSON.parse(await readFile(new URL('./SETUP.schema.json', import.meta.url)));
  const manifest = {schema:1,title:'Branding',groups:[],fields:[{name:'APP_NAME',label:'Name',kind:'text',required:true}],steps:[{type:'extension',id:'branding'}]};

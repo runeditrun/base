@@ -1,4 +1,4 @@
-import { checkCases } from '../test-fixture.mjs';
+import { caseRows } from '../test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInstallerModel } from '../setup-manifest.mjs';
@@ -10,7 +10,7 @@ const manifest = {
   steps: [{ type: 'extension', id: 'fixture' }],
 };
 const presentation = { product: { name: 'Example' } };
-test("manifest draft resolution retains owner answers and declared defaults, readiness and summary", () => checkCases([
+test("manifest draft resolution retains owner answers and declared defaults, readiness and summary", t => caseRows(t, [
   ['manifest alone controls required fields without hosting, owner or artwork', () => {
   const model = createInstallerModel(manifest, presentation);
   assert.deepEqual(model.initialDraft({ draft: { TITLE: 'Team', password: 'private' } }), { TITLE: 'Team' });
@@ -60,7 +60,7 @@ test("manifest draft resolution retains owner answers and declared defaults, rea
 
 
 
-test("failure details preserve captured output, final log custody and last-step guidance", () => checkCases([
+test("failure details preserve captured output, final log custody and last-step guidance", t => caseRows(t, [
   ['failed-install details use the actual command output and installer log path', () => {
   const model = createInstallerModel(manifest, presentation);
   const details = model.failureDetails({

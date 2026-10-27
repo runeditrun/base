@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import {exportCLI} from '../cli/export.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,7 +43,7 @@ async function fixture(build, healthStatus = 200, healthBody = { status: 'ok' },
  } };
 }
 
-test("foundation local start retains cleanup custody and diagnostics through healthy, exited and failed startup", () => checkCases([
+test("foundation local start retains cleanup custody and diagnostics through healthy, exited and failed startup", t => caseRows(t, [
   ['foundation failed attempt awaits delayed application termination and final pipe output', async () => {
  const f = await fixture(`console.log('build completed');`, 503, undefined, `
   const http=require('node:http');

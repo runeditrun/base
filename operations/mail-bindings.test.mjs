@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
@@ -37,7 +37,7 @@ async function fixture(t, selected = binding()) {
   return { root, descriptor, save, run };
 }
 
-test("declared mail inputs select hosted or development bindings and refuse malformed declarations", () => checkCases([
+test("declared mail inputs select hosted or development bindings and refuse malformed declarations", t => caseRows(t, [
   ['mail binding checks the selected runtime inputs, preserves foundation validation, and guides the CLI without values', async t => {
   const { root, descriptor, save, run } = await fixture(t);
   descriptor.environmentSources = { MAIL_API_KEY: 'Owner vault, active mail account', RESEND_API_KEY: 'Owner vault, legacy mail account' };

@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -22,7 +22,7 @@ const refuses = (text, line, pattern) => {
   assert.ok(found.some(problem => problem.line === line && pattern.test(problem.message)), `expected line ${line} ${pattern}, got ${JSON.stringify(found)}`)
 }
 
-test("contract parsing retains clause identities, row counts and source-linked refusal diagnostics", () => checkCases([
+test("contract parsing retains clause identities, row counts and source-linked refusal diagnostics", t => caseRows(t, [
   ["Slate's contract parses into its target, areas and one clause per Status row, counted from the rows", () => {
   const contract = parseContract(slate)
   const rows = lines.slice(headerLine + 1).filter(line => line.startsWith('| `')).map(line => line.split('|').map(cell => cell.trim()))

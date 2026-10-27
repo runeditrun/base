@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -125,7 +125,7 @@ function run(f, output, extra = []) {
 function succeeds(result) {
   assert.equal(result.status, 0, result.stderr);
 }
-test("committed exports preserve selected source bytes, provenance and portable consumer instructions", () => checkCases([
+test("committed exports preserve selected source bytes, provenance and portable consumer instructions", t => caseRows(t, [
   ["committed export relocates byte-identically and ignores explicit-ref dirty bytes", async (t) => {
   const f = await fixture(t);
   const out = resolve(f.root, "one");
@@ -267,7 +267,7 @@ test("committed exports preserve selected source bytes, provenance and portable 
 }]
  ]));
 
-test("composition refuses unsafe sources, destinations and component selections", () => checkCases([
+test("composition refuses unsafe sources, destinations and component selections", t => caseRows(t, [
   ...[
   "collision",
   "symlink",

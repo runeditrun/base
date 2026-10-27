@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -16,7 +16,7 @@ function fakeChild(){const child=new EventEmitter();child.stdout=new PassThrough
 async function fixture(t,spawn){const root=await mkdtemp(join(tmpdir(),'commands-'));const state={logs:[]};let terminal='';const store=await createCommands(root,state,{spawn,terminal:text=>{terminal+=text;}});t.after(async()=>{await store.closeCommands();await rm(root,{recursive:true,force:true});});return {root,state,store,terminal:()=>terminal};}
 function clock(){let time=0,timers=[];return {now:()=>time,wait:(ms,signal)=>new Promise(resolve=>{const entry={at:time+ms,resolve};timers.push(entry);const abort=()=>{timers=timers.filter(timer=>timer!==entry);resolve();};signal?.addEventListener('abort',abort,{once:true});entry.cleanup=()=>signal?.removeEventListener('abort',abort);}),async advance(ms){time+=ms;for(const entry of [...timers])if(entry.at<=time){timers=timers.filter(timer=>timer!==entry);entry.cleanup();entry.resolve();}for(let n=0;n<20;n++)await Promise.resolve();},get pending(){return timers.length;}};}
 
-test("command capture preserves diagnostics while keeping registered and inferred credentials private in every sink", () => checkCases([
+test("command capture preserves diagnostics while keeping registered and inferred credentials private in every sink", t => caseRows(t, [
   ['command capture strips ANSI and all split credentials and preserves final close output', async t=>{
  let child;const f=await fixture(t,()=>child=fakeChild());
  const secrets=['VAULT_SECRET_123','INVALIDATED_SECRET_456','DIRECT_NESTED_KEY_789','SESSION_TOKEN_ABC'];
@@ -75,7 +75,7 @@ test("command capture preserves diagnostics while keeping registered and inferre
 }]
  ]));
 
-test("redaction retains private values across registry changes, stream boundaries and snapshots", () => checkCases([
+test("redaction retains private values across registry changes, stream boundaries and snapshots", t => caseRows(t, [
   ['redaction registry retains omitted and cleared vault secrets', ()=>{
  const redaction=createRedaction();const vault=createSecretVault({fields:{token:{valid:()=>true}},secretScopes:{token:['name']}},redaction.addSecrets);
  vault.set({token:'old-secret'},{name:'old'});vault.set({token:'new-secret'},{name:'new'});vault.clear();
@@ -119,14 +119,14 @@ test('stream and page memory remain bounded for huge lines and token tails',asyn
  assert.ok(f.state.logs.join('\n').length<=65536);assert.ok(f.state.logs.length<=400);assert.match(f.terminal(),/plain output/);
 });
 
-test("private log creation refuses permissive links without touching targets", () => checkCases([
+test("private log creation refuses permissive links without touching targets", t => caseRows(t, [
   ...['symlink','hardlink'].map(kind => [`log refuses permissive ${kind} without touching target`, async t=>{
  const root=await mkdtemp(join(tmpdir(),'log-link-'));t.after(()=>rm(root,{recursive:true,force:true}));const target=join(root,'target');await writeFile(target,'preserve',{mode:0o644});await (kind==='symlink'?symlink:link)(target,join(root,'install.log'));
  await assert.rejects(createCommands(root,{logs:[]},{terminal:()=>{}}));assert.equal(await readFile(target,'utf8'),'preserve');assert.equal((await stat(target)).mode&0o777,0o644);
 }])
 ]));
 
-test("readiness reports progress and resolves on health, exit, error, deadline or cancellation", () => checkCases([
+test("readiness reports progress and resolves on health, exit, error, deadline or cancellation", t => caseRows(t, [
   ['150-second readiness succeeds after soft progress without stopping child', async t=>{
  const f=await fixture(t),child=fakeChild(),time=clock();f.store.track('Start',child);
  const ready=f.store.waitForReady('Start',child,()=>time.now()>=150000?true:{ready:false,message:'HTTP 503'},{...time,intervalMs:1000});

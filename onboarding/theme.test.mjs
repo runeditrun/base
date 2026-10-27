@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises';
@@ -21,7 +21,7 @@ async function seedRoot(t,files) {
 }
 const start=(t,root,extra={})=>startInstaller(root,{seed:{product:'Theme fixture',setup:{manifestFile:'rer-setup.json'},background:'background.svg',install:async()=>{},...extra},noPrefill:true}).then(server=>{t.after(()=>server.close());return server;});
 
-test("installer theme selection serves declared safe assets and refuses invalid grammar or contrast", () => checkCases([
+test("installer theme selection serves declared safe assets and refuses invalid grammar or contrast", t => caseRows(t, [
   ['a seed theme dresses the installer from files the app serves, and an unthemed seed keeps the current page', async t=>{
  const files={'public/rer-theme.css':theme,'public/fonts/brand.woff2':'font-bytes','public/brand/mark.svg':'<svg xmlns="http://www.w3.org/2000/svg"/>','public/private.woff2':'not declared'};
  const themed=await start(t,await seedRoot(t,files),{theme:'public/rer-theme.css'});

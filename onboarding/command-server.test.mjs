@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,7 +34,7 @@ test('HTTP capture retains cleared vault secrets, nested direct credentials, and
  for(const secret of [...emit,'ADAPTER_GENERATED_SECRET'])assert.ok(!output.includes(secret));assert.match(client.server.state.error,/Probe: exit 7/);
 });
 
-test("HTTP stop custody cancels owned command groups, retains final output and permits explicit retry", () => checkCases([
+test("HTTP stop custody cancels owned command groups, retains final output and permits explicit retry", t => caseRows(t, [
   ['owner Stop cancels captured running command and supports explicit retry', async t=>{
  let attempts=0;
  const client=await setup(t,async(_root,_input,store)=>{if(++attempts===1)await store.run('Long operation',process.execPath,['-e','setInterval(()=>{},1000)']);else await store.phase('complete');});
@@ -62,7 +62,7 @@ test("HTTP stop custody cancels owned command groups, retains final output and p
 
 
 
-test("failed command group cleanup closes descendants and leaves the retry log writable", {skip:process.platform==='win32'}, () => checkCases([
+test("failed command group cleanup closes descendants and leaves the retry log writable", {skip:process.platform==='win32'}, t => caseRows(t, [
   ...['readiness','core failure'].map(reason => [`failed ${reason} cleans an exited command group before retry and keeps the log writable`, async t=>{
  let attempts=0,child,closed=false,descendant;
  const client=await setup(t,async(_root,_input,store,onApp)=>{
@@ -86,7 +86,7 @@ test("failed command group cleanup closes descendants and leaves the retry log w
 }])
 ]));
 
-test("uncooperative command group cleanup escalates before permitting retry", {skip:process.platform==='win32'}, () => checkCases([
+test("uncooperative command group cleanup escalates before permitting retry", {skip:process.platform==='win32'}, t => caseRows(t, [
   ...['readiness exit','core failure','hard deadline','owner stop'].map(reason => [`${reason} cleans a group that ignores SIGTERM before permitting retry`, async t=>{
  let attempts=0,child,closed=false;
  const client=await setup(t,async(_root,_input,store,onApp)=>{

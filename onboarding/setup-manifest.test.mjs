@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,symlink,mkdir,rm} from 'node:fs/promises';
@@ -33,7 +33,7 @@ async function session(t,root,seed={}){
  const headers={Origin:server.origin,Cookie:page.headers.get('set-cookie').split(';')[0],'X-Installer-Token':html.match(/name="installer-token" content="([a-f0-9]+)"/)[1],'Content-Type':'application/json'};
  return {server,call:async(path,value)=>fetch(server.origin+path,{headers,...(value===undefined?{}:{method:'POST',body:JSON.stringify(value)})})};
 }
-test("declared manifest validation governs model and server inputs before adapter execution", () => checkCases([
+test("declared manifest validation governs model and server inputs before adapter execution", t => caseRows(t, [
   ['manifest model preserves names, group order, defaults, options and conditional presentation', async()=>{
  const {createInstallerModel}=await reader();const model=createInstallerModel(manifest,presentation);
  assert.deepEqual(Object.keys(model.fields),manifest.fields.map(field=>field.name));
@@ -84,7 +84,7 @@ test("declared manifest validation governs model and server inputs before adapte
 
 
 
-test("manifest settings custody preserves declared answers, generated secret encodings and invalidations", () => checkCases([
+test("manifest settings custody preserves declared answers, generated secret encodings and invalidations", t => caseRows(t, [
   ['entered secrets follow presentation dependencies, stay private, and settings prefill by name', async t=>{
  const root=await fixture(t);await writeFile(join(root,'.dev.vars'),'MODE=online\nSERVICE_URL=https://example.test\nCONTACT_EMAIL=owner@example.test\nACCESS_KEY=test-saved-private-value\n');
  const {call,server}=await session(t,root,{settings:{file:'.dev.vars'}});

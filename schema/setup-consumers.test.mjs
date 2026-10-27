@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,cp,mkdtemp,writeFile,rm} from 'node:fs/promises';
@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {BUSINESS_FIELD_INPUTS} from './business-field-inputs.mjs';
 const root=new URL('../',import.meta.url);
-test("portable setup consumers share declared Business hints, audiences and answer validation", () => checkCases([
+test("portable setup consumers share declared Business hints, audiences and answer validation", t => caseRows(t, [
   ['setup doors share the Business input table and retain developer audiences and owner defaults', async t=>{
  const destination=await mkdtemp(join(tmpdir(),'setup-audience-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));

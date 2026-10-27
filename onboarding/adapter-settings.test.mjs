@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
@@ -18,7 +18,7 @@ async function fixture(t) {
  return { root, store, install };
 }
 
-test("settings recovery preserves owner bytes, private permissions and credential registration across formats and interrupted builds", () => checkCases([
+test("settings recovery preserves owner bytes, private permissions and credential registration across formats and interrupted builds", t => caseRows(t, [
   ...['dotenv', 'json'].map(format => [`a ${format} rerun tightens a complete existing settings file without changing its bytes`, async t => {
   const { root, install } = await fixture(t);
   const path = join(root, 'settings');

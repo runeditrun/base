@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -21,7 +21,7 @@ function childDouble() {
 
 // All credentials below are invented here. Assertions never include environment
 // values, raw child diagnostics, or secret-bearing subprocess error objects.
-test("command output custody keeps private bytes out of sinks and survives closed or blocked terminal readers", () => checkCases([
+test("command output custody keeps private bytes out of sinks and survives closed or blocked terminal readers", t => caseRows(t, [
   ['real child output is redacted in browser state, log, terminal and failure while flags and trusted status survive', async t=>{
  const root=await workspace(t),state={logs:[]};let terminal='';
  const store=await createCommands(root,state,{terminal:text=>{terminal+=text;}});t.after(()=>store.closeCommands());
@@ -97,7 +97,7 @@ test("command output custody keeps private bytes out of sinks and survives close
 
 
 
-test("command output bounds retain final diagnostics while limiting page, heap and private log storage", () => checkCases([
+test("command output bounds retain final diagnostics while limiting page, heap and private log storage", t => caseRows(t, [
   ['private log starts a fresh session and caps output with exactly one marker', async t=>{
  const root=await workspace(t),path=join(root,'install.log');await writeFile(path,'OLD_SESSION_PRIVATE_OUTPUT',{mode:0o600});
  const log=await openPrivateLog(path);assert.equal(await readFile(path,'utf8'),'');
@@ -130,7 +130,7 @@ test("command output bounds retain final diagnostics while limiting page, heap a
 
 
 
-test("private directory self-ignore preserves unrelated targets and secures new and existing storage", () => checkCases([
+test("private directory self-ignore preserves unrelated targets and secures new and existing storage", t => caseRows(t, [
   ...[false,true].map(existing => [`private directory self-ignore covers ${existing?'existing':'new'} .seed storage`, async t=>{
  const root=await workspace(t);if(existing){await mkdir(join(root,'.seed'));await writeFile(join(root,'.seed/.gitignore'),'old rules\n');}
  const path=await privateDirectory(root,['.seed','installer']);

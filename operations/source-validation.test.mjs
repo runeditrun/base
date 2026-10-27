@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -28,7 +28,7 @@ const unsafeSources = () => {
   ];
 };
 
-test("environment source guidance rejects credential values through native and copied inspectors", () => checkCases([
+test("environment source guidance rejects credential values through native and copied inspectors", t => caseRows(t, [
   ['source guidance rejects embedded assignments and provider tokens with generic errors', () => {
   for (const source of unsafeSources()) {
     // Compare only generic errors: a failed assertion must never print a value.

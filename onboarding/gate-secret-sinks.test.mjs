@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
@@ -8,7 +8,7 @@ import {localInstaller} from './adapter.mjs';
 import {createCommands} from './commands.mjs';
 import {loadInstallerSeed} from './setup-manifest.mjs';
 
-test("manifest secrets remain excluded from build bindings and private in success and failure sinks", () => checkCases([
+test("manifest secrets remain excluded from build bindings and private in success and failure sinks", t => caseRows(t, [
   ...['success','failure'].map(outcome => [`table: generated, entered, saved and inherited manifest secrets stay out of build bindings and all installer ${outcome} sinks`, async t=>{
  const root=await mkdtemp(join(tmpdir(),'installer-secret-table-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const names=['OPAQUE_VALUE','NEW_GENERATED','SAVED_GENERATED','INHERITED_PRIVATE'];

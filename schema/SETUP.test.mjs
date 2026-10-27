@@ -1,4 +1,4 @@
-import {checkCases} from './test-fixture.mjs';
+import {caseRows} from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
@@ -119,4 +119,4 @@ test('expected-invalid CLI mode rejects a missing negative example path', () => 
   assert.match(result.stderr, /ENOENT/);
 });
 
-test('setup manifests accept supported inputs and refuse invalid configurations', () => checkCases(manifestCases));
+test('setup manifests accept supported inputs and refuse invalid configurations', t => caseRows(t, manifestCases));

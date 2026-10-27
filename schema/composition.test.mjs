@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -7,7 +7,7 @@ const read = (name) => JSON.parse(readFileSync(new URL(name, import.meta.url)));
 const seed = read('SEED.example.json');
 const schema = read('SEED.schema.json');
 const composition = { base: 'base', family: 'support', edition: 'lily', modules: ['support-email'] };
-test("composition manifest validation accepts historical and purpose editions and refuses malformed selections", () => checkCases([
+test("composition manifest validation accepts historical and purpose editions and refuses malformed selections", t => caseRows(t, [
   ['legacy manifests and purpose editions coexist without incumbent replacement claims', () => {
   checkSchema(schema);
   assert.deepEqual(validate(schema, seed), []);

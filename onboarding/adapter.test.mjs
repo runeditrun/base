@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile, chmod } from 'node:fs/promises';
@@ -88,7 +88,7 @@ test('feature flags must describe the hooks the adapter really runs', () => {
  assert.throws(() => localInstaller({ migrations: [] }), /Unknown installer hook: migrations/);
 });
 
-test("local installation and reruns preserve private settings, claim the owner and open the declared application", () => checkCases([
+test("local installation and reruns preserve private settings, claim the owner and open the declared application", t => caseRows(t, [
   ['a complete install generates private settings, hides them from the build, claims the owner and opens the application', async t => {
  const f = await fixture(t);
  const { store, app } = await installOnce(f, localInstaller(hooks()));
@@ -190,7 +190,7 @@ const localCliProof = secret => createHmac('sha256', secret).update('local-cli\0
 
 
 
-test("local installation refuses unmet prerequisites, failed builds and rejected or cancelled startup before reporting failure", () => checkCases([
+test("local installation refuses unmet prerequisites, failed builds and rejected or cancelled startup before reporting failure", t => caseRows(t, [
   ['setup stops before the claim when another process answers on the port the application did not bind', async t => {
  const f = await fixture(t);
  const requests = [];
@@ -371,7 +371,7 @@ async function devRun(t, f, { load, migrate }) {
  return { store, outcome, app };
 }
 
-test("dev start distinguishes queue refusal, migration failure and a healthy application", () => checkCases([
+test("dev start distinguishes queue refusal, migration failure and a healthy application", t => caseRows(t, [
   ['a dev start held by the machine-load queue says the computer is busy, not that migrations failed', async t => {
  const f = await fixture(t);
  const { store, outcome, app } = await devRun(t, f, { load: 40 });

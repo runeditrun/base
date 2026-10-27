@@ -1,4 +1,4 @@
-import { checkCases } from './test-fixture.mjs';
+import { caseRows } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +25,7 @@ async function waitPhase(client,phase){
  for(let n=0;n<200;n++){const state=await client.state();if(state.phase===phase)return state;await new Promise(resolve=>setTimeout(resolve,5));}
  assert.fail(`Never reached ${phase}`);
 }
-test("HTTP failure recovery keeps a safe resumable draft and clears the preceding error on explicit retry", () => checkCases([
+test("HTTP failure recovery keeps a safe resumable draft and clears the preceding error on explicit retry", t => caseRows(t, [
   ...[
  ['runtime',async()=>{throw installationFailure('node_version',{version:'26.8.1'});},/Install Node.js 26\.8\.1/],
  ['missing npm',async root=>{try{await run('npm',['--version'],{cwd:root,env:{PATH:root},stdio:'ignore'});}catch(error){assert.equal(error.code,'ENOENT');throw installationFailure('missing_tool',{tool:'npm'});}},/npm was not found.*PATH/],

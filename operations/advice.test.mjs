@@ -1,4 +1,4 @@
-import { checkCases } from '../onboarding/test-fixture.mjs';
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { access, copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
@@ -47,7 +47,7 @@ async function runCheck(root, env) {
   });
 }
 
-test("operations check gives safe actionable recovery guidance for missing, invalid and unreadable inputs", () => checkCases([
+test("operations check gives safe actionable recovery guidance for missing, invalid and unreadable inputs", t => caseRows(t, [
   ['missing MAIL_API_KEY with a throwing validator defers configuration judgment and names the declared setup command', async t => {
   const root = await fixture(t);
   const checked = await runCheck(root, { APP_ORIGIN: 'https://workspace.example' });
