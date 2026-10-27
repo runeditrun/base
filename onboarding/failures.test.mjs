@@ -32,7 +32,7 @@ test("HTTP failure recovery keeps a safe resumable draft and clears the precedin
  ['command exit',async root=>{try{await run(process.execPath,['-e','process.exit(7)'],{cwd:root,stdio:'ignore'});}catch{throw installationFailure('command_failed',{step:'build'});}},/stopped while building the application/],
  ['unknown',async()=>{throw Object.assign(new Error(secret),{code:'missing_tool',tool:'npm',cause:new Error(secret)});},/stopped unexpectedly.*last installation step/],
  ['modified typed error',async()=>{const error=installationFailure('missing_tool',{tool:'git'});error.message=secret;error.cause=new Error(secret);throw error;},/Git was not found/]
-].map([name,failure,expected] => [`HTTP reports ${name} safely and preserves a resumable draft`, async t=>{
+].map(([name,failure,expected]) => [`HTTP reports ${name} safely and preserves a resumable draft`, async t=>{
  const root=await mkdtemp(join(tmpdir(),'rer-failure-'));let calls=0,client;
  const seed={product:'Failure fixture',model:{fields:{NAME:{valid:v=>typeof v==='string'}},safeKeys:['NAME'],secretScopes:{API_TOKEN:['NAME']}},validateInput:v=>v,install:async(root,input,store)=>{calls++;await store.step('Building application');if(calls===1)await failure(root);else await store.phase('complete');}};
  t.after(async()=>{await client?.server.close();await rm(root,{recursive:true,force:true});});

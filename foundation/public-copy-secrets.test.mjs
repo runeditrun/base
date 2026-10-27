@@ -178,7 +178,7 @@ test('module reference check rejects private, missing and unreviewed repositorie
     ['private', 'hygiene.github-private', 'FAIL', 1],
     ['missing', 'hygiene.github-missing', 'FAIL', 1],
     ['unknown', 'scan.github-incomplete', 'INCOMPLETE', 2],
-  ].map([state, rule, status, exit] => [state, t => {
+  ].map(([state, rule, status, exit]) => [state, t => {
     const repository = `fixture-${randomBytes(8).toString('hex')}/source`
     const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'],
       { [file]: JSON.stringify({ sourceRepository: repository }) }, { [repository]: state })
@@ -226,7 +226,7 @@ test('fictional examples never exempt nearby names, real private repositories or
     ['fictional private override', 'example-owner/example-repo', 'private', 'hygiene.github-private', 'FAIL', 1],
     ['fictional missing override', 'example-owner/example-repo', 'missing', 'hygiene.github-missing', 'FAIL', 1],
     ['fictional unknown override', 'example-owner/example-repo', 'unknown', 'scan.github-incomplete', 'INCOMPLETE', 2],
-  ].map([name, repository, state, rule, status, exit] => [name, t => {
+  ].map(([name, repository, state, rule, status, exit]) => [name, t => {
     const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'],
       { [file]: JSON.stringify({ sourceRepository: repository }) }, state ? { [repository]: state } : {})
     assert.deepEqual(references.map(f => `${f.rule} ${f.path}`), [`${rule} ${file}`])

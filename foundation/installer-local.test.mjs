@@ -75,7 +75,7 @@ test("foundation local start retains cleanup custody and diagnostics through hea
   ...[
  ['process.exit(7)', 7, null, /exit 7/],
  ["process.kill(process.pid,'SIGTERM')", null, 'SIGTERM', /signal SIGTERM/],
-].map([exit, code, signal, diagnostic] => [`foundation application ${signal ?? `exit ${code}`} completes failure without signalling its retired PID`, async () => {
+].map(([exit, code, signal, diagnostic]) => [`foundation application ${signal ?? `exit ${code}`} completes failure without signalling its retired PID`, async () => {
  const f = await fixture(`console.log('build completed');`, undefined, undefined, `console.error('application final failure detail');${exit};`);
  let child, closed = false;
  const stop = f.store.stop.bind(f.store);
@@ -136,7 +136,7 @@ test("foundation local start retains cleanup custody and diagnostics through hea
   ...[
  [503, { status: 'private response body must stay private' }, /Last health: HTTP 503/],
  [200, { status: 'private response body must stay private' }, /Last health: HTTP 200; health status not ok/],
-].map([status, body, diagnostic] => [`foundation readiness deadline records actual HTTP ${status} health status`, async () => {
+].map(([status, body, diagnostic]) => [`foundation readiness deadline records actual HTTP ${status} health status`, async () => {
   const f = await fixture(`console.log('build completed');`, status, body);
   const waitForReady = f.store.waitForReady.bind(f.store);
   f.store.waitForReady = (label, child, health, options) => waitForReady(label, child, health, { ...options, timeoutMs: 1000, intervalMs: 20, softAfterMs: 30 });
