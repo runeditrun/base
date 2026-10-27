@@ -104,8 +104,9 @@ test('operations v2 required mail fails with missing, blank or wrong selected ke
 });
 test('new template calls real authoring lock/check and refuses any existing destination/lock',async t=>{
   const dir=await temporary(t);const root=join(dir,'edition');const args={destination:root,project:'example/edition',sourcePaths:['app.mjs'],commands:{verify:{argv:['node','app.mjs'],inputs:['app.mjs'],effects:'Local app validation'}}};
-  await createTemplates(args);await writeFile(join(root,'app.mjs'),'export const value=1;');const git=(...argv)=>execFileSync('git',argv,{cwd:root,stdio:'pipe'});git('init');git('add','.');
+  const created=await createTemplates(args);await writeFile(join(root,'app.mjs'),'export const value=1;');const git=(...argv)=>execFileSync('git',argv,{cwd:root,stdio:'pipe'});git('init');git('add','.');
   await lockTemplates(root);const lock=JSON.parse(await readFile(join(root,'sources.lock.json'),'utf8'));assert(lock.toolchain?.sha256 ?? lock.tools?.sha256 ?? JSON.stringify(lock).includes(hash('export const value=1;')));
+  execFileSync(process.execPath,created.check.slice(1),{cwd:root,stdio:'pipe'});
   assert.equal((await inspectOperations(root,{})).ok,true);await assert.rejects(createTemplates(args));await assert.rejects(lockTemplates(root),/existing-source-lock/);
 });
 test('D1 documented pagination without total_pages follows total_count and rejects unstable counts',async()=>{

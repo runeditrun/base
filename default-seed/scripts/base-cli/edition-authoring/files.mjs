@@ -119,6 +119,16 @@ export function tracked(root, allowMissing = false) {
   return result;
 }
 export const digest = files => hash(json(files));
+// The complete tool in `dir`, as sorted relative paths: its non-test modules and
+// every vendored parser file with its licence. Copies and the lock identity use it.
+export function toolFiles(dir) {
+  const modules = fs.readdirSync(dir).filter(p => p.endsWith('.mjs') && !p.endsWith('.test.mjs'));
+  const vendored = fs.readdirSync(path.join(dir, 'vendor'), {recursive: true, withFileTypes: true}).filter(entry => {
+    if (!entry.isFile() && !entry.isDirectory()) throw Error(`Unsupported vendored tool entry: ${entry.name}`);
+    return entry.isFile();
+  }).map(entry => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'));
+  return [...modules, ...vendored].sort();
+}
 // Base's test, fixture and browser-check sources, which portable copies leave out.
 // Composition pins its tooling alone, so composition/git-source.mjs keeps its own copy.
 export function testSource(path) {
