@@ -92,6 +92,9 @@ test('install.sh and rer update install verified registry releases, the Run page
  const hint = activate(installed.stdout);
  assert.ok(hint, installed.stdout);
  assert.equal(installed.stdout.match(/^Next, /gm)?.length, 1, `one next step, not two: ${installed.stdout}`);
+ const restart = installed.stdout.split('\n').find(line => line.startsWith('Next, ')).slice('Next, start an app: '.length);
+ assert.equal(restart, `'${join(home, '.local/bin/rer')}' dev <owner>/<repo>`);
+ assert.equal((await run('sh', ['-c', restart.replace(' dev <owner>/<repo>', ' --version')], env)).stdout.trim(), manifest.version, 'printed command works before PATH activation');
  assert.equal((await run('sh', ['-c', `${hint}\nrer --version`], env)).stdout.trim(), manifest.version);
  assert.equal((await run('sh', ['-l', '-c', 'rer --version'], env)).stdout.trim(), manifest.version, 'a new shell finds rer after the line ran once');
 

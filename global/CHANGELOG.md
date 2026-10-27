@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Print an absolute installer launch command, lead ready output with a plain app link and label the site, explain local owner accounts, and time each launch phase separately. Machine ready output stays unchanged.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

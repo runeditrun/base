@@ -21,6 +21,7 @@ import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFo
 // Dev opens through the local identity exchange. Preview serves production output.
 export function ready(out,url,dev,json=false,siteUrl,demo){
  if(json){out.event('ready',{url,...(dev?{signedInAs:dev.signedInAs??null,openUrl:dev.openUrl}:{}),...(siteUrl?{siteUrl}:{}),...(demo?{demo}:{})});return;}
+ out.human(`Your app is ready, open it: ${dev?.openUrl ?? url}`);
  out.human(`RER_READY ${url}`);
  if(dev){
   if(dev.signedInAs)out.human(`RER_SIGNED_IN ${dev.signedInAs}`);
@@ -28,7 +29,7 @@ export function ready(out,url,dev,json=false,siteUrl,demo){
   out.human(`RER_OPEN ${dev.openUrl}`);
   out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
  }
- if(siteUrl)out.human(`RER_SITE ${siteUrl}`);
+ if(siteUrl){out.human(`Site: ${siteUrl}`);out.human(`RER_SITE ${siteUrl}`);}
  if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real. This checkout's own data is untouched.`);}
 }
 export async function managedServer(project,options,out,{clock={}}={}){
