@@ -153,6 +153,9 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       const {specifier, dependency, destination} = edge;
       if (preserved(edge)) continue;
       include(dependency, destination);
+      if (/\.d\.[cm]?ts$/.test(destination) && [...(imports.get(specifier) ?? [])].some(name => !oldBindings.get(specifier)?.has(name))) {
+        refuse(target, `${destination} is a declaration file, not a runtime module for ${specifier}`, `\${EDITOR:-vi} ${quote(target)}`);
+      }
       const owner = recorded.get(destination);
       if (!adapted && !planned.has(destination) && (index.has(destination) || owner?.copy.adapted?.[destination])) {
         for (const [types, current, previous] of [[false, imports, oldBindings], [true, typeImports, oldTypes]]) {

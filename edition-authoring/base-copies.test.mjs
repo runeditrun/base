@@ -458,6 +458,8 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         if (row === 'star') write(seed, 'vendor/sample/leaf.mjs', 'export const missing = true;\n');
         if (row === 'declaration' || row === 'type-declaration') write(seed, 'vendor/sample/helper.d.mts', 'export type missing = boolean;\n');
         if (row === 'declaration-target') {
+          fs.rmSync(path.join(base, 'modules/sample/helper.mjs'));
+          write(base, 'modules/sample/helper.d.mts', 'export declare const missing: boolean;\n');
           fs.rmSync(path.join(seed, 'vendor/sample/helper.mjs'));
           write(seed, 'vendor/sample/helper.d.mts', 'export declare const missing: boolean;\n');
         }

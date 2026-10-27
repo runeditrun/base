@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g2737288c",
+  "cliVersion": "0.2.83-dev.gb7cd5ebd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1203,7 +1203,7 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "7ae9d4962d4604f66182a65b3d001a22b22c02a33ab4ab1f13fbca0d476d8984"
+      "sha256": "0e1f0a7e7181e419c684d08a9d995de5c4801b2ddc49c9c9d63175f751631bcb"
     },
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
