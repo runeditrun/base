@@ -39,6 +39,28 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         self.write('pnpm-lock.yaml', lockfile(quoted))
         self.write('nested/pnpm-lock.yaml', lockfile('"Contact \\"support\\" at ' + address + '"'))
         self.write('single/pnpm-lock.yaml', lockfile("'Maintainer''s contact: " + address + "'"))
+        self.write('reserved.txt', ''.join(('synthetic', '@', 'scanner-fixture.invalid')))
+        self.write('reserved/pnpm-lock.yaml',
+                   lockfile("'" + ''.join(('synthetic', '@', 'scanner-fixture.invalid')) + "'", key='author'))
+        self.write('quoted-tab/pnpm-lock.yaml', lockfile("'Contact\t" + address + "'"))
+        self.write('crlf/pnpm-lock.yaml', lockfile(quoted).replace('\n', '\r\n'))
+        self.write('long/pnpm-lock.yaml', lockfile("'" + 'x' * (70 * 1024) + ' ' + address + "'"))
+        self.write('multiline-value/pnpm-lock.yaml', lockfile("'Contact\n      " + address + "\n      support'"))
+        self.write('multiline-double-value/pnpm-lock.yaml', lockfile('"Contact\n      ' + address + '\n      support"'))
+        self.write('key-spaces/pnpm-lock.yaml', lockfile(quoted, key='deprecated  '))
+        self.write('after-plain/pnpm-lock.yaml',
+                   lockfile('text with a stray "\n      continued', key='description')
+                   + '    deprecated: ' + quoted + '\n')
+        self.write('after-flow/pnpm-lock.yaml',
+                   lockfile('{node: [">=18", {optional: true}]}', key='engines')
+                   + '    deprecated: ' + quoted + '\n')
+        self.write('after-sequence-map/pnpm-lock.yaml',
+                   lockfile('\n      - name: first\n        note: plain\n'
+                            '      - name: second\n        note: "quoted"', key='maintainers')
+                   + '    deprecated: ' + quoted + '\n')
+        self.write('after-sequence/pnpm-lock.yaml',
+                   lockfile('\n      - "first\n        continued"\n      - plain', key='maintainers')
+                   + '    deprecated: ' + quoted + '\n')
         self.commit()
         code, report = publication()
         self.assertEqual(code, 0)
@@ -69,6 +91,38 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
             'root/pnpm-lock.yaml': 'deprecated: ' + quoted + '\n',
             'duplicate/pnpm-lock.yaml': lockfile(quoted) + '    author: ' + quoted + '\n',
             'quote-end/pnpm-lock.yaml': lockfile("'Obsolete' # '" + address + "'"),
+            'flow-resolution/pnpm-lock.yaml': lockfile("{\n    deprecated: " + quoted + "\n    }", key='resolution'),
+            'flow-engines/pnpm-lock.yaml': lockfile("{\n    deprecated: " + quoted + "\n    }", key='engines'),
+            'flow-sequence/pnpm-lock.yaml': lockfile("[{\n    deprecated: " + quoted + "\n    }]", key='engines'),
+            'plain-quote/pnpm-lock.yaml':
+                lockfile('text with a stray "\n      continued', key='description')
+                + '    author: "Text\n    deprecated: ' + quoted + '\n    end"\n',
+            'plain-single-quote/pnpm-lock.yaml':
+                lockfile("text with a stray '\n      continued", key='description')
+                + "    author: 'Text\n    deprecated: \"" + address + "\"\n    end'\n",
+            'maintainers/pnpm-lock.yaml': lockfile('[' + quoted + ']', key='maintainers'),
+            'folded/pnpm-lock.yaml': lockfile('>\n      Contact ' + address),
+            'literal/pnpm-lock.yaml': lockfile('|\n      Contact ' + address),
+            'block-resolution/pnpm-lock.yaml': lockfile('\n      deprecated: ' + quoted, key='resolution'),
+            'package-sequence/pnpm-lock.yaml': 'packages:\n  - name: synthetic-package\n    deprecated: ' + quoted + '\n',
+            'sequence-key/pnpm-lock.yaml': lockfile('\n      - deprecated: ' + quoted, key='engines'),
+            'sequence-scalar/pnpm-lock.yaml':
+                lockfile('\n      - "Text\n    deprecated: ' + quoted + '\n        end"', key='maintainers'),
+            'complex-key/pnpm-lock.yaml': 'packages:\n  ? synthetic-package@1.0.0:\n    deprecated: ' + quoted + '\n',
+            'nested-quoted-key/pnpm-lock.yaml': lockfile('\n      "deprecated": ' + quoted, key='resolution'),
+            'quoted-key/pnpm-lock.yaml': lockfile(quoted, key='"deprecated"'),
+            'nested-key-spaces/pnpm-lock.yaml': lockfile('\n      deprecated  : ' + quoted, key='resolution'),
+            'anchor/pnpm-lock.yaml': lockfile('&notice ' + quoted),
+            'alias/pnpm-lock.yaml': lockfile('&notice ' + quoted, key='author')
+                                  + '    deprecated: *notice\n',
+            'tab/pnpm-lock.yaml': lockfile(quoted).replace('    deprecated', '\tdeprecated'),
+            'later-quote/pnpm-lock.yaml': lockfile(quoted) + '    author: "unfinished\n',
+            'later-flow/pnpm-lock.yaml': lockfile(quoted) + '    engines: {node: [unfinished}\n',
+            'mixed-collection/pnpm-lock.yaml':
+                'packages:\n  synthetic-package@1.0.0:\n    - name: item\n    deprecated: ' + quoted + '\n',
+            'inconsistent/pnpm-lock.yaml': lockfile(quoted) + '     author: plain\n',
+            'bad-key-escape/pnpm-lock.yaml': lockfile(quoted) + '    "\\q": plain\n',
+            'bad-escape/pnpm-lock.yaml': lockfile('"Contact \\q ' + address + '"'),
         }
         for path, data in cases.items():
             self.write(path, data)

@@ -85,10 +85,17 @@ repository mentions fail. Commit and annotated-tag messages are scanned, excludi
 Git author/committer identity headers. Matched values and messages are never printed;
 sensitive paths receive opaque SHA-256 handles.
 
-In files with the exact basename `pnpm-lock.yaml`, `hygiene.email` ignores only
-the quoted value on a four-space `deprecated:` line beneath a two-space package
-entry in the top-level `packages:` section. Comments, other keys and sections,
-unquoted values and other filenames remain inspected, as do all other rules.
+In files whose basename is `pnpm-lock.yaml`, `hygiene.email` can ignore a
+single or double quoted scalar only at the unquoted `deprecated` key (allowing
+spaces before the colon), at four-space field indentation of a two-space package
+entry in the top-level `packages:` block mapping.
+The scan consumes multiline quoted scalars with their escapes, continues plain
+and block scalars by indentation and tracks nested flow collections; nested
+fields, quoted keys, plain or block values, comments, trailing text, other
+sections (including `snapshots:`) and other filenames remain inspected.
+Unsupported or ambiguous structure, including anchors, aliases, structural tabs, unterminated
+quotes or inconsistent indentation, disables every exemption in that file;
+all other rules always apply.
 
 In actual commit messages only, `hygiene.email` accepts the address in a complete,
 case-insensitive `Co-Authored-By: Name <address>` line in the final trailer
