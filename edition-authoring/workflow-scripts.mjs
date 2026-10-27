@@ -103,7 +103,7 @@ export function literalPaths(script) {
     for (const {value, dynamic} of shellWords(text)) {
       if (dynamic) continue;
       const relative = value.replace(/^\.\//, '');
-      if ((value.startsWith('./') || relative.startsWith('scripts/') || !/\s/.test(value) && (relative.includes('/') || /\.[a-z0-9]+$/i.test(relative))) && !/[$*?:]|^\//.test(relative)) names.add(relative);
+      if ((value.startsWith('./') || relative.startsWith('scripts/') || !/\s/.test(value) && (relative.includes('/') || /\.[a-z0-9]+$/i.test(relative))) && !relative.startsWith('/')) names.add(relative);
       // A complete quoted path is one word; only script-like quoted content is
       // recursively tokenized, never a path whose filename contains whitespace.
       else if (/\s/.test(value)) scan(value, nested);
