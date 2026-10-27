@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gc15e4ded",
+  "cliVersion": "0.2.83-dev.gf4b2bbe0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "2d315019b9751ce7e2a30043e2f7b14d19b83d6c82eed9cf3a28ef3488fafbcd"
+      "sha256": "5716c02b9bc620b15190bf79b3d961d59a34f8521007cfd9b18fa1e507d0d2fd"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1744,6 +1744,10 @@
     "edition-authoring/workflow-scripts.mjs": {
       "source": "edition-authoring/workflow-scripts.mjs",
       "sha256": "5861735ba452b54a0902c2c47ff44dc17722dd830807ad21cfb2565183c76245"
+    },
+    "foundation/runtime/contract-docs.mjs": {
+      "source": "foundation/runtime/contract-docs.mjs",
+      "sha256": "9c1d8f38c42cd18539792f71bda94cbcd6ebe30e25c884eb6af51de1dccabdfd"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",
