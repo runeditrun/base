@@ -45,11 +45,19 @@ foldedCases.push(['a fresh lease blocks another import and reports when the owne
   assert.equal(status.stale,false);assert.ok(Date.parse(status.abortableAt)>Date.now());
 }]);
 foldedCases.push(['expired uploads and finalize cannot revive or publish an abandoned import', async t=>{
-  const {target,archive,elapse}=await setup(t),id=await stage(target.service,archive);
-  elapse();
-  await assert.rejects(target.service.imports.finalize(id,archive.closing),e=>e.code==='import_lease_expired' && e.status===409);
-  await assert.rejects(target.service.imports.uploadPart(id,0,archive.parts[0]),e=>e.code==='import_lease_expired');
-  assert.deepEqual(await rows(target.db),[]);assert.deepEqual(await objects(target.bucket),[]);
+  await runCases(t, [
+    ['expired finalize cannot publish', async t => {
+      const {target,archive,elapse}=await setup(t),id=await stage(target.service,archive);
+      elapse();
+      await assert.rejects(target.service.imports.finalize(id,archive.closing),e=>e.code==='import_lease_expired' && e.status===409);
+    }],
+    ['expired upload cannot revive staging', async t => {
+      const {target,archive,elapse}=await setup(t),id=await stage(target.service,archive);
+      elapse();
+      await assert.rejects(target.service.imports.uploadPart(id,0,archive.parts[0]),e=>e.code==='import_lease_expired');
+      assert.deepEqual(await rows(target.db),[]);assert.deepEqual(await objects(target.bucket),[]);
+    }],
+  ]);
 }]);
 foldedCases.push(['a worker lost after object apply is reclaimed through owned-object abort, preserving foreign data', async t=>{
   const {target,archive,elapse}=await setup(t);let offline=false;
@@ -90,14 +98,32 @@ foldedCases.push(['the authenticated owner can discover, inspect and abort a sta
   assert.equal((await call('imports','POST',{confirmed:true,manifest:archive.manifest})).status,201);
 }]);
 foldedCases.push(['an active finalize renews across a long callback and excludes concurrent abort and finalize', async t=>{
-  const {target,archive,advance}=await setup(t),paused=await pausedFinalize(target,archive),scheduled=heartbeats(t);
-  const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
-  for(let minute=0;minute<8;minute++){advance(60*1000);assert.ok(scheduled.length);await scheduled.shift()();}
-  const status=await target.service.imports.status(paused.id);assert.equal(status.stale,false);
-  await assert.rejects(target.service.imports.create(archive.manifest),e=>e.code==='import_running');
-  await assert.rejects(target.service.imports.abort(paused.id),e=>e.code==='import_running');
-  await assert.rejects(target.service.imports.finalize(paused.id,archive.closing),e=>e.code==='import_running');
-  paused.release();assert.equal((await finishing).phase,'complete');
+  await runCases(t, [
+    ['active finalize excludes create across renewed lease', async t => {
+      const {target,archive,advance}=await setup(t),paused=await pausedFinalize(target,archive),scheduled=heartbeats(t);
+      const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
+      try {
+        for(let minute=0;minute<8;minute++){advance(60*1000);assert.ok(scheduled.length);await scheduled.shift()();}
+        const status=await target.service.imports.status(paused.id);assert.equal(status.stale,false);
+        await assert.rejects(target.service.imports.create(archive.manifest),e=>e.code==='import_running');
+      } finally { paused.release();await finishing; }
+      assert.equal((await finishing).phase,'complete');
+    }],
+    ['active finalize excludes abort', async t => {
+      const {target,archive}=await setup(t),paused=await pausedFinalize(target,archive);heartbeats(t);
+      const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
+      try {
+        await assert.rejects(target.service.imports.abort(paused.id),e=>e.code==='import_running');
+      } finally { paused.release();await finishing; }
+    }],
+    ['active finalize excludes another finalize', async t => {
+      const {target,archive}=await setup(t),paused=await pausedFinalize(target,archive);heartbeats(t);
+      const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
+      try {
+        await assert.rejects(target.service.imports.finalize(paused.id,archive.closing),e=>e.code==='import_running');
+      } finally { paused.release();await finishing; }
+    }],
+  ]);
 }]);
 foldedCases.push(['a request that lost its lease cannot publish after its replacement restores', async t=>{
   const {target,archive,elapse}=await setup(t),paused=await pausedFinalize(target,archive);heartbeats(t);

@@ -48,8 +48,14 @@ foldedCases.push(['schema mismatches are refused and an explicit earlier schema 
   await assert.rejects((await target.connect()).imports.create(bundle.manifest),/schema_mismatch/);
   const service=await createPortability({db:target.db,buckets:{FILES:target.bucket},policy:{...fixturePolicy,acceptedSchemas:{[bundle.manifest.schema]:{upgradeRow(table,row){if(table==='heap')delete row.extra;return row;}}}}});
   await interruptedLedger(target.db);
-  await refusesUncertainImport(await target.connect(),bundle,target);
-  await refusesUncertainImport(service,bundle,target);
+  await runCases(t, [
+    ["uncertain migration services: case 1", async t => {
+      await refusesUncertainImport(await target.connect(),bundle,target);
+    }],
+    ["uncertain migration services: case 2", async t => {
+      await refusesUncertainImport(service,bundle,target);
+    }]
+  ]);
   await target.db.prepare("UPDATE d1_migrations SET state='applied'").run();
   assert.equal((await restore(service,bundle)).status.phase,'complete');assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM heap').first()).n,3);
 }]);
@@ -63,9 +69,9 @@ foldedCases.push(['staged product validation can refuse before any R2 write', as
 }]);
 foldedCases.push(['restore refuses file references outside the declared prefix before any write', async t=>{
   const {objectReferences}=fixturePolicy.buckets.FILES;
+  await runCases(t, Array.from(['other/kept.bin','people-other/x','/people/x','','people/../x'], (key, rowIndex) => [`${t.name}: key row ${rowIndex + 1}`, async t => {
   const source=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{prefix:'people/'}}}}),target=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{prefix:'people/',objectReferences}}}}),service=await target.connect();
   await target.bucket.put('other/kept.bin','unrelated');
-  await runCases(t, Array.from(['other/kept.bin','people-other/x','/people/x','','people/../x'], (key, rowIndex) => [`${t.name}: key row ${rowIndex + 1}`, async t => {
     await source.db.batch([source.db.prepare('DELETE FROM files'),source.db.prepare('INSERT INTO files VALUES(?)').bind(key)]);
     // The dot-segment key passes the prefix, so its archive carries an object of that name too.
     if(key.startsWith('people/'))await source.bucket.put(key,'archived');
@@ -76,15 +82,22 @@ foldedCases.push(['restore refuses file references outside the declared prefix b
 }]));
 }]);
 foldedCases.push(['restore refuses file references that differ from the archived objects', async t=>{
-  const source=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{}}}}),target=await runtime(t),service=await target.connect();await seed(source);
-  const refused=async()=>{
+  const refused=async(t,change)=>{
+    const source=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{}}}}),target=await runtime(t),service=await target.connect();await seed(source);
+    await change(source);
     const bundle=await archive(await source.connect()),id=await stage(service,bundle);
     await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/object_references:FILES/);
     assert.equal((await target.bucket.list()).objects.length,0);assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM files').first()).n,0);await service.imports.abort(id);
   };
   // A referenced object the archive lacks, then an archived object nothing references.
-  await source.bucket.delete('small');await refused();
-  await source.bucket.put('small',Uint8Array.of(1,2,3));await source.db.prepare("DELETE FROM files WHERE key='small'").run();await refused();
+  await runCases(t, [
+    ['referenced object is missing', async t => {
+      await refused(t, async source => { await source.bucket.delete('small'); });
+    }],
+    ['archived object is unreferenced', async t => {
+      await refused(t, async source => { await source.bucket.put('small',Uint8Array.of(1,2,3));await source.db.prepare("DELETE FROM files WHERE key='small'").run(); });
+    }],
+  ]);
 }]);
   await runCases(t, foldedCases);
 }]);
@@ -125,10 +138,20 @@ foldedCases.push(['uploads enforce order, checksums, declared columns, types and
 foldedCases.push(['finalize requires all parts and the archive binding before publishing', async t=>{
   const {bundle,service,target}=await setup(t),manifest={...bundle.manifest,sourceIdentity:bundle.manifest.sourceIdentity+'-altered'},id=await service.imports.create(manifest);await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/parts_missing/);
   for(const p of bundle.parts)await service.imports.uploadPart(id,p.index,p);
-  await assert.rejects(service.imports.finalize(id),/archive_checksum/);
-  await assert.rejects(service.imports.finalize(id,{archiveHash:'0'.repeat(64)}),/archive_checksum/);
-  await assert.rejects(service.imports.finalize(id,{contentHash:'0'.repeat(64),archiveHash:bundle.closing.archiveHash}),/content_checksum/);
-  await assert.rejects(service.imports.finalize(id,{contentHash:bundle.contentHash,archiveHash:bundle.closing.archiveHash}),/archive_checksum/);
+  await runCases(t, [
+    ["archive closing inputs: case 1", async t => {
+      await assert.rejects(service.imports.finalize(id),/archive_checksum/);
+    }],
+    ["archive closing inputs: case 2", async t => {
+      await assert.rejects(service.imports.finalize(id,{archiveHash:'0'.repeat(64)}),/archive_checksum/);
+    }],
+    ["archive closing inputs: case 3", async t => {
+      await assert.rejects(service.imports.finalize(id,{contentHash:'0'.repeat(64),archiveHash:bundle.closing.archiveHash}),/content_checksum/);
+    }],
+    ["archive closing inputs: case 4", async t => {
+      await assert.rejects(service.imports.finalize(id,{contentHash:bundle.contentHash,archiveHash:bundle.closing.archiveHash}),/archive_checksum/);
+    }]
+  ]);
   assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM effects').first()).n,0);
   assert.equal((await target.bucket.list()).objects.length,0);
   assert.equal((await target.db.prepare('SELECT applying FROM rer_portability_state').first()).applying,0);

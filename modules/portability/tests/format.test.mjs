@@ -15,16 +15,25 @@ async function fixture() {
   return [manifest,...parts,{kind:'closing',partCount:2,contentHash:verifier.digest(),archiveHash:integrity.digest()}];
 }
 test("bounded archive text", async t => {
+  await runCases(t, [['independent input groups', async t => {
   // Each row keeps its original assertions and reports its own failure name.
   await runCases(t, [
     ['bounded reader rejects an over-long line', async()=>{await assert.rejects(collect(archiveLines(bytesStream('12345\n'),4)),/exceeds/);}],
     ['bounded reader rejects invalid UTF-8 as malformed archive text', async()=>{await assert.rejects(collect(archiveLines(new Response(Uint8Array.of(255,10)).body,10)),/^Error: archive_json$/);}],
-    ['bounded reader accepts fragmented UTF-8, CRLF and final unterminated lines', async()=>{
+    ['bounded reader accepts fragmented UTF-8, CRLF and final unterminated lines', async(t)=>{
   const bytes=new TextEncoder().encode('🙂\r\nlast'),source=new ReadableStream({start(c){for(const b of bytes)c.enqueue(Uint8Array.of(b));c.close();}});
-  assert.deepEqual(await collect(archiveLines(source,16)),['🙂','last']);
-  await assert.rejects(collect(archiveLines(bytesStream('x'),0)),/Invalid/);
+  await runCases(t, [
+    ["archive line inputs: case 1", async t => {
+      assert.deepEqual(await collect(archiveLines(source,16)),['🙂','last']);
+    }],
+    ["archive line inputs: case 2", async t => {
+      await assert.rejects(collect(archiveLines(bytesStream('x'),0)),/Invalid/);
+    }]
+  ]);
 }],
   ]);
+
+  }]]);
 });
 
 
