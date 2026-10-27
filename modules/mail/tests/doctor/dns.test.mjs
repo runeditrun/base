@@ -15,13 +15,15 @@ const planned = () => dnsPlan('mail.example.com', 'resend', recordPlan(records))
 
 test("offline mail diagnosis normalizes setup and never invents DNS or delivery evidence", async t => {
   const foldedCases = [];
-foldedCases.push(['offline plan names all six items and never treats supplied records as evidence', async () => {
+foldedCases.push(['offline plan names all six items and never treats supplied records as evidence', async (t) => {
   const result = await mailDoctor({ domain: 'MAIL.EXAMPLE.COM.', provider: 'resend', dnsRecords: records }, {
     fetch() { assert.fail('offline fetch'); }, resolveDns() { assert.fail('offline DNS'); }, sender: { send() { assert.fail('offline send'); } },
   });
   assert.equal(result.domain, 'mail.example.com');
   assert.deepEqual(result.items.map(row => row.id), ['mx', 'spf', 'dkim', 'dmarc', 'send', 'receive']);
-  for (const item of result.items) { assert.ok(['pending', 'not_checked'].includes(item.status)); assert.ok(item.nextSteps.length); }
+  await runCases(t, Array.from(result.items, (item, rowIndex) => [`${t.name}: diagnostic item row ${rowIndex + 1}`, async t => {
+ assert.ok(['pending', 'not_checked'].includes(item.status)); assert.ok(item.nextSteps.length);
+}]));
   assert.deepEqual(result.items[2].records, records.dkim);
 }]);
 foldedCases.push(['sample without provider setup explains selector and values without manufacturing DKIM', async () => {

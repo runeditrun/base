@@ -7,7 +7,7 @@ import { snapshot, authoritySnapshot, operator, marker, owner, invite, error, se
 
 test("legacy cancellation recovery preserves witnessed admission guards", async t => {
   const foldedCases = [];
-foldedCases.push(['post-upgrade witnessed cancellation remains guarded through reissue/restart and atomic acceptance', async () => {
+foldedCases.push(['post-upgrade witnessed cancellation remains guarded through reissue/restart and atomic acceptance', async t => {
   const r = await runtime();
   try {
     await r.migrate();
@@ -18,13 +18,13 @@ foldedCases.push(['post-upgrade witnessed cancellation remains guarded through r
     assert.deepEqual(await operator(r, 'guarded'), { ...original, status: 'inactive', version: 2 });
     const cancellation = { operator_id: original.id, operator_version: 2 };
     assert.deepEqual(await marker(r, 'guarded'), cancellation);
-    await deniedLink(r, oldLink);
+    await deniedLink(t, r, oldLink);
     await guarded(r, 'guarded');
     await conflict(r, 'guarded', 'admin');
     await r.restart();
     assert.deepEqual(await marker(r, 'guarded'), cancellation);
     await guarded(r, 'guarded');
-    await deniedLink(r, oldLink);
+    await deniedLink(t, r, oldLink);
     const returnTo = '/original/guarded?view=invitation';
     assert.equal((await invite(r, 'guarded', 'member', returnTo)).status, 202);
     const freshLink = await r.latestLink();
@@ -36,12 +36,12 @@ foldedCases.push(['post-upgrade witnessed cancellation remains guarded through r
     assert.deepEqual(await marker(r, 'guarded'), cancellation);
     await guarded(r, 'guarded');
     await conflict(r, 'guarded', 'admin');
-    await deniedLink(r, oldLink);
+    await deniedLink(t, r, oldLink);
     await r.restart();
     assert.deepEqual(await operator(r, 'guarded'), reissued);
     assert.deepEqual(await marker(r, 'guarded'), cancellation);
     await guarded(r, 'guarded');
-    await deniedLink(r, oldLink);
+    await deniedLink(t, r, oldLink);
 
     // Real D1 abort at activation must roll back the preceding session insertion
     // and ledger deletion, as well as leave token consumption untouched.
@@ -51,17 +51,17 @@ foldedCases.push(['post-upgrade witnessed cancellation remains guarded through r
     await error(await r.call('/auth/confirm', post({ token: freshLink })), 503, 'auth_unavailable');
     assert.deepEqual(await authoritySnapshot(r), before, 'Failed activation rolls back every acceptance write');
     await db.prepare('DROP TRIGGER test_abort_acceptance').run();
-    const cookie = await accept(r, freshLink, original.id, 4, returnTo);
+    const cookie = await accept(t, r, freshLink, original.id, 4, returnTo);
     assert.deepEqual(await operator(r, 'guarded'), { ...reissued, status: 'active', version: 4 });
-    await deniedLink(r, oldLink);
+    await deniedLink(t, r, oldLink);
     await r.restart();
     await session(r, cookie, original.id, 4);
     assert.equal(await marker(r, 'guarded'), null);
-    await deniedLink(r, oldLink);
-    await deniedLink(r, freshLink);
+    await deniedLink(t, r, oldLink);
+    await deniedLink(t, r, freshLink);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecorded legacy cancellation', async () => {
+foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecorded legacy cancellation', async t => {
   const r = await runtime();
   try {
     await r.migrate();
@@ -69,7 +69,7 @@ foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecor
     const legacy = await operator(r, 'cancelled');
     assert.equal(await marker(r, legacy.id), null);
     await conflict(r, 'cancelled');
-    await deniedLink(r, credentials.cancelledLink);
+    await deniedLink(t, r, credentials.cancelledLink);
     const before = await snapshot(r);
     // No delete API exists. This is the owner's explicit database operation,
     // deleting FK dependencies first, not a runtime workaround or inferred marker.
@@ -87,7 +87,7 @@ foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecor
       oa_operators: before.oa_operators.filter(row => row.id !== legacy.id),
       oa_tokens: before.oa_tokens.filter(row => row.operator_id !== legacy.id),
     }, 'Only the deliberately removed legacy identity and its invitation are removed');
-    await deniedLink(r, credentials.cancelledLink);
+    await deniedLink(t, r, credentials.cancelledLink);
     const returnTo = '/original/cancelled?view=invitation';
     assert.equal((await invite(r, 'cancelled', 'member', returnTo)).status, 202);
     const replacement = await (await r.db).prepare('SELECT * FROM oa_operators WHERE email=?').bind(legacy.email).first();
@@ -98,12 +98,12 @@ foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecor
     assert.equal(replacement.status, 'invited');
     assert.equal(replacement.version, 1);
     const freshLink = await r.latestLink();
-    await deniedLink(r, credentials.cancelledLink);
-    const cookie = await accept(r, freshLink, replacement.id, 2, returnTo);
+    await deniedLink(t, r, credentials.cancelledLink);
+    const cookie = await accept(t, r, freshLink, replacement.id, 2, returnTo);
     await r.restart();
     await session(r, cookie, replacement.id, 2);
-    await deniedLink(r, credentials.cancelledLink);
-    await deniedLink(r, freshLink);
+    await deniedLink(t, r, credentials.cancelledLink);
+    await deniedLink(t, r, freshLink);
     await session(r, owner, 'owner', 1);
   } finally { await r.close(); }
 }]);

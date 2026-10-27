@@ -14,7 +14,8 @@ async function snapshot(db) {
 const schemaOf = async db => (await db.prepare("SELECT type,name,tbl_name FROM sqlite_master WHERE tbl_name='oa_sessions' ORDER BY type,name").all()).results;
 const status = async (r, letter) => (await r.call('/auth/session', { cookie: cookieFor(letter.repeat(43)) })).status;
 
-test('a populated store upgrades with identical rows; native sessions survive and legacy OIDC needs new provider admission', async () => {
+test('a populated store upgrades with identical rows; native sessions survive and legacy OIDC needs new provider admission', async (t) => {
+  await runCases(t, [['independent journey rows', async t => {
   const r = await runtime([...await Promise.all(priorMain.map(seedMigration)), await read('./fixtures/dev-sessions/rows.sql')], { externalIssuers: ['https://idp.example.com'] });
   try {
     const migration = await read('../accounts/schema/dev-sessions.sql');
@@ -33,12 +34,16 @@ test('a populated store upgrades with identical rows; native sessions survive an
     for (const name of ['domain-rules-step-up.sql', 'provider-control.sql', 'provider-pins.sql']) await applySql(r.db, await read('../accounts/schema/' + name));
     assert.deepEqual(await snapshot(r.db), before, 'every row and column, including ids and expiries, is unchanged');
     assert.deepEqual(await schemaOf(r.db), structure, 'the operator index and both unique indexes are rebuilt under their names');
-    for (const letter of ['N', 'R', 'P']) assert.equal(await status(r, letter), 200, `the ${letter} session is still valid`);
+    await runCases(t, Array.from(['N', 'R', 'P'], (letter, rowIndex) => [`${t.name}: valid session kind row ${rowIndex + 1}`, async t => {
+assert.equal(await status(r, letter), 200, `the ${letter} session is still valid`);
+}]));
     assert.equal(await status(r, 'O'), 401, 'a legacy provider session cannot bypass owner opt-in');
     assert.equal((await r.call('/auth/settings/identity', { method: 'POST', cookie: cookieFor('N'.repeat(43)), input: { idpSignIn: true } })).status, 200);
     assert.equal(await status(r, 'O'), 401, 'owner opt-in does not invent missing provider session provenance');
     assert.deepEqual(await snapshot(r.db), before, 'provider controls preserve every historical row and expiry');
-    for (const letter of ['V', 'E', 'G']) assert.equal(await status(r, letter), 401, `the ${letter} session stays revoked, expired or fenced`);
+    await runCases(t, Array.from(['V', 'E', 'G'], (letter, rowIndex) => [`${t.name}: fenced session kind row ${rowIndex + 1}`, async t => {
+assert.equal(await status(r, letter), 401, `the ${letter} session stays revoked, expired or fenced`);
+}]));
     // Constraints survive the rebuild: CHECK, UNIQUE token hash and source link, and foreign keys.
     const row = before.oa_sessions.find(s => s.id === 's-native');
     await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('x','y','owner',1,'bogus',1,2)").run(), /CHECK/);
@@ -51,6 +56,8 @@ test('a populated store upgrades with identical rows; native sessions survive an
     assert.equal((await r.db.prepare("SELECT count(*) AS n FROM oa_sessions WHERE kind='dev'").first()).n, 1);
     assert.equal((await r.call('/auth/session', { cookie: cookies(entered) })).status, 200);
   } finally { await r.close(); }
+
+  }]]);
 });
 
 test('a fresh store from the current schema admits dev sessions, and the migration is also safe after it', async (t) => {

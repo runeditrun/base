@@ -6,6 +6,7 @@ import { store, loopback } from './support.ts';
 
 const slackUrl = 'https://hooks.slack.com/services/TLOCAL/BLOCAL/fixture-secret';
 test('public provider composition: both Slack paths and credential custody', async t => {
+  await runCases(t, [['independent journey rows', async t => {
   const db = await store(t); const now = 1800000000000;
   let loseSlackReply = false;
   const wire = await loopback(t, [slackUrl, 'https://slack.com/api/chat.postMessage'], async (request, req, res) => {
@@ -35,6 +36,10 @@ test('public provider composition: both Slack paths and credential custody', asy
   db.restart(); const count = wire.received.length;
   await slack().delivery.dispatchDue(); await slack().delivery.dispatch('slack-lost'); assert.equal(wire.received.length, count);
   const stored = await db.contents();
-  for (const secret of [slackUrl, ['xoxb', 'local', 'fixture'].join('-')]) assert.equal(stored.includes(secret), false);
+  await runCases(t, Array.from([slackUrl, ['xoxb', 'local', 'fixture'].join('-')], (secret, rowIndex) => [`${t.name}: stored provider secret row ${rowIndex + 1}`, async t => {
+assert.equal(stored.includes(secret), false);
+}]));
   assert.deepEqual(wire.failures, []);
+
+  }]]);
 });

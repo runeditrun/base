@@ -39,11 +39,17 @@ await assert.rejects(operation(), /Forbidden/);
     assert.equal(await tokens.authorize(expiring.token, ['read'], context('expired')), null);
     const usage = await tokens.usage(owner), byRequest = new Map(usage.map(row => [row.requestId, row]));
     assert.equal(usage.length, 7);
-    for (const request of ['allow', 'restarted']) assert.equal(byRequest.get(request)!.allowed, true);
-    for (const request of ['scope-denied', 'unknown', 'scope-removed', 'revoked', 'expired']) assert.equal(byRequest.get(request)!.allowed, false);
+    await runCases(t, Array.from(['allow', 'restarted'], (request, rowIndex) => [`${t.name}: allowed request row ${rowIndex + 1}`, async t => {
+assert.equal(byRequest.get(request)!.allowed, true);
+}]));
+    await runCases(t, Array.from(['scope-denied', 'unknown', 'scope-removed', 'revoked', 'expired'], (request, rowIndex) => [`${t.name}: denied request row ${rowIndex + 1}`, async t => {
+assert.equal(byRequest.get(request)!.allowed, false);
+}]));
     assert.equal(byRequest.get('unknown')!.tokenId, null);
     assert.equal(byRequest.get('scope-denied')!.resource, 'tickets/43');
-    for (const row of usage.filter(row => row.requestId !== 'scope-denied')) assert.equal(row.resource, 'tickets/42');
+    await runCases(t, Array.from(usage.filter(row => row.requestId !== 'scope-denied'), (row, rowIndex) => [`${t.name}: usage resource row ${rowIndex + 1}`, async t => {
+assert.equal(row.resource, 'tickets/42');
+}]));
     await store.repo().query('DELETE FROM integration_tokens WHERE namespace=?');
     assert.deepEqual(await tokens.usage(owner), usage, 'usage is retained after credential deletion');
     assert.equal((await readFile(store.path)).includes(Buffer.from(token)), false);
@@ -66,7 +72,7 @@ foldedCases.push(['missing or unsafe request context rejects; valid context is s
     assert.equal(row.requestId, 'request-original'); assert.equal(row.resource, 'tickets/42');
   } finally { await store.close(); }
 }]);
-foldedCases.push(['usage failure denies visibly with no partial receipt; concurrent issuance retains random hash-only credentials', async () => {
+foldedCases.push(['usage failure denies visibly with no partial receipt; concurrent issuance retains random hash-only credentials', async (t) => {
   const store = await database();
   try {
     await installIssuer(store.db);
@@ -75,7 +81,9 @@ foldedCases.push(['usage failure denies visibly with no partial receipt; concurr
     assert.equal(new Set(issued.map(i => i.token)).size, 100);
     const rows = await store.repo().query('SELECT * FROM integration_tokens WHERE namespace=?');
     assert.equal(rows.length, 100);
-    for (const row of rows) assert.match(String(row.token_hash), /^[a-f0-9]{64}$/);
+    await runCases(t, Array.from(rows, (row, rowIndex) => [`${t.name}: token hash row ${rowIndex + 1}`, async t => {
+assert.match(String(row.token_hash), /^[a-f0-9]{64}$/);
+}]));
     assert.equal(JSON.stringify(await tokens.list(owner)).includes('token_hash'), false);
     store.db.migrate("CREATE TRIGGER fail_usage_v2 BEFORE INSERT ON integration_token_usage BEGIN SELECT RAISE(ABORT,'usage unavailable'); END;");
     await assert.rejects(tokens.authorize(issued[0]!.token, ['read'], context('failed-allowed')), /usage unavailable/);

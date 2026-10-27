@@ -22,7 +22,9 @@ foldedCases.push(['lost advance acknowledgement cannot duplicate or replay a par
 foldedCases.push(['export abort drops every snapshot and part', async t=>{
   const f=await runtime(t);await seed(f);const s=await f.connect(),id=await s.exports.create();await s.exports.advance(id);await s.exports.abort(id);
   assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name GLOB 'rer_portability_snap_*'").first()).n,0);
-  for(const table of ['parts','segments'])assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_'+table).first()).n,0);
+  await runCases(t, Array.from(['parts','segments'], (table, rowIndex) => [`${t.name}: snapshot cleanup row ${rowIndex + 1}`, async t => {
+assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_'+table).first()).n,0);
+}]));
 }]);
 foldedCases.push(['export is refused while an import applies', async t=>{
   const f=await runtime(t);await f.db.prepare("INSERT INTO rer_portability_state VALUES(1,'identity',0,'import',1)").run();await assert.rejects((await f.connect()).exports.create(),/import_applying/);

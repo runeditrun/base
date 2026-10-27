@@ -119,15 +119,35 @@ await denied(message(overrides));
     await denied(message({ headers: { [name]: 'value' } }), 'reserved_or_duplicate_header');
 }]));
 }],
-    ['Cloudflare enforces byte header limits and value restrictions', async () => {
+    ['Cloudflare enforces byte header limits and value restrictions', async t => {
+  await runCases(t, [
+    ['header name byte limit', async t => {
+
   await denied(message({ headers: { ['X-' + 'a'.repeat(99)]: 'v' } }), 'cloudflare_invalid_header_name');
+    }],
+    ['header value byte limit', async t => {
+
   await denied(message({ headers: { 'X-Test': 'é'.repeat(1025) } }), 'cloudflare_invalid_header_value');
+    }],
+    ['empty header value refuses', async t => {
+
   await denied(message({ headers: { 'X-Test': '' } }), 'cloudflare_invalid_header_value');
+    }],
+    ['unknown importance refuses', async t => {
+
   await denied(message({ headers: { Importance: 'extreme' } }), 'cloudflare_invalid_header_value');
+    }],
+    ['aggregate header limit', async t => {
+
   await denied(message({ headers: Object.fromEntries(Array.from({ length: 9 }, (_, n) => [`X-${n}`, 'a'.repeat(2048)])) }), 'cloudflare_headers_too_large');
+    }],
+    ['exact legal values send once', async t => {
+
   const fixture = transport();
   await sendCloudflare(config, message({ headers: { 'x-trace': 'é'.repeat(1024), Importance: 'high' } }), fixture);
   assert.equal(fixture.calls.length, 1);
+    }]
+  ]);
 }],
     ['raw list headers obey HTTPS, mailto and exact one-click pairing', async (t) => {
   await runCases(t, Array.from([
@@ -144,19 +164,30 @@ await denied(message({ headers }), 'cloudflare_invalid_unsubscribe_header');
     ['oversized serialized payload is rejected before effects', async () => {
   await denied(message({ text: 'a'.repeat(5 * 1024 * 1024) }), 'cloudflare_message_too_large');
 }],
-    ['total header byte boundary is exact, and twenty standard headers are the maximum', async () => {
+    ['total header byte boundary is exact, and twenty standard headers are the maximum', async t => {
+
   // Eight X headers: 8 * (name bytes 3 + framing 4) + value bytes = 16 KiB.
   const headers = Object.fromEntries(Array.from({ length: 8 }, (_, n) => [`X-${n}`, 'a'.repeat(n === 7 ? 1992 : 2048)]));
+  const names = ['In-Reply-To', 'References', 'Thread-Index', 'Thread-Topic', 'List-Id', 'List-Archive', 'List-Help', 'List-Owner', 'List-Post', 'List-Subscribe', 'Content-Language', 'Keywords', 'Comments', 'Organization', 'Require-Recipient-Valid-Since', 'Expires', 'Reply-By', 'Archived-At'];
+  const twenty = { ...Object.fromEntries(names.map(name => [name, 'value'])), Importance: 'normal', Priority: 'normal' };
+  await runCases(t, [
+['exact aggregate header bytes', async t => {
   const fixture = transport();
   await sendCloudflare(config, message({ headers }), fixture);
   assert.equal(fixture.calls.length, 1);
+}],
+['one excess header byte', async t => {
   await denied(message({ headers: { ...headers, 'X-7': headers['X-7'] + 'a' } }), 'cloudflare_headers_too_large');
-  const names = ['In-Reply-To', 'References', 'Thread-Index', 'Thread-Topic', 'List-Id', 'List-Archive', 'List-Help', 'List-Owner', 'List-Post', 'List-Subscribe', 'Content-Language', 'Keywords', 'Comments', 'Organization', 'Require-Recipient-Valid-Since', 'Expires', 'Reply-By', 'Archived-At'];
-  const twenty = { ...Object.fromEntries(names.map(name => [name, 'value'])), Importance: 'normal', Priority: 'normal' };
+}],
+['twenty standard headers', async t => {
   const accepted = transport();
   await sendCloudflare(config, message({ headers: twenty }), accepted);
   assert.equal(accepted.calls.length, 1);
+}],
+['twenty-one headers refuse', async t => {
   await denied(message({ headers: { ...twenty, Sensitivity: 'private' } }), 'cloudflare_headers_too_large');
+}]
+  ]);
 }],
   ]);
 });

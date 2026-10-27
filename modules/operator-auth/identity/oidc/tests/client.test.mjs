@@ -18,7 +18,9 @@ foldedCases.push(['real PKCE exchange, private_key_jwt and a signed token admit 
   assert.equal(f.location.searchParams.get('redirect_uri'), `${ORIGIN}/auth/oidc/auth/callback`);
   assert.match(f.start.headers.get('set-cookie'), /HttpOnly; SameSite=Lax; Max-Age=600; Secure/);
   const row = r.sqlite.prepare('SELECT * FROM oa_oidc_transactions').get();
-  for (const secret of [f.state, f.cookie.split('=')[1], f.location.searchParams.get('nonce')]) assert.ok(!JSON.stringify(row).includes(secret));
+  await runCases(t, Array.from([f.state, f.cookie.split('=')[1], f.location.searchParams.get('nonce')], (secret, rowIndex) => [`${t.name}: correlation secret row ${rowIndex + 1}`, async t => {
+assert.ok(!JSON.stringify(row).includes(secret));
+}]));
   r.restart();
   const response = await r.finish(f); assert.equal(response.status, 303, await response.clone().text());
   assert.equal(response.headers.get('location'), '/app/tickets?mine=1');
@@ -98,11 +100,18 @@ foldedCases.push(['expired correlations and altered encryption fail closed; a co
   await denied(await r.finish(inFlight));
 }]);
 foldedCases.push(['multiple audiences require explicit trust of every extra audience plus matching azp', async t => {
+
   const claims = { aud: ['client', 'api-resource'], azp: 'client' };
+  await runCases(t, [
+['untrusted extra audience refuses', async t => {
   const untrusted = await fixture(t, [authProvider({}, { claims })]); await untrusted.bootstrap();
   assert.equal((await untrusted.finish(await untrusted.flow())).status, 400);
+}],
+['explicit extra audience admits', async t => {
   const trusted = await fixture(t, [authProvider({ additionalAudiences: ['api-resource'] }, { claims })]); await trusted.bootstrap();
   assert.equal((await trusted.finish(await trusted.flow())).status, 303);
+}]
+  ]);
 }]);
 foldedCases.push(['a substituted key under a known kid fails without a refetch', async t => {
   const r = await fixture(t); await r.bootstrap(); assert.equal((await r.finish(await r.flow())).status, 303);
@@ -122,15 +131,30 @@ foldedCases.push(['a substituted key under a known kid fails without a refetch',
 test("OIDC start refuses unsafe configuration, routing and provider transport", async t => {
   const foldedCases = [];
 foldedCases.push(['start requires exact Origin, host, POST; callback exact route and GET', async t => {
+
   const r = await fixture(t); await r.bootstrap();
+  await runCases(t, [
+['start requires POST', async t => {
   await denied(await r.call('/auth/oidc/auth/start'), 405);
+}],
+['start requires exact Origin', async t => {
   await denied(await r.call('/auth/oidc/auth/start', { method: 'POST', headers: { Origin: 'https://attacker.example' }, body: {} }), 403);
+}],
+['start requires exact Host', async t => {
   await denied(await r.call('/auth/oidc/auth/start', { method: 'POST', headers: { Host: 'attacker.example' }, body: {} }), 403);
+}],
+['start refuses cross-site', async t => {
   await denied(await r.call('/auth/oidc/auth/start', { method: 'POST', headers: { 'Sec-Fetch-Site': 'cross-site' }, body: {} }), 403);
+}],
+['unknown provider refuses', async t => {
   await denied(await r.call('/auth/oidc/unknown/start', { method: 'POST', body: {} }), 404);
+}],
+['callback method and host refusals preserve one-use completion', async t => {
   const f = await r.flow(); await denied(await r.finish(f, { method: 'HEAD' }), 405);
   await denied(await r.finish(f, { headers: { Host: 'attacker.example' } }), 403);
   assert.equal((await r.finish(f)).status, 303);
+}]
+  ]);
 }]);
 foldedCases.push(['discovery and requests enforce trust, size, redirects, timeout; diagnostics are redacted', async t => {
   await runCases(t, Array.from([{ issuer: 'https://evil.example' }, { token_endpoint: 'https://evil.example/token' }, { authorization_endpoint: 'http://idp.example/auth' }, { jwks_uri: 'https://idp.example/jwks?secret=fixture' }, { code_challenge_methods_supported: ['plain'] }], (metadata, rowIndex) => [`${t.name}: metadata row ${rowIndex + 1}`, async t => {
@@ -177,14 +201,21 @@ foldedCases.push(['unknown and inactive operators never join; native policy gove
   await denied(await r.finish(f2), 403);
 }]);
 foldedCases.push(['Google with client_secret_post and Okta with an RS256 private_key_jwt are genuine protocol variations', async t => {
+
+  await runCases(t, [
+['Google POST secret exchange', async t => {
   const google = await fixture(t, [{ config: { id: 'google', preset: 'google', clientId: 'client', tokenAuthMethod: 'client_secret_post', clientSecret: 'fixture-secret' },
     fake: { issuer: 'https://accounts.google.com', method: 'client_secret_post', claims: { hd: 'example.com' } } }]);
   await google.bootstrap(); assert.equal((await google.finish(await google.flow())).status, 303);
+}],
+['Okta RSA assertion exchange', async t => {
   const okta = await fixture(t, [{ config: { id: 'okta', preset: 'okta', issuer: 'https://example.okta.com', clientId: 'client', privateKey: clientKey.RS256.private, subjectEmails: { 'operator-subject': 'owner@example.com' } },
     fake: { issuer: 'https://example.okta.com', method: 'private_key_jwt', clientKey: clientKey.RS256.public } }]);
   await okta.bootstrap(); assert.equal((await okta.finish(await okta.flow())).status, 303);
   const assertion = okta.provider.requests.filter(x => x.uri.endsWith('/token'));
   assert.equal(assertion.length, 1);
+}]
+  ]);
 }]);
 foldedCases.push(['Microsoft style unverified email only works with an explicit subject association', async t => {
   const entry = subjectEmails => ({ config: { id: 'microsoft', preset: 'microsoft', tenant: 'contoso.example', clientId: 'client', clientSecret: 'fixture-secret', tokenAuthMethod: 'client_secret_basic', subjectEmails },

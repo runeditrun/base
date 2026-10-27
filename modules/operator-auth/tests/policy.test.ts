@@ -28,13 +28,16 @@ assert.throws(() => normalizeEmail(input));
   assert.equal(defaultRolePolicy({ actor: admin, target: owner, action: 'operators:deactivate' }), false);
 });
 test('review requires literal URL and Host; forwarded headers confer no trust', async (t) => {
-  await runCases(t, Array.from(['localhost', '127.0.0.1', '[::1]'], (host, rowIndex) => [`${t.name}: host row ${rowIndex + 1}`, async t => {
+  await runCases(t, [['literal host scenarios', async t => {
+  await runCases(t, Array.from(['localhost', '127.0.0.1', '[::1]'], (host, rowIndex) => [`${t.name}: allowed literal host row ${rowIndex + 1}`, async t => {
 assert.doesNotThrow(() => requireLoopback(new Request(`http://${host}:8787`, { headers: { Host: `${host}:8787` } })));
 }]));
-  await runCases(t, Array.from(['evil.test', 'localhost.evil.test', '127.0.0.2', 'localhost:99'], (host, rowIndex) => [`${t.name}: host row ${rowIndex + 1}`, async t => {
+  await runCases(t, Array.from(['evil.test', 'localhost.evil.test', '127.0.0.2', 'localhost:99'], (host, rowIndex) => [`${t.name}: refused Host row ${rowIndex + 1}`, async t => {
 assert.throws(() => requireLoopback(new Request('http://localhost:8787', { headers: { Host: host, 'X-Forwarded-Host': 'localhost:8787' } })), { status: 403 });
 }]));
   assert.throws(() => requireLoopback(new Request('https://evil.test', { headers: { Host: 'localhost', Forwarded: 'host=localhost' } })), { status: 403 });
+
+  }]]);
 });
 test('cryptographic tokens and strict config are domain-separated and fail closed', async (t) => {
   const token = opaqueToken(); assert.ok(validToken(token)); assert.notEqual(token, opaqueToken());

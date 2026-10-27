@@ -37,18 +37,37 @@ foldedCases.push(['schema independently rejects wrong block/text types, length/c
 assert.equal(validate(value), false);
 }]));
 }]);
-foldedCases.push(['templates select event semantics, preserve user text as Slack-escaped literals, support custom events and fail visibly', () => {
+foldedCases.push(['templates select event semantics, preserve user text as Slack-escaped literals, support custom events and fail visibly', async t => {
+
   const data = { title: '<!channel> & title', detail: 'A *literal* detail' };
+  await runCases(t, [
+['resolved event', async t => {
   assert.match(renderSlackEvent('incident.resolved', data, slackEventTemplates).text, /^Incident resolved:/);
+}],
+['opened event', async t => {
   assert.equal(renderSlackEvent('incident.opened', data, slackEventTemplates).blocks[0]!.text.text, 'Incident opened: &lt;!channel&gt; &amp; title');
   assert.equal(renderSlackEvent('incident.opened', data, slackEventTemplates).blocks[1]!.text.text, data.detail);
+}],
+['custom event', async t => {
   const custom = renderSlackEvent('job.done', { count: 7 }, { 'job.done': d => ({ summary: `Finished ${d.count}`, sections: [`${d.count} records`] }) });
   assert.equal(custom.text, 'Finished 7'); assert.equal(validate(custom), true);
+}],
+['prototype event refuses', async t => {
   assert.throws(() => renderSlackEvent('toString', data, slackEventTemplates), /Unknown/);
+}],
+['missing event refuses', async t => {
   assert.throws(() => renderSlackEvent('missing', data, slackEventTemplates), /Unknown/);
+}],
+['empty detail refuses', async t => {
   assert.throws(() => renderSlackEvent('incident.opened', { ...data, detail: '' }, slackEventTemplates), /failed/);
+}],
+['long detail refuses', async t => {
   assert.throws(() => renderSlackEvent('incident.opened', { ...data, detail: 'x'.repeat(3001) }, slackEventTemplates), /failed/);
+}],
+['invalid Unicode detail refuses', async t => {
   assert.throws(() => renderSlackEvent('incident.opened', { ...data, detail: '\ud800' }, slackEventTemplates), /failed/);
+}]
+  ]);
 }]);
 foldedCases.push(['every Slack control sequence in user content is neutralised in every field the notifier writes', async (t) => {
   await runCases(t, Array.from(injections, (injection, rowIndex) => [`${t.name}: injection row ${rowIndex + 1}`, async t => {

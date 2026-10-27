@@ -15,12 +15,18 @@ async function responseCase(response, status, code) {
 
 test("Resend response classification admits only bounded unambiguous provider acceptance", async t => {
   const foldedCases = [];
-foldedCases.push(['only HTTP 200 with a real usable body ID establishes acceptance', async () => {
-  for (const data of [null, [], {}, { id: null }, { id: 42 }, { id: '' }, { id: ' ' }, { id: ' padded ' }, { id: 'bad\nvalue' }, { id: 'x'.repeat(1025) }, { data: { id: receipt } }, { id: receipt, error: 'SENSITIVE' }, { id: receipt, name: 'validation_error' }]) {
+foldedCases.push(['only HTTP 200 with a real usable body ID establishes acceptance', async (t) => {
+  await runCases(t, Array.from([null, [], {}, { id: null }, { id: 42 }, { id: '' }, { id: ' ' }, { id: ' padded ' }, { id: 'bad\nvalue' }, { id: 'x'.repeat(1025) }, { data: { id: receipt } }, { id: receipt, error: 'SENSITIVE' }, { id: receipt, name: 'validation_error' }], (data, rowIndex) => [`${t.name}: invalid acceptance body row ${rowIndex + 1}`, async t => {
+
     await responseCase(Response.json(data), 'uncertain', 'invalid_provider_response');
-  }
-  for (const body of ['', '{"id":', '<html>SENSITIVE</html>']) await responseCase(new Response(body), 'uncertain', 'invalid_provider_response');
-  for (const status of [201, 202, 204, 206, 299]) await responseCase(new Response(status === 204 ? null : JSON.stringify({ id: receipt }), { status }), 'uncertain', 'unexpected_response');
+
+}]));
+  await runCases(t, Array.from(['', '{"id":', '<html>SENSITIVE</html>'], (body, rowIndex) => [`${t.name}: malformed acceptance body row ${rowIndex + 1}`, async t => {
+await responseCase(new Response(body), 'uncertain', 'invalid_provider_response');
+}]));
+  await runCases(t, Array.from([201, 202, 204, 206, 299], (status, rowIndex) => [`${t.name}: unexpected acceptance status row ${rowIndex + 1}`, async t => {
+await responseCase(new Response(status === 204 ? null : JSON.stringify({ id: receipt }), { status }), 'uncertain', 'unexpected_response');
+}]));
 }]);
 foldedCases.push(['HTTP failure matrix never reports delivery or follows redirect instructions', async t => {
   await runCases(t, [
@@ -35,13 +41,29 @@ foldedCases.push(['HTTP failure matrix never reports delivery or follows redirec
     }],
   ]);
 }]);
-foldedCases.push(['idempotency conflicts distinguish payload mismatch from an in-progress request', async () => {
+foldedCases.push(['idempotency conflicts distinguish payload mismatch from an in-progress request', async t => {
+  await runCases(t, [
+    ['payload mismatch rejects', async t => {
+
   await responseCase(Response.json({ name: 'invalid_idempotent_request', message: 'SENSITIVE' }, { status: 409 }), 'rejected', 'idempotency_conflict');
+    }],
+    ['in-progress request remains uncertain', async t => {
+
   await responseCase(Response.json({ name: 'concurrent_idempotent_requests', message: 'SENSITIVE' }, { status: 409 }), 'uncertain', 'idempotency_in_progress');
-  for (const data of [{ name: 'unrecognized', message: 'SENSITIVE' }, {}, { error: { name: 'invalid_idempotent_request' } }]) {
+    }],
+    ['unknown structured conflicts remain uncertain', async t => {
+
+  await runCases(t, Array.from([{ name: 'unrecognized', message: 'SENSITIVE' }, {}, { error: { name: 'invalid_idempotent_request' } }], (data, rowIndex) => [`${t.name}: unknown idempotency conflict row ${rowIndex + 1}`, async t => {
+
     await responseCase(Response.json(data, { status: 409 }), 'uncertain', 'idempotency_unknown_conflict');
-  }
+
+}]));
+    }],
+    ['unstructured conflict remains uncertain', async t => {
+
   await responseCase(new Response('SENSITIVE', { status: 409 }), 'uncertain', 'idempotency_unknown_conflict');
+    }]
+  ]);
 }]);
 foldedCases.push(['transport interruption and invalid fetch responses remain uncertain without leaking exceptions', async (t) => {
   await runCases(t, Array.from([() => { throw new Error('SENSITIVE credentials and body'); }, async () => { throw new Error('SENSITIVE'); }, async () => null, async () => ({ status: 200, id: receipt })], (operation, rowIndex) => [`${t.name}: operation row ${rowIndex + 1}`, async t => {
@@ -51,17 +73,31 @@ foldedCases.push(['transport interruption and invalid fetch responses remain unc
     assert.equal(calls, 1);
 }]));
 }]);
-foldedCases.push(['body streaming, UTF-8 errors, transport errors and oversized responses are bounded', async () => {
+foldedCases.push(['body streaming, UTF-8 errors, transport errors and oversized responses are bounded', async t => {
+  await runCases(t, [
+    ['streamed valid UTF-8 is accepted', async t => {
+
   const encoded = new TextEncoder().encode(JSON.stringify({ id: receipt }));
   const chunks = new ReadableStream({ start(controller) { for (const byte of encoded) controller.enqueue(Uint8Array.of(byte)); controller.close(); } });
   assert.deepEqual(await sendResend(config, message(), providerFixture(new Response(chunks))), { provider: 'resend', status: 'accepted', providerMessageId: receipt });
+    }],
+    ['stream errors remain uncertain', async t => {
+
   const broken = new ReadableStream({ start(controller) { controller.error(new Error('SENSITIVE')); } });
   await responseCase(new Response(broken), 'uncertain', 'invalid_provider_response');
+    }],
+    ['invalid UTF-8 remains uncertain', async t => {
+
   await responseCase(new Response(Uint8Array.of(255)), 'uncertain', 'invalid_provider_response');
+    }],
+    ['oversized stream is canceled', async t => {
+
   let canceled = false;
   const oversized = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(65537)); }, cancel() { canceled = true; } });
   await responseCase(new Response(oversized), 'uncertain', 'invalid_provider_response');
   assert.equal(canceled, true);
+    }]
+  ]);
 }]);
 foldedCases.push(['an unfinished response body times out and its stream is canceled', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });

@@ -6,8 +6,10 @@ import { runtime } from './runtime.mjs';
 const post = (input, cookie, options = {}) => ({ method: 'POST', input, cookie, ...options });
 const invitation = (email = 'pending@example.com', extra = {}) => ({ email, displayName: 'Pending', ...extra });
 const token = async r => (await r.link()).searchParams.get('token');
-async function dead(r, value) {
-  for (const method of ['GET', 'HEAD']) assert.equal((await r.call(`/auth/confirm?token=${value}`, { method })).status, 400);
+async function dead(t, r, value) {
+  await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`dead method row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(`/auth/confirm?token=${value}`, { method })).status, 400);
+}]));
   const response = await r.call('/auth/confirm', post({ token: value }));
   assert.equal(response.status, 400);
   assert.equal(response.headers.get('set-cookie'), null);
@@ -46,7 +48,9 @@ foldedCases.push(['two cancellation cycles preserve identity/history and admissi
       assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: initial.id }, owner))).status, 200);
       await guarded(r, owner, initial.id);
       await r.restart();
-      for (const value of old) await dead(r, value);
+      await runCases(t, Array.from(old, (value, rowIndex) => [`${t.name}: stale credential after restart row ${rowIndex + 1}`, async t => {
+await dead(t, r, value);
+}]));
       assert.equal((await r.call('/auth/invite', post(invitation(' PENDING@example.COM ', { returnTo: '/workspace?accepted=yes#inbox' }), owner))).status, 202);
       const current = await token(r);
       const pending = await (await r.db).prepare('SELECT * FROM oa_operators WHERE id=?').bind(initial.id).first();
@@ -58,7 +62,9 @@ foldedCases.push(['two cancellation cycles preserve identity/history and admissi
       assert.ok(await (await r.db).prepare('SELECT 1 FROM oa_invitation_cancellations WHERE operator_id=?').bind(initial.id).first());
       await guarded(r, owner, initial.id);
       await r.restart();
-      for (const value of old) await dead(r, value);
+      await runCases(t, Array.from(old, (value, rowIndex) => [`${t.name}: stale credential after reissue row ${rowIndex + 1}`, async t => {
+await dead(t, r, value);
+}]));
       await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
         const preview = await r.call(`/auth/confirm?token=${current}`, { method });
         assert.equal(preview.status, 200);
@@ -70,7 +76,9 @@ foldedCases.push(['two cancellation cycles preserve identity/history and admissi
     await (await r.db).prepare('DELETE FROM oa_tokens WHERE operator_id=?').bind(initial.id).run();
     await r.restart();
     await guarded(r, owner, initial.id);
-    for (const value of old) await dead(r, value);
+    await runCases(t, Array.from(old, (value, rowIndex) => [`${t.name}: pruned stale credential row ${rowIndex + 1}`, async t => {
+await dead(t, r, value);
+}]));
     assert.equal((await r.call('/auth/invite', post(invitation(undefined, { returnTo: '/workspace?accepted=yes#inbox' }), owner))).status, 202);
     const fresh = await token(r);
     await r.restart();
@@ -79,7 +87,7 @@ foldedCases.push(['two cancellation cycles preserve identity/history and admissi
     assert.equal(accepted.headers.get('location'), '/workspace?accepted=yes#inbox');
     const cookie = accepted.headers.get('set-cookie').split(';')[0];
     assert.equal((await r.call('/auth/session', { cookie })).status, 200);
-    await dead(r, fresh);
+    await dead(t, r, fresh);
     assert.equal(await (await r.db).prepare('SELECT 1 FROM oa_invitation_cancellations WHERE operator_id=?').bind(initial.id).first(), null);
     assert.deepEqual(await (await r.db).prepare('SELECT * FROM lifecycle_history').first(), { id: 'created', operator_id: initial.id });
     assert.deepEqual(await (await r.db).prepare('SELECT * FROM oa_bootstrap').first(), bootstrap);
@@ -89,7 +97,7 @@ foldedCases.push(['two cancellation cycles preserve identity/history and admissi
     assert.equal((await r.call('/auth/operator/status', post({ operatorId: initial.id, status: 'active' }, owner))).status, 200);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['expired and same-role pending invites resend, role conflicts do not send, and cancelled role changes need current authority', async () => {
+foldedCases.push(['expired and same-role pending invites resend, role conflicts do not send, and cancelled role changes need current authority', async t => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -99,11 +107,11 @@ foldedCases.push(['expired and same-role pending invites resend, role conflicts 
     assert.equal((await r.call('/auth/invite', post(invitation(undefined, { role: 'admin' }), owner))).status, 409);
     assert.equal((await r.mails()).length, 1);
     assert.equal((await r.call('/auth/invite', post(invitation(), owner))).status, 202);
-    await dead(r, first);
+    await dead(t, r, first);
     const second = await token(r);
     await (await r.db).prepare('UPDATE oa_tokens SET expires_at=0 WHERE operator_id=?').bind(initial.id).run();
     await r.restart();
-    await dead(r, second);
+    await dead(t, r, second);
     assert.equal((await r.call('/auth/invite', post(invitation(), owner))).status, 202);
     assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: initial.id }, owner))).status, 200);
     assert.equal((await r.call('/auth/invite', post(invitation(undefined, { role: 'admin' }), owner))).status, 409);

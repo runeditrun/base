@@ -26,10 +26,24 @@ assert.throws(()=>options([key==='from'?'import':'export','--origin','https://ex
 }]));
   assert.equal(options(['export','--origin','http://[::1]:8787',...flags]).origin,'http://[::1]:8787');
 }]);
-foldedCases.push(['CLI session input is one small regular cookie file', async t=>{
+foldedCases.push(['CLI session input is one small regular cookie file', async t => {
+  await runCases(t, [
+    ['oversized cookie file refuses', async t => {
+
   const f=await runtime(t),path=join(f.directory,'session');await writeFile(path,'session='+'a'.repeat(4090));await assert.rejects(cookieFile(path),/small regular/);
+    }],
+    ['multiple cookies refuse', async t => {
+
+  const f=await runtime(t),path=join(f.directory,'session');
   await writeFile(path,'one=value; two=value');await assert.rejects(cookieFile(path),/one cookie/);
+    }],
+    ['symbolic link refuses', async t => {
+
+  const f=await runtime(t),path=join(f.directory,'session');
+  await writeFile(path,'one=value; two=value');
   const link=join(f.directory,'linked');await symlink(path,link);await assert.rejects(cookieFile(link),/small regular/);
+    }]
+  ]);
 }]);
   await runCases(t, foldedCases);
 });

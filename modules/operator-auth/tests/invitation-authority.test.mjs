@@ -53,7 +53,7 @@ assert.equal((await r.call(`/auth/confirm?token=${token}`, { method })).status, 
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['configured product policy can grant members admin invitations and is re-evaluated for existing links', async () => {
+foldedCases.push(['configured product policy can grant members admin invitations and is re-evaluated for existing links', async (t) => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -67,10 +67,12 @@ foldedCases.push(['configured product policy can grant members admin invitations
     const ownerToken = await invite(r, owner, 'pending-member@example.com');
     r.options.policy = 'deny-invites';
     await r.restart();
-    for (const value of [token, ownerToken]) {
+    await runCases(t, Array.from([token, ownerToken], (value, rowIndex) => [`${t.name}: revoked invitation link row ${rowIndex + 1}`, async t => {
+
       assert.equal((await r.call(`/auth/confirm?token=${value}`)).status, 400);
       assert.equal((await r.call('/auth/confirm', post({ token: value }))).status, 400);
-    }
+
+}]));
     await unconsumed(r, 'pending-admin@example.com');
     await unconsumed(r, 'pending-member@example.com');
     assert.equal((await r.call('/auth/session', { cookie: member.cookie })).status, 200);

@@ -6,7 +6,7 @@ import { config, receipt, message, providerFixture } from './fixtures.mjs';
 
 test("Resend serialization preserves exact message bytes and caller idempotency identity", async t => {
   const foldedCases = [];
-foldedCases.push(['official endpoint, auth, exact wire schema, threading and bytes', async () => {
+foldedCases.push(['official endpoint, auth, exact wire schema, threading and bytes', async t => {
   const input = { ...message(), html: '<p>你好<img src="cid:logo-1"></p>',
     cc: ['copy@example.org'], bcc: ['Private <blind@example.org>'], replyTo: 'Replies <reply@example.com>',
     headers: { 'Message-ID': '<new@example.com>', 'In-Reply-To': '<old@example.com>', References: '<first@example.com> <old@example.com>', 'X-Case': '42',
@@ -39,7 +39,9 @@ foldedCases.push(['official endpoint, auth, exact wire schema, threading and byt
   };
   assert.equal(body, JSON.stringify(expected));
   assert.deepEqual(JSON.parse(body), expected);
-  for (let i = 0; i < expected.attachments.length; i++) assert.deepEqual(new Uint8Array(Buffer.from(expected.attachments[i].content, 'base64')), input.attachments[i].content);
+  await runCases(t, Array.from(expected.attachments.keys(), i => [`attachment bytes row ${i + 1}`, async () => {
+    assert.deepEqual(new Uint8Array(Buffer.from(expected.attachments[i].content, 'base64')), input.attachments[i].content);
+  }]));
 }]);
 foldedCases.push(['HTML-only, explicit empty text, empty subject and omitted options retain distinct semantics', async (t) => {
   await runCases(t, Array.from([undefined, ''], (text, rowIndex) => [`${t.name}: text row ${rowIndex + 1}`, async t => {

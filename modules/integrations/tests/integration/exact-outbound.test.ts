@@ -6,6 +6,7 @@ import { DeliveryService, createWebhookProtocol, verifyWebhook } from '../../ind
 import { loopback, store } from './support.ts';
 
 test('outbound HMAC preserves original UTF-8 bytes including whitespace, line endings and signed BOM', async t => {
+  await runCases(t, [['independent journey rows', async t => {
   const sender = await store(t), inbox = await store(t);
   const key = new Uint8Array(32).fill(83), now = 1800000000000;
   const url = 'https://receiver.example.com/exact-bytes';
@@ -32,8 +33,12 @@ test('outbound HMAC preserves original UTF-8 bytes including whitespace, line en
   assert.equal(transport.received.length, bodies.length);
   assert.deepEqual(transport.failures, []);
   inbox.restart();
-  for (const request of transport.received) {
+  await runCases(t, Array.from(transport.received, (request, rowIndex) => [`${t.name}: durable outbound replay row ${rowIndex + 1}`, async t => {
+
     const verified = await verifyWebhook({ body: request.rawBody, headers: request.headers, key, tenant: 'installation', destinationId: 'exact-v1', now });
     assert.equal(await inbox.repo().acceptReplay(verified), false);
-  }
+
+}]));
+
+  }]]);
 });

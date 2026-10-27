@@ -11,13 +11,22 @@ test("Cloudflare response disposition preserves recipient truth under malformed 
 foldedCases.push(["Cloudflare acceptance conservatively preserves exact recipient outcomes", async t => {
   // Each row keeps its original assertions and reports its own failure name.
   await runCases(t, [
-    ['documented REST success without message_id returns nullable ID, not invented correlation', async () => {
+    ['documented REST success without message_id returns nullable ID, not invented correlation', async t => {
+
+  await runCases(t, [
+['missing provider ID remains null', async t => {
   assert.deepEqual(await send(success()), {
     provider: 'cloudflare', status: 'accepted', providerMessageId: null,
     recipientResults: [{ recipient: 'a@example.com', status: 'accepted' }],
   });
+}],
+['explicit null ID remains null', async t => {
   assert.equal((await send(success({ message_id: null }))).providerMessageId, null);
+}],
+['usable provider ID remains exact', async t => {
   assert.equal((await send(success({ message_id: '<real@cloudflare.example>' }))).providerMessageId, '<real@cloudflare.example>');
+}]
+  ]);
 }],
     ['queued recipients are accepted without claiming mailbox receipt', async () => {
   const result = await send(success({ delivered: [], queued: ['a@example.com'] }));

@@ -69,7 +69,9 @@ foldedCases.push(['an old archive carrying its Platform ledger restores into a P
   assert.deepEqual(receipt.bridged.migrations,['1270_roles.sql','1280_policy_rules.sql']);
   assert.deepEqual(receipt.bridged.tables,['roles']);
   assert.deepEqual(receipt.skippedTables,['rer_migrations']);
-  for(const table of ['items','jobs','policies'])assert.deepEqual(await all(target.db,`SELECT * FROM ${table} ORDER BY id`),await all(source.db,`SELECT * FROM ${table} ORDER BY id`));
+  await runCases(t, Array.from(['items','jobs','policies'], (table, rowIndex) => [`${t.name}: migration restored table row ${rowIndex + 1}`, async t => {
+assert.deepEqual(await all(target.db,`SELECT * FROM ${table} ORDER BY id`),await all(source.db,`SELECT * FROM ${table} ORDER BY id`));
+}]));
   assert.deepEqual(await all(target.db,'SELECT * FROM roles'),[]);
   assert.deepEqual(await ledgerRows(target.db),before);
 }]);

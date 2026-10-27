@@ -13,13 +13,15 @@ function run(args) { return spawnSync(process.execPath, [cli, ...args], { encodi
 
 test("mail doctor CLI requires explicit live configuration and server-side credential custody", async t => {
   const foldedCases = [];
-foldedCases.push(['real CLI sample JSON and human plans work without assembled adapters or secrets', () => {
+foldedCases.push(['real CLI sample JSON and human plans work without assembled adapters or secrets', async (t) => {
   const args = ['--domain', 'mail.example.com', '--provider', 'resend', '--plan'];
   const json = run([...args, '--json']); assert.equal(json.status, 0, json.stderr);
   const result = JSON.parse(json.stdout); assert.equal(result.items.length, 6);
   assert.ok(result.items.every(item => item.status === 'not_checked'));
   const human = run(args); assert.equal(human.status, 0, human.stderr);
-  for (const label of ['MX', 'SPF', 'DKIM', 'DMARC', 'SEND', 'RECEIVE']) assert.match(human.stdout, new RegExp(`${label}:`));
+  await runCases(t, Array.from(['MX', 'SPF', 'DKIM', 'DMARC', 'SEND', 'RECEIVE'], (label, rowIndex) => [`${t.name}: diagnostic label row ${rowIndex + 1}`, async t => {
+assert.match(human.stdout, new RegExp(`${label}:`));
+}]));
 }]);
 foldedCases.push(['CLI live requires explicit configuration and rejects mutually exclusive/unknown flags', async (t) => {
   await runCases(t, Array.from([ ['--live'], ['--live', '--plan'], ['--provider'], ['--api-key', 'private-key'] ], (args, rowIndex) => [`${t.name}: args row ${rowIndex + 1}`, async t => {

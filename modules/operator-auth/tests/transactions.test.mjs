@@ -17,7 +17,9 @@ foldedCases.push(['D1 auth writes survive audit triggers and storage failures wi
     await applySql(db, await readFile(new URL('./fixtures/trigger-writes.sql', import.meta.url), 'utf8'));
     await db.prepare("CREATE TRIGGER test_reject_session BEFORE INSERT ON oa_sessions BEGIN SELECT RAISE(ABORT,'test_storage_failure'); END").run();
     assert.equal((await r.call('/auth/bootstrap', post({ token: SETUP, displayName: 'Owner' }))).status, 503);
-    for (const table of ['oa_bootstrap', 'oa_operators', 'oa_sessions']) assert.equal((await db.prepare(`SELECT count(*) AS n FROM ${table}`).first()).n, 0);
+    await runCases(t, Array.from(['oa_bootstrap', 'oa_operators', 'oa_sessions'], (table, rowIndex) => [`${t.name}: transaction rollback table row ${rowIndex + 1}`, async t => {
+assert.equal((await db.prepare(`SELECT count(*) AS n FROM ${table}`).first()).n, 0);
+}]));
     await db.exec('DROP TRIGGER test_reject_session');
     const owner = await r.bootstrap();
     assert.equal((await r.call('/auth/invite', post({ email: 'invite@example.com', displayName: 'Invitee' }, owner))).status, 202);

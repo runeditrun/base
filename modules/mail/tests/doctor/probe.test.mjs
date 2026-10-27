@@ -147,9 +147,16 @@ foldedCases.push(['receive scan caps pages and time even when mailbox has more m
   assert.equal(calls, 3); assert.equal(result.evidence.state, 'timeout');
   assert.equal(result.evidence.polls, 1); assert.equal(result.evidence.requests, 3);
 }]);
-foldedCases.push(['bounded operation times out even if an injected transport ignores abort', async () => {
+foldedCases.push(['bounded operation times out even if an injected transport ignores abort', async t => {
+
+  await runCases(t, [
+['ignored abort still times out', async t => {
   await assert.rejects(bounded(() => new Promise(() => {}), 20));
+}],
+['oversized JSON refuses', async t => {
   await assert.rejects(readJson(new Response('x'.repeat(20)), 10));
+}]
+  ]);
 }]);
   await runCases(t, foldedCases);
 });

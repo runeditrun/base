@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -29,10 +30,18 @@ export async function cliJourney(t,cli,worker,{truncate=false}={}) {
   const imported=await cliRun(cli,other,session,'import','--from',out);assert.equal(imported.code,0,imported.stderr);output.push(imported.stdout,imported.stderr);
   const again=await cliRun(cli,other,session,'export','--out',second);assert.equal(again.code,0,again.stderr);output.push(again.stdout,again.stderr);
   const first=await readFile(out,'utf8'),last=await readFile(second,'utf8'),a=await collect(readArchive(new Response(first).body)),b=await collect(readArchive(new Response(last).body));
-  assert.equal(a.at(-1).contentHash,b.at(-1).contentHash);
-  for(const file of [out,out+'.transfer.json',second,second+'.transfer.json'])assert.equal((await stat(file)).mode&0o777,0o600);
-  for(const file of [out,second]){assert.equal((await stat(file)).nlink,1);await assert.rejects(stat(file+'.partial'),{code:'ENOENT'});}
-  assert.equal((await stat(join(source.directory,'archives'))).mode&0o777,0o700);
-  for(const text of [...output,first,last,await readFile(out+'.transfer.json','utf8'),await readFile(second+'.transfer.json','utf8')])assert.ok(!text.includes(cookie) && !text.includes(cookie.split('=')[1]),'cookie must stay private');
+  await runCases(t, [['archive file observations', async t => {
+  await runCases(t, [['archive content equivalence', async () => { assert.equal(a.at(-1).contentHash,b.at(-1).contentHash); }]]);
+  await runCases(t, Array.from([out,out+'.transfer.json',second,second+'.transfer.json'], (file, rowIndex) => [`archive file mode row ${rowIndex + 1}`, async t => {
+assert.equal((await stat(file)).mode&0o777,0o600);
+}]));
+  await runCases(t, Array.from([out,second], (file, rowIndex) => [`archive file identity row ${rowIndex + 1}`, async t => {
+assert.equal((await stat(file)).nlink,1);await assert.rejects(stat(file+'.partial'),{code:'ENOENT'});
+}]));
+  await runCases(t, [['archive directory mode', async () => { assert.equal((await stat(join(source.directory,'archives'))).mode&0o777,0o700); }]]);
+  await runCases(t, Array.from([...output,first,last,await readFile(out+'.transfer.json','utf8'),await readFile(second+'.transfer.json','utf8')], (text, rowIndex) => [`private CLI output row ${rowIndex + 1}`, async t => {
+assert.ok(!text.includes(cookie) && !text.includes(cookie.split('=')[1]),'cookie must stay private');
+}]));
+  }]]);
   return {source,target,origin,session,out,cli};
 }

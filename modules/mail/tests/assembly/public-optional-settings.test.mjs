@@ -109,7 +109,7 @@ foldedCases.push(['public SendGrid accepts exactly 10,000 UTF-8 custom argument 
   assert.equal(Buffer.byteLength(JSON.stringify(wire.custom_args)), 10000);
   await rejectsWithoutEffects({ ...input, customArgs: { ...customArgs, marker: customArgs.marker + 'x' } }, 'custom_args_too_large');
 }]);
-foldedCases.push(['public SendGrid rejects invalid optional settings before any effect', async () => {
+foldedCases.push(['public SendGrid rejects invalid optional settings before any effect', async (t) => {
   const invalid = [
     ...[0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '33984', null].map(asmGroupId => [{ asmGroupId }, 'invalid_asm_group']),
     ...['true', 0, 1, null].map(subscriptionTracking => [{ subscriptionTracking }, 'invalid_subscription_tracking']),
@@ -119,15 +119,21 @@ foldedCases.push(['public SendGrid rejects invalid optional settings before any 
     ...['rer_delivery_id', 'email', 'event', 'timestamp', 'sg_event_id', 'sg_message_id']
       .map(key => [{ customArgs: { [key]: 'replacement' } }, 'invalid_custom_arg']),
   ];
-  for (const [extra, code] of invalid) await rejectsWithoutEffects({ ...message(), ...extra }, code);
+  await runCases(t, Array.from(invalid, ([extra, code], rowIndex) => [`${t.name}: invalid optional setting row ${rowIndex + 1}`, async t => {
+await rejectsWithoutEffects({ ...message(), ...extra }, code);
+}]));
 }]);
-foldedCases.push(['public remote providers reject unsupported SendGrid settings even when false or empty', async () => {
-  for (const provider of ['resend', 'cloudflare']) {
+foldedCases.push(['public remote providers reject unsupported SendGrid settings even when false or empty', async (t) => {
+  await runCases(t, Array.from(['resend', 'cloudflare'], (provider, rowIndex) => [`${t.name}: unsupported provider row ${rowIndex + 1}`, async t => {
+
     const configuration = { ...config, provider, ...(provider === 'cloudflare' ? { accountId: 'a'.repeat(32) } : {}) };
-    for (const extra of [{ asmGroupId: 1 }, { subscriptionTracking: false }, { subscriptionTracking: true }, { customArgs: {} }, { customArgs: { rer_product: 'orbit' } }]) {
+    await runCases(t, Array.from([{ asmGroupId: 1 }, { subscriptionTracking: false }, { subscriptionTracking: true }, { customArgs: {} }, { customArgs: { rer_product: 'orbit' } }], (extra, rowIndex) => [`${t.name}: unsupported provider setting row ${rowIndex + 1}`, async t => {
+
       await rejectsWithoutEffects({ ...message(), ...extra }, 'unsupported_provider_setting', configuration);
-    }
-  }
+
+}]));
+
+}]));
 }]);
   await runCases(t, foldedCases);
 });

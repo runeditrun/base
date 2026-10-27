@@ -69,18 +69,35 @@ assert.equal(await verifyWebhook({ ...input, key: pair.publicKey.export({ type: 
 }]));
   assert.equal(await verifyWebhook({ ...input, key: Buffer.concat([Buffer.from(input.key, 'base64'), Buffer.from([0])]).toString('base64') }), false);
 }]);
-foldedCases.push(['Resend verifies rotation signatures and binds Svix identity and timestamp', async () => {
+foldedCases.push(['Resend verifies rotation signatures and binds Svix identity and timestamp', async t => {
+
   const input = signed('resend', '{}');
+  await runCases(t, [
+['rotated signature verifies', async t => {
   const headers = new Headers(input.headers);
   headers.set('svix-signature', `v1,${randomBytes(32).toString('base64')} ${headers.get('svix-signature')}`);
   assert.equal(await verifyWebhook({ ...input, headers }), true);
+}],
+['rotation binds identity', async t => {
+  const headers = new Headers(input.headers);
+  headers.set('svix-signature', `v1,${randomBytes(32).toString('base64')} ${headers.get('svix-signature')}`);
   headers.set('svix-id', 'other'); assert.equal(await verifyWebhook({ ...input, headers }), false);
+}],
+['timestamp binding', async t => {
   const changedTime = new Headers(input.headers); changedTime.set('svix-timestamp', String(NOW / 1000 - 1));
   assert.equal(await verifyWebhook({ ...input, headers: changedTime }), false);
+}],
+['wrong signing key', async t => {
   assert.equal(await verifyWebhook({ ...input, key: `whsec_${randomBytes(32).toString('base64')}` }), false);
+}],
+['short signing key', async t => {
   assert.equal(await verifyWebhook({ ...input, key: `whsec_${Buffer.from('short').toString('base64')}` }), false);
+}],
+['malformed signature', async t => {
   const malformed = new Headers(input.headers); malformed.set('svix-signature', `${malformed.get('svix-signature')} invalid`);
   assert.equal(await verifyWebhook({ ...input, headers: malformed }), false);
+}],
+['noncanonical Base64 signature', async t => {
   // Non-zero padding bits must not alias a valid MAC.
   const signature = input.headers.get('svix-signature');
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -88,6 +105,8 @@ foldedCases.push(['Resend verifies rotation signatures and binds Svix identity a
   const aliased = signature.slice(0, position) + alphabet[alphabet.indexOf(signature[position]) + 1] + '=';
   const aliases = new Headers(input.headers); aliases.set('svix-signature', aliased);
   assert.equal(await verifyWebhook({ ...input, headers: aliases }), false);
+}]
+  ]);
 }]);
 foldedCases.push(['published Svix interoperability vector', async () => {
   // The key is Svix's published example: its base64 body is kept apart from the

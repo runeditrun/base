@@ -69,10 +69,12 @@ foldedCases.push(['a wrong ID-token iss or aud is refused', async t => {
 }]);
 foldedCases.push(['alg none, HS256 and an algorithm the link did not pin are refused before any key is used', async t => {
   const r = await runtime(t); await r.bootstrap();
-  for (const alg of ['none', 'HS256']) {
+  await runCases(t, Array.from(['none', 'HS256'], (alg, rowIndex) => [`${t.name}: refused token algorithm row ${rowIndex + 1}`, async t => {
+
     await r.set('https://id.example', { header: { alg } });
     await refused(r, await r.login('auth'), 400, 'oidc_algorithm_refused');
-  }
+
+}]));
   // RS256 is not in the Auth pin (ES256 only); ES256 is not in Google's (RS256 only).
   await r.set('https://id.example', { header: {}, signingKeyName: 'googleSigning', jwksNames: ['authSigning', 'googleSigning'] });
   await refused(r, await r.login('auth'), 400, 'oidc_algorithm_refused');
@@ -123,10 +125,12 @@ test("provider admission requires current trusted email, binding and domain poli
 foldedCases.push(['production refuses amr dev and emails under .localhost, .test or .invalid', async t => {
   const r = await runtime(t); await r.bootstrap();
   await refused(r, await r.login('auth', { amr: ['dev'] }), 403, 'oidc_admission_denied');
-  for (const domain of ['dev.localhost', 'example.test', 'example.invalid']) {
+  await runCases(t, Array.from(['dev.localhost', 'example.test', 'example.invalid'], (domain, rowIndex) => [`${t.name}: untrusted email domain row ${rowIndex + 1}`, async t => {
+
     await r.operator(`person@${domain}`);
     await refused(r, await r.login('auth', { sub: `sub-${domain}`, email: `person@${domain}` }), 403);
-  }
+
+}]));
   assert.equal(await sessions(r), 0);
 }]);
 foldedCases.push(['email trust: unverified, stale (31 days) and unproven emails are refused; a 29-day proof and Google with hd or @gmail.com count', async t => {
@@ -229,7 +233,9 @@ foldedCases.push(['Google supplied proof dates govern first and bound sign-ins; 
   const r = await runtime(t); await r.bootstrap(); await r.operator('member@example.com');
   const now = Math.floor(Date.now() / 1000), claims = { sub: 'google-dated', email: 'member@example.com' };
   const bad = [now - 31 * day, now + day, null, String(now), now + 0.5, Number.MAX_SAFE_INTEGER, {}, false];
-  for (const email_verified_at of bad) await refused(r, await r.login('google', { ...claims, email_verified_at }), 403);
+  await runCases(t, Array.from(bad, (email_verified_at, rowIndex) => [`${t.name}: email proof date row ${rowIndex + 1}`, async t => {
+await refused(r, await r.login('google', { ...claims, email_verified_at }), 403);
+}]));
   assert.equal(await sessions(r), 0);
   await signedIn(r, await r.login('google', { ...claims, email_verified_at: now - 29 * day }), claims.email);
   const n = await sessions(r);
@@ -327,7 +333,9 @@ foldedCases.push(['owner invitation issue and reissue require the inviting sessi
   await refused(r, await invite('new-owner@example.com'), 403, 'step_up_required');
   assert.equal((await r.mails()).length, 0);
   assert.equal(await r.db.prepare("SELECT id FROM oa_operators WHERE email='new-owner@example.com'").first(), null);
-  for (const role of ['member', 'admin']) assert.equal((await invite(`${role}@example.com`, role)).status, 202);
+  await runCases(t, Array.from(['member', 'admin'], (role, rowIndex) => [`${t.name}: invitation role row ${rowIndex + 1}`, async t => {
+assert.equal((await invite(`${role}@example.com`, role)).status, 202);
+}]));
   assert.equal((await r.stepUp(owner, 'owner:transfer')).status, 303);
   assert.equal((await invite('new-owner@example.com')).status, 202);
   const obsolete = await r.link();

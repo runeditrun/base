@@ -35,11 +35,18 @@ foldedCases.push(['binary attachment bytes containing boundary-like text remain 
   const input = form([['from', 'sender@example.test'], ['to', 'receiver@example.test'], ['attachments', '1']], [{ name: 'attachment1', filename: 'binary.bin', type: 'application/octet-stream', content: bytes }]);
   assert.deepEqual((await normalizeInbound(input, limits)).attachments[0].content, bytes);
 }]);
-foldedCases.push(['RFC 2231 continued filename and missing attachment filename normalize without losing content', async () => {
+foldedCases.push(['RFC 2231 continued filename and missing attachment filename normalize without losing content', async t => {
+
+  await runCases(t, [
+['continued UTF-8 filename', async t => {
   const raw = full.replace("filename*=utf-8''caf%C3%A9.png", "filename*0*=utf-8''caf%C3; filename*1*=%A9.png");
   assert.equal((await normalizeInbound(cloudflare(encoder.encode(raw)), limits)).attachments[0].filename, 'café.png');
+}],
+['missing attachment filename', async t => {
   const unnamed = full.replace("Content-Disposition: inline; filename*=utf-8''caf%C3%A9.png\r\n", '');
   assert.equal((await normalizeInbound(cloudflare(encoder.encode(unnamed)), limits)).attachments[0].filename, '');
+}]
+  ]);
 }]);
 foldedCases.push(['invalid limits, UTF-8, unknown encoding and malformed folds fail closed', async (t) => {
   await runCases(t, Array.from([0, -1, 1.5, NaN, Infinity, undefined], (value, rowIndex) => [`${t.name}: value row ${rowIndex + 1}`, async t => {

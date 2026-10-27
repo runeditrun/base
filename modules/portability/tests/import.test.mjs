@@ -96,14 +96,31 @@ foldedCases.push(['duplicate uploads are no-ops, different contents return 409',
   await assert.rejects(service.imports.uploadPart(id,0,other),e=>e.code==='part_conflict' && e.status===409);
   assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_parts').first()).n,1);
 }]);
-foldedCases.push(['uploads enforce order, checksums, declared columns, types and NOT NULL', async t=>{
+foldedCases.push(['uploads enforce order, checksums, declared columns, types and NOT NULL', async t => {
+
+  const item={kind:'row',table:'effects',index:0,row:{id:'x',enabled:0,delivery:'review'}};
+  await runCases(t, [
+['upload order', async t => {
   const {bundle,service}=await setup(t),id=await service.imports.create(bundle.manifest);
   await assert.rejects(service.imports.uploadPart(id,1,bundle.parts[1]),/part_order/);
+}],
+['upload checksum', async t => {
+  const {bundle,service}=await setup(t),id=await service.imports.create(bundle.manifest);
   await assert.rejects(service.imports.uploadPart(id,0,{...bundle.parts[0],sha256:'0'.repeat(64)}),/part_checksum/);
-  const item={kind:'row',table:'effects',index:0,row:{id:'x',enabled:0,delivery:'review'}};
+}],
+['upload columns', async t => {
+  const {bundle,service}=await setup(t),id=await service.imports.create(bundle.manifest);
   await assert.rejects(service.imports.uploadPart(id,0,await makePart(0,[{...item,row:{...item.row,unknown:'x'}}])),/row_columns/);
+}],
+['upload nullability', async t => {
+  const {bundle,service}=await setup(t),id=await service.imports.create(bundle.manifest);
   await assert.rejects(service.imports.uploadPart(id,0,await makePart(0,[{...item,row:{...item.row,delivery:null}}])),/row_not_null/);
+}],
+['upload integer type', async t => {
+  const {bundle,service}=await setup(t),id=await service.imports.create(bundle.manifest);
   await assert.rejects(service.imports.uploadPart(id,0,await makePart(0,[{...item,row:{...item.row,enabled:'x'}}])),/unsafe_integer/);
+}]
+  ]);
 }]);
 foldedCases.push(['finalize requires all parts and the archive binding before publishing', async t=>{
   const {bundle,service,target}=await setup(t),manifest={...bundle.manifest,sourceIdentity:bundle.manifest.sourceIdentity+'-altered'},id=await service.imports.create(manifest);await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/parts_missing/);
@@ -134,7 +151,9 @@ foldedCases.push(["restore commit and rollback preserve the correct owned object
 foldedCases.push(['foreign-key failure rolls back rows and triggers, removing every owned object', async t=>{
   const {bundle,target,service}=await setup(t),bad=await changed(bundle,'cycle_a',row=>{row.b='absent';}),id=await stage(service,bad);
   await assert.rejects(service.imports.finalize(id,{archiveHash:bad.closing.archiveHash}),/FOREIGN KEY/);
-  for(const table of bad.manifest.tables)assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM "'+table.name+'"').first()).n,0,table.name);
+  await runCases(t, Array.from(bad.manifest.tables, (table, rowIndex) => [`${t.name}: rollback table row ${rowIndex + 1}`, async t => {
+assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM "'+table.name+'"').first()).n,0,table.name);
+}]));
   assert.equal((await target.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='trigger' AND name='triggered_insert'").first()).n,1);
   assert.equal((await target.bucket.list()).objects.length,0);assert.equal((await service.imports.status(id)).phase,'staging');
   assert.ok((await target.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*'").first()).n>0,'rollback keeps staging available until abort');
@@ -189,7 +208,9 @@ foldedCases.push(['direct bindings export, import, export gives equal rows, obje
   await restore(service,bundle);const second=await archive(service);
   assert.equal(second.contentHash,bundle.contentHash);assert.deepEqual(rows(second),rows(bundle));
   assert.equal((await target.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*'").first()).n,0);
-  for(const key of ['large','small'])assert.deepEqual(new Uint8Array(await (await target.bucket.get(key)).arrayBuffer()),new Uint8Array(await (await source.bucket.get(key)).arrayBuffer()));
+  await runCases(t, Array.from(['large','small'], (key, rowIndex) => [`${t.name}: restored object row ${rowIndex + 1}`, async t => {
+assert.deepEqual(new Uint8Array(await (await target.bucket.get(key)).arrayBuffer()),new Uint8Array(await (await source.bucket.get(key)).arrayBuffer()));
+}]));
   assert.deepEqual(second.manifest.objects,bundle.manifest.objects);assert.equal(second.manifest.sourceIdentity,bundle.manifest.sourceIdentity);
 }]);
   await runCases(t, foldedCases);

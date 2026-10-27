@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 // Prior data: a populated store from the auth-1 main (Base d6080a2), produced by
 // that code's own public API (fixtures/auth-1-store/README.md), runs unchanged
 // under the new layers once the two additive migrations are applied.
@@ -20,15 +21,20 @@ const setup = {
 const cookie = name => `__Host-operator_session=${credentials.sessions[name]}`;
 
 test('a populated auth-1 store upgrades additively and every session, link, binding and guard keeps working', async t => {
+  await runCases(t, [['independent journey rows', async t => {
   const r = await runtime(t, setup, { schemas: [...seedMigrations, await read('./fixtures/auth-1-store/rows.sql')] });
   // Run at the moment the store was written, so its links and sessions are exactly as live as they were.
   await r.clock(credentials.generatedAt + 60000 - Date.now());
   const before = await snapshot(r.db);
-  for (const [table, count] of Object.entries(credentials.counts)) assert.equal(before[table].length, count, `${table} rows`);
-  for (const migration of ['../accounts/schema/provider-control.sql','../accounts/schema/domain-rules-step-up.sql', '../identity/oidc/schema/oidc.sql']) {
+  await runCases(t, Array.from(Object.entries(credentials.counts), ([table, count], rowIndex) => [`${t.name}: prior credential table row ${rowIndex + 1}`, async t => {
+assert.equal(before[table].length, count, `${table} rows`);
+}]));
+  await runCases(t, Array.from(['../accounts/schema/provider-control.sql','../accounts/schema/domain-rules-step-up.sql', '../identity/oidc/schema/oidc.sql'], (migration, rowIndex) => [`${t.name}: prior migration row ${rowIndex + 1}`, async t => {
+
     const applied = await r.apply(await read(migration));
     assert.equal(applied.appliedStatements, applied.statementCount);
-  }
+
+}]));
   assert.deepEqual(await snapshot(r.db), before, 'no existing row or column changed');
   const who = async name => { const response = await r.call('/test/private', { cookie: cookie(name) }); return response.status === 200 ? (await response.json()) : response.status; };
   assert.deepEqual([(await who('ownerNative')).role, (await who('adminNative')).role, (await who('memberNative')).role], ['owner', 'admin', 'member']);
@@ -59,4 +65,6 @@ test('a populated auth-1 store upgrades additively and every session, link, bind
   assert.equal((await (await r.call('/test/private', { cookie: r.session(admin) })).json()).email, 'admin@example.com');
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM oa_external_identities').first()).n, 1);
   assert.equal((await r.call('/auth/operators', { cookie: cookie('adminNative') })).status, 200);
+
+  }]]);
 });

@@ -1,14 +1,17 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
 import { browserRuntime, chromium, DEV_KEY, OWNER } from './dev-gate-browser-runtime.mjs';
 
-test('RER_OPEN enters as owner on initial load and same-path fragment navigation from the waiting gate', async () => {
+test('RER_OPEN enters as owner on initial load and same-path fragment navigation from the waiting gate', async (t) => {
+  await runCases(t, [['independent journey rows', async t => {
   const r = await browserRuntime();
   let browser;
   try {
     browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
-    for (const waitingGate of [false, true]) {
+    await runCases(t, Array.from([false, true], (waitingGate, rowIndex) => [`${t.name}: waiting gate state row ${rowIndex + 1}`, async t => {
+
       const context = await browser.newContext();
       try {
         const page = await context.newPage();
@@ -54,16 +57,23 @@ test('RER_OPEN enters as owner on initial load and same-path fragment navigation
         } finally { await other.close(); }
         const gateGets = requests.filter(request => request.method() === 'GET' && new URL(request.url()).pathname === '/__dev/key');
         assert.equal(gateGets.length, 1, 'same-path navigation must work without reloading the waiting document');
+        let requestRow = 0;
         for (const request of requests) {
-          assert.ok(!request.url().includes(DEV_KEY), 'the key stays out of HTTP URLs');
-          assert.ok(!(await request.allHeaders()).referer?.includes(DEV_KEY), 'the key stays out of Referer');
+          await runCases(t, [[`${t.name}: browser request row ${++requestRow}`, async t => {
+            assert.ok(!request.url().includes(DEV_KEY), 'the key stays out of HTTP URLs');
+            assert.ok(!(await request.allHeaders()).referer?.includes(DEV_KEY), 'the key stays out of Referer');
+          }]]);
         }
       } finally { await context.close(); }
-    }
+
+}]));
   } finally { await browser?.close(); await r.close(); }
+
+  }]]);
 });
 
-test('the hand-off page shows the seed\'s own logo, and its product name as text when the seed declares none', async () => {
+test('the hand-off page shows the seed\'s own logo, and its product name as text when the seed declares none', async (t) => {
+  await runCases(t, [['independent journey rows', async t => {
   const cases = [
     { branding: { productName: 'Gate Test', theme: '/rer-theme.css' }, logo: true },
     { branding: { productName: 'Gate Test', theme: '/no-logo-theme.css' }, logo: false },
@@ -71,7 +81,8 @@ test('the hand-off page shows the seed\'s own logo, and its product name as text
   let browser;
   try {
     browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
-    for (const { branding, logo } of cases) {
+    await runCases(t, Array.from(cases, ({ branding, logo }, rowIndex) => [`${t.name}: brand mark row ${rowIndex + 1}`, async t => {
+
       const r = await browserRuntime(branding);
       try {
         const page = await (await browser.newContext()).newPage();
@@ -89,8 +100,11 @@ test('the hand-off page shows the seed\'s own logo, and its product name as text
           assert.equal(await brand.locator('span').getAttribute('aria-hidden'), null, 'the name is the only mark, so readers keep it');
         }
       } finally { await r.close(); }
-    }
+
+}]));
   } finally { await browser?.close(); }
+
+  }]]);
 });
 
 // A page on another site (localhost, while the app is on 127.0.0.1): an Allow link

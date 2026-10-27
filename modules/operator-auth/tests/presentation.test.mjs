@@ -129,12 +129,13 @@ test('mail provides a self-contained reading layout and describes navigation bef
 });
 
 test('branding preserves encoded percent data while inspecting nested unsafe encodings', async (t) => {
+  await runCases(t, [['encoded branding scenarios', async t => {
   await runCases(t, Array.from([
     '/search?q=%25',
     '/signin?next=%2Fapp%3Fdiscount%3D100%2525',
     '/search?q=%25ab&currency=%25E2%2582%25AC',
     '/search?q=%25zz#100%25',
-  ], (signInPath, rowIndex) => [`${t.name}: signInPath row ${rowIndex + 1}`, async t => {
+  ], (signInPath, rowIndex) => [`${t.name}: valid encoded path row ${rowIndex + 1}`, async t => {
     assert.equal(configure({ ...base, branding: { signInPath } }).branding.signInPath, signInPath);
 }]));
   await runCases(t, Array.from([
@@ -149,12 +150,15 @@ test('branding preserves encoded percent data while inspecting nested unsafe enc
     '/signin?q=%',
     '/signin?q=%2',
     '/signin?q=%ab',
-  ], (signInPath, rowIndex) => [`${t.name}: signInPath row ${rowIndex + 1}`, async t => {
+  ], (signInPath, rowIndex) => [`${t.name}: unsafe encoded path row ${rowIndex + 1}`, async t => {
     assert.throws(() => configure({ ...base, branding: { signInPath } }), { code: 'invalid_configuration', status: 503 }, signInPath);
 }]));
+
+  }]]);
 });
 
 test('HTML confirmation has one exact-byte stylesheet hash and a minimal credential footprint', async t => {
+  await runCases(t, [['confirmation footprint scenarios', async t => {
   await runCases(t, Array.from(['#ffffff', '#000000', '#336699'], (accentColor, rowIndex) => [`${t.name}: accentColor row ${rowIndex + 1}`, async t => {
     await runCases(t, Array.from([{ kind: 'magic', expiresInMinutes: 15 }, { kind: 'invite', expiresInMinutes: 1 }, null], (preview, rowIndex) => [`${t.name}: preview row ${rowIndex + 1}`, async t => {
       const token = 'test-only-opaque-token';
@@ -185,6 +189,8 @@ test('HTML confirmation has one exact-byte stylesheet hash and a minimal credent
 }]));
 }]));
   await runCases(t, conformanceGroups.presentation);
+
+  }]]);
 });
 
 test('a declared seed theme links its served stylesheet and the CSP admits only same-origin theme files', async (t) => {

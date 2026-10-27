@@ -23,7 +23,9 @@ async function login(r,address='owner@example.com') {
   const response=await post(r,'/auth/confirm',{token:await email(r,address)});assert.equal(response.status,303,await response.clone().text());return r.session(response);
 }
 const count=async(r,table)=>(await r.db.prepare(`SELECT count(*) AS n FROM ${table}`).first()).n;
-async function noOa(r) {const rows=(await r.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'oa_%'").all()).results;for(const name of ['oa_operators','oa_sessions','oa_external_identities','oa_tokens','oa_step_up_challenges','oa_provider_sessions','oa_auth_settings','oa_setup_links'])assert.ok(!rows.some(row=>row.name===name),`${name} must not be installed`);}
+async function noOa(t, r) {const rows=(await r.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'oa_%'").all()).results;await runCases(t, Array.from(['oa_operators','oa_sessions','oa_external_identities','oa_tokens','oa_step_up_challenges','oa_provider_sessions','oa_auth_settings','oa_setup_links'], (name, rowIndex) => [`noOa name row ${rowIndex + 1}`, async t => {
+assert.ok(!rows.some(row=>row.name===name),`${name} must not be installed`);
+}]));}
 
 test("native email admission preserves identity and refuses invalid proofs", async t => {
   const foldedCases = [];
@@ -48,7 +50,7 @@ const p=await r.call('/auth/confirm?token='+token,{method});assert.equal(p.statu
   const session=await r.call('/auth/session',{cookie});assert.equal(session.status,200);const value=await session.json();assert.equal(value.hash,undefined);assert.equal(value.operator.id,'native-contact');assert.equal(value.operator.role,'contact');
   await r.restart();assert.equal((await r.call('/auth/session',{cookie})).status,200);
   assert.equal((await post(r,'/auth/signout',{},cookie)).status,204);assert.equal((await r.call('/auth/session',{cookie})).status,401);
-  assert.equal((await post(r,'/auth/confirm',{token})).status,400);assert.equal((await r.call('/auth/session',{cookie:oldCookie})).status,200);await noOa(r);
+  assert.equal((await post(r,'/auth/confirm',{token})).status,400);assert.equal((await r.call('/auth/session',{cookie:oldCookie})).status,200);await noOa(t, r);
 }]);
 foldedCases.push(['native proof lifecycle refuses failed mail, stale authority, domain changes and expired links; keeps uniform rate limits', async t=>{
   const r=await runtime(t,setup());
@@ -63,8 +65,10 @@ foldedCases.push(['native proof lifecycle refuses failed mail, stale authority, 
   await r.db.prepare("UPDATE people SET status='active' WHERE id='native-owner'").run();const owner=await email(r);assert.equal((await post(r,'/auth/confirm',{token:owner})).status,303,'owner exempt');
   const expires=await email(r);await r.clock(3600001);assert.equal((await post(r,'/auth/confirm',{token:expires})).status,400);
   const limited=await runtime(t,setup({core:{ipLimit:2,emailLimit:2}}));
-  for(const address of ['unknown@example.com','owner@example.com'])assert.equal((await post(limited,'/auth/magic-link',{email:address})).status,202);
-  assert.equal((await post(limited,'/auth/magic-link',{email:'another@example.com'})).status,429);await noOa(r);
+  await runCases(t, Array.from(['unknown@example.com','owner@example.com'], (address, rowIndex) => [`${t.name}: rate budget address row ${rowIndex + 1}`, async t => {
+assert.equal((await post(limited,'/auth/magic-link',{email:address})).status,202);
+}]));
+  assert.equal((await post(limited,'/auth/magic-link',{email:'another@example.com'})).status,429);await noOa(t, r);
 }]);
   await runCases(t, foldedCases);
 });
@@ -89,7 +93,7 @@ test('native step-up binds the asking session and current account version, expir
   assert.equal((await post(r,'/auth/confirm',{token:await r.link()},cookie)).status,400);
   await post(r,'/__fake/mail',{status:'accepted'});
   assert.equal((await r.stepUp(cookie,'export')).status,303);assert.equal((await r.call('/test/guard/export',{cookie})).status,200);
-  await r.db.prepare("UPDATE people SET status='inactive' WHERE id='native-owner'").run();assert.equal((await r.call('/test/guard/export',{cookie})).status,401);await noOa(r);
+  await r.db.prepare("UPDATE people SET status='inactive' WHERE id='native-owner'").run();assert.equal((await r.call('/test/guard/export',{cookie})).status,401);await noOa(t, r);
 });
 
 test("native OIDC admission binds its configured protocol and current authority", async t => {
@@ -107,7 +111,7 @@ foldedCases.push(['native pinned RS256 incumbent signs in at its selected callba
   assert.equal((await r.finish(flow)).status,400);assert.equal((await post(r,'/test/password',{operatorId:'native-owner'})).status,400);
   assert.equal((await r.db.prepare("SELECT password FROM people WHERE id='native-owner'").first()).password,0);
   await r.db.prepare("INSERT INTO bindings VALUES(?,'another','native-owner')").bind(issuer).run();assert.equal((await r.call('/test/editor',{cookie})).status,403);
-  await r.clock(86400001);assert.equal((await r.call('/auth/session',{cookie})).status,401);assert.equal((await r.call('/auth/session',{cookie:old})).status,200);await noOa(r);
+  await r.clock(86400001);assert.equal((await r.call('/auth/session',{cookie})).status,401);assert.equal((await r.call('/auth/session',{cookie:old})).status,200);await noOa(t, r);
 }]);
 foldedCases.push(['native provider proof/mix-up/signature matrix and URI/policy changes fail closed before any session', async t=>{
   const r=await runtime(t,setup());
@@ -123,7 +127,7 @@ await r.set(issuer,{header:{alg}});assert.equal((await r.login('incumbent')).sta
   await r.configure('incumbent',{redirectUri:ORIGIN+callback});const policy=await r.flow('incumbent');await r.db.prepare('UPDATE settings SET generation=generation+1').run();assert.equal((await r.finish(policy)).status,403);
   assert.equal(await count(r,'sessions'),0);
   const fresh=await r.login('incumbent');assert.equal(fresh.status,303);const staleBound=await r.login('incumbent',{email_verified_at:Math.floor(Date.now()/1000)-31*86400});assert.equal(staleBound.status,403);
-  const owner=await login(r);assert.equal((await post(r,'/auth/settings/identity',{idpSignIn:false},owner)).status,200);assert.equal((await r.call('/auth/session',{cookie:r.session(fresh)})).status,401);await noOa(r);
+  const owner=await login(r);assert.equal((await post(r,'/auth/settings/identity',{idpSignIn:false},owner)).status,200);assert.equal((await r.call('/auth/session',{cookie:r.session(fresh)})).status,401);await noOa(t, r);
 }]);
 foldedCases.push(['native opt-in and explicit callback configuration refuse partial adapters, unsupported capabilities and conflicting/foreign URLs', async t=>{
   const options={db:{prepare(){throw new Error('No account DB query allowed');}},clientIp:()=> 'test',config:{origin:ORIGIN,OWNER_EMAIL:'owner@example.com',SESSION_SECRET:'test-session-secret-32-bytes-value'}};
@@ -160,7 +164,7 @@ assert.equal((await post(r,path,input,cookie)).status,501,path);
   const bootstrap=await runtime(t,setup({native:{bootstrap:true},providers:[],fakes:[]}));await bootstrap.db.prepare('DELETE FROM people').run();await bootstrap.db.prepare('UPDATE settings SET first_setup=1,idp_sign_in=0').run();
   const claims=await Promise.all([post(bootstrap,'/auth/bootstrap',{token:SETUP,displayName:'Owner'}),post(bootstrap,'/auth/bootstrap',{token:SETUP,displayName:'Owner'})]);assert.deepEqual(claims.map(r=>r.status).sort(),[303,409]);assert.equal(await count(bootstrap,'people'),1);assert.equal(await count(bootstrap,'sessions'),1);
   assert.deepEqual(await bootstrap.db.prepare('SELECT first_setup,idp_sign_in FROM settings').first(),{first_setup:0,idp_sign_in:0},'bootstrap without setup provenance closes eligibility');
-  await noOa(r);
+  await noOa(t, r);
 }]);
   await runCases(t, foldedCases);
 });
@@ -241,7 +245,7 @@ assert.equal((await post(r,path,{...principal,emailVerified:true,emailVerifiedAt
 assert.equal((await post(r,path,principal)).status,403);
 }]));
   assert.equal((await r.call('/auth/session',{cookie:old})).status,200);
-  await noOa(r);
+  await noOa(t, r);
 }], ...conformanceGroups.oidc]);
 });
 
@@ -251,13 +255,16 @@ assert.equal((await post(r,path,principal)).status,403);
 
 test('native linked Auth uses selected native owner roles and local proof for settings, approval and unlink, and logout/fence reach native sessions',async t=>{
   for(const ownerRole of ['owner','workspace-owner']) await t.test(ownerRole,async t=>{
+  await runCases(t, [['independent journey rows', async t => {
     const base=presets();const authFake=base.fakes[0];const r=await runtime(t,setup({native:{ownerRole},core:{dependencies:true},dependencyIssuer:authFake.issuer,fakes:[...setup().fakes,authFake]}));
     await r.db.prepare("UPDATE people SET role=? WHERE id='native-owner'").bind(ownerRole).run();
     await r.db.prepare("INSERT INTO people(id,workspace,email,role) VALUES('a-other-owner','workspace-b','other@example.com',?)").bind(ownerRole).run();
     const owner=await login(r),contact=await login(r,'contact@example.com');
     const unsupported=await post(r,'/auth/dependencies/setup',{issuer:authFake.issuer,token:SETUP});
     assert.equal(unsupported.status,501);assert.deepEqual(await unsupported.json(),{error:'native_capability_unavailable'});
-    for(const table of ['rer_dependency_keys','rer_dependency_pending','rer_dependency_codes'])assert.equal(await count(r,table),0,'unsupported setup leaves '+table+' untouched');
+    await runCases(t, Array.from(['rer_dependency_keys','rer_dependency_pending','rer_dependency_codes'], (table, rowIndex) => [`${t.name}: unsupported setup table row ${rowIndex + 1}`, async t => {
+assert.equal(await count(r,table),0,'unsupported setup leaves '+table+' untouched');
+}]));
     assert.equal((await r.call('/.well-known/rer-dependencies')).status,200);
     assert.equal((await rawLink(r,authFake.issuer)).status,403,'configured issuer cannot link without app approval');
     await approveLink(r,authFake.issuer,owner);
@@ -271,7 +278,7 @@ test('native linked Auth uses selected native owner roles and local proof for se
     const page=await r.call('/signin');const html=await page.text();assert.match(html,/incumbent\/start/);assert.match(html,/auth\/start/);
     assert.equal((await r.call('/.well-known/rer-dependencies')).status,200);
     assert.equal((await rawLink(r,authFake.issuer)).status,403,'unchanged links need a new local approval');
-    await nativeApprovalJourney(r,authFake.issuer,owner,ownerRole);
+    await nativeApprovalJourney(t, r,authFake.issuer,owner,ownerRole);
     assert.equal((await r.call('/auth/settings/identity',{cookie:owner})).status,200);
     await runCases(t, Array.from([['/auth/settings/identity',{idpSignIn:false}],['/auth/dependencies/relink',{issuer:authFake.issuer}],['/auth/dependencies/unlink',{}]], ([path,input], rowIndex) => [`${t.name}: [path,input] row ${rowIndex + 1}`, async t => {
       assert.equal((await post(r,path,{...input,ownerRole:'contact',role:ownerRole,owner:true},contact)).status,403,'HTTP input cannot select an owner');
@@ -287,7 +294,7 @@ assert.equal((await post(r,'/auth/settings/identity',{idpSignIn,ownerRole:'conta
     const token=await r.login('auth',{sid:'provider-session',role:'contact',ownerRole:'contact',owner:false});assert.equal(token.status,303,await token.clone().text());const providerCookie=r.session(token),emailCookie=await login(r);
     assert.equal((await (await r.call('/auth/session',{cookie:providerCookie})).json()).operator.role,ownerRole,'provider claims cannot select a native role');
     assert.equal((await post(r,'/auth/dependencies/unlink',{},providerCookie)).status,403,'provider sign-in does not supply local proof');
-    await providerApprovalJourney(r,authFake.issuer,providerCookie);
+    await providerApprovalJourney(t, r,authFake.issuer,providerCookie);
     const logout=async(overrides={},fence=false)=>post(r,'/auth/oidc/auth/logout',{logout_token:await sign(KEYS.authSigning,{iss:authFake.issuer,aud:authFake.clientId,sub:'operator-subject',sid:'provider-session',iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+300,jti:crypto.randomUUID(),events:{[fence?'https://runeditrun.com/events/identity-fence':'http://schemas.openid.net/event/backchannel-logout']:{}},...overrides},{typ:'logout+jwt'})});
     assert.equal((await logout({nonce:'bad'})).status,400);
     const jti=crypto.randomUUID();assert.equal((await logout({jti})).status,204);assert.equal((await logout({jti})).status,409);
@@ -300,9 +307,13 @@ assert.equal((await post(r,'/auth/settings/identity',{idpSignIn,ownerRole:'conta
     const sector=(await (await r.call('/.well-known/rer-dependencies')).json()).sector_id;
     await r.db.prepare("INSERT INTO domains VALUES('example.org','auth')").run();
     const unlink=await post(r,'/auth/dependencies/unlink',{},fresh);assert.equal(unlink.status,200,await unlink.clone().text());
-    for(const table of ['rer_dependency_keys','rer_dependency_pending','rer_dependency_link','domains'])assert.equal(await count(r,table),0);
+    await runCases(t, Array.from(['rer_dependency_keys','rer_dependency_pending','rer_dependency_link','domains'], (table, rowIndex) => [`${t.name}: unlinked table row ${rowIndex + 1}`, async t => {
+assert.equal(await count(r,table),0);
+}]));
     assert.equal((await rawLink(r,authFake.issuer)).status,403,'unlink cannot be bypassed by provider continuity');
-    assert.equal((await (await r.call('/.well-known/rer-dependencies')).json()).sector_id,sector);await noOa(r);
+    assert.equal((await (await r.call('/.well-known/rer-dependencies')).json()).sector_id,sector);await noOa(t, r);
     await r.db.prepare('DROP TABLE rer_dependency_link').run();const failure=await post(r,'/auth/oidc/auth/start');assert.equal(failure.status,503);assert.deepEqual(await failure.json(),{error:'auth_unavailable'});
-  });
+
+  }]]);
+});
 });

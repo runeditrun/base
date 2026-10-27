@@ -38,9 +38,17 @@ foldedCases.push(["archive integrity", async t => {
     ['archive reader refuses a part out of order', async()=>{const a=await fixture();[a[1],a[2]]=[a[2],a[1]];await assert.rejects(collect(readArchive(bundleStream(a))),/part_order/);}],
     ['archive reader refuses a checksum mismatch', async()=>{const a=await fixture();a[1].items[0].row.id=9;await assert.rejects(collect(readArchive(bundleStream(a))),/part_checksum/);}],
     ['archive reader refuses data after closing', async()=>{const a=await fixture();a.push(a[1]);await assert.rejects(collect(readArchive(bundleStream(a))),/data_after_closing/);}],
-    ['archive reader refuses missing closing and content mismatch', async()=>{
+    ['archive reader refuses missing closing and content mismatch', async t => {
+
+  await runCases(t, [
+['closing record required', async t => {
   const a=await fixture();await assert.rejects(collect(readArchive(bundleStream(a.slice(0,-1)))),/closing_missing/);
+}],
+['content hash required', async t => {
+  const a=await fixture();
   a.at(-1).contentHash='0'.repeat(64);await assert.rejects(collect(readArchive(bundleStream(a))),/content_checksum/);
+}]
+  ]);
 }],
     ['manifest format, version and schema checksums are required', async(t)=>{
   await runCases(t, Array.from([{format:'other'},{version:3},{schema:'0'.repeat(64)}], (change, rowIndex) => [`${t.name}: change row ${rowIndex + 1}`, async t => {

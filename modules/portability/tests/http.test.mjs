@@ -46,10 +46,12 @@ foldedCases.push(['HTTP authorization failures cannot impersonate import lease m
   console.log('authority lease:',kind,wrapper,status,'=>',response.status,text,JSON.stringify(headers));
   results.push({response,text,headers,status});
  }
- for(const {response,text,headers,status} of results){
+ await runCases(t, Array.from(results, ({response,text,headers,status}, rowIndex) => [`${t.name}: authority response row ${rowIndex + 1}`, async t => {
+
   assert.equal(response.status,status);assert.deepEqual(JSON.parse(text),{error:'import_running'});
   assert.equal(response.headers.get('Cache-Control'),'no-store');assert.doesNotMatch(text+JSON.stringify(headers),/private|sentinel/);
- }
+
+}]));
 }]);
 foldedCases.push(['HTTP publishes genuine import lease details after authorization and suppresses replays during authorization', async t=>{
  let failure,validationFailure,actor='owner';
@@ -76,7 +78,9 @@ foldedCases.push(['HTTP publishes genuine import lease details after authorizati
   console.log('replayed lease:',actor,response.status,text);
   results.push({response,text});
  }
- for(const {response,text} of results){assert.equal(response.status,409);assert.deepEqual(JSON.parse(text),{error:'import_running'});assert.ok(!text.includes(id));}
+ await runCases(t, Array.from(results, ({response,text}, rowIndex) => [`${t.name}: replayed lease refusal row ${rowIndex + 1}`, async t => {
+assert.equal(response.status,409);assert.deepEqual(JSON.parse(text),{error:'import_running'});assert.ok(!text.includes(id));
+}]));
  failure=undefined;actor='owner';
  for(const part of bundle.parts)assert.equal((await call('imports/'+id+'/parts/'+part.index,'PUT',part)).status,200);
  await runCases(t, Array.from([new PortabilityError('import_running',409),new AuthError('import_running',409),{status:409,code:'import_running'}], (error, rowIndex) => [`${t.name}: error row ${rowIndex + 1}`, async t => {

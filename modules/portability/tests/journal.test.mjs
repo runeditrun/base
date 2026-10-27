@@ -42,13 +42,20 @@ foldedCases.push(['keyless rowids with gaps restore exactly and are erasure-fenc
 
 
 test('erasure invalidation removes every snapshot, staging copy and stored part',async t=>{
+  await runCases(t, [['independent journey rows', async t => {
   const {s,d,source,target}=await setup(t),a=await archive(s),id=await d.imports.create(a.manifest);await d.imports.uploadPart(id,0,a.parts[0]);
-  for(const [service,f] of [[s,source],[d,target]]) {
+  await runCases(t, Array.from([[s,source],[d,target]], ([service,f], rowIndex) => [`${t.name}: erasure store row ${rowIndex + 1}`, async t => {
+
     await f.db.batch([...(await service.invalidateTransfersStatements()),...(await service.erasureStatements('effects',{id:'gone'}))]);
     assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name GLOB 'rer_portability_snap_*' OR name GLOB 'rer_portability_stage_*'").first()).n,0);
-    for(const table of ['jobs','parts','segments'])assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_'+table).first()).n,0);
+    await runCases(t, Array.from(['jobs','parts','segments'], (table, rowIndex) => [`${t.name}: erasure transfer table row ${rowIndex + 1}`, async t => {
+assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_'+table).first()).n,0);
+}]));
     assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_journal').first()).n,1);
-  }
+
+}]));
+
+  }]]);
 });
 
 test('a tombstone added after staging is checked again inside the restore commit',async t=>{
