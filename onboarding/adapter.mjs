@@ -223,7 +223,7 @@ async function start(context, hooks) {
  await onApp(child);
  const url = new URL(health, context.origin).href;
  let expectedPort=context.runtimePort??Number(new URL(context.origin).port||80);
- const readinessLabel=`${labels.start} (expected internal port ${expectedPort})`;
+ const readinessLabel=runtimePortHandshake?`${labels.start} (waiting for the bound internal listener)`:`${labels.start} (expected internal port ${expectedPort})`;
  const ownedPorts=async()=>{
   try{return await listenerPorts(child.pid);}
   catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}

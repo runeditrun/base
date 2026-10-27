@@ -9,7 +9,7 @@ import {watchProductionAssets} from './production-assets.mjs';
 // only the pinned Miniflare, which owns one workerd and no bundler or
 // source/config watcher. Built-asset changes refresh its manifest.
 let planner,stopping,runtime,closeAssets;
-const stop=()=>stopping??=(async()=>{planner?.kill('SIGTERM');await closeAssets?.();await runtime?.dispose();process.disconnect?.();})();
+const stop=()=>stopping??=(async()=>{planner?.kill('SIGTERM');await closeAssets?.();await runtime?.dispose();if(process.connected)process.disconnect();})();
 process.on('SIGINT',()=>void stop());process.on('SIGTERM',()=>void stop());
 async function plan(){
  let text='';

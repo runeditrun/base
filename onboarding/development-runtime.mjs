@@ -9,7 +9,7 @@ const {createServer}=await import(pathToFileURL(require.resolve('vite')).href);
 const args=process.argv.slice(2),port=Number(args[args.indexOf('--port')+1]);
 const server=await createServer({server:{host:'127.0.0.1',port,strictPort:true}});
 let stopping;
-const stop=()=>stopping??=server.close().finally(()=>process.disconnect?.());
+const stop=()=>stopping??=server.close().finally(()=>{if(process.connected)process.disconnect();});
 process.on('SIGINT',()=>void stop());process.on('SIGTERM',()=>void stop());
 try {
  await server.listen();

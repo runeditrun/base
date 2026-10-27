@@ -323,9 +323,9 @@ test('managed startup reports a real misbound application port and stops its des
      throw error;
     });
     if(ports)listener??=await ownedListener(tree,ports.wrong);
-    if(listener)observedAt??=Date.now();
     if(listener&&!proxyFailed&&tree.some(item=>item.pid===listener.pid&&item.start===listener.start)){
      healthyWrongPort=(await healthStatus(`http://127.0.0.1:${ports.wrong}`)).healthy;
+     if(healthyWrongPort)observedAt??=Date.now();
      if(healthyWrongPort)proxyFailed=(await healthStatus(url)).status===404;
     }
     await pause(250);
@@ -333,7 +333,7 @@ test('managed startup reports a real misbound application port and stops its des
    assert.notEqual(child.exitCode,null,'misbound real application cannot wait indefinitely');
    assert.equal(await child.done,1);
    const mismatchMs=Date.now()-observedAt;
-   assert.ok(mismatchMs<10000,'mismatch fails within ten seconds of the owned listener appearing');
+   assert.ok(mismatchMs<10000,`mismatch fails within ten seconds of independently confirming the application on its owned listener (${mismatchMs} ms)`);
    t.diagnostic(`${mode}: observed listener mismatch failed and stopped in ${mismatchMs} ms`);
    ({assigned:expectedPort,wrong:wrongPort}=JSON.parse(await readFile(portsFile,'utf8')));
    const failure=events(child).find(event=>event.event==='error');

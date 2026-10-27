@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.g0b871c51",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "5b86b38ab22f4260c45c170827b21d55e36c85c065d4476b57c54f49abd150a3"
+      "sha256": "d6677445506a122bc8ea7a4d6ece57e00ad7308c71652523904831a677d1f878"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -81,7 +81,7 @@
     },
     "development-runtime.mjs": {
       "source": "onboarding/development-runtime.mjs",
-      "sha256": "51e771d066281ea0fbfde26d39960a2bc613208cfae7de2a1ce4a34cc4365de8"
+      "sha256": "db95a05420065e5488baec71192ab5884fdefbc8167411645207e9645066fbeb"
     },
     "email.mjs": {
       "source": "onboarding/email.mjs",
@@ -241,7 +241,7 @@
     },
     "production-runtime.mjs": {
       "source": "onboarding/production-runtime.mjs",
-      "sha256": "8ba0912db0a9e3fd4a98807ee9738391dd8e42ce5e5a36ae532db4635ef4b47e"
+      "sha256": "dcdb0a44ab6fd64c9faf6457d1bb5e3431a13618fec515c9551fc4c62f74a8be"
     },
     "project-vite.mjs": {
       "source": "onboarding/project-vite.mjs",
