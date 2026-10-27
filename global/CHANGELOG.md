@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Bind shared local runtimes before reporting their port to the CLI, and fail early when an application listens on another port instead of waiting about 15 minutes. Bound application health readiness to 60 seconds.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

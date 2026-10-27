@@ -65,6 +65,16 @@ owner/sign-in hooks. The reference hook declaration is
 internal build/dev/verify targets and deployment policy. The CLI owns flags,
 pins, containment, cancellation, capture, output and sequencing.
 
+Shared local dev and preview runtimes bind an OS-assigned socket before reporting
+its port over their private parent channel. The CLI confirms that the runtime
+owns that socket, then updates the traffic proxy and scheduled-trigger target.
+Custom runtime targets retain the assigned internal port contract: bind it
+strictly. A healthy application on a different owned port causes an immediate
+port-mismatch refusal. Application health has a hard 60-second limit, including
+setup; an individual probe gets at most five seconds by default. Concurrent
+starts waiting on an existing server have one five-minute elapsed deadline,
+including control requests and polling.
+
 `rer dev` runs the local migration hook before starting the app and checking its
 owner prerequisites. The shared operator hook reads every SQL file in the seed's
 canonical `migrations/core` inventory, including changes pulled since the last

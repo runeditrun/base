@@ -11,7 +11,7 @@ import { dependencyEnvironment } from './dependency-environment.mjs';
 import { labels } from './adapter-labels.mjs';
 import { chooseOrigin, prepareSettings, readSettings } from './adapter-settings.mjs';
 import {listenerPorts,listenerOwnership,inspectionContext} from './process-diagnostics.mjs';
-import { appFetch } from './app-fetch.mjs';
+import { appFetch, loopbackRequest } from './app-fetch.mjs';
 import { owner, signIn } from './adapter-auth.mjs';
 import { installerDevKey } from './dev-identity.mjs';
 import { assertArchiveFree } from './archive-output.mjs';
@@ -208,26 +208,55 @@ async function start(context, hooks) {
  const { store, onApp, signal } = context;
  await store.step(labels.start);
  const [[command, args = [], options = {}]] = await commandsFor(context, hooks.start);
- const { health = '/health', ready, timeoutMs, softAfterMs, intervalMs, ...spawnOptions } = options;
+ const { health = '/health', ready, timeoutMs, softAfterMs, intervalMs, runtimePortHandshake, ...spawnOptions } = options;
  if (hooks.guard) await hooks.guard(context);
  let child;
  try { child = store.spawn(labels.start, command, args, { cwd: context.root, signal, ...spawnOptions }); } catch (error) {
   if (signal?.aborted) throw error;
   throw installationFailure('command_failed', { step: 'start', diagnostic: error });
  }
+ let announcement,detectedMismatch;
+ const mismatch=port=>({fatal:detectedMismatch=`the application listened on port ${port} but the CLI expected ${expectedPort}`});
+ const announced=message=>{if(message?.type==='rer-listening')announcement=message;};
+ if(runtimePortHandshake)child.on('message',announced);
  context.app = child;
  await onApp(child);
  const url = new URL(health, context.origin).href;
- const expectedPort=context.runtimePort??Number(new URL(context.origin).port||80);
+ let expectedPort=context.runtimePort??Number(new URL(context.origin).port||80);
  const readinessLabel=`${labels.start} (expected internal port ${expectedPort})`;
  const ownedPorts=async()=>{
   try{return await listenerPorts(child.pid);}
   catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}
  };
  try {
-  await store.waitForReady(readinessLabel, child, ready ? probeSignal => ready(url, probeSignal, context) : probeSignal => (hooks.health ?? defaultHealth)(url, probeSignal, context), { signal, timeoutMs: ['dev','preview'].includes(context.verb)?Math.min(timeoutMs??60000,120000):(timeoutMs??900000), ...(softAfterMs ? { softAfterMs } : {}), ...(intervalMs ? { intervalMs } : {}) });
+  await store.waitForReady(readinessLabel, child, async probeSignal => {
+   if(runtimePortHandshake){
+    if(!announcement)return {ready:false,message:'Waiting for the application listener handshake'};
+    const {port,requestedPort}=announcement;
+    if(!Number.isInteger(port)||port<1||port>65535)return {fatal:'The application reported an invalid listener port.'};
+    if(requestedPort!==0)return mismatch(port);
+    if(context.runtimePort!==port){
+     const ownership=await listenerOwnership(child.pid,port,'127.0.0.1',inspectionContext({port,signal:probeSignal,budgetMs:3000}));
+     if(ownership.status!=='owned')return {fatal:'The application listener handshake did not identify an owned socket.'};
+     context.setRuntimePort(port);context.runtimePort=port;expectedPort=port;
+    }
+   }
+   const result=await (ready??hooks.health??defaultHealth)(url,probeSignal,context);
+   if(result===true||result?.ready===true)return result;
+   // Auxiliary runtime listeners are common. Only an owned listener serving the
+   // application's healthy response proves a mismatched application port.
+   const ports=await listenerPorts(child.pid,inspectionContext({signal:probeSignal,budgetMs:3000}));
+   if(!ports.includes(expectedPort))for(const port of ports){
+    try{
+     const reply=await loopbackRequest({port,path:health,headers:{host:new URL(url).host},signal:probeSignal,timeoutMs:1000});
+     if(reply.status===200&&JSON.parse(reply.body.toString()).status==='ok')return mismatch(port);
+    }catch(error){if(probeSignal.aborted)throw error;}
+   }
+   return result;
+  }, { signal, timeoutMs: Math.min(timeoutMs??60000,60000), ...(softAfterMs ? { softAfterMs } : {}), ...(intervalMs ? { intervalMs } : {}) });
  } catch (error) {
   if (signal?.aborted) throw error;
+  if(detectedMismatch)throw installationFailure('command_failed',{step:'start',diagnostic:error});
   const ports=await ownedPorts();
   if(ports.length){
    let diagnosis;
@@ -237,7 +266,7 @@ async function start(context, hooks) {
    store.report(message);const prior=approvedFailure(error);error=commandFailure(`${prior?.message??readinessLabel}\n${message}`,prior??{});
   }
   throw installationFailure('command_failed', { step: 'start', diagnostic: error });
- }
+ } finally { if(runtimePortHandshake)child.removeListener('message',announced); }
  // Another app can take the loopback port between the port check and the bind;
  // its /health would pass. Claim and sign in only against the process this
  // setup started.

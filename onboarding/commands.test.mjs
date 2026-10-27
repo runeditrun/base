@@ -65,6 +65,13 @@ test('child exit at 40 seconds wins even during a hung health probe and includes
 
 test('hard limit names last health and cancellation interrupts an in-flight probe',async t=>{
  const f=await fixture(t),child=fakeChild(),time=clock();f.store.track('Start',child);
+ const bounded=f.store.waitForReady('Start',child,()=>new Promise(()=>{}),{...time,timeoutMs:60000});
+ const deadline=assert.rejects(bounded,/readiness deadline exceeded/);
+ await time.advance(60000);await deadline;assert.equal(time.pending,0);
+ const mismatch=f.store.waitForReady('Start',child,()=>({fatal:'the application listened on port 10001 but the CLI expected 10002'}),{...time,timeoutMs:60000});
+ await assert.rejects(mismatch,/the application listened on port 10001 but the CLI expected 10002/);
+ assert.equal(time.pending,0);
+
  const ready=f.store.waitForReady('Start',child,()=>({ready:false,message:'HTTP 503 waiting for migration'}),{...time,timeoutMs:900000});
  const failed=assert.rejects(ready,error=>/deadline exceeded.*Last health: HTTP 503 waiting for migration/s.test(installationFailureMessage(error)));
  await time.advance(0);await time.advance(900000);await failed;assert.equal(child.exitCode,null);
