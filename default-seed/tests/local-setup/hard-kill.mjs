@@ -1,13 +1,11 @@
-import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { link, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { test } from 'node:test'
 import { localOperation } from '../../scripts/base-onboarding/local/operation.mjs'
 import { scriptFixture } from './script-fixture.mjs'
 
-const recoveryRows = []
+export const recoveryRows = []
 
 const credentials = () => Buffer.from(`# private comment\nOWNER_EMAIL=owner@example.test\nAUTH_LOCAL=true\nAUTH_ORIGIN=http://127.0.0.1:8899\nSESSION_SECRET=${randomBytes(32).toString('hex')}\nSETUP_TOKEN=${randomBytes(32).toString('hex')}\nMAIL_PROVIDER=development\n`)
 
@@ -141,7 +139,3 @@ recoveryRows.push(['an earlier stranded copy beside a current .dev.vars is named
     assert.deepEqual(await stranded(dir), [copy])
   }
 }])
-
-test("interrupted local credentials recover exact originals without taking live or concurrent files", async t => {
-  await runRows(t, recoveryRows)
-})

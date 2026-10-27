@@ -1,3 +1,5 @@
+import { runRows } from '../rows.mjs'
+const archiveRows = []
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
@@ -71,7 +73,7 @@ async function businessSeed(t) {
   return { call, token, owned, upload, plan, apply, people }
 }
 
-test('Business keeps a tool\'s final export as an archive in the default seed: plan and catch-up leave it, and restore-check parses it writing nothing', async (t) => {
+archiveRows.push(['Business keeps a tool\'s final export as an archive in the default seed: plan and catch-up leave it, and restore-check parses it writing nothing', {}, async (t) => {
   const seed = await businessSeed(t)
   // What rer's vendor export uploads: each live credential value stripped, its
   // marker left in a field (`[removed]`), a URL's user name (`removed@`) and a
@@ -158,9 +160,9 @@ test('Business keeps a tool\'s final export as an archive in the default seed: p
   }
   assert.deepEqual(await seed.people(), native, 'restore-check writes nothing native')
   assert.deepEqual(await seed.call('restore-check', { archiveId: randomUUID() }), { status: 404, body: { error: 'archive_not_found' } })
-})
+}])
 
-test('A person\'s erasure withdraws the door\'s archives and says so; the erased person\'s export cannot be archived again', async (t) => {
+archiveRows.push(['A person\'s erasure withdraws the door\'s archives and says so; the erased person\'s export cannot be archived again', {}, async (t) => {
   const seed = await businessSeed(t)
   const exported = [
     { ref: 'eve', name: 'Eve Erased', email: 'eve@example.test', details: { phone: '+1 555 0100' } },
@@ -184,4 +186,8 @@ test('A person\'s erasure withdraws the door\'s archives and says so; the erased
   const again = await seed.upload(exported)
   assert.deepEqual(await seed.call('archive', { uploadId: again.uploadId, tool: 'people-vendor', takenAt: new Date().toISOString() }), { status: 409, body: { error: 'source_erased' } })
   assert.deepEqual(await seed.call('uploads', { uploadId: again.uploadId }), { status: 404, body: { error: 'upload_not_found' } })
+}])
+
+test('Business archive journey retains exact exports across catch-up and withdraws erased custody', async t => {
+  await runRows(t, archiveRows)
 })

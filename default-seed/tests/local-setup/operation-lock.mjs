@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promise
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { test } from 'node:test'
+
+export const ownershipRows = []
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const module = import.meta.resolve('../../scripts/base-onboarding/local/operation.mjs')
@@ -16,6 +17,7 @@ const { localOperation } = await import(module)
 const starter = `
 import { localOperation } from ${JSON.stringify(module)};
 import { createInterface } from 'node:readline';
+
 const lines = createInterface({ input: process.stdin });
 let operation;
 console.log('ready');
@@ -38,7 +40,7 @@ function start(dir) {
   return { child, next, exited }
 }
 
-test('six simultaneous starters take over a stale lock with exactly one owner', { timeout: 120000 }, async (t) => {
+ownershipRows.push(['six simultaneous starters take over a stale lock with exactly one owner', { timeout: 120000 }, async (t) => {
   const parent = join(root, '.wrangler/local-setup-tests')
   await mkdir(parent, { recursive: true })
   const dir = await mkdtemp(join(parent, 'lock-'))
@@ -76,4 +78,4 @@ test('six simultaneous starters take over a stale lock with exactly one owner', 
     const next = await localOperation(dir)
     await next.release()
   }
-})
+}])

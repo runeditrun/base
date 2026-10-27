@@ -1,7 +1,9 @@
-import test from 'node:test'
 import assert from 'node:assert/strict'
 import { emittedRuntime, owner, setupToken } from './emitted-runtime.mjs'
 import { signSettings, testDocument, testTrust } from '../../../modules/business-settings/testing/index.mjs'
+
+export const teamIdentityRows = []
+
 
 const tokenOf = mail => new URL(mail.text.match(/https?:\/\/\S+/)[0]).searchParams.get('token')
 const cookieOf = response => {
@@ -11,7 +13,7 @@ const cookieOf = response => {
 
 // The native email-change door must not let a Business-created identity escape
 // its durable roster key, even when a human or the owner takes that old address.
-test('Business removal and re-addition follow operator IDs after native email changes', async () => {
+teamIdentityRows.push(['Business removal and re-addition follow operator IDs after native email changes', {}, async () => {
   const runtime = await emittedRuntime({ bindings: { RER_BUSINESS_TRUST: JSON.stringify(testTrust({ email: undefined })) } })
   let rev = 0, ownerEmail = owner
   const member = { email: 'sam@example.test', name: 'Sam Chen', role: 'member', invite: 0 }
@@ -78,4 +80,4 @@ test('Business removal and re-addition follow operator IDs after native email ch
     assert.deepEqual(await operator(ownerBefore.id), ownerBefore)
     assert.deepEqual(await operator(human.id), human)
   } finally { await runtime.close() }
-})
+}])

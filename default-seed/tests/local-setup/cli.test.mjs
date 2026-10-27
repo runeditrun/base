@@ -1,3 +1,6 @@
+import { nativeBindingRows } from './native-bindings.mjs'
+import { ownershipRows } from './operation-lock.mjs'
+import { setupRerunRows } from './setup-rerun.mjs'
 import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
@@ -8,10 +11,11 @@ import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { localOperation } from '../../scripts/base-onboarding/local/operation.mjs'
 
+const buildRows = []
+
 const optionRows = []
 const lifecycleRows = []
 const unsafeFileRows = []
-const buildRows = []
 const devRows = []
 const operationRows = []
 
@@ -35,6 +39,7 @@ async function fixture(t) {
   const mock = `#!/usr/bin/env node
 import { appendFileSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+
 const command = basename(process.argv[1]);
 if(command === 'git') { console.log(process.env.TEST_EMAIL ?? 'owner@example.test'); process.exit(0); }
 appendFileSync(join(process.cwd(), 'calls.jsonl'), JSON.stringify({ args:process.argv.slice(2), varsPresent:(()=>{try{readFileSync('.dev.vars');return true}catch{return false}})(), authEnv:process.env.SESSION_SECRET, loadDevVars:process.env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV, includeProcessEnv:process.env.CLOUDFLARE_INCLUDE_PROCESS_ENV })+'\\n');
@@ -391,13 +396,13 @@ test("build keeps credentials private on success and failure", async t => {
 })
 
 test("dev preflight refuses missing credentials and reports occupied ports", async t => {
-  await runRows(t, devRows)
+  await runRows(t, [...devRows, ...nativeBindingRows])
 })
 
 test("local operation ownership excludes overlap and recovers stale locks", async t => {
-  await runRows(t, operationRows)
+  await runRows(t, [...operationRows, ...ownershipRows])
 })
 
 test("setup admission and credential lifecycle validate safe inputs before private publication", async t => {
-  await runRows(t, [...optionRows, ...lifecycleRows, ...unsafeFileRows])
+  await runRows(t, [...optionRows, ...lifecycleRows, ...unsafeFileRows, ...setupRerunRows])
 })

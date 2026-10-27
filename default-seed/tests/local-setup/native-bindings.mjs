@@ -6,7 +6,9 @@ import { advertisedOrigin } from '../worker-listener.mjs'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { test } from 'node:test'
+
+export const nativeBindingRows = []
+
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 
@@ -23,7 +25,7 @@ async function stop(child, closed) {
   await closed
 }
 
-test('native Wrangler receives only explicit private file bindings despite inherited loader settings', { timeout: 60000 }, async () => {
+nativeBindingRows.push(['native Wrangler receives only explicit private file bindings despite inherited loader settings', { timeout: 60000 }, async () => {
   const parent = join(root, '.wrangler/local-setup-tests')
   await mkdir(parent, { recursive: true, mode: 0o700 })
   const dir = await mkdtemp(join(parent, 'native-'))
@@ -114,4 +116,4 @@ test('native Wrangler receives only explicit private file bindings despite inher
     await output?.close()
     await rm(dir, { recursive: true, force: true })
   }
-})
+}])

@@ -1,11 +1,9 @@
-import { runRows } from '../rows.mjs'
-import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { scheduledHarness, definition } from './scheduled-harness.mjs'
 import { emittedRuntime, setupToken } from './emitted-runtime.mjs'
 import { AuthError } from '../../../modules/operator-auth/errors.mjs'
 
-const recoveryRows = []
+export const recoveryRows = []
 
 recoveryRows.push(['scheduled approval hashes and executes the same validated getter snapshot; unknown actions refuse', {}, async () => {
   let getters = false
@@ -248,7 +246,3 @@ recoveryRows.push(['the owner approves and revokes a scheduled policy through th
     assert.equal(formFields(await html()).some(fields => fields.action === 'revoke'), false, 'a revoked approval offers no second revoke')
   } finally { await r.close() }
 }])
-
-test("scheduled policy recovery retains bounds, expiry audit and owner control", async t => {
-  await runRows(t, recoveryRows)
-})

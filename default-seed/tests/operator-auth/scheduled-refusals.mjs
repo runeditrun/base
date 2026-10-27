@@ -1,9 +1,7 @@
-import { runRows } from '../rows.mjs'
-import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { scheduledHarness, definition } from './scheduled-harness.mjs'
 
-const refusalRows = []
+export const refusalRows = []
 
 async function refused(response, error, status = 403) {
   assert.equal(response.status, status, await response.clone().text())
@@ -185,7 +183,3 @@ refusalRows.push(['inactivity refusals survive provider-session scrubbing after 
     assert.equal(await h.status(member.id), 'active')
   } finally { await h.close() }
 }])
-
-test("scheduled policy refusal keeps native proof, scope and interval authority fenced", async t => {
-  await runRows(t, refusalRows)
-})

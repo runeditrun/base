@@ -1,3 +1,7 @@
+import { nativeAuthRows } from './conformance.mjs'
+import { lobbyRows } from './lobby.mjs'
+import { demoRows } from './demo.mjs'
+import { runRows } from '../rows.mjs'
 import { completeFirstRun } from './first-run.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -5,6 +9,9 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { emittedRuntime, root, owner, setupToken, decodeStart } from './emitted-runtime.mjs'
 import { startTogether } from '../ports.mjs'
+
+const admissionRows = []
+
 
 export const cookieOf = (response) => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
 export async function functionId(name) {
@@ -49,7 +56,7 @@ async function matrix(runtime, cookie, allowed) {
   }
 }
 
-test('emitted Worker: fresh D1, bootstrap without mail, private session transport matrix, revoke, queue and cron', async () => {
+admissionRows.push(['emitted Worker: fresh D1, bootstrap without mail, private session transport matrix, revoke, queue and cron', {}, async () => {
   const runtime = await emittedRuntime({ noMail: true })
   try {
     for (const table of ['operators', 'articles', 'jobs', 'oa_operators']) assert.equal((await runtime.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n, 0)
@@ -95,9 +102,9 @@ test('emitted Worker: fresh D1, bootstrap without mail, private session transpor
     assert.equal((await runtime.call('/setup', { method: 'POST', cookie, input: {} })).status, 401, 'revoked session cannot complete setup')
     assert.equal((await runtime.db.prepare('SELECT COUNT(*) AS n FROM articles').first()).n, 0)
   } finally { await runtime.close() }
-})
+}])
 
-test('emitted Worker: the owner corrects their name at first-run setup and later from settings', async () => {
+admissionRows.push(['emitted Worker: the owner corrects their name at first-run setup and later from settings', {}, async () => {
   const runtime = await emittedRuntime({ noMail: true })
   try {
     const cookie = cookieOf(await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Owner' } }))
@@ -119,9 +126,9 @@ test('emitted Worker: the owner corrects their name at first-run setup and later
     assert.equal((await runtime.call('/auth/display-name', { method: 'POST', cookie, input: { displayName: 'x'.repeat(121) } })).status, 400)
     assert.equal(await name(), 'R. Lee')
   } finally { await runtime.close() }
-})
+}])
 
-test('emitted Worker: prior data survives additive migration and legacy cookies do not authenticate', async () => {
+admissionRows.push(['emitted Worker: prior data survives additive migration and legacy cookies do not authenticate', {}, async () => {
   const runtime = await emittedRuntime({ prior: true, noMail: true })
   try {
     assert.equal((await runtime.db.prepare('SELECT email FROM operators').first()).email, 'previous@example.test')
@@ -132,7 +139,7 @@ test('emitted Worker: prior data survives additive migration and legacy cookies 
     assert.equal((await runtime.db.prepare('SELECT count(*) AS n FROM oa_operators').first()).n, 1)
     assert.match(await runtime.call('/records').then((response) => response.text()), /Previous data/)
   } finally { await runtime.close() }
-})
+}])
 
 test('emitted Worker browser: owner setup, POST magic confirmation and revoke at desktop/mobile widths', async () => {
   const { browserProof } = await import('./browser.mjs')
@@ -186,7 +193,7 @@ test('emitted Worker browser: native sessions stay separate across loopback port
   } finally { await Promise.allSettled([browser?.close(), a.close(), b.close()]) }
 })
 
-test('emitted Worker: a linked Auth provider verifies a signed callback and shares revoked session admission', async () => {
+admissionRows.push(['emitted Worker: a linked Auth provider verifies a signed callback and shares revoked session admission', {}, async () => {
   const runtime = await emittedRuntime({ oidc: true, noMail: true })
   try {
     assert.equal((await runtime.call('/auth/dependencies/setup', { method: 'POST', input: { issuer: runtime.provider.issuer, token: setupToken } })).status, 200)
@@ -218,7 +225,7 @@ test('emitted Worker: a linked Auth provider verifies a signed callback and shar
     assert.equal((await runtime.call('/auth/oidc/auth/start', { method: 'POST', input: {} })).status, 502)
     assert.equal(runtime.networkRequests.some((request) => request.origin === 'https://attacker.example.test'), false)
   } finally { await runtime.close() }
-})
+}])
 
 test('native Wrangler emitted artifact: fresh migrations, browser navigation, SSR, assets and real 404s', async () => {
   const { nativeWranglerProof } = await import('./native-wrangler.mjs')
@@ -230,7 +237,7 @@ test('vite dev: real Start scripts hydrate and navigate with no layout or transp
   await devBrowserProof()
 })
 
-test('emitted Worker administration: invitations, scoped admin roles, deactivation/reactivation and loopback review', async () => {
+admissionRows.push(['emitted Worker administration: invitations, scoped admin roles, deactivation/reactivation and loopback review', {}, async () => {
   const runtime = await emittedRuntime()
   const post = (path, input, cookie) => runtime.call(path, { method: 'POST', input, cookie })
   const confirm = async () => {
@@ -264,9 +271,13 @@ test('emitted Worker administration: invitations, scoped admin roles, deactivati
     assert.equal((await post('/auth/operator/status', { operatorId: ownerSession.operator.id, status: 'inactive' }, provedOwnerCookie)).status, 409, 'fresh proof still cannot remove the final owner')
     assert.equal((await runtime.call('/auth/session', { cookie: provedOwnerCookie }).then((response) => response.json())).operator.status, 'active')
   } finally { await runtime.close() }
-})
+}])
 
 test('emitted Worker: the Start renderer stays out of the complete eager module graph', async () => {
   const { rendererBoundaryProof } = await import('./renderer-boundary.mjs')
   await rendererBoundaryProof()
+})
+
+test('emitted Worker operator admission journey: bootstrap, owner identity, migration, linked provider and administration', async t => {
+  await runRows(t, [...admissionRows, ...nativeAuthRows, ...lobbyRows, ...demoRows])
 })

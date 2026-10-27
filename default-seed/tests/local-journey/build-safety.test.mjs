@@ -1,3 +1,4 @@
+import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -9,6 +10,9 @@ import { after, before, test } from 'node:test'
 import { freshBuildCopy } from './build-copy.mjs'
 import { assertDistExcludesSecrets } from './readme.mjs'
 import { liveOwnedGroup } from '../owned-process-group.mjs'
+
+const buildRows = []
+
 
 const execute = promisify(execFile)
 let copy
@@ -35,7 +39,7 @@ async function localVariableFiles(directory) {
 }
 
 for (const command of [['pnpm', 'exec', 'vite', 'build'], ['npx', 'vite', 'build']]) {
-  test(`a direct \`${command.join(' ')}\` with .dev.vars present succeeds and emits no local credentials`, { timeout: 15 * 60_000 }, async () => {
+  buildRows.push([`a direct \`${command.join(' ')}\` with .dev.vars present succeeds and emits no local credentials`, { timeout: 15 * 60_000 }, async () => {
     const { path, bytes, secrets } = await credentials()
     await rm(join(copy.root, 'dist'), { recursive: true, force: true })
     const result = await copy.run(command[0], command.slice(1))
@@ -44,10 +48,10 @@ for (const command of [['pnpm', 'exec', 'vite', 'build'], ['npx', 'vite', 'build
     assert.deepEqual(await localVariableFiles(join(copy.root, 'dist')), [], 'no .dev.vars in dist')
     await assertDistExcludesSecrets(copy.root, secrets)
     assert.ok((await readFile(path)).equals(bytes), '.dev.vars itself is untouched')
-  })
+  }])
 }
 
-test('a SIGKILLed real build strands nothing: the next pnpm build restores .dev.vars', { timeout: 15 * 60_000 }, async () => {
+buildRows.push(['a SIGKILLed real build strands nothing: the next pnpm build restores .dev.vars', { timeout: 15 * 60_000 }, async () => {
   const { path, bytes, secrets, status } = await credentials()
   const build = copy.start('pnpm', ['build'])
   // Wait until local-build has hidden .dev.vars and Vite is building.
@@ -89,4 +93,8 @@ test('a SIGKILLed real build strands nothing: the next pnpm build restores .dev.
   assert.equal(restored.nlink, 1)
   await assert.rejects(stat(hidden), { code: 'ENOENT' })
   await assertDistExcludesSecrets(copy.root, secrets)
+}])
+
+test('real builds retain private credentials through direct commands and interrupted recovery', async t => {
+  await runRows(t, buildRows)
 })

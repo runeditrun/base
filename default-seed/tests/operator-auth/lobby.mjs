@@ -1,9 +1,7 @@
-import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
 import { emittedRuntime, setupToken, owner } from './emitted-runtime.mjs'
 
-const lobbyRows = []
+export const lobbyRows = []
 
 lobbyRows.push(['the claimed Lobby opens the local sign-in flow without deployment credentials', {}, async () => {
   for (const options of [{ hostname: 'localhost', noMail: true }, { demoHost: true }]) {
@@ -90,7 +88,3 @@ lobbyRows.push(['the Lobby Sign in link opens the sign-in form with the claimed 
     assert.equal(runtime.mails.length, 0, 'opening the form sends nothing')
   } finally { await runtime.close() }
 }])
-
-test("Lobby admission follows claim, current session, signout and local owner hint", async t => {
-  await runRows(t, lobbyRows)
-})

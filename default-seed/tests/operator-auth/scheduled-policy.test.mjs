@@ -1,3 +1,5 @@
+import { recoveryRows } from './scheduled-recovery.mjs'
+import { refusalRows } from './scheduled-refusals.mjs'
 import { runRows } from '../rows.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -139,6 +141,6 @@ policyRows.push(['scheduled Worker door: exact owner approval bounds actions, au
   } finally { await r.close() }
 }])
 
-test("scheduled owner approval binds the exact definition and controls Worker actions", async t => {
-  await runRows(t, policyRows)
+test("scheduled owner approval and recovery retain exact policy authority, bounds and audit", async t => {
+  await runRows(t, [...policyRows, ...recoveryRows, ...refusalRows])
 })

@@ -1,4 +1,3 @@
-import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -6,12 +5,11 @@ import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } fro
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
-import { test } from 'node:test'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 import { isProcessRunning as alive } from './process-liveness.mjs'
 
-const cancellationRows = []
+export const cancellationRows = []
 
 async function until(check, message) {
   const deadline = Date.now() + 10000
@@ -200,7 +198,3 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     assert.ok(alive(survivor.pid), 'Unrelated process survives')
   }])
 }
-
-test("cancelled local operations restore private credentials and stop only their descendants", async t => {
-  await runRows(t, cancellationRows)
-})
