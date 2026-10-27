@@ -7,11 +7,15 @@ const sourceExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', 
 // rules; source TS also recognizes filenames produced by its compiler. An
 // erased type edge is the only route that can resolve a declaration file.
 // Package-name imports belong to the edition's package manager, not this graph.
-export function resolve(tree, source, specifier, {types = false, kind = 'import'} = {}) {
+export function resolve(tree, source, specifier, {types = false, kind = 'import', manifests = new Set()} = {}) {
   if (!specifier.startsWith('.')) return;
-  const name = path.posix.normalize(path.posix.join(path.posix.dirname(source), specifier.split(/[?#]/)[0]));
+  types ||= declaration(source);
+  const relative = specifier.split(/[?#]/)[0];
+  if (/%2f|%5c/i.test(relative)) throw Error(`Invalid encoded separator in module specifier ${specifier}`);
+  const name = path.posix.normalize(path.posix.join(path.posix.dirname(source), decodeURIComponent(relative)));
   const sourceModule = /\.(?:[cm]?ts|[jt]sx)$/.test(source);
   const file = candidate => (types || !declaration(candidate)) && tree.has(candidate) ? candidate : undefined;
+  if (!types && declaration(name)) return;
   const direct = file(name);
   if (direct) return direct;
   const extension = path.posix.extname(name);
@@ -36,9 +40,10 @@ export function resolve(tree, source, specifier, {types = false, kind = 'import'
       const main = JSON.parse(tree.read(manifest)).main;
       if (typeof main === 'string') {
         const target = path.posix.join(name, main);
+        if (!types && declaration(target) && tree.has(target)) return;
         for (const candidate of [target, ...['.js', '.json', '.node'].map(suffix => target + suffix), ...['.js', '.json', '.node'].map(suffix => target + '/index' + suffix)]) {
           const found = file(candidate);
-          if (found) return found;
+          if (found) { manifests.add(manifest); return found; }
         }
       }
     }

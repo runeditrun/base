@@ -26,7 +26,7 @@ async function fixture(t) {
  env.GIT_CONFIG_COUNT = '1'; env.GIT_CONFIG_KEY_0 = `url.${source}.insteadOf`; env.GIT_CONFIG_VALUE_0 = 'https://github.com/runeditrun/base.git';
  const run = (...args) => spawnSync(process.execPath, [path.join(pkg, 'global/rer.mjs'), ...args, '--cwd', seed, '--json'], {env, cwd: temp, encoding: 'utf8', timeout: 20000});
  const result = (...args) => { const r = run(...args); assert.equal(r.status, 0, r.stdout + r.stderr); return JSON.parse(r.stdout.trim().split('\n').at(-1)); };
- const old = (...args) => { const r = spawnSync(process.execPath, [path.join(pkg, 'edition-authoring/cli.mjs'), ...args], {env, cwd: seed, encoding: 'utf8'}); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
+ const old = (...args) => { const r = spawnSync(process.execPath, [path.join(pkg, 'edition-authoring/cli.mjs'), ...args], {env, cwd: seed, encoding: 'utf8'}); assert.equal(r.status, 0, r.stdout + r.stderr); return JSON.parse(r.stdout); };
  write(seed, '.gitignore', 'node_modules/\n');
  write(seed, '.node-version', process.versions.node + '\n');
  write(seed, 'package.json', JSON.stringify({engines: {node: process.versions.node}, devDependencies: {'@runeditrun/rer': version}}));
@@ -199,7 +199,7 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   write(source, origin, `jobs:\n  check:\n    steps:\n      - run: ${scalar}\n`);
   write(source, helper, 'export const helper = true;\n');
   const next = commit(source);
-  if (owned) { write(seed, target, fs.readFileSync(path.join(source, origin))); commit(seed); }
+  if (owned) { write(seed, target, fs.readFileSync(path.join(source, origin), 'utf8') + '# Edition-owned workflow\n'); commit(seed); }
   result('refresh-base', '--ref', next, '--base', source);
   assert.equal(fs.readFileSync(path.join(seed, destination), 'utf8'), 'export const helper = true;\n');
   const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));

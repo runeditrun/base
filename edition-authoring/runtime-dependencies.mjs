@@ -25,8 +25,8 @@ export function dependencies(source) {
     while (end < t.length && ![';', 'import', 'export', 'from'].includes(t[end])) end++;
     if (t[end] !== 'from') continue;
     const clause = t.slice(i + 1, end);
-    const erased = clause[0] === 'type' || clause[0] === '{' && clause.at(-1) === '}' &&
-      clause.slice(1, -1).length > 0 && clause.slice(1, -1).join(' ').split(' , ').every(item => item.startsWith('type '));
+    const erased = clause[0] === 'type' && clause.length > 1 && clause[1] !== ',' || clause[0] === '{' && clause.at(-1) === '}' &&
+      clause.slice(1, -1).length > 0 && clause.slice(1, -1).join(' ').split(' , ').every(item => item.startsWith('type ') && !item.startsWith('type as '));
     add(t[end + 1], 'import', erased);
   }
   return result;
@@ -38,8 +38,8 @@ const tokens = source => [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\
   .map(match => match[0]).filter(token => !/^(?:\/\/|\/\*)/.test(token));
 const unquote = value => {
   if (!/^['"`]/.test(value ?? '') || value[0] === '`' && value.includes('${')) return null;
-  return value.slice(1, -1).replace(/\\(?:x([\da-fA-F]{2})|u([\da-fA-F]{4})|([\s\S]))/g,
-    (_, x, u, character) => x || u ? String.fromCodePoint(parseInt(x ?? u, 16)) : character === '\n' ? '' : character);
+  return value.slice(1, -1).replace(/\\(?:x([\da-fA-F]{2})|u(?:\{([\da-fA-F]+)\}|([\da-fA-F]{4}))|([\s\S]))/g,
+    (_, x, codepoint, u, character) => x || codepoint || u ? String.fromCodePoint(parseInt(x ?? codepoint ?? u, 16)) : character === '\n' ? '' : ({n:'\n',r:'\r',t:'\t',b:'\b',f:'\f',v:'\v',0:'\0'}[character] ?? character));
 };
 export function bindings(source, types = false) {
   const t = tokens(source), result = new Map();
@@ -48,7 +48,7 @@ export function bindings(source, types = false) {
     let end = i + 1;
     while (end < t.length && ![';', 'import', 'export'].includes(t[end]) && t[end] !== 'from') end++;
     if (t[end] !== 'from') continue;
-    const specifier = unquote(t[end + 1])?.split('?')[0];
+    const specifier = unquote(t[end + 1])?.split(/[?#]/)[0];
     if (!specifier?.startsWith('.')) continue;
     const names = new Set(result.get(specifier) ?? []);
     let start = i + 1;

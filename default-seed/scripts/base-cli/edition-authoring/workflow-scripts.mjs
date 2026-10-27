@@ -5,18 +5,20 @@ import {parseDocument, isMap, isSeq, isScalar} from './vendor/yaml/index.js';
 export function workflowScripts(text) {
   const document = parseDocument(text, {uniqueKeys: true});
   if (document.errors.length) throw Error(`Cannot parse workflow: ${document.errors.map(error => error.message).join('; ')}`);
+  const dereference = node => node?.resolve ? node.resolve(document) : node;
   const scalar = node => {
-    const value = node?.resolve ? node.resolve(document) : node;
+    const value = dereference(node);
     return isScalar(value) && typeof value.value === 'string' ? value.value : null;
   };
   const result = {scripts: [], uses: []};
-  const jobs = document.get('jobs', true);
+  const jobs = dereference(document.get('jobs', true));
   if (!isMap(jobs)) return result;
-  for (const {value: job} of jobs.items) {
+  for (const {value} of jobs.items) {
+    const job = dereference(value);
     if (!isMap(job)) continue;
     const reusable = scalar(job.get('uses', true));
     if (reusable?.startsWith('./')) result.uses.push(reusable);
-    const steps = job.get('steps', true);
+    const steps = dereference(job.get('steps', true));
     if (!isSeq(steps)) continue;
     for (let step of steps.items) {
       if (step?.resolve) step = step.resolve(document);

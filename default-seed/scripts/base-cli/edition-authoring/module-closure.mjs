@@ -96,11 +96,12 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       const dependency = planned.get(destination)?.source ?? (owner && owner.copy.originPath + destination.slice(owner.copy.path.length)) ?? resolve(tree, source, specifier, request);
       return {...request, dependency, destination, satisfied: true};
     }
-    const dependency = resolve(tree, source, specifier, request);
-    return {...request, dependency, destination: dependency && path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))};
+    const manifests = new Set();
+    const dependency = resolve(tree, source, specifier, {...request, manifests});
+    return {...request, manifests, dependency, destination: dependency && path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))};
   }
   const key = (target, request) => JSON.stringify([target, request.kind, request.types, request.specifier]);
-  const bootstrap = source => /(?:^|\/)edition-authoring\//.test(source);
+  const bootstrap = source => /^(?:edition-authoring|(?:default-seed|export)\/scripts\/base-cli\/edition-authoring)\//.test(source);
   // Snapshot the original unresolved set once, before closure can add a file.
   // Only toolkit bootstraps and recorded removals may change that baseline.
   const baseline = new Set();
@@ -157,6 +158,9 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const imports = bindings(bytes), oldBindings = bindings(before);
     const typeImports = bindings(bytes, true), oldTypes = bindings(before, true);
     const edges = dependencies(bytes).map(request => edge(source, target, request));
+    for (const {manifests = []} of [...edges]) for (const dependency of manifests) {
+      edges.push({dependency, destination: path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))});
+    }
     const declaration = source.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts');
     if (declaration !== source && tree.has(declaration)) edges.push({dependency: declaration, destination: target.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts')});
     const novel = directoryAdditions.has(target) && !required.has(target) && !incoming.has(target);
