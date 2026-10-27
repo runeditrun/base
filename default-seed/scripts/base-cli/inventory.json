@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.g2844a4c3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -655,7 +655,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "b4b1a389aaaf8289320fb680d4511b7374384d27fc26bcf45fbbdd1c3df58830"
+      "sha256": "41832c92684e4b9fda0d5a4ff0f3aee74e02edb7a6048e5ec4d62901e0717963"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -907,7 +907,7 @@
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",
-      "sha256": "5fdda051d4757b45f49c2beed4a221b646d3167b66968db418aaa792adce94fa"
+      "sha256": "3714bbfc27ad5428db55d312e7098529014d5f70979c880fde8634a84ffdd8a8"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",

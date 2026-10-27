@@ -27,7 +27,9 @@ export async function nativeOwnerBrowser(f, mode, ready, email) {
     const wrongOrigin = await request.post(row.url + '/__dev/key', { headers: { Origin: 'https://synthetic-base-1.invalid' }, data: { key } });
     assert.equal(wrongOrigin.status(), 403, 'foreign origin cannot redeem the link');
     const wrongHost = await request.post(row.url + '/__dev/key', { headers: { Host: 'synthetic-base-1.invalid', Origin: row.url }, data: { key } });
-    assert.notEqual(wrongHost.status(), 200, 'non-loopback host cannot redeem the link');
+    assert.equal(wrongHost.status(), 421, 'non-loopback host cannot redeem the link');
+    const bypass = await request.post(row.url + '/auth/owner-signin', { headers: { Origin: row.url }, data: { token: key } });
+    assert.equal(bypass.status(), 400, 'public entry credential cannot bypass its run-owned gate');
     const page = await context.newPage();
     await page.goto(row.ownerOpenUrl);
     await page.waitForURL(url => url.pathname !== '/__dev/key');

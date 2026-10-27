@@ -8,16 +8,17 @@ import { openUrl } from './dev-identity.mjs';
 import { shared } from './shared.mjs';
 
 // The dev fragment exchange, with a run-owned, expiring, single-use key. Only
-// its digest enters the local native-owner grant ledger, on redemption. Neither
-// the key nor its URL is saved; the native grant supplies normal owner fencing.
-export function nativeOwnerEntry({ origin, state, store, demo, devKey }) {
+// an independent native grant digest enters the local ledger, on redemption.
+// The public key cannot redeem that grant outside this proxy's lifetime. Neither
+// credential is saved; the native grant supplies normal owner fencing.
+export function nativeOwnerEntry({ origin, state, store, demo, devKey, clock = Date.now }) {
  if (!loopback(new URL(origin).hostname)) return null;
  let entry, grant;
  const same = (a, b) => { const left = Buffer.from(a), right = Buffer.from(b); return left.length === right.length && timingSafeEqual(left, right); };
  function issue() {
   const key = randomBytes(32).toString('base64url');
   store.addSecrets([key]);
-  entry = { key, expires: Date.now() + OWNER_SIGNIN_SECONDS * 1000, used: false, gate: devGate({ key, origin, local: true }) };
+  entry = { key, expires: clock() + OWNER_SIGNIN_SECONDS * 1000, used: false, gate: devGate({ key, origin, local: true }) };
   return openUrl(origin, key, { path: DEV_KEY_PATH, next: '/' });
  }
  async function database() {
@@ -59,21 +60,23 @@ export function nativeOwnerEntry({ origin, state, store, demo, devKey }) {
    for await (const bytes of req) { body += bytes; if (body.length > 1024) return reply(denied()); }
    let key; try { key = JSON.parse(body).key; } catch {}
    // Preserve the demo persona through the same dev gate as its Worker.
-   if (demo && typeof key === 'string' && !same(key, entry.key)) return reply(await devGate({ key: devKey, origin, local: true }).exchange(new Request(origin + DEV_KEY_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body })));
-   if (!entry || typeof key !== 'string' || !same(key, entry.key) || entry.used || Date.now() >= entry.expires || req.headers.origin !== origin) return reply(denied());
+   if (demo && entry && typeof key === 'string' && !same(key, entry.key)) return reply(await devGate({ key: devKey, origin, local: true }).exchange(new Request(origin + DEV_KEY_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body })));
+   if (!entry || typeof key !== 'string' || !same(key, entry.key) || entry.used || clock() >= entry.expires || req.headers.origin !== origin) return reply(denied());
    entry.used = true;
    const exchange = await entry.gate.exchange(new Request(origin + DEV_KEY_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body }));
    if (!exchange.ok) return reply(denied());
    await clear();
-   grant = randomUUID();
-   const db = await database(), now = Date.now();
+   const id = randomUUID(), nativeToken = randomBytes(32).toString('base64url');
+   store.addSecrets([nativeToken]);
+   const db = await database(), now = clock();
    try {
     db.prepare(`INSERT INTO oa_owner_signins(id,token_hash,operator_id,operator_version,created_at,expires_at)
       SELECT ?,?,o.id,o.version,?,? FROM oa_operators o LEFT JOIN oa_bootstrap b ON b.claim_id=o.id
-      WHERE o.role='owner' AND o.status='active' ORDER BY b.claim_id IS NULL,o.created_at,o.id LIMIT 1`).run(grant, await ownerSigninDigest(key), now, entry.expires);
+      WHERE o.role='owner' AND o.status='active' ORDER BY b.claim_id IS NULL,o.created_at,o.id LIMIT 1`).run(id, await ownerSigninDigest(nativeToken), now, entry.expires);
+    grant = id;
    } finally { db.close(); }
    const { appFetch } = await shared('app-fetch.mjs');
-   const response = await appFetch(origin + OWNER_SIGNIN_PATH, { method: 'POST', redirect: 'manual', headers: { Origin: origin, 'content-type': 'application/json' }, body: JSON.stringify({ token: key }), signal: AbortSignal.timeout(10000) });
+   const response = await appFetch(origin + OWNER_SIGNIN_PATH, { method: 'POST', redirect: 'manual', headers: { Origin: origin, 'content-type': 'application/json' }, body: JSON.stringify({ token: nativeToken }), signal: AbortSignal.timeout(10000) });
    if (response.status !== 303) { await response.body?.cancel(); return reply(denied()); }
    const cookies = response.headers.getSetCookie(); await response.body?.cancel();
    res.writeHead(204, { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookies }); res.end();
