@@ -1009,3 +1009,46 @@ Base's default-seed and composed foundation CLI adapters adopt direct local D1
 bindings with explicit identity/configuration exclusions. Their CLI journeys
 exercise archive/reset/restore/archive equivalence. Remote transfer and deployed
 product acceptance remain outside this local adoption.
+
+
+### Optional Managed data intake
+
+Platform's data download is a stored ZIP with kind `runeditrun-app-data` and
+schema 1. It is distinct from an installation archive. The reference adapter
+opts in with `localPortability({database, policy, buckets, managedData: true})`.
+Existing adapters retain their native archive and legacy JSON readers.
+
+Adapters with their own native archive format can keep their existing `import`
+method and add `managedDataImport` from an opted-in `localPortability`
+declaration. The CLI selects that method only for ZIP input; all other inputs
+continue through the adapter's original reader. This requires the seed's real
+native Workers database name, binding and portability policy.
+
+Adapters that already consume Base's native format can import `withManagedDataImport`
+from the package's portability entry point and call
+`withManagedDataImport(context, declaration, restoreNative)` before their native
+reader. The declaration supplies the real `binding`, `buckets`, `policy` or
+`policyModule`, and optional `platformMigrations`. The callback receives the
+context with a private native archive path for a Managed ZIP, or the original
+context for other inputs. Authentication, explicit confirmation, custody and
+empty-target checks remain the caller's responsibility. The callback must await
+its native restore before returning; staging is deleted on success or failure.
+This helper emits Base's native portability format; an adapter with a different
+format must provide a callback that adopts that native restore contract.
+
+The intake checks the complete ZIP and manifest, required members, checksums,
+bindings and Platform ledger before native restore. Source SQL runs in a private
+workerd D1 sandbox. The existing exporter preserves its erasure journal, excludes
+identity and secret data, maps migration identities using the same hash matching
+as native Platform-ledger archives, and emits a verified native archive. Native
+restore still checks emptiness, migration compatibility, erasure and row safety.
+No source SQL runs against the destination.
+
+The current intake supports one database and declared buckets, local Workers
+transport, stored ZIP members, at most 10,000 entries and statements, a 128 MiB
+archive, 64 MiB members, 4 MiB metadata members and 16 MiB of SQL, with each SQL
+statement at most 100,000 bytes after binding string literals, with at most 100
+parameters of at most 2 MiB each. It refuses compressed or encrypted entries,
+unsafe paths, duplicate or unexpected members, missing ledgers, other versions,
+container transport, later-journal and legacy-recovery options. Refusals use
+constant `managed_data_*` reasons and do not print source values.

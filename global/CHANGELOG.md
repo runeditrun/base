@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Import the Platform data download natively.** The Managed data ZIP previously failed as a damaged archive. The reference adapter now opts into a bounded ZIP intake that stages the source in isolation, translates its Platform migration ledger and uses the existing empty-install restore. Malformed downloads report a specific refusal before destination data changes. Adapters can opt in with `managedData: true` or wrap their native restore with `withManagedDataImport`.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

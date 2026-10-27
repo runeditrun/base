@@ -7,13 +7,16 @@ import { fileRecords } from '../modules/portability/files.mjs';
 import { RerError, refuse } from './errors.mjs';
 import { policyModuleURL, serializablePolicy } from './portability-policy.mjs';
 import { shared } from './shared.mjs';
+import { withManagedDataImport } from './managed-data.mjs';
 import { ledgerRefusal } from './ledger-refusal.mjs';
+
+export { withManagedDataImport };
 
 const reExport = 'Re-export from the original installation with rer export --output exports/recovered.rer (add --target remote for a hosted installation), then retry rer import --input exports/recovered.rer --yes. Keep the original archive until recovery succeeds.';
 
 // Seeds declare their real bindings and data policy. The shared module owns the
 // archive format and atomic restore; the shared runner owns its native children.
-export function localPortability({ database, binding = 'DB', buckets = {}, policy, policyModule, transient = [], platformMigrations }) {
+export function localPortability({ database, binding = 'DB', buckets = {}, policy, policyModule, transient = [], platformMigrations, managedData = false }) {
  async function run({ root, path, journal, store, signal, operationToken, platform, legacyRecovery }, direction) {
   if (direction === 'export') {
    if (await lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) throw refuse('Export requires a new archive path.');
@@ -68,7 +71,9 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   if(legacyRecovery)receipt.output=relative(root,legacyRecovery.output);
   return { target: 'local', [direction === 'export' ? 'output' : 'input']: relative(root, path), ...receipt };
  }
- return { legacyRecovery:true, export: context => run(context, 'export'), import: context => run(context, 'import') };
+ const restore = context => run(context, 'import');
+ const intake = context => withManagedDataImport(context, { binding, buckets, policy, policyModule, platformMigrations, transient }, restore);
+ return { legacyRecovery:true, export: context => run(context, 'export'), import: managedData ? intake : restore, ...(managedData ? { managedDataImport: intake } : {}) };
 }
 
 async function nativeWorker(store,direction,input,signal) {

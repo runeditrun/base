@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge628089b",
+  "cliVersion": "0.2.83",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -901,6 +901,14 @@
       "source": "cli/main.mjs",
       "sha256": "5a0c1a005d051031c539d4bae486bce0091268a47799d00d094aa0674831b66f"
     },
+    "cli/managed-data-zip.mjs": {
+      "source": "cli/managed-data-zip.mjs",
+      "sha256": "4c2b2c5761b1163b1783f256eb5a54bac2012f1ce0a7c1d5ccb4aa045ab425ba"
+    },
+    "cli/managed-data.mjs": {
+      "source": "cli/managed-data.mjs",
+      "sha256": "7c7aa713d32e77c37068419beb07fa9112387ccf9b17a4816d476e74eb1a5231"
+    },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
       "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
@@ -971,7 +979,7 @@
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "879c71fed17b976b03026a25c5ef6adb511f7e27411fcf369a10028083f9ca21"
+      "sha256": "dc91366e250a2d4463ed5d646f2bf3cb46a235c84f0545b4e60327246847f39a"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -1131,7 +1139,7 @@
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
-      "sha256": "bf0a4727930d749563a0c675b1b0715350bc1b4321154dea653d154fdc7e878b"
+      "sha256": "d5ea5de63049a0d077da2778338c4a686983763dbf5ff7e8baf52855b3b0687e"
     },
     "cli/upstream-agent.mjs": {
       "source": "cli/upstream-agent.mjs",
@@ -3635,7 +3643,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "585194f9c4491686f5eb46e6e5306c07db56d55b409eae1ab42e13e1c4e34596"
+      "sha256": "89af783876f6bfd816a5162bfb52913766a8cb68958167f62b2a9e354e29a0fc"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
