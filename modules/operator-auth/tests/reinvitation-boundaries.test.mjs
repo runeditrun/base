@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, SECRET } from './runtime.mjs';
@@ -13,7 +14,9 @@ async function cancelled(r, owner, email = 'pending@example.com', role = 'member
   return operator;
 }
 
-for (const scope of ['email', 'ip']) test(`${scope} invite budget survives cancellation, reissue and restart and stops mail before send`, async () => {
+test("reissued invitations retain admission, rate, delivery and rollback safeguards", async t => {
+  const foldedCases = [];
+for (const scope of ['email', 'ip']) foldedCases.push([`${scope} invite budget survives cancellation, reissue and restart and stops mail before send`, async () => {
   const r = await runtime({ emailLimit: scope === 'email' ? 2 : 100, ipLimit: scope === 'ip' ? 2 : 100, limitWindowSeconds: 86400 });
   try {
     const owner = await r.bootstrap();
@@ -36,9 +39,8 @@ for (const scope of ['email', 'ip']) test(`${scope} invite budget survives cance
     assert.equal((await (await r.db).prepare('SELECT status FROM oa_operators WHERE id=?').bind(original.id).first()).status, 'inactive');
     assert.equal(await (await r.db).prepare("SELECT 1 FROM oa_operators WHERE email='another@example.com'").first(), null);
   } finally { await r.close(); }
-});
-
-for (const failure of ['failed', 'uncertain', 'throw']) test(`reissued invitation is revoked after ${failure} mail delivery`, async () => {
+}]);
+for (const failure of ['failed', 'uncertain', 'throw']) foldedCases.push([`reissued invitation is revoked after ${failure} mail delivery`, async (t) => {
   const options = {};
   const r = await runtime({}, options);
   try {
@@ -56,13 +58,14 @@ for (const failure of ['failed', 'uncertain', 'throw']) test(`reissued invitatio
     assert.ok(await (await r.db).prepare('SELECT 1 FROM oa_invitation_cancellations WHERE operator_id=?').bind(original.id).first());
     await r.restart();
     const token = (await r.link()).searchParams.get('token');
-    for (const method of ['GET', 'HEAD']) assert.equal((await r.call(`/auth/confirm?token=${token}`, { method })).status, 400);
+    await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(`/auth/confirm?token=${token}`, { method })).status, 400);
+}]));
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
     assert.equal((await (await r.db).prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(original.id).first()).n, 0);
   } finally { await r.close(); }
-});
-
-test('failed witnessed-acceptance cleanup rolls back session, cancellation ledger and operator atomically', async () => {
+}]);
+foldedCases.push(['failed witnessed-acceptance cleanup rolls back session, cancellation ledger and operator atomically', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap(), db = await r.db;
@@ -78,10 +81,9 @@ test('failed witnessed-acceptance cleanup rolls back session, cancellation ledge
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 303);
     assert.equal(await db.prepare('SELECT 1 FROM oa_invitation_cancellations WHERE operator_id=?').bind(original.id).first(), null);
   } finally { await r.close(); }
-});
-
+}]);
 for (const change of ['target-role', 'target-reissued', 'actor-session-revoked', 'actor-session-expired', 'actor-version']) {
-  test(`reinvitation fences stale ${change} snapshots without revoking or issuing credentials`, async () => {
+  foldedCases.push([`reinvitation fences stale ${change} snapshots without revoking or issuing credentials`, async () => {
     const r = await runtime();
     try {
       const owner = await r.bootstrap(), db = await r.db;
@@ -103,10 +105,9 @@ for (const change of ['target-role', 'target-reissued', 'actor-session-revoked',
       assert.deepEqual(await store.operator(original.id), beforeOperator);
       assert.deepEqual((await db.prepare('SELECT * FROM oa_tokens ORDER BY id').all()).results, beforeTokens);
     } finally { await r.close(); }
-  });
+  }]);
 }
-
-test('reinvitation keeps role, policy, allow-list, origin and session admission boundaries', async () => {
+foldedCases.push(['reinvitation keeps role, policy, allow-list, origin and session admission boundaries', async () => {
   const options = {};
   const r = await runtime({}, options);
   try {
@@ -133,4 +134,6 @@ test('reinvitation keeps role, policy, allow-list, origin and session admission 
     assert.equal((await r.call('/auth/invite', post(input('pending@example.com', 'owner'), owner))).status, 403);
     assert.equal((await r.mails()).length, count);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

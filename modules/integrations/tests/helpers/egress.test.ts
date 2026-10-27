@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,7 +24,9 @@ function declaration() {
   });
 }
 
-test('projects explicit provider, custom destination, data and secret custody to actual SEED fields', () => {
+test("egress declarations preserve explicit custody and refuse mismatched or unsafe configuration", async t => {
+  const foldedCases: Case[] = [];
+foldedCases.push(['projects explicit provider, custom destination, data and secret custody to actual SEED fields', () => {
   const result = declaration();
   assert.deepEqual(Object.keys(result.external).sort(), ['adapters', 'data', 'id', 'required', 'requiredWhen', 'why']);
   assert.match(result.external.why, /Customer webhook receiver \(customer-webhook\)/);
@@ -49,9 +52,8 @@ test('projects explicit provider, custom destination, data and secret custody to
   assert.equal('provider' in result.external, false);
   assert.equal('destination' in result.external, false);
   assert.equal('custody' in result.external, false);
-});
-
-test('validates configured egress against its declaration and core destination policy', () => {
+}]);
+foldedCases.push(['validates configured egress against its declaration and core destination policy', () => {
   const result = declaration();
   const validated = validateEgressConfiguration(result, {
     providerId: 'customer-webhook',
@@ -65,9 +67,8 @@ test('validates configured egress against its declaration and core destination p
     destinationUrl: 'https://hooks.example.com/events',
   });
   assert.equal(Object.isFrozen(validated), true);
-});
-
-test('rejects route drift, missing credentials and unsafe or malformed destinations', () => {
+}]);
+foldedCases.push(['rejects route drift, missing credentials and unsafe or malformed destinations', async (t) => {
   const result = declaration();
   const config = {
     providerId: 'customer-webhook',
@@ -75,26 +76,37 @@ test('rejects route drift, missing credentials and unsafe or malformed destinati
     destinationUrl: 'https://hooks.example.com/events',
     secrets: { CUSTOMER_WEBHOOK_SIGNING_KEY: 'base64-signing-key' },
   };
-  assert.throws(() => validateEgressConfiguration(result, { ...config, providerId: 'other-provider' }), /provider does not match/);
-  assert.throws(() => validateEgressConfiguration(result, { ...config, destinationId: 'other-destination' }), /destination does not match/);
-  assert.throws(() => validateEgressConfiguration(result, { ...config, secrets: {} }), /CUSTOMER_WEBHOOK_SIGNING_KEY/);
-  assert.throws(() => validateEgressConfiguration(result, {
+  await runCases(t, [
+    ["configuration refusal inputs: case 1", async t => {
+      assert.throws(() => validateEgressConfiguration(result, { ...config, providerId: 'other-provider' }), /provider does not match/);
+    }],
+    ["configuration refusal inputs: case 2", async t => {
+      assert.throws(() => validateEgressConfiguration(result, { ...config, destinationId: 'other-destination' }), /destination does not match/);
+    }],
+    ["configuration refusal inputs: case 3", async t => {
+      assert.throws(() => validateEgressConfiguration(result, { ...config, secrets: {} }), /CUSTOMER_WEBHOOK_SIGNING_KEY/);
+    }],
+    ["configuration refusal inputs: case 4", async t => {
+      assert.throws(() => validateEgressConfiguration(result, {
     ...config,
     secrets: { CUSTOMER_WEBHOOK_SIGNING_KEY: 'bad\nheader' },
   }), /CUSTOMER_WEBHOOK_SIGNING_KEY/);
-  for (const destinationUrl of [
+    }]
+  ]);
+  await runCases(t, Array.from([
     'http://hooks.example.com/events',
     'https://localhost/events',
     'https://127.0.0.1/events',
     'https://user:test-password@hooks.example.com/events',
     'not a URL',
-  ]) {
+  ], (destinationUrl, rowIndex) => [`${t.name}: destinationUrl row ${rowIndex + 1}`, async t => {
     assert.throws(() => validateEgressConfiguration(result, { ...config, destinationUrl }), /Invalid public HTTPS egress destination/);
-  }
-});
-
-test('rejects incomplete declarations before they can become external promises', () => {
-  assert.throws(() => declareEgress({
+}]));
+}]);
+foldedCases.push(['rejects incomplete declarations before they can become external promises', async (t) => {
+  await runCases(t, [
+    ["incomplete declaration inputs: case 1", async t => {
+      assert.throws(() => declareEgress({
     id: 'custom-hook',
     required: false,
     provider: { id: 'custom-hook', name: 'Custom receiver' },
@@ -104,7 +116,9 @@ test('rejects incomplete declarations before they can become external promises',
     adapters: ['integrations.webhook.v1'],
     custody: [],
   }), /requiredWhen/);
-  assert.throws(() => declareEgress({
+    }],
+    ["incomplete declaration inputs: case 2", async t => {
+      assert.throws(() => declareEgress({
     id: 'custom-hook',
     required: true,
     provider: { id: 'custom-hook', name: 'Custom receiver' },
@@ -114,7 +128,9 @@ test('rejects incomplete declarations before they can become external promises',
     adapters: ['not-a-versioned-adapter'],
     custody: [],
   }), /adapter IDs/);
-  assert.throws(() => declareEgress({
+    }],
+    ["incomplete declaration inputs: case 3", async t => {
+      assert.throws(() => declareEgress({
     id: 'custom-hook',
     required: true,
     provider: { id: 'custom-hook', name: 'Custom receiver' },
@@ -124,9 +140,10 @@ test('rejects incomplete declarations before they can become external promises',
     adapters: ['integrations.webhook.v1'],
     custody: [{ name: 'not_an_ENV', purpose: 'signs event body' }],
   }), /secret declaration/);
-});
-
-test('represents a non-replaceable external with the schema-supported empty adapters list', () => {
+    }]
+  ]);
+}]);
+foldedCases.push(['represents a non-replaceable external with the schema-supported empty adapters list', () => {
   const nonReplaceable = declareEgress({
     id: 'customer-webhook',
     required: true,
@@ -138,9 +155,8 @@ test('represents a non-replaceable external with the schema-supported empty adap
     custody: [],
   });
   assert.deepEqual(nonReplaceable.external.adapters, []);
-});
-
-test('positive and negative declaration controls run through Base SEED validation', () => {
+}]);
+foldedCases.push(['positive and negative declaration controls run through Base SEED validation', () => {
   const dir = mkdtempSync(join(tmpdir(), 't060-egress-seed-'));
   const target = join(dir, 'seed.json');
   try {
@@ -178,4 +194,6 @@ test('positive and negative declaration controls run through Base SEED validatio
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}]);
+  await runCases(t, foldedCases);
 });

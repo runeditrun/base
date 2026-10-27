@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPortability, createPortabilityHandler } from '../index.mjs';
@@ -16,7 +17,9 @@ const objects=async bucket=>(await bucket.list()).objects.map(o=>o.key);
 const rows=async db=>(await db.prepare('SELECT * FROM notes').all()).results;
 const staging=async db=>(await db.prepare("SELECT name FROM sqlite_master WHERE name GLOB 'rer_portability_stage_*'").all()).results;
 
-test('a new import reclaims expired staging and can restore the archive',async t=>{
+test("restore lease ownership survives expiration, restart and competing requests", async t => {
+  const foldedCases = [];
+foldedCases.push(['a new import reclaims expired staging and can restore the archive', async t=>{
   const {target,archive,elapse}=await setup(t),old=await stage(target.service,archive);
   assert.ok((await staging(target.db)).length);
   elapse();
@@ -29,9 +32,8 @@ test('a new import reclaims expired staging and can restore the archive',async t
   assert.equal((await target.service.imports.finalize(id,archive.closing)).phase,'complete');
   assert.deepEqual(await rows(target.db),[{id:'note-1',body:'Retained owner note'}]);
   assert.deepEqual(await objects(target.bucket),['attachment']);
-});
-
-test('a fresh lease blocks another import and reports when the owner can abort it',async t=>{
+}]);
+foldedCases.push(['a fresh lease blocks another import and reports when the owner can abort it', async t=>{
   const {target,archive,advance}=await setup(t),id=await target.service.imports.create(archive.manifest);
   advance(2*60*1000);await target.service.imports.uploadPart(id,0,archive.parts[0]);
   advance(4*60*1000); // Beyond creation's lease, still within the renewed lease.
@@ -41,17 +43,23 @@ test('a fresh lease blocks another import and reports when the owner can abort i
   });
   const status=await target.service.imports.status(id);
   assert.equal(status.stale,false);assert.ok(Date.parse(status.abortableAt)>Date.now());
-});
-
-test('expired uploads and finalize cannot revive or publish an abandoned import',async t=>{
-  const {target,archive,elapse}=await setup(t),id=await stage(target.service,archive);
-  elapse();
-  await assert.rejects(target.service.imports.finalize(id,archive.closing),e=>e.code==='import_lease_expired' && e.status===409);
-  await assert.rejects(target.service.imports.uploadPart(id,0,archive.parts[0]),e=>e.code==='import_lease_expired');
-  assert.deepEqual(await rows(target.db),[]);assert.deepEqual(await objects(target.bucket),[]);
-});
-
-test('a worker lost after object apply is reclaimed through owned-object abort, preserving foreign data',async t=>{
+}]);
+foldedCases.push(['expired uploads and finalize cannot revive or publish an abandoned import', async t=>{
+  await runCases(t, [
+    ['expired finalize cannot publish', async t => {
+      const {target,archive,elapse}=await setup(t),id=await stage(target.service,archive);
+      elapse();
+      await assert.rejects(target.service.imports.finalize(id,archive.closing),e=>e.code==='import_lease_expired' && e.status===409);
+    }],
+    ['expired upload cannot revive staging', async t => {
+      const {target,archive,elapse}=await setup(t),id=await stage(target.service,archive);
+      elapse();
+      await assert.rejects(target.service.imports.uploadPart(id,0,archive.parts[0]),e=>e.code==='import_lease_expired');
+      assert.deepEqual(await rows(target.db),[]);assert.deepEqual(await objects(target.bucket),[]);
+    }],
+  ]);
+}]);
+foldedCases.push(['a worker lost after object apply is reclaimed through owned-object abort, preserving foreign data', async t=>{
   const {target,archive,elapse}=await setup(t);let offline=false;
   const db={prepare(sql){const raw=target.db.prepare(sql);const wrap=q=>({
     raw:q,bind:(...args)=>wrap(q.bind(...args)),all:()=>q.all(),run:()=>q.run(),
@@ -70,9 +78,8 @@ test('a worker lost after object apply is reclaimed through owned-object abort, 
   assert.equal(await (await target.bucket.get('foreign')).text(),'Keep this object');
   assert.equal((await target.db.prepare('SELECT applying FROM rer_portability_state').first()).applying,0);
   assert.deepEqual(await rows(target.db),[]);
-});
-
-test('the authenticated owner can discover, inspect and abort a stale import through HTTP',async t=>{
+}]);
+foldedCases.push(['the authenticated owner can discover, inspect and abort a stale import through HTTP', async t=>{
   const {target,archive,elapse}=await setup(t);let actor='owner';
   const handler=await createPortabilityHandler({db:target.db,buckets:{FILES:target.bucket},policy,appOrigin:'https://app.test',authorize:()=>actor});
   const call=(path,method='GET',body,origin='https://app.test')=>handler(new Request('https://app.test/api/portability/'+path,{method,headers:{Origin:origin},body:body===undefined?undefined:JSON.stringify(body)}));
@@ -89,7 +96,56 @@ test('the authenticated owner can discover, inspect and abort a stale import thr
   assert.equal((await (await call('imports/'+id+'/abort','POST')).json()).phase,'aborted');
   assert.deepEqual(await (await call('imports')).json(),{active:null});
   assert.equal((await call('imports','POST',{confirmed:true,manifest:archive.manifest})).status,201);
+}]);
+foldedCases.push(['an active finalize renews across a long callback and excludes concurrent abort and finalize', async t=>{
+  await runCases(t, [
+    ['active finalize excludes create across renewed lease', async t => {
+      const {target,archive,advance}=await setup(t),paused=await pausedFinalize(target,archive),scheduled=heartbeats(t);
+      const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
+      try {
+        for(let minute=0;minute<8;minute++){advance(60*1000);assert.ok(scheduled.length);await scheduled.shift()();}
+        const status=await target.service.imports.status(paused.id);assert.equal(status.stale,false);
+        await assert.rejects(target.service.imports.create(archive.manifest),e=>e.code==='import_running');
+      } finally { paused.release();await finishing; }
+      assert.equal((await finishing).phase,'complete');
+    }],
+    ['active finalize excludes abort', async t => {
+      const {target,archive}=await setup(t),paused=await pausedFinalize(target,archive);heartbeats(t);
+      const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
+      try {
+        await assert.rejects(target.service.imports.abort(paused.id),e=>e.code==='import_running');
+      } finally { paused.release();await finishing; }
+    }],
+    ['active finalize excludes another finalize', async t => {
+      const {target,archive}=await setup(t),paused=await pausedFinalize(target,archive);heartbeats(t);
+      const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
+      try {
+        await assert.rejects(target.service.imports.finalize(paused.id,archive.closing),e=>e.code==='import_running');
+      } finally { paused.release();await finishing; }
+    }],
+  ]);
+}]);
+foldedCases.push(['a request that lost its lease cannot publish after its replacement restores', async t=>{
+  const {target,archive,elapse}=await setup(t),paused=await pausedFinalize(target,archive);heartbeats(t);
+  const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
+  elapse();const replacement=await stage(target.service,archive);
+  assert.equal((await target.service.imports.finalize(replacement,archive.closing)).phase,'complete');
+  paused.release();await assert.rejects(finishing,e=>e.code==='import_lease_expired');
+  assert.equal((await target.service.imports.status(paused.id)).phase,'aborted');
+  assert.equal((await target.service.imports.status(replacement)).phase,'complete');
+  assert.deepEqual(await rows(target.db),[{id:'note-1',body:'Retained owner note'}]);
+  assert.deepEqual(await objects(target.bucket),['attachment']);
+}]);
+  await runCases(t, foldedCases);
 });
+
+
+
+
+
+
+
+
 
 // Control only the import heartbeat; Miniflare's own timers stay real.
 function heartbeats(t) {
@@ -107,24 +163,3 @@ async function pausedFinalize(target,archive) {
   const id=await stage(service,archive);
   return {id,service,entered,release};
 }
-test('an active finalize renews across a long callback and excludes concurrent abort and finalize',async t=>{
-  const {target,archive,advance}=await setup(t),paused=await pausedFinalize(target,archive),scheduled=heartbeats(t);
-  const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
-  for(let minute=0;minute<8;minute++){advance(60*1000);assert.ok(scheduled.length);await scheduled.shift()();}
-  const status=await target.service.imports.status(paused.id);assert.equal(status.stale,false);
-  await assert.rejects(target.service.imports.create(archive.manifest),e=>e.code==='import_running');
-  await assert.rejects(target.service.imports.abort(paused.id),e=>e.code==='import_running');
-  await assert.rejects(target.service.imports.finalize(paused.id,archive.closing),e=>e.code==='import_running');
-  paused.release();assert.equal((await finishing).phase,'complete');
-});
-test('a request that lost its lease cannot publish after its replacement restores',async t=>{
-  const {target,archive,elapse}=await setup(t),paused=await pausedFinalize(target,archive);heartbeats(t);
-  const finishing=paused.service.imports.finalize(paused.id,archive.closing);await paused.entered;
-  elapse();const replacement=await stage(target.service,archive);
-  assert.equal((await target.service.imports.finalize(replacement,archive.closing)).phase,'complete');
-  paused.release();await assert.rejects(finishing,e=>e.code==='import_lease_expired');
-  assert.equal((await target.service.imports.status(paused.id)).phase,'aborted');
-  assert.equal((await target.service.imports.status(replacement)).phase,'complete');
-  assert.deepEqual(await rows(target.db),[{id:'note-1',body:'Retained owner note'}]);
-  assert.deepEqual(await objects(target.bucket),['attachment']);
-});

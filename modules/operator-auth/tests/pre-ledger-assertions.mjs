@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { post } from './pre-ledger-runtime.mjs';
 import { oldCookie } from './fixtures/pre-ledger/owner-state.mjs';
@@ -28,14 +29,16 @@ export async function session(r, cookie, id, version) {
   assert.equal(body.operator.version, version);
   assert.equal(body.operator.status, 'active');
 }
-export async function deniedLink(r, token) {
+export async function deniedLink(t, r, token) {
   const before = await authoritySnapshot(r);
-  for (const method of ['GET', 'HEAD']) {
+  await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`denied preview method row ${rowIndex + 1}`, async t => {
+
     const response = await r.call(`/auth/confirm?token=${token}`, { method });
     assert.equal(response.status, 400);
     assert.equal(response.headers.get('set-cookie'), null);
     if (method === 'HEAD') assert.equal(await response.text(), '');
-  }
+
+}]));
   await error(await r.call('/auth/confirm', post({ token })), 400, 'invalid_or_expired');
   assert.deepEqual(await authoritySnapshot(r), before, 'Denied credentials cannot alter authority, mail or tokens');
 }
@@ -50,13 +53,15 @@ export async function guarded(r, id) {
   await assert.rejects((await r.db).prepare("UPDATE oa_operators SET status='active' WHERE id=?").bind(id).run(), /invitation_required/);
   assert.deepEqual(await authoritySnapshot(r), before);
 }
-export async function accept(r, token, id, version, returnTo) {
+export async function accept(t, r, token, id, version, returnTo) {
   const before = await authoritySnapshot(r);
-  for (const method of ['GET', 'HEAD']) {
+  await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`admission preview method row ${rowIndex + 1}`, async t => {
+
     const response = await r.call(`/auth/confirm?token=${token}`, { method });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('set-cookie'), null);
-  }
+
+}]));
   assert.deepEqual(await authoritySnapshot(r), before, 'Previews are read-only');
   const response = await r.call('/auth/confirm', post({ token, returnTo: '/must-not-override-link-destination' }));
   assert.equal(response.status, 303);
@@ -74,6 +79,6 @@ export async function accept(r, token, id, version, returnTo) {
   assert.equal(consumed.operator_version, version - 1);
   assert.equal(consumed.consumed_at, sessions[0].created_at);
   assert.equal(consumed.return_to, returnTo);
-  await deniedLink(r, token);
+  await deniedLink(t, r, token);
   return cookie;
 }

@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -5,6 +6,7 @@ import { DeliveryService, createWebhookProtocol, verifyWebhook } from '../../ind
 import { loopback, store } from './support.ts';
 
 test('outbound HMAC preserves original UTF-8 bytes including whitespace, line endings and signed BOM', async t => {
+  await runCases(t, [['independent journey rows', async t => {
   const sender = await store(t), inbox = await store(t);
   const key = new Uint8Array(32).fill(83), now = 1800000000000;
   const url = 'https://receiver.example.com/exact-bytes';
@@ -23,16 +25,20 @@ test('outbound HMAC preserves original UTF-8 bytes including whitespace, line en
   });
   const protocol = createWebhookProtocol({ resolveDestination: async () => url, signingKey: async () => key });
   const service = new DeliveryService({ repository: sender.repo(), protocols: [protocol], transport: transport.transport, now: () => now });
-  for (const [index, body] of bodies.entries()) {
+  await runCases(t, Array.from(bodies.entries(), ([index, body], rowIndex) => [`${t.name}: [index, body] row ${rowIndex + 1}`, async t => {
     const id = `exact-${index}`;
     await service.enqueue({ id, tenant: 'installation', destinationId: 'exact-v1', event: 'changed', protocol: 'webhook', body });
     assert.equal((await service.dispatch(id))?.state, 'accepted');
-  }
+}]));
   assert.equal(transport.received.length, bodies.length);
   assert.deepEqual(transport.failures, []);
   inbox.restart();
-  for (const request of transport.received) {
+  await runCases(t, Array.from(transport.received, (request, rowIndex) => [`${t.name}: durable outbound replay row ${rowIndex + 1}`, async t => {
+
     const verified = await verifyWebhook({ body: request.rawBody, headers: request.headers, key, tenant: 'installation', destinationId: 'exact-v1', now });
     assert.equal(await inbox.repo().acceptReplay(verified), false);
-  }
+
+}]));
+
+  }]]);
 });

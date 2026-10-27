@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -25,7 +26,9 @@ function database(t) {
   return { db, sqlite };
 }
 
-test('SQLite batches preserve complete prepared messages and detach raw bytes', async t => {
+test("development outbox capture remains atomic, bounded and detached from caller bytes", async t => {
+  const foldedCases = [];
+foldedCases.push(['SQLite batches preserve complete prepared messages and detach raw bytes', async t => {
   const { db } = database(t);
   const outbox = createD1DevelopmentOutbox({ db, clock: () => 1000 });
   const input = { ...message('repeat'), cc: ['copy@example.test'], bcc: ['hidden@example.test'], replyTo: 'reply@example.test', html: '<b>Hello</b>', headers: { 'List-Unsubscribe': '<https://example.test/leave>' }, customArgs: { purpose: 'test' }, asmGroupId: 2, subscriptionTracking: false };
@@ -44,9 +47,8 @@ test('SQLite batches preserve complete prepared messages and detach raw bytes', 
   await outbox.put(message('repeat'));
   const rows = await outbox.list(); assert.equal(rows.length, 2); assert.notEqual(rows[0].id, rows[1].id);
   assert.equal(await outbox.get('missing'), null);
-});
-
-test('retention prunes count on writes and bounds reads with deterministic time ties', async t => {
+}]);
+foldedCases.push(['retention prunes count on writes and bounds reads with deterministic time ties', async t => {
   const { db, sqlite } = database(t);
   const outbox = createD1DevelopmentOutbox({ db, maxMessages: 2, clock: () => 1000 });
   for (const id of ['first', 'second', 'third']) await outbox.put(message(id));
@@ -56,9 +58,8 @@ test('retention prunes count on writes and bounds reads with deterministic time 
   const rows = await smaller.list(); assert.deepEqual(rows.map(row => row.message.deliveryId), ['third']);
   // Reads never write: the smaller bound limits the listing but prunes nothing.
   assert.equal(sqlite.prepare('SELECT count(*) AS count FROM rer_mail_development_outbox').get().count, 2);
-});
-
-test('age expiration applies at exact boundary on reads and writes, including get', async t => {
+}]);
+foldedCases.push(['age expiration applies at exact boundary on reads and writes, including get', async t => {
   const { db, sqlite } = database(t); let time = 1000;
   const outbox = createD1DevelopmentOutbox({ db, maxAgeMs: 100, clock: () => time });
   await outbox.put(message('one')); const [first] = await outbox.list();
@@ -69,29 +70,51 @@ test('age expiration applies at exact boundary on reads and writes, including ge
   await outbox.put(message('three')); time = 1300; await outbox.put(message('four'));
   assert.deepEqual((await outbox.list()).map(row => row.message.deliveryId), ['four']);
   assert.equal(sqlite.prepare('SELECT count(*) AS count FROM rer_mail_development_outbox').get().count, 1);
-});
-
-test('invalid retention, clocks and unprepared mail fail before storage', async t => {
+}]);
+foldedCases.push(['invalid retention, clocks and unprepared mail fail before storage', async t => {
   const { db } = database(t);
-  for (const key of ['maxMessages', 'maxAgeMs']) for (const value of [0, -1, 1.5, NaN, Infinity, '10', Number.MAX_SAFE_INTEGER + 1]) {
+  await runCases(t, Array.from(['maxMessages', 'maxAgeMs'], (key, rowIndex) => [`${t.name}: key row ${rowIndex + 1}`, async t => {
+await runCases(t, Array.from([0, -1, 1.5, NaN, Infinity, '10', Number.MAX_SAFE_INTEGER + 1], (value, rowIndex) => [`${t.name}: value row ${rowIndex + 1}`, async t => {
     assert.throws(() => createD1DevelopmentOutbox({ db, [key]: value }), /retention/);
-  }
-  assert.throws(() => createD1DevelopmentOutbox(), /configuration/);
-  assert.throws(() => createD1DevelopmentOutbox({ db, clock: 3 }), /configuration/);
-  for (const time of [-1, NaN, Infinity, '100', 1.1, 8_640_000_000_000_001]) {
+}]));
+}]));
+  await runCases(t, [
+    ["outbox configuration inputs: case 1", async t => {
+      assert.throws(() => createD1DevelopmentOutbox(), /configuration/);
+    }],
+    ["outbox configuration inputs: case 2", async t => {
+      assert.throws(() => createD1DevelopmentOutbox({ db, clock: 3 }), /configuration/);
+    }]
+  ]);
+  await runCases(t, Array.from([-1, NaN, Infinity, '100', 1.1, 8_640_000_000_000_001], (time, rowIndex) => [`${t.name}: time row ${rowIndex + 1}`, async t => {
     const outbox = createD1DevelopmentOutbox({ db, clock: () => time });
-    await assert.rejects(outbox.put(message('bad')), /clock/);
-    await assert.rejects(outbox.list(), /clock/);
-    await assert.rejects(outbox.get('id'), /clock/);
-  }
+    await runCases(t, [
+    ["invalid clock operations: case 1", async t => {
+      await assert.rejects(outbox.put(message('bad')), /clock/);
+    }],
+    ["invalid clock operations: case 2", async t => {
+      await assert.rejects(outbox.list(), /clock/);
+    }],
+    ["invalid clock operations: case 3", async t => {
+      await assert.rejects(outbox.get('id'), /clock/);
+    }]
+  ]);
+}]));
   const outbox = createD1DevelopmentOutbox({ db });
-  await assert.rejects(outbox.put({ ...message('unprepared'), unsubscribe: { url: 'https://example.test/leave' } }), error => error.code === 'unsubscribe_not_assembled');
-  await assert.rejects(outbox.put({ ...message('invalid'), attachments: [{ content: 'not raw bytes' }] }));
-  for (const id of ['', null, 'x'.repeat(129)]) await assert.rejects(outbox.get(id), /ID/);
+  await runCases(t, [
+    ["invalid outbox messages: case 1", async t => {
+      await assert.rejects(outbox.put({ ...message('unprepared'), unsubscribe: { url: 'https://example.test/leave' } }), error => error.code === 'unsubscribe_not_assembled');
+    }],
+    ["invalid outbox messages: case 2", async t => {
+      await assert.rejects(outbox.put({ ...message('invalid'), attachments: [{ content: 'not raw bytes' }] }));
+    }]
+  ]);
+  await runCases(t, Array.from(['', null, 'x'.repeat(129)], (id, rowIndex) => [`${t.name}: id row ${rowIndex + 1}`, async t => {
+await assert.rejects(outbox.get(id), /ID/);
+}]));
   assert.deepEqual(await outbox.list(), []);
-});
-
-test('a batch failure rolls back capture and does not silently fall back', async t => {
+}]);
+foldedCases.push(['a batch failure rolls back capture and does not silently fall back', async t => {
   const { db, sqlite } = database(t);
   const outbox = createD1DevelopmentOutbox({ db, clock: () => 1000, maxMessages: 1 });
   await outbox.put(message('first'));
@@ -100,4 +123,6 @@ test('a batch failure rolls back capture and does not silently fall back', async
   assert.deepEqual((await outbox.list()).map(row => row.message.deliveryId), ['first']);
   const failed = createD1DevelopmentOutbox({ db: { prepare: db.prepare, batch: async () => [{ success: false }] } });
   await assert.rejects(failed.list(), /storage failed/);
+}]);
+  await runCases(t, foldedCases);
 });
