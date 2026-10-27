@@ -1,3 +1,4 @@
+import {tokens, unquote} from './module-syntax.mjs';
 export {resolve} from './module-resolution.mjs';
 
 // Module edges retain their import kind and erased-type status before resolving.
@@ -11,6 +12,7 @@ export function dependencies(source) {
   };
   for (let i = 0; i < t.length; i++) {
     const word = t[i];
+    if (word === 'module' && t[i + 1] === '[' && unquote(t[i + 2]) === 'require' && t[i + 3] === ']' && t[i + 4] === '(') add(t[i + 5], 'require');
     if (!['import', 'export', 'require'].includes(word)) continue;
     if (t[i - 1] === '.' && !(word === 'require' && t[i - 2] === 'module')) continue;
     if (word === 'require') {
@@ -34,13 +36,6 @@ export function dependencies(source) {
 export const specifiers = source => dependencies(source).map(edge => edge.specifier);
 
 // Binding checks are lexical: unknown export forms remain unknown, never absent.
-const tokens = source => [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|[\w$]+|[^\s]/g)]
-  .map(match => match[0]).filter(token => !/^(?:\/\/|\/\*)/.test(token));
-const unquote = value => {
-  if (!/^['"`]/.test(value ?? '') || value[0] === '`' && value.includes('${')) return null;
-  return value.slice(1, -1).replace(/\\(?:x([\da-fA-F]{2})|u(?:\{([\da-fA-F]+)\}|([\da-fA-F]{4}))|([\s\S]))/g,
-    (_, x, codepoint, u, character) => x || codepoint || u ? String.fromCodePoint(parseInt(x ?? codepoint ?? u, 16)) : character === '\n' ? '' : ({n:'\n',r:'\r',t:'\t',b:'\b',f:'\f',v:'\v',0:'\0'}[character] ?? character));
-};
 export function bindings(source, types = false) {
   const t = tokens(source), result = new Map();
   for (let i = 0; i < t.length; i++) {
@@ -52,7 +47,7 @@ export function bindings(source, types = false) {
     if (!specifier?.startsWith('.')) continue;
     const names = new Set(result.get(specifier) ?? []);
     let start = i + 1;
-    const declarationType = t[start] === 'type';
+    const declarationType = t[start] === 'type' && start + 1 < end && t[start + 1] !== ',';
     if (declarationType) start++;
     if (declarationType === types && t[i] === 'import' && /^[\w$]+$/.test(t[start] ?? '') && t[start] !== 'from') names.add('default');
     const open = t.indexOf('{', start);

@@ -69,7 +69,8 @@ function invocations(text) {
 function candidates(invoked) {
   if (invoked.startsWith('.github/workflows/')) return ['export/' + path.posix.basename(invoked), 'default-seed/' + invoked];
   return ['export/' + invoked.replace(/^scripts\//, ''), 'default-seed/' + invoked,
-    ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])];
+    ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])]
+    .filter(name => !name.startsWith('scripts/') && !name.startsWith('.github/workflows/')); 
 }
 
 export function completeWorkflowHelpers(root, plans, {tree, read, revision}) {

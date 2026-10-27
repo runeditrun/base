@@ -13,6 +13,9 @@ export function closureClasses({init, write, commit, git, run, ok, snapshotTree}
     spec => `export {value} from '${spec}';`,
     spec => `await import('${spec}');`,
     spec => `const value = require('${spec}');`,
+    spec => 'export const message = `${(await import( + spec + )).value}`;',
+    spec => 'export const message = `${(await import(`' + spec + '`)).value}`;',
+    spec => `module['require']('${spec}');`,
   ];
   function fixture(callback) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'closure-classes-'));
