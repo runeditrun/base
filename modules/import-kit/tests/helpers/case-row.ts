@@ -17,7 +17,16 @@ const rejection = (error: unknown, promise: Promise<unknown>): void => {
   const row = promiseRows.get(promise);
   if (row?.active) row.errors.push(error);
   // Preserve the test runner's handling for unrelated or late failures.
-  else for (const listener of previousListeners) listener.call(process, error, promise);
+  else if (previousListeners.length) {
+    for (const listener of [...previousListeners]) {
+      // A forwarded once-listener has been consumed and must not be restored.
+      if ('listener' in listener) previousListeners = previousListeners.filter(value => value !== listener);
+      listener.call(process, error, promise);
+    }
+  } else {
+    // Outside node:test there may be no listener: retain a fatal failure.
+    queueMicrotask(() => { throw error; });
+  }
 };
 function observeRejections(): () => void {
   if (activeRows++ === 0) {
