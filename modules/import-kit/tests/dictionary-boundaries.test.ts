@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildImportPlan } from '../src/plan/index.ts';
@@ -7,7 +9,7 @@ import { partitionPlan } from '../src/d1/stream-partition.ts';
 import type { ImportPlan, Json } from '../src/types.ts';
 
 const codec = { id: 'finite-json-v1', encode: (plan: ImportPlan) => plan as unknown as Json, decode: (value: Json) => value as unknown as ImportPlan };
-for (const bytes of [128 * 1024 - 1, 128 * 1024, 128 * 1024 + 1]) test(`complete normalized custody preserves a ${bytes}-byte distinct Unicode dictionary`, t => {
+for (const bytes of [128 * 1024 - 1, 128 * 1024, 128 * 1024 + 1]) familyRows[0].push([`complete normalized custody preserves a ${bytes}-byte distinct Unicode dictionary`, t => {
   const statements = Array.from({ length: 49 }, (_, index) => {
     let seed = index + 1;
     return Array.from({ length: 891 }, () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return String.fromCharCode(0x4e00 + seed % 20000); }).join('');
@@ -26,4 +28,6 @@ for (const bytes of [128 * 1024 - 1, 128 * 1024, 128 * 1024 + 1]) test(`complete
   assert.equal(mapped, records.length);
   assert.ok(total < 512 * 1024);
   assert.deepEqual(retained.flatMap(body => expandCompressedPlan(body, codec).entries), plan.entries);
-});
+}]);
+
+ test("dictionary boundaries preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

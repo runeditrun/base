@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readApiSource } from '../../src/readers/index.ts';
@@ -6,7 +8,7 @@ import { sqliteMapping, sqliteRuntime } from '../d1/sqlite-runtime.ts';
 import type { Json } from '../../src/types.ts';
 import { apiInput, code, jsonResponse } from './helpers.ts';
 
-test('rejects cross-origin pagination/redirects before sending a credential to another origin', async () => {
+familyRows[0].push(['rejects cross-origin pagination/redirects before sending a credential to another origin', async () => {
   for (const next of ['https://other.example.test/items', '//other.example.test/items', 'http://import.example.test/items', 'https://import.example.test:9443/items']) {
     for (const redirect of [false, true]) {
       const requests: Request[] = [];
@@ -18,9 +20,9 @@ test('rejects cross-origin pagination/redirects before sending a credential to a
       assert.equal(new URL(requests[0].url).origin, 'https://import.example.test');
     }
   }
-});
+}]);
 
-test('same-origin redirects preserve auth and exact noncredential query data within request limits', async () => {
+familyRows[0].push(['same-origin redirects preserve auth and exact noncredential query data within request limits', async () => {
   const requests: Request[] = [];
   const bundle = await readApiSource(apiInput({ token: 'synthetic-secret' }), async request => {
     requests.push(request);
@@ -31,9 +33,9 @@ test('same-origin redirects preserve auth and exact noncredential query data wit
   assert.equal(bundle.artifacts.length, 1);
   await assert.rejects(readApiSource(apiInput({ maxRequests: 1 }), async () => new Response(null, { status: 302, headers: { location: '/v2' } })), code('SOURCE_REQUEST_LIMIT'));
   await assert.rejects(readApiSource(apiInput(), async () => new Response(null, { status: 302, headers: { location: '/items' } })), code('SOURCE_PAGINATION_CYCLE'));
-});
+}]);
 
-test('credential URLs are rejected intact; no stripping, metadata leakage or second request', async () => {
+familyRows[0].push(['credential URLs are rejected intact; no stripping, metadata leakage or second request', async () => {
   for (const next of [
     '/items?access_token=synthetic-secret', '/items?API_KEY=synthetic-secret',
     'https://name:test-password@import.example.test/items', '/items?cursor=synthetic-secret',
@@ -48,9 +50,9 @@ test('credential URLs are rejected intact; no stripping, metadata leakage or sec
   let calls = 0;
   await assert.rejects(readApiSource(apiInput({ url: 'https://import.example.test/items?token=synthetic-secret' }), async () => { calls++; return jsonResponse([]); }));
   assert.equal(calls, 0);
-});
+}]);
 
-test('credentials in response originals, parser output or thrown errors cannot reach a bundle or diagnostics', async () => {
+familyRows[0].push(['credentials in response originals, parser output or thrown errors cannot reach a bundle or diagnostics', async () => {
   const payloads: Json[] = [{ id: 'a', token: 'test-other-value' }, { id: 'a', message: 'synthetic-secret' }, { id: 'a', message: 'Bearer synthetic-secret' }];
   for (const payload of payloads) {
     await assert.rejects(readApiSource(apiInput({ token: 'synthetic-secret', parsePage: () => ({ records: [] }) }), async () => jsonResponse([payload])), error => {
@@ -61,9 +63,9 @@ test('credentials in response originals, parser output or thrown errors cannot r
   await assert.rejects(readApiSource(apiInput({ token: 'synthetic-secret' }), async () => { throw new Error('Bearer synthetic-secret'); }), error => {
     assert.ok(code('SOURCE_REQUEST_FAILED')(error)); assert.ok(!String(error).includes('synthetic-secret')); assert.equal((error as Error).cause, undefined); return true;
   });
-});
+}]);
 
-test('explicit header credentials work in memory; conflicts fail rather than dropping credentials', async () => {
+familyRows[0].push(['explicit header credentials work in memory; conflicts fail rather than dropping credentials', async () => {
   let calls = 0;
   await assert.rejects(readApiSource(apiInput({ token: 'test-one-value', headers: { Authorization: 'Bearer test-another-value' } }), async () => { calls++; return jsonResponse([]); }), code('CONFLICTING_API_CREDENTIALS'));
   assert.equal(calls, 0);
@@ -71,9 +73,9 @@ test('explicit header credentials work in memory; conflicts fail rather than dro
     assert.equal(request.headers.get('authorization'), 'Bearer test-header-secret'); return jsonResponse([]);
   });
   await assert.rejects(readApiSource(apiInput({ headers: { Authorization: 'Bearer test-header-secret' } }), async () => jsonResponse([{ id: 'a', text: 'test-header-secret' }])), code('CREDENTIAL_IN_SOURCE_DATA'));
-});
+}]);
 
-test('authentication in excluded metadata rejects before parsing while unrelated exact originals remain usable', async t => {
+familyRows[0].push(['authentication in excluded metadata rejects before parsing while unrelated exact originals remain usable', async t => {
   const credentials = ['synthetic-' + String.fromCharCode(233), 'synthetic-' + String.fromCharCode(232, 195, 169, 241) + '-literal%41', 'synthetic-escaped%41', 'synthetic-regex.[a]+$'];
   for (const credential of credentials) {
     const encoded = encodeURIComponent(credential);
@@ -172,10 +174,12 @@ test('authentication in excluded metadata rejects before parsing while unrelated
       assert.deepEqual(Buffer.from(original.base64, 'base64'), numericBytes);
     }
   }
-});
+}]);
 
-test('rejects a transport that automatically followed a redirect', async () => {
+familyRows[0].push(['rejects a transport that automatically followed a redirect', async () => {
   const response = jsonResponse([]);
   Object.defineProperty(response, 'redirected', { value: true });
   await assert.rejects(readApiSource(apiInput(), async () => response), code('UNSAFE_TRANSPORT_REDIRECT'));
-});
+}]);
+
+ test("readers security preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

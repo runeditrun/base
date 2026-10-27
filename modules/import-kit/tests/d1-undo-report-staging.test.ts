@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { provenanceTransportFixture } from './d1/provenance-transport-fixture.ts';
@@ -6,7 +8,7 @@ import { applyD1ImportBatches, readD1ImportUndoReport, undoD1Import } from '../s
 for (const [name, mutation] of [
   ['authority', "UPDATE native_authority SET enabled=0 WHERE id='owner'"],
   ['custody', 'UPDATE ik_d1_custody_revisions SET revision=revision+1'],
-] as const) test(`bounded undo report rejects late ${name} changes between SELECT-only guard batches`, async t => {
+] as const) familyRows[0].push([`bounded undo report rejects late ${name} changes between SELECT-only guard batches`, async t => {
   const r = await provenanceTransportFixture(t, 4, true), meter = r.meter;
   assert.equal((await meter.request('apply-owner', () => applyD1ImportBatches(r.job.id, r.context()))).state, 'completed');
   r.largeProvenance(); r.clean();
@@ -41,4 +43,6 @@ for (const [name, mutation] of [
   assert.equal(report.dispositions[0].targetId, '3'); assert.equal(report.dispositions[0].disposition, 'reversed');
   r.clean();
   console.log(JSON.stringify({ boundedUndoReportGuard: { mutation: name, guardBatches, ...meter.summary() } }));
-});
+}]);
+
+ test("d1 undo report staging preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

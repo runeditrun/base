@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -6,7 +8,7 @@ import { join } from 'node:path';
 import { openSqliteImportStorage, readFileSource, planImport, createImportJob, applyImportBatches, undoImport, reconcileImport, readPersistedImport, sha256 } from '../../src/index.ts';
 import { lilyTargets, snapshot } from '../../proof/zendesk/sqlite.ts';
 import { differences, outcomeCounts, normalizeTables } from '../../proof/zendesk/compare.ts';
-test('native SQLite adapter publishes attributed physical rows and detects native edits',async()=>{
+familyRows[0].push(['native SQLite adapter publishes attributed physical rows and detects native edits', async()=>{
  const root=await mkdtemp(join(tmpdir(),'zendesk-native-'));const storage=openSqliteImportStorage(join(root,'target.sqlite'),{targets:lilyTargets});
  try{
   storage.database.exec('CREATE TABLE customers(id TEXT PRIMARY KEY, name TEXT NOT NULL)');
@@ -21,13 +23,13 @@ test('native SQLite adapter publishes attributed physical rows and detects nativ
   await assert.rejects(undoImport(job.id,context),/NATIVE_EDIT_CONFLICT/);
   assert.equal(storage.database.prepare('SELECT name FROM customers').get().name,'Native edit');
  }finally{storage.close();await rm(root,{recursive:true,force:true});}
-});
-test('comparison includes values, source outcome kinds, and only execution-time normalization',()=>{
+}]);
+familyRows[0].push(['comparison includes values, source outcome kinds, and only execution-time normalization', ()=>{
  assert.deepEqual(outcomeCounts([{type:'ticket',outcome:'imported'},{type:'comment',outcome:'private'}]),{total:2,byKind:{ticket:1,comment:1},byOutcome:{imported:1,private:1}});
  assert.deepEqual(differences({tickets:[{id:'1',subject:'A'}]},{tickets:[{id:'1',subject:'B'}]}),['tickets']);
  assert.deepEqual(normalizeTables({tickets:[{created_at:'source-time',updated_at:'run-time'}]},'run-time'),{tickets:[{created_at:'source-time',updated_at:'$IMPORT_TIME'}]});
-});
-test('native partial failure rollback removes committed physical effects',async()=>{
+}]);
+familyRows[0].push(['native partial failure rollback removes committed physical effects', async()=>{
  const root=await mkdtemp(join(tmpdir(),'zendesk-rollback-'));const storage=openSqliteImportStorage(join(root,'target.sqlite'),{targets:lilyTargets});
  try{
   storage.database.exec("CREATE TABLE customers(id TEXT PRIMARY KEY,name TEXT NOT NULL); CREATE TRIGGER reject_second BEFORE INSERT ON customers WHEN NEW.id='2' BEGIN SELECT RAISE(ABORT,'native failure'); END;");
@@ -38,4 +40,6 @@ test('native partial failure rollback removes committed physical effects',async(
   assert.deepEqual(storage.database.prepare('SELECT id FROM customers').all().map(r=>r.id),['1']);
   const {rollbackImport}=await import('../../src/index.ts');assert.equal((await rollbackImport(job.id,context)).state,'rolled_back');assert.equal(storage.database.prepare('SELECT count(*) AS n FROM customers').get().n,0);
  }finally{storage.close();await rm(root,{recursive:true,force:true});}
-});
+}]);
+
+ test("zendesk native preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

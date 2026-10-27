@@ -1,3 +1,6 @@
+import { originalNameRows } from './helpers/original-name-cases.ts';
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping } from './d1/fixtures.ts';
@@ -8,7 +11,7 @@ for (const [provider, open, input, map] of [
   ['SQLite', sqliteRuntime, sqliteSource, sqliteMapping],
   ['real D1', runtime, source, mapping],
 ] as const) {
-  test(`${provider}: original names retain leading, embedded and trailing NUL across restart and undo`, async t => {
+  familyRows[0].push([`${provider}: original names retain leading, embedded and trailing NUL across restart and undo`, async t => {
     const r = await open(t), bundle = input(1);
     for (const [i, name] of ['\0leading🌱', '🌱\0"\\\n漢\0tail', 'trailing\0', 'unavailable\0suffix'].entries()) {
       const bytes = i === 0 ? Buffer.alloc(0) : Buffer.from([0, 255, 13, 10, i]);
@@ -30,9 +33,9 @@ for (const [provider, open, input, map] of [
     await undoD1Import(job.id, r.context());
     await r.reopen();
     await inspect();
-  });
+  }]);
 
-  test(`${provider}: corruption after a name's NUL rejects read and publication`, async t => {
+  familyRows[0].push([`${provider}: corruption after a name's NUL rejects read and publication`, async t => {
     const r = await open(t), bundle = input(1);
     bundle.artifacts[0].name = 'prefix\0original';
     bundle.records[0].location.artifact = bundle.artifacts[0].name;
@@ -44,9 +47,9 @@ for (const [provider, open, input, map] of [
     await assert.rejects(resumeD1Import(job.id, r.context()), /ORIGINAL_CUSTODY_MISMATCH/);
     assert.equal((await r.db().prepare('SELECT checkpoint FROM ik_jobs WHERE id=?').bind(job.id).first())?.checkpoint, 0);
     assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_provenance').first())?.n, 0);
-  });
+  }]);
 
-  test(`${provider}: corruption after a name's NUL during creation rolls back custody`, async t => {
+  familyRows[0].push([`${provider}: corruption after a name's NUL during creation rolls back custody`, async t => {
     const r = await open(t), bundle = input(1);
     bundle.artifacts[0].name = 'prefix\0original';
     bundle.records[0].location.artifact = bundle.artifacts[0].name;
@@ -56,5 +59,7 @@ for (const [provider, open, input, map] of [
     for (const table of ['ik_jobs', 'ik_original_sets', 'ik_originals', 'ik_d1_original_chunks', 'ik_d1_plan_chunks', 'ik_d1_creation_plans']) {
       assert.equal((await r.db().prepare(`SELECT COUNT(*) AS n FROM ${table}`).first())?.n, 0, table);
     }
-  });
+  }]);
 }
+
+ test("original custody preserves exact names and refuses lossy representations across providers", async t => { await caseRows(t, [...familyRows[0], ...originalNameRows[0]]); });

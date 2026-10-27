@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { brotliCompressSync } from 'node:zlib';
@@ -8,7 +10,7 @@ import { buildImportPlan } from '../src/plan/index.ts';
 import { source, mapping } from './d1/fixtures.ts';
 import type { D1PlanCodec, ImportPlan, Json } from '../src/d1/index.ts';
 
-test('embedded JSON shares literal bytes while retaining exact serialized text and types', () => {
+familyRows[0].push(['embedded JSON shares literal bytes while retaining exact serialized text and types', () => {
   const statement = Array.from({ length: 1000 }, (_, index) => String.fromCharCode(0x4e00 + index)).join('');
   const consent = { accepted: true, statement }, encoded = JSON.stringify(consent);
   const values = [consent, encoded, JSON.stringify({ accepted: false, statement }), JSON.stringify({ nested: encoded }), '{ "spaced" : 1 }', '{"negative":-0}', '{"number":1.0,"exponent":1e0}', '{"escaped":"\\u6f22","slash":"\\/"}', '{"surrogate":"\\ud800"}', '{malformed', '[1,"漢",null]', '[]', '{}', '{"10":1,"2":2}', JSON.stringify(JSON.parse('{"__proto__":{"constructor":"😀\\n"}}'))];
@@ -21,9 +23,9 @@ test('embedded JSON shares literal bytes while retaining exact serialized text a
   assert.ok(Buffer.byteLength(canonicalJson(packed)) < Buffer.byteLength(canonicalJson(values)) / 2);
   (dictionaryDecode(packed) as any[])[0].statement = 'Changed only in this read';
   assert.deepEqual(dictionaryDecode(packed), values);
-});
+}]);
 
-test('structured string tables reject malformed, unused, cyclic and duplicate entries', () => {
+familyRows[0].push(['structured string tables reject malformed, unused, cyclic and duplicate entries', () => {
   const base = { version: 2, strings: ['key', 'value'], json: [[2, 0, [0, 1]]], tree: [3, 0] };
   assert.equal(dictionaryDecode(base), '{"key":"value"}');
   for (const value of [
@@ -38,9 +40,9 @@ test('structured string tables reject malformed, unused, cyclic and duplicate en
   for (let index = 1; index < 30; index++) expanding.json.push([1, [3, index - 1], [3, index - 1], [3, index - 1], [3, index - 1]]);
   assert.throws(() => dictionaryDecode(expanding, 1024), /STORED_PLAN_CHANGED/);
   assert.throws(() => dictionaryDecode(base, 1), /STORED_PLAN_CHANGED/);
-});
+}]);
 
-test('nested JSON text retains only payload strings and bounds their aggregate reconstruction', () => {
+familyRows[0].push(['nested JSON text retains only payload strings and bounds their aggregate reconstruction', () => {
   const values = [JSON.stringify(Array(10000).fill(1))];
   for (let index = 0; index < 10; index++) values.push(JSON.stringify([values.at(-1)]));
   const final = values.at(-1)!;
@@ -58,9 +60,9 @@ test('nested JSON text retains only payload strings and bounds their aggregate r
   repeated.tree = [3, 1];
   assert.throws(() => dictionaryDecode(repeated, Number.MAX_SAFE_INTEGER), /STORED_PLAN_CHANGED/);
   assert.equal(reads, 0);
-});
+}]);
 
-test('persisted first-version dictionaries still decode and retain their canonical plan', () => {
+familyRows[0].push(['persisted first-version dictionaries still decode and retain their canonical plan', () => {
   const bundle = source(2);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   const plan = buildImportPlan(bundle, mapping, { destination: 'workspace', namespace: 'archive', mappingVersion: 'v1', authorization: { principalId: 'owner' } });
@@ -80,4 +82,6 @@ test('persisted first-version dictionaries still decode and retain their canonic
     const invalidBody = canonicalJson(malformed);
     for (const dictionary of [1, 2]) assert.throws(() => expandCompressedPlan(canonicalJson({ ...envelope, dictionary, ...(dictionary === 2 ? { payloadSize: 64 } : {}), size: Buffer.byteLength(invalidBody), sha256: sha256(invalidBody), data: Buffer.from(brotliCompressSync(invalidBody)).toString('base64') }), codec), /STORED_PLAN_CHANGED/);
   }
-});
+}]);
+
+ test("dictionary json strings preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

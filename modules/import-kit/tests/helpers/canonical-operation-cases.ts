@@ -1,7 +1,8 @@
-import test from 'node:test';
+import { type CaseRow } from "./case-row.ts";
+export const canonicalOperationRows: CaseRow[][] = [[]];
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { createCanonicalHasher } from '../src/provenance/canonical-hash.ts';
+import { createCanonicalHasher } from '../../src/provenance/canonical-hash.ts';
 
 const oracle = (value: any): string => Array.isArray(value)
   ? `[${Array.from({ length: value.length }, (_, index) => oracle(value[index])).join(',')}]`
@@ -10,7 +11,7 @@ const oracle = (value: any): string => Array.isArray(value)
     : JSON.stringify(value);
 const expected = (value: unknown) => createHash('sha256').update(oracle(value)).digest('hex');
 
-test('one operation reuses immutable encodings but rereads every payload and releases bytes', t => {
+canonicalOperationRows[0].push(['one operation reuses immutable encodings but rereads every payload and releases bytes', t => {
   const encode = TextEncoder.prototype.encode, allocations: Uint8Array[] = [];
   t.mock.method(TextEncoder.prototype, 'encode', function(this: TextEncoder, text: string) {
     const bytes = encode.call(this, text); allocations.push(bytes); return bytes;
@@ -39,9 +40,9 @@ test('one operation reuses immutable encodings but rereads every payload and rel
   assert.equal(hasher.hash(statement), expected(statement));
   assert.ok(allocations.length > oldCount, 'cleared encodings must be rebuilt');
   hasher.clear();
-});
+}]);
 
-test('operation cache preserves the entry and encoded-byte bounds across separate calls', t => {
+canonicalOperationRows[0].push(['operation cache preserves the entry and encoded-byte bounds across separate calls', t => {
   const encode = TextEncoder.prototype.encode, allocations: Uint8Array[] = [];
   t.mock.method(TextEncoder.prototype, 'encode', function(this: TextEncoder, text: string) {
     const bytes = encode.call(this, text); allocations.push(bytes); return bytes;
@@ -61,4 +62,5 @@ test('operation cache preserves the entry and encoded-byte bounds across separat
     } finally { hasher.clear(); }
     assert.ok(allocations.every(bytes => bytes.every(byte => byte === 0)));
   }
-});
+}]);
+

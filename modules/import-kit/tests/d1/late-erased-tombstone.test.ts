@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nativeStagingFixture } from './retained-fixtures.ts';
@@ -26,7 +28,7 @@ function meter(input:any){
 const publicTables=['ik_jobs','ik_d1_plan_chunks','ik_d1_plan_index','ik_d1_indexed_jobs','ik_d1_erased_sources','ik_d1_erased_targets','ik_provenance','ik_d1_history','ik_sources','ik_d1_entries','ik_batches','ik_d1_streams','ik_d1_stream_pages','ik_d1_custody_revisions','ik_d1_custody_states','native_records','native_parts','native_clock'];
 function publicDigest(r:any){return Object.fromEntries(publicTables.map(table=>{const rows=r.native().prepare(`SELECT * FROM ${table} ORDER BY rowid`).all();return [table,sha256(canonicalJson(rows))];}));}
 
-for(const action of ['cold read','another erasure'])for(const kind of ['source','target'])test(`bounded ${action} rejects late removal of an earlier erased ${kind} tombstone`,async t=>{
+for(const action of ['cold read','another erasure'])for(const kind of ['source','target'])familyRows[0].push([`bounded ${action} rejects late removal of an earlier erased ${kind} tombstone`, async t=>{
   const r=await mixedCustody(t),table=kind==='source'?'ik_d1_erased_sources':'ik_d1_erased_targets',identity=kind==='source'?r.index.source_identity:r.index.target_identity;
   const before=publicDigest(r),measured=meter(r.context());
   const lateDeletes:number[]=[];
@@ -81,4 +83,6 @@ for(const action of ['cold read','another erasure'])for(const kind of ['source',
   r.reopen();assert.equal((await readD1ImportJob(r.index.job_id as string,r.context())).erasedRecords,2);
   for(const name of nativePrivateTables)assert.equal(r.native().prepare(`SELECT count(*) n FROM ${name}`).get()!.n,0,name);
   t.diagnostic(JSON.stringify({action,kind,failedRequest:measured.evidence,recoveredRequest:recovered.evidence}));
-});
+}]);
+
+ test("d1 late erased tombstone preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

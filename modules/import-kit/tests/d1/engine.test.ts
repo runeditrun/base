@@ -1,10 +1,12 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[], [], [], []];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planD1Import, createD1ImportJob, applyD1ImportBatches, resumeD1Import, undoD1Import, rollbackD1Import, readD1ImportJob, readD1ImportOriginals, readD1PersistedImport } from '../../src/d1/index.ts';
 import { runtime, source, mapping, targets } from './fixtures.ts';
 
 async function create(ctx: any, count = 3) { const plan = await planD1Import(source(count), mapping, ctx); return createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }); }
-test('real D1: bounded native contact + evidence publication, durable reopen/resume, originals, restartable undo', async t => {
+familyRows[0].push(['real D1: bounded native contact + evidence publication, durable reopen/resume, originals, restartable undo', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx);
   assert.equal((await applyD1ImportBatches(job, { ...ctx, maxBatches: 1 })).checkpoint, 1);
   assert.equal((await readD1PersistedImport(ctx)).rows.length, 1);
@@ -20,16 +22,16 @@ test('real D1: bounded native contact + evidence publication, durable reopen/res
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM evidence').first())?.n, 0);
   assert.equal((await undoD1Import(job.id, r.context())).state, 'undone');
   assert.equal((await readD1ImportOriginals(job.id, r.context()))[0].original.status, 'retained');
-});
-test('real D1: failed native statement rolls back rows, evidence, provenance, source claim and checkpoint', async t => {
+}]);
+familyRows[0].push(['real D1: failed native statement rolls back rows, evidence, provenance, source claim and checkpoint', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx, 1);
   const bad = { ...targets, write(row: any) { return [...targets.write(row), { sql: 'INSERT INTO table_that_does_not_exist VALUES(1)' }]; } };
   await assert.rejects(applyD1ImportBatches(job, { ...ctx, storage: { ...ctx.storage, targets: bad } }));
   for (const table of ['contacts', 'evidence', 'ik_provenance', 'ik_sources', 'ik_batches']) assert.equal((await r.db().prepare(`SELECT COUNT(*) AS n FROM ${table}`).first())?.n, 0);
   assert.equal((await readD1ImportJob(job.id, ctx)).checkpoint, 0);
   assert.equal((await resumeD1Import(job.id, ctx)).state, 'completed');
-});
-test('real D1: authority revoked after preflight or during native write aborts atomic publication', async t => {
+}]);
+familyRows[0].push(['real D1: authority revoked after preflight or during native write aborts atomic publication', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx, 1);
   const revoking = { ...targets, async read(...args: Parameters<typeof targets.read>) { const row = await targets.read(...args); await r.db().prepare("UPDATE sessions SET enabled=0").run(); return row; } };
   await assert.rejects(applyD1ImportBatches(job, { ...ctx, storage: { ...ctx.storage, targets: revoking } }), /IMPORT_ATOMIC_GUARD/);
@@ -39,8 +41,8 @@ test('real D1: authority revoked after preflight or during native write aborts a
   await assert.rejects(applyD1ImportBatches(job, { ...ctx, storage: { ...ctx.storage, targets: mid } }), /IMPORT_ATOMIC_GUARD/);
   assert.equal((await r.db().prepare('SELECT enabled FROM sessions').first())?.enabled, 1);
   assert.equal((await readD1ImportJob(job.id, ctx)).checkpoint, 0);
-});
-test('real D1: native value edit even without revision change blocks undo and forward resume', async t => {
+}]);
+familyRows[1].push(['real D1: native value edit even without revision change blocks undo and forward resume', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx, 1);
   await resumeD1Import(job.id, ctx);
   await r.db().prepare("UPDATE evidence SET detail='native correction'").run();
@@ -48,16 +50,16 @@ test('real D1: native value edit even without revision change blocks undo and fo
   assert.equal((await readD1ImportJob(job.id, ctx)).state, 'undoing');
   await assert.rejects(applyD1ImportBatches(job, ctx), /IMPORT_ALREADY_REVERSING/);
   assert.equal((await r.db().prepare('SELECT detail FROM evidence').first())?.detail, 'native correction');
-});
-test('real D1: concurrent requests have one atomic winner and resume does not duplicate', async t => {
+}]);
+familyRows[0].push(['real D1: concurrent requests have one atomic winner and resume does not duplicate', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx, 1);
   const results = await Promise.allSettled([resumeD1Import(job.id, ctx), resumeD1Import(job.id, ctx)]);
   assert.ok(results.some(r => r.status === 'fulfilled'));
   assert.equal((await resumeD1Import(job.id, ctx)).state, 'completed');
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_provenance').first())?.n, 1);
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_batches').first())?.n, 1);
-});
-test('real D1: review and actor binding, changed source conflict, partial rollback retains originals', async t => {
+}]);
+familyRows[0].push(['real D1: review and actor binding, changed source conflict, partial rollback retains originals', async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(source(), mapping, ctx);
   await assert.rejects(createD1ImportJob(plan, ctx), /REVIEW_FINGERPRINT_MISMATCH/);
   const job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
@@ -66,8 +68,8 @@ test('real D1: review and actor binding, changed source conflict, partial rollba
   assert.equal((await rollbackD1Import(job.id, ctx)).state, 'rolled_back');
   assert.equal((await readD1PersistedImport(ctx)).rows.length, 0);
   assert.equal((await readD1ImportOriginals(job.id, ctx)).length, 1);
-});
-test('real D1: immutable plans, custody corruption and deleted provenance fail closed', async t => {
+}]);
+familyRows[2].push(['real D1: immutable plans, custody corruption and deleted provenance fail closed', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx, 1);
   await resumeD1Import(job.id, ctx);
   await r.db().prepare('DELETE FROM ik_provenance WHERE job_id=?').bind(job.id).run();
@@ -75,8 +77,8 @@ test('real D1: immutable plans, custody corruption and deleted provenance fail c
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM contacts').first())?.n, 1);
   await r.db().prepare("UPDATE ik_originals SET bytes=X'00' WHERE job_id=?").bind(job.id).run();
   await assert.rejects(readD1ImportOriginals(job.id, ctx), /ORIGINAL_CUSTODY_MISMATCH/);
-});
-test('real D1: explicit replacement restores full native before image; source duplicate retains original ownership', async t => {
+}]);
+familyRows[3].push(['real D1: explicit replacement restores full native before image; source duplicate retains original ownership', async t => {
   const r = await runtime(t), ctx = r.context();
   await r.db().prepare("INSERT INTO contacts VALUES('workspace','contact','0','native-1','before@example.test')").run();
   await r.db().prepare("INSERT INTO evidence VALUES('0','before evidence')").run();
@@ -91,8 +93,8 @@ test('real D1: explicit replacement restores full native before image; source du
   const restored = await targets.read(r.db(), 'workspace', 'contact', '0');
   assert.deepEqual(restored?.value, { email: 'before@example.test', evidence: 'before evidence' });
   assert.equal(restored?.revision, 'native-1');
-});
-test('real D1: changed source identity refuses overwrite and failed postcondition rolls whole batch back', async t => {
+}]);
+familyRows[0].push(['real D1: changed source identity refuses overwrite and failed postcondition rolls whole batch back', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx, 1);
   await resumeD1Import(job.id, ctx);
   const changed = { ...mapping, map: (record: any) => ({ effects: [{ ...mapping.map(record).effects[0], value: { email: 'changed@example.test', evidence: 'different' } }] }) };
@@ -102,8 +104,8 @@ test('real D1: changed source identity refuses overwrite and failed postconditio
   const bad = { ...targets, write(row: any) { return targets.write(row).slice(0, 1); } };
   await assert.rejects(resumeD1Import(other.id, { ...ctx, storage: { ...ctx.storage, targets: bad } }), /IMPORT_ATOMIC_GUARD/);
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM contacts').first())?.n, 0);
-});
-test('real D1: native edit after undo preflight and malformed provenance preserve native state', async t => {
+}]);
+familyRows[1].push(['real D1: native edit after undo preflight and malformed provenance preserve native state', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx, 1);
   await resumeD1Import(job.id, ctx);
   let edited = false;
@@ -113,8 +115,8 @@ test('real D1: native edit after undo preflight and malformed provenance preserv
   await r.db().prepare("UPDATE ik_provenance SET target_id='corrupt'").run();
   await assert.rejects(readD1PersistedImport(ctx), /PROVENANCE_STORAGE_MISMATCH/);
   await assert.rejects(resumeD1Import(job.id, ctx), /PROVENANCE_STORAGE_MISMATCH/);
-});
-test('real D1: sequential imports transfer attribution and newer undo restores the original ownership chain', async t => {
+}]);
+familyRows[3].push(['real D1: sequential imports transfer attribution and newer undo restores the original ownership chain', async t => {
   const r = await runtime(t), ctx = r.context(), first = await create(ctx, 1);
   await resumeD1Import(first.id, ctx);
   const original = await targets.read(r.db(), 'workspace', 'contact', '0');
@@ -136,8 +138,8 @@ test('real D1: sequential imports transfer attribution and newer undo restores t
   assert.equal((await readD1ImportOriginals(second.id, r.context())).length, 1);
   await undoD1Import(first.id, r.context());
   assert.equal((await targets.read(r.db(), 'workspace', 'contact', '0')), undefined);
-});
-test('real D1: history transfer rolls back with failed effects and current authority; native edit blocks successor undo', async t => {
+}]);
+familyRows[3].push(['real D1: history transfer rolls back with failed effects and current authority; native edit blocks successor undo', async t => {
   const r = await runtime(t), ctx = r.context(), first = await create(ctx, 1);
   await resumeD1Import(first.id, ctx);
   const original = await targets.read(r.db(), 'workspace', 'contact', '0');
@@ -154,8 +156,8 @@ test('real D1: history transfer rolls back with failed effects and current autho
   await assert.rejects(undoD1Import(next.id, ctx), /NATIVE_EDIT_CONFLICT/);
   await assert.rejects(undoD1Import(first.id, ctx), /IMPORT_SUPERSEDED/);
   assert.equal((await r.db().prepare('SELECT detail FROM evidence').first())?.detail, 'native edit');
-});
-test('real D1: multiple target transfers from one predecessor are atomic and reversal restarts across batches', async t => {
+}]);
+familyRows[3].push(['real D1: multiple target transfers from one predecessor are atomic and reversal restarts across batches', async t => {
   const r = await runtime(t), ctx = { ...r.context(), batchSize: 3 }, first = await create(ctx, 3);
   await resumeD1Import(first.id, ctx);
   const prior = await targets.list(r.db(), ctx.destination);
@@ -171,8 +173,8 @@ test('real D1: multiple target transfers from one predecessor are atomic and rev
   assert.deepEqual(await targets.list(r.db(), ctx.destination), prior);
   await undoD1Import(first.id, r.context());
   assert.equal((await targets.list(r.db(), ctx.destination)).length, 0);
-});
-test('real D1: competing successors have one ownership winner and three-layer undo restores each exact state', async t => {
+}]);
+familyRows[3].push(['real D1: competing successors have one ownership winner and three-layer undo restores each exact state', async t => {
   const r = await runtime(t), ctx = r.context(), first = await create(ctx, 1);
   await resumeD1Import(first.id, ctx);
   const original = await targets.read(r.db(), ctx.destination, 'contact', '0');
@@ -193,8 +195,8 @@ test('real D1: competing successors have one ownership winner and three-layer un
   await undoD1Import(third.id, ctx); assert.deepEqual(await targets.read(r.db(), ctx.destination, 'contact', '0'), middle);
   await undoD1Import(winner.id, ctx); assert.deepEqual(await targets.read(r.db(), ctx.destination, 'contact', '0'), original);
   await undoD1Import(first.id, ctx); assert.equal(await targets.read(r.db(), ctx.destination, 'contact', '0'), undefined);
-});
-test('real D1: missing predecessor custody prevents successor undo from losing attribution', async t => {
+}]);
+familyRows[3].push(['real D1: missing predecessor custody prevents successor undo from losing attribution', async t => {
   const r = await runtime(t), ctx = r.context(), first = await create(ctx, 1); await resumeD1Import(first.id, ctx);
   const original = await targets.read(r.db(), ctx.destination, 'contact', '0');
   const input = source(1); input.records[0].sourceId = 'next-original';
@@ -204,4 +206,12 @@ test('real D1: missing predecessor custody prevents successor undo from losing a
   await assert.rejects(undoD1Import(next.id, ctx), /IMPORT_HISTORY_MISMATCH/);
   assert.equal((await r.db().prepare('SELECT detail FROM evidence').first())?.detail, 'cleaned');
   assert.equal((await readD1PersistedImport(ctx)).provenance[0].jobId, next.id);
-});
+}]);
+
+ test("D1 publication keeps atomic bounded progress and current authority", async t => { await caseRows(t, familyRows[0]); });
+
+ test("D1 reversal refuses native edits before changing targets", async t => { await caseRows(t, familyRows[1]); });
+
+ test("D1 custody refuses changed plans or missing attribution", async t => { await caseRows(t, familyRows[2]); });
+
+ test("D1 ownership transfer and reversal retain the exact publisher chain", async t => { await caseRows(t, familyRows[3]); });

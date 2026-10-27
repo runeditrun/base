@@ -1,3 +1,6 @@
+import { planAggregateRows } from './helpers/plan-size-aggregate-cases.ts';
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Json } from '../src/types.ts';
@@ -22,7 +25,7 @@ const unsafeSizeError = (error: unknown) => {
   return true;
 };
 
-test('bounded shared DAG fixtures agree with a small serialization oracle and BigInt recurrence', () => {
+familyRows[0].push(['bounded shared DAG fixtures agree with a small serialization oracle and BigInt recurrence', () => {
   for (let bytes = 1n; bytes <= 200n; bytes++) {
     const value = logicalValue(bytes);
     assert.equal(BigInt(Buffer.byteLength(JSON.stringify(value))), bytes);
@@ -34,7 +37,7 @@ test('bounded shared DAG fixtures agree with a small serialization oracle and Bi
     assert.equal(BigInt(canonicalJsonBytes(logicalValue(bytes))), bytes);
   }
   assert.throws(() => canonicalJsonBytes(logicalValue(safe + 1n)), unsafeSizeError);
-});
+}]);
 
 const scenarios = [
   {
@@ -85,7 +88,7 @@ const scenarios = [
 // Each budget operation keeps its exact boundary and first unsafe sum. Larger
 // overflows take the same checkedSizeSum refusal path.
 for (const scenario of scenarios) for (const overflow of [0n, 1n]) {
-  test(`${scenario.name} ${overflow ? `rejects safe-range overflow +${overflow}` : 'reports the exact safe-integer boundary'}`, () => {
+  familyRows[0].push([`${scenario.name} ${overflow ? `rejects safe-range overflow +${overflow}` : 'reports the exact safe-integer boundary'}`, () => {
     const small = scenario.make();
     small.apply('');
     const expected = safe + overflow;
@@ -101,10 +104,10 @@ for (const scenario of scenarios) for (const overflow of [0n, 1n]) {
       large.apply(value);
       assert.throws(() => large.budget.assert(), exactCapError(expected));
     }
-  });
+  }]);
 }
 
-test('replacement shrinking and signed counter deltas stay exact through the inclusive cap', () => {
+familyRows[0].push(['replacement shrinking and signed counter deltas stay exact through the inclusive cap', () => {
   const plan = emptyPlan(); plan.counts.effects = 9;
   const budget = new PlanSizeBudget(plan), initialBytes = serializedContentBytes(plan);
   const hugeBytes = safe - initialBytes + 2n;
@@ -120,9 +123,9 @@ test('replacement shrinking and signed counter deltas stay exact through the inc
   budget.assert();
   budget.increment('input', 9); // 1 -> 10 adds exactly one canonical byte.
   assert.throws(() => budget.assert(), exactCapError(300_000_001n));
-});
+}]);
 
-test('all numeric counters and arithmetic inputs reject unsafe or nonfinite sums', () => {
+familyRows[0].push(['all numeric counters and arithmetic inputs reject unsafe or nonfinite sums', () => {
   assert.equal(checkedSizeSum(Number(safe), -Number(safe)), 0);
   assert.equal(checkedSizeSum(-Number(safe), Number(safe) - 1), -1);
   for (const invalid of [NaN, Infinity, -Infinity, 0.5, Number(safe + 1n)]) {
@@ -143,9 +146,9 @@ test('all numeric counters and arithmetic inputs reject unsafe or nonfinite sums
   const budget = new PlanSizeBudget(plan);
   assert.throws(() => budget.entry(entry()), unsafeSizeError);
   assert.equal(plan.counts.byKind.item, Number(safe));
-});
+}]);
 
-test('cycle and depth guards keep rejecting before a budget can admit malformed JSON', () => {
+familyRows[0].push(['cycle and depth guards keep rejecting before a budget can admit malformed JSON', () => {
   const cycle: Json[] = []; cycle.push(cycle);
   let deep: Json = '';
   for (let i = 0; i < 256; i++) deep = [deep];
@@ -157,4 +160,6 @@ test('cycle and depth guards keep rejecting before a budget can admit malformed 
     assert.throws(() => budget.replace(2, value), /INVALID_JSON: cyclic or excessively nested durable value/);
     budget.assert();
   }
-});
+}]);
+
+ test("plan-size admission preserves exact safe-integer totals before mapper encoding", async t => { await caseRows(t, [...familyRows[0], ...planAggregateRows[0]]); });
