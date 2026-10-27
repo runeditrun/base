@@ -28,25 +28,37 @@ export class DatabaseSync extends NativeDatabaseSync {
   }
   close() { try { return super.close(); } finally { this.patterns.close(); } }
   preflight(sql, args = []) { d1Preflight(sql, args, table => d1ColumnCount(table, text => NativeDatabaseSync.prototype.prepare.call(this, text).all(), 'table_xinfo')); }
-  guard(query) { guardD1Rows(this, sql => super.prepare(sql), sql => super.exec(sql), query ? true : undefined); }
+  guard(changingSchema = false) { guardD1Rows(this, sql => super.prepare(sql), sql => super.exec(sql), undefined, changingSchema); }
   exec(sql) {
     this.preflight(sql);
-    const changingSchema = schemaEdit(sql);
-    if (changingSchema) super.exec('SAVEPOINT rer_d1_schema');
-    this.guard(schemaEdit(sql));
-    try {
-      const result = super.exec(sql);
-      // A multi-statement exec can write while schema guards are suspended.
-      // Check its final rows before releasing the atomic schema edit.
-      if (changingSchema) {
-        guardD1Rows(this, text => super.prepare(text));
-        super.exec('RELEASE rer_d1_schema');
-      }
-      return result;
-    } catch (error) {
-      if (changingSchema) { super.exec('ROLLBACK TO rer_d1_schema'); super.exec('RELEASE rer_d1_schema'); }
-      throw error;
-    } finally { this.guard(); }
+    if (!schemaEdit(sql)) {
+      this.guard();
+      try { return super.exec(sql); } finally { this.guard(); }
+    }
+    // Let SQLite identify statement boundaries, including trigger bodies.
+    // Execute transaction control in its original order, and guard each schema
+    // edit separately so an error later in exec retains earlier effects.
+    let remaining = sql;
+    while (!/^(?:\s|;|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*$/.test(remaining)) {
+      this.guard(schemaEdit(remaining));
+      let text;
+      try { text = super.prepare(remaining).sourceSQL; }
+      catch (error) { this.guard(); throw error; }
+      const changingSchema = schemaEdit(text);
+      this.guard(changingSchema);
+      if (changingSchema) super.exec('SAVEPOINT rer_d1_schema');
+      try {
+        super.exec(text);
+        if (changingSchema) {
+          guardD1Rows(this, query => super.prepare(query));
+          super.exec('RELEASE rer_d1_schema');
+        }
+      } catch (error) {
+        if (changingSchema) { super.exec('ROLLBACK TO rer_d1_schema'); super.exec('RELEASE rer_d1_schema'); }
+        throw error;
+      } finally { this.guard(); }
+      remaining = remaining.slice(text.length);
+    }
   }
   prepare(sql) {
     this.preflight(sql);

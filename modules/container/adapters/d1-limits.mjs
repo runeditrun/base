@@ -163,11 +163,11 @@ export function createD1RowGuard() {
     : `(${sum(terms.slice(0, terms.length >> 1))}+${sum(terms.slice(terms.length >> 1))})`;
   const state = new WeakMap();
   const key = name => name.replace(/[A-Z]/g, char => char.toLowerCase());
-  return function guardD1Rows(db, prepare, exec, query) {
+  return function guardD1Rows(db, prepare, exec, query, schemaEdit = false) {
     // Internal TEMP triggers must not participate in application schema edits.
     // SQLite validates every trigger when a column is dropped, even though
     // these guards will be regenerated against the resulting schema.
-    if (exec && query === true) {
+    if (exec && schemaEdit) {
       for (const name of state.get(db)?.names ?? []) exec(`DROP TRIGGER IF EXISTS temp.${quote(name)}`);
       state.delete(db);
       return;

@@ -109,17 +109,31 @@ test('shared D1 reset removes prior-case state and restores seeded schema and pr
         await assert.rejects(connection.prepare('INSERT INTO synthetic_base_alter VALUES(?)').bind('x'.repeat(1999996)).run(), /table row bytes maximum 2000000, measured 2000001/);
         assert.equal((await connection.prepare('SELECT count(*) AS n FROM synthetic_base_alter').first())?.n, 1);
         const longNames = Array.from({length:99},(_,i)=>'c'+i+'_'+'x'.repeat(550));
-        await connection.prepare('CREATE TABLE synthetic_base_wide(id INTEGER PRIMARY KEY,'+longNames.map(name=>'"'+name+'" TEXT').join(',')+')').run();
-        const insertWide = 'INSERT INTO synthetic_base_wide VALUES('+Array(100).fill('?').join(',')+')';
-        const wideValues = longNames.map(()=> 'x'.repeat(20199));
-        wideValues[0] = wideValues[0].slice(1);
-        await connection.prepare(insertWide).bind(1,...wideValues).run();
-        wideValues[0] += 'x';
-        await assert.rejects(connection.prepare(insertWide).bind(2,...wideValues).run(), /table row bytes maximum 2000000, measured 2000001/);
-        assert.equal((await connection.prepare('SELECT count(*) AS n FROM synthetic_base_wide').first())?.n, 1);
+        for (const suffix of ['', '_without']) {
+          const table = 'synthetic_base_wide'+suffix;
+          await connection.prepare('CREATE TABLE '+table+'(id INTEGER PRIMARY KEY,'+longNames.map(name=>'"'+name+'" TEXT').join(',')+')'+(suffix?' WITHOUT ROWID':'')).run();
+          await connection.prepare('CREATE INDEX '+table+'_cover ON '+table+'("'+longNames[0]+'")').run();
+          const insertWide = 'INSERT INTO '+table+' VALUES('+Array(100).fill('?').join(',')+')';
+          const wideValues = longNames.map(()=> 'x'.repeat(20199));
+          wideValues[0] = wideValues[0].slice(1);
+          await connection.prepare(insertWide).bind(0,...wideValues).run();
+          wideValues[0] += 'x';
+          await assert.rejects(connection.prepare(insertWide).bind(1,...wideValues).run(), /table row bytes maximum 2000000, measured 2000001/);
+          assert.equal((await connection.prepare('SELECT count(*) AS n FROM '+table).first())?.n, 1);
+        }
         assert.equal((await connection.prepare(`SELECT max(${Array(32).fill(1).join(',')}) AS value`).first())?.value, 1);
         await assert.rejects(connection.prepare(`SELECT max(${Array(33).fill(1).join(',')})`).first(), /D1 limit exceeded: SQL function arguments maximum 32, measured 33/);
       }
+      const { DatabaseSync } = await import('../../container/adapters/d1-sqlite.mjs');
+      const schemaDb = new DatabaseSync(':memory:');
+      try {
+        schemaDb.exec("BEGIN; CREATE TABLE synthetic_base_1(a TEXT,b TEXT); INSERT INTO synthetic_base_1 VALUES('retained',NULL); ALTER TABLE synthetic_base_1 DROP COLUMN b; COMMIT; -- trailing comment");
+        assert.equal(schemaDb.prepare('SELECT a FROM synthetic_base_1').get()?.a, 'retained');
+        assert.throws(()=>schemaDb.exec('ALTER TABLE synthetic_base_1 ADD COLUMN b TEXT; SELECT * FROM synthetic_base_missing'), /no such table/);
+        assert.equal(schemaDb.prepare('PRAGMA table_info(synthetic_base_1)').all().length, 2);
+        assert.throws(()=>schemaDb.exec("ALTER TABLE synthetic_base_1 DROP COLUMN b; INSERT INTO synthetic_base_1 VALUES(printf('%.*c',1999996,'x'))"), /table row bytes maximum 2000000, measured 2000001/);
+        assert.equal(schemaDb.prepare('SELECT count(*) AS n FROM synthetic_base_1').get()?.n, 1);
+      } finally { schemaDb.close(); }
       t.diagnostic('Statement bytes 100000 PASS, 100001 rejected; per-statement binds 100 PASS, 101 rejected, two 100-bind batch statements PASS; UTF-8 strings and BLOBs 2000000 PASS, 2000001 rejected; encoded rows 2000000 PASS, 2000001 rejected without a write.');
       t.diagnostic('Native workerd and preflight agree: depth 100 PASS, 101 rejected; columns 100 PASS, 101 rejected; LIKE and GLOB 50 PASS, 51 rejected. Function arguments 33 pass native workerd and are rejected only by preflight.');
     } finally { await node.close(); }
