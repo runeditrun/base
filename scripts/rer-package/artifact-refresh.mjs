@@ -23,14 +23,14 @@ function snapshot(root) {
  }
  walk(root); return files;
 }
-function imports(seed, record, specifiers, resolve) {
+function imports(seed, record, dependencies, resolve) {
  const disk = {has: name => { try { return lstatSync(join(seed, name)).isFile(); } catch (error) { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false; throw error; } }};
  return record.copies.flatMap(copy => Object.keys(copy.files)).filter(name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && disk.has(name))
-  .flatMap(name => specifiers(readFileSync(join(seed, name), 'utf8')).map(specifier => ({path: name, specifier, target: resolve(disk, name, specifier)})));
+  .flatMap(name => dependencies(readFileSync(join(seed, name), 'utf8')).map(request => ({path: name, ...request, target: resolve(disk, name, request.specifier, request)})));
 }
 export async function refreshSmoke({root, installed, base, ref, run, output}) {
  const cli = join(installed, 'edition-authoring/cli.mjs');
- const {specifiers, resolve} = await import(pathToFileURL(join(installed, 'edition-authoring/runtime-dependencies.mjs')));
+ const {dependencies, resolve} = await import(pathToFileURL(join(installed, 'edition-authoring/runtime-dependencies.mjs')));
  const data = JSON.parse(run('git', ['-C', base, 'show', `${ref}:foundation/edition-migrations.json`]));
  const consent = data.migrations.flatMap(step => ['--edition-migration', step.id]);
  return seeds.map(([seedRepository, seedRevision]) => {
@@ -39,7 +39,7 @@ export async function refreshSmoke({root, installed, base, ref, run, output}) {
   run('git', ['-C', seed, 'checkout', '--quiet', '--detach', seedRevision]);
   const recordPath = join(seed, 'base-copies.json');
   const record = () => JSON.parse(readFileSync(recordPath));
-  const unresolved = new Set(imports(seed, record(), specifiers, resolve).filter(edge => !edge.target).map(edge => edge.path + '\0' + edge.specifier));
+  const unresolved = new Set(imports(seed, record(), dependencies, resolve).filter(edge => !edge.target).map(edge => edge.path + '\0' + edge.specifier));
   const attempts = [];
   for (const flags of [[], consent]) {
    const before = snapshot(seed);
@@ -51,7 +51,7 @@ export async function refreshSmoke({root, installed, base, ref, run, output}) {
     attempts.push({consent: flags.length > 0, refused: true, exit: error.cause.status, error: error.message});
     continue;
    }
-   const modules = imports(seed, record(), specifiers, resolve);
+   const modules = imports(seed, record(), dependencies, resolve);
    for (const edge of modules) assert.ok(edge.target || unresolved.has(edge.path + '\0' + edge.specifier), `${edge.path}: new unresolved relative import ${edge.specifier}`);
    const local = join(seed, 'scripts/edition-authoring/cli.mjs');
    for (const entry of [local, cli]) {

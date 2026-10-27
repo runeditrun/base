@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gf7ba2500",
+  "cliVersion": "0.2.83-dev.gabc062e4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1207,7 +1207,7 @@
     },
     "edition-authoring/module-resolution.mjs": {
       "source": "edition-authoring/module-resolution.mjs",
-      "sha256": "5c195b51ab81de6dd00d37cec9bc7779ce211302f182cd4c0f4ab07afddd5878"
+      "sha256": "b2b8b52d07cbc72b3b73b6dcaf2ecac3a6c7c85262291b08c49ca2ae7cacd0bf"
     },
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
@@ -1227,7 +1227,7 @@
     },
     "edition-authoring/runtime-dependencies.mjs": {
       "source": "edition-authoring/runtime-dependencies.mjs",
-      "sha256": "9c9ee83ccc335e0a36fcb6fb1cc996e2fd583c62364c862d06615ebb18c7e74c"
+      "sha256": "204304246e8535731f5c2f785549bbd75f85bd4b8eebfae6b97cc2410c83021b"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",
@@ -1380,6 +1380,10 @@
     "edition-authoring/vendor/yaml/nodes/toJS.js": {
       "source": "edition-authoring/vendor/yaml/nodes/toJS.js",
       "sha256": "80f2431eaef0c531ab93b1a8883206394ae3fac75732cc683cdabfdcc00dd724"
+    },
+    "edition-authoring/vendor/yaml/package.json": {
+      "source": "edition-authoring/vendor/yaml/package.json",
+      "sha256": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a"
     },
     "edition-authoring/vendor/yaml/parse/cst-scalar.js": {
       "source": "edition-authoring/vendor/yaml/parse/cst-scalar.js",
@@ -1543,7 +1547,7 @@
     },
     "edition-authoring/workflow-scripts.mjs": {
       "source": "edition-authoring/workflow-scripts.mjs",
-      "sha256": "0b24a43fc86ebbced54131f6d733dd83f56c8e27244dc367979cb7151d0ea0bb"
+      "sha256": "aa77308dc5e3372fcdee677196351f71b94bd46c78a9a9b5bf653e23739d46ad"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",

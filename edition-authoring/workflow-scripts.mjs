@@ -1,3 +1,5 @@
+// This package scope is a runtime input when bootstrapped into a CommonJS seed.
+import './vendor/yaml/package.json' with {type: 'json'};
 import {parseDocument, isMap, isSeq, isScalar} from './vendor/yaml/index.js';
 
 // YAML owns scalar decoding, folding, indentation, aliases and flow syntax.

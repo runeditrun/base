@@ -10,9 +10,9 @@ const sourceExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', 
 export function resolve(tree, source, specifier, {types = false, kind = 'import', manifests = new Set()} = {}) {
   if (!specifier.startsWith('.')) return;
   types ||= declaration(source);
-  const relative = specifier.split(/[?#]/)[0];
-  if (/%2f|%5c/i.test(relative)) throw Error(`Invalid encoded separator in module specifier ${specifier}`);
-  const name = path.posix.normalize(path.posix.join(path.posix.dirname(source), decodeURIComponent(relative)));
+  const relative = kind === 'require' ? specifier : specifier.split(/[?#]/)[0];
+  if (kind !== 'require' && /%2f|%5c/i.test(relative)) throw Error(`Invalid encoded separator in module specifier ${specifier}`);
+  const name = path.posix.normalize(path.posix.join(path.posix.dirname(source), kind === 'require' ? relative : decodeURIComponent(relative)));
   const sourceModule = /\.(?:[cm]?ts|[jt]sx)$/.test(source);
   const file = candidate => (types || !declaration(candidate)) && tree.has(candidate) ? candidate : undefined;
   if (!types && declaration(name)) return;

@@ -7,7 +7,7 @@ export function dependencies(source) {
   const t = tokens(source), result = [];
   const add = (token, kind, types = false) => {
     const specifier = unquote(token);
-    if (specifier?.startsWith('.')) result.push({specifier: specifier.split(/[?#]/)[0], kind, types});
+    if (specifier?.startsWith('.')) result.push({specifier: kind === 'require' ? specifier : specifier.split(/[?#]/)[0], kind, types});
   };
   for (let i = 0; i < t.length; i++) {
     const word = t[i];
