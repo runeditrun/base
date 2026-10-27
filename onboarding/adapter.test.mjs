@@ -91,9 +91,10 @@ test('feature flags must describe the hooks the adapter really runs', () => {
 test('a complete install generates private settings, hides them from the build, claims the owner and opens the application', async t => {
  // Cross a server-side idle close through the same public transport as readiness
  // and owner claims. POST must arrive exactly once; replay is unsafe.
- const received = [], connections = new Set();
+ const received = [], connections = new Set(), headers = [];
  const server = http.createServer((request, response) => {
   connections.add(request.socket);
+  headers.push({ connection: request.headers.connection, marker: request.headers['x-base-test'] });
   request.resume();
   request.on('end', () => { received.push(request.method); response.end('synthetic-base-1'); });
  });
@@ -101,13 +102,17 @@ test('a complete install generates private settings, hides them from the build, 
  t.after(() => { server.closeAllConnections(); server.close(); });
  const origin = 'http://127.0.0.1:' + server.address().port;
  for (let pair = 0; pair < 20; pair++) {
-  assert.equal(await (await appFetch(origin)).text(), 'synthetic-base-1');
+  assert.equal(await (await appFetch(new Request(origin, { headers: { connection: 'keep-alive', 'x-base-test': 'synthetic-base-3' } }))).text(), 'synthetic-base-1');
   server.closeIdleConnections();
   try {
-   assert.equal(await (await appFetch(origin, { method: 'POST', body: 'synthetic-base-2' })).text(), 'synthetic-base-1');
+   assert.equal(await (await appFetch(new URL(origin), { method: 'POST', body: 'synthetic-base-2', headers: new Headers({ connection: 'keep-alive', 'x-base-test': 'synthetic-base-4' }) })).text(), 'synthetic-base-1');
   } catch (error) { t.diagnostic(`idle-close transport cause: ${error.cause?.code}`); throw error; }
  }
  assert.equal(connections.size, 40, 'each request owns a fresh connection');
+ assert.deepEqual(headers, Array.from({ length: 20 }, () => [
+  { connection: 'close', marker: 'synthetic-base-3' },
+  { connection: 'close', marker: 'synthetic-base-4' },
+ ]).flat(), 'Request and init headers survive while keep-alive is overridden');
  assert.deepEqual(received, Array.from({ length: 20 }, () => ['GET', 'POST']).flat(), 'no request was replayed');
  t.diagnostic('20 idle-close pairs; 40 distinct connections; 40 requests, no replay');
  const f = await fixture(t);

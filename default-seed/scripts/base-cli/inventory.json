@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.g161b7d5b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -37,7 +37,7 @@
     },
     "app-fetch.mjs": {
       "source": "onboarding/app-fetch.mjs",
-      "sha256": "7287abade33ed9cf50d9b915da924f7e1c4fc37ff22833b8292193418544d64d"
+      "sha256": "5ba750eabd99ad84d8f0b5545f673b6bf1bcc2755a75d1181e41a3fb4587507a"
     },
     "app-processes.mjs": {
       "source": "onboarding/app-processes.mjs",
