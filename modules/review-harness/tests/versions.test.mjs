@@ -1,3 +1,4 @@
+import { namedSteps } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, symlink, writeFile, realpath } from 'node:fs/promises';
@@ -25,12 +26,18 @@ async function project(t, wrong) {
   return directory;
 }
 
-for (const wrong of Object.keys(PINS)) {
-  test(`wrong resolved ${wrong} is refused and names all expected pins`, async t => {
-    const directory = await project(t, wrong);
-    assert.throws(() => resolveVersions(directory), error => Object.entries(PINS).every(([name, version]) => error.message.includes(`${name} ${version}`)) && /mismatch/.test(error.message));
+test("dependency resolution refuses mismatched or unavailable packages with guidance", async t => {
+  const step = namedSteps(t);
+  for (const wrong of Object.keys(PINS)) {
+    await step(`wrong resolved ${wrong} is refused and names all expected pins`, async t => {
+      const directory = await project(t, wrong);
+      assert.throws(() => resolveVersions(directory), error => Object.entries(PINS).every(([name, version]) => error.message.includes(`${name} ${version}`)) && /mismatch/.test(error.message));
+    });
+  }
+  
+  await step('missing dependencies are refused with pin guidance', () => {
+    assert.throws(() => resolveVersions('/nonexistent-review-consumer'), /expected @playwright\/test 1\.63\.0, @axe-core\/playwright 4\.13\.0/);
   });
-}
-test('missing dependencies are refused with pin guidance', () => {
-  assert.throws(() => resolveVersions('/nonexistent-review-consumer'), /expected @playwright\/test 1\.63\.0, @axe-core\/playwright 4\.13\.0/);
-});
+})
+
+
